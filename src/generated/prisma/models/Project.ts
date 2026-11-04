@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,17 +27,17 @@ export type AggregateProject = {
 }
 
 export type ProjectAvgAggregateOutputType = {
-  pagu: runtime.Decimal | null
-  landArea: runtime.Decimal | null
+  pagu: number | null
+  landArea: number | null
   progress: number | null
-  budget: runtime.Decimal | null
+  budget: number | null
 }
 
 export type ProjectSumAggregateOutputType = {
-  pagu: runtime.Decimal | null
-  landArea: runtime.Decimal | null
+  pagu: bigint | null
+  landArea: bigint | null
   progress: number | null
-  budget: runtime.Decimal | null
+  budget: bigint | null
 }
 
 export type ProjectMinAggregateOutputType = {
@@ -49,8 +49,8 @@ export type ProjectMinAggregateOutputType = {
   kelompokTani: string | null
   address: string | null
   jenisPekerjaan: string | null
-  pagu: runtime.Decimal | null
-  landArea: runtime.Decimal | null
+  pagu: bigint | null
+  landArea: bigint | null
   progress: number | null
   priority: $Enums.ProjectPriority | null
   vendor: string | null
@@ -59,7 +59,7 @@ export type ProjectMinAggregateOutputType = {
   status: $Enums.ProjectStatus | null
   startDate: Date | null
   endDate: Date | null
-  budget: runtime.Decimal | null
+  budget: bigint | null
   fieldPicId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -74,8 +74,8 @@ export type ProjectMaxAggregateOutputType = {
   kelompokTani: string | null
   address: string | null
   jenisPekerjaan: string | null
-  pagu: runtime.Decimal | null
-  landArea: runtime.Decimal | null
+  pagu: bigint | null
+  landArea: bigint | null
   progress: number | null
   priority: $Enums.ProjectPriority | null
   vendor: string | null
@@ -84,7 +84,7 @@ export type ProjectMaxAggregateOutputType = {
   status: $Enums.ProjectStatus | null
   startDate: Date | null
   endDate: Date | null
-  budget: runtime.Decimal | null
+  budget: bigint | null
   fieldPicId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -302,8 +302,8 @@ export type ProjectGroupByOutputType = {
   kelompokTani: string
   address: string
   jenisPekerjaan: string | null
-  pagu: runtime.Decimal
-  landArea: runtime.Decimal | null
+  pagu: bigint
+  landArea: bigint | null
   progress: number
   priority: $Enums.ProjectPriority
   vendor: string | null
@@ -312,7 +312,7 @@ export type ProjectGroupByOutputType = {
   status: $Enums.ProjectStatus
   startDate: Date | null
   endDate: Date | null
-  budget: runtime.Decimal | null
+  budget: bigint | null
   fieldPicId: string | null
   createdAt: Date
   updatedAt: Date
@@ -323,7 +323,7 @@ export type ProjectGroupByOutputType = {
   _max: ProjectMaxAggregateOutputType | null
 }
 
-export type GetProjectGroupByPayload<T extends ProjectGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectGroupByPayload<T extends ProjectGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectGroupByOutputType, T['by']> &
       {
@@ -350,8 +350,8 @@ export type ProjectWhereInput = {
   kelompokTani?: Prisma.StringFilter<"Project"> | string
   address?: Prisma.StringFilter<"Project"> | string
   jenisPekerjaan?: Prisma.StringNullableFilter<"Project"> | string | null
-  pagu?: Prisma.DecimalFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.DecimalNullableFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFilter<"Project"> | bigint | number
+  landArea?: Prisma.BigIntNullableFilter<"Project"> | bigint | number | null
   progress?: Prisma.FloatFilter<"Project"> | number
   priority?: Prisma.EnumProjectPriorityFilter<"Project"> | $Enums.ProjectPriority
   vendor?: Prisma.StringNullableFilter<"Project"> | string | null
@@ -360,7 +360,7 @@ export type ProjectWhereInput = {
   status?: Prisma.EnumProjectStatusFilter<"Project"> | $Enums.ProjectStatus
   startDate?: Prisma.DateTimeNullableFilter<"Project"> | Date | string | null
   endDate?: Prisma.DateTimeNullableFilter<"Project"> | Date | string | null
-  budget?: Prisma.DecimalNullableFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.BigIntNullableFilter<"Project"> | bigint | number | null
   fieldPicId?: Prisma.StringNullableFilter<"Project"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Project"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Project"> | Date | string
@@ -396,19 +396,19 @@ export type ProjectOrderByWithRelationInput = {
   isDeleted?: Prisma.SortOrder
   kelompokTani?: Prisma.SortOrder
   address?: Prisma.SortOrder
-  jenisPekerjaan?: Prisma.SortOrderInput | Prisma.SortOrder
+  jenisPekerjaan?: Prisma.SortOrder
   pagu?: Prisma.SortOrder
-  landArea?: Prisma.SortOrderInput | Prisma.SortOrder
+  landArea?: Prisma.SortOrder
   progress?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  vendor?: Prisma.SortOrderInput | Prisma.SortOrder
-  clientName?: Prisma.SortOrderInput | Prisma.SortOrder
-  location?: Prisma.SortOrderInput | Prisma.SortOrder
+  vendor?: Prisma.SortOrder
+  clientName?: Prisma.SortOrder
+  location?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  startDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  endDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  budget?: Prisma.SortOrderInput | Prisma.SortOrder
-  fieldPicId?: Prisma.SortOrderInput | Prisma.SortOrder
+  startDate?: Prisma.SortOrder
+  endDate?: Prisma.SortOrder
+  budget?: Prisma.SortOrder
+  fieldPicId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   fieldPic?: Prisma.UserOrderByWithRelationInput
@@ -447,8 +447,8 @@ export type ProjectWhereUniqueInput = Prisma.AtLeast<{
   kelompokTani?: Prisma.StringFilter<"Project"> | string
   address?: Prisma.StringFilter<"Project"> | string
   jenisPekerjaan?: Prisma.StringNullableFilter<"Project"> | string | null
-  pagu?: Prisma.DecimalFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.DecimalNullableFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFilter<"Project"> | bigint | number
+  landArea?: Prisma.BigIntNullableFilter<"Project"> | bigint | number | null
   progress?: Prisma.FloatFilter<"Project"> | number
   priority?: Prisma.EnumProjectPriorityFilter<"Project"> | $Enums.ProjectPriority
   vendor?: Prisma.StringNullableFilter<"Project"> | string | null
@@ -457,7 +457,7 @@ export type ProjectWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.EnumProjectStatusFilter<"Project"> | $Enums.ProjectStatus
   startDate?: Prisma.DateTimeNullableFilter<"Project"> | Date | string | null
   endDate?: Prisma.DateTimeNullableFilter<"Project"> | Date | string | null
-  budget?: Prisma.DecimalNullableFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.BigIntNullableFilter<"Project"> | bigint | number | null
   fieldPicId?: Prisma.StringNullableFilter<"Project"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Project"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Project"> | Date | string
@@ -493,19 +493,19 @@ export type ProjectOrderByWithAggregationInput = {
   isDeleted?: Prisma.SortOrder
   kelompokTani?: Prisma.SortOrder
   address?: Prisma.SortOrder
-  jenisPekerjaan?: Prisma.SortOrderInput | Prisma.SortOrder
+  jenisPekerjaan?: Prisma.SortOrder
   pagu?: Prisma.SortOrder
-  landArea?: Prisma.SortOrderInput | Prisma.SortOrder
+  landArea?: Prisma.SortOrder
   progress?: Prisma.SortOrder
   priority?: Prisma.SortOrder
-  vendor?: Prisma.SortOrderInput | Prisma.SortOrder
-  clientName?: Prisma.SortOrderInput | Prisma.SortOrder
-  location?: Prisma.SortOrderInput | Prisma.SortOrder
+  vendor?: Prisma.SortOrder
+  clientName?: Prisma.SortOrder
+  location?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  startDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  endDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  budget?: Prisma.SortOrderInput | Prisma.SortOrder
-  fieldPicId?: Prisma.SortOrderInput | Prisma.SortOrder
+  startDate?: Prisma.SortOrder
+  endDate?: Prisma.SortOrder
+  budget?: Prisma.SortOrder
+  fieldPicId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ProjectCountOrderByAggregateInput
@@ -527,8 +527,8 @@ export type ProjectScalarWhereWithAggregatesInput = {
   kelompokTani?: Prisma.StringWithAggregatesFilter<"Project"> | string
   address?: Prisma.StringWithAggregatesFilter<"Project"> | string
   jenisPekerjaan?: Prisma.StringNullableWithAggregatesFilter<"Project"> | string | null
-  pagu?: Prisma.DecimalWithAggregatesFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.DecimalNullableWithAggregatesFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntWithAggregatesFilter<"Project"> | bigint | number
+  landArea?: Prisma.BigIntNullableWithAggregatesFilter<"Project"> | bigint | number | null
   progress?: Prisma.FloatWithAggregatesFilter<"Project"> | number
   priority?: Prisma.EnumProjectPriorityWithAggregatesFilter<"Project"> | $Enums.ProjectPriority
   vendor?: Prisma.StringNullableWithAggregatesFilter<"Project"> | string | null
@@ -537,7 +537,7 @@ export type ProjectScalarWhereWithAggregatesInput = {
   status?: Prisma.EnumProjectStatusWithAggregatesFilter<"Project"> | $Enums.ProjectStatus
   startDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Project"> | Date | string | null
   endDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Project"> | Date | string | null
-  budget?: Prisma.DecimalNullableWithAggregatesFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.BigIntNullableWithAggregatesFilter<"Project"> | bigint | number | null
   fieldPicId?: Prisma.StringNullableWithAggregatesFilter<"Project"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Project"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Project"> | Date | string
@@ -552,8 +552,8 @@ export type ProjectCreateInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -562,7 +562,7 @@ export type ProjectCreateInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -598,8 +598,8 @@ export type ProjectUncheckedCreateInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -608,7 +608,7 @@ export type ProjectUncheckedCreateInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -636,7 +636,6 @@ export type ProjectUncheckedCreateInput = {
 }
 
 export type ProjectUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -644,8 +643,8 @@ export type ProjectUpdateInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -654,7 +653,7 @@ export type ProjectUpdateInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -682,7 +681,6 @@ export type ProjectUpdateInput = {
 }
 
 export type ProjectUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -690,8 +688,8 @@ export type ProjectUncheckedUpdateInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -700,7 +698,7 @@ export type ProjectUncheckedUpdateInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -736,8 +734,8 @@ export type ProjectCreateManyInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -746,14 +744,13 @@ export type ProjectCreateManyInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type ProjectUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -761,8 +758,8 @@ export type ProjectUpdateManyMutationInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -771,13 +768,12 @@ export type ProjectUpdateManyMutationInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -785,8 +781,8 @@ export type ProjectUncheckedUpdateManyInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -795,7 +791,7 @@ export type ProjectUncheckedUpdateManyInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -962,7 +958,7 @@ export type ProjectUpdateOneWithoutCalendarEventsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutCalendarEventsInput, Prisma.ProjectUncheckedCreateWithoutCalendarEventsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutCalendarEventsInput
   upsert?: Prisma.ProjectUpsertWithoutCalendarEventsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutCalendarEventsInput, Prisma.ProjectUpdateWithoutCalendarEventsInput>, Prisma.ProjectUncheckedUpdateWithoutCalendarEventsInput>
@@ -996,12 +992,12 @@ export type ProjectUpdateOneRequiredWithoutTimesheetEntriesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutTimesheetEntriesInput, Prisma.ProjectUpdateWithoutTimesheetEntriesInput>, Prisma.ProjectUncheckedUpdateWithoutTimesheetEntriesInput>
 }
 
-export type DecimalFieldUpdateOperationsInput = {
-  set?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  increment?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  divide?: runtime.Decimal | runtime.DecimalJsLike | number | string
+export type BigIntFieldUpdateOperationsInput = {
+  set?: bigint | number
+  increment?: bigint | number
+  decrement?: bigint | number
+  multiply?: bigint | number
+  divide?: bigint | number
 }
 
 export type FloatFieldUpdateOperationsInput = {
@@ -1030,7 +1026,7 @@ export type ProjectUpdateOneWithoutFieldSurveysNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutFieldSurveysInput, Prisma.ProjectUncheckedCreateWithoutFieldSurveysInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutFieldSurveysInput
   upsert?: Prisma.ProjectUpsertWithoutFieldSurveysInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutFieldSurveysInput, Prisma.ProjectUpdateWithoutFieldSurveysInput>, Prisma.ProjectUncheckedUpdateWithoutFieldSurveysInput>
@@ -1102,7 +1098,7 @@ export type ProjectUpdateOneWithoutDrawingDocumentsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutDrawingDocumentsInput, Prisma.ProjectUncheckedCreateWithoutDrawingDocumentsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutDrawingDocumentsInput
   upsert?: Prisma.ProjectUpsertWithoutDrawingDocumentsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutDrawingDocumentsInput, Prisma.ProjectUpdateWithoutDrawingDocumentsInput>, Prisma.ProjectUncheckedUpdateWithoutDrawingDocumentsInput>
@@ -1118,7 +1114,7 @@ export type ProjectUpdateOneWithoutStockMovementsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutStockMovementsInput, Prisma.ProjectUncheckedCreateWithoutStockMovementsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutStockMovementsInput
   upsert?: Prisma.ProjectUpsertWithoutStockMovementsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutStockMovementsInput, Prisma.ProjectUpdateWithoutStockMovementsInput>, Prisma.ProjectUncheckedUpdateWithoutStockMovementsInput>
@@ -1204,7 +1200,7 @@ export type ProjectUpdateOneWithoutTicketsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutTicketsInput, Prisma.ProjectUncheckedCreateWithoutTicketsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutTicketsInput
   upsert?: Prisma.ProjectUpsertWithoutTicketsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutTicketsInput, Prisma.ProjectUpdateWithoutTicketsInput>, Prisma.ProjectUncheckedUpdateWithoutTicketsInput>
@@ -1220,7 +1216,7 @@ export type ProjectUpdateOneWithoutPurchaseOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutPurchaseOrdersInput, Prisma.ProjectUncheckedCreateWithoutPurchaseOrdersInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutPurchaseOrdersInput
   upsert?: Prisma.ProjectUpsertWithoutPurchaseOrdersInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutPurchaseOrdersInput, Prisma.ProjectUpdateWithoutPurchaseOrdersInput>, Prisma.ProjectUncheckedUpdateWithoutPurchaseOrdersInput>
@@ -1236,7 +1232,7 @@ export type ProjectUpdateOneWithoutVehicleTripLogsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutVehicleTripLogsInput, Prisma.ProjectUncheckedCreateWithoutVehicleTripLogsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutVehicleTripLogsInput
   upsert?: Prisma.ProjectUpsertWithoutVehicleTripLogsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutVehicleTripLogsInput, Prisma.ProjectUpdateWithoutVehicleTripLogsInput>, Prisma.ProjectUncheckedUpdateWithoutVehicleTripLogsInput>
@@ -1252,7 +1248,7 @@ export type ProjectUpdateOneWithoutVehicleFuelRequestsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutVehicleFuelRequestsInput, Prisma.ProjectUncheckedCreateWithoutVehicleFuelRequestsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutVehicleFuelRequestsInput
   upsert?: Prisma.ProjectUpsertWithoutVehicleFuelRequestsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutVehicleFuelRequestsInput, Prisma.ProjectUpdateWithoutVehicleFuelRequestsInput>, Prisma.ProjectUncheckedUpdateWithoutVehicleFuelRequestsInput>
@@ -1268,7 +1264,7 @@ export type ProjectUpdateOneWithoutInvoicesNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutInvoicesInput, Prisma.ProjectUncheckedCreateWithoutInvoicesInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutInvoicesInput
   upsert?: Prisma.ProjectUpsertWithoutInvoicesInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutInvoicesInput, Prisma.ProjectUpdateWithoutInvoicesInput>, Prisma.ProjectUncheckedUpdateWithoutInvoicesInput>
@@ -1284,7 +1280,7 @@ export type ProjectUpdateOneWithoutCashflowsNestedInput = {
   create?: Prisma.XOR<Prisma.ProjectCreateWithoutCashflowsInput, Prisma.ProjectUncheckedCreateWithoutCashflowsInput>
   connectOrCreate?: Prisma.ProjectCreateOrConnectWithoutCashflowsInput
   upsert?: Prisma.ProjectUpsertWithoutCashflowsInput
-  disconnect?: Prisma.ProjectWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.ProjectWhereInput | boolean
   connect?: Prisma.ProjectWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProjectUpdateToOneWithWhereWithoutCashflowsInput, Prisma.ProjectUpdateWithoutCashflowsInput>, Prisma.ProjectUncheckedUpdateWithoutCashflowsInput>
@@ -1299,8 +1295,8 @@ export type ProjectCreateWithoutFieldPicInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1309,7 +1305,7 @@ export type ProjectCreateWithoutFieldPicInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldSurveys?: Prisma.FieldSurveyCreateNestedManyWithoutProjectInput
@@ -1344,8 +1340,8 @@ export type ProjectUncheckedCreateWithoutFieldPicInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1354,7 +1350,7 @@ export type ProjectUncheckedCreateWithoutFieldPicInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldSurveys?: Prisma.FieldSurveyUncheckedCreateNestedManyWithoutProjectInput
@@ -1387,7 +1383,6 @@ export type ProjectCreateOrConnectWithoutFieldPicInput = {
 
 export type ProjectCreateManyFieldPicInputEnvelope = {
   data: Prisma.ProjectCreateManyFieldPicInput | Prisma.ProjectCreateManyFieldPicInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectUpsertWithWhereUniqueWithoutFieldPicInput = {
@@ -1418,8 +1413,8 @@ export type ProjectScalarWhereInput = {
   kelompokTani?: Prisma.StringFilter<"Project"> | string
   address?: Prisma.StringFilter<"Project"> | string
   jenisPekerjaan?: Prisma.StringNullableFilter<"Project"> | string | null
-  pagu?: Prisma.DecimalFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.DecimalNullableFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFilter<"Project"> | bigint | number
+  landArea?: Prisma.BigIntNullableFilter<"Project"> | bigint | number | null
   progress?: Prisma.FloatFilter<"Project"> | number
   priority?: Prisma.EnumProjectPriorityFilter<"Project"> | $Enums.ProjectPriority
   vendor?: Prisma.StringNullableFilter<"Project"> | string | null
@@ -1428,7 +1423,7 @@ export type ProjectScalarWhereInput = {
   status?: Prisma.EnumProjectStatusFilter<"Project"> | $Enums.ProjectStatus
   startDate?: Prisma.DateTimeNullableFilter<"Project"> | Date | string | null
   endDate?: Prisma.DateTimeNullableFilter<"Project"> | Date | string | null
-  budget?: Prisma.DecimalNullableFilter<"Project"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.BigIntNullableFilter<"Project"> | bigint | number | null
   fieldPicId?: Prisma.StringNullableFilter<"Project"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Project"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Project"> | Date | string
@@ -1443,8 +1438,8 @@ export type ProjectCreateWithoutCalendarEventsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1453,7 +1448,7 @@ export type ProjectCreateWithoutCalendarEventsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -1488,8 +1483,8 @@ export type ProjectUncheckedCreateWithoutCalendarEventsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1498,7 +1493,7 @@ export type ProjectUncheckedCreateWithoutCalendarEventsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1541,7 +1536,6 @@ export type ProjectUpdateToOneWithWhereWithoutCalendarEventsInput = {
 }
 
 export type ProjectUpdateWithoutCalendarEventsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1549,8 +1543,8 @@ export type ProjectUpdateWithoutCalendarEventsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1559,7 +1553,7 @@ export type ProjectUpdateWithoutCalendarEventsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -1586,7 +1580,6 @@ export type ProjectUpdateWithoutCalendarEventsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutCalendarEventsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1594,8 +1587,8 @@ export type ProjectUncheckedUpdateWithoutCalendarEventsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1604,7 +1597,7 @@ export type ProjectUncheckedUpdateWithoutCalendarEventsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1639,8 +1632,8 @@ export type ProjectCreateWithoutWorkTasksInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1649,7 +1642,7 @@ export type ProjectCreateWithoutWorkTasksInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -1684,8 +1677,8 @@ export type ProjectUncheckedCreateWithoutWorkTasksInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1694,7 +1687,7 @@ export type ProjectUncheckedCreateWithoutWorkTasksInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1737,7 +1730,6 @@ export type ProjectUpdateToOneWithWhereWithoutWorkTasksInput = {
 }
 
 export type ProjectUpdateWithoutWorkTasksInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1745,8 +1737,8 @@ export type ProjectUpdateWithoutWorkTasksInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1755,7 +1747,7 @@ export type ProjectUpdateWithoutWorkTasksInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -1782,7 +1774,6 @@ export type ProjectUpdateWithoutWorkTasksInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutWorkTasksInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1790,8 +1781,8 @@ export type ProjectUncheckedUpdateWithoutWorkTasksInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1800,7 +1791,7 @@ export type ProjectUncheckedUpdateWithoutWorkTasksInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1835,8 +1826,8 @@ export type ProjectCreateWithoutTimesheetEntriesInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1845,7 +1836,7 @@ export type ProjectCreateWithoutTimesheetEntriesInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -1880,8 +1871,8 @@ export type ProjectUncheckedCreateWithoutTimesheetEntriesInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -1890,7 +1881,7 @@ export type ProjectUncheckedCreateWithoutTimesheetEntriesInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1933,7 +1924,6 @@ export type ProjectUpdateToOneWithWhereWithoutTimesheetEntriesInput = {
 }
 
 export type ProjectUpdateWithoutTimesheetEntriesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1941,8 +1931,8 @@ export type ProjectUpdateWithoutTimesheetEntriesInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1951,7 +1941,7 @@ export type ProjectUpdateWithoutTimesheetEntriesInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -1978,7 +1968,6 @@ export type ProjectUpdateWithoutTimesheetEntriesInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutTimesheetEntriesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1986,8 +1975,8 @@ export type ProjectUncheckedUpdateWithoutTimesheetEntriesInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1996,7 +1985,7 @@ export type ProjectUncheckedUpdateWithoutTimesheetEntriesInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2031,8 +2020,8 @@ export type ProjectCreateWithoutFieldSurveysInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2041,7 +2030,7 @@ export type ProjectCreateWithoutFieldSurveysInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -2076,8 +2065,8 @@ export type ProjectUncheckedCreateWithoutFieldSurveysInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2086,7 +2075,7 @@ export type ProjectUncheckedCreateWithoutFieldSurveysInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2129,7 +2118,6 @@ export type ProjectUpdateToOneWithWhereWithoutFieldSurveysInput = {
 }
 
 export type ProjectUpdateWithoutFieldSurveysInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2137,8 +2125,8 @@ export type ProjectUpdateWithoutFieldSurveysInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2147,7 +2135,7 @@ export type ProjectUpdateWithoutFieldSurveysInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -2174,7 +2162,6 @@ export type ProjectUpdateWithoutFieldSurveysInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutFieldSurveysInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2182,8 +2169,8 @@ export type ProjectUncheckedUpdateWithoutFieldSurveysInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2192,7 +2179,7 @@ export type ProjectUncheckedUpdateWithoutFieldSurveysInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2227,8 +2214,8 @@ export type ProjectCreateWithoutPolygonsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2237,7 +2224,7 @@ export type ProjectCreateWithoutPolygonsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -2272,8 +2259,8 @@ export type ProjectUncheckedCreateWithoutPolygonsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2282,7 +2269,7 @@ export type ProjectUncheckedCreateWithoutPolygonsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2325,7 +2312,6 @@ export type ProjectUpdateToOneWithWhereWithoutPolygonsInput = {
 }
 
 export type ProjectUpdateWithoutPolygonsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2333,8 +2319,8 @@ export type ProjectUpdateWithoutPolygonsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2343,7 +2329,7 @@ export type ProjectUpdateWithoutPolygonsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -2370,7 +2356,6 @@ export type ProjectUpdateWithoutPolygonsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutPolygonsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2378,8 +2363,8 @@ export type ProjectUncheckedUpdateWithoutPolygonsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2388,7 +2373,7 @@ export type ProjectUncheckedUpdateWithoutPolygonsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2423,8 +2408,8 @@ export type ProjectCreateWithoutDailyReportsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2433,7 +2418,7 @@ export type ProjectCreateWithoutDailyReportsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -2468,8 +2453,8 @@ export type ProjectUncheckedCreateWithoutDailyReportsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2478,7 +2463,7 @@ export type ProjectUncheckedCreateWithoutDailyReportsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2521,7 +2506,6 @@ export type ProjectUpdateToOneWithWhereWithoutDailyReportsInput = {
 }
 
 export type ProjectUpdateWithoutDailyReportsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2529,8 +2513,8 @@ export type ProjectUpdateWithoutDailyReportsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2539,7 +2523,7 @@ export type ProjectUpdateWithoutDailyReportsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -2566,7 +2550,6 @@ export type ProjectUpdateWithoutDailyReportsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutDailyReportsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2574,8 +2557,8 @@ export type ProjectUncheckedUpdateWithoutDailyReportsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2584,7 +2567,7 @@ export type ProjectUncheckedUpdateWithoutDailyReportsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2619,8 +2602,8 @@ export type ProjectCreateWithoutWorkPointsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2629,7 +2612,7 @@ export type ProjectCreateWithoutWorkPointsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -2664,8 +2647,8 @@ export type ProjectUncheckedCreateWithoutWorkPointsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2674,7 +2657,7 @@ export type ProjectUncheckedCreateWithoutWorkPointsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2717,7 +2700,6 @@ export type ProjectUpdateToOneWithWhereWithoutWorkPointsInput = {
 }
 
 export type ProjectUpdateWithoutWorkPointsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2725,8 +2707,8 @@ export type ProjectUpdateWithoutWorkPointsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2735,7 +2717,7 @@ export type ProjectUpdateWithoutWorkPointsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -2762,7 +2744,6 @@ export type ProjectUpdateWithoutWorkPointsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutWorkPointsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2770,8 +2751,8 @@ export type ProjectUncheckedUpdateWithoutWorkPointsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2780,7 +2761,7 @@ export type ProjectUncheckedUpdateWithoutWorkPointsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2815,8 +2796,8 @@ export type ProjectCreateWithoutBlueprintsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2825,7 +2806,7 @@ export type ProjectCreateWithoutBlueprintsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -2860,8 +2841,8 @@ export type ProjectUncheckedCreateWithoutBlueprintsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -2870,7 +2851,7 @@ export type ProjectUncheckedCreateWithoutBlueprintsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2913,7 +2894,6 @@ export type ProjectUpdateToOneWithWhereWithoutBlueprintsInput = {
 }
 
 export type ProjectUpdateWithoutBlueprintsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2921,8 +2901,8 @@ export type ProjectUpdateWithoutBlueprintsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2931,7 +2911,7 @@ export type ProjectUpdateWithoutBlueprintsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -2958,7 +2938,6 @@ export type ProjectUpdateWithoutBlueprintsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutBlueprintsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2966,8 +2945,8 @@ export type ProjectUncheckedUpdateWithoutBlueprintsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2976,7 +2955,7 @@ export type ProjectUncheckedUpdateWithoutBlueprintsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3011,8 +2990,8 @@ export type ProjectCreateWithoutDrawingDocumentsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3021,7 +3000,7 @@ export type ProjectCreateWithoutDrawingDocumentsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -3056,8 +3035,8 @@ export type ProjectUncheckedCreateWithoutDrawingDocumentsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3066,7 +3045,7 @@ export type ProjectUncheckedCreateWithoutDrawingDocumentsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3109,7 +3088,6 @@ export type ProjectUpdateToOneWithWhereWithoutDrawingDocumentsInput = {
 }
 
 export type ProjectUpdateWithoutDrawingDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3117,8 +3095,8 @@ export type ProjectUpdateWithoutDrawingDocumentsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3127,7 +3105,7 @@ export type ProjectUpdateWithoutDrawingDocumentsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -3154,7 +3132,6 @@ export type ProjectUpdateWithoutDrawingDocumentsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutDrawingDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3162,8 +3139,8 @@ export type ProjectUncheckedUpdateWithoutDrawingDocumentsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3172,7 +3149,7 @@ export type ProjectUncheckedUpdateWithoutDrawingDocumentsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3207,8 +3184,8 @@ export type ProjectCreateWithoutStockMovementsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3217,7 +3194,7 @@ export type ProjectCreateWithoutStockMovementsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -3252,8 +3229,8 @@ export type ProjectUncheckedCreateWithoutStockMovementsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3262,7 +3239,7 @@ export type ProjectUncheckedCreateWithoutStockMovementsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3305,7 +3282,6 @@ export type ProjectUpdateToOneWithWhereWithoutStockMovementsInput = {
 }
 
 export type ProjectUpdateWithoutStockMovementsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3313,8 +3289,8 @@ export type ProjectUpdateWithoutStockMovementsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3323,7 +3299,7 @@ export type ProjectUpdateWithoutStockMovementsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -3350,7 +3326,6 @@ export type ProjectUpdateWithoutStockMovementsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutStockMovementsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3358,8 +3333,8 @@ export type ProjectUncheckedUpdateWithoutStockMovementsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3368,7 +3343,7 @@ export type ProjectUncheckedUpdateWithoutStockMovementsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3403,8 +3378,8 @@ export type ProjectCreateWithoutWageDisbursementsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3413,7 +3388,7 @@ export type ProjectCreateWithoutWageDisbursementsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -3448,8 +3423,8 @@ export type ProjectUncheckedCreateWithoutWageDisbursementsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3458,7 +3433,7 @@ export type ProjectUncheckedCreateWithoutWageDisbursementsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3501,7 +3476,6 @@ export type ProjectUpdateToOneWithWhereWithoutWageDisbursementsInput = {
 }
 
 export type ProjectUpdateWithoutWageDisbursementsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3509,8 +3483,8 @@ export type ProjectUpdateWithoutWageDisbursementsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3519,7 +3493,7 @@ export type ProjectUpdateWithoutWageDisbursementsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -3546,7 +3520,6 @@ export type ProjectUpdateWithoutWageDisbursementsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutWageDisbursementsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3554,8 +3527,8 @@ export type ProjectUncheckedUpdateWithoutWageDisbursementsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3564,7 +3537,7 @@ export type ProjectUncheckedUpdateWithoutWageDisbursementsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3599,8 +3572,8 @@ export type ProjectCreateWithoutSubkonContractsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3609,7 +3582,7 @@ export type ProjectCreateWithoutSubkonContractsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -3644,8 +3617,8 @@ export type ProjectUncheckedCreateWithoutSubkonContractsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3654,7 +3627,7 @@ export type ProjectUncheckedCreateWithoutSubkonContractsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3697,7 +3670,6 @@ export type ProjectUpdateToOneWithWhereWithoutSubkonContractsInput = {
 }
 
 export type ProjectUpdateWithoutSubkonContractsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3705,8 +3677,8 @@ export type ProjectUpdateWithoutSubkonContractsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3715,7 +3687,7 @@ export type ProjectUpdateWithoutSubkonContractsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -3742,7 +3714,6 @@ export type ProjectUpdateWithoutSubkonContractsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutSubkonContractsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3750,8 +3721,8 @@ export type ProjectUncheckedUpdateWithoutSubkonContractsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3760,7 +3731,7 @@ export type ProjectUncheckedUpdateWithoutSubkonContractsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3795,8 +3766,8 @@ export type ProjectCreateWithoutEquipmentLogsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3805,7 +3776,7 @@ export type ProjectCreateWithoutEquipmentLogsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -3840,8 +3811,8 @@ export type ProjectUncheckedCreateWithoutEquipmentLogsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -3850,7 +3821,7 @@ export type ProjectUncheckedCreateWithoutEquipmentLogsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3893,7 +3864,6 @@ export type ProjectUpdateToOneWithWhereWithoutEquipmentLogsInput = {
 }
 
 export type ProjectUpdateWithoutEquipmentLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3901,8 +3871,8 @@ export type ProjectUpdateWithoutEquipmentLogsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3911,7 +3881,7 @@ export type ProjectUpdateWithoutEquipmentLogsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -3938,7 +3908,6 @@ export type ProjectUpdateWithoutEquipmentLogsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutEquipmentLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3946,8 +3915,8 @@ export type ProjectUncheckedUpdateWithoutEquipmentLogsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3956,7 +3925,7 @@ export type ProjectUncheckedUpdateWithoutEquipmentLogsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3991,8 +3960,8 @@ export type ProjectCreateWithoutAddendumsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4001,7 +3970,7 @@ export type ProjectCreateWithoutAddendumsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -4036,8 +4005,8 @@ export type ProjectUncheckedCreateWithoutAddendumsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4046,7 +4015,7 @@ export type ProjectUncheckedCreateWithoutAddendumsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4089,7 +4058,6 @@ export type ProjectUpdateToOneWithWhereWithoutAddendumsInput = {
 }
 
 export type ProjectUpdateWithoutAddendumsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4097,8 +4065,8 @@ export type ProjectUpdateWithoutAddendumsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4107,7 +4075,7 @@ export type ProjectUpdateWithoutAddendumsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -4134,7 +4102,6 @@ export type ProjectUpdateWithoutAddendumsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutAddendumsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4142,8 +4109,8 @@ export type ProjectUncheckedUpdateWithoutAddendumsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4152,7 +4119,7 @@ export type ProjectUncheckedUpdateWithoutAddendumsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4187,8 +4154,8 @@ export type ProjectCreateWithoutBastDocumentsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4197,7 +4164,7 @@ export type ProjectCreateWithoutBastDocumentsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -4232,8 +4199,8 @@ export type ProjectUncheckedCreateWithoutBastDocumentsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4242,7 +4209,7 @@ export type ProjectUncheckedCreateWithoutBastDocumentsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4285,7 +4252,6 @@ export type ProjectUpdateToOneWithWhereWithoutBastDocumentsInput = {
 }
 
 export type ProjectUpdateWithoutBastDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4293,8 +4259,8 @@ export type ProjectUpdateWithoutBastDocumentsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4303,7 +4269,7 @@ export type ProjectUpdateWithoutBastDocumentsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -4330,7 +4296,6 @@ export type ProjectUpdateWithoutBastDocumentsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutBastDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4338,8 +4303,8 @@ export type ProjectUncheckedUpdateWithoutBastDocumentsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4348,7 +4313,7 @@ export type ProjectUncheckedUpdateWithoutBastDocumentsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4383,8 +4348,8 @@ export type ProjectCreateWithoutTicketsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4393,7 +4358,7 @@ export type ProjectCreateWithoutTicketsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -4428,8 +4393,8 @@ export type ProjectUncheckedCreateWithoutTicketsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4438,7 +4403,7 @@ export type ProjectUncheckedCreateWithoutTicketsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4481,7 +4446,6 @@ export type ProjectUpdateToOneWithWhereWithoutTicketsInput = {
 }
 
 export type ProjectUpdateWithoutTicketsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4489,8 +4453,8 @@ export type ProjectUpdateWithoutTicketsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4499,7 +4463,7 @@ export type ProjectUpdateWithoutTicketsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -4526,7 +4490,6 @@ export type ProjectUpdateWithoutTicketsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutTicketsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4534,8 +4497,8 @@ export type ProjectUncheckedUpdateWithoutTicketsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4544,7 +4507,7 @@ export type ProjectUncheckedUpdateWithoutTicketsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4579,8 +4542,8 @@ export type ProjectCreateWithoutPurchaseOrdersInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4589,7 +4552,7 @@ export type ProjectCreateWithoutPurchaseOrdersInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -4624,8 +4587,8 @@ export type ProjectUncheckedCreateWithoutPurchaseOrdersInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4634,7 +4597,7 @@ export type ProjectUncheckedCreateWithoutPurchaseOrdersInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4677,7 +4640,6 @@ export type ProjectUpdateToOneWithWhereWithoutPurchaseOrdersInput = {
 }
 
 export type ProjectUpdateWithoutPurchaseOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4685,8 +4647,8 @@ export type ProjectUpdateWithoutPurchaseOrdersInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4695,7 +4657,7 @@ export type ProjectUpdateWithoutPurchaseOrdersInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -4722,7 +4684,6 @@ export type ProjectUpdateWithoutPurchaseOrdersInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutPurchaseOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4730,8 +4691,8 @@ export type ProjectUncheckedUpdateWithoutPurchaseOrdersInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4740,7 +4701,7 @@ export type ProjectUncheckedUpdateWithoutPurchaseOrdersInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4775,8 +4736,8 @@ export type ProjectCreateWithoutVehicleTripLogsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4785,7 +4746,7 @@ export type ProjectCreateWithoutVehicleTripLogsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -4820,8 +4781,8 @@ export type ProjectUncheckedCreateWithoutVehicleTripLogsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4830,7 +4791,7 @@ export type ProjectUncheckedCreateWithoutVehicleTripLogsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4873,7 +4834,6 @@ export type ProjectUpdateToOneWithWhereWithoutVehicleTripLogsInput = {
 }
 
 export type ProjectUpdateWithoutVehicleTripLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4881,8 +4841,8 @@ export type ProjectUpdateWithoutVehicleTripLogsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4891,7 +4851,7 @@ export type ProjectUpdateWithoutVehicleTripLogsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -4918,7 +4878,6 @@ export type ProjectUpdateWithoutVehicleTripLogsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutVehicleTripLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4926,8 +4885,8 @@ export type ProjectUncheckedUpdateWithoutVehicleTripLogsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4936,7 +4895,7 @@ export type ProjectUncheckedUpdateWithoutVehicleTripLogsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4971,8 +4930,8 @@ export type ProjectCreateWithoutVehicleFuelRequestsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -4981,7 +4940,7 @@ export type ProjectCreateWithoutVehicleFuelRequestsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -5016,8 +4975,8 @@ export type ProjectUncheckedCreateWithoutVehicleFuelRequestsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -5026,7 +4985,7 @@ export type ProjectUncheckedCreateWithoutVehicleFuelRequestsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5069,7 +5028,6 @@ export type ProjectUpdateToOneWithWhereWithoutVehicleFuelRequestsInput = {
 }
 
 export type ProjectUpdateWithoutVehicleFuelRequestsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5077,8 +5035,8 @@ export type ProjectUpdateWithoutVehicleFuelRequestsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5087,7 +5045,7 @@ export type ProjectUpdateWithoutVehicleFuelRequestsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -5114,7 +5072,6 @@ export type ProjectUpdateWithoutVehicleFuelRequestsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutVehicleFuelRequestsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5122,8 +5079,8 @@ export type ProjectUncheckedUpdateWithoutVehicleFuelRequestsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5132,7 +5089,7 @@ export type ProjectUncheckedUpdateWithoutVehicleFuelRequestsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5167,8 +5124,8 @@ export type ProjectCreateWithoutInvoicesInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -5177,7 +5134,7 @@ export type ProjectCreateWithoutInvoicesInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -5212,8 +5169,8 @@ export type ProjectUncheckedCreateWithoutInvoicesInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -5222,7 +5179,7 @@ export type ProjectUncheckedCreateWithoutInvoicesInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5265,7 +5222,6 @@ export type ProjectUpdateToOneWithWhereWithoutInvoicesInput = {
 }
 
 export type ProjectUpdateWithoutInvoicesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5273,8 +5229,8 @@ export type ProjectUpdateWithoutInvoicesInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5283,7 +5239,7 @@ export type ProjectUpdateWithoutInvoicesInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -5310,7 +5266,6 @@ export type ProjectUpdateWithoutInvoicesInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutInvoicesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5318,8 +5273,8 @@ export type ProjectUncheckedUpdateWithoutInvoicesInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5328,7 +5283,7 @@ export type ProjectUncheckedUpdateWithoutInvoicesInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5363,8 +5318,8 @@ export type ProjectCreateWithoutCashflowsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -5373,7 +5328,7 @@ export type ProjectCreateWithoutCashflowsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   fieldPic?: Prisma.UserCreateNestedOneWithoutAssignedProjectsInput
@@ -5408,8 +5363,8 @@ export type ProjectUncheckedCreateWithoutCashflowsInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -5418,7 +5373,7 @@ export type ProjectUncheckedCreateWithoutCashflowsInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   fieldPicId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5461,7 +5416,6 @@ export type ProjectUpdateToOneWithWhereWithoutCashflowsInput = {
 }
 
 export type ProjectUpdateWithoutCashflowsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5469,8 +5423,8 @@ export type ProjectUpdateWithoutCashflowsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5479,7 +5433,7 @@ export type ProjectUpdateWithoutCashflowsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldPic?: Prisma.UserUpdateOneWithoutAssignedProjectsNestedInput
@@ -5506,7 +5460,6 @@ export type ProjectUpdateWithoutCashflowsInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutCashflowsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5514,8 +5467,8 @@ export type ProjectUncheckedUpdateWithoutCashflowsInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5524,7 +5477,7 @@ export type ProjectUncheckedUpdateWithoutCashflowsInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   fieldPicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5559,8 +5512,8 @@ export type ProjectCreateManyFieldPicInput = {
   kelompokTani: string
   address: string
   jenisPekerjaan?: string | null
-  pagu: runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu: bigint | number
+  landArea?: bigint | number | null
   progress?: number
   priority?: $Enums.ProjectPriority
   vendor?: string | null
@@ -5569,13 +5522,12 @@ export type ProjectCreateManyFieldPicInput = {
   status?: $Enums.ProjectStatus
   startDate?: Date | string | null
   endDate?: Date | string | null
-  budget?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type ProjectUpdateWithoutFieldPicInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5583,8 +5535,8 @@ export type ProjectUpdateWithoutFieldPicInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5593,7 +5545,7 @@ export type ProjectUpdateWithoutFieldPicInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldSurveys?: Prisma.FieldSurveyUpdateManyWithoutProjectNestedInput
@@ -5620,7 +5572,6 @@ export type ProjectUpdateWithoutFieldPicInput = {
 }
 
 export type ProjectUncheckedUpdateWithoutFieldPicInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5628,8 +5579,8 @@ export type ProjectUncheckedUpdateWithoutFieldPicInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5638,7 +5589,7 @@ export type ProjectUncheckedUpdateWithoutFieldPicInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   fieldSurveys?: Prisma.FieldSurveyUncheckedUpdateManyWithoutProjectNestedInput
@@ -5665,7 +5616,6 @@ export type ProjectUncheckedUpdateWithoutFieldPicInput = {
 }
 
 export type ProjectUncheckedUpdateManyWithoutFieldPicInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5673,8 +5623,8 @@ export type ProjectUncheckedUpdateManyWithoutFieldPicInput = {
   kelompokTani?: Prisma.StringFieldUpdateOperationsInput | string
   address?: Prisma.StringFieldUpdateOperationsInput | string
   jenisPekerjaan?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pagu?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  landArea?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  pagu?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  landArea?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   priority?: Prisma.EnumProjectPriorityFieldUpdateOperationsInput | $Enums.ProjectPriority
   vendor?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5683,7 +5633,7 @@ export type ProjectUncheckedUpdateManyWithoutFieldPicInput = {
   status?: Prisma.EnumProjectStatusFieldUpdateOperationsInput | $Enums.ProjectStatus
   startDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   endDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  budget?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  budget?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -5947,57 +5897,7 @@ export type ProjectSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   _count?: boolean | Prisma.ProjectCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["project"]>
 
-export type ProjectSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  code?: boolean
-  name?: boolean
-  title?: boolean
-  isDeleted?: boolean
-  kelompokTani?: boolean
-  address?: boolean
-  jenisPekerjaan?: boolean
-  pagu?: boolean
-  landArea?: boolean
-  progress?: boolean
-  priority?: boolean
-  vendor?: boolean
-  clientName?: boolean
-  location?: boolean
-  status?: boolean
-  startDate?: boolean
-  endDate?: boolean
-  budget?: boolean
-  fieldPicId?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  fieldPic?: boolean | Prisma.Project$fieldPicArgs<ExtArgs>
-}, ExtArgs["result"]["project"]>
 
-export type ProjectSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  code?: boolean
-  name?: boolean
-  title?: boolean
-  isDeleted?: boolean
-  kelompokTani?: boolean
-  address?: boolean
-  jenisPekerjaan?: boolean
-  pagu?: boolean
-  landArea?: boolean
-  progress?: boolean
-  priority?: boolean
-  vendor?: boolean
-  clientName?: boolean
-  location?: boolean
-  status?: boolean
-  startDate?: boolean
-  endDate?: boolean
-  budget?: boolean
-  fieldPicId?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  fieldPic?: boolean | Prisma.Project$fieldPicArgs<ExtArgs>
-}, ExtArgs["result"]["project"]>
 
 export type ProjectSelectScalar = {
   id?: boolean
@@ -6050,12 +5950,6 @@ export type ProjectInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   bastDocuments?: boolean | Prisma.Project$bastDocumentsArgs<ExtArgs>
   _count?: boolean | Prisma.ProjectCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type ProjectIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  fieldPic?: boolean | Prisma.Project$fieldPicArgs<ExtArgs>
-}
-export type ProjectIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  fieldPic?: boolean | Prisma.Project$fieldPicArgs<ExtArgs>
-}
 
 export type $ProjectPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Project"
@@ -6092,8 +5986,8 @@ export type $ProjectPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     kelompokTani: string
     address: string
     jenisPekerjaan: string | null
-    pagu: runtime.Decimal
-    landArea: runtime.Decimal | null
+    pagu: bigint
+    landArea: bigint | null
     progress: number
     priority: $Enums.ProjectPriority
     vendor: string | null
@@ -6102,7 +5996,7 @@ export type $ProjectPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     status: $Enums.ProjectStatus
     startDate: Date | null
     endDate: Date | null
-    budget: runtime.Decimal | null
+    budget: bigint | null
     fieldPicId: string | null
     createdAt: Date
     updatedAt: Date
@@ -6224,30 +6118,6 @@ export interface ProjectDelegate<ExtArgs extends runtime.Types.Extensions.Intern
   createMany<T extends ProjectCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Projects and returns the data saved in the database.
-   * @param {ProjectCreateManyAndReturnArgs} args - Arguments to create many Projects.
-   * @example
-   * // Create many Projects
-   * const project = await prisma.project.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Projects and only return the `id`
-   * const projectWithIdOnly = await prisma.project.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Project.
    * @param {ProjectDeleteArgs} args - Arguments to delete one Project.
    * @example
@@ -6312,36 +6182,6 @@ export interface ProjectDelegate<ExtArgs extends runtime.Types.Extensions.Intern
   updateMany<T extends ProjectUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Projects and returns the data updated in the database.
-   * @param {ProjectUpdateManyAndReturnArgs} args - Arguments to update many Projects.
-   * @example
-   * // Update many Projects
-   * const project = await prisma.project.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Projects and only return the `id`
-   * const projectWithIdOnly = await prisma.project.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Project.
    * @param {ProjectUpsertArgs} args - Arguments to update or create a Project.
    * @example
@@ -6359,6 +6199,29 @@ export interface ProjectDelegate<ExtArgs extends runtime.Types.Extensions.Intern
    * })
    */
   upsert<T extends ProjectUpsertArgs>(args: Prisma.SelectSubset<T, ProjectUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectClient<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Projects that matches the filter.
+   * @param {ProjectFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const project = await prisma.project.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Project.
+   * @param {ProjectAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const project = await prisma.project.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -6559,8 +6422,8 @@ export interface ProjectFieldRefs {
   readonly kelompokTani: Prisma.FieldRef<"Project", 'String'>
   readonly address: Prisma.FieldRef<"Project", 'String'>
   readonly jenisPekerjaan: Prisma.FieldRef<"Project", 'String'>
-  readonly pagu: Prisma.FieldRef<"Project", 'Decimal'>
-  readonly landArea: Prisma.FieldRef<"Project", 'Decimal'>
+  readonly pagu: Prisma.FieldRef<"Project", 'BigInt'>
+  readonly landArea: Prisma.FieldRef<"Project", 'BigInt'>
   readonly progress: Prisma.FieldRef<"Project", 'Float'>
   readonly priority: Prisma.FieldRef<"Project", 'ProjectPriority'>
   readonly vendor: Prisma.FieldRef<"Project", 'String'>
@@ -6569,7 +6432,7 @@ export interface ProjectFieldRefs {
   readonly status: Prisma.FieldRef<"Project", 'ProjectStatus'>
   readonly startDate: Prisma.FieldRef<"Project", 'DateTime'>
   readonly endDate: Prisma.FieldRef<"Project", 'DateTime'>
-  readonly budget: Prisma.FieldRef<"Project", 'Decimal'>
+  readonly budget: Prisma.FieldRef<"Project", 'BigInt'>
   readonly fieldPicId: Prisma.FieldRef<"Project", 'String'>
   readonly createdAt: Prisma.FieldRef<"Project", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Project", 'DateTime'>
@@ -6769,11 +6632,6 @@ export type ProjectFindManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Skip the first `n` Projects.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Projects.
-   */
   distinct?: Prisma.ProjectScalarFieldEnum | Prisma.ProjectScalarFieldEnum[]
 }
 
@@ -6807,30 +6665,6 @@ export type ProjectCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * The data used to create many Projects.
    */
   data: Prisma.ProjectCreateManyInput | Prisma.ProjectCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Project createManyAndReturn
- */
-export type ProjectCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Project
-   */
-  select?: Prisma.ProjectSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Project
-   */
-  omit?: Prisma.ProjectOmit<ExtArgs> | null
-  /**
-   * The data used to create many Projects.
-   */
-  data: Prisma.ProjectCreateManyInput | Prisma.ProjectCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -6875,36 +6709,6 @@ export type ProjectUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Projects to update.
    */
   limit?: number
-}
-
-/**
- * Project updateManyAndReturn
- */
-export type ProjectUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Project
-   */
-  select?: Prisma.ProjectSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Project
-   */
-  omit?: Prisma.ProjectOmit<ExtArgs> | null
-  /**
-   * The data used to update Projects.
-   */
-  data: Prisma.XOR<Prisma.ProjectUpdateManyMutationInput, Prisma.ProjectUncheckedUpdateManyInput>
-  /**
-   * Filter which Projects to update
-   */
-  where?: Prisma.ProjectWhereInput
-  /**
-   * Limit how many Projects to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -6971,6 +6775,34 @@ export type ProjectDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Projects to delete.
    */
   limit?: number
+}
+
+/**
+ * Project findRaw
+ */
+export type ProjectFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Project aggregateRaw
+ */
+export type ProjectAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

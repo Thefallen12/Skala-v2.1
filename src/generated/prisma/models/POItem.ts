@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -228,7 +228,7 @@ export type POItemGroupByOutputType = {
   _max: POItemMaxAggregateOutputType | null
 }
 
-export type GetPOItemGroupByPayload<T extends POItemGroupByArgs> = Prisma.PrismaPromise<
+type GetPOItemGroupByPayload<T extends POItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<POItemGroupByOutputType, T['by']> &
       {
@@ -264,8 +264,8 @@ export type POItemWhereInput = {
 export type POItemOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   poId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
-  stockItemId?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
+  stockItemId?: Prisma.SortOrder
   itemName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
@@ -297,8 +297,8 @@ export type POItemWhereUniqueInput = Prisma.AtLeast<{
 export type POItemOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   poId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
-  stockItemId?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
+  stockItemId?: Prisma.SortOrder
   itemName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
@@ -353,7 +353,6 @@ export type POItemUncheckedCreateInput = {
 }
 
 export type POItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -366,7 +365,6 @@ export type POItemUpdateInput = {
 }
 
 export type POItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stockItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -391,7 +389,6 @@ export type POItemCreateManyInput = {
 }
 
 export type POItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -401,7 +398,6 @@ export type POItemUpdateManyMutationInput = {
 }
 
 export type POItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stockItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -569,7 +565,7 @@ export type POItemUpdateOneWithoutTicketItemsNestedInput = {
   create?: Prisma.XOR<Prisma.POItemCreateWithoutTicketItemsInput, Prisma.POItemUncheckedCreateWithoutTicketItemsInput>
   connectOrCreate?: Prisma.POItemCreateOrConnectWithoutTicketItemsInput
   upsert?: Prisma.POItemUpsertWithoutTicketItemsInput
-  disconnect?: Prisma.POItemWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.POItemWhereInput | boolean
   connect?: Prisma.POItemWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.POItemUpdateToOneWithWhereWithoutTicketItemsInput, Prisma.POItemUpdateWithoutTicketItemsInput>, Prisma.POItemUncheckedUpdateWithoutTicketItemsInput>
@@ -606,7 +602,6 @@ export type POItemCreateOrConnectWithoutStockItemInput = {
 
 export type POItemCreateManyStockItemInputEnvelope = {
   data: Prisma.POItemCreateManyStockItemInput | Prisma.POItemCreateManyStockItemInput[]
-  skipDuplicates?: boolean
 }
 
 export type POItemUpsertWithWhereUniqueWithoutStockItemInput = {
@@ -671,7 +666,6 @@ export type POItemCreateOrConnectWithoutPoInput = {
 
 export type POItemCreateManyPoInputEnvelope = {
   data: Prisma.POItemCreateManyPoInput | Prisma.POItemCreateManyPoInput[]
-  skipDuplicates?: boolean
 }
 
 export type POItemUpsertWithWhereUniqueWithoutPoInput = {
@@ -731,7 +725,6 @@ export type POItemUpdateToOneWithWhereWithoutTicketItemsInput = {
 }
 
 export type POItemUpdateWithoutTicketItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -743,7 +736,6 @@ export type POItemUpdateWithoutTicketItemsInput = {
 }
 
 export type POItemUncheckedUpdateWithoutTicketItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stockItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -766,7 +758,6 @@ export type POItemCreateManyStockItemInput = {
 }
 
 export type POItemUpdateWithoutStockItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -778,7 +769,6 @@ export type POItemUpdateWithoutStockItemInput = {
 }
 
 export type POItemUncheckedUpdateWithoutStockItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -790,7 +780,6 @@ export type POItemUncheckedUpdateWithoutStockItemInput = {
 }
 
 export type POItemUncheckedUpdateManyWithoutStockItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -812,7 +801,6 @@ export type POItemCreateManyPoInput = {
 }
 
 export type POItemUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -824,7 +812,6 @@ export type POItemUpdateWithoutPoInput = {
 }
 
 export type POItemUncheckedUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stockItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -836,7 +823,6 @@ export type POItemUncheckedUpdateWithoutPoInput = {
 }
 
 export type POItemUncheckedUpdateManyWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stockItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -893,33 +879,7 @@ export type POItemSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   _count?: boolean | Prisma.POItemCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["pOItem"]>
 
-export type POItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  poId?: boolean
-  itemCode?: boolean
-  stockItemId?: boolean
-  itemName?: boolean
-  quantity?: boolean
-  unit?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.POItem$stockItemArgs<ExtArgs>
-}, ExtArgs["result"]["pOItem"]>
 
-export type POItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  poId?: boolean
-  itemCode?: boolean
-  stockItemId?: boolean
-  itemName?: boolean
-  quantity?: boolean
-  unit?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.POItem$stockItemArgs<ExtArgs>
-}, ExtArgs["result"]["pOItem"]>
 
 export type POItemSelectScalar = {
   id?: boolean
@@ -939,14 +899,6 @@ export type POItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   stockItem?: boolean | Prisma.POItem$stockItemArgs<ExtArgs>
   ticketItems?: boolean | Prisma.POItem$ticketItemsArgs<ExtArgs>
   _count?: boolean | Prisma.POItemCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type POItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.POItem$stockItemArgs<ExtArgs>
-}
-export type POItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.POItem$stockItemArgs<ExtArgs>
 }
 
 export type $POItemPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1084,30 +1036,6 @@ export interface POItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   createMany<T extends POItemCreateManyArgs>(args?: Prisma.SelectSubset<T, POItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many POItems and returns the data saved in the database.
-   * @param {POItemCreateManyAndReturnArgs} args - Arguments to create many POItems.
-   * @example
-   * // Create many POItems
-   * const pOItem = await prisma.pOItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many POItems and only return the `id`
-   * const pOItemWithIdOnly = await prisma.pOItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends POItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, POItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$POItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a POItem.
    * @param {POItemDeleteArgs} args - Arguments to delete one POItem.
    * @example
@@ -1172,36 +1100,6 @@ export interface POItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   updateMany<T extends POItemUpdateManyArgs>(args: Prisma.SelectSubset<T, POItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more POItems and returns the data updated in the database.
-   * @param {POItemUpdateManyAndReturnArgs} args - Arguments to update many POItems.
-   * @example
-   * // Update many POItems
-   * const pOItem = await prisma.pOItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more POItems and only return the `id`
-   * const pOItemWithIdOnly = await prisma.pOItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends POItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, POItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$POItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one POItem.
    * @param {POItemUpsertArgs} args - Arguments to update or create a POItem.
    * @example
@@ -1219,6 +1117,29 @@ export interface POItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
    * })
    */
   upsert<T extends POItemUpsertArgs>(args: Prisma.SelectSubset<T, POItemUpsertArgs<ExtArgs>>): Prisma.Prisma__POItemClient<runtime.Types.Result.GetResult<Prisma.$POItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more POItems that matches the filter.
+   * @param {POItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const pOItem = await prisma.pOItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.POItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a POItem.
+   * @param {POItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const pOItem = await prisma.pOItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.POItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1597,11 +1518,6 @@ export type POItemFindManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Skip the first `n` POItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of POItems.
-   */
   distinct?: Prisma.POItemScalarFieldEnum | Prisma.POItemScalarFieldEnum[]
 }
 
@@ -1635,30 +1551,6 @@ export type POItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many POItems.
    */
   data: Prisma.POItemCreateManyInput | Prisma.POItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * POItem createManyAndReturn
- */
-export type POItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the POItem
-   */
-  select?: Prisma.POItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the POItem
-   */
-  omit?: Prisma.POItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many POItems.
-   */
-  data: Prisma.POItemCreateManyInput | Prisma.POItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.POItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1703,36 +1595,6 @@ export type POItemUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many POItems to update.
    */
   limit?: number
-}
-
-/**
- * POItem updateManyAndReturn
- */
-export type POItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the POItem
-   */
-  select?: Prisma.POItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the POItem
-   */
-  omit?: Prisma.POItemOmit<ExtArgs> | null
-  /**
-   * The data used to update POItems.
-   */
-  data: Prisma.XOR<Prisma.POItemUpdateManyMutationInput, Prisma.POItemUncheckedUpdateManyInput>
-  /**
-   * Filter which POItems to update
-   */
-  where?: Prisma.POItemWhereInput
-  /**
-   * Limit how many POItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.POItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1799,6 +1661,34 @@ export type POItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many POItems to delete.
    */
   limit?: number
+}
+
+/**
+ * POItem findRaw
+ */
+export type POItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * POItem aggregateRaw
+ */
+export type POItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

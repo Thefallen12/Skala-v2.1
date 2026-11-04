@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -221,7 +221,7 @@ export type InvoiceItemGroupByOutputType = {
   _max: InvoiceItemMaxAggregateOutputType | null
 }
 
-export type GetInvoiceItemGroupByPayload<T extends InvoiceItemGroupByArgs> = Prisma.PrismaPromise<
+type GetInvoiceItemGroupByPayload<T extends InvoiceItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<InvoiceItemGroupByOutputType, T['by']> &
       {
@@ -254,7 +254,7 @@ export type InvoiceItemWhereInput = {
 export type InvoiceItemOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   invoiceId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
   description?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
@@ -281,7 +281,7 @@ export type InvoiceItemWhereUniqueInput = Prisma.AtLeast<{
 export type InvoiceItemOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   invoiceId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
   description?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
@@ -331,7 +331,6 @@ export type InvoiceItemUncheckedCreateInput = {
 }
 
 export type InvoiceItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -342,7 +341,6 @@ export type InvoiceItemUpdateInput = {
 }
 
 export type InvoiceItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   invoiceId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
@@ -364,7 +362,6 @@ export type InvoiceItemCreateManyInput = {
 }
 
 export type InvoiceItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -374,7 +371,6 @@ export type InvoiceItemUpdateManyMutationInput = {
 }
 
 export type InvoiceItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   invoiceId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
@@ -508,7 +504,6 @@ export type InvoiceItemCreateOrConnectWithoutInvoiceInput = {
 
 export type InvoiceItemCreateManyInvoiceInputEnvelope = {
   data: Prisma.InvoiceItemCreateManyInvoiceInput | Prisma.InvoiceItemCreateManyInvoiceInput[]
-  skipDuplicates?: boolean
 }
 
 export type InvoiceItemUpsertWithWhereUniqueWithoutInvoiceInput = {
@@ -552,7 +547,6 @@ export type InvoiceItemCreateManyInvoiceInput = {
 }
 
 export type InvoiceItemUpdateWithoutInvoiceInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -562,7 +556,6 @@ export type InvoiceItemUpdateWithoutInvoiceInput = {
 }
 
 export type InvoiceItemUncheckedUpdateWithoutInvoiceInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -572,7 +565,6 @@ export type InvoiceItemUncheckedUpdateWithoutInvoiceInput = {
 }
 
 export type InvoiceItemUncheckedUpdateManyWithoutInvoiceInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -595,29 +587,7 @@ export type InvoiceItemSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   invoice?: boolean | Prisma.InvoiceDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["invoiceItem"]>
 
-export type InvoiceItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  invoiceId?: boolean
-  itemCode?: boolean
-  description?: boolean
-  quantity?: boolean
-  unit?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  invoice?: boolean | Prisma.InvoiceDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["invoiceItem"]>
 
-export type InvoiceItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  invoiceId?: boolean
-  itemCode?: boolean
-  description?: boolean
-  quantity?: boolean
-  unit?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  invoice?: boolean | Prisma.InvoiceDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["invoiceItem"]>
 
 export type InvoiceItemSelectScalar = {
   id?: boolean
@@ -632,12 +602,6 @@ export type InvoiceItemSelectScalar = {
 
 export type InvoiceItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "invoiceId" | "itemCode" | "description" | "quantity" | "unit" | "unitPrice" | "totalPrice", ExtArgs["result"]["invoiceItem"]>
 export type InvoiceItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  invoice?: boolean | Prisma.InvoiceDefaultArgs<ExtArgs>
-}
-export type InvoiceItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  invoice?: boolean | Prisma.InvoiceDefaultArgs<ExtArgs>
-}
-export type InvoiceItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   invoice?: boolean | Prisma.InvoiceDefaultArgs<ExtArgs>
 }
 
@@ -773,30 +737,6 @@ export interface InvoiceItemDelegate<ExtArgs extends runtime.Types.Extensions.In
   createMany<T extends InvoiceItemCreateManyArgs>(args?: Prisma.SelectSubset<T, InvoiceItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many InvoiceItems and returns the data saved in the database.
-   * @param {InvoiceItemCreateManyAndReturnArgs} args - Arguments to create many InvoiceItems.
-   * @example
-   * // Create many InvoiceItems
-   * const invoiceItem = await prisma.invoiceItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many InvoiceItems and only return the `id`
-   * const invoiceItemWithIdOnly = await prisma.invoiceItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends InvoiceItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, InvoiceItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvoiceItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a InvoiceItem.
    * @param {InvoiceItemDeleteArgs} args - Arguments to delete one InvoiceItem.
    * @example
@@ -861,36 +801,6 @@ export interface InvoiceItemDelegate<ExtArgs extends runtime.Types.Extensions.In
   updateMany<T extends InvoiceItemUpdateManyArgs>(args: Prisma.SelectSubset<T, InvoiceItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more InvoiceItems and returns the data updated in the database.
-   * @param {InvoiceItemUpdateManyAndReturnArgs} args - Arguments to update many InvoiceItems.
-   * @example
-   * // Update many InvoiceItems
-   * const invoiceItem = await prisma.invoiceItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more InvoiceItems and only return the `id`
-   * const invoiceItemWithIdOnly = await prisma.invoiceItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends InvoiceItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, InvoiceItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvoiceItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one InvoiceItem.
    * @param {InvoiceItemUpsertArgs} args - Arguments to update or create a InvoiceItem.
    * @example
@@ -908,6 +818,29 @@ export interface InvoiceItemDelegate<ExtArgs extends runtime.Types.Extensions.In
    * })
    */
   upsert<T extends InvoiceItemUpsertArgs>(args: Prisma.SelectSubset<T, InvoiceItemUpsertArgs<ExtArgs>>): Prisma.Prisma__InvoiceItemClient<runtime.Types.Result.GetResult<Prisma.$InvoiceItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more InvoiceItems that matches the filter.
+   * @param {InvoiceItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const invoiceItem = await prisma.invoiceItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.InvoiceItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a InvoiceItem.
+   * @param {InvoiceItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const invoiceItem = await prisma.invoiceItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.InvoiceItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1283,11 +1216,6 @@ export type InvoiceItemFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` InvoiceItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of InvoiceItems.
-   */
   distinct?: Prisma.InvoiceItemScalarFieldEnum | Prisma.InvoiceItemScalarFieldEnum[]
 }
 
@@ -1321,30 +1249,6 @@ export type InvoiceItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * The data used to create many InvoiceItems.
    */
   data: Prisma.InvoiceItemCreateManyInput | Prisma.InvoiceItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * InvoiceItem createManyAndReturn
- */
-export type InvoiceItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the InvoiceItem
-   */
-  select?: Prisma.InvoiceItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the InvoiceItem
-   */
-  omit?: Prisma.InvoiceItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many InvoiceItems.
-   */
-  data: Prisma.InvoiceItemCreateManyInput | Prisma.InvoiceItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.InvoiceItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1389,36 +1293,6 @@ export type InvoiceItemUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many InvoiceItems to update.
    */
   limit?: number
-}
-
-/**
- * InvoiceItem updateManyAndReturn
- */
-export type InvoiceItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the InvoiceItem
-   */
-  select?: Prisma.InvoiceItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the InvoiceItem
-   */
-  omit?: Prisma.InvoiceItemOmit<ExtArgs> | null
-  /**
-   * The data used to update InvoiceItems.
-   */
-  data: Prisma.XOR<Prisma.InvoiceItemUpdateManyMutationInput, Prisma.InvoiceItemUncheckedUpdateManyInput>
-  /**
-   * Filter which InvoiceItems to update
-   */
-  where?: Prisma.InvoiceItemWhereInput
-  /**
-   * Limit how many InvoiceItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.InvoiceItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1485,6 +1359,34 @@ export type InvoiceItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many InvoiceItems to delete.
    */
   limit?: number
+}
+
+/**
+ * InvoiceItem findRaw
+ */
+export type InvoiceItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * InvoiceItem aggregateRaw
+ */
+export type InvoiceItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

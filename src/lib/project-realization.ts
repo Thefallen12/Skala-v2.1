@@ -5,6 +5,7 @@ import {
   UserRole,
 } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+import { decimalFromScaledInteger } from "@/lib/scaled-decimal";
 
 export type ProjectPaidRealization = {
   total: Prisma.Decimal;
@@ -83,14 +84,15 @@ export async function getPaidProjectTicketRealization(
           (orderTotal, order) =>
             orderTotal.plus(
               order.items.reduce(
-                (itemTotal, item) => itemTotal.plus(item.totalPrice),
+                (itemTotal, item) =>
+                  itemTotal.plus(item.totalPrice),
                 new Prisma.Decimal(0),
               ),
             ),
           new Prisma.Decimal(0),
         )
       : ticket.transferReceiptUrl && ticket.totalAmount
-        ? ticket.totalAmount
+        ? decimalFromScaledInteger(ticket.totalAmount)
         : new Prisma.Decimal(0);
 
     const projectTotal = totals.get(ticket.projectId) ?? {
@@ -121,10 +123,14 @@ export async function getPaidProjectTicketRealization(
     ) {
       continue;
     }
-    const unitPrice = movement.stockItem?.unitPrice ?? new Prisma.Decimal(0);
+    const unitPrice = movement.stockItem?.unitPrice
+      ? decimalFromScaledInteger(movement.stockItem.unitPrice)
+      : new Prisma.Decimal(0);
     const amount =
-      movement.totalCost ??
-      movement.quantity.mul(unitPrice).toDecimalPlaces(
+      (movement.totalCost
+        ? decimalFromScaledInteger(movement.totalCost)
+        : null) ??
+      decimalFromScaledInteger(movement.quantity).mul(unitPrice).toDecimalPlaces(
         2,
         Prisma.Decimal.ROUND_HALF_UP,
       );

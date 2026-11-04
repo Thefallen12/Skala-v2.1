@@ -5,7 +5,12 @@ import { Prisma } from "@/generated/prisma/client";
 import { DOStatus, UserRole } from "@/generated/prisma/enums";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER } from "@/lib/vehicle-fuel";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
 
 export type VehicleTripLogInput = {
   vehicleId: string;
@@ -92,9 +97,13 @@ export async function createVehicleTripLog(
         if (vehicle.status !== "AVAILABLE") {
           throw new Error("Kendaraan harus berstatus tersedia untuk mencatat log.");
         }
-        if (!vehicle.currentKilometer.equals(kilometerStart)) {
+        if (
+          !decimalFromScaledInteger(vehicle.currentKilometer).equals(
+            kilometerStart,
+          )
+        ) {
           throw new Error(
-            `KM awal harus sama dengan odometer terakhir (${vehicle.currentKilometer.toString()} km).`,
+            `KM awal harus sama dengan odometer terakhir (${decimalStringFromScaledInteger(vehicle.currentKilometer)} km).`,
           );
         }
 
@@ -135,9 +144,11 @@ export async function createVehicleTripLog(
           where: {
             id: vehicle.id,
             status: "AVAILABLE",
-            currentKilometer: kilometerStart,
+            currentKilometer: scaledIntegerFromDecimal(kilometerStart),
           },
-          data: { currentKilometer: kilometerEnd },
+          data: {
+            currentKilometer: scaledIntegerFromDecimal(kilometerEnd),
+          },
         });
         if (updatedVehicle.count !== 1) {
           throw new Error("Odometer berubah. Muat ulang halaman dan coba kembali.");
@@ -148,16 +159,17 @@ export async function createVehicleTripLog(
             vehicleId: vehicle.id,
             deliveryOrderId: input.deliveryOrderId || null,
             projectId: input.projectId,
-            kilometerStart,
-            kilometerEnd,
-            distanceKm,
-            fuelLiter,
-            fuelEfficiencyKmPerL: VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+            kilometerStart: scaledIntegerFromDecimal(kilometerStart),
+            kilometerEnd: scaledIntegerFromDecimal(kilometerEnd),
+            distanceKm: scaledIntegerFromDecimal(distanceKm),
+            fuelLiter: scaledIntegerFromDecimal(fuelLiter),
+            fuelEfficiencyKmPerL: scaledIntegerFromDecimal(
+              VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+            ),
             createdById: session.user.id,
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
     console.error("Vehicle trip log creation failed:", error);

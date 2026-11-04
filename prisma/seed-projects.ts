@@ -1,19 +1,17 @@
 import "dotenv/config";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import {
   ProjectPriority,
   ProjectStatus,
 } from "../src/generated/prisma/enums";
+import { scaledIntegerFromDecimal } from "../src/lib/scaled-decimal";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.MONGODB_URL;
 if (!connectionString) {
-  throw new Error("DATABASE_URL is required to seed sample projects.");
+  throw new Error("MONGODB_URL is required to seed sample projects.");
 }
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+const prisma = new PrismaClient();
 
 const reportDates = [
   new Date("2026-10-01T00:00:00.000Z"),
@@ -95,14 +93,14 @@ async function main(): Promise<void> {
         title: sample.title,
         kelompokTani: sample.kelompokTani,
         address: sample.address,
-        pagu: sample.pagu,
+        pagu: scaledIntegerFromDecimal(sample.pagu),
         progress: sample.progress,
         status: sample.status,
         vendor: sample.vendor,
         priority: sample.priority,
         clientName: sample.kelompokTani,
         location: sample.address,
-        budget: sample.pagu,
+        budget: scaledIntegerFromDecimal(sample.pagu),
         startDate: reportDates[0],
       },
       update: {
@@ -110,14 +108,14 @@ async function main(): Promise<void> {
         title: sample.title,
         kelompokTani: sample.kelompokTani,
         address: sample.address,
-        pagu: sample.pagu,
+        pagu: scaledIntegerFromDecimal(sample.pagu),
         progress: sample.progress,
         status: sample.status,
         vendor: sample.vendor,
         priority: sample.priority,
         clientName: sample.kelompokTani,
         location: sample.address,
-        budget: sample.pagu,
+        budget: scaledIntegerFromDecimal(sample.pagu),
       },
       select: { id: true },
     });

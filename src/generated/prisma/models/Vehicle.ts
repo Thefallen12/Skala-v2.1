@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,11 +27,11 @@ export type AggregateVehicle = {
 }
 
 export type VehicleAvgAggregateOutputType = {
-  currentKilometer: runtime.Decimal | null
+  currentKilometer: number | null
 }
 
 export type VehicleSumAggregateOutputType = {
-  currentKilometer: runtime.Decimal | null
+  currentKilometer: bigint | null
 }
 
 export type VehicleMinAggregateOutputType = {
@@ -40,7 +40,7 @@ export type VehicleMinAggregateOutputType = {
   vehicleType: string | null
   brand: string | null
   modelName: string | null
-  currentKilometer: runtime.Decimal | null
+  currentKilometer: bigint | null
   odometerInitialized: boolean | null
   status: string | null
   createdAt: Date | null
@@ -53,7 +53,7 @@ export type VehicleMaxAggregateOutputType = {
   vehicleType: string | null
   brand: string | null
   modelName: string | null
-  currentKilometer: runtime.Decimal | null
+  currentKilometer: bigint | null
   odometerInitialized: boolean | null
   status: string | null
   createdAt: Date | null
@@ -215,7 +215,7 @@ export type VehicleGroupByOutputType = {
   vehicleType: string
   brand: string | null
   modelName: string | null
-  currentKilometer: runtime.Decimal
+  currentKilometer: bigint
   odometerInitialized: boolean
   status: string
   createdAt: Date
@@ -227,7 +227,7 @@ export type VehicleGroupByOutputType = {
   _max: VehicleMaxAggregateOutputType | null
 }
 
-export type GetVehicleGroupByPayload<T extends VehicleGroupByArgs> = Prisma.PrismaPromise<
+type GetVehicleGroupByPayload<T extends VehicleGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<VehicleGroupByOutputType, T['by']> &
       {
@@ -251,7 +251,7 @@ export type VehicleWhereInput = {
   vehicleType?: Prisma.StringFilter<"Vehicle"> | string
   brand?: Prisma.StringNullableFilter<"Vehicle"> | string | null
   modelName?: Prisma.StringNullableFilter<"Vehicle"> | string | null
-  currentKilometer?: Prisma.DecimalFilter<"Vehicle"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFilter<"Vehicle"> | bigint | number
   odometerInitialized?: Prisma.BoolFilter<"Vehicle"> | boolean
   status?: Prisma.StringFilter<"Vehicle"> | string
   createdAt?: Prisma.DateTimeFilter<"Vehicle"> | Date | string
@@ -265,8 +265,8 @@ export type VehicleOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   plateNumber?: Prisma.SortOrder
   vehicleType?: Prisma.SortOrder
-  brand?: Prisma.SortOrderInput | Prisma.SortOrder
-  modelName?: Prisma.SortOrderInput | Prisma.SortOrder
+  brand?: Prisma.SortOrder
+  modelName?: Prisma.SortOrder
   currentKilometer?: Prisma.SortOrder
   odometerInitialized?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -286,7 +286,7 @@ export type VehicleWhereUniqueInput = Prisma.AtLeast<{
   vehicleType?: Prisma.StringFilter<"Vehicle"> | string
   brand?: Prisma.StringNullableFilter<"Vehicle"> | string | null
   modelName?: Prisma.StringNullableFilter<"Vehicle"> | string | null
-  currentKilometer?: Prisma.DecimalFilter<"Vehicle"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFilter<"Vehicle"> | bigint | number
   odometerInitialized?: Prisma.BoolFilter<"Vehicle"> | boolean
   status?: Prisma.StringFilter<"Vehicle"> | string
   createdAt?: Prisma.DateTimeFilter<"Vehicle"> | Date | string
@@ -300,8 +300,8 @@ export type VehicleOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   plateNumber?: Prisma.SortOrder
   vehicleType?: Prisma.SortOrder
-  brand?: Prisma.SortOrderInput | Prisma.SortOrder
-  modelName?: Prisma.SortOrderInput | Prisma.SortOrder
+  brand?: Prisma.SortOrder
+  modelName?: Prisma.SortOrder
   currentKilometer?: Prisma.SortOrder
   odometerInitialized?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -323,7 +323,7 @@ export type VehicleScalarWhereWithAggregatesInput = {
   vehicleType?: Prisma.StringWithAggregatesFilter<"Vehicle"> | string
   brand?: Prisma.StringNullableWithAggregatesFilter<"Vehicle"> | string | null
   modelName?: Prisma.StringNullableWithAggregatesFilter<"Vehicle"> | string | null
-  currentKilometer?: Prisma.DecimalWithAggregatesFilter<"Vehicle"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntWithAggregatesFilter<"Vehicle"> | bigint | number
   odometerInitialized?: Prisma.BoolWithAggregatesFilter<"Vehicle"> | boolean
   status?: Prisma.StringWithAggregatesFilter<"Vehicle"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Vehicle"> | Date | string
@@ -336,7 +336,7 @@ export type VehicleCreateInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -352,7 +352,7 @@ export type VehicleUncheckedCreateInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -363,12 +363,11 @@ export type VehicleUncheckedCreateInput = {
 }
 
 export type VehicleUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -379,12 +378,11 @@ export type VehicleUpdateInput = {
 }
 
 export type VehicleUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -400,7 +398,7 @@ export type VehicleCreateManyInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -408,12 +406,11 @@ export type VehicleCreateManyInput = {
 }
 
 export type VehicleUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -421,12 +418,11 @@ export type VehicleUpdateManyMutationInput = {
 }
 
 export type VehicleUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -500,7 +496,7 @@ export type VehicleUpdateOneWithoutDeliveryOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.VehicleCreateWithoutDeliveryOrdersInput, Prisma.VehicleUncheckedCreateWithoutDeliveryOrdersInput>
   connectOrCreate?: Prisma.VehicleCreateOrConnectWithoutDeliveryOrdersInput
   upsert?: Prisma.VehicleUpsertWithoutDeliveryOrdersInput
-  disconnect?: Prisma.VehicleWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.VehicleWhereInput | boolean
   connect?: Prisma.VehicleWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.VehicleUpdateToOneWithWhereWithoutDeliveryOrdersInput, Prisma.VehicleUpdateWithoutDeliveryOrdersInput>, Prisma.VehicleUncheckedUpdateWithoutDeliveryOrdersInput>
@@ -540,7 +536,7 @@ export type VehicleCreateWithoutDeliveryOrdersInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -555,7 +551,7 @@ export type VehicleUncheckedCreateWithoutDeliveryOrdersInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -581,12 +577,11 @@ export type VehicleUpdateToOneWithWhereWithoutDeliveryOrdersInput = {
 }
 
 export type VehicleUpdateWithoutDeliveryOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -596,12 +591,11 @@ export type VehicleUpdateWithoutDeliveryOrdersInput = {
 }
 
 export type VehicleUncheckedUpdateWithoutDeliveryOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -616,7 +610,7 @@ export type VehicleCreateWithoutTripLogsInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -631,7 +625,7 @@ export type VehicleUncheckedCreateWithoutTripLogsInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -657,12 +651,11 @@ export type VehicleUpdateToOneWithWhereWithoutTripLogsInput = {
 }
 
 export type VehicleUpdateWithoutTripLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -672,12 +665,11 @@ export type VehicleUpdateWithoutTripLogsInput = {
 }
 
 export type VehicleUncheckedUpdateWithoutTripLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -692,7 +684,7 @@ export type VehicleCreateWithoutFuelRequestsInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -707,7 +699,7 @@ export type VehicleUncheckedCreateWithoutFuelRequestsInput = {
   vehicleType: string
   brand?: string | null
   modelName?: string | null
-  currentKilometer?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: bigint | number
   odometerInitialized?: boolean
   status?: string
   createdAt?: Date | string
@@ -733,12 +725,11 @@ export type VehicleUpdateToOneWithWhereWithoutFuelRequestsInput = {
 }
 
 export type VehicleUpdateWithoutFuelRequestsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -748,12 +739,11 @@ export type VehicleUpdateWithoutFuelRequestsInput = {
 }
 
 export type VehicleUncheckedUpdateWithoutFuelRequestsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   plateNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleType?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   modelName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  currentKilometer?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentKilometer?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   odometerInitialized?: Prisma.BoolFieldUpdateOperationsInput | boolean
   status?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -828,31 +818,7 @@ export type VehicleSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   _count?: boolean | Prisma.VehicleCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["vehicle"]>
 
-export type VehicleSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  plateNumber?: boolean
-  vehicleType?: boolean
-  brand?: boolean
-  modelName?: boolean
-  currentKilometer?: boolean
-  odometerInitialized?: boolean
-  status?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["vehicle"]>
 
-export type VehicleSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  plateNumber?: boolean
-  vehicleType?: boolean
-  brand?: boolean
-  modelName?: boolean
-  currentKilometer?: boolean
-  odometerInitialized?: boolean
-  status?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["vehicle"]>
 
 export type VehicleSelectScalar = {
   id?: boolean
@@ -874,8 +840,6 @@ export type VehicleInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   fuelRequests?: boolean | Prisma.Vehicle$fuelRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.VehicleCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type VehicleIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type VehicleIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $VehiclePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Vehicle"
@@ -890,7 +854,7 @@ export type $VehiclePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     vehicleType: string
     brand: string | null
     modelName: string | null
-    currentKilometer: runtime.Decimal
+    currentKilometer: bigint
     odometerInitialized: boolean
     status: string
     createdAt: Date
@@ -1013,30 +977,6 @@ export interface VehicleDelegate<ExtArgs extends runtime.Types.Extensions.Intern
   createMany<T extends VehicleCreateManyArgs>(args?: Prisma.SelectSubset<T, VehicleCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Vehicles and returns the data saved in the database.
-   * @param {VehicleCreateManyAndReturnArgs} args - Arguments to create many Vehicles.
-   * @example
-   * // Create many Vehicles
-   * const vehicle = await prisma.vehicle.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Vehicles and only return the `id`
-   * const vehicleWithIdOnly = await prisma.vehicle.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends VehicleCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, VehicleCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VehiclePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Vehicle.
    * @param {VehicleDeleteArgs} args - Arguments to delete one Vehicle.
    * @example
@@ -1101,36 +1041,6 @@ export interface VehicleDelegate<ExtArgs extends runtime.Types.Extensions.Intern
   updateMany<T extends VehicleUpdateManyArgs>(args: Prisma.SelectSubset<T, VehicleUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Vehicles and returns the data updated in the database.
-   * @param {VehicleUpdateManyAndReturnArgs} args - Arguments to update many Vehicles.
-   * @example
-   * // Update many Vehicles
-   * const vehicle = await prisma.vehicle.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Vehicles and only return the `id`
-   * const vehicleWithIdOnly = await prisma.vehicle.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends VehicleUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, VehicleUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VehiclePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Vehicle.
    * @param {VehicleUpsertArgs} args - Arguments to update or create a Vehicle.
    * @example
@@ -1148,6 +1058,29 @@ export interface VehicleDelegate<ExtArgs extends runtime.Types.Extensions.Intern
    * })
    */
   upsert<T extends VehicleUpsertArgs>(args: Prisma.SelectSubset<T, VehicleUpsertArgs<ExtArgs>>): Prisma.Prisma__VehicleClient<runtime.Types.Result.GetResult<Prisma.$VehiclePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Vehicles that matches the filter.
+   * @param {VehicleFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const vehicle = await prisma.vehicle.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.VehicleFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Vehicle.
+   * @param {VehicleAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const vehicle = await prisma.vehicle.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.VehicleAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1326,7 +1259,7 @@ export interface VehicleFieldRefs {
   readonly vehicleType: Prisma.FieldRef<"Vehicle", 'String'>
   readonly brand: Prisma.FieldRef<"Vehicle", 'String'>
   readonly modelName: Prisma.FieldRef<"Vehicle", 'String'>
-  readonly currentKilometer: Prisma.FieldRef<"Vehicle", 'Decimal'>
+  readonly currentKilometer: Prisma.FieldRef<"Vehicle", 'BigInt'>
   readonly odometerInitialized: Prisma.FieldRef<"Vehicle", 'Boolean'>
   readonly status: Prisma.FieldRef<"Vehicle", 'String'>
   readonly createdAt: Prisma.FieldRef<"Vehicle", 'DateTime'>
@@ -1527,11 +1460,6 @@ export type VehicleFindManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Skip the first `n` Vehicles.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Vehicles.
-   */
   distinct?: Prisma.VehicleScalarFieldEnum | Prisma.VehicleScalarFieldEnum[]
 }
 
@@ -1565,26 +1493,6 @@ export type VehicleCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * The data used to create many Vehicles.
    */
   data: Prisma.VehicleCreateManyInput | Prisma.VehicleCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Vehicle createManyAndReturn
- */
-export type VehicleCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Vehicle
-   */
-  select?: Prisma.VehicleSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Vehicle
-   */
-  omit?: Prisma.VehicleOmit<ExtArgs> | null
-  /**
-   * The data used to create many Vehicles.
-   */
-  data: Prisma.VehicleCreateManyInput | Prisma.VehicleCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1617,32 +1525,6 @@ export type VehicleUpdateArgs<ExtArgs extends runtime.Types.Extensions.InternalA
  * Vehicle updateMany
  */
 export type VehicleUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update Vehicles.
-   */
-  data: Prisma.XOR<Prisma.VehicleUpdateManyMutationInput, Prisma.VehicleUncheckedUpdateManyInput>
-  /**
-   * Filter which Vehicles to update
-   */
-  where?: Prisma.VehicleWhereInput
-  /**
-   * Limit how many Vehicles to update.
-   */
-  limit?: number
-}
-
-/**
- * Vehicle updateManyAndReturn
- */
-export type VehicleUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Vehicle
-   */
-  select?: Prisma.VehicleSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Vehicle
-   */
-  omit?: Prisma.VehicleOmit<ExtArgs> | null
   /**
    * The data used to update Vehicles.
    */
@@ -1721,6 +1603,34 @@ export type VehicleDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Vehicles to delete.
    */
   limit?: number
+}
+
+/**
+ * Vehicle findRaw
+ */
+export type VehicleFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Vehicle aggregateRaw
+ */
+export type VehicleAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

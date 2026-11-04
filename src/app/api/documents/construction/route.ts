@@ -9,6 +9,7 @@ import {
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import { renderPdf } from "@/lib/documents/render-pdf";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const runtime = "nodejs";
 
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
           <p><strong>Proyek / Lokasi:</strong> ${escapeHtml(projectName)}</p>
           <p><strong>Subkontraktor:</strong> ${escapeHtml(contract.subkonName)}</p>
           <p><strong>Tanggal:</strong> ${escapeHtml(documentDate)}</p>
-          <p><strong>Nilai kontrak:</strong> ${escapeHtml(currency(contract.contractValue.toString()))}</p>
+          <p><strong>Nilai kontrak:</strong> ${escapeHtml(currency(decimalStringFromScaledInteger(contract.contractValue)))}</p>
         </section>
         <h3>Lingkup Pekerjaan</h3>
         <p class="scope">${escapeHtml(contract.workScope).replaceAll("\n", "<br>")}</p>`

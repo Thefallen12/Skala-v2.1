@@ -10,7 +10,6 @@ type PublicCodeClient = Pick<
   | "blueprint"
   | "subkonContract"
   | "bASTDocument"
-  | "$queryRaw"
 >;
 
 export function generateRandomCode(): string {
@@ -24,12 +23,6 @@ export function isValidPublicCode(value: string): boolean {
 export async function generateAvailablePublicCode(
   client: PublicCodeClient,
 ): Promise<string> {
-  await client.$queryRaw<{ locked: boolean }[]>`
-    WITH lock_acquired AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(hashtext('public-order-code')::bigint)
-    )
-    SELECT true AS locked FROM lock_acquired
-  `;
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const publicCode = generateRandomCode();
     const [

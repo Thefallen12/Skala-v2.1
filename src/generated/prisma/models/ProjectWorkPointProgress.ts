@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -199,7 +199,7 @@ export type ProjectWorkPointProgressGroupByOutputType = {
   _max: ProjectWorkPointProgressMaxAggregateOutputType | null
 }
 
-export type GetProjectWorkPointProgressGroupByPayload<T extends ProjectWorkPointProgressGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectWorkPointProgressGroupByPayload<T extends ProjectWorkPointProgressGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectWorkPointProgressGroupByOutputType, T['by']> &
       {
@@ -233,7 +233,7 @@ export type ProjectWorkPointProgressOrderByWithRelationInput = {
   workPointId?: Prisma.SortOrder
   reportDate?: Prisma.SortOrder
   progress?: Prisma.SortOrder
-  workSummary?: Prisma.SortOrderInput | Prisma.SortOrder
+  workSummary?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   workPoint?: Prisma.ProjectWorkPointOrderByWithRelationInput
   photos?: Prisma.ProjectWorkPointProgressPhotoOrderByRelationAggregateInput
@@ -258,7 +258,7 @@ export type ProjectWorkPointProgressOrderByWithAggregationInput = {
   workPointId?: Prisma.SortOrder
   reportDate?: Prisma.SortOrder
   progress?: Prisma.SortOrder
-  workSummary?: Prisma.SortOrderInput | Prisma.SortOrder
+  workSummary?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.ProjectWorkPointProgressCountOrderByAggregateInput
   _avg?: Prisma.ProjectWorkPointProgressAvgOrderByAggregateInput
@@ -300,7 +300,6 @@ export type ProjectWorkPointProgressUncheckedCreateInput = {
 }
 
 export type ProjectWorkPointProgressUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -310,7 +309,6 @@ export type ProjectWorkPointProgressUpdateInput = {
 }
 
 export type ProjectWorkPointProgressUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -329,7 +327,6 @@ export type ProjectWorkPointProgressCreateManyInput = {
 }
 
 export type ProjectWorkPointProgressUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -337,7 +334,6 @@ export type ProjectWorkPointProgressUpdateManyMutationInput = {
 }
 
 export type ProjectWorkPointProgressUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -476,7 +472,6 @@ export type ProjectWorkPointProgressCreateOrConnectWithoutWorkPointInput = {
 
 export type ProjectWorkPointProgressCreateManyWorkPointInputEnvelope = {
   data: Prisma.ProjectWorkPointProgressCreateManyWorkPointInput | Prisma.ProjectWorkPointProgressCreateManyWorkPointInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWorkPointProgressUpsertWithWhereUniqueWithoutWorkPointInput = {
@@ -542,7 +537,6 @@ export type ProjectWorkPointProgressUpdateToOneWithWhereWithoutPhotosInput = {
 }
 
 export type ProjectWorkPointProgressUpdateWithoutPhotosInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -551,7 +545,6 @@ export type ProjectWorkPointProgressUpdateWithoutPhotosInput = {
 }
 
 export type ProjectWorkPointProgressUncheckedUpdateWithoutPhotosInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -568,7 +561,6 @@ export type ProjectWorkPointProgressCreateManyWorkPointInput = {
 }
 
 export type ProjectWorkPointProgressUpdateWithoutWorkPointInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -577,7 +569,6 @@ export type ProjectWorkPointProgressUpdateWithoutWorkPointInput = {
 }
 
 export type ProjectWorkPointProgressUncheckedUpdateWithoutWorkPointInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -586,7 +577,6 @@ export type ProjectWorkPointProgressUncheckedUpdateWithoutWorkPointInput = {
 }
 
 export type ProjectWorkPointProgressUncheckedUpdateManyWithoutWorkPointInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -636,25 +626,7 @@ export type ProjectWorkPointProgressSelect<ExtArgs extends runtime.Types.Extensi
   _count?: boolean | Prisma.ProjectWorkPointProgressCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectWorkPointProgress"]>
 
-export type ProjectWorkPointProgressSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  workPointId?: boolean
-  reportDate?: boolean
-  progress?: boolean
-  workSummary?: boolean
-  createdAt?: boolean
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["projectWorkPointProgress"]>
 
-export type ProjectWorkPointProgressSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  workPointId?: boolean
-  reportDate?: boolean
-  progress?: boolean
-  workSummary?: boolean
-  createdAt?: boolean
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["projectWorkPointProgress"]>
 
 export type ProjectWorkPointProgressSelectScalar = {
   id?: boolean
@@ -670,12 +642,6 @@ export type ProjectWorkPointProgressInclude<ExtArgs extends runtime.Types.Extens
   workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
   photos?: boolean | Prisma.ProjectWorkPointProgress$photosArgs<ExtArgs>
   _count?: boolean | Prisma.ProjectWorkPointProgressCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type ProjectWorkPointProgressIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-}
-export type ProjectWorkPointProgressIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
 }
 
 export type $ProjectWorkPointProgressPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -809,30 +775,6 @@ export interface ProjectWorkPointProgressDelegate<ExtArgs extends runtime.Types.
   createMany<T extends ProjectWorkPointProgressCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectWorkPointProgressCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many ProjectWorkPointProgresses and returns the data saved in the database.
-   * @param {ProjectWorkPointProgressCreateManyAndReturnArgs} args - Arguments to create many ProjectWorkPointProgresses.
-   * @example
-   * // Create many ProjectWorkPointProgresses
-   * const projectWorkPointProgress = await prisma.projectWorkPointProgress.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many ProjectWorkPointProgresses and only return the `id`
-   * const projectWorkPointProgressWithIdOnly = await prisma.projectWorkPointProgress.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectWorkPointProgressCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectWorkPointProgressCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointProgressPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a ProjectWorkPointProgress.
    * @param {ProjectWorkPointProgressDeleteArgs} args - Arguments to delete one ProjectWorkPointProgress.
    * @example
@@ -897,36 +839,6 @@ export interface ProjectWorkPointProgressDelegate<ExtArgs extends runtime.Types.
   updateMany<T extends ProjectWorkPointProgressUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointProgressUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more ProjectWorkPointProgresses and returns the data updated in the database.
-   * @param {ProjectWorkPointProgressUpdateManyAndReturnArgs} args - Arguments to update many ProjectWorkPointProgresses.
-   * @example
-   * // Update many ProjectWorkPointProgresses
-   * const projectWorkPointProgress = await prisma.projectWorkPointProgress.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more ProjectWorkPointProgresses and only return the `id`
-   * const projectWorkPointProgressWithIdOnly = await prisma.projectWorkPointProgress.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectWorkPointProgressUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointProgressUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointProgressPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one ProjectWorkPointProgress.
    * @param {ProjectWorkPointProgressUpsertArgs} args - Arguments to update or create a ProjectWorkPointProgress.
    * @example
@@ -944,6 +856,29 @@ export interface ProjectWorkPointProgressDelegate<ExtArgs extends runtime.Types.
    * })
    */
   upsert<T extends ProjectWorkPointProgressUpsertArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointProgressUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectWorkPointProgressClient<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointProgressPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more ProjectWorkPointProgresses that matches the filter.
+   * @param {ProjectWorkPointProgressFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const projectWorkPointProgress = await prisma.projectWorkPointProgress.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectWorkPointProgressFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a ProjectWorkPointProgress.
+   * @param {ProjectWorkPointProgressAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const projectWorkPointProgress = await prisma.projectWorkPointProgress.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectWorkPointProgressAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1318,11 +1253,6 @@ export type ProjectWorkPointProgressFindManyArgs<ExtArgs extends runtime.Types.E
    * Skip the first `n` ProjectWorkPointProgresses.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ProjectWorkPointProgresses.
-   */
   distinct?: Prisma.ProjectWorkPointProgressScalarFieldEnum | Prisma.ProjectWorkPointProgressScalarFieldEnum[]
 }
 
@@ -1356,30 +1286,6 @@ export type ProjectWorkPointProgressCreateManyArgs<ExtArgs extends runtime.Types
    * The data used to create many ProjectWorkPointProgresses.
    */
   data: Prisma.ProjectWorkPointProgressCreateManyInput | Prisma.ProjectWorkPointProgressCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * ProjectWorkPointProgress createManyAndReturn
- */
-export type ProjectWorkPointProgressCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWorkPointProgress
-   */
-  select?: Prisma.ProjectWorkPointProgressSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWorkPointProgress
-   */
-  omit?: Prisma.ProjectWorkPointProgressOmit<ExtArgs> | null
-  /**
-   * The data used to create many ProjectWorkPointProgresses.
-   */
-  data: Prisma.ProjectWorkPointProgressCreateManyInput | Prisma.ProjectWorkPointProgressCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWorkPointProgressIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1424,36 +1330,6 @@ export type ProjectWorkPointProgressUpdateManyArgs<ExtArgs extends runtime.Types
    * Limit how many ProjectWorkPointProgresses to update.
    */
   limit?: number
-}
-
-/**
- * ProjectWorkPointProgress updateManyAndReturn
- */
-export type ProjectWorkPointProgressUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWorkPointProgress
-   */
-  select?: Prisma.ProjectWorkPointProgressSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWorkPointProgress
-   */
-  omit?: Prisma.ProjectWorkPointProgressOmit<ExtArgs> | null
-  /**
-   * The data used to update ProjectWorkPointProgresses.
-   */
-  data: Prisma.XOR<Prisma.ProjectWorkPointProgressUpdateManyMutationInput, Prisma.ProjectWorkPointProgressUncheckedUpdateManyInput>
-  /**
-   * Filter which ProjectWorkPointProgresses to update
-   */
-  where?: Prisma.ProjectWorkPointProgressWhereInput
-  /**
-   * Limit how many ProjectWorkPointProgresses to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWorkPointProgressIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1520,6 +1396,34 @@ export type ProjectWorkPointProgressDeleteManyArgs<ExtArgs extends runtime.Types
    * Limit how many ProjectWorkPointProgresses to delete.
    */
   limit?: number
+}
+
+/**
+ * ProjectWorkPointProgress findRaw
+ */
+export type ProjectWorkPointProgressFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * ProjectWorkPointProgress aggregateRaw
+ */
+export type ProjectWorkPointProgressAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

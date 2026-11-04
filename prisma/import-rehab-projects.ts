@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { Prisma } from "../src/generated/prisma/client";
 import { ProjectPriority, ProjectStatus } from "../src/generated/prisma/enums";
 import { prisma } from "../src/lib/prisma";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "../src/lib/scaled-decimal";
 import { z } from "zod";
 
 const recordSchema = z.object({
@@ -72,8 +76,8 @@ async function main(): Promise<void> {
           title: record.title,
           kelompokTani: record.kelompokTani,
           address: record.address,
-          pagu: new Prisma.Decimal(record.pagu),
-          landArea: new Prisma.Decimal(record.landArea),
+          pagu: scaledIntegerFromDecimal(record.pagu),
+          landArea: scaledIntegerFromDecimal(record.landArea),
           progress: 0,
           priority: ProjectPriority.MEDIUM,
           status: ProjectStatus.PENDING,
@@ -81,7 +85,6 @@ async function main(): Promise<void> {
           location: record.location,
           startDate: new Date(`${record.startDate}T00:00:00.000Z`),
         })),
-        skipDuplicates: true,
       })
     : { count: 0 };
   if (recordsToUpdateLandArea.length) {
@@ -89,7 +92,7 @@ async function main(): Promise<void> {
       recordsToUpdateLandArea.map((record) =>
         prisma.project.update({
           where: { code: record.code },
-          data: { landArea: new Prisma.Decimal(record.landArea) },
+          data: { landArea: scaledIntegerFromDecimal(record.landArea) },
         }),
       ),
     );
@@ -100,7 +103,8 @@ async function main(): Promise<void> {
     select: { code: true, pagu: true },
   });
   const importedBudget = importedProjects.reduce(
-    (total, project) => total.plus(project.pagu),
+    (total, project) =>
+      total.plus(decimalFromScaledInteger(project.pagu)),
     new Prisma.Decimal(0),
   );
   if (

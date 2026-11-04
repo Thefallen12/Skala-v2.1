@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -186,7 +186,7 @@ export type OperationalDocumentTemplateGroupByOutputType = {
   _max: OperationalDocumentTemplateMaxAggregateOutputType | null
 }
 
-export type GetOperationalDocumentTemplateGroupByPayload<T extends OperationalDocumentTemplateGroupByArgs> = Prisma.PrismaPromise<
+type GetOperationalDocumentTemplateGroupByPayload<T extends OperationalDocumentTemplateGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OperationalDocumentTemplateGroupByOutputType, T['by']> &
       {
@@ -306,7 +306,6 @@ export type OperationalDocumentTemplateUncheckedCreateInput = {
 }
 
 export type OperationalDocumentTemplateUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -319,7 +318,6 @@ export type OperationalDocumentTemplateUpdateInput = {
 }
 
 export type OperationalDocumentTemplateUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -344,7 +342,6 @@ export type OperationalDocumentTemplateCreateManyInput = {
 }
 
 export type OperationalDocumentTemplateUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -355,7 +352,6 @@ export type OperationalDocumentTemplateUpdateManyMutationInput = {
 }
 
 export type OperationalDocumentTemplateUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -473,7 +469,7 @@ export type OperationalDocumentTemplateUpdateOneWithoutDocumentsNestedInput = {
   create?: Prisma.XOR<Prisma.OperationalDocumentTemplateCreateWithoutDocumentsInput, Prisma.OperationalDocumentTemplateUncheckedCreateWithoutDocumentsInput>
   connectOrCreate?: Prisma.OperationalDocumentTemplateCreateOrConnectWithoutDocumentsInput
   upsert?: Prisma.OperationalDocumentTemplateUpsertWithoutDocumentsInput
-  disconnect?: Prisma.OperationalDocumentTemplateWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.OperationalDocumentTemplateWhereInput | boolean
   connect?: Prisma.OperationalDocumentTemplateWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OperationalDocumentTemplateUpdateToOneWithWhereWithoutDocumentsInput, Prisma.OperationalDocumentTemplateUpdateWithoutDocumentsInput>, Prisma.OperationalDocumentTemplateUncheckedUpdateWithoutDocumentsInput>
@@ -510,7 +506,6 @@ export type OperationalDocumentTemplateCreateOrConnectWithoutCreatedByInput = {
 
 export type OperationalDocumentTemplateCreateManyCreatedByInputEnvelope = {
   data: Prisma.OperationalDocumentTemplateCreateManyCreatedByInput | Prisma.OperationalDocumentTemplateCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type OperationalDocumentTemplateUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -585,7 +580,6 @@ export type OperationalDocumentTemplateUpdateToOneWithWhereWithoutDocumentsInput
 }
 
 export type OperationalDocumentTemplateUpdateWithoutDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -597,7 +591,6 @@ export type OperationalDocumentTemplateUpdateWithoutDocumentsInput = {
 }
 
 export type OperationalDocumentTemplateUncheckedUpdateWithoutDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -620,7 +613,6 @@ export type OperationalDocumentTemplateCreateManyCreatedByInput = {
 }
 
 export type OperationalDocumentTemplateUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -632,7 +624,6 @@ export type OperationalDocumentTemplateUpdateWithoutCreatedByInput = {
 }
 
 export type OperationalDocumentTemplateUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -644,7 +635,6 @@ export type OperationalDocumentTemplateUncheckedUpdateWithoutCreatedByInput = {
 }
 
 export type OperationalDocumentTemplateUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   kind?: Prisma.EnumOperationalDocumentKindFieldUpdateOperationsInput | $Enums.OperationalDocumentKind
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -700,31 +690,7 @@ export type OperationalDocumentTemplateSelect<ExtArgs extends runtime.Types.Exte
   _count?: boolean | Prisma.OperationalDocumentTemplateCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["operationalDocumentTemplate"]>
 
-export type OperationalDocumentTemplateSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  name?: boolean
-  kind?: boolean
-  title?: boolean
-  content?: boolean
-  isActive?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["operationalDocumentTemplate"]>
 
-export type OperationalDocumentTemplateSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  name?: boolean
-  kind?: boolean
-  title?: boolean
-  content?: boolean
-  isActive?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["operationalDocumentTemplate"]>
 
 export type OperationalDocumentTemplateSelectScalar = {
   id?: boolean
@@ -743,12 +709,6 @@ export type OperationalDocumentTemplateInclude<ExtArgs extends runtime.Types.Ext
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   documents?: boolean | Prisma.OperationalDocumentTemplate$documentsArgs<ExtArgs>
   _count?: boolean | Prisma.OperationalDocumentTemplateCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type OperationalDocumentTemplateIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type OperationalDocumentTemplateIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 
 export type $OperationalDocumentTemplatePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -885,30 +845,6 @@ export interface OperationalDocumentTemplateDelegate<ExtArgs extends runtime.Typ
   createMany<T extends OperationalDocumentTemplateCreateManyArgs>(args?: Prisma.SelectSubset<T, OperationalDocumentTemplateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many OperationalDocumentTemplates and returns the data saved in the database.
-   * @param {OperationalDocumentTemplateCreateManyAndReturnArgs} args - Arguments to create many OperationalDocumentTemplates.
-   * @example
-   * // Create many OperationalDocumentTemplates
-   * const operationalDocumentTemplate = await prisma.operationalDocumentTemplate.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many OperationalDocumentTemplates and only return the `id`
-   * const operationalDocumentTemplateWithIdOnly = await prisma.operationalDocumentTemplate.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends OperationalDocumentTemplateCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, OperationalDocumentTemplateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OperationalDocumentTemplatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a OperationalDocumentTemplate.
    * @param {OperationalDocumentTemplateDeleteArgs} args - Arguments to delete one OperationalDocumentTemplate.
    * @example
@@ -973,36 +909,6 @@ export interface OperationalDocumentTemplateDelegate<ExtArgs extends runtime.Typ
   updateMany<T extends OperationalDocumentTemplateUpdateManyArgs>(args: Prisma.SelectSubset<T, OperationalDocumentTemplateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more OperationalDocumentTemplates and returns the data updated in the database.
-   * @param {OperationalDocumentTemplateUpdateManyAndReturnArgs} args - Arguments to update many OperationalDocumentTemplates.
-   * @example
-   * // Update many OperationalDocumentTemplates
-   * const operationalDocumentTemplate = await prisma.operationalDocumentTemplate.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more OperationalDocumentTemplates and only return the `id`
-   * const operationalDocumentTemplateWithIdOnly = await prisma.operationalDocumentTemplate.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends OperationalDocumentTemplateUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, OperationalDocumentTemplateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OperationalDocumentTemplatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one OperationalDocumentTemplate.
    * @param {OperationalDocumentTemplateUpsertArgs} args - Arguments to update or create a OperationalDocumentTemplate.
    * @example
@@ -1020,6 +926,29 @@ export interface OperationalDocumentTemplateDelegate<ExtArgs extends runtime.Typ
    * })
    */
   upsert<T extends OperationalDocumentTemplateUpsertArgs>(args: Prisma.SelectSubset<T, OperationalDocumentTemplateUpsertArgs<ExtArgs>>): Prisma.Prisma__OperationalDocumentTemplateClient<runtime.Types.Result.GetResult<Prisma.$OperationalDocumentTemplatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more OperationalDocumentTemplates that matches the filter.
+   * @param {OperationalDocumentTemplateFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const operationalDocumentTemplate = await prisma.operationalDocumentTemplate.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.OperationalDocumentTemplateFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a OperationalDocumentTemplate.
+   * @param {OperationalDocumentTemplateAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const operationalDocumentTemplate = await prisma.operationalDocumentTemplate.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.OperationalDocumentTemplateAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1397,11 +1326,6 @@ export type OperationalDocumentTemplateFindManyArgs<ExtArgs extends runtime.Type
    * Skip the first `n` OperationalDocumentTemplates.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of OperationalDocumentTemplates.
-   */
   distinct?: Prisma.OperationalDocumentTemplateScalarFieldEnum | Prisma.OperationalDocumentTemplateScalarFieldEnum[]
 }
 
@@ -1435,30 +1359,6 @@ export type OperationalDocumentTemplateCreateManyArgs<ExtArgs extends runtime.Ty
    * The data used to create many OperationalDocumentTemplates.
    */
   data: Prisma.OperationalDocumentTemplateCreateManyInput | Prisma.OperationalDocumentTemplateCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * OperationalDocumentTemplate createManyAndReturn
- */
-export type OperationalDocumentTemplateCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OperationalDocumentTemplate
-   */
-  select?: Prisma.OperationalDocumentTemplateSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the OperationalDocumentTemplate
-   */
-  omit?: Prisma.OperationalDocumentTemplateOmit<ExtArgs> | null
-  /**
-   * The data used to create many OperationalDocumentTemplates.
-   */
-  data: Prisma.OperationalDocumentTemplateCreateManyInput | Prisma.OperationalDocumentTemplateCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OperationalDocumentTemplateIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1503,36 +1403,6 @@ export type OperationalDocumentTemplateUpdateManyArgs<ExtArgs extends runtime.Ty
    * Limit how many OperationalDocumentTemplates to update.
    */
   limit?: number
-}
-
-/**
- * OperationalDocumentTemplate updateManyAndReturn
- */
-export type OperationalDocumentTemplateUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OperationalDocumentTemplate
-   */
-  select?: Prisma.OperationalDocumentTemplateSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the OperationalDocumentTemplate
-   */
-  omit?: Prisma.OperationalDocumentTemplateOmit<ExtArgs> | null
-  /**
-   * The data used to update OperationalDocumentTemplates.
-   */
-  data: Prisma.XOR<Prisma.OperationalDocumentTemplateUpdateManyMutationInput, Prisma.OperationalDocumentTemplateUncheckedUpdateManyInput>
-  /**
-   * Filter which OperationalDocumentTemplates to update
-   */
-  where?: Prisma.OperationalDocumentTemplateWhereInput
-  /**
-   * Limit how many OperationalDocumentTemplates to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OperationalDocumentTemplateIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1599,6 +1469,34 @@ export type OperationalDocumentTemplateDeleteManyArgs<ExtArgs extends runtime.Ty
    * Limit how many OperationalDocumentTemplates to delete.
    */
   limit?: number
+}
+
+/**
+ * OperationalDocumentTemplate findRaw
+ */
+export type OperationalDocumentTemplateFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * OperationalDocumentTemplate aggregateRaw
+ */
+export type OperationalDocumentTemplateAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

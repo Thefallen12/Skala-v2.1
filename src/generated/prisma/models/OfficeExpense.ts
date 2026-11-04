@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -230,7 +230,7 @@ export type OfficeExpenseGroupByOutputType = {
   _max: OfficeExpenseMaxAggregateOutputType | null
 }
 
-export type GetOfficeExpenseGroupByPayload<T extends OfficeExpenseGroupByArgs> = Prisma.PrismaPromise<
+type GetOfficeExpenseGroupByPayload<T extends OfficeExpenseGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OfficeExpenseGroupByOutputType, T['by']> &
       {
@@ -370,7 +370,6 @@ export type OfficeExpenseUncheckedCreateInput = {
 }
 
 export type OfficeExpenseUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -384,7 +383,6 @@ export type OfficeExpenseUpdateInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -412,7 +410,6 @@ export type OfficeExpenseCreateManyInput = {
 }
 
 export type OfficeExpenseUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -422,7 +419,6 @@ export type OfficeExpenseUpdateManyMutationInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -698,7 +694,6 @@ export type OfficeExpenseCreateOrConnectWithoutRecipientInput = {
 
 export type OfficeExpenseCreateManyRecipientInputEnvelope = {
   data: Prisma.OfficeExpenseCreateManyRecipientInput | Prisma.OfficeExpenseCreateManyRecipientInput[]
-  skipDuplicates?: boolean
 }
 
 export type OfficeExpenseCreateWithoutRecorderInput = {
@@ -734,7 +729,6 @@ export type OfficeExpenseCreateOrConnectWithoutRecorderInput = {
 
 export type OfficeExpenseCreateManyRecorderInputEnvelope = {
   data: Prisma.OfficeExpenseCreateManyRecorderInput | Prisma.OfficeExpenseCreateManyRecorderInput[]
-  skipDuplicates?: boolean
 }
 
 export type OfficeExpenseUpsertWithWhereUniqueWithoutRecipientInput = {
@@ -819,7 +813,6 @@ export type OfficeExpenseCreateOrConnectWithoutAccountInput = {
 
 export type OfficeExpenseCreateManyAccountInputEnvelope = {
   data: Prisma.OfficeExpenseCreateManyAccountInput | Prisma.OfficeExpenseCreateManyAccountInput[]
-  skipDuplicates?: boolean
 }
 
 export type OfficeExpenseUpsertWithWhereUniqueWithoutAccountInput = {
@@ -881,7 +874,6 @@ export type OfficeExpenseUpdateToOneWithWhereWithoutCashflowInput = {
 }
 
 export type OfficeExpenseUpdateWithoutCashflowInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -894,7 +886,6 @@ export type OfficeExpenseUpdateWithoutCashflowInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateWithoutCashflowInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -933,7 +924,6 @@ export type OfficeExpenseCreateManyRecorderInput = {
 }
 
 export type OfficeExpenseUpdateWithoutRecipientInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -946,7 +936,6 @@ export type OfficeExpenseUpdateWithoutRecipientInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateWithoutRecipientInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -959,7 +948,6 @@ export type OfficeExpenseUncheckedUpdateWithoutRecipientInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateManyWithoutRecipientInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -972,7 +960,6 @@ export type OfficeExpenseUncheckedUpdateManyWithoutRecipientInput = {
 }
 
 export type OfficeExpenseUpdateWithoutRecorderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -985,7 +972,6 @@ export type OfficeExpenseUpdateWithoutRecorderInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateWithoutRecorderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -998,7 +984,6 @@ export type OfficeExpenseUncheckedUpdateWithoutRecorderInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateManyWithoutRecorderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1024,7 +1009,6 @@ export type OfficeExpenseCreateManyAccountInput = {
 }
 
 export type OfficeExpenseUpdateWithoutAccountInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1037,7 +1021,6 @@ export type OfficeExpenseUpdateWithoutAccountInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateWithoutAccountInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1050,7 +1033,6 @@ export type OfficeExpenseUncheckedUpdateWithoutAccountInput = {
 }
 
 export type OfficeExpenseUncheckedUpdateManyWithoutAccountInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   expenseType?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1082,41 +1064,7 @@ export type OfficeExpenseSelect<ExtArgs extends runtime.Types.Extensions.Interna
   cashflow?: boolean | Prisma.CashflowDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["officeExpense"]>
 
-export type OfficeExpenseSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  expenseType?: boolean
-  description?: boolean
-  amount?: boolean
-  recipientId?: boolean
-  accountId?: boolean
-  paymentMethod?: boolean
-  proofUrls?: boolean
-  recordedBy?: boolean
-  cashflowId?: boolean
-  createdAt?: boolean
-  recipient?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  cashflow?: boolean | Prisma.CashflowDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["officeExpense"]>
 
-export type OfficeExpenseSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  expenseType?: boolean
-  description?: boolean
-  amount?: boolean
-  recipientId?: boolean
-  accountId?: boolean
-  paymentMethod?: boolean
-  proofUrls?: boolean
-  recordedBy?: boolean
-  cashflowId?: boolean
-  createdAt?: boolean
-  recipient?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  cashflow?: boolean | Prisma.CashflowDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["officeExpense"]>
 
 export type OfficeExpenseSelectScalar = {
   id?: boolean
@@ -1134,18 +1082,6 @@ export type OfficeExpenseSelectScalar = {
 
 export type OfficeExpenseOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "expenseType" | "description" | "amount" | "recipientId" | "accountId" | "paymentMethod" | "proofUrls" | "recordedBy" | "cashflowId" | "createdAt", ExtArgs["result"]["officeExpense"]>
 export type OfficeExpenseInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  recipient?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  cashflow?: boolean | Prisma.CashflowDefaultArgs<ExtArgs>
-}
-export type OfficeExpenseIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  recipient?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  cashflow?: boolean | Prisma.CashflowDefaultArgs<ExtArgs>
-}
-export type OfficeExpenseIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   recipient?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
   recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -1290,30 +1226,6 @@ export interface OfficeExpenseDelegate<ExtArgs extends runtime.Types.Extensions.
   createMany<T extends OfficeExpenseCreateManyArgs>(args?: Prisma.SelectSubset<T, OfficeExpenseCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many OfficeExpenses and returns the data saved in the database.
-   * @param {OfficeExpenseCreateManyAndReturnArgs} args - Arguments to create many OfficeExpenses.
-   * @example
-   * // Create many OfficeExpenses
-   * const officeExpense = await prisma.officeExpense.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many OfficeExpenses and only return the `id`
-   * const officeExpenseWithIdOnly = await prisma.officeExpense.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends OfficeExpenseCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, OfficeExpenseCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OfficeExpensePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a OfficeExpense.
    * @param {OfficeExpenseDeleteArgs} args - Arguments to delete one OfficeExpense.
    * @example
@@ -1378,36 +1290,6 @@ export interface OfficeExpenseDelegate<ExtArgs extends runtime.Types.Extensions.
   updateMany<T extends OfficeExpenseUpdateManyArgs>(args: Prisma.SelectSubset<T, OfficeExpenseUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more OfficeExpenses and returns the data updated in the database.
-   * @param {OfficeExpenseUpdateManyAndReturnArgs} args - Arguments to update many OfficeExpenses.
-   * @example
-   * // Update many OfficeExpenses
-   * const officeExpense = await prisma.officeExpense.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more OfficeExpenses and only return the `id`
-   * const officeExpenseWithIdOnly = await prisma.officeExpense.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends OfficeExpenseUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, OfficeExpenseUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OfficeExpensePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one OfficeExpense.
    * @param {OfficeExpenseUpsertArgs} args - Arguments to update or create a OfficeExpense.
    * @example
@@ -1425,6 +1307,29 @@ export interface OfficeExpenseDelegate<ExtArgs extends runtime.Types.Extensions.
    * })
    */
   upsert<T extends OfficeExpenseUpsertArgs>(args: Prisma.SelectSubset<T, OfficeExpenseUpsertArgs<ExtArgs>>): Prisma.Prisma__OfficeExpenseClient<runtime.Types.Result.GetResult<Prisma.$OfficeExpensePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more OfficeExpenses that matches the filter.
+   * @param {OfficeExpenseFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const officeExpense = await prisma.officeExpense.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.OfficeExpenseFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a OfficeExpense.
+   * @param {OfficeExpenseAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const officeExpense = await prisma.officeExpense.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.OfficeExpenseAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1806,11 +1711,6 @@ export type OfficeExpenseFindManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Skip the first `n` OfficeExpenses.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of OfficeExpenses.
-   */
   distinct?: Prisma.OfficeExpenseScalarFieldEnum | Prisma.OfficeExpenseScalarFieldEnum[]
 }
 
@@ -1844,30 +1744,6 @@ export type OfficeExpenseCreateManyArgs<ExtArgs extends runtime.Types.Extensions
    * The data used to create many OfficeExpenses.
    */
   data: Prisma.OfficeExpenseCreateManyInput | Prisma.OfficeExpenseCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * OfficeExpense createManyAndReturn
- */
-export type OfficeExpenseCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OfficeExpense
-   */
-  select?: Prisma.OfficeExpenseSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the OfficeExpense
-   */
-  omit?: Prisma.OfficeExpenseOmit<ExtArgs> | null
-  /**
-   * The data used to create many OfficeExpenses.
-   */
-  data: Prisma.OfficeExpenseCreateManyInput | Prisma.OfficeExpenseCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OfficeExpenseIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1912,36 +1788,6 @@ export type OfficeExpenseUpdateManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many OfficeExpenses to update.
    */
   limit?: number
-}
-
-/**
- * OfficeExpense updateManyAndReturn
- */
-export type OfficeExpenseUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OfficeExpense
-   */
-  select?: Prisma.OfficeExpenseSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the OfficeExpense
-   */
-  omit?: Prisma.OfficeExpenseOmit<ExtArgs> | null
-  /**
-   * The data used to update OfficeExpenses.
-   */
-  data: Prisma.XOR<Prisma.OfficeExpenseUpdateManyMutationInput, Prisma.OfficeExpenseUncheckedUpdateManyInput>
-  /**
-   * Filter which OfficeExpenses to update
-   */
-  where?: Prisma.OfficeExpenseWhereInput
-  /**
-   * Limit how many OfficeExpenses to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OfficeExpenseIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2008,6 +1854,34 @@ export type OfficeExpenseDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many OfficeExpenses to delete.
    */
   limit?: number
+}
+
+/**
+ * OfficeExpense findRaw
+ */
+export type OfficeExpenseFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * OfficeExpense aggregateRaw
+ */
+export type OfficeExpenseAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

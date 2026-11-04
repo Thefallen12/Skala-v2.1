@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { isValidDateKey } from "@/lib/habit-date";
 import { isHabitTaskColor } from "@/lib/habit-task-colors";
 import { auth } from "../../../auth";
+import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
 
 export type WorkspaceActionResult = {
   success: boolean;
@@ -574,11 +575,10 @@ export async function createTimesheetEntry(input: {
     }
     const workDate = new Date(`${input.date}T00:00:00.000Z`);
     await prisma.$transaction(async (transaction) => {
-      await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(
-          hashtext(${`timesheet-${user.id}-${input.date}`})::bigint
-        )
-      `;
+      await acquireMongoTransactionLock(
+        transaction,
+        `timesheet-${user.id}-${input.date}`,
+      );
       const dailyTotal = await transaction.timesheetEntry.aggregate({
         where: { userId: user.id, workDate },
         _sum: { durationMinutes: true },

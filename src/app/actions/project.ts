@@ -21,6 +21,10 @@ import {
 } from "@/lib/project-progress-photos";
 import { removeBlueprintFile } from "@/lib/blueprint-files";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
 
 export type ProjectFinancialCategory = {
   key: "MATERIAL" | "LABOR" | "TRANSPORT" | "OPERATIONAL";
@@ -280,9 +284,9 @@ export async function saveProject(
     jenisPekerjaan: values.jenisPekerjaan || null,
     fieldPicId: values.fieldPicId || null,
     ...(values.pagu
-      ? { pagu: new Prisma.Decimal(values.pagu) }
+      ? { pagu: scaledIntegerFromDecimal(values.pagu) }
       : {}),
-    landArea: values.landArea ? new Prisma.Decimal(values.landArea) : null,
+    landArea: values.landArea ? scaledIntegerFromDecimal(values.landArea) : null,
     progress: values.progress,
     priority: values.priority,
     vendor: values.vendor || null,
@@ -295,7 +299,11 @@ export async function saveProject(
       ? new Date(`${values.endDate}T00:00:00.000Z`)
       : null,
     ...(values.budget !== undefined
-      ? { budget: values.budget ? new Prisma.Decimal(values.budget) : null }
+      ? {
+          budget: values.budget
+            ? scaledIntegerFromDecimal(values.budget)
+            : null,
+        }
       : {}),
   };
 
@@ -310,7 +318,7 @@ export async function saveProject(
       const created = await prisma.project.create({
         data: {
           ...data,
-          pagu: new Prisma.Decimal(values.pagu),
+          pagu: scaledIntegerFromDecimal(values.pagu),
           status: ProjectStatus.PENDING_SETUP,
         },
         select: { id: true },
@@ -501,25 +509,38 @@ export async function importProjects(
       address,
       location: address,
       jenisPekerjaan: row.jenisPekerjaan || null,
-      pagu: new Prisma.Decimal(row.pagu),
+      pagu: scaledIntegerFromDecimal(row.pagu),
       status,
       isDeleted: false,
     };
   });
 
   try {
-    const result = await prisma.project.createMany({
-      data,
-      skipDuplicates: true,
-    });
+    let importedCount = 0;
+    let skippedCount = 0;
+    for (const project of data) {
+      try {
+        await prisma.project.create({ data: project });
+        importedCount += 1;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          skippedCount += 1;
+          continue;
+        }
+        throw error;
+      }
+    }
     revalidatePath("/apps/projects");
     revalidatePath("/apps/project");
     revalidatePath("/apps/habits");
     return {
       success: true,
-      message: `${result.count} proyek diimpor. Kode yang sudah ada dilewati.`,
-      importedCount: result.count,
-      skippedCount: data.length - result.count,
+      message: `${importedCount} proyek diimpor. Kode yang sudah ada dilewati.`,
+      importedCount,
+      skippedCount,
     };
   } catch (error) {
     console.error("Importing projects failed:", error);
@@ -761,10 +782,14 @@ export async function createProjectWorkPoint(
           targetDate: parsed.data.targetDate
             ? new Date(`${parsed.data.targetDate}T00:00:00.000Z`)
             : null,
-          proposedVolume: new Prisma.Decimal(parsed.data.proposedVolume),
+          proposedVolume: scaledIntegerFromDecimal(parsed.data.proposedVolume),
           proposedUnit: parsed.data.proposedUnit,
-          proposedUnitPrice: new Prisma.Decimal(parsed.data.proposedUnitPrice),
-          proposedTotalWage: new Prisma.Decimal(parsed.data.proposedTotalWage),
+          proposedUnitPrice: scaledIntegerFromDecimal(
+            parsed.data.proposedUnitPrice,
+          ),
+          proposedTotalWage: scaledIntegerFromDecimal(
+            parsed.data.proposedTotalWage,
+          ),
           proposedById: session.user.id,
         },
         select: { id: true },
@@ -954,7 +979,7 @@ export async function approveProjectWorkPointWage(
       await transaction.projectWorkPoint.update({
         where: { id: workPointId },
         data: {
-          approvedTotalWage: newWage,
+          approvedTotalWage: scaledIntegerFromDecimal(newWage),
           wageApprovedAt: new Date(),
           wageApprovedById: session.user.id,
         },
@@ -962,8 +987,9 @@ export async function approveProjectWorkPointWage(
       await transaction.wageAuditLog.create({
         data: {
           workPointId,
-          oldWage: workPoint.approvedTotalWage ?? workPoint.proposedTotalWage,
-          newWage,
+          oldWage:
+            workPoint.approvedTotalWage ?? workPoint.proposedTotalWage,
+          newWage: scaledIntegerFromDecimal(newWage),
           changedById: session.user.id,
           reason: reason.trim() || "Persetujuan awal atas nilai usulan.",
         },
@@ -1019,7 +1045,7 @@ export async function editApprovedProjectWorkPointWage(
       const updated = await transaction.projectWorkPoint.updateMany({
         where: { id: workPointId, approvedTotalWage: workPoint.approvedTotalWage },
         data: {
-          approvedTotalWage: newWage,
+          approvedTotalWage: scaledIntegerFromDecimal(newWage),
           wageApprovedAt: new Date(),
           wageApprovedById: session.user.id,
         },
@@ -1029,7 +1055,7 @@ export async function editApprovedProjectWorkPointWage(
         data: {
           workPointId,
           oldWage: workPoint.approvedTotalWage,
-          newWage,
+          newWage: scaledIntegerFromDecimal(newWage),
           changedById: session.user.id,
           reason: reason.trim(),
         },
@@ -1219,8 +1245,6 @@ export async function addProjectProgress(
           })),
         });
       }
-    }, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
     transactionCommitted = true;
     revalidatePath("/apps/project");
@@ -1299,7 +1323,7 @@ export async function getProjectFinancialBreakdown(
       await getPaidProjectTicketRealization([projectId])
     ).get(projectId);
     const realized = paidRealization?.total ?? zero;
-    const budget = project.pagu;
+    const budget = decimalFromScaledInteger(project.pagu);
     const remaining = budget.minus(realized);
     const percentage = budget.greaterThan(0)
       ? realized.dividedBy(budget).times(100).toNumber()

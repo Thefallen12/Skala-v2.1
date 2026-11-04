@@ -40,7 +40,7 @@ export type FinanceCashflowRow = {
   transferGroupId: string | null;
   proofUrl: string | null;
   createdAt: string;
-  account: { accountName: string };
+  account: { id: string; accountName: string };
   project: { kelompokTani: string | null } | null;
   recorder: { name: string | null };
 };
@@ -74,6 +74,7 @@ const financeInstitutions = {
     "Bank Jago",
   ],
   Ewallet: ["DANA", "OVO", "GoPay", "ShopeePay"],
+  Cash: ["Kas Tunai"],
 };
 
 export default function FinanceLedger({
@@ -101,6 +102,7 @@ export default function FinanceLedger({
 }) {
   const router = useRouter();
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [accountMessage, setAccountMessage] = useState("");
   const [accountSelections, setAccountSelections] = useState<
     Record<string, string>
@@ -110,6 +112,9 @@ export default function FinanceLedger({
     null,
   );
   const [isPending, startTransition] = useTransition();
+  const hasCashAccount = accounts.some(
+    (account) => account.accountName === "Kas Tunai",
+  );
 
   const submitAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -130,6 +135,23 @@ export default function FinanceLedger({
       } catch (error) {
         console.error("Finance account form submission failed:", error);
         setAccountMessage("Akun keuangan gagal dibuat. Silakan coba kembali.");
+      }
+    });
+  };
+
+  const addCashAccount = () => {
+    setAccountMessage("");
+    startTransition(async () => {
+      try {
+        const result = await createFinanceAccount({
+          accountName: "Kas Tunai",
+          holderName: "Kas Perusahaan",
+        });
+        setAccountMessage(result.message);
+        if (result.success) router.refresh();
+      } catch (error) {
+        console.error("Cash account creation failed:", error);
+        setAccountMessage("Akun Kas Tunai gagal dibuat. Silakan coba kembali.");
       }
     });
   };
@@ -188,11 +210,29 @@ export default function FinanceLedger({
     })),
   ].sort((first, second) => second.timestamp - first.timestamp);
   const visibleLedgerEntries = ledgerEntries.filter((entry) => {
+    if (selectedAccountId) {
+      return (
+        entry.kind === "cashflow" &&
+        entry.cashflow.account.id === selectedAccountId &&
+        entry.cashflow.type === "OUT" &&
+        entry.cashflow.transferGroupId === null
+      );
+    }
     if (!typeFilter) return true;
     return entry.kind === "historical"
       ? typeFilter === "OUT"
       : entry.cashflow.type === typeFilter;
   });
+  const selectAccount = (accountId: string) => {
+    setSelectedAccountId((current) =>
+      current === accountId ? null : accountId,
+    );
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("finance-cashflow-history")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -213,6 +253,17 @@ export default function FinanceLedger({
               <Plus className="mr-2 size-4" aria-hidden="true" />
               Tambah Rekening / Kas
             </Button>
+            {!hasCashAccount && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addCashAccount}
+                disabled={isPending}
+              >
+                <Wallet className="mr-2 size-4" aria-hidden="true" />
+                Tambah Kas Tunai
+              </Button>
+            )}
             <Button
               type="button"
               onClick={() => onFundModeChange("incoming")}
@@ -239,28 +290,63 @@ export default function FinanceLedger({
       </div>
 
       {accounts.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              Pilih rekening untuk melihat riwayat transaksinya di bawah.
+            </p>
+            {selectedAccountId && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedAccountId(null)}
+              >
+                Tampilkan semua rekening
+              </Button>
+            )}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {accounts.map((account) => (
-            <Card key={account.id}>
+            <Card
+              key={account.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selectedAccountId === account.id}
+              className={`cursor-pointer transition-colors hover:border-primary ${
+                selectedAccountId === account.id
+                  ? "border-primary ring-1 ring-primary"
+                  : ""
+              }`}
+              onClick={() => selectAccount(account.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  selectAccount(account.id);
+                }
+              }}
+            >
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <CardTitle className="text-base">{account.accountName}</CardTitle>
-                <Wallet className="size-5 text-primary" aria-hidden="true" />
-              </CardHeader>
-              <CardContent className="space-y-1">
-                <p className="text-2xl font-bold text-primary">
-                  {currency(account.balance)}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  a.n. {account.holderName}
-                </p>
-                {account.accountNumber && (
-                  <p className="text-xs text-muted-foreground">
-                    Rekening {account.accountNumber}
+                <div>
+                  <CardTitle className="text-base">{account.accountName}</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    a.n. {account.holderName}
+                    {account.accountNumber
+                      ? ` · Rekening ${account.accountNumber}`
+                      : ""}
                   </p>
-                )}
-              </CardContent>
+                </div>
+                <div className="text-right">
+                  <Wallet className="ml-auto size-5 text-primary" aria-hidden="true" />
+                  <p className="mt-2 text-xl font-bold text-primary">
+                    {currency(account.balance)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Saldo saat ini</p>
+                </div>
+              </CardHeader>
             </Card>
           ))}
+          </div>
         </div>
       ) : (
         <Card>
@@ -274,42 +360,63 @@ export default function FinanceLedger({
         </Card>
       )}
 
-      <Card>
+      {accountMessage && !accountModalOpen && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {accountMessage}
+        </p>
+      )}
+
+      <Card id="finance-cashflow-history" className="scroll-mt-24">
         <CardHeader>
-          <CardTitle>Riwayat Arus Dana</CardTitle>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={typeFilter === null ? "default" : "outline"}
-              onClick={() => onTypeFilterChange(null)}
-            >
-              Semua
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={typeFilter === "IN" ? "default" : "outline"}
-              onClick={() => onTypeFilterChange("IN")}
-            >
-              Dana Masuk
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={typeFilter === "OUT" ? "default" : "outline"}
-              onClick={() => onTypeFilterChange("OUT")}
-            >
-              Dana Keluar
-            </Button>
-          </div>
-          {historicalPayments.length > 0 && typeFilter !== "IN" && (
+          <CardTitle>
+            {selectedAccountId
+              ? `Riwayat Pembelanjaan / Pembayaran · ${
+                  accounts.find((account) => account.id === selectedAccountId)
+                    ?.accountName ?? "Rekening"
+                }`
+              : "Riwayat Arus Dana"}
+          </CardTitle>
+          {selectedAccountId ? (
+            <p className="text-sm text-muted-foreground">
+              Menampilkan riwayat pembelanjaan dan pembayaran dari rekening ini.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={typeFilter === null ? "default" : "outline"}
+                onClick={() => onTypeFilterChange(null)}
+              >
+                Semua
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={typeFilter === "IN" ? "default" : "outline"}
+                onClick={() => onTypeFilterChange("IN")}
+              >
+                Dana Masuk
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={typeFilter === "OUT" ? "default" : "outline"}
+                onClick={() => onTypeFilterChange("OUT")}
+              >
+                Dana Keluar
+              </Button>
+            </div>
+          )}
+          {!selectedAccountId &&
+            historicalPayments.length > 0 &&
+            typeFilter !== "IN" && (
             <p className="text-sm text-muted-foreground">
               Pembayaran lama yang belum dicatat ditampilkan bersama arus kas.
               Pilih rekening sumber pada baris tersebut untuk mencatatnya dan
               mengurangi saldo.
             </p>
-          )}
+            )}
         </CardHeader>
         <CardContent>
           {historicalMessage && (
@@ -557,7 +664,9 @@ export default function FinanceLedger({
                       colSpan={7}
                       className="px-3 py-10 text-center text-muted-foreground"
                     >
-                      {typeFilter
+                      {selectedAccountId
+                        ? "Belum ada riwayat pembelanjaan atau pembayaran pada rekening ini."
+                        : typeFilter
                         ? `Belum ada transaksi dana ${typeFilter === "IN" ? "masuk" : "keluar"}.`
                         : "Belum ada transaksi arus kas."}
                     </td>
@@ -592,7 +701,8 @@ export default function FinanceLedger({
         title="Tambah Rekening / Kas"
         icon={<Wallet aria-hidden="true" className="size-5" />}
         description="Daftarkan rekening atau e-wallet. Saldo awal akun baru adalah Rp 0."
-        className="sm:max-w-xl"
+        className="max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] sm:max-w-md"
+        bodyClassName="overscroll-y-contain"
         footer={
           <>
             <Button
@@ -618,16 +728,16 @@ export default function FinanceLedger({
           onSubmit={submitAccount}
         >
           <div className="space-y-2">
-            <Label htmlFor="finance-account-name">Nama Bank / E-Wallet</Label>
+            <Label htmlFor="finance-account-name">Jenis Rekening / Kas</Label>
             <select
               id="finance-account-name"
               name="accountName"
               required
               defaultValue=""
-              className="border-input focus-visible:ring-ring w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2"
+              className="border-input focus-visible:ring-ring w-full max-w-sm rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2"
             >
               <option value="" disabled>
-                Pilih bank atau e-wallet
+                Pilih bank, e-wallet, atau kas
               </option>
               <optgroup label="Bank">
                 {financeInstitutions.Bank.map((institution) => (
@@ -643,6 +753,13 @@ export default function FinanceLedger({
                   </option>
                 ))}
               </optgroup>
+              <optgroup label="Kas">
+                {financeInstitutions.Cash.map((institution) => (
+                  <option key={institution} value={institution}>
+                    {institution}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <div className="space-y-2">
@@ -653,7 +770,7 @@ export default function FinanceLedger({
               id="finance-account-number"
               name="accountNumber"
               maxLength={80}
-              placeholder="Nomor rekening bank"
+              placeholder="Kosongkan untuk kas tunai"
             />
           </div>
           <div className="space-y-2">

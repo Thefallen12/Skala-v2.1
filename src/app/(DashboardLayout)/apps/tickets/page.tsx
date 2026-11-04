@@ -6,6 +6,7 @@ import { PaymentStatus, UserRole } from "@/generated/prisma/enums";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import type { TicketRow } from "../../types/ticket";
 import { redirect } from "next/navigation";
 export const metadata: Metadata = {
@@ -242,12 +243,19 @@ const Tickets = async ({
     status: ticket.status,
     fulfillmentStatus: ticket.fulfillmentStatus,
     canSubmit: ticket.requesterId === session.user.id,
+    canRequesterEdit: !ticket.auditLogs.some(
+      (audit) =>
+        audit.userId === ticket.requesterId &&
+        (audit.action === "UPDATED" || audit.action === "REQUESTER_EDITED"),
+    ),
     totalAmount:
       ticket.purchaseOrders[0]?.items.reduce(
         (sum, item) => sum + item.totalPrice,
         0,
       ).toString() ??
-      ticket.totalAmount?.toString() ??
+      (ticket.totalAmount !== null
+        ? decimalStringFromScaledInteger(ticket.totalAmount)
+        : null) ??
       null,
     attachmentUrl: ticket.attachmentUrl,
     receiptUrls: ticket.receiptUrls,
@@ -269,7 +277,10 @@ const Tickets = async ({
     project: ticket.project,
     items: ticket.items.map((item) => ({
       ...item,
-      estimatedCost: item.estimatedCost?.toString() ?? null,
+      estimatedCost:
+        item.estimatedCost !== null
+          ? decimalStringFromScaledInteger(item.estimatedCost)
+          : null,
       expectedDeliveryDate:
         item.expectedDeliveryDate?.toISOString().slice(0, 10) ?? null,
     })),
@@ -304,7 +315,7 @@ const Tickets = async ({
     })),
     directStockPurchases: ticket.directStockPurchases.map((purchase) => ({
       ...purchase,
-      totalAmount: purchase.totalAmount.toString(),
+      totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
       createdAt: purchase.createdAt.toISOString(),
     })),
     paymentTransactions:
@@ -358,8 +369,8 @@ const Tickets = async ({
             movers={movers}
             stockItems={stockItems.map((item) => ({
               ...item,
-              unitPrice: item.unitPrice.toString(),
-              stockQuantity: item.stockQuantity.toString(),
+              unitPrice: decimalStringFromScaledInteger(item.unitPrice),
+              stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
             }))}
           />
         }
@@ -373,7 +384,7 @@ const Tickets = async ({
           sku: item.sku,
           name: item.name,
           unit: item.unit,
-          unitPrice: item.unitPrice.toString(),
+          unitPrice: decimalStringFromScaledInteger(item.unitPrice),
         }))}
         role={session.user.role}
         initialOpenSheet={openSheet}

@@ -7,6 +7,7 @@ import {
 } from "@/lib/documents/generate-document";
 import { getDocumentHeaderLogoDataUrl } from "@/lib/documents/qr-code";
 import { renderPdf } from "@/lib/documents/render-pdf";
+import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const runtime = "nodejs";
 
@@ -101,7 +102,7 @@ export async function GET(
         nama_proyek: ticket.project?.title ?? "—",
         nama_klien: ticket.project?.clientName ?? "—",
         total_biaya: ticket.totalAmount
-          ? currency(Number(ticket.totalAmount))
+          ? currency(decimalNumberFromScaledInteger(ticket.totalAmount))
           : "—",
         diskon: "—",
         pajak: "—",
@@ -117,7 +118,10 @@ export async function GET(
           "Sesuai koordinasi proyek",
         catatan: ticket.title,
         items: ticket.items.map((item): DocumentLineItem => {
-          const unitPrice = Number(item.estimatedCost ?? 0);
+          const unitPrice =
+            item.estimatedCost === null
+              ? 0
+              : decimalNumberFromScaledInteger(item.estimatedCost);
           return {
             description: item.itemName,
             quantity: item.quantity,

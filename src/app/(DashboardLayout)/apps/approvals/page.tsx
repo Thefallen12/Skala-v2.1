@@ -12,6 +12,7 @@ import {
 } from "@/generated/prisma/enums";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const metadata: Metadata = {
   title: "Executive Approval Hub",
@@ -54,8 +55,6 @@ export default async function ApprovalsPage({
     prisma.purchaseOrder.findMany({
       where: {
         status: POStatus.PENDING_APPROVAL,
-        reviewedById: { not: null },
-        reviewedAt: { not: null },
       },
       orderBy: { createdAt: "asc" },
       select: {
@@ -521,12 +520,12 @@ export default async function ApprovalsPage({
           id: purchase.id,
           purchaseNumber: purchase.purchaseNumber,
           vendorName: purchase.vendorName,
-          totalAmount: purchase.totalAmount.toString(),
+          totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
           createdAt: purchase.createdAt.toISOString(),
           createdByName: purchase.createdBy.name,
           items: purchase.items.map((item) => ({
             ...item,
-            quantity: item.quantity.toString(),
+            quantity: decimalStringFromScaledInteger(item.quantity),
           })),
         }))}
         tickets={tickets.map((ticket) => ({
@@ -535,7 +534,9 @@ export default async function ApprovalsPage({
           title: ticket.title,
           type: ticket.type,
           totalAmount:
-            ticket.totalAmount?.toString() ??
+            (ticket.totalAmount !== null
+              ? decimalStringFromScaledInteger(ticket.totalAmount)
+              : null) ??
             ticket.requestedAmount?.toString() ??
             null,
           recipientName:
@@ -555,21 +556,32 @@ export default async function ApprovalsPage({
           id: workPoint.id,
           title: workPoint.title,
           location: workPoint.location,
-          proposedVolume: workPoint.proposedVolume?.toString() ?? null,
+          proposedVolume:
+            workPoint.proposedVolume !== null
+              ? decimalStringFromScaledInteger(workPoint.proposedVolume)
+              : null,
           proposedUnit: workPoint.proposedUnit,
-          proposedUnitPrice: workPoint.proposedUnitPrice?.toString() ?? null,
+          proposedUnitPrice:
+            workPoint.proposedUnitPrice !== null
+              ? decimalStringFromScaledInteger(workPoint.proposedUnitPrice)
+              : null,
           projectName: `${workPoint.project.kelompokTani} · ${workPoint.project.title}`,
-          proposedTotalWage: workPoint.proposedTotalWage.toString(),
-          approvedTotalWage: workPoint.approvedTotalWage?.toString() ?? null,
+          proposedTotalWage: decimalStringFromScaledInteger(
+            workPoint.proposedTotalWage,
+          ),
+          approvedTotalWage:
+            workPoint.approvedTotalWage !== null
+              ? decimalStringFromScaledInteger(workPoint.approvedTotalWage)
+              : null,
           proposedByName: workPoint.proposedBy.name,
         }))}
         termyns={termyns.map((termyn) => ({
           id: termyn.id,
           termynNumber: termyn.termynNumber,
-          claimedPercent: termyn.claimedPercent.toString(),
-          grossAmount: termyn.grossAmount.toString(),
-          retentionAmount: termyn.retentionAmount.toString(),
-          netAmount: termyn.netAmount.toString(),
+          claimedPercent: decimalStringFromScaledInteger(termyn.claimedPercent),
+          grossAmount: decimalStringFromScaledInteger(termyn.grossAmount),
+          retentionAmount: decimalStringFromScaledInteger(termyn.retentionAmount),
+          netAmount: decimalStringFromScaledInteger(termyn.netAmount),
           createdAt: termyn.createdAt.toISOString(),
           createdByName: termyn.createdBy.name,
           contractNumber: termyn.subkonContract.contractNumber,
@@ -581,14 +593,14 @@ export default async function ApprovalsPage({
           contractNumber: contract.contractNumber,
           subkonName: contract.subkonName,
           workScope: contract.workScope,
-          contractValue: contract.contractValue.toString(),
+          contractValue: decimalStringFromScaledInteger(contract.contractValue),
           createdById: contract.createdById,
           projectName: `${contract.project.kelompokTani} · ${contract.project.title}`,
         }))}
         addendums={addendums.map((addendum) => ({
           id: addendum.id,
           addendumNumber: addendum.addendumNumber,
-          budgetChange: addendum.budgetChange.toString(),
+          budgetChange: decimalStringFromScaledInteger(addendum.budgetChange),
           timeExtension: addendum.timeExtension,
           reason: addendum.reason,
           projectName: `${addendum.project.kelompokTani} · ${addendum.project.title}`,

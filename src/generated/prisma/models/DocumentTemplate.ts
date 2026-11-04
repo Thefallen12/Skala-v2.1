@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -175,7 +175,7 @@ export type DocumentTemplateGroupByOutputType = {
   _max: DocumentTemplateMaxAggregateOutputType | null
 }
 
-export type GetDocumentTemplateGroupByPayload<T extends DocumentTemplateGroupByArgs> = Prisma.PrismaPromise<
+type GetDocumentTemplateGroupByPayload<T extends DocumentTemplateGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DocumentTemplateGroupByOutputType, T['by']> &
       {
@@ -210,7 +210,7 @@ export type DocumentTemplateOrderByWithRelationInput = {
   name?: Prisma.SortOrder
   type?: Prisma.SortOrder
   contentHtml?: Prisma.SortOrder
-  contentJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  contentJson?: Prisma.SortOrder
   variables?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -237,7 +237,7 @@ export type DocumentTemplateOrderByWithAggregationInput = {
   name?: Prisma.SortOrder
   type?: Prisma.SortOrder
   contentHtml?: Prisma.SortOrder
-  contentJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  contentJson?: Prisma.SortOrder
   variables?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -265,7 +265,7 @@ export type DocumentTemplateCreateInput = {
   name: string
   type: $Enums.DocType
   contentHtml: string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | null
   variables: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -277,7 +277,7 @@ export type DocumentTemplateUncheckedCreateInput = {
   name: string
   type: $Enums.DocType
   contentHtml: string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | null
   variables: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -285,11 +285,10 @@ export type DocumentTemplateUncheckedCreateInput = {
 }
 
 export type DocumentTemplateUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumDocTypeFieldUpdateOperationsInput | $Enums.DocType
   contentHtml?: Prisma.StringFieldUpdateOperationsInput | string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | runtime.InputJsonValue | null
   variables?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -297,11 +296,10 @@ export type DocumentTemplateUpdateInput = {
 }
 
 export type DocumentTemplateUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumDocTypeFieldUpdateOperationsInput | $Enums.DocType
   contentHtml?: Prisma.StringFieldUpdateOperationsInput | string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | runtime.InputJsonValue | null
   variables?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -313,29 +311,27 @@ export type DocumentTemplateCreateManyInput = {
   name: string
   type: $Enums.DocType
   contentHtml: string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | null
   variables: string
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type DocumentTemplateUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumDocTypeFieldUpdateOperationsInput | $Enums.DocType
   contentHtml?: Prisma.StringFieldUpdateOperationsInput | string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | runtime.InputJsonValue | null
   variables?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentTemplateUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumDocTypeFieldUpdateOperationsInput | $Enums.DocType
   contentHtml?: Prisma.StringFieldUpdateOperationsInput | string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | runtime.InputJsonValue | null
   variables?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -400,7 +396,7 @@ export type DocumentTemplateCreateWithoutIssuedDocumentsInput = {
   name: string
   type: $Enums.DocType
   contentHtml: string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | null
   variables: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -411,7 +407,7 @@ export type DocumentTemplateUncheckedCreateWithoutIssuedDocumentsInput = {
   name: string
   type: $Enums.DocType
   contentHtml: string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | null
   variables: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -434,22 +430,20 @@ export type DocumentTemplateUpdateToOneWithWhereWithoutIssuedDocumentsInput = {
 }
 
 export type DocumentTemplateUpdateWithoutIssuedDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumDocTypeFieldUpdateOperationsInput | $Enums.DocType
   contentHtml?: Prisma.StringFieldUpdateOperationsInput | string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | runtime.InputJsonValue | null
   variables?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DocumentTemplateUncheckedUpdateWithoutIssuedDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumDocTypeFieldUpdateOperationsInput | $Enums.DocType
   contentHtml?: Prisma.StringFieldUpdateOperationsInput | string
-  contentJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  contentJson?: runtime.InputJsonValue | runtime.InputJsonValue | null
   variables?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -499,27 +493,7 @@ export type DocumentTemplateSelect<ExtArgs extends runtime.Types.Extensions.Inte
   _count?: boolean | Prisma.DocumentTemplateCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["documentTemplate"]>
 
-export type DocumentTemplateSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  name?: boolean
-  type?: boolean
-  contentHtml?: boolean
-  contentJson?: boolean
-  variables?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["documentTemplate"]>
 
-export type DocumentTemplateSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  name?: boolean
-  type?: boolean
-  contentHtml?: boolean
-  contentJson?: boolean
-  variables?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["documentTemplate"]>
 
 export type DocumentTemplateSelectScalar = {
   id?: boolean
@@ -537,8 +511,6 @@ export type DocumentTemplateInclude<ExtArgs extends runtime.Types.Extensions.Int
   issuedDocuments?: boolean | Prisma.DocumentTemplate$issuedDocumentsArgs<ExtArgs>
   _count?: boolean | Prisma.DocumentTemplateCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type DocumentTemplateIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type DocumentTemplateIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $DocumentTemplatePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "DocumentTemplate"
@@ -672,30 +644,6 @@ export interface DocumentTemplateDelegate<ExtArgs extends runtime.Types.Extensio
   createMany<T extends DocumentTemplateCreateManyArgs>(args?: Prisma.SelectSubset<T, DocumentTemplateCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DocumentTemplates and returns the data saved in the database.
-   * @param {DocumentTemplateCreateManyAndReturnArgs} args - Arguments to create many DocumentTemplates.
-   * @example
-   * // Create many DocumentTemplates
-   * const documentTemplate = await prisma.documentTemplate.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DocumentTemplates and only return the `id`
-   * const documentTemplateWithIdOnly = await prisma.documentTemplate.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DocumentTemplateCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DocumentTemplateCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DocumentTemplatePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DocumentTemplate.
    * @param {DocumentTemplateDeleteArgs} args - Arguments to delete one DocumentTemplate.
    * @example
@@ -760,36 +708,6 @@ export interface DocumentTemplateDelegate<ExtArgs extends runtime.Types.Extensio
   updateMany<T extends DocumentTemplateUpdateManyArgs>(args: Prisma.SelectSubset<T, DocumentTemplateUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DocumentTemplates and returns the data updated in the database.
-   * @param {DocumentTemplateUpdateManyAndReturnArgs} args - Arguments to update many DocumentTemplates.
-   * @example
-   * // Update many DocumentTemplates
-   * const documentTemplate = await prisma.documentTemplate.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DocumentTemplates and only return the `id`
-   * const documentTemplateWithIdOnly = await prisma.documentTemplate.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DocumentTemplateUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DocumentTemplateUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DocumentTemplatePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DocumentTemplate.
    * @param {DocumentTemplateUpsertArgs} args - Arguments to update or create a DocumentTemplate.
    * @example
@@ -807,6 +725,29 @@ export interface DocumentTemplateDelegate<ExtArgs extends runtime.Types.Extensio
    * })
    */
   upsert<T extends DocumentTemplateUpsertArgs>(args: Prisma.SelectSubset<T, DocumentTemplateUpsertArgs<ExtArgs>>): Prisma.Prisma__DocumentTemplateClient<runtime.Types.Result.GetResult<Prisma.$DocumentTemplatePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DocumentTemplates that matches the filter.
+   * @param {DocumentTemplateFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const documentTemplate = await prisma.documentTemplate.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DocumentTemplateFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DocumentTemplate.
+   * @param {DocumentTemplateAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const documentTemplate = await prisma.documentTemplate.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DocumentTemplateAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1182,11 +1123,6 @@ export type DocumentTemplateFindManyArgs<ExtArgs extends runtime.Types.Extension
    * Skip the first `n` DocumentTemplates.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DocumentTemplates.
-   */
   distinct?: Prisma.DocumentTemplateScalarFieldEnum | Prisma.DocumentTemplateScalarFieldEnum[]
 }
 
@@ -1220,26 +1156,6 @@ export type DocumentTemplateCreateManyArgs<ExtArgs extends runtime.Types.Extensi
    * The data used to create many DocumentTemplates.
    */
   data: Prisma.DocumentTemplateCreateManyInput | Prisma.DocumentTemplateCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DocumentTemplate createManyAndReturn
- */
-export type DocumentTemplateCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DocumentTemplate
-   */
-  select?: Prisma.DocumentTemplateSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DocumentTemplate
-   */
-  omit?: Prisma.DocumentTemplateOmit<ExtArgs> | null
-  /**
-   * The data used to create many DocumentTemplates.
-   */
-  data: Prisma.DocumentTemplateCreateManyInput | Prisma.DocumentTemplateCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1272,32 +1188,6 @@ export type DocumentTemplateUpdateArgs<ExtArgs extends runtime.Types.Extensions.
  * DocumentTemplate updateMany
  */
 export type DocumentTemplateUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update DocumentTemplates.
-   */
-  data: Prisma.XOR<Prisma.DocumentTemplateUpdateManyMutationInput, Prisma.DocumentTemplateUncheckedUpdateManyInput>
-  /**
-   * Filter which DocumentTemplates to update
-   */
-  where?: Prisma.DocumentTemplateWhereInput
-  /**
-   * Limit how many DocumentTemplates to update.
-   */
-  limit?: number
-}
-
-/**
- * DocumentTemplate updateManyAndReturn
- */
-export type DocumentTemplateUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DocumentTemplate
-   */
-  select?: Prisma.DocumentTemplateSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DocumentTemplate
-   */
-  omit?: Prisma.DocumentTemplateOmit<ExtArgs> | null
   /**
    * The data used to update DocumentTemplates.
    */
@@ -1376,6 +1266,34 @@ export type DocumentTemplateDeleteManyArgs<ExtArgs extends runtime.Types.Extensi
    * Limit how many DocumentTemplates to delete.
    */
   limit?: number
+}
+
+/**
+ * DocumentTemplate findRaw
+ */
+export type DocumentTemplateFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DocumentTemplate aggregateRaw
+ */
+export type DocumentTemplateAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

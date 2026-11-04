@@ -176,7 +176,7 @@ export async function saveRichDocumentTemplate(
     return failure("Nama, tipe, dan isi template wajib diisi dengan format yang valid.");
   }
 
-  let contentJson: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
+  let contentJson: Prisma.InputJsonValue | null = null;
   let pdfmeVariableNames: string[] = [];
   if (input.contentJson) {
     try {

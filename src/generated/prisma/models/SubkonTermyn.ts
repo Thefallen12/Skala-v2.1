@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -28,28 +28,28 @@ export type AggregateSubkonTermyn = {
 
 export type SubkonTermynAvgAggregateOutputType = {
   termynNumber: number | null
-  claimedPercent: runtime.Decimal | null
-  grossAmount: runtime.Decimal | null
-  retentionAmount: runtime.Decimal | null
-  netAmount: runtime.Decimal | null
+  claimedPercent: number | null
+  grossAmount: number | null
+  retentionAmount: number | null
+  netAmount: number | null
 }
 
 export type SubkonTermynSumAggregateOutputType = {
   termynNumber: number | null
-  claimedPercent: runtime.Decimal | null
-  grossAmount: runtime.Decimal | null
-  retentionAmount: runtime.Decimal | null
-  netAmount: runtime.Decimal | null
+  claimedPercent: bigint | null
+  grossAmount: bigint | null
+  retentionAmount: bigint | null
+  netAmount: bigint | null
 }
 
 export type SubkonTermynMinAggregateOutputType = {
   id: string | null
   subkonContractId: string | null
   termynNumber: number | null
-  claimedPercent: runtime.Decimal | null
-  grossAmount: runtime.Decimal | null
-  retentionAmount: runtime.Decimal | null
-  netAmount: runtime.Decimal | null
+  claimedPercent: bigint | null
+  grossAmount: bigint | null
+  retentionAmount: bigint | null
+  netAmount: bigint | null
   status: $Enums.SubkonTermynStatus | null
   paymentProofUrl: string | null
   createdById: string | null
@@ -69,10 +69,10 @@ export type SubkonTermynMaxAggregateOutputType = {
   id: string | null
   subkonContractId: string | null
   termynNumber: number | null
-  claimedPercent: runtime.Decimal | null
-  grossAmount: runtime.Decimal | null
-  retentionAmount: runtime.Decimal | null
-  netAmount: runtime.Decimal | null
+  claimedPercent: bigint | null
+  grossAmount: bigint | null
+  retentionAmount: bigint | null
+  netAmount: bigint | null
   status: $Enums.SubkonTermynStatus | null
   paymentProofUrl: string | null
   createdById: string | null
@@ -289,10 +289,10 @@ export type SubkonTermynGroupByOutputType = {
   id: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal
-  grossAmount: runtime.Decimal
-  retentionAmount: runtime.Decimal
-  netAmount: runtime.Decimal
+  claimedPercent: bigint
+  grossAmount: bigint
+  retentionAmount: bigint
+  netAmount: bigint
   status: $Enums.SubkonTermynStatus
   paymentProofUrl: string | null
   createdById: string
@@ -313,7 +313,7 @@ export type SubkonTermynGroupByOutputType = {
   _max: SubkonTermynMaxAggregateOutputType | null
 }
 
-export type GetSubkonTermynGroupByPayload<T extends SubkonTermynGroupByArgs> = Prisma.PrismaPromise<
+type GetSubkonTermynGroupByPayload<T extends SubkonTermynGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<SubkonTermynGroupByOutputType, T['by']> &
       {
@@ -335,10 +335,10 @@ export type SubkonTermynWhereInput = {
   id?: Prisma.StringFilter<"SubkonTermyn"> | string
   subkonContractId?: Prisma.StringFilter<"SubkonTermyn"> | string
   termynNumber?: Prisma.IntFilter<"SubkonTermyn"> | number
-  claimedPercent?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  grossAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  retentionAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  netAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFilter<"SubkonTermyn"> | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.StringNullableFilter<"SubkonTermyn"> | string | null
   createdById?: Prisma.StringFilter<"SubkonTermyn"> | string
@@ -370,16 +370,16 @@ export type SubkonTermynOrderByWithRelationInput = {
   retentionAmount?: Prisma.SortOrder
   netAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  paymentProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentProofUrl?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
-  fieldVerifiedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  fieldVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  financeReviewedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  financeReviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidById?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  fieldVerifiedById?: Prisma.SortOrder
+  fieldVerifiedAt?: Prisma.SortOrder
+  financeReviewedById?: Prisma.SortOrder
+  financeReviewedAt?: Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  paidById?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   subkonContract?: Prisma.SubkonContractOrderByWithRelationInput
@@ -399,10 +399,10 @@ export type SubkonTermynWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.SubkonTermynWhereInput | Prisma.SubkonTermynWhereInput[]
   subkonContractId?: Prisma.StringFilter<"SubkonTermyn"> | string
   termynNumber?: Prisma.IntFilter<"SubkonTermyn"> | number
-  claimedPercent?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  grossAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  retentionAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  netAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFilter<"SubkonTermyn"> | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.StringNullableFilter<"SubkonTermyn"> | string | null
   createdById?: Prisma.StringFilter<"SubkonTermyn"> | string
@@ -434,16 +434,16 @@ export type SubkonTermynOrderByWithAggregationInput = {
   retentionAmount?: Prisma.SortOrder
   netAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  paymentProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentProofUrl?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
-  fieldVerifiedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  fieldVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  financeReviewedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  financeReviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidById?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  fieldVerifiedById?: Prisma.SortOrder
+  fieldVerifiedAt?: Prisma.SortOrder
+  financeReviewedById?: Prisma.SortOrder
+  financeReviewedAt?: Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  paidById?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SubkonTermynCountOrderByAggregateInput
@@ -460,10 +460,10 @@ export type SubkonTermynScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"SubkonTermyn"> | string
   subkonContractId?: Prisma.StringWithAggregatesFilter<"SubkonTermyn"> | string
   termynNumber?: Prisma.IntWithAggregatesFilter<"SubkonTermyn"> | number
-  claimedPercent?: Prisma.DecimalWithAggregatesFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalWithAggregatesFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalWithAggregatesFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalWithAggregatesFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntWithAggregatesFilter<"SubkonTermyn"> | bigint | number
+  grossAmount?: Prisma.BigIntWithAggregatesFilter<"SubkonTermyn"> | bigint | number
+  retentionAmount?: Prisma.BigIntWithAggregatesFilter<"SubkonTermyn"> | bigint | number
+  netAmount?: Prisma.BigIntWithAggregatesFilter<"SubkonTermyn"> | bigint | number
   status?: Prisma.EnumSubkonTermynStatusWithAggregatesFilter<"SubkonTermyn"> | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.StringNullableWithAggregatesFilter<"SubkonTermyn"> | string | null
   createdById?: Prisma.StringWithAggregatesFilter<"SubkonTermyn"> | string
@@ -482,10 +482,10 @@ export type SubkonTermynScalarWhereWithAggregatesInput = {
 export type SubkonTermynCreateInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -507,10 +507,10 @@ export type SubkonTermynUncheckedCreateInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -528,12 +528,11 @@ export type SubkonTermynUncheckedCreateInput = {
 }
 
 export type SubkonTermynUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -552,13 +551,12 @@ export type SubkonTermynUpdateInput = {
 }
 
 export type SubkonTermynUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -579,10 +577,10 @@ export type SubkonTermynCreateManyInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -599,12 +597,11 @@ export type SubkonTermynCreateManyInput = {
 }
 
 export type SubkonTermynUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -616,13 +613,12 @@ export type SubkonTermynUpdateManyMutationInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1009,7 +1005,7 @@ export type SubkonTermynUpdateOneWithoutInvoiceNestedInput = {
   create?: Prisma.XOR<Prisma.SubkonTermynCreateWithoutInvoiceInput, Prisma.SubkonTermynUncheckedCreateWithoutInvoiceInput>
   connectOrCreate?: Prisma.SubkonTermynCreateOrConnectWithoutInvoiceInput
   upsert?: Prisma.SubkonTermynUpsertWithoutInvoiceInput
-  disconnect?: Prisma.SubkonTermynWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.SubkonTermynWhereInput | boolean
   connect?: Prisma.SubkonTermynWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SubkonTermynUpdateToOneWithWhereWithoutInvoiceInput, Prisma.SubkonTermynUpdateWithoutInvoiceInput>, Prisma.SubkonTermynUncheckedUpdateWithoutInvoiceInput>
@@ -1018,10 +1014,10 @@ export type SubkonTermynUpdateOneWithoutInvoiceNestedInput = {
 export type SubkonTermynCreateWithoutCreatedByInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1042,10 +1038,10 @@ export type SubkonTermynUncheckedCreateWithoutCreatedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedById?: string | null
@@ -1068,16 +1064,15 @@ export type SubkonTermynCreateOrConnectWithoutCreatedByInput = {
 
 export type SubkonTermynCreateManyCreatedByInputEnvelope = {
   data: Prisma.SubkonTermynCreateManyCreatedByInput | Prisma.SubkonTermynCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonTermynCreateWithoutFieldVerifiedByInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1098,10 +1093,10 @@ export type SubkonTermynUncheckedCreateWithoutFieldVerifiedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1124,16 +1119,15 @@ export type SubkonTermynCreateOrConnectWithoutFieldVerifiedByInput = {
 
 export type SubkonTermynCreateManyFieldVerifiedByInputEnvelope = {
   data: Prisma.SubkonTermynCreateManyFieldVerifiedByInput | Prisma.SubkonTermynCreateManyFieldVerifiedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonTermynCreateWithoutFinanceReviewedByInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1154,10 +1148,10 @@ export type SubkonTermynUncheckedCreateWithoutFinanceReviewedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1180,16 +1174,15 @@ export type SubkonTermynCreateOrConnectWithoutFinanceReviewedByInput = {
 
 export type SubkonTermynCreateManyFinanceReviewedByInputEnvelope = {
   data: Prisma.SubkonTermynCreateManyFinanceReviewedByInput | Prisma.SubkonTermynCreateManyFinanceReviewedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonTermynCreateWithoutApprovedByInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1210,10 +1203,10 @@ export type SubkonTermynUncheckedCreateWithoutApprovedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1236,16 +1229,15 @@ export type SubkonTermynCreateOrConnectWithoutApprovedByInput = {
 
 export type SubkonTermynCreateManyApprovedByInputEnvelope = {
   data: Prisma.SubkonTermynCreateManyApprovedByInput | Prisma.SubkonTermynCreateManyApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonTermynCreateWithoutPaidByInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1266,10 +1258,10 @@ export type SubkonTermynUncheckedCreateWithoutPaidByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1292,7 +1284,6 @@ export type SubkonTermynCreateOrConnectWithoutPaidByInput = {
 
 export type SubkonTermynCreateManyPaidByInputEnvelope = {
   data: Prisma.SubkonTermynCreateManyPaidByInput | Prisma.SubkonTermynCreateManyPaidByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonTermynUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -1318,10 +1309,10 @@ export type SubkonTermynScalarWhereInput = {
   id?: Prisma.StringFilter<"SubkonTermyn"> | string
   subkonContractId?: Prisma.StringFilter<"SubkonTermyn"> | string
   termynNumber?: Prisma.IntFilter<"SubkonTermyn"> | number
-  claimedPercent?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFilter<"SubkonTermyn"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  grossAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  retentionAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
+  netAmount?: Prisma.BigIntFilter<"SubkonTermyn"> | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFilter<"SubkonTermyn"> | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.StringNullableFilter<"SubkonTermyn"> | string | null
   createdById?: Prisma.StringFilter<"SubkonTermyn"> | string
@@ -1404,10 +1395,10 @@ export type SubkonTermynUpdateManyWithWhereWithoutPaidByInput = {
 export type SubkonTermynCreateWithoutSubkonContractInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1427,10 +1418,10 @@ export type SubkonTermynCreateWithoutSubkonContractInput = {
 export type SubkonTermynUncheckedCreateWithoutSubkonContractInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1454,7 +1445,6 @@ export type SubkonTermynCreateOrConnectWithoutSubkonContractInput = {
 
 export type SubkonTermynCreateManySubkonContractInputEnvelope = {
   data: Prisma.SubkonTermynCreateManySubkonContractInput | Prisma.SubkonTermynCreateManySubkonContractInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonTermynUpsertWithWhereUniqueWithoutSubkonContractInput = {
@@ -1476,10 +1466,10 @@ export type SubkonTermynUpdateManyWithWhereWithoutSubkonContractInput = {
 export type SubkonTermynCreateWithoutInvoiceInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedAt?: Date | string | null
@@ -1500,10 +1490,10 @@ export type SubkonTermynUncheckedCreateWithoutInvoiceInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1536,12 +1526,11 @@ export type SubkonTermynUpdateToOneWithWhereWithoutInvoiceInput = {
 }
 
 export type SubkonTermynUpdateWithoutInvoiceInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1559,13 +1548,12 @@ export type SubkonTermynUpdateWithoutInvoiceInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutInvoiceInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1585,10 +1573,10 @@ export type SubkonTermynCreateManyCreatedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   fieldVerifiedById?: string | null
@@ -1607,10 +1595,10 @@ export type SubkonTermynCreateManyFieldVerifiedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1629,10 +1617,10 @@ export type SubkonTermynCreateManyFinanceReviewedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1651,10 +1639,10 @@ export type SubkonTermynCreateManyApprovedByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1673,10 +1661,10 @@ export type SubkonTermynCreateManyPaidByInput = {
   id?: string
   subkonContractId: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -1692,12 +1680,11 @@ export type SubkonTermynCreateManyPaidByInput = {
 }
 
 export type SubkonTermynUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1715,13 +1702,12 @@ export type SubkonTermynUpdateWithoutCreatedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1738,13 +1724,12 @@ export type SubkonTermynUncheckedUpdateWithoutCreatedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1760,12 +1745,11 @@ export type SubkonTermynUncheckedUpdateManyWithoutCreatedByInput = {
 }
 
 export type SubkonTermynUpdateWithoutFieldVerifiedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1783,13 +1767,12 @@ export type SubkonTermynUpdateWithoutFieldVerifiedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutFieldVerifiedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1806,13 +1789,12 @@ export type SubkonTermynUncheckedUpdateWithoutFieldVerifiedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyWithoutFieldVerifiedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1828,12 +1810,11 @@ export type SubkonTermynUncheckedUpdateManyWithoutFieldVerifiedByInput = {
 }
 
 export type SubkonTermynUpdateWithoutFinanceReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1851,13 +1832,12 @@ export type SubkonTermynUpdateWithoutFinanceReviewedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutFinanceReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1874,13 +1854,12 @@ export type SubkonTermynUncheckedUpdateWithoutFinanceReviewedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyWithoutFinanceReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1896,12 +1875,11 @@ export type SubkonTermynUncheckedUpdateManyWithoutFinanceReviewedByInput = {
 }
 
 export type SubkonTermynUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1919,13 +1897,12 @@ export type SubkonTermynUpdateWithoutApprovedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1942,13 +1919,12 @@ export type SubkonTermynUncheckedUpdateWithoutApprovedByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1964,12 +1940,11 @@ export type SubkonTermynUncheckedUpdateManyWithoutApprovedByInput = {
 }
 
 export type SubkonTermynUpdateWithoutPaidByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1987,13 +1962,12 @@ export type SubkonTermynUpdateWithoutPaidByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutPaidByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2010,13 +1984,12 @@ export type SubkonTermynUncheckedUpdateWithoutPaidByInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyWithoutPaidByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   subkonContractId?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2034,10 +2007,10 @@ export type SubkonTermynUncheckedUpdateManyWithoutPaidByInput = {
 export type SubkonTermynCreateManySubkonContractInput = {
   id?: string
   termynNumber: number
-  claimedPercent: runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent: bigint | number
+  grossAmount: bigint | number
+  retentionAmount: bigint | number
+  netAmount: bigint | number
   status?: $Enums.SubkonTermynStatus
   paymentProofUrl?: string | null
   createdById: string
@@ -2054,12 +2027,11 @@ export type SubkonTermynCreateManySubkonContractInput = {
 }
 
 export type SubkonTermynUpdateWithoutSubkonContractInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fieldVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -2077,12 +2049,11 @@ export type SubkonTermynUpdateWithoutSubkonContractInput = {
 }
 
 export type SubkonTermynUncheckedUpdateWithoutSubkonContractInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2100,12 +2071,11 @@ export type SubkonTermynUncheckedUpdateWithoutSubkonContractInput = {
 }
 
 export type SubkonTermynUncheckedUpdateManyWithoutSubkonContractInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   termynNumber?: Prisma.IntFieldUpdateOperationsInput | number
-  claimedPercent?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  grossAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  netAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  claimedPercent?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  grossAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  netAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSubkonTermynStatusFieldUpdateOperationsInput | $Enums.SubkonTermynStatus
   paymentProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2153,63 +2123,7 @@ export type SubkonTermynSelect<ExtArgs extends runtime.Types.Extensions.Internal
   invoice?: boolean | Prisma.SubkonTermyn$invoiceArgs<ExtArgs>
 }, ExtArgs["result"]["subkonTermyn"]>
 
-export type SubkonTermynSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  subkonContractId?: boolean
-  termynNumber?: boolean
-  claimedPercent?: boolean
-  grossAmount?: boolean
-  retentionAmount?: boolean
-  netAmount?: boolean
-  status?: boolean
-  paymentProofUrl?: boolean
-  createdById?: boolean
-  fieldVerifiedById?: boolean
-  fieldVerifiedAt?: boolean
-  financeReviewedById?: boolean
-  financeReviewedAt?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  paidById?: boolean
-  paidAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  subkonContract?: boolean | Prisma.SubkonContractDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  fieldVerifiedBy?: boolean | Prisma.SubkonTermyn$fieldVerifiedByArgs<ExtArgs>
-  financeReviewedBy?: boolean | Prisma.SubkonTermyn$financeReviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonTermyn$approvedByArgs<ExtArgs>
-  paidBy?: boolean | Prisma.SubkonTermyn$paidByArgs<ExtArgs>
-}, ExtArgs["result"]["subkonTermyn"]>
 
-export type SubkonTermynSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  subkonContractId?: boolean
-  termynNumber?: boolean
-  claimedPercent?: boolean
-  grossAmount?: boolean
-  retentionAmount?: boolean
-  netAmount?: boolean
-  status?: boolean
-  paymentProofUrl?: boolean
-  createdById?: boolean
-  fieldVerifiedById?: boolean
-  fieldVerifiedAt?: boolean
-  financeReviewedById?: boolean
-  financeReviewedAt?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  paidById?: boolean
-  paidAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  subkonContract?: boolean | Prisma.SubkonContractDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  fieldVerifiedBy?: boolean | Prisma.SubkonTermyn$fieldVerifiedByArgs<ExtArgs>
-  financeReviewedBy?: boolean | Prisma.SubkonTermyn$financeReviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonTermyn$approvedByArgs<ExtArgs>
-  paidBy?: boolean | Prisma.SubkonTermyn$paidByArgs<ExtArgs>
-}, ExtArgs["result"]["subkonTermyn"]>
 
 export type SubkonTermynSelectScalar = {
   id?: boolean
@@ -2244,22 +2158,6 @@ export type SubkonTermynInclude<ExtArgs extends runtime.Types.Extensions.Interna
   paidBy?: boolean | Prisma.SubkonTermyn$paidByArgs<ExtArgs>
   invoice?: boolean | Prisma.SubkonTermyn$invoiceArgs<ExtArgs>
 }
-export type SubkonTermynIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  subkonContract?: boolean | Prisma.SubkonContractDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  fieldVerifiedBy?: boolean | Prisma.SubkonTermyn$fieldVerifiedByArgs<ExtArgs>
-  financeReviewedBy?: boolean | Prisma.SubkonTermyn$financeReviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonTermyn$approvedByArgs<ExtArgs>
-  paidBy?: boolean | Prisma.SubkonTermyn$paidByArgs<ExtArgs>
-}
-export type SubkonTermynIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  subkonContract?: boolean | Prisma.SubkonContractDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  fieldVerifiedBy?: boolean | Prisma.SubkonTermyn$fieldVerifiedByArgs<ExtArgs>
-  financeReviewedBy?: boolean | Prisma.SubkonTermyn$financeReviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonTermyn$approvedByArgs<ExtArgs>
-  paidBy?: boolean | Prisma.SubkonTermyn$paidByArgs<ExtArgs>
-}
 
 export type $SubkonTermynPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "SubkonTermyn"
@@ -2276,10 +2174,10 @@ export type $SubkonTermynPayload<ExtArgs extends runtime.Types.Extensions.Intern
     id: string
     subkonContractId: string
     termynNumber: number
-    claimedPercent: runtime.Decimal
-    grossAmount: runtime.Decimal
-    retentionAmount: runtime.Decimal
-    netAmount: runtime.Decimal
+    claimedPercent: bigint
+    grossAmount: bigint
+    retentionAmount: bigint
+    netAmount: bigint
     status: $Enums.SubkonTermynStatus
     paymentProofUrl: string | null
     createdById: string
@@ -2411,30 +2309,6 @@ export interface SubkonTermynDelegate<ExtArgs extends runtime.Types.Extensions.I
   createMany<T extends SubkonTermynCreateManyArgs>(args?: Prisma.SelectSubset<T, SubkonTermynCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many SubkonTermyns and returns the data saved in the database.
-   * @param {SubkonTermynCreateManyAndReturnArgs} args - Arguments to create many SubkonTermyns.
-   * @example
-   * // Create many SubkonTermyns
-   * const subkonTermyn = await prisma.subkonTermyn.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many SubkonTermyns and only return the `id`
-   * const subkonTermynWithIdOnly = await prisma.subkonTermyn.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends SubkonTermynCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, SubkonTermynCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SubkonTermynPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a SubkonTermyn.
    * @param {SubkonTermynDeleteArgs} args - Arguments to delete one SubkonTermyn.
    * @example
@@ -2499,36 +2373,6 @@ export interface SubkonTermynDelegate<ExtArgs extends runtime.Types.Extensions.I
   updateMany<T extends SubkonTermynUpdateManyArgs>(args: Prisma.SelectSubset<T, SubkonTermynUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more SubkonTermyns and returns the data updated in the database.
-   * @param {SubkonTermynUpdateManyAndReturnArgs} args - Arguments to update many SubkonTermyns.
-   * @example
-   * // Update many SubkonTermyns
-   * const subkonTermyn = await prisma.subkonTermyn.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more SubkonTermyns and only return the `id`
-   * const subkonTermynWithIdOnly = await prisma.subkonTermyn.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends SubkonTermynUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, SubkonTermynUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SubkonTermynPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one SubkonTermyn.
    * @param {SubkonTermynUpsertArgs} args - Arguments to update or create a SubkonTermyn.
    * @example
@@ -2546,6 +2390,29 @@ export interface SubkonTermynDelegate<ExtArgs extends runtime.Types.Extensions.I
    * })
    */
   upsert<T extends SubkonTermynUpsertArgs>(args: Prisma.SelectSubset<T, SubkonTermynUpsertArgs<ExtArgs>>): Prisma.Prisma__SubkonTermynClient<runtime.Types.Result.GetResult<Prisma.$SubkonTermynPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more SubkonTermyns that matches the filter.
+   * @param {SubkonTermynFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const subkonTermyn = await prisma.subkonTermyn.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.SubkonTermynFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a SubkonTermyn.
+   * @param {SubkonTermynAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const subkonTermyn = await prisma.subkonTermyn.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.SubkonTermynAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2726,10 +2593,10 @@ export interface SubkonTermynFieldRefs {
   readonly id: Prisma.FieldRef<"SubkonTermyn", 'String'>
   readonly subkonContractId: Prisma.FieldRef<"SubkonTermyn", 'String'>
   readonly termynNumber: Prisma.FieldRef<"SubkonTermyn", 'Int'>
-  readonly claimedPercent: Prisma.FieldRef<"SubkonTermyn", 'Decimal'>
-  readonly grossAmount: Prisma.FieldRef<"SubkonTermyn", 'Decimal'>
-  readonly retentionAmount: Prisma.FieldRef<"SubkonTermyn", 'Decimal'>
-  readonly netAmount: Prisma.FieldRef<"SubkonTermyn", 'Decimal'>
+  readonly claimedPercent: Prisma.FieldRef<"SubkonTermyn", 'BigInt'>
+  readonly grossAmount: Prisma.FieldRef<"SubkonTermyn", 'BigInt'>
+  readonly retentionAmount: Prisma.FieldRef<"SubkonTermyn", 'BigInt'>
+  readonly netAmount: Prisma.FieldRef<"SubkonTermyn", 'BigInt'>
   readonly status: Prisma.FieldRef<"SubkonTermyn", 'SubkonTermynStatus'>
   readonly paymentProofUrl: Prisma.FieldRef<"SubkonTermyn", 'String'>
   readonly createdById: Prisma.FieldRef<"SubkonTermyn", 'String'>
@@ -2939,11 +2806,6 @@ export type SubkonTermynFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` SubkonTermyns.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of SubkonTermyns.
-   */
   distinct?: Prisma.SubkonTermynScalarFieldEnum | Prisma.SubkonTermynScalarFieldEnum[]
 }
 
@@ -2977,30 +2839,6 @@ export type SubkonTermynCreateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * The data used to create many SubkonTermyns.
    */
   data: Prisma.SubkonTermynCreateManyInput | Prisma.SubkonTermynCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * SubkonTermyn createManyAndReturn
- */
-export type SubkonTermynCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SubkonTermyn
-   */
-  select?: Prisma.SubkonTermynSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SubkonTermyn
-   */
-  omit?: Prisma.SubkonTermynOmit<ExtArgs> | null
-  /**
-   * The data used to create many SubkonTermyns.
-   */
-  data: Prisma.SubkonTermynCreateManyInput | Prisma.SubkonTermynCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SubkonTermynIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3045,36 +2883,6 @@ export type SubkonTermynUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many SubkonTermyns to update.
    */
   limit?: number
-}
-
-/**
- * SubkonTermyn updateManyAndReturn
- */
-export type SubkonTermynUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SubkonTermyn
-   */
-  select?: Prisma.SubkonTermynSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SubkonTermyn
-   */
-  omit?: Prisma.SubkonTermynOmit<ExtArgs> | null
-  /**
-   * The data used to update SubkonTermyns.
-   */
-  data: Prisma.XOR<Prisma.SubkonTermynUpdateManyMutationInput, Prisma.SubkonTermynUncheckedUpdateManyInput>
-  /**
-   * Filter which SubkonTermyns to update
-   */
-  where?: Prisma.SubkonTermynWhereInput
-  /**
-   * Limit how many SubkonTermyns to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SubkonTermynIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3141,6 +2949,34 @@ export type SubkonTermynDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many SubkonTermyns to delete.
    */
   limit?: number
+}
+
+/**
+ * SubkonTermyn findRaw
+ */
+export type SubkonTermynFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * SubkonTermyn aggregateRaw
+ */
+export type SubkonTermynAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

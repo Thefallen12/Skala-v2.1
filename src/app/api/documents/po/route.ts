@@ -19,6 +19,7 @@ import {
 } from "@/lib/documents/universal-transaction-print";
 import { renderPdf } from "@/lib/documents/render-pdf";
 import { isValidPublicCode } from "@/lib/documents/random-code";
+import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const runtime = "nodejs";
 
@@ -148,7 +149,10 @@ export async function POST(request: NextRequest) {
         maximumFractionDigits: 0,
       }).format(amount);
     const lineItems = ticket.items.map((item): DocumentLineItem => {
-      const unitPrice = Number(item.estimatedCost ?? 0);
+      const unitPrice =
+        item.estimatedCost === null
+          ? 0
+          : decimalNumberFromScaledInteger(item.estimatedCost);
       return {
         description: item.itemName,
         quantity: item.quantity,
@@ -168,7 +172,7 @@ export async function POST(request: NextRequest) {
         nama_proyek: ticket.project?.title ?? "—",
         nama_klien: ticket.project?.clientName ?? "—",
         total_biaya: ticket.totalAmount
-          ? currency(Number(ticket.totalAmount))
+          ? currency(decimalNumberFromScaledInteger(ticket.totalAmount))
           : "—",
         diskon: "—",
         pajak: "—",
@@ -195,7 +199,11 @@ export async function POST(request: NextRequest) {
 
     const subtotal = ticket.items.reduce(
       (total, item) =>
-        total + Number(item.estimatedCost ?? 0) * item.quantity,
+        total +
+          (item.estimatedCost === null
+            ? 0
+            : decimalNumberFromScaledInteger(item.estimatedCost)) *
+            item.quantity,
       0,
     );
     const [logoDataUrl, qrDataUrl] = await Promise.all([
@@ -224,7 +232,9 @@ export async function POST(request: NextRequest) {
       ],
       items: ticket.items.map((item) => {
         const unitPrice =
-          item.estimatedCost === null ? null : Number(item.estimatedCost);
+          item.estimatedCost === null
+            ? null
+            : decimalNumberFromScaledInteger(item.estimatedCost);
         return {
           description: item.itemName,
           quantity: item.quantity,

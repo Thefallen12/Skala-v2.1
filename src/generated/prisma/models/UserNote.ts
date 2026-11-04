@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -20,22 +20,12 @@ export type UserNoteModel = runtime.Types.Result.DefaultSelection<Prisma.$UserNo
 
 export type AggregateUserNote = {
   _count: UserNoteCountAggregateOutputType | null
-  _avg: UserNoteAvgAggregateOutputType | null
-  _sum: UserNoteSumAggregateOutputType | null
   _min: UserNoteMinAggregateOutputType | null
   _max: UserNoteMaxAggregateOutputType | null
 }
 
-export type UserNoteAvgAggregateOutputType = {
-  id: number | null
-}
-
-export type UserNoteSumAggregateOutputType = {
-  id: number | null
-}
-
 export type UserNoteMinAggregateOutputType = {
-  id: number | null
+  id: string | null
   userId: string | null
   title: string | null
   color: string | null
@@ -44,7 +34,7 @@ export type UserNoteMinAggregateOutputType = {
 }
 
 export type UserNoteMaxAggregateOutputType = {
-  id: number | null
+  id: string | null
   userId: string | null
   title: string | null
   color: string | null
@@ -62,14 +52,6 @@ export type UserNoteCountAggregateOutputType = {
   _all: number
 }
 
-
-export type UserNoteAvgAggregateInputType = {
-  id?: true
-}
-
-export type UserNoteSumAggregateInputType = {
-  id?: true
-}
 
 export type UserNoteMinAggregateInputType = {
   id?: true
@@ -137,18 +119,6 @@ export type UserNoteAggregateArgs<ExtArgs extends runtime.Types.Extensions.Inter
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
-   * Select which fields to average
-  **/
-  _avg?: UserNoteAvgAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
-   * Select which fields to sum
-  **/
-  _sum?: UserNoteSumAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
    * Select which fields to find the minimum value
   **/
   _min?: UserNoteMinAggregateInputType
@@ -179,27 +149,23 @@ export type UserNoteGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   _count?: UserNoteCountAggregateInputType | true
-  _avg?: UserNoteAvgAggregateInputType
-  _sum?: UserNoteSumAggregateInputType
   _min?: UserNoteMinAggregateInputType
   _max?: UserNoteMaxAggregateInputType
 }
 
 export type UserNoteGroupByOutputType = {
-  id: number
+  id: string
   userId: string
   title: string
   color: string
   createdAt: Date
   updatedAt: Date
   _count: UserNoteCountAggregateOutputType | null
-  _avg: UserNoteAvgAggregateOutputType | null
-  _sum: UserNoteSumAggregateOutputType | null
   _min: UserNoteMinAggregateOutputType | null
   _max: UserNoteMaxAggregateOutputType | null
 }
 
-export type GetUserNoteGroupByPayload<T extends UserNoteGroupByArgs> = Prisma.PrismaPromise<
+type GetUserNoteGroupByPayload<T extends UserNoteGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<UserNoteGroupByOutputType, T['by']> &
       {
@@ -218,7 +184,7 @@ export type UserNoteWhereInput = {
   AND?: Prisma.UserNoteWhereInput | Prisma.UserNoteWhereInput[]
   OR?: Prisma.UserNoteWhereInput[]
   NOT?: Prisma.UserNoteWhereInput | Prisma.UserNoteWhereInput[]
-  id?: Prisma.IntFilter<"UserNote"> | number
+  id?: Prisma.StringFilter<"UserNote"> | string
   userId?: Prisma.StringFilter<"UserNote"> | string
   title?: Prisma.StringFilter<"UserNote"> | string
   color?: Prisma.StringFilter<"UserNote"> | string
@@ -238,7 +204,7 @@ export type UserNoteOrderByWithRelationInput = {
 }
 
 export type UserNoteWhereUniqueInput = Prisma.AtLeast<{
-  id?: number
+  id?: string
   AND?: Prisma.UserNoteWhereInput | Prisma.UserNoteWhereInput[]
   OR?: Prisma.UserNoteWhereInput[]
   NOT?: Prisma.UserNoteWhereInput | Prisma.UserNoteWhereInput[]
@@ -258,17 +224,15 @@ export type UserNoteOrderByWithAggregationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.UserNoteCountOrderByAggregateInput
-  _avg?: Prisma.UserNoteAvgOrderByAggregateInput
   _max?: Prisma.UserNoteMaxOrderByAggregateInput
   _min?: Prisma.UserNoteMinOrderByAggregateInput
-  _sum?: Prisma.UserNoteSumOrderByAggregateInput
 }
 
 export type UserNoteScalarWhereWithAggregatesInput = {
   AND?: Prisma.UserNoteScalarWhereWithAggregatesInput | Prisma.UserNoteScalarWhereWithAggregatesInput[]
   OR?: Prisma.UserNoteScalarWhereWithAggregatesInput[]
   NOT?: Prisma.UserNoteScalarWhereWithAggregatesInput | Prisma.UserNoteScalarWhereWithAggregatesInput[]
-  id?: Prisma.IntWithAggregatesFilter<"UserNote"> | number
+  id?: Prisma.StringWithAggregatesFilter<"UserNote"> | string
   userId?: Prisma.StringWithAggregatesFilter<"UserNote"> | string
   title?: Prisma.StringWithAggregatesFilter<"UserNote"> | string
   color?: Prisma.StringWithAggregatesFilter<"UserNote"> | string
@@ -277,6 +241,7 @@ export type UserNoteScalarWhereWithAggregatesInput = {
 }
 
 export type UserNoteCreateInput = {
+  id?: string
   title: string
   color?: string
   createdAt?: Date | string
@@ -285,7 +250,7 @@ export type UserNoteCreateInput = {
 }
 
 export type UserNoteUncheckedCreateInput = {
-  id?: number
+  id?: string
   userId: string
   title: string
   color?: string
@@ -302,7 +267,6 @@ export type UserNoteUpdateInput = {
 }
 
 export type UserNoteUncheckedUpdateInput = {
-  id?: Prisma.IntFieldUpdateOperationsInput | number
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   color?: Prisma.StringFieldUpdateOperationsInput | string
@@ -311,7 +275,7 @@ export type UserNoteUncheckedUpdateInput = {
 }
 
 export type UserNoteCreateManyInput = {
-  id?: number
+  id?: string
   userId: string
   title: string
   color?: string
@@ -327,7 +291,6 @@ export type UserNoteUpdateManyMutationInput = {
 }
 
 export type UserNoteUncheckedUpdateManyInput = {
-  id?: Prisma.IntFieldUpdateOperationsInput | number
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   color?: Prisma.StringFieldUpdateOperationsInput | string
@@ -354,10 +317,6 @@ export type UserNoteCountOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
 }
 
-export type UserNoteAvgOrderByAggregateInput = {
-  id?: Prisma.SortOrder
-}
-
 export type UserNoteMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -374,10 +333,6 @@ export type UserNoteMinOrderByAggregateInput = {
   color?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-}
-
-export type UserNoteSumOrderByAggregateInput = {
-  id?: Prisma.SortOrder
 }
 
 export type UserNoteCreateNestedManyWithoutUserInput = {
@@ -422,15 +377,8 @@ export type UserNoteUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.UserNoteScalarWhereInput | Prisma.UserNoteScalarWhereInput[]
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type UserNoteCreateWithoutUserInput = {
+  id?: string
   title: string
   color?: string
   createdAt?: Date | string
@@ -438,7 +386,7 @@ export type UserNoteCreateWithoutUserInput = {
 }
 
 export type UserNoteUncheckedCreateWithoutUserInput = {
-  id?: number
+  id?: string
   title: string
   color?: string
   createdAt?: Date | string
@@ -452,7 +400,6 @@ export type UserNoteCreateOrConnectWithoutUserInput = {
 
 export type UserNoteCreateManyUserInputEnvelope = {
   data: Prisma.UserNoteCreateManyUserInput | Prisma.UserNoteCreateManyUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type UserNoteUpsertWithWhereUniqueWithoutUserInput = {
@@ -475,7 +422,7 @@ export type UserNoteScalarWhereInput = {
   AND?: Prisma.UserNoteScalarWhereInput | Prisma.UserNoteScalarWhereInput[]
   OR?: Prisma.UserNoteScalarWhereInput[]
   NOT?: Prisma.UserNoteScalarWhereInput | Prisma.UserNoteScalarWhereInput[]
-  id?: Prisma.IntFilter<"UserNote"> | number
+  id?: Prisma.StringFilter<"UserNote"> | string
   userId?: Prisma.StringFilter<"UserNote"> | string
   title?: Prisma.StringFilter<"UserNote"> | string
   color?: Prisma.StringFilter<"UserNote"> | string
@@ -484,7 +431,7 @@ export type UserNoteScalarWhereInput = {
 }
 
 export type UserNoteCreateManyUserInput = {
-  id?: number
+  id?: string
   title: string
   color?: string
   createdAt?: Date | string
@@ -499,7 +446,6 @@ export type UserNoteUpdateWithoutUserInput = {
 }
 
 export type UserNoteUncheckedUpdateWithoutUserInput = {
-  id?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.StringFieldUpdateOperationsInput | string
   color?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -507,7 +453,6 @@ export type UserNoteUncheckedUpdateWithoutUserInput = {
 }
 
 export type UserNoteUncheckedUpdateManyWithoutUserInput = {
-  id?: Prisma.IntFieldUpdateOperationsInput | number
   title?: Prisma.StringFieldUpdateOperationsInput | string
   color?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -526,25 +471,7 @@ export type UserNoteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["userNote"]>
 
-export type UserNoteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  userId?: boolean
-  title?: boolean
-  color?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["userNote"]>
 
-export type UserNoteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  userId?: boolean
-  title?: boolean
-  color?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["userNote"]>
 
 export type UserNoteSelectScalar = {
   id?: boolean
@@ -559,12 +486,6 @@ export type UserNoteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs =
 export type UserNoteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
-export type UserNoteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type UserNoteIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $UserNotePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "UserNote"
@@ -572,7 +493,7 @@ export type $UserNotePayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     user: Prisma.$UserPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
-    id: number
+    id: string
     userId: string
     title: string
     color: string
@@ -696,30 +617,6 @@ export interface UserNoteDelegate<ExtArgs extends runtime.Types.Extensions.Inter
   createMany<T extends UserNoteCreateManyArgs>(args?: Prisma.SelectSubset<T, UserNoteCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many UserNotes and returns the data saved in the database.
-   * @param {UserNoteCreateManyAndReturnArgs} args - Arguments to create many UserNotes.
-   * @example
-   * // Create many UserNotes
-   * const userNote = await prisma.userNote.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many UserNotes and only return the `id`
-   * const userNoteWithIdOnly = await prisma.userNote.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends UserNoteCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, UserNoteCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserNotePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a UserNote.
    * @param {UserNoteDeleteArgs} args - Arguments to delete one UserNote.
    * @example
@@ -784,36 +681,6 @@ export interface UserNoteDelegate<ExtArgs extends runtime.Types.Extensions.Inter
   updateMany<T extends UserNoteUpdateManyArgs>(args: Prisma.SelectSubset<T, UserNoteUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more UserNotes and returns the data updated in the database.
-   * @param {UserNoteUpdateManyAndReturnArgs} args - Arguments to update many UserNotes.
-   * @example
-   * // Update many UserNotes
-   * const userNote = await prisma.userNote.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more UserNotes and only return the `id`
-   * const userNoteWithIdOnly = await prisma.userNote.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends UserNoteUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, UserNoteUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$UserNotePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one UserNote.
    * @param {UserNoteUpsertArgs} args - Arguments to update or create a UserNote.
    * @example
@@ -831,6 +698,29 @@ export interface UserNoteDelegate<ExtArgs extends runtime.Types.Extensions.Inter
    * })
    */
   upsert<T extends UserNoteUpsertArgs>(args: Prisma.SelectSubset<T, UserNoteUpsertArgs<ExtArgs>>): Prisma.Prisma__UserNoteClient<runtime.Types.Result.GetResult<Prisma.$UserNotePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more UserNotes that matches the filter.
+   * @param {UserNoteFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const userNote = await prisma.userNote.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.UserNoteFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a UserNote.
+   * @param {UserNoteAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const userNote = await prisma.userNote.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.UserNoteAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1002,7 +892,7 @@ export interface Prisma__UserNoteClient<T, Null = never, ExtArgs extends runtime
  * Fields of the UserNote model
  */
 export interface UserNoteFieldRefs {
-  readonly id: Prisma.FieldRef<"UserNote", 'Int'>
+  readonly id: Prisma.FieldRef<"UserNote", 'String'>
   readonly userId: Prisma.FieldRef<"UserNote", 'String'>
   readonly title: Prisma.FieldRef<"UserNote", 'String'>
   readonly color: Prisma.FieldRef<"UserNote", 'String'>
@@ -1204,11 +1094,6 @@ export type UserNoteFindManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Skip the first `n` UserNotes.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of UserNotes.
-   */
   distinct?: Prisma.UserNoteScalarFieldEnum | Prisma.UserNoteScalarFieldEnum[]
 }
 
@@ -1242,30 +1127,6 @@ export type UserNoteCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * The data used to create many UserNotes.
    */
   data: Prisma.UserNoteCreateManyInput | Prisma.UserNoteCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * UserNote createManyAndReturn
- */
-export type UserNoteCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the UserNote
-   */
-  select?: Prisma.UserNoteSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the UserNote
-   */
-  omit?: Prisma.UserNoteOmit<ExtArgs> | null
-  /**
-   * The data used to create many UserNotes.
-   */
-  data: Prisma.UserNoteCreateManyInput | Prisma.UserNoteCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserNoteIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1310,36 +1171,6 @@ export type UserNoteUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Limit how many UserNotes to update.
    */
   limit?: number
-}
-
-/**
- * UserNote updateManyAndReturn
- */
-export type UserNoteUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the UserNote
-   */
-  select?: Prisma.UserNoteSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the UserNote
-   */
-  omit?: Prisma.UserNoteOmit<ExtArgs> | null
-  /**
-   * The data used to update UserNotes.
-   */
-  data: Prisma.XOR<Prisma.UserNoteUpdateManyMutationInput, Prisma.UserNoteUncheckedUpdateManyInput>
-  /**
-   * Filter which UserNotes to update
-   */
-  where?: Prisma.UserNoteWhereInput
-  /**
-   * Limit how many UserNotes to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.UserNoteIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1406,6 +1237,34 @@ export type UserNoteDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Limit how many UserNotes to delete.
    */
   limit?: number
+}
+
+/**
+ * UserNote findRaw
+ */
+export type UserNoteFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * UserNote aggregateRaw
+ */
+export type UserNoteAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

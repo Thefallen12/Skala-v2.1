@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,18 +27,18 @@ export type AggregateProjectWorkPoint = {
 }
 
 export type ProjectWorkPointAvgAggregateOutputType = {
-  proposedVolume: runtime.Decimal | null
-  proposedUnitPrice: runtime.Decimal | null
-  proposedTotalWage: runtime.Decimal | null
-  approvedTotalWage: runtime.Decimal | null
+  proposedVolume: number | null
+  proposedUnitPrice: number | null
+  proposedTotalWage: number | null
+  approvedTotalWage: number | null
   progress: number | null
 }
 
 export type ProjectWorkPointSumAggregateOutputType = {
-  proposedVolume: runtime.Decimal | null
-  proposedUnitPrice: runtime.Decimal | null
-  proposedTotalWage: runtime.Decimal | null
-  approvedTotalWage: runtime.Decimal | null
+  proposedVolume: bigint | null
+  proposedUnitPrice: bigint | null
+  proposedTotalWage: bigint | null
+  approvedTotalWage: bigint | null
   progress: number | null
 }
 
@@ -49,11 +49,11 @@ export type ProjectWorkPointMinAggregateOutputType = {
   location: string | null
   plannedStartDate: Date | null
   targetDate: Date | null
-  proposedVolume: runtime.Decimal | null
+  proposedVolume: bigint | null
   proposedUnit: string | null
-  proposedUnitPrice: runtime.Decimal | null
-  proposedTotalWage: runtime.Decimal | null
-  approvedTotalWage: runtime.Decimal | null
+  proposedUnitPrice: bigint | null
+  proposedTotalWage: bigint | null
+  approvedTotalWage: bigint | null
   wageApprovedAt: Date | null
   proposedById: string | null
   wageApprovedById: string | null
@@ -69,11 +69,11 @@ export type ProjectWorkPointMaxAggregateOutputType = {
   location: string | null
   plannedStartDate: Date | null
   targetDate: Date | null
-  proposedVolume: runtime.Decimal | null
+  proposedVolume: bigint | null
   proposedUnit: string | null
-  proposedUnitPrice: runtime.Decimal | null
-  proposedTotalWage: runtime.Decimal | null
-  approvedTotalWage: runtime.Decimal | null
+  proposedUnitPrice: bigint | null
+  proposedTotalWage: bigint | null
+  approvedTotalWage: bigint | null
   wageApprovedAt: Date | null
   proposedById: string | null
   wageApprovedById: string | null
@@ -274,11 +274,11 @@ export type ProjectWorkPointGroupByOutputType = {
   location: string | null
   plannedStartDate: Date | null
   targetDate: Date | null
-  proposedVolume: runtime.Decimal | null
+  proposedVolume: bigint | null
   proposedUnit: string | null
-  proposedUnitPrice: runtime.Decimal | null
-  proposedTotalWage: runtime.Decimal
-  approvedTotalWage: runtime.Decimal | null
+  proposedUnitPrice: bigint | null
+  proposedTotalWage: bigint
+  approvedTotalWage: bigint | null
   wageApprovedAt: Date | null
   proposedById: string
   wageApprovedById: string | null
@@ -292,7 +292,7 @@ export type ProjectWorkPointGroupByOutputType = {
   _max: ProjectWorkPointMaxAggregateOutputType | null
 }
 
-export type GetProjectWorkPointGroupByPayload<T extends ProjectWorkPointGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectWorkPointGroupByPayload<T extends ProjectWorkPointGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectWorkPointGroupByOutputType, T['by']> &
       {
@@ -317,11 +317,11 @@ export type ProjectWorkPointWhereInput = {
   location?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
   plannedStartDate?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
   targetDate?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
-  proposedVolume?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
   proposedUnit?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
-  proposedUnitPrice?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFilter<"ProjectWorkPoint"> | bigint | number
+  approvedTotalWage?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
   wageApprovedAt?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
   proposedById?: Prisma.StringFilter<"ProjectWorkPoint"> | string
   wageApprovedById?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
@@ -339,17 +339,17 @@ export type ProjectWorkPointOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   title?: Prisma.SortOrder
-  location?: Prisma.SortOrderInput | Prisma.SortOrder
-  plannedStartDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  targetDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  proposedVolume?: Prisma.SortOrderInput | Prisma.SortOrder
-  proposedUnit?: Prisma.SortOrderInput | Prisma.SortOrder
-  proposedUnitPrice?: Prisma.SortOrderInput | Prisma.SortOrder
+  location?: Prisma.SortOrder
+  plannedStartDate?: Prisma.SortOrder
+  targetDate?: Prisma.SortOrder
+  proposedVolume?: Prisma.SortOrder
+  proposedUnit?: Prisma.SortOrder
+  proposedUnitPrice?: Prisma.SortOrder
   proposedTotalWage?: Prisma.SortOrder
-  approvedTotalWage?: Prisma.SortOrderInput | Prisma.SortOrder
-  wageApprovedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedTotalWage?: Prisma.SortOrder
+  wageApprovedAt?: Prisma.SortOrder
   proposedById?: Prisma.SortOrder
-  wageApprovedById?: Prisma.SortOrderInput | Prisma.SortOrder
+  wageApprovedById?: Prisma.SortOrder
   progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -370,11 +370,11 @@ export type ProjectWorkPointWhereUniqueInput = Prisma.AtLeast<{
   location?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
   plannedStartDate?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
   targetDate?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
-  proposedVolume?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
   proposedUnit?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
-  proposedUnitPrice?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFilter<"ProjectWorkPoint"> | bigint | number
+  approvedTotalWage?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
   wageApprovedAt?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
   proposedById?: Prisma.StringFilter<"ProjectWorkPoint"> | string
   wageApprovedById?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
@@ -392,17 +392,17 @@ export type ProjectWorkPointOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   title?: Prisma.SortOrder
-  location?: Prisma.SortOrderInput | Prisma.SortOrder
-  plannedStartDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  targetDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  proposedVolume?: Prisma.SortOrderInput | Prisma.SortOrder
-  proposedUnit?: Prisma.SortOrderInput | Prisma.SortOrder
-  proposedUnitPrice?: Prisma.SortOrderInput | Prisma.SortOrder
+  location?: Prisma.SortOrder
+  plannedStartDate?: Prisma.SortOrder
+  targetDate?: Prisma.SortOrder
+  proposedVolume?: Prisma.SortOrder
+  proposedUnit?: Prisma.SortOrder
+  proposedUnitPrice?: Prisma.SortOrder
   proposedTotalWage?: Prisma.SortOrder
-  approvedTotalWage?: Prisma.SortOrderInput | Prisma.SortOrder
-  wageApprovedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedTotalWage?: Prisma.SortOrder
+  wageApprovedAt?: Prisma.SortOrder
   proposedById?: Prisma.SortOrder
-  wageApprovedById?: Prisma.SortOrderInput | Prisma.SortOrder
+  wageApprovedById?: Prisma.SortOrder
   progress?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -423,11 +423,11 @@ export type ProjectWorkPointScalarWhereWithAggregatesInput = {
   location?: Prisma.StringNullableWithAggregatesFilter<"ProjectWorkPoint"> | string | null
   plannedStartDate?: Prisma.DateTimeNullableWithAggregatesFilter<"ProjectWorkPoint"> | Date | string | null
   targetDate?: Prisma.DateTimeNullableWithAggregatesFilter<"ProjectWorkPoint"> | Date | string | null
-  proposedVolume?: Prisma.DecimalNullableWithAggregatesFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.BigIntNullableWithAggregatesFilter<"ProjectWorkPoint"> | bigint | number | null
   proposedUnit?: Prisma.StringNullableWithAggregatesFilter<"ProjectWorkPoint"> | string | null
-  proposedUnitPrice?: Prisma.DecimalNullableWithAggregatesFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalWithAggregatesFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.DecimalNullableWithAggregatesFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.BigIntNullableWithAggregatesFilter<"ProjectWorkPoint"> | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntWithAggregatesFilter<"ProjectWorkPoint"> | bigint | number
+  approvedTotalWage?: Prisma.BigIntNullableWithAggregatesFilter<"ProjectWorkPoint"> | bigint | number | null
   wageApprovedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ProjectWorkPoint"> | Date | string | null
   proposedById?: Prisma.StringWithAggregatesFilter<"ProjectWorkPoint"> | string
   wageApprovedById?: Prisma.StringNullableWithAggregatesFilter<"ProjectWorkPoint"> | string | null
@@ -442,11 +442,11 @@ export type ProjectWorkPointCreateInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   progress?: number
   createdAt?: Date | string
@@ -465,11 +465,11 @@ export type ProjectWorkPointUncheckedCreateInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   wageApprovedById?: string | null
@@ -481,16 +481,15 @@ export type ProjectWorkPointUncheckedCreateInput = {
 }
 
 export type ProjectWorkPointUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -503,17 +502,16 @@ export type ProjectWorkPointUpdateInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -531,11 +529,11 @@ export type ProjectWorkPointCreateManyInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   wageApprovedById?: string | null
@@ -545,16 +543,15 @@ export type ProjectWorkPointCreateManyInput = {
 }
 
 export type ProjectWorkPointUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -562,17 +559,16 @@ export type ProjectWorkPointUpdateManyMutationInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -832,11 +828,11 @@ export type ProjectWorkPointCreateWithoutProposedByInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   progress?: number
   createdAt?: Date | string
@@ -854,11 +850,11 @@ export type ProjectWorkPointUncheckedCreateWithoutProposedByInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   wageApprovedById?: string | null
   progress?: number
@@ -875,7 +871,6 @@ export type ProjectWorkPointCreateOrConnectWithoutProposedByInput = {
 
 export type ProjectWorkPointCreateManyProposedByInputEnvelope = {
   data: Prisma.ProjectWorkPointCreateManyProposedByInput | Prisma.ProjectWorkPointCreateManyProposedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWorkPointCreateWithoutWageApprovedByInput = {
@@ -884,11 +879,11 @@ export type ProjectWorkPointCreateWithoutWageApprovedByInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   progress?: number
   createdAt?: Date | string
@@ -906,11 +901,11 @@ export type ProjectWorkPointUncheckedCreateWithoutWageApprovedByInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   progress?: number
@@ -927,7 +922,6 @@ export type ProjectWorkPointCreateOrConnectWithoutWageApprovedByInput = {
 
 export type ProjectWorkPointCreateManyWageApprovedByInputEnvelope = {
   data: Prisma.ProjectWorkPointCreateManyWageApprovedByInput | Prisma.ProjectWorkPointCreateManyWageApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWorkPointUpsertWithWhereUniqueWithoutProposedByInput = {
@@ -956,11 +950,11 @@ export type ProjectWorkPointScalarWhereInput = {
   location?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
   plannedStartDate?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
   targetDate?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
-  proposedVolume?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
   proposedUnit?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
-  proposedUnitPrice?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.DecimalNullableFilter<"ProjectWorkPoint"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFilter<"ProjectWorkPoint"> | bigint | number
+  approvedTotalWage?: Prisma.BigIntNullableFilter<"ProjectWorkPoint"> | bigint | number | null
   wageApprovedAt?: Prisma.DateTimeNullableFilter<"ProjectWorkPoint"> | Date | string | null
   proposedById?: Prisma.StringFilter<"ProjectWorkPoint"> | string
   wageApprovedById?: Prisma.StringNullableFilter<"ProjectWorkPoint"> | string | null
@@ -991,11 +985,11 @@ export type ProjectWorkPointCreateWithoutProjectInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   progress?: number
   createdAt?: Date | string
@@ -1012,11 +1006,11 @@ export type ProjectWorkPointUncheckedCreateWithoutProjectInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   wageApprovedById?: string | null
@@ -1034,7 +1028,6 @@ export type ProjectWorkPointCreateOrConnectWithoutProjectInput = {
 
 export type ProjectWorkPointCreateManyProjectInputEnvelope = {
   data: Prisma.ProjectWorkPointCreateManyProjectInput | Prisma.ProjectWorkPointCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWorkPointUpsertWithWhereUniqueWithoutProjectInput = {
@@ -1059,11 +1052,11 @@ export type ProjectWorkPointCreateWithoutProgressReportsInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   progress?: number
   createdAt?: Date | string
@@ -1081,11 +1074,11 @@ export type ProjectWorkPointUncheckedCreateWithoutProgressReportsInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   wageApprovedById?: string | null
@@ -1112,16 +1105,15 @@ export type ProjectWorkPointUpdateToOneWithWhereWithoutProgressReportsInput = {
 }
 
 export type ProjectWorkPointUpdateWithoutProgressReportsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1133,17 +1125,16 @@ export type ProjectWorkPointUpdateWithoutProgressReportsInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateWithoutProgressReportsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1159,11 +1150,11 @@ export type ProjectWorkPointCreateWithoutWageAuditLogsInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   progress?: number
   createdAt?: Date | string
@@ -1181,11 +1172,11 @@ export type ProjectWorkPointUncheckedCreateWithoutWageAuditLogsInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   wageApprovedById?: string | null
@@ -1212,16 +1203,15 @@ export type ProjectWorkPointUpdateToOneWithWhereWithoutWageAuditLogsInput = {
 }
 
 export type ProjectWorkPointUpdateWithoutWageAuditLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1233,17 +1223,16 @@ export type ProjectWorkPointUpdateWithoutWageAuditLogsInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateWithoutWageAuditLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1260,11 +1249,11 @@ export type ProjectWorkPointCreateManyProposedByInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   wageApprovedById?: string | null
   progress?: number
@@ -1279,11 +1268,11 @@ export type ProjectWorkPointCreateManyWageApprovedByInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   progress?: number
@@ -1292,16 +1281,15 @@ export type ProjectWorkPointCreateManyWageApprovedByInput = {
 }
 
 export type ProjectWorkPointUpdateWithoutProposedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1313,17 +1301,16 @@ export type ProjectWorkPointUpdateWithoutProposedByInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateWithoutProposedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1334,17 +1321,16 @@ export type ProjectWorkPointUncheckedUpdateWithoutProposedByInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateManyWithoutProposedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1353,16 +1339,15 @@ export type ProjectWorkPointUncheckedUpdateManyWithoutProposedByInput = {
 }
 
 export type ProjectWorkPointUpdateWithoutWageApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1374,17 +1359,16 @@ export type ProjectWorkPointUpdateWithoutWageApprovedByInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateWithoutWageApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1395,17 +1379,16 @@ export type ProjectWorkPointUncheckedUpdateWithoutWageApprovedByInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateManyWithoutWageApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -1419,11 +1402,11 @@ export type ProjectWorkPointCreateManyProjectInput = {
   location?: string | null
   plannedStartDate?: Date | string | null
   targetDate?: Date | string | null
-  proposedVolume?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: bigint | number | null
   proposedUnit?: string | null
-  proposedUnitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: bigint | number | null
+  proposedTotalWage: bigint | number
+  approvedTotalWage?: bigint | number | null
   wageApprovedAt?: Date | string | null
   proposedById: string
   wageApprovedById?: string | null
@@ -1433,16 +1416,15 @@ export type ProjectWorkPointCreateManyProjectInput = {
 }
 
 export type ProjectWorkPointUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   progress?: Prisma.FloatFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1454,16 +1436,15 @@ export type ProjectWorkPointUpdateWithoutProjectInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1475,16 +1456,15 @@ export type ProjectWorkPointUncheckedUpdateWithoutProjectInput = {
 }
 
 export type ProjectWorkPointUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   plannedStartDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   targetDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  proposedVolume?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedVolume?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   proposedUnit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  proposedUnitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  proposedTotalWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  approvedTotalWage?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  proposedUnitPrice?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  proposedTotalWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  approvedTotalWage?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   wageApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   proposedById?: Prisma.StringFieldUpdateOperationsInput | string
   wageApprovedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1559,51 +1539,7 @@ export type ProjectWorkPointSelect<ExtArgs extends runtime.Types.Extensions.Inte
   _count?: boolean | Prisma.ProjectWorkPointCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectWorkPoint"]>
 
-export type ProjectWorkPointSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  title?: boolean
-  location?: boolean
-  plannedStartDate?: boolean
-  targetDate?: boolean
-  proposedVolume?: boolean
-  proposedUnit?: boolean
-  proposedUnitPrice?: boolean
-  proposedTotalWage?: boolean
-  approvedTotalWage?: boolean
-  wageApprovedAt?: boolean
-  proposedById?: boolean
-  wageApprovedById?: boolean
-  progress?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  proposedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  wageApprovedBy?: boolean | Prisma.ProjectWorkPoint$wageApprovedByArgs<ExtArgs>
-}, ExtArgs["result"]["projectWorkPoint"]>
 
-export type ProjectWorkPointSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  title?: boolean
-  location?: boolean
-  plannedStartDate?: boolean
-  targetDate?: boolean
-  proposedVolume?: boolean
-  proposedUnit?: boolean
-  proposedUnitPrice?: boolean
-  proposedTotalWage?: boolean
-  approvedTotalWage?: boolean
-  wageApprovedAt?: boolean
-  proposedById?: boolean
-  wageApprovedById?: boolean
-  progress?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  proposedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  wageApprovedBy?: boolean | Prisma.ProjectWorkPoint$wageApprovedByArgs<ExtArgs>
-}, ExtArgs["result"]["projectWorkPoint"]>
 
 export type ProjectWorkPointSelectScalar = {
   id?: boolean
@@ -1634,16 +1570,6 @@ export type ProjectWorkPointInclude<ExtArgs extends runtime.Types.Extensions.Int
   wageAuditLogs?: boolean | Prisma.ProjectWorkPoint$wageAuditLogsArgs<ExtArgs>
   _count?: boolean | Prisma.ProjectWorkPointCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type ProjectWorkPointIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  proposedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  wageApprovedBy?: boolean | Prisma.ProjectWorkPoint$wageApprovedByArgs<ExtArgs>
-}
-export type ProjectWorkPointIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  proposedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  wageApprovedBy?: boolean | Prisma.ProjectWorkPoint$wageApprovedByArgs<ExtArgs>
-}
 
 export type $ProjectWorkPointPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ProjectWorkPoint"
@@ -1661,11 +1587,11 @@ export type $ProjectWorkPointPayload<ExtArgs extends runtime.Types.Extensions.In
     location: string | null
     plannedStartDate: Date | null
     targetDate: Date | null
-    proposedVolume: runtime.Decimal | null
+    proposedVolume: bigint | null
     proposedUnit: string | null
-    proposedUnitPrice: runtime.Decimal | null
-    proposedTotalWage: runtime.Decimal
-    approvedTotalWage: runtime.Decimal | null
+    proposedUnitPrice: bigint | null
+    proposedTotalWage: bigint
+    approvedTotalWage: bigint | null
     wageApprovedAt: Date | null
     proposedById: string
     wageApprovedById: string | null
@@ -1790,30 +1716,6 @@ export interface ProjectWorkPointDelegate<ExtArgs extends runtime.Types.Extensio
   createMany<T extends ProjectWorkPointCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectWorkPointCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many ProjectWorkPoints and returns the data saved in the database.
-   * @param {ProjectWorkPointCreateManyAndReturnArgs} args - Arguments to create many ProjectWorkPoints.
-   * @example
-   * // Create many ProjectWorkPoints
-   * const projectWorkPoint = await prisma.projectWorkPoint.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many ProjectWorkPoints and only return the `id`
-   * const projectWorkPointWithIdOnly = await prisma.projectWorkPoint.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectWorkPointCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectWorkPointCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a ProjectWorkPoint.
    * @param {ProjectWorkPointDeleteArgs} args - Arguments to delete one ProjectWorkPoint.
    * @example
@@ -1878,36 +1780,6 @@ export interface ProjectWorkPointDelegate<ExtArgs extends runtime.Types.Extensio
   updateMany<T extends ProjectWorkPointUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more ProjectWorkPoints and returns the data updated in the database.
-   * @param {ProjectWorkPointUpdateManyAndReturnArgs} args - Arguments to update many ProjectWorkPoints.
-   * @example
-   * // Update many ProjectWorkPoints
-   * const projectWorkPoint = await prisma.projectWorkPoint.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more ProjectWorkPoints and only return the `id`
-   * const projectWorkPointWithIdOnly = await prisma.projectWorkPoint.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectWorkPointUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one ProjectWorkPoint.
    * @param {ProjectWorkPointUpsertArgs} args - Arguments to update or create a ProjectWorkPoint.
    * @example
@@ -1925,6 +1797,29 @@ export interface ProjectWorkPointDelegate<ExtArgs extends runtime.Types.Extensio
    * })
    */
   upsert<T extends ProjectWorkPointUpsertArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectWorkPointClient<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more ProjectWorkPoints that matches the filter.
+   * @param {ProjectWorkPointFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const projectWorkPoint = await prisma.projectWorkPoint.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectWorkPointFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a ProjectWorkPoint.
+   * @param {ProjectWorkPointAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const projectWorkPoint = await prisma.projectWorkPoint.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectWorkPointAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2106,11 +2001,11 @@ export interface ProjectWorkPointFieldRefs {
   readonly location: Prisma.FieldRef<"ProjectWorkPoint", 'String'>
   readonly plannedStartDate: Prisma.FieldRef<"ProjectWorkPoint", 'DateTime'>
   readonly targetDate: Prisma.FieldRef<"ProjectWorkPoint", 'DateTime'>
-  readonly proposedVolume: Prisma.FieldRef<"ProjectWorkPoint", 'Decimal'>
+  readonly proposedVolume: Prisma.FieldRef<"ProjectWorkPoint", 'BigInt'>
   readonly proposedUnit: Prisma.FieldRef<"ProjectWorkPoint", 'String'>
-  readonly proposedUnitPrice: Prisma.FieldRef<"ProjectWorkPoint", 'Decimal'>
-  readonly proposedTotalWage: Prisma.FieldRef<"ProjectWorkPoint", 'Decimal'>
-  readonly approvedTotalWage: Prisma.FieldRef<"ProjectWorkPoint", 'Decimal'>
+  readonly proposedUnitPrice: Prisma.FieldRef<"ProjectWorkPoint", 'BigInt'>
+  readonly proposedTotalWage: Prisma.FieldRef<"ProjectWorkPoint", 'BigInt'>
+  readonly approvedTotalWage: Prisma.FieldRef<"ProjectWorkPoint", 'BigInt'>
   readonly wageApprovedAt: Prisma.FieldRef<"ProjectWorkPoint", 'DateTime'>
   readonly proposedById: Prisma.FieldRef<"ProjectWorkPoint", 'String'>
   readonly wageApprovedById: Prisma.FieldRef<"ProjectWorkPoint", 'String'>
@@ -2313,11 +2208,6 @@ export type ProjectWorkPointFindManyArgs<ExtArgs extends runtime.Types.Extension
    * Skip the first `n` ProjectWorkPoints.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ProjectWorkPoints.
-   */
   distinct?: Prisma.ProjectWorkPointScalarFieldEnum | Prisma.ProjectWorkPointScalarFieldEnum[]
 }
 
@@ -2351,30 +2241,6 @@ export type ProjectWorkPointCreateManyArgs<ExtArgs extends runtime.Types.Extensi
    * The data used to create many ProjectWorkPoints.
    */
   data: Prisma.ProjectWorkPointCreateManyInput | Prisma.ProjectWorkPointCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * ProjectWorkPoint createManyAndReturn
- */
-export type ProjectWorkPointCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWorkPoint
-   */
-  select?: Prisma.ProjectWorkPointSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWorkPoint
-   */
-  omit?: Prisma.ProjectWorkPointOmit<ExtArgs> | null
-  /**
-   * The data used to create many ProjectWorkPoints.
-   */
-  data: Prisma.ProjectWorkPointCreateManyInput | Prisma.ProjectWorkPointCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWorkPointIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2419,36 +2285,6 @@ export type ProjectWorkPointUpdateManyArgs<ExtArgs extends runtime.Types.Extensi
    * Limit how many ProjectWorkPoints to update.
    */
   limit?: number
-}
-
-/**
- * ProjectWorkPoint updateManyAndReturn
- */
-export type ProjectWorkPointUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWorkPoint
-   */
-  select?: Prisma.ProjectWorkPointSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWorkPoint
-   */
-  omit?: Prisma.ProjectWorkPointOmit<ExtArgs> | null
-  /**
-   * The data used to update ProjectWorkPoints.
-   */
-  data: Prisma.XOR<Prisma.ProjectWorkPointUpdateManyMutationInput, Prisma.ProjectWorkPointUncheckedUpdateManyInput>
-  /**
-   * Filter which ProjectWorkPoints to update
-   */
-  where?: Prisma.ProjectWorkPointWhereInput
-  /**
-   * Limit how many ProjectWorkPoints to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWorkPointIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2515,6 +2351,34 @@ export type ProjectWorkPointDeleteManyArgs<ExtArgs extends runtime.Types.Extensi
    * Limit how many ProjectWorkPoints to delete.
    */
   limit?: number
+}
+
+/**
+ * ProjectWorkPoint findRaw
+ */
+export type ProjectWorkPointFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * ProjectWorkPoint aggregateRaw
+ */
+export type ProjectWorkPointAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

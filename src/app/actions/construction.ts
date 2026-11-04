@@ -32,6 +32,11 @@ import {
   saveTicketReceipt,
 } from "@/lib/ticket-receipts";
 import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
+import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
 
 export type ConstructionActionResult = {
   success: boolean;
@@ -242,8 +247,8 @@ export async function createEquipmentMaster(
         name: parsed.data.name,
         brand: parsed.data.brand || null,
         licensePlate: parsed.data.licensePlate || null,
-        hourlyRate: new Prisma.Decimal(parsed.data.hourlyRate),
-        currentHM: new Prisma.Decimal(parsed.data.currentHM),
+        hourlyRate: scaledIntegerFromDecimal(parsed.data.hourlyRate),
+        currentHM: scaledIntegerFromDecimal(parsed.data.currentHM),
         status: EquipmentStatus.READY,
       },
     });
@@ -299,7 +304,11 @@ export async function createEquipmentLog(
           select: { id: true, name: true, currentHM: true },
         });
         if (!master) throw new Error("Master alat tidak ditemukan.");
-        if (!master.currentHM.equals(new Prisma.Decimal(values.hmStart))) {
+        if (
+          !decimalFromScaledInteger(master.currentHM).equals(
+            new Prisma.Decimal(values.hmStart),
+          )
+        ) {
           throw new Error("HM awal harus sama dengan HM terakhir alat pada master.");
         }
         const updated = await transaction.equipmentMaster.updateMany({
@@ -308,7 +317,7 @@ export async function createEquipmentLog(
             currentHM: master.currentHM,
           },
           data: {
-            currentHM: new Prisma.Decimal(values.hmEnd),
+            currentHM: scaledIntegerFromDecimal(values.hmEnd),
             status: EquipmentStatus.IN_USE,
           },
         });
@@ -324,10 +333,10 @@ export async function createEquipmentLog(
           equipmentName,
           operatorName: values.operatorName || null,
           date: new Date(`${values.date}T00:00:00.000Z`),
-          hmStart: new Prisma.Decimal(values.hmStart),
-          hmEnd: new Prisma.Decimal(values.hmEnd),
-          effectiveHours: new Prisma.Decimal(values.effectiveHours),
-          fuelLiter: new Prisma.Decimal(values.fuelLiter),
+          hmStart: scaledIntegerFromDecimal(values.hmStart),
+          hmEnd: scaledIntegerFromDecimal(values.hmEnd),
+          effectiveHours: scaledIntegerFromDecimal(values.effectiveHours),
+          fuelLiter: scaledIntegerFromDecimal(values.fuelLiter),
           notes: values.notes || null,
           createdById: session.user.id,
         },
@@ -384,7 +393,7 @@ export async function createSubkonContract(
           projectId: parsed.data.projectId,
           subkonName: parsed.data.subkonName,
           workScope: parsed.data.workScope,
-          contractValue: new Prisma.Decimal(parsed.data.contractValue),
+          contractValue: scaledIntegerFromDecimal(parsed.data.contractValue),
           status: SPKStatus.PENDING_APPROVAL,
           createdById: session.user.id,
         },
@@ -457,9 +466,7 @@ export async function submitSubkonTermyn(
   }
   try {
     await prisma.$transaction(async (transaction) => {
-      await transaction.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext(${`subkon-termyn-${publicCode}`})::bigint)
-      `;
+      await acquireMongoTransactionLock(transaction, `subkon-termyn-${publicCode}`);
       const contract = await transaction.subkonContract.findUnique({
         where: { publicCode },
         select: {
@@ -485,19 +492,23 @@ export async function submitSubkonTermyn(
         throw new Error("Anda hanya dapat mengajukan termin untuk proyek yang ditugaskan kepada Anda.");
       }
       const maxClaimed = contract.termyns.reduce(
-        (maximum, termyn) => Math.max(maximum, termyn.claimedPercent.toNumber()),
+        (maximum, termyn) =>
+          Math.max(
+            maximum,
+            decimalFromScaledInteger(termyn.claimedPercent).toNumber(),
+          ),
         0,
       );
       if (claimedPercent <= maxClaimed) {
         throw new Error(`Klaim harus lebih besar dari progres terdahulu ${maxClaimed}%.`);
       }
       const incrementalPercent = new Prisma.Decimal(claimedPercent - maxClaimed);
-      const grossAmount = contract.contractValue
+      const grossAmount = decimalFromScaledInteger(contract.contractValue)
         .mul(incrementalPercent)
         .div(100)
         .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
       const retentionAmount = grossAmount
-        .mul(contract.retentionPct)
+        .mul(decimalFromScaledInteger(contract.retentionPct))
         .div(100)
         .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
       const count = await transaction.subkonTermyn.count({
@@ -508,10 +519,10 @@ export async function submitSubkonTermyn(
         data: {
           subkonContractId: contract.id,
           termynNumber,
-          claimedPercent: new Prisma.Decimal(claimedPercent),
-          grossAmount,
-          retentionAmount,
-          netAmount: grossAmount.minus(retentionAmount),
+          claimedPercent: scaledIntegerFromDecimal(claimedPercent),
+          grossAmount: scaledIntegerFromDecimal(grossAmount),
+          retentionAmount: scaledIntegerFromDecimal(retentionAmount),
+          netAmount: scaledIntegerFromDecimal(grossAmount.minus(retentionAmount)),
           status: SubkonTermynStatus.SUBMITTED,
           createdById: session.user.id,
         },
@@ -649,7 +660,7 @@ export async function approveSubkonTermyn(id: string) {
       const recipients = await sendNotification({
         roleTarget: UserRole.FINANCE,
         title: "Termin Subkon Siap Dibayar",
-        message: `Termin ${termyn.termynNumber} untuk SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) disetujui sebesar Rp ${termyn.netAmount.toString()}.`,
+        message: `Termin ${termyn.termynNumber} untuk SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) disetujui sebesar Rp ${decimalFromScaledInteger(termyn.netAmount).toString()}.`,
         actionUrl: "/apps/finance?tab=subcontract",
         type: NotificationType.APPROVAL,
         database: transaction,
@@ -737,7 +748,7 @@ export async function paySubkonTermyn(
       });
       await recordFinanceCashflowOutflow(transaction, {
         financeAccountId,
-        amount: termyn.netAmount.toNumber(),
+        amount: decimalFromScaledInteger(termyn.netAmount).toNumber(),
         sourceDesc: `Pembayaran Termin ${termyn.termynNumber} · ${termyn.subkonContract.contractNumber} · ${termyn.subkonContract.subkonName}`,
         projectId: termyn.subkonContract.projectId,
         paymentMethod: "TRANSFER",
@@ -758,19 +769,19 @@ export async function paySubkonTermyn(
             projectId: termyn.subkonContract.projectId,
             subkonTermynId: termyn.id,
             vendorName: termyn.subkonContract.subkonName,
-            periodOrDate: `Termin ${termyn.termynNumber} · progres ${termyn.claimedPercent.toString()}%`,
-            subTotal: termyn.grossAmount.toNumber(),
+            periodOrDate: `Termin ${termyn.termynNumber} · progres ${decimalFromScaledInteger(termyn.claimedPercent).toString()}%`,
+            subTotal: decimalFromScaledInteger(termyn.grossAmount).toNumber(),
             tax: 0,
-            deduction: termyn.retentionAmount.toNumber(),
-            grandTotal: termyn.netAmount.toNumber(),
+            deduction: decimalFromScaledInteger(termyn.retentionAmount).toNumber(),
+            grandTotal: decimalFromScaledInteger(termyn.netAmount).toNumber(),
             status: "PAID",
             items: {
               create: {
                 description: termyn.subkonContract.workScope,
                 quantity: 1,
                 unit: `Termin ${termyn.termynNumber}`,
-                unitPrice: termyn.grossAmount.toNumber(),
-                totalPrice: termyn.grossAmount.toNumber(),
+                unitPrice: decimalFromScaledInteger(termyn.grossAmount).toNumber(),
+                totalPrice: decimalFromScaledInteger(termyn.grossAmount).toNumber(),
               },
             },
           },
@@ -820,7 +831,7 @@ export async function createProjectAddendum(
     await prisma.projectAddendum.create({
       data: {
         ...parsed.data,
-        budgetChange: new Prisma.Decimal(parsed.data.budgetChange),
+        budgetChange: scaledIntegerFromDecimal(parsed.data.budgetChange),
         status: ProjectAddendumStatus.PENDING_APPROVAL,
         createdById: session.user.id,
       },
@@ -873,7 +884,11 @@ export async function approveProjectAddendum(
           where: { id: addendum.projectId },
           select: { endDate: true, pagu: true },
         });
-        if (project && project.pagu.plus(addendum.budgetChange).lessThan(0)) {
+        const budgetChange = decimalFromScaledInteger(addendum.budgetChange);
+        if (
+          project &&
+          decimalFromScaledInteger(project.pagu).plus(budgetChange).lessThan(0)
+        ) {
           throw new Error("Perubahan CCO tidak boleh membuat pagu proyek negatif.");
         }
         await transaction.project.update({
@@ -1109,7 +1124,8 @@ export async function releaseSubkonRetention(
     return failure("Masa pemeliharaan setelah PHO belum selesai.");
   }
   const totalRetention = contract.termyns.reduce(
-    (sum, termyn) => sum.plus(termyn.retentionAmount),
+    (sum, termyn) =>
+  sum.plus(decimalFromScaledInteger(termyn.retentionAmount)),
     new Prisma.Decimal(0),
   );
   if (totalRetention.lessThanOrEqualTo(0)) {

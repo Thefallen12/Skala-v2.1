@@ -23,6 +23,10 @@ import {
 } from "@/generated/prisma/enums";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
 import { resolveVendorBankAccount } from "@/lib/vendor-bank-accounts";
 import { nextDocumentNumber } from "@/lib/documents/numbering";
 import {
@@ -42,6 +46,7 @@ import {
   saveDirectStockPurchasePhoto,
 } from "@/lib/direct-stock-purchase-photos";
 import { MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS } from "@/lib/direct-stock-purchase-photo-config";
+import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
 import {
   CloudinaryPhotoValidationError,
   CloudinaryConfigurationError,
@@ -188,8 +193,8 @@ function evaluateWarehouseStock(
     id: string;
     name: string;
     unit: string;
-    stockQuantity: Prisma.Decimal;
-    unitPrice: Prisma.Decimal;
+    stockQuantity: bigint;
+    unitPrice: bigint;
   }[],
 ): {
   available: true;
@@ -231,7 +236,7 @@ function evaluateWarehouseStock(
       name: stockItem.name,
       unit: stockItem.unit,
       quantity: (current?.quantity ?? 0) + ticketItem.quantity,
-      unitPrice: stockItem.unitPrice,
+      unitPrice: decimalFromScaledInteger(stockItem.unitPrice),
     });
   }
 
@@ -239,11 +244,14 @@ function evaluateWarehouseStock(
     const stockItem = stockItems.find(
       (item) => item.id === reservation.stockItemId,
     );
-    if (!stockItem || stockItem.stockQuantity.lessThan(reservation.quantity)) {
+    const availableQuantity = stockItem
+      ? decimalFromScaledInteger(stockItem.stockQuantity)
+      : new Prisma.Decimal(0);
+    if (!stockItem || availableQuantity.lessThan(reservation.quantity)) {
       return {
         available: false,
         fallbackRequired: true,
-        message: `Stok "${reservation.name}" tidak mencukupi: tersedia ${stockItem?.stockQuantity.toString() ?? "0"} ${reservation.unit}, dibutuhkan ${reservation.quantity} ${reservation.unit}.`,
+        message: `Stok "${reservation.name}" tidak mencukupi: tersedia ${availableQuantity.toString()} ${reservation.unit}, dibutuhkan ${reservation.quantity} ${reservation.unit}.`,
       };
     }
   }
@@ -257,7 +265,7 @@ function evaluateWarehouseItemAvailability(
     id: string;
     name: string;
     unit: string;
-    stockQuantity: Prisma.Decimal;
+    stockQuantity: bigint;
   }[],
 ) {
   const normalize = (value: string) =>
@@ -299,7 +307,9 @@ function evaluateWarehouseItemAvailability(
     success: true as const,
     items: ticketItems.map((ticketItem) => {
       const match = matchesByTicketItem.get(ticketItem.id)!;
-      const availableQuantity = match.stockItem?.stockQuantity ?? new Prisma.Decimal(0);
+      const availableQuantity = match.stockItem
+        ? decimalFromScaledInteger(match.stockItem.stockQuantity)
+        : new Prisma.Decimal(0);
       const requiredQuantity = match.stockItem
         ? requiredByStockId.get(match.stockItem.id) ?? ticketItem.quantity
         : ticketItem.quantity;
@@ -423,21 +433,14 @@ async function nextTicketNumber(
   const month = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   const prefix = `TKT-${month}-`;
 
-  await transaction.$queryRaw`
-    WITH ticket_number_lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(hashtext(${prefix})::bigint)
-    )
-    SELECT TRUE AS locked FROM ticket_number_lock
-  `;
+  const sequence = await transaction.documentNumberSequence.upsert({
+    where: { kind_year: { kind: prefix, year: 0 } },
+    update: { value: { increment: 1 } },
+    create: { kind: prefix, year: 0, value: 1 },
+    select: { value: true },
+  });
 
-  const [latest] = await transaction.$queryRaw<{ sequence: number | null }[]>`
-    SELECT MAX(SPLIT_PART("ticketNumber", '-', 3)::integer) AS sequence
-    FROM "Ticket"
-    WHERE "ticketNumber" LIKE ${`${prefix}%`}
-  `;
-  const sequence = (latest?.sequence ?? 0) + 1;
-
-  return `${prefix}${String(sequence).padStart(3, "0")}`;
+  return `${prefix}${String(sequence.value).padStart(3, "0")}`;
 }
 
 export async function createLogisticsPurchaseOrder(input: {
@@ -519,7 +522,7 @@ export async function createLogisticsPurchaseOrder(input: {
     itemName: item.name,
     quantity: quantities.get(item.id)!,
     unit: item.unit,
-    estimatedCost: item.unitPrice,
+    estimatedCost: decimalFromScaledInteger(item.unitPrice),
   }));
   const totalAmount = ticketItems.reduce(
     (total, item) =>
@@ -547,7 +550,7 @@ export async function createLogisticsPurchaseOrder(input: {
           requestCategory: TicketRequestCategory.MATERIAL,
           priority: TicketPriority.MEDIUM,
           status: TicketStatus.PENDING_DIRECTOR,
-          totalAmount,
+          totalAmount: scaledIntegerFromDecimal(totalAmount),
           requesterId: session.user.id,
           projectId: project?.id,
           updatedAt: new Date(),
@@ -556,7 +559,7 @@ export async function createLogisticsPurchaseOrder(input: {
               itemName: item.itemName,
               quantity: item.quantity,
               unit: item.unit,
-              estimatedCost: item.estimatedCost,
+              estimatedCost: scaledIntegerFromDecimal(item.estimatedCost),
             })),
           },
           auditLogs: {
@@ -675,21 +678,26 @@ export async function saveLogisticsStockItem(input: {
       }
       savedStockItem = await prisma.stockItem.update({
         where: { id: input.id },
-        data: { sku, name, unit, stockQuantity, minimumStock, unitPrice },
+        data: {
+          sku,
+          name,
+          unit,
+          stockQuantity: scaledIntegerFromDecimal(stockQuantity),
+          minimumStock: scaledIntegerFromDecimal(minimumStock),
+          unitPrice: scaledIntegerFromDecimal(unitPrice),
+        },
         select: { id: true, sku: true, name: true, unit: true, unitPrice: true },
-      });
+      }).then((item) => ({
+        ...item,
+        unitPrice: decimalFromScaledInteger(item.unitPrice),
+      }));
     } else {
       savedStockItem = await prisma.$transaction(async (transaction) => {
         const lockKey = JSON.stringify([
           name.replace(/\s+/g, " ").toLocaleLowerCase("id-ID"),
           unit.replace(/\s+/g, " ").toLocaleLowerCase("id-ID"),
         ]);
-        await transaction.$queryRaw`
-          WITH stock_catalog_lock AS MATERIALIZED (
-            SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)
-          )
-          SELECT TRUE AS locked FROM stock_catalog_lock
-        `;
+        await acquireMongoTransactionLock(transaction, `stock-catalog:${lockKey}`);
         const matches = await transaction.stockItem.findMany({
           where: {
             name: { equals: name, mode: "insensitive" },
@@ -705,7 +713,10 @@ export async function saveLogisticsStockItem(input: {
         }
         if (matches[0]) {
           reusedCatalogItem = true;
-          return matches[0];
+          return {
+            ...matches[0],
+            unitPrice: decimalFromScaledInteger(matches[0].unitPrice),
+          };
         }
 
         const generatedSku = `MAT-${randomUUID()
@@ -717,12 +728,15 @@ export async function saveLogisticsStockItem(input: {
             sku: generatedSku,
             name,
             unit,
-            stockQuantity,
-            minimumStock,
-            unitPrice,
+            stockQuantity: scaledIntegerFromDecimal(stockQuantity),
+            minimumStock: scaledIntegerFromDecimal(minimumStock),
+            unitPrice: scaledIntegerFromDecimal(unitPrice),
           },
           select: { id: true, sku: true, name: true, unit: true, unitPrice: true },
-        });
+        }).then((item) => ({
+          ...item,
+          unitPrice: decimalFromScaledInteger(item.unitPrice),
+        }));
       });
     }
     revalidatePath("/apps/logistics/stock");
@@ -911,7 +925,7 @@ export async function createDirectStockPurchase(input: {
         const quantity = new Prisma.Decimal(item.quantity);
         const unitPrice = new Prisma.Decimal(item.unitPrice);
         return {
-          stockItemId: stockItem.id,
+          stockItem,
           itemName: stockItem.name,
           unit: stockItem.unit,
           quantity,
@@ -1026,11 +1040,20 @@ export async function createDirectStockPurchase(input: {
             : null,
           paymentTerms: "Pembelian langsung tanpa PO",
           includeTax: input.includeTax ?? false,
-          totalAmount,
+          totalAmount: scaledIntegerFromDecimal(totalAmount),
           reference: input.reference?.trim() || null,
           notes: input.notes?.trim() || null,
           createdById: session.user.id,
-          items: { create: items },
+          items: {
+            create: items.map((item) => ({
+              stockItem: { connect: { id: item.stockItem.id } },
+              itemName: item.itemName,
+              unit: item.unit,
+              quantity: scaledIntegerFromDecimal(item.quantity),
+              unitPrice: scaledIntegerFromDecimal(item.unitPrice),
+              totalPrice: scaledIntegerFromDecimal(item.totalPrice),
+            })),
+          },
         },
         select: { id: true },
       });
@@ -1473,9 +1496,10 @@ export async function receiveDirectStockPurchase(
           quantity: new Prisma.Decimal(0),
           purchaseValue: new Prisma.Decimal(0),
         };
-        group.quantity = group.quantity.plus(item.quantity);
+        const receivedQuantity = decimalFromScaledInteger(item.quantity);
+        group.quantity = group.quantity.plus(receivedQuantity);
         group.purchaseValue = group.purchaseValue.plus(
-          item.quantity.mul(item.unitPrice),
+          receivedQuantity.mul(decimalFromScaledInteger(item.unitPrice)),
         );
         groupedItems.set(item.stockItemId, group);
       }
@@ -1485,22 +1509,29 @@ export async function receiveDirectStockPurchase(
           where: { id: stockItemId },
           select: { stockQuantity: true, unitPrice: true },
         });
-        const previousValue = stockItem.stockQuantity.mul(stockItem.unitPrice);
-        const newQuantity = stockItem.stockQuantity.plus(group.quantity);
+        const previousValue = decimalFromScaledInteger(
+          stockItem.stockQuantity,
+        ).mul(decimalFromScaledInteger(stockItem.unitPrice));
+        const newQuantity = decimalFromScaledInteger(
+          stockItem.stockQuantity,
+        ).plus(group.quantity);
         const averageUnitPrice = previousValue
           .plus(group.purchaseValue)
           .div(newQuantity)
           .toDecimalPlaces(2);
         await transaction.stockItem.update({
           where: { id: stockItemId },
-          data: { stockQuantity: newQuantity, unitPrice: averageUnitPrice },
+          data: {
+            stockQuantity: scaledIntegerFromDecimal(newQuantity),
+            unitPrice: scaledIntegerFromDecimal(averageUnitPrice),
+          },
         });
         await transaction.stockMovement.create({
           data: {
             stockItemId,
             type: "IN",
             materialName: group.itemName,
-            quantity: group.quantity,
+            quantity: scaledIntegerFromDecimal(group.quantity),
             unit: group.unit,
             reference: purchase.purchaseNumber,
             notes:
@@ -1521,7 +1552,7 @@ export async function receiveDirectStockPurchase(
         });
       }
       return purchase.purchaseNumber;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
     receiptRecorded = true;
 
     revalidatePath("/apps/logistics/stock");
@@ -1687,9 +1718,9 @@ export async function importLogisticsStockCsv(
     sku: string;
     name: string;
     unit: string;
-    stockQuantity: Prisma.Decimal;
-    minimumStock: Prisma.Decimal;
-    unitPrice: Prisma.Decimal;
+    stockQuantity: bigint;
+    minimumStock: bigint;
+    unitPrice: bigint;
   }[] = [];
   for (const [index, values] of rows.entries()) {
     const [rawSku, rawName, rawUnit, rawQuantity, rawMinimum, rawPrice] = values;
@@ -1728,9 +1759,9 @@ export async function importLogisticsStockCsv(
       sku,
       name,
       unit,
-      stockQuantity: new Prisma.Decimal(rawQuantity.trim()),
-      minimumStock: new Prisma.Decimal(rawMinimum.trim()),
-      unitPrice: new Prisma.Decimal(rawPrice.trim()),
+      stockQuantity: scaledIntegerFromDecimal(rawQuantity.trim()),
+      minimumStock: scaledIntegerFromDecimal(rawMinimum.trim()),
+      unitPrice: scaledIntegerFromDecimal(rawPrice.trim()),
     });
   }
 
@@ -2274,7 +2305,8 @@ export async function createTicket(
           status: isInternalFundingRequest
             ? TicketStatus.PENDING_DIRECTOR
             : TicketStatus.DRAFT,
-          totalAmount,
+          totalAmount:
+            totalAmount === null ? null : scaledIntegerFromDecimal(totalAmount),
           requestedAmount: requiresRequestedAmount
             ? input.requestedAmount!
             : null,
@@ -2300,7 +2332,10 @@ export async function createTicket(
               itemName: item.itemName,
               quantity: item.quantity,
               unit: item.unit,
-              estimatedCost: item.estimatedCost ?? null,
+              estimatedCost:
+                item.estimatedCost === undefined || item.estimatedCost === null
+                  ? null
+                  : scaledIntegerFromDecimal(item.estimatedCost),
               categoryHint: item.categoryHint,
               expectedDeliveryDate: item.expectedDeliveryDate
                 ? new Date(`${item.expectedDeliveryDate}T00:00:00.000Z`)
@@ -2367,13 +2402,6 @@ export async function createTicket(
   };
 }
 
-const ticketManagementRoles: UserRole[] = [
-  UserRole.LOGISTICS,
-  UserRole.FINANCE,
-  UserRole.ADMINISTRATIONS,
-  UserRole.DIRECTOR,
-];
-
 export async function updateTicketDetails(
   ticketId: string,
   input: { title: string; description: string; priority: TicketPriority },
@@ -2400,42 +2428,27 @@ export async function updateTicketDetails(
     const updated = await prisma.$transaction(async (transaction) => {
       const ticket = await transaction.ticket.findUnique({
         where: { id: ticketId },
-        select: {
-          requesterId: true,
-          status: true,
-          purchaseOrders: { select: { id: true }, take: 1 },
-          directStockPurchases: { select: { id: true }, take: 1 },
-          paymentTransactions: { select: { id: true }, take: 1 },
-          deliveryOrders: { select: { id: true }, take: 1 },
-          operationalDocuments: { select: { id: true }, take: 1 },
-          items: {
-            where: { OR: [{ poItemId: { not: null } }, { doItemId: { not: null } }] },
-            select: { id: true },
-            take: 1,
-          },
-        },
+        select: { requesterId: true },
       });
       if (!ticket) return "NOT_FOUND" as const;
-      if (
-        !ticketManagementRoles.includes(session.user.role) &&
-        ticket.requesterId !== session.user.id
-      ) {
+      const isDirector = session.user.role === UserRole.DIRECTOR;
+      const isRequester = ticket.requesterId === session.user.id;
+      if (!isDirector && !isRequester) {
         return "FORBIDDEN" as const;
       }
-      if (ticket.status !== TicketStatus.DRAFT) return "LOCKED" as const;
-      if (
-        ticket.purchaseOrders.length > 0 ||
-        ticket.directStockPurchases.length > 0 ||
-        ticket.paymentTransactions.length > 0 ||
-        ticket.deliveryOrders.length > 0 ||
-        ticket.operationalDocuments.length > 0 ||
-        ticket.items.length > 0
-      ) {
-        return "LOCKED" as const;
+      if (!isDirector) {
+        const previousEdits = await transaction.ticketAuditLog.count({
+          where: {
+            ticketId,
+            userId: session.user.id,
+            action: { in: ["UPDATED", "REQUESTER_EDITED"] },
+          },
+        });
+        if (previousEdits > 0) return "EDIT_LIMIT_REACHED" as const;
       }
 
       const result = await transaction.ticket.updateMany({
-        where: { id: ticketId, status: TicketStatus.DRAFT },
+        where: { id: ticketId },
         data: {
           title: input.title.trim(),
           description: input.description.trim() || null,
@@ -2448,7 +2461,7 @@ export async function updateTicketDetails(
         data: {
           ticketId,
           userId: session.user.id,
-          action: "UPDATED",
+          action: isDirector ? "UPDATED" : "REQUESTER_EDITED",
           notes: "Judul, deskripsi, atau prioritas tiket diperbarui.",
         },
       });
@@ -2462,7 +2475,10 @@ export async function updateTicketDetails(
       return actionFailure("Anda tidak memiliki izin untuk mengedit tiket ini.");
     }
     if (updated === "LOCKED") {
-      return actionFailure("Tiket hanya dapat diedit selama masih berstatus Draft.");
+      return actionFailure("Tiket sudah tidak tersedia untuk diperbarui.");
+    }
+    if (updated === "EDIT_LIMIT_REACHED") {
+      return actionFailure("Pemohon hanya dapat mengedit tiket satu kali.");
     }
   } catch (error) {
     console.error("Ticket update failed:", error);
@@ -2478,7 +2494,7 @@ export async function deleteTicket(
   ticketId: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || !ticketManagementRoles.includes(session.user.role)) {
+  if (!session?.user?.id || session.user.role !== UserRole.DIRECTOR) {
     return actionFailure("Anda tidak memiliki izin untuk menghapus tiket.");
   }
   if (typeof ticketId !== "string" || !ticketId) {
@@ -3991,9 +4007,15 @@ async function createWarehouseDeliveryOrder(
         const updated = await transaction.stockItem.updateMany({
           where: {
             id: reservation.stockItemId,
-            stockQuantity: { gte: reservation.quantity },
+            stockQuantity: {
+              gte: scaledIntegerFromDecimal(reservation.quantity),
+            },
           },
-          data: { stockQuantity: { decrement: reservation.quantity } },
+          data: {
+            stockQuantity: {
+              decrement: scaledIntegerFromDecimal(reservation.quantity),
+            },
+          },
         });
         if (updated.count !== 1) {
           throw new Error(warehouseInsufficientMessage);
@@ -4004,11 +4026,13 @@ async function createWarehouseDeliveryOrder(
             stockItemId: reservation.stockItemId,
             type: "OUT",
             materialName: reservation.name,
-            quantity: new Prisma.Decimal(reservation.quantity),
+            quantity: scaledIntegerFromDecimal(reservation.quantity),
             unit: reservation.unit,
-            totalCost: new Prisma.Decimal(reservation.quantity)
-              .mul(reservation.unitPrice)
-              .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+            totalCost: scaledIntegerFromDecimal(
+              new Prisma.Decimal(reservation.quantity)
+                .mul(reservation.unitPrice)
+                .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+            ),
             reference: doNumber,
             notes: `Pemenuhan tiket ${ticket.ticketNumber} melalui DO ${doNumber}.`,
             createdById: logisticsUserId,
@@ -4260,7 +4284,10 @@ export async function processFinancePayment(
               (order.includeTax ? 1.11 : 1) *
               100,
           ) / 100
-        : Number(ticket.requestedAmount ?? ticket.totalAmount ?? 0);
+        : ticket.requestedAmount ??
+          (ticket.totalAmount
+            ? decimalFromScaledInteger(ticket.totalAmount).toNumber()
+            : 0);
       if (!Number.isFinite(invoiceTotal) || invoiceTotal <= 0) {
         throw new Error("Total tagihan tiket tidak valid.");
       }
@@ -4604,14 +4631,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
       if (!order.vendorInvoiceUrl) {
         throw new Error("Logistik harus mengunggah invoice/bon sebelum pembayaran PO.");
       }
-      await transaction.$queryRaw<{ locked: boolean }[]>`
-        WITH payment_lock AS MATERIALIZED (
-          SELECT pg_advisory_xact_lock(
-            hashtext(${`po-payment:${order.id}`}::text)::bigint
-          )
-        )
-        SELECT TRUE AS locked FROM payment_lock
-      `;
+      await acquireMongoTransactionLock(transaction, `po-payment:${order.id}`);
       const subtotal = order.invoices[0]?.subTotal ?? order.items.reduce(
         (sum, item) => sum + item.totalPrice,
         0,
@@ -4845,14 +4865,10 @@ export async function processFinanceDirectStockPurchasePayment(
       if (!purchase.vendorInvoiceUrl) {
         throw new Error("Logistik harus melampirkan invoice/bon sebelum pembayaran.");
       }
-      await transaction.$queryRaw<{ locked: boolean }[]>`
-        WITH payment_lock AS MATERIALIZED (
-          SELECT pg_advisory_xact_lock(
-            hashtext(${`direct-stock-payment:${purchase.id}`}::text)::bigint
-          )
-        )
-        SELECT TRUE AS locked FROM payment_lock
-      `;
+      await acquireMongoTransactionLock(
+        transaction,
+        `direct-stock-payment:${purchase.id}`,
+      );
       const paymentHistory = await transaction.paymentTransaction.aggregate({
         where: {
           directStockPurchaseId: purchase.id,
@@ -4860,7 +4876,7 @@ export async function processFinanceDirectStockPurchasePayment(
         },
         _sum: { amount: true },
       });
-      const total = Number(purchase.totalAmount);
+      const total = decimalFromScaledInteger(purchase.totalAmount).toNumber();
       const allocation = allocatePaymentAmount(
         total,
         paymentHistory._sum.amount ?? 0,

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -326,7 +326,7 @@ export type PurchaseOrderGroupByOutputType = {
   _max: PurchaseOrderMaxAggregateOutputType | null
 }
 
-export type GetPurchaseOrderGroupByPayload<T extends PurchaseOrderGroupByArgs> = Prisma.PrismaPromise<
+type GetPurchaseOrderGroupByPayload<T extends PurchaseOrderGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<PurchaseOrderGroupByOutputType, T['by']> &
       {
@@ -394,30 +394,30 @@ export type PurchaseOrderOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   publicCode?: Prisma.SortOrder
   poNumber?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   vendorName?: Prisma.SortOrder
   paymentMethod?: Prisma.SortOrder
-  paymentBankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTerms?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentBankName?: Prisma.SortOrder
+  paymentAccountNumber?: Prisma.SortOrder
+  paymentAccountName?: Prisma.SortOrder
+  paymentTerms?: Prisma.SortOrder
   includeTax?: Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorPoSentAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorPoSentById?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  paymentReceiptUrl?: Prisma.SortOrder
+  vendorInvoiceUrl?: Prisma.SortOrder
+  vendorInvoiceUploadedAt?: Prisma.SortOrder
+  vendorInvoiceUploadedById?: Prisma.SortOrder
+  vendorPoSentAt?: Prisma.SortOrder
+  vendorPoSentById?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  createdById?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorId?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  ticketId?: Prisma.SortOrderInput | Prisma.SortOrder
+  createdById?: Prisma.SortOrder
+  vendorId?: Prisma.SortOrder
+  reviewedById?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  ticketId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -489,30 +489,30 @@ export type PurchaseOrderOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   publicCode?: Prisma.SortOrder
   poNumber?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   vendorName?: Prisma.SortOrder
   paymentMethod?: Prisma.SortOrder
-  paymentBankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTerms?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentBankName?: Prisma.SortOrder
+  paymentAccountNumber?: Prisma.SortOrder
+  paymentAccountName?: Prisma.SortOrder
+  paymentTerms?: Prisma.SortOrder
   includeTax?: Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorPoSentAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorPoSentById?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  paymentReceiptUrl?: Prisma.SortOrder
+  vendorInvoiceUrl?: Prisma.SortOrder
+  vendorInvoiceUploadedAt?: Prisma.SortOrder
+  vendorInvoiceUploadedById?: Prisma.SortOrder
+  vendorPoSentAt?: Prisma.SortOrder
+  vendorPoSentById?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  createdById?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorId?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  ticketId?: Prisma.SortOrderInput | Prisma.SortOrder
+  createdById?: Prisma.SortOrder
+  vendorId?: Prisma.SortOrder
+  reviewedById?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  ticketId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.PurchaseOrderCountOrderByAggregateInput
@@ -632,7 +632,6 @@ export type PurchaseOrderUncheckedCreateInput = {
 }
 
 export type PurchaseOrderUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -670,7 +669,6 @@ export type PurchaseOrderUpdateInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -740,7 +738,6 @@ export type PurchaseOrderCreateManyInput = {
 }
 
 export type PurchaseOrderUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -764,7 +761,6 @@ export type PurchaseOrderUpdateManyMutationInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1173,7 +1169,7 @@ export type PurchaseOrderUpdateOneWithoutStockPurchasesNestedInput = {
   create?: Prisma.XOR<Prisma.PurchaseOrderCreateWithoutStockPurchasesInput, Prisma.PurchaseOrderUncheckedCreateWithoutStockPurchasesInput>
   connectOrCreate?: Prisma.PurchaseOrderCreateOrConnectWithoutStockPurchasesInput
   upsert?: Prisma.PurchaseOrderUpsertWithoutStockPurchasesInput
-  disconnect?: Prisma.PurchaseOrderWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.PurchaseOrderWhereInput | boolean
   connect?: Prisma.PurchaseOrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PurchaseOrderUpdateToOneWithWhereWithoutStockPurchasesInput, Prisma.PurchaseOrderUpdateWithoutStockPurchasesInput>, Prisma.PurchaseOrderUncheckedUpdateWithoutStockPurchasesInput>
@@ -1277,7 +1273,7 @@ export type PurchaseOrderUpdateOneWithoutPaymentTransactionsNestedInput = {
   create?: Prisma.XOR<Prisma.PurchaseOrderCreateWithoutPaymentTransactionsInput, Prisma.PurchaseOrderUncheckedCreateWithoutPaymentTransactionsInput>
   connectOrCreate?: Prisma.PurchaseOrderCreateOrConnectWithoutPaymentTransactionsInput
   upsert?: Prisma.PurchaseOrderUpsertWithoutPaymentTransactionsInput
-  disconnect?: Prisma.PurchaseOrderWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.PurchaseOrderWhereInput | boolean
   connect?: Prisma.PurchaseOrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PurchaseOrderUpdateToOneWithWhereWithoutPaymentTransactionsInput, Prisma.PurchaseOrderUpdateWithoutPaymentTransactionsInput>, Prisma.PurchaseOrderUncheckedUpdateWithoutPaymentTransactionsInput>
@@ -1293,7 +1289,7 @@ export type PurchaseOrderUpdateOneWithoutDeliveryOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.PurchaseOrderCreateWithoutDeliveryOrdersInput, Prisma.PurchaseOrderUncheckedCreateWithoutDeliveryOrdersInput>
   connectOrCreate?: Prisma.PurchaseOrderCreateOrConnectWithoutDeliveryOrdersInput
   upsert?: Prisma.PurchaseOrderUpsertWithoutDeliveryOrdersInput
-  disconnect?: Prisma.PurchaseOrderWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.PurchaseOrderWhereInput | boolean
   connect?: Prisma.PurchaseOrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PurchaseOrderUpdateToOneWithWhereWithoutDeliveryOrdersInput, Prisma.PurchaseOrderUpdateWithoutDeliveryOrdersInput>, Prisma.PurchaseOrderUncheckedUpdateWithoutDeliveryOrdersInput>
@@ -1323,7 +1319,7 @@ export type PurchaseOrderUpdateOneWithoutInvoicesNestedInput = {
   create?: Prisma.XOR<Prisma.PurchaseOrderCreateWithoutInvoicesInput, Prisma.PurchaseOrderUncheckedCreateWithoutInvoicesInput>
   connectOrCreate?: Prisma.PurchaseOrderCreateOrConnectWithoutInvoicesInput
   upsert?: Prisma.PurchaseOrderUpsertWithoutInvoicesInput
-  disconnect?: Prisma.PurchaseOrderWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.PurchaseOrderWhereInput | boolean
   connect?: Prisma.PurchaseOrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PurchaseOrderUpdateToOneWithWhereWithoutInvoicesInput, Prisma.PurchaseOrderUpdateWithoutInvoicesInput>, Prisma.PurchaseOrderUncheckedUpdateWithoutInvoicesInput>
@@ -1424,7 +1420,6 @@ export type PurchaseOrderCreateOrConnectWithoutCreatedByInput = {
 
 export type PurchaseOrderCreateManyCreatedByInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyCreatedByInput | Prisma.PurchaseOrderCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderCreateWithoutReviewedByInput = {
@@ -1508,7 +1503,6 @@ export type PurchaseOrderCreateOrConnectWithoutReviewedByInput = {
 
 export type PurchaseOrderCreateManyReviewedByInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyReviewedByInput | Prisma.PurchaseOrderCreateManyReviewedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderCreateWithoutApprovedByInput = {
@@ -1592,7 +1586,6 @@ export type PurchaseOrderCreateOrConnectWithoutApprovedByInput = {
 
 export type PurchaseOrderCreateManyApprovedByInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyApprovedByInput | Prisma.PurchaseOrderCreateManyApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderCreateWithoutVendorPoSentByInput = {
@@ -1676,7 +1669,6 @@ export type PurchaseOrderCreateOrConnectWithoutVendorPoSentByInput = {
 
 export type PurchaseOrderCreateManyVendorPoSentByInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyVendorPoSentByInput | Prisma.PurchaseOrderCreateManyVendorPoSentByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderCreateWithoutVendorInvoiceUploadedByInput = {
@@ -1760,7 +1752,6 @@ export type PurchaseOrderCreateOrConnectWithoutVendorInvoiceUploadedByInput = {
 
 export type PurchaseOrderCreateManyVendorInvoiceUploadedByInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyVendorInvoiceUploadedByInput | Prisma.PurchaseOrderCreateManyVendorInvoiceUploadedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -1959,7 +1950,6 @@ export type PurchaseOrderCreateOrConnectWithoutProjectInput = {
 
 export type PurchaseOrderCreateManyProjectInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyProjectInput | Prisma.PurchaseOrderCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderUpsertWithWhereUniqueWithoutProjectInput = {
@@ -2069,7 +2059,6 @@ export type PurchaseOrderUpdateToOneWithWhereWithoutStockPurchasesInput = {
 }
 
 export type PurchaseOrderUpdateWithoutStockPurchasesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2106,7 +2095,6 @@ export type PurchaseOrderUpdateWithoutStockPurchasesInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutStockPurchasesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2223,7 +2211,6 @@ export type PurchaseOrderCreateOrConnectWithoutVendorInput = {
 
 export type PurchaseOrderCreateManyVendorInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyVendorInput | Prisma.PurchaseOrderCreateManyVendorInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderUpsertWithWhereUniqueWithoutVendorInput = {
@@ -2323,7 +2310,6 @@ export type PurchaseOrderCreateOrConnectWithoutTicketInput = {
 
 export type PurchaseOrderCreateManyTicketInputEnvelope = {
   data: Prisma.PurchaseOrderCreateManyTicketInput | Prisma.PurchaseOrderCreateManyTicketInput[]
-  skipDuplicates?: boolean
 }
 
 export type PurchaseOrderUpsertWithWhereUniqueWithoutTicketInput = {
@@ -2433,7 +2419,6 @@ export type PurchaseOrderUpdateToOneWithWhereWithoutPaymentTransactionsInput = {
 }
 
 export type PurchaseOrderUpdateWithoutPaymentTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2470,7 +2455,6 @@ export type PurchaseOrderUpdateWithoutPaymentTransactionsInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutPaymentTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2597,7 +2581,6 @@ export type PurchaseOrderUpdateToOneWithWhereWithoutDeliveryOrdersInput = {
 }
 
 export type PurchaseOrderUpdateWithoutDeliveryOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2634,7 +2617,6 @@ export type PurchaseOrderUpdateWithoutDeliveryOrdersInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutDeliveryOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2761,7 +2743,6 @@ export type PurchaseOrderUpdateToOneWithWhereWithoutItemsInput = {
 }
 
 export type PurchaseOrderUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2798,7 +2779,6 @@ export type PurchaseOrderUpdateWithoutItemsInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2925,7 +2905,6 @@ export type PurchaseOrderUpdateToOneWithWhereWithoutInvoicesInput = {
 }
 
 export type PurchaseOrderUpdateWithoutInvoicesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2962,7 +2941,6 @@ export type PurchaseOrderUpdateWithoutInvoicesInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutInvoicesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3089,7 +3067,6 @@ export type PurchaseOrderUpdateToOneWithWhereWithoutConfirmationsInput = {
 }
 
 export type PurchaseOrderUpdateWithoutConfirmationsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3126,7 +3103,6 @@ export type PurchaseOrderUpdateWithoutConfirmationsInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutConfirmationsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3318,7 +3294,6 @@ export type PurchaseOrderCreateManyVendorInvoiceUploadedByInput = {
 }
 
 export type PurchaseOrderUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3355,7 +3330,6 @@ export type PurchaseOrderUpdateWithoutCreatedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3392,7 +3366,6 @@ export type PurchaseOrderUncheckedUpdateWithoutCreatedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3423,7 +3396,6 @@ export type PurchaseOrderUncheckedUpdateManyWithoutCreatedByInput = {
 }
 
 export type PurchaseOrderUpdateWithoutReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3460,7 +3432,6 @@ export type PurchaseOrderUpdateWithoutReviewedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3497,7 +3468,6 @@ export type PurchaseOrderUncheckedUpdateWithoutReviewedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3528,7 +3498,6 @@ export type PurchaseOrderUncheckedUpdateManyWithoutReviewedByInput = {
 }
 
 export type PurchaseOrderUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3565,7 +3534,6 @@ export type PurchaseOrderUpdateWithoutApprovedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3602,7 +3570,6 @@ export type PurchaseOrderUncheckedUpdateWithoutApprovedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3633,7 +3600,6 @@ export type PurchaseOrderUncheckedUpdateManyWithoutApprovedByInput = {
 }
 
 export type PurchaseOrderUpdateWithoutVendorPoSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3670,7 +3636,6 @@ export type PurchaseOrderUpdateWithoutVendorPoSentByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutVendorPoSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3707,7 +3672,6 @@ export type PurchaseOrderUncheckedUpdateWithoutVendorPoSentByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutVendorPoSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3738,7 +3702,6 @@ export type PurchaseOrderUncheckedUpdateManyWithoutVendorPoSentByInput = {
 }
 
 export type PurchaseOrderUpdateWithoutVendorInvoiceUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3775,7 +3738,6 @@ export type PurchaseOrderUpdateWithoutVendorInvoiceUploadedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutVendorInvoiceUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3812,7 +3774,6 @@ export type PurchaseOrderUncheckedUpdateWithoutVendorInvoiceUploadedByInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutVendorInvoiceUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3874,7 +3835,6 @@ export type PurchaseOrderCreateManyProjectInput = {
 }
 
 export type PurchaseOrderUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3911,7 +3871,6 @@ export type PurchaseOrderUpdateWithoutProjectInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3948,7 +3907,6 @@ export type PurchaseOrderUncheckedUpdateWithoutProjectInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4010,7 +3968,6 @@ export type PurchaseOrderCreateManyVendorInput = {
 }
 
 export type PurchaseOrderUpdateWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4047,7 +4004,6 @@ export type PurchaseOrderUpdateWithoutVendorInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4084,7 +4040,6 @@ export type PurchaseOrderUncheckedUpdateWithoutVendorInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4146,7 +4101,6 @@ export type PurchaseOrderCreateManyTicketInput = {
 }
 
 export type PurchaseOrderUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4183,7 +4137,6 @@ export type PurchaseOrderUpdateWithoutTicketInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4220,7 +4173,6 @@ export type PurchaseOrderUncheckedUpdateWithoutTicketInput = {
 }
 
 export type PurchaseOrderUncheckedUpdateManyWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   poNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4373,85 +4325,7 @@ export type PurchaseOrderSelect<ExtArgs extends runtime.Types.Extensions.Interna
   _count?: boolean | Prisma.PurchaseOrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["purchaseOrder"]>
 
-export type PurchaseOrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  poNumber?: boolean
-  projectId?: boolean
-  vendorName?: boolean
-  paymentMethod?: boolean
-  paymentBankName?: boolean
-  paymentAccountNumber?: boolean
-  paymentAccountName?: boolean
-  paymentTerms?: boolean
-  includeTax?: boolean
-  transferDestination?: boolean
-  paymentReceiptUrl?: boolean
-  vendorInvoiceUrl?: boolean
-  vendorInvoiceUploadedAt?: boolean
-  vendorInvoiceUploadedById?: boolean
-  vendorPoSentAt?: boolean
-  vendorPoSentById?: boolean
-  paidAt?: boolean
-  status?: boolean
-  createdById?: boolean
-  vendorId?: boolean
-  reviewedById?: boolean
-  reviewedAt?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  ticketId?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.PurchaseOrder$projectArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.PurchaseOrder$vendorInvoiceUploadedByArgs<ExtArgs>
-  vendorPoSentBy?: boolean | Prisma.PurchaseOrder$vendorPoSentByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.PurchaseOrder$createdByArgs<ExtArgs>
-  vendor?: boolean | Prisma.PurchaseOrder$vendorArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.PurchaseOrder$reviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.PurchaseOrder$approvedByArgs<ExtArgs>
-  ticket?: boolean | Prisma.PurchaseOrder$ticketArgs<ExtArgs>
-}, ExtArgs["result"]["purchaseOrder"]>
 
-export type PurchaseOrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  poNumber?: boolean
-  projectId?: boolean
-  vendorName?: boolean
-  paymentMethod?: boolean
-  paymentBankName?: boolean
-  paymentAccountNumber?: boolean
-  paymentAccountName?: boolean
-  paymentTerms?: boolean
-  includeTax?: boolean
-  transferDestination?: boolean
-  paymentReceiptUrl?: boolean
-  vendorInvoiceUrl?: boolean
-  vendorInvoiceUploadedAt?: boolean
-  vendorInvoiceUploadedById?: boolean
-  vendorPoSentAt?: boolean
-  vendorPoSentById?: boolean
-  paidAt?: boolean
-  status?: boolean
-  createdById?: boolean
-  vendorId?: boolean
-  reviewedById?: boolean
-  reviewedAt?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  ticketId?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.PurchaseOrder$projectArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.PurchaseOrder$vendorInvoiceUploadedByArgs<ExtArgs>
-  vendorPoSentBy?: boolean | Prisma.PurchaseOrder$vendorPoSentByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.PurchaseOrder$createdByArgs<ExtArgs>
-  vendor?: boolean | Prisma.PurchaseOrder$vendorArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.PurchaseOrder$reviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.PurchaseOrder$approvedByArgs<ExtArgs>
-  ticket?: boolean | Prisma.PurchaseOrder$ticketArgs<ExtArgs>
-}, ExtArgs["result"]["purchaseOrder"]>
 
 export type PurchaseOrderSelectScalar = {
   id?: boolean
@@ -4502,26 +4376,6 @@ export type PurchaseOrderInclude<ExtArgs extends runtime.Types.Extensions.Intern
   stockPurchases?: boolean | Prisma.PurchaseOrder$stockPurchasesArgs<ExtArgs>
   paymentTransactions?: boolean | Prisma.PurchaseOrder$paymentTransactionsArgs<ExtArgs>
   _count?: boolean | Prisma.PurchaseOrderCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type PurchaseOrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.PurchaseOrder$projectArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.PurchaseOrder$vendorInvoiceUploadedByArgs<ExtArgs>
-  vendorPoSentBy?: boolean | Prisma.PurchaseOrder$vendorPoSentByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.PurchaseOrder$createdByArgs<ExtArgs>
-  vendor?: boolean | Prisma.PurchaseOrder$vendorArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.PurchaseOrder$reviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.PurchaseOrder$approvedByArgs<ExtArgs>
-  ticket?: boolean | Prisma.PurchaseOrder$ticketArgs<ExtArgs>
-}
-export type PurchaseOrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.PurchaseOrder$projectArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.PurchaseOrder$vendorInvoiceUploadedByArgs<ExtArgs>
-  vendorPoSentBy?: boolean | Prisma.PurchaseOrder$vendorPoSentByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.PurchaseOrder$createdByArgs<ExtArgs>
-  vendor?: boolean | Prisma.PurchaseOrder$vendorArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.PurchaseOrder$reviewedByArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.PurchaseOrder$approvedByArgs<ExtArgs>
-  ticket?: boolean | Prisma.PurchaseOrder$ticketArgs<ExtArgs>
 }
 
 export type $PurchaseOrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -4690,30 +4544,6 @@ export interface PurchaseOrderDelegate<ExtArgs extends runtime.Types.Extensions.
   createMany<T extends PurchaseOrderCreateManyArgs>(args?: Prisma.SelectSubset<T, PurchaseOrderCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many PurchaseOrders and returns the data saved in the database.
-   * @param {PurchaseOrderCreateManyAndReturnArgs} args - Arguments to create many PurchaseOrders.
-   * @example
-   * // Create many PurchaseOrders
-   * const purchaseOrder = await prisma.purchaseOrder.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many PurchaseOrders and only return the `id`
-   * const purchaseOrderWithIdOnly = await prisma.purchaseOrder.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends PurchaseOrderCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, PurchaseOrderCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a PurchaseOrder.
    * @param {PurchaseOrderDeleteArgs} args - Arguments to delete one PurchaseOrder.
    * @example
@@ -4778,36 +4608,6 @@ export interface PurchaseOrderDelegate<ExtArgs extends runtime.Types.Extensions.
   updateMany<T extends PurchaseOrderUpdateManyArgs>(args: Prisma.SelectSubset<T, PurchaseOrderUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more PurchaseOrders and returns the data updated in the database.
-   * @param {PurchaseOrderUpdateManyAndReturnArgs} args - Arguments to update many PurchaseOrders.
-   * @example
-   * // Update many PurchaseOrders
-   * const purchaseOrder = await prisma.purchaseOrder.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more PurchaseOrders and only return the `id`
-   * const purchaseOrderWithIdOnly = await prisma.purchaseOrder.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends PurchaseOrderUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, PurchaseOrderUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one PurchaseOrder.
    * @param {PurchaseOrderUpsertArgs} args - Arguments to update or create a PurchaseOrder.
    * @example
@@ -4825,6 +4625,29 @@ export interface PurchaseOrderDelegate<ExtArgs extends runtime.Types.Extensions.
    * })
    */
   upsert<T extends PurchaseOrderUpsertArgs>(args: Prisma.SelectSubset<T, PurchaseOrderUpsertArgs<ExtArgs>>): Prisma.Prisma__PurchaseOrderClient<runtime.Types.Result.GetResult<Prisma.$PurchaseOrderPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more PurchaseOrders that matches the filter.
+   * @param {PurchaseOrderFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const purchaseOrder = await prisma.purchaseOrder.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.PurchaseOrderFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a PurchaseOrder.
+   * @param {PurchaseOrderAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const purchaseOrder = await prisma.purchaseOrder.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.PurchaseOrderAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -5234,11 +5057,6 @@ export type PurchaseOrderFindManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Skip the first `n` PurchaseOrders.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of PurchaseOrders.
-   */
   distinct?: Prisma.PurchaseOrderScalarFieldEnum | Prisma.PurchaseOrderScalarFieldEnum[]
 }
 
@@ -5272,30 +5090,6 @@ export type PurchaseOrderCreateManyArgs<ExtArgs extends runtime.Types.Extensions
    * The data used to create many PurchaseOrders.
    */
   data: Prisma.PurchaseOrderCreateManyInput | Prisma.PurchaseOrderCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * PurchaseOrder createManyAndReturn
- */
-export type PurchaseOrderCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PurchaseOrder
-   */
-  select?: Prisma.PurchaseOrderSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the PurchaseOrder
-   */
-  omit?: Prisma.PurchaseOrderOmit<ExtArgs> | null
-  /**
-   * The data used to create many PurchaseOrders.
-   */
-  data: Prisma.PurchaseOrderCreateManyInput | Prisma.PurchaseOrderCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.PurchaseOrderIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -5340,36 +5134,6 @@ export type PurchaseOrderUpdateManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many PurchaseOrders to update.
    */
   limit?: number
-}
-
-/**
- * PurchaseOrder updateManyAndReturn
- */
-export type PurchaseOrderUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PurchaseOrder
-   */
-  select?: Prisma.PurchaseOrderSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the PurchaseOrder
-   */
-  omit?: Prisma.PurchaseOrderOmit<ExtArgs> | null
-  /**
-   * The data used to update PurchaseOrders.
-   */
-  data: Prisma.XOR<Prisma.PurchaseOrderUpdateManyMutationInput, Prisma.PurchaseOrderUncheckedUpdateManyInput>
-  /**
-   * Filter which PurchaseOrders to update
-   */
-  where?: Prisma.PurchaseOrderWhereInput
-  /**
-   * Limit how many PurchaseOrders to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.PurchaseOrderIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -5436,6 +5200,34 @@ export type PurchaseOrderDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many PurchaseOrders to delete.
    */
   limit?: number
+}
+
+/**
+ * PurchaseOrder findRaw
+ */
+export type PurchaseOrderFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * PurchaseOrder aggregateRaw
+ */
+export type PurchaseOrderAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

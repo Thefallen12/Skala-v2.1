@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -206,7 +206,7 @@ export type FinanceAccountGroupByOutputType = {
   _max: FinanceAccountMaxAggregateOutputType | null
 }
 
-export type GetFinanceAccountGroupByPayload<T extends FinanceAccountGroupByArgs> = Prisma.PrismaPromise<
+type GetFinanceAccountGroupByPayload<T extends FinanceAccountGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<FinanceAccountGroupByOutputType, T['by']> &
       {
@@ -239,7 +239,7 @@ export type FinanceAccountWhereInput = {
 export type FinanceAccountOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   accountName?: Prisma.SortOrder
-  accountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
+  accountNumber?: Prisma.SortOrder
   holderName?: Prisma.SortOrder
   balance?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -266,7 +266,7 @@ export type FinanceAccountWhereUniqueInput = Prisma.AtLeast<{
 export type FinanceAccountOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   accountName?: Prisma.SortOrder
-  accountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
+  accountNumber?: Prisma.SortOrder
   holderName?: Prisma.SortOrder
   balance?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -316,7 +316,6 @@ export type FinanceAccountUncheckedCreateInput = {
 }
 
 export type FinanceAccountUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -328,7 +327,6 @@ export type FinanceAccountUpdateInput = {
 }
 
 export type FinanceAccountUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -350,7 +348,6 @@ export type FinanceAccountCreateManyInput = {
 }
 
 export type FinanceAccountUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -360,7 +357,6 @@ export type FinanceAccountUpdateManyMutationInput = {
 }
 
 export type FinanceAccountUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -479,7 +475,6 @@ export type FinanceAccountUpdateToOneWithWhereWithoutTransactionsInput = {
 }
 
 export type FinanceAccountUpdateWithoutTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -490,7 +485,6 @@ export type FinanceAccountUpdateWithoutTransactionsInput = {
 }
 
 export type FinanceAccountUncheckedUpdateWithoutTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -539,7 +533,6 @@ export type FinanceAccountUpdateToOneWithWhereWithoutOfficeExpensesInput = {
 }
 
 export type FinanceAccountUpdateWithoutOfficeExpensesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -550,7 +543,6 @@ export type FinanceAccountUpdateWithoutOfficeExpensesInput = {
 }
 
 export type FinanceAccountUncheckedUpdateWithoutOfficeExpensesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   accountName?: Prisma.StringFieldUpdateOperationsInput | string
   accountNumber?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   holderName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -613,25 +605,7 @@ export type FinanceAccountSelect<ExtArgs extends runtime.Types.Extensions.Intern
   _count?: boolean | Prisma.FinanceAccountCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["financeAccount"]>
 
-export type FinanceAccountSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  accountName?: boolean
-  accountNumber?: boolean
-  holderName?: boolean
-  balance?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["financeAccount"]>
 
-export type FinanceAccountSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  accountName?: boolean
-  accountNumber?: boolean
-  holderName?: boolean
-  balance?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["financeAccount"]>
 
 export type FinanceAccountSelectScalar = {
   id?: boolean
@@ -649,8 +623,6 @@ export type FinanceAccountInclude<ExtArgs extends runtime.Types.Extensions.Inter
   officeExpenses?: boolean | Prisma.FinanceAccount$officeExpensesArgs<ExtArgs>
   _count?: boolean | Prisma.FinanceAccountCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type FinanceAccountIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type FinanceAccountIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $FinanceAccountPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "FinanceAccount"
@@ -784,30 +756,6 @@ export interface FinanceAccountDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends FinanceAccountCreateManyArgs>(args?: Prisma.SelectSubset<T, FinanceAccountCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many FinanceAccounts and returns the data saved in the database.
-   * @param {FinanceAccountCreateManyAndReturnArgs} args - Arguments to create many FinanceAccounts.
-   * @example
-   * // Create many FinanceAccounts
-   * const financeAccount = await prisma.financeAccount.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many FinanceAccounts and only return the `id`
-   * const financeAccountWithIdOnly = await prisma.financeAccount.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends FinanceAccountCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, FinanceAccountCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FinanceAccountPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a FinanceAccount.
    * @param {FinanceAccountDeleteArgs} args - Arguments to delete one FinanceAccount.
    * @example
@@ -872,36 +820,6 @@ export interface FinanceAccountDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends FinanceAccountUpdateManyArgs>(args: Prisma.SelectSubset<T, FinanceAccountUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more FinanceAccounts and returns the data updated in the database.
-   * @param {FinanceAccountUpdateManyAndReturnArgs} args - Arguments to update many FinanceAccounts.
-   * @example
-   * // Update many FinanceAccounts
-   * const financeAccount = await prisma.financeAccount.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more FinanceAccounts and only return the `id`
-   * const financeAccountWithIdOnly = await prisma.financeAccount.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends FinanceAccountUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, FinanceAccountUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FinanceAccountPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one FinanceAccount.
    * @param {FinanceAccountUpsertArgs} args - Arguments to update or create a FinanceAccount.
    * @example
@@ -919,6 +837,29 @@ export interface FinanceAccountDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends FinanceAccountUpsertArgs>(args: Prisma.SelectSubset<T, FinanceAccountUpsertArgs<ExtArgs>>): Prisma.Prisma__FinanceAccountClient<runtime.Types.Result.GetResult<Prisma.$FinanceAccountPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more FinanceAccounts that matches the filter.
+   * @param {FinanceAccountFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const financeAccount = await prisma.financeAccount.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.FinanceAccountFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a FinanceAccount.
+   * @param {FinanceAccountAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const financeAccount = await prisma.financeAccount.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.FinanceAccountAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1294,11 +1235,6 @@ export type FinanceAccountFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` FinanceAccounts.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of FinanceAccounts.
-   */
   distinct?: Prisma.FinanceAccountScalarFieldEnum | Prisma.FinanceAccountScalarFieldEnum[]
 }
 
@@ -1332,26 +1268,6 @@ export type FinanceAccountCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many FinanceAccounts.
    */
   data: Prisma.FinanceAccountCreateManyInput | Prisma.FinanceAccountCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * FinanceAccount createManyAndReturn
- */
-export type FinanceAccountCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the FinanceAccount
-   */
-  select?: Prisma.FinanceAccountSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the FinanceAccount
-   */
-  omit?: Prisma.FinanceAccountOmit<ExtArgs> | null
-  /**
-   * The data used to create many FinanceAccounts.
-   */
-  data: Prisma.FinanceAccountCreateManyInput | Prisma.FinanceAccountCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1384,32 +1300,6 @@ export type FinanceAccountUpdateArgs<ExtArgs extends runtime.Types.Extensions.In
  * FinanceAccount updateMany
  */
 export type FinanceAccountUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update FinanceAccounts.
-   */
-  data: Prisma.XOR<Prisma.FinanceAccountUpdateManyMutationInput, Prisma.FinanceAccountUncheckedUpdateManyInput>
-  /**
-   * Filter which FinanceAccounts to update
-   */
-  where?: Prisma.FinanceAccountWhereInput
-  /**
-   * Limit how many FinanceAccounts to update.
-   */
-  limit?: number
-}
-
-/**
- * FinanceAccount updateManyAndReturn
- */
-export type FinanceAccountUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the FinanceAccount
-   */
-  select?: Prisma.FinanceAccountSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the FinanceAccount
-   */
-  omit?: Prisma.FinanceAccountOmit<ExtArgs> | null
   /**
    * The data used to update FinanceAccounts.
    */
@@ -1488,6 +1378,34 @@ export type FinanceAccountDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many FinanceAccounts to delete.
    */
   limit?: number
+}
+
+/**
+ * FinanceAccount findRaw
+ */
+export type FinanceAccountFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * FinanceAccount aggregateRaw
+ */
+export type FinanceAccountAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

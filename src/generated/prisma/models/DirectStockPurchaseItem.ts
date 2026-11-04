@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,15 +27,15 @@ export type AggregateDirectStockPurchaseItem = {
 }
 
 export type DirectStockPurchaseItemAvgAggregateOutputType = {
-  quantity: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  totalPrice: runtime.Decimal | null
+  quantity: number | null
+  unitPrice: number | null
+  totalPrice: number | null
 }
 
 export type DirectStockPurchaseItemSumAggregateOutputType = {
-  quantity: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  totalPrice: runtime.Decimal | null
+  quantity: bigint | null
+  unitPrice: bigint | null
+  totalPrice: bigint | null
 }
 
 export type DirectStockPurchaseItemMinAggregateOutputType = {
@@ -44,9 +44,9 @@ export type DirectStockPurchaseItemMinAggregateOutputType = {
   stockItemId: string | null
   itemName: string | null
   unit: string | null
-  quantity: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  totalPrice: runtime.Decimal | null
+  quantity: bigint | null
+  unitPrice: bigint | null
+  totalPrice: bigint | null
 }
 
 export type DirectStockPurchaseItemMaxAggregateOutputType = {
@@ -55,9 +55,9 @@ export type DirectStockPurchaseItemMaxAggregateOutputType = {
   stockItemId: string | null
   itemName: string | null
   unit: string | null
-  quantity: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  totalPrice: runtime.Decimal | null
+  quantity: bigint | null
+  unitPrice: bigint | null
+  totalPrice: bigint | null
 }
 
 export type DirectStockPurchaseItemCountAggregateOutputType = {
@@ -211,9 +211,9 @@ export type DirectStockPurchaseItemGroupByOutputType = {
   stockItemId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal
-  unitPrice: runtime.Decimal
-  totalPrice: runtime.Decimal
+  quantity: bigint
+  unitPrice: bigint
+  totalPrice: bigint
   _count: DirectStockPurchaseItemCountAggregateOutputType | null
   _avg: DirectStockPurchaseItemAvgAggregateOutputType | null
   _sum: DirectStockPurchaseItemSumAggregateOutputType | null
@@ -221,7 +221,7 @@ export type DirectStockPurchaseItemGroupByOutputType = {
   _max: DirectStockPurchaseItemMaxAggregateOutputType | null
 }
 
-export type GetDirectStockPurchaseItemGroupByPayload<T extends DirectStockPurchaseItemGroupByArgs> = Prisma.PrismaPromise<
+type GetDirectStockPurchaseItemGroupByPayload<T extends DirectStockPurchaseItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DirectStockPurchaseItemGroupByOutputType, T['by']> &
       {
@@ -245,9 +245,9 @@ export type DirectStockPurchaseItemWhereInput = {
   stockItemId?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
   itemName?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
   unit?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
-  quantity?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
+  unitPrice?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
+  totalPrice?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
   purchase?: Prisma.XOR<Prisma.DirectStockPurchaseScalarRelationFilter, Prisma.DirectStockPurchaseWhereInput>
   stockItem?: Prisma.XOR<Prisma.StockItemScalarRelationFilter, Prisma.StockItemWhereInput>
 }
@@ -274,9 +274,9 @@ export type DirectStockPurchaseItemWhereUniqueInput = Prisma.AtLeast<{
   stockItemId?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
   itemName?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
   unit?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
-  quantity?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
+  unitPrice?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
+  totalPrice?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
   purchase?: Prisma.XOR<Prisma.DirectStockPurchaseScalarRelationFilter, Prisma.DirectStockPurchaseWhereInput>
   stockItem?: Prisma.XOR<Prisma.StockItemScalarRelationFilter, Prisma.StockItemWhereInput>
 }, "id">
@@ -306,18 +306,18 @@ export type DirectStockPurchaseItemScalarWhereWithAggregatesInput = {
   stockItemId?: Prisma.StringWithAggregatesFilter<"DirectStockPurchaseItem"> | string
   itemName?: Prisma.StringWithAggregatesFilter<"DirectStockPurchaseItem"> | string
   unit?: Prisma.StringWithAggregatesFilter<"DirectStockPurchaseItem"> | string
-  quantity?: Prisma.DecimalWithAggregatesFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalWithAggregatesFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalWithAggregatesFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntWithAggregatesFilter<"DirectStockPurchaseItem"> | bigint | number
+  unitPrice?: Prisma.BigIntWithAggregatesFilter<"DirectStockPurchaseItem"> | bigint | number
+  totalPrice?: Prisma.BigIntWithAggregatesFilter<"DirectStockPurchaseItem"> | bigint | number
 }
 
 export type DirectStockPurchaseItemCreateInput = {
   id?: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
   purchase: Prisma.DirectStockPurchaseCreateNestedOneWithoutItemsInput
   stockItem: Prisma.StockItemCreateNestedOneWithoutDirectPurchaseItemsInput
 }
@@ -328,31 +328,29 @@ export type DirectStockPurchaseItemUncheckedCreateInput = {
   stockItemId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
 }
 
 export type DirectStockPurchaseItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   purchase?: Prisma.DirectStockPurchaseUpdateOneRequiredWithoutItemsNestedInput
   stockItem?: Prisma.StockItemUpdateOneRequiredWithoutDirectPurchaseItemsNestedInput
 }
 
 export type DirectStockPurchaseItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseId?: Prisma.StringFieldUpdateOperationsInput | string
   stockItemId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 export type DirectStockPurchaseItemCreateManyInput = {
@@ -361,29 +359,27 @@ export type DirectStockPurchaseItemCreateManyInput = {
   stockItemId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
 }
 
 export type DirectStockPurchaseItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 export type DirectStockPurchaseItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseId?: Prisma.StringFieldUpdateOperationsInput | string
   stockItemId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 export type DirectStockPurchaseItemListRelationFilter = {
@@ -529,9 +525,9 @@ export type DirectStockPurchaseItemCreateWithoutStockItemInput = {
   id?: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
   purchase: Prisma.DirectStockPurchaseCreateNestedOneWithoutItemsInput
 }
 
@@ -540,9 +536,9 @@ export type DirectStockPurchaseItemUncheckedCreateWithoutStockItemInput = {
   purchaseId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
 }
 
 export type DirectStockPurchaseItemCreateOrConnectWithoutStockItemInput = {
@@ -552,7 +548,6 @@ export type DirectStockPurchaseItemCreateOrConnectWithoutStockItemInput = {
 
 export type DirectStockPurchaseItemCreateManyStockItemInputEnvelope = {
   data: Prisma.DirectStockPurchaseItemCreateManyStockItemInput | Prisma.DirectStockPurchaseItemCreateManyStockItemInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseItemUpsertWithWhereUniqueWithoutStockItemInput = {
@@ -580,18 +575,18 @@ export type DirectStockPurchaseItemScalarWhereInput = {
   stockItemId?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
   itemName?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
   unit?: Prisma.StringFilter<"DirectStockPurchaseItem"> | string
-  quantity?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFilter<"DirectStockPurchaseItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
+  unitPrice?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
+  totalPrice?: Prisma.BigIntFilter<"DirectStockPurchaseItem"> | bigint | number
 }
 
 export type DirectStockPurchaseItemCreateWithoutPurchaseInput = {
   id?: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
   stockItem: Prisma.StockItemCreateNestedOneWithoutDirectPurchaseItemsInput
 }
 
@@ -600,9 +595,9 @@ export type DirectStockPurchaseItemUncheckedCreateWithoutPurchaseInput = {
   stockItemId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
 }
 
 export type DirectStockPurchaseItemCreateOrConnectWithoutPurchaseInput = {
@@ -612,7 +607,6 @@ export type DirectStockPurchaseItemCreateOrConnectWithoutPurchaseInput = {
 
 export type DirectStockPurchaseItemCreateManyPurchaseInputEnvelope = {
   data: Prisma.DirectStockPurchaseItemCreateManyPurchaseInput | Prisma.DirectStockPurchaseItemCreateManyPurchaseInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseItemUpsertWithWhereUniqueWithoutPurchaseInput = {
@@ -636,39 +630,36 @@ export type DirectStockPurchaseItemCreateManyStockItemInput = {
   purchaseId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
 }
 
 export type DirectStockPurchaseItemUpdateWithoutStockItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   purchase?: Prisma.DirectStockPurchaseUpdateOneRequiredWithoutItemsNestedInput
 }
 
 export type DirectStockPurchaseItemUncheckedUpdateWithoutStockItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 export type DirectStockPurchaseItemUncheckedUpdateManyWithoutStockItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 export type DirectStockPurchaseItemCreateManyPurchaseInput = {
@@ -676,39 +667,36 @@ export type DirectStockPurchaseItemCreateManyPurchaseInput = {
   stockItemId: string
   itemName: string
   unit: string
-  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity: bigint | number
+  unitPrice: bigint | number
+  totalPrice: bigint | number
 }
 
 export type DirectStockPurchaseItemUpdateWithoutPurchaseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   stockItem?: Prisma.StockItemUpdateOneRequiredWithoutDirectPurchaseItemsNestedInput
 }
 
 export type DirectStockPurchaseItemUncheckedUpdateWithoutPurchaseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   stockItemId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 export type DirectStockPurchaseItemUncheckedUpdateManyWithoutPurchaseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   stockItemId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  totalPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  quantity?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  totalPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
 }
 
 
@@ -726,31 +714,7 @@ export type DirectStockPurchaseItemSelect<ExtArgs extends runtime.Types.Extensio
   stockItem?: boolean | Prisma.StockItemDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["directStockPurchaseItem"]>
 
-export type DirectStockPurchaseItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  purchaseId?: boolean
-  stockItemId?: boolean
-  itemName?: boolean
-  unit?: boolean
-  quantity?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  purchase?: boolean | Prisma.DirectStockPurchaseDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.StockItemDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["directStockPurchaseItem"]>
 
-export type DirectStockPurchaseItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  purchaseId?: boolean
-  stockItemId?: boolean
-  itemName?: boolean
-  unit?: boolean
-  quantity?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  purchase?: boolean | Prisma.DirectStockPurchaseDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.StockItemDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["directStockPurchaseItem"]>
 
 export type DirectStockPurchaseItemSelectScalar = {
   id?: boolean
@@ -768,14 +732,6 @@ export type DirectStockPurchaseItemInclude<ExtArgs extends runtime.Types.Extensi
   purchase?: boolean | Prisma.DirectStockPurchaseDefaultArgs<ExtArgs>
   stockItem?: boolean | Prisma.StockItemDefaultArgs<ExtArgs>
 }
-export type DirectStockPurchaseItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  purchase?: boolean | Prisma.DirectStockPurchaseDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.StockItemDefaultArgs<ExtArgs>
-}
-export type DirectStockPurchaseItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  purchase?: boolean | Prisma.DirectStockPurchaseDefaultArgs<ExtArgs>
-  stockItem?: boolean | Prisma.StockItemDefaultArgs<ExtArgs>
-}
 
 export type $DirectStockPurchaseItemPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "DirectStockPurchaseItem"
@@ -789,9 +745,9 @@ export type $DirectStockPurchaseItemPayload<ExtArgs extends runtime.Types.Extens
     stockItemId: string
     itemName: string
     unit: string
-    quantity: runtime.Decimal
-    unitPrice: runtime.Decimal
-    totalPrice: runtime.Decimal
+    quantity: bigint
+    unitPrice: bigint
+    totalPrice: bigint
   }, ExtArgs["result"]["directStockPurchaseItem"]>
   composites: {}
 }
@@ -910,30 +866,6 @@ export interface DirectStockPurchaseItemDelegate<ExtArgs extends runtime.Types.E
   createMany<T extends DirectStockPurchaseItemCreateManyArgs>(args?: Prisma.SelectSubset<T, DirectStockPurchaseItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DirectStockPurchaseItems and returns the data saved in the database.
-   * @param {DirectStockPurchaseItemCreateManyAndReturnArgs} args - Arguments to create many DirectStockPurchaseItems.
-   * @example
-   * // Create many DirectStockPurchaseItems
-   * const directStockPurchaseItem = await prisma.directStockPurchaseItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DirectStockPurchaseItems and only return the `id`
-   * const directStockPurchaseItemWithIdOnly = await prisma.directStockPurchaseItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DirectStockPurchaseItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DirectStockPurchaseItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DirectStockPurchaseItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DirectStockPurchaseItem.
    * @param {DirectStockPurchaseItemDeleteArgs} args - Arguments to delete one DirectStockPurchaseItem.
    * @example
@@ -998,36 +930,6 @@ export interface DirectStockPurchaseItemDelegate<ExtArgs extends runtime.Types.E
   updateMany<T extends DirectStockPurchaseItemUpdateManyArgs>(args: Prisma.SelectSubset<T, DirectStockPurchaseItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DirectStockPurchaseItems and returns the data updated in the database.
-   * @param {DirectStockPurchaseItemUpdateManyAndReturnArgs} args - Arguments to update many DirectStockPurchaseItems.
-   * @example
-   * // Update many DirectStockPurchaseItems
-   * const directStockPurchaseItem = await prisma.directStockPurchaseItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DirectStockPurchaseItems and only return the `id`
-   * const directStockPurchaseItemWithIdOnly = await prisma.directStockPurchaseItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DirectStockPurchaseItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DirectStockPurchaseItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DirectStockPurchaseItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DirectStockPurchaseItem.
    * @param {DirectStockPurchaseItemUpsertArgs} args - Arguments to update or create a DirectStockPurchaseItem.
    * @example
@@ -1045,6 +947,29 @@ export interface DirectStockPurchaseItemDelegate<ExtArgs extends runtime.Types.E
    * })
    */
   upsert<T extends DirectStockPurchaseItemUpsertArgs>(args: Prisma.SelectSubset<T, DirectStockPurchaseItemUpsertArgs<ExtArgs>>): Prisma.Prisma__DirectStockPurchaseItemClient<runtime.Types.Result.GetResult<Prisma.$DirectStockPurchaseItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DirectStockPurchaseItems that matches the filter.
+   * @param {DirectStockPurchaseItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const directStockPurchaseItem = await prisma.directStockPurchaseItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DirectStockPurchaseItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DirectStockPurchaseItem.
+   * @param {DirectStockPurchaseItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const directStockPurchaseItem = await prisma.directStockPurchaseItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DirectStockPurchaseItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1222,9 +1147,9 @@ export interface DirectStockPurchaseItemFieldRefs {
   readonly stockItemId: Prisma.FieldRef<"DirectStockPurchaseItem", 'String'>
   readonly itemName: Prisma.FieldRef<"DirectStockPurchaseItem", 'String'>
   readonly unit: Prisma.FieldRef<"DirectStockPurchaseItem", 'String'>
-  readonly quantity: Prisma.FieldRef<"DirectStockPurchaseItem", 'Decimal'>
-  readonly unitPrice: Prisma.FieldRef<"DirectStockPurchaseItem", 'Decimal'>
-  readonly totalPrice: Prisma.FieldRef<"DirectStockPurchaseItem", 'Decimal'>
+  readonly quantity: Prisma.FieldRef<"DirectStockPurchaseItem", 'BigInt'>
+  readonly unitPrice: Prisma.FieldRef<"DirectStockPurchaseItem", 'BigInt'>
+  readonly totalPrice: Prisma.FieldRef<"DirectStockPurchaseItem", 'BigInt'>
 }
     
 
@@ -1421,11 +1346,6 @@ export type DirectStockPurchaseItemFindManyArgs<ExtArgs extends runtime.Types.Ex
    * Skip the first `n` DirectStockPurchaseItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DirectStockPurchaseItems.
-   */
   distinct?: Prisma.DirectStockPurchaseItemScalarFieldEnum | Prisma.DirectStockPurchaseItemScalarFieldEnum[]
 }
 
@@ -1459,30 +1379,6 @@ export type DirectStockPurchaseItemCreateManyArgs<ExtArgs extends runtime.Types.
    * The data used to create many DirectStockPurchaseItems.
    */
   data: Prisma.DirectStockPurchaseItemCreateManyInput | Prisma.DirectStockPurchaseItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DirectStockPurchaseItem createManyAndReturn
- */
-export type DirectStockPurchaseItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DirectStockPurchaseItem
-   */
-  select?: Prisma.DirectStockPurchaseItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DirectStockPurchaseItem
-   */
-  omit?: Prisma.DirectStockPurchaseItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many DirectStockPurchaseItems.
-   */
-  data: Prisma.DirectStockPurchaseItemCreateManyInput | Prisma.DirectStockPurchaseItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DirectStockPurchaseItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1527,36 +1423,6 @@ export type DirectStockPurchaseItemUpdateManyArgs<ExtArgs extends runtime.Types.
    * Limit how many DirectStockPurchaseItems to update.
    */
   limit?: number
-}
-
-/**
- * DirectStockPurchaseItem updateManyAndReturn
- */
-export type DirectStockPurchaseItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DirectStockPurchaseItem
-   */
-  select?: Prisma.DirectStockPurchaseItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DirectStockPurchaseItem
-   */
-  omit?: Prisma.DirectStockPurchaseItemOmit<ExtArgs> | null
-  /**
-   * The data used to update DirectStockPurchaseItems.
-   */
-  data: Prisma.XOR<Prisma.DirectStockPurchaseItemUpdateManyMutationInput, Prisma.DirectStockPurchaseItemUncheckedUpdateManyInput>
-  /**
-   * Filter which DirectStockPurchaseItems to update
-   */
-  where?: Prisma.DirectStockPurchaseItemWhereInput
-  /**
-   * Limit how many DirectStockPurchaseItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DirectStockPurchaseItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1623,6 +1489,34 @@ export type DirectStockPurchaseItemDeleteManyArgs<ExtArgs extends runtime.Types.
    * Limit how many DirectStockPurchaseItems to delete.
    */
   limit?: number
+}
+
+/**
+ * DirectStockPurchaseItem findRaw
+ */
+export type DirectStockPurchaseItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DirectStockPurchaseItem aggregateRaw
+ */
+export type DirectStockPurchaseItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

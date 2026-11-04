@@ -2123,8 +2123,10 @@ export default function FinanceHub({
           "Detail Finance"
         }
         description="Pemeriksaan dokumen dan transaksi tersimpan di satu panel."
+        hideHeader={Boolean(previewOrder)}
         className="sm:max-w-2xl"
         footer={
+          previewOrder ? undefined : (
           <Button
             variant="outline"
             type="button"
@@ -2141,18 +2143,30 @@ export default function FinanceHub({
           >
             Tutup
           </Button>
+          )
         }
       >
-          <div className="mt-6 space-y-4">
+          <div className={previewOrder ? "flex min-h-0 flex-1 flex-col" : "mt-6 space-y-4"}>
             {previewOrder && (
               <>
-                <p className="text-sm">
-                  Vendor: <strong>{previewOrder.vendorName}</strong>
-                </p>
                 <UniversalDocumentPreview
                   title={`Purchase Order ${previewOrder.poNumber}`}
                   documentNumber={previewOrder.poNumber}
                   src={`/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(previewOrder.publicCode)}`}
+                  toolbarLabel={`Vendor: ${previewOrder.vendorName}`}
+                  minimalToolbar
+                  onClose={() => {
+                    setSelection(null);
+                    setReceiptUrl(null);
+                    setPaymentAmount("");
+                    setPaymentType(PaymentType.FULL_PAYMENT);
+                    setMessage("");
+                    if (initialOpenSheet) {
+                      router.replace(`/apps/finance?tab=${activeTab}`, {
+                        scroll: false,
+                      });
+                    }
+                  }}
                 />
               </>
             )}

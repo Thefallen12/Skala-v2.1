@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,20 +27,20 @@ export type AggregateWageAuditLog = {
 }
 
 export type WageAuditLogAvgAggregateOutputType = {
-  oldWage: runtime.Decimal | null
-  newWage: runtime.Decimal | null
+  oldWage: number | null
+  newWage: number | null
 }
 
 export type WageAuditLogSumAggregateOutputType = {
-  oldWage: runtime.Decimal | null
-  newWage: runtime.Decimal | null
+  oldWage: bigint | null
+  newWage: bigint | null
 }
 
 export type WageAuditLogMinAggregateOutputType = {
   id: string | null
   workPointId: string | null
-  oldWage: runtime.Decimal | null
-  newWage: runtime.Decimal | null
+  oldWage: bigint | null
+  newWage: bigint | null
   changedById: string | null
   reason: string | null
   createdAt: Date | null
@@ -49,8 +49,8 @@ export type WageAuditLogMinAggregateOutputType = {
 export type WageAuditLogMaxAggregateOutputType = {
   id: string | null
   workPointId: string | null
-  oldWage: runtime.Decimal | null
-  newWage: runtime.Decimal | null
+  oldWage: bigint | null
+  newWage: bigint | null
   changedById: string | null
   reason: string | null
   createdAt: Date | null
@@ -198,8 +198,8 @@ export type WageAuditLogGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 export type WageAuditLogGroupByOutputType = {
   id: string
   workPointId: string
-  oldWage: runtime.Decimal
-  newWage: runtime.Decimal
+  oldWage: bigint
+  newWage: bigint
   changedById: string
   reason: string | null
   createdAt: Date
@@ -210,7 +210,7 @@ export type WageAuditLogGroupByOutputType = {
   _max: WageAuditLogMaxAggregateOutputType | null
 }
 
-export type GetWageAuditLogGroupByPayload<T extends WageAuditLogGroupByArgs> = Prisma.PrismaPromise<
+type GetWageAuditLogGroupByPayload<T extends WageAuditLogGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<WageAuditLogGroupByOutputType, T['by']> &
       {
@@ -231,8 +231,8 @@ export type WageAuditLogWhereInput = {
   NOT?: Prisma.WageAuditLogWhereInput | Prisma.WageAuditLogWhereInput[]
   id?: Prisma.StringFilter<"WageAuditLog"> | string
   workPointId?: Prisma.StringFilter<"WageAuditLog"> | string
-  oldWage?: Prisma.DecimalFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFilter<"WageAuditLog"> | bigint | number
+  newWage?: Prisma.BigIntFilter<"WageAuditLog"> | bigint | number
   changedById?: Prisma.StringFilter<"WageAuditLog"> | string
   reason?: Prisma.StringNullableFilter<"WageAuditLog"> | string | null
   createdAt?: Prisma.DateTimeFilter<"WageAuditLog"> | Date | string
@@ -246,7 +246,7 @@ export type WageAuditLogOrderByWithRelationInput = {
   oldWage?: Prisma.SortOrder
   newWage?: Prisma.SortOrder
   changedById?: Prisma.SortOrder
-  reason?: Prisma.SortOrderInput | Prisma.SortOrder
+  reason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   workPoint?: Prisma.ProjectWorkPointOrderByWithRelationInput
   changedBy?: Prisma.UserOrderByWithRelationInput
@@ -258,8 +258,8 @@ export type WageAuditLogWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.WageAuditLogWhereInput[]
   NOT?: Prisma.WageAuditLogWhereInput | Prisma.WageAuditLogWhereInput[]
   workPointId?: Prisma.StringFilter<"WageAuditLog"> | string
-  oldWage?: Prisma.DecimalFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFilter<"WageAuditLog"> | bigint | number
+  newWage?: Prisma.BigIntFilter<"WageAuditLog"> | bigint | number
   changedById?: Prisma.StringFilter<"WageAuditLog"> | string
   reason?: Prisma.StringNullableFilter<"WageAuditLog"> | string | null
   createdAt?: Prisma.DateTimeFilter<"WageAuditLog"> | Date | string
@@ -273,7 +273,7 @@ export type WageAuditLogOrderByWithAggregationInput = {
   oldWage?: Prisma.SortOrder
   newWage?: Prisma.SortOrder
   changedById?: Prisma.SortOrder
-  reason?: Prisma.SortOrderInput | Prisma.SortOrder
+  reason?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.WageAuditLogCountOrderByAggregateInput
   _avg?: Prisma.WageAuditLogAvgOrderByAggregateInput
@@ -288,8 +288,8 @@ export type WageAuditLogScalarWhereWithAggregatesInput = {
   NOT?: Prisma.WageAuditLogScalarWhereWithAggregatesInput | Prisma.WageAuditLogScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"WageAuditLog"> | string
   workPointId?: Prisma.StringWithAggregatesFilter<"WageAuditLog"> | string
-  oldWage?: Prisma.DecimalWithAggregatesFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalWithAggregatesFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntWithAggregatesFilter<"WageAuditLog"> | bigint | number
+  newWage?: Prisma.BigIntWithAggregatesFilter<"WageAuditLog"> | bigint | number
   changedById?: Prisma.StringWithAggregatesFilter<"WageAuditLog"> | string
   reason?: Prisma.StringNullableWithAggregatesFilter<"WageAuditLog"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"WageAuditLog"> | Date | string
@@ -297,8 +297,8 @@ export type WageAuditLogScalarWhereWithAggregatesInput = {
 
 export type WageAuditLogCreateInput = {
   id?: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   reason?: string | null
   createdAt?: Date | string
   workPoint: Prisma.ProjectWorkPointCreateNestedOneWithoutWageAuditLogsInput
@@ -308,17 +308,16 @@ export type WageAuditLogCreateInput = {
 export type WageAuditLogUncheckedCreateInput = {
   id?: string
   workPointId: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   changedById: string
   reason?: string | null
   createdAt?: Date | string
 }
 
 export type WageAuditLogUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workPoint?: Prisma.ProjectWorkPointUpdateOneRequiredWithoutWageAuditLogsNestedInput
@@ -326,10 +325,9 @@ export type WageAuditLogUpdateInput = {
 }
 
 export type WageAuditLogUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   changedById?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -338,26 +336,24 @@ export type WageAuditLogUncheckedUpdateInput = {
 export type WageAuditLogCreateManyInput = {
   id?: string
   workPointId: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   changedById: string
   reason?: string | null
   createdAt?: Date | string
 }
 
 export type WageAuditLogUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WageAuditLogUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   changedById?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -499,8 +495,8 @@ export type WageAuditLogUncheckedUpdateManyWithoutWorkPointNestedInput = {
 
 export type WageAuditLogCreateWithoutChangedByInput = {
   id?: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   reason?: string | null
   createdAt?: Date | string
   workPoint: Prisma.ProjectWorkPointCreateNestedOneWithoutWageAuditLogsInput
@@ -509,8 +505,8 @@ export type WageAuditLogCreateWithoutChangedByInput = {
 export type WageAuditLogUncheckedCreateWithoutChangedByInput = {
   id?: string
   workPointId: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   reason?: string | null
   createdAt?: Date | string
 }
@@ -522,7 +518,6 @@ export type WageAuditLogCreateOrConnectWithoutChangedByInput = {
 
 export type WageAuditLogCreateManyChangedByInputEnvelope = {
   data: Prisma.WageAuditLogCreateManyChangedByInput | Prisma.WageAuditLogCreateManyChangedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type WageAuditLogUpsertWithWhereUniqueWithoutChangedByInput = {
@@ -547,8 +542,8 @@ export type WageAuditLogScalarWhereInput = {
   NOT?: Prisma.WageAuditLogScalarWhereInput | Prisma.WageAuditLogScalarWhereInput[]
   id?: Prisma.StringFilter<"WageAuditLog"> | string
   workPointId?: Prisma.StringFilter<"WageAuditLog"> | string
-  oldWage?: Prisma.DecimalFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFilter<"WageAuditLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFilter<"WageAuditLog"> | bigint | number
+  newWage?: Prisma.BigIntFilter<"WageAuditLog"> | bigint | number
   changedById?: Prisma.StringFilter<"WageAuditLog"> | string
   reason?: Prisma.StringNullableFilter<"WageAuditLog"> | string | null
   createdAt?: Prisma.DateTimeFilter<"WageAuditLog"> | Date | string
@@ -556,8 +551,8 @@ export type WageAuditLogScalarWhereInput = {
 
 export type WageAuditLogCreateWithoutWorkPointInput = {
   id?: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   reason?: string | null
   createdAt?: Date | string
   changedBy: Prisma.UserCreateNestedOneWithoutWageAuditLogsInput
@@ -565,8 +560,8 @@ export type WageAuditLogCreateWithoutWorkPointInput = {
 
 export type WageAuditLogUncheckedCreateWithoutWorkPointInput = {
   id?: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   changedById: string
   reason?: string | null
   createdAt?: Date | string
@@ -579,7 +574,6 @@ export type WageAuditLogCreateOrConnectWithoutWorkPointInput = {
 
 export type WageAuditLogCreateManyWorkPointInputEnvelope = {
   data: Prisma.WageAuditLogCreateManyWorkPointInput | Prisma.WageAuditLogCreateManyWorkPointInput[]
-  skipDuplicates?: boolean
 }
 
 export type WageAuditLogUpsertWithWhereUniqueWithoutWorkPointInput = {
@@ -601,70 +595,64 @@ export type WageAuditLogUpdateManyWithWhereWithoutWorkPointInput = {
 export type WageAuditLogCreateManyChangedByInput = {
   id?: string
   workPointId: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   reason?: string | null
   createdAt?: Date | string
 }
 
 export type WageAuditLogUpdateWithoutChangedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workPoint?: Prisma.ProjectWorkPointUpdateOneRequiredWithoutWageAuditLogsNestedInput
 }
 
 export type WageAuditLogUncheckedUpdateWithoutChangedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WageAuditLogUncheckedUpdateManyWithoutChangedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workPointId?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WageAuditLogCreateManyWorkPointInput = {
   id?: string
-  oldWage: runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage: runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage: bigint | number
+  newWage: bigint | number
   changedById: string
   reason?: string | null
   createdAt?: Date | string
 }
 
 export type WageAuditLogUpdateWithoutWorkPointInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   changedBy?: Prisma.UserUpdateOneRequiredWithoutWageAuditLogsNestedInput
 }
 
 export type WageAuditLogUncheckedUpdateWithoutWorkPointInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   changedById?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WageAuditLogUncheckedUpdateManyWithoutWorkPointInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  oldWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  newWage?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  oldWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  newWage?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   changedById?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -684,29 +672,7 @@ export type WageAuditLogSelect<ExtArgs extends runtime.Types.Extensions.Internal
   changedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["wageAuditLog"]>
 
-export type WageAuditLogSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  workPointId?: boolean
-  oldWage?: boolean
-  newWage?: boolean
-  changedById?: boolean
-  reason?: boolean
-  createdAt?: boolean
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-  changedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["wageAuditLog"]>
 
-export type WageAuditLogSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  workPointId?: boolean
-  oldWage?: boolean
-  newWage?: boolean
-  changedById?: boolean
-  reason?: boolean
-  createdAt?: boolean
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-  changedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["wageAuditLog"]>
 
 export type WageAuditLogSelectScalar = {
   id?: boolean
@@ -723,14 +689,6 @@ export type WageAuditLogInclude<ExtArgs extends runtime.Types.Extensions.Interna
   workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
   changedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
-export type WageAuditLogIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-  changedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type WageAuditLogIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  workPoint?: boolean | Prisma.ProjectWorkPointDefaultArgs<ExtArgs>
-  changedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $WageAuditLogPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "WageAuditLog"
@@ -741,8 +699,8 @@ export type $WageAuditLogPayload<ExtArgs extends runtime.Types.Extensions.Intern
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     workPointId: string
-    oldWage: runtime.Decimal
-    newWage: runtime.Decimal
+    oldWage: bigint
+    newWage: bigint
     changedById: string
     reason: string | null
     createdAt: Date
@@ -864,30 +822,6 @@ export interface WageAuditLogDelegate<ExtArgs extends runtime.Types.Extensions.I
   createMany<T extends WageAuditLogCreateManyArgs>(args?: Prisma.SelectSubset<T, WageAuditLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many WageAuditLogs and returns the data saved in the database.
-   * @param {WageAuditLogCreateManyAndReturnArgs} args - Arguments to create many WageAuditLogs.
-   * @example
-   * // Create many WageAuditLogs
-   * const wageAuditLog = await prisma.wageAuditLog.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many WageAuditLogs and only return the `id`
-   * const wageAuditLogWithIdOnly = await prisma.wageAuditLog.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends WageAuditLogCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, WageAuditLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WageAuditLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a WageAuditLog.
    * @param {WageAuditLogDeleteArgs} args - Arguments to delete one WageAuditLog.
    * @example
@@ -952,36 +886,6 @@ export interface WageAuditLogDelegate<ExtArgs extends runtime.Types.Extensions.I
   updateMany<T extends WageAuditLogUpdateManyArgs>(args: Prisma.SelectSubset<T, WageAuditLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more WageAuditLogs and returns the data updated in the database.
-   * @param {WageAuditLogUpdateManyAndReturnArgs} args - Arguments to update many WageAuditLogs.
-   * @example
-   * // Update many WageAuditLogs
-   * const wageAuditLog = await prisma.wageAuditLog.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more WageAuditLogs and only return the `id`
-   * const wageAuditLogWithIdOnly = await prisma.wageAuditLog.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends WageAuditLogUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, WageAuditLogUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WageAuditLogPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one WageAuditLog.
    * @param {WageAuditLogUpsertArgs} args - Arguments to update or create a WageAuditLog.
    * @example
@@ -999,6 +903,29 @@ export interface WageAuditLogDelegate<ExtArgs extends runtime.Types.Extensions.I
    * })
    */
   upsert<T extends WageAuditLogUpsertArgs>(args: Prisma.SelectSubset<T, WageAuditLogUpsertArgs<ExtArgs>>): Prisma.Prisma__WageAuditLogClient<runtime.Types.Result.GetResult<Prisma.$WageAuditLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more WageAuditLogs that matches the filter.
+   * @param {WageAuditLogFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const wageAuditLog = await prisma.wageAuditLog.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.WageAuditLogFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a WageAuditLog.
+   * @param {WageAuditLogAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const wageAuditLog = await prisma.wageAuditLog.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.WageAuditLogAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1173,8 +1100,8 @@ export interface Prisma__WageAuditLogClient<T, Null = never, ExtArgs extends run
 export interface WageAuditLogFieldRefs {
   readonly id: Prisma.FieldRef<"WageAuditLog", 'String'>
   readonly workPointId: Prisma.FieldRef<"WageAuditLog", 'String'>
-  readonly oldWage: Prisma.FieldRef<"WageAuditLog", 'Decimal'>
-  readonly newWage: Prisma.FieldRef<"WageAuditLog", 'Decimal'>
+  readonly oldWage: Prisma.FieldRef<"WageAuditLog", 'BigInt'>
+  readonly newWage: Prisma.FieldRef<"WageAuditLog", 'BigInt'>
   readonly changedById: Prisma.FieldRef<"WageAuditLog", 'String'>
   readonly reason: Prisma.FieldRef<"WageAuditLog", 'String'>
   readonly createdAt: Prisma.FieldRef<"WageAuditLog", 'DateTime'>
@@ -1374,11 +1301,6 @@ export type WageAuditLogFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` WageAuditLogs.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of WageAuditLogs.
-   */
   distinct?: Prisma.WageAuditLogScalarFieldEnum | Prisma.WageAuditLogScalarFieldEnum[]
 }
 
@@ -1412,30 +1334,6 @@ export type WageAuditLogCreateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * The data used to create many WageAuditLogs.
    */
   data: Prisma.WageAuditLogCreateManyInput | Prisma.WageAuditLogCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * WageAuditLog createManyAndReturn
- */
-export type WageAuditLogCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the WageAuditLog
-   */
-  select?: Prisma.WageAuditLogSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the WageAuditLog
-   */
-  omit?: Prisma.WageAuditLogOmit<ExtArgs> | null
-  /**
-   * The data used to create many WageAuditLogs.
-   */
-  data: Prisma.WageAuditLogCreateManyInput | Prisma.WageAuditLogCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.WageAuditLogIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1480,36 +1378,6 @@ export type WageAuditLogUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many WageAuditLogs to update.
    */
   limit?: number
-}
-
-/**
- * WageAuditLog updateManyAndReturn
- */
-export type WageAuditLogUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the WageAuditLog
-   */
-  select?: Prisma.WageAuditLogSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the WageAuditLog
-   */
-  omit?: Prisma.WageAuditLogOmit<ExtArgs> | null
-  /**
-   * The data used to update WageAuditLogs.
-   */
-  data: Prisma.XOR<Prisma.WageAuditLogUpdateManyMutationInput, Prisma.WageAuditLogUncheckedUpdateManyInput>
-  /**
-   * Filter which WageAuditLogs to update
-   */
-  where?: Prisma.WageAuditLogWhereInput
-  /**
-   * Limit how many WageAuditLogs to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.WageAuditLogIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1576,6 +1444,34 @@ export type WageAuditLogDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many WageAuditLogs to delete.
    */
   limit?: number
+}
+
+/**
+ * WageAuditLog findRaw
+ */
+export type WageAuditLogFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * WageAuditLog aggregateRaw
+ */
+export type WageAuditLogAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

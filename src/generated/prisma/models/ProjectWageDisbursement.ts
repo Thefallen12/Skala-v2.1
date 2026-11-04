@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,17 +27,17 @@ export type AggregateProjectWageDisbursement = {
 }
 
 export type ProjectWageDisbursementAvgAggregateOutputType = {
-  amount: runtime.Decimal | null
+  amount: number | null
 }
 
 export type ProjectWageDisbursementSumAggregateOutputType = {
-  amount: runtime.Decimal | null
+  amount: bigint | null
 }
 
 export type ProjectWageDisbursementMinAggregateOutputType = {
   id: string | null
   projectId: string | null
-  amount: runtime.Decimal | null
+  amount: bigint | null
   receiptNumber: string | null
   paidAt: Date | null
   notes: string | null
@@ -48,7 +48,7 @@ export type ProjectWageDisbursementMinAggregateOutputType = {
 export type ProjectWageDisbursementMaxAggregateOutputType = {
   id: string | null
   projectId: string | null
-  amount: runtime.Decimal | null
+  amount: bigint | null
   receiptNumber: string | null
   paidAt: Date | null
   notes: string | null
@@ -200,7 +200,7 @@ export type ProjectWageDisbursementGroupByArgs<ExtArgs extends runtime.Types.Ext
 export type ProjectWageDisbursementGroupByOutputType = {
   id: string
   projectId: string
-  amount: runtime.Decimal
+  amount: bigint
   receiptNumber: string
   paidAt: Date
   notes: string | null
@@ -213,7 +213,7 @@ export type ProjectWageDisbursementGroupByOutputType = {
   _max: ProjectWageDisbursementMaxAggregateOutputType | null
 }
 
-export type GetProjectWageDisbursementGroupByPayload<T extends ProjectWageDisbursementGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectWageDisbursementGroupByPayload<T extends ProjectWageDisbursementGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectWageDisbursementGroupByOutputType, T['by']> &
       {
@@ -234,7 +234,7 @@ export type ProjectWageDisbursementWhereInput = {
   NOT?: Prisma.ProjectWageDisbursementWhereInput | Prisma.ProjectWageDisbursementWhereInput[]
   id?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
   projectId?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
-  amount?: Prisma.DecimalFilter<"ProjectWageDisbursement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFilter<"ProjectWageDisbursement"> | bigint | number
   receiptNumber?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
   paidAt?: Prisma.DateTimeFilter<"ProjectWageDisbursement"> | Date | string
   notes?: Prisma.StringNullableFilter<"ProjectWageDisbursement"> | string | null
@@ -250,7 +250,7 @@ export type ProjectWageDisbursementOrderByWithRelationInput = {
   amount?: Prisma.SortOrder
   receiptNumber?: Prisma.SortOrder
   paidAt?: Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  notes?: Prisma.SortOrder
   paidById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -263,7 +263,7 @@ export type ProjectWageDisbursementWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.ProjectWageDisbursementWhereInput[]
   NOT?: Prisma.ProjectWageDisbursementWhereInput | Prisma.ProjectWageDisbursementWhereInput[]
   projectId?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
-  amount?: Prisma.DecimalFilter<"ProjectWageDisbursement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFilter<"ProjectWageDisbursement"> | bigint | number
   receiptNumber?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
   paidAt?: Prisma.DateTimeFilter<"ProjectWageDisbursement"> | Date | string
   notes?: Prisma.StringNullableFilter<"ProjectWageDisbursement"> | string | null
@@ -279,7 +279,7 @@ export type ProjectWageDisbursementOrderByWithAggregationInput = {
   amount?: Prisma.SortOrder
   receiptNumber?: Prisma.SortOrder
   paidAt?: Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  notes?: Prisma.SortOrder
   paidById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.ProjectWageDisbursementCountOrderByAggregateInput
@@ -295,7 +295,7 @@ export type ProjectWageDisbursementScalarWhereWithAggregatesInput = {
   NOT?: Prisma.ProjectWageDisbursementScalarWhereWithAggregatesInput | Prisma.ProjectWageDisbursementScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"ProjectWageDisbursement"> | string
   projectId?: Prisma.StringWithAggregatesFilter<"ProjectWageDisbursement"> | string
-  amount?: Prisma.DecimalWithAggregatesFilter<"ProjectWageDisbursement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntWithAggregatesFilter<"ProjectWageDisbursement"> | bigint | number
   receiptNumber?: Prisma.StringWithAggregatesFilter<"ProjectWageDisbursement"> | string
   paidAt?: Prisma.DateTimeWithAggregatesFilter<"ProjectWageDisbursement"> | Date | string
   notes?: Prisma.StringNullableWithAggregatesFilter<"ProjectWageDisbursement"> | string | null
@@ -305,7 +305,7 @@ export type ProjectWageDisbursementScalarWhereWithAggregatesInput = {
 
 export type ProjectWageDisbursementCreateInput = {
   id?: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -317,7 +317,7 @@ export type ProjectWageDisbursementCreateInput = {
 export type ProjectWageDisbursementUncheckedCreateInput = {
   id?: string
   projectId: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -326,8 +326,7 @@ export type ProjectWageDisbursementUncheckedCreateInput = {
 }
 
 export type ProjectWageDisbursementUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -337,9 +336,8 @@ export type ProjectWageDisbursementUpdateInput = {
 }
 
 export type ProjectWageDisbursementUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -350,7 +348,7 @@ export type ProjectWageDisbursementUncheckedUpdateInput = {
 export type ProjectWageDisbursementCreateManyInput = {
   id?: string
   projectId: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -359,8 +357,7 @@ export type ProjectWageDisbursementCreateManyInput = {
 }
 
 export type ProjectWageDisbursementUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -368,9 +365,8 @@ export type ProjectWageDisbursementUpdateManyMutationInput = {
 }
 
 export type ProjectWageDisbursementUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -515,7 +511,7 @@ export type ProjectWageDisbursementUncheckedUpdateManyWithoutProjectNestedInput 
 
 export type ProjectWageDisbursementCreateWithoutPaidByInput = {
   id?: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -526,7 +522,7 @@ export type ProjectWageDisbursementCreateWithoutPaidByInput = {
 export type ProjectWageDisbursementUncheckedCreateWithoutPaidByInput = {
   id?: string
   projectId: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -540,7 +536,6 @@ export type ProjectWageDisbursementCreateOrConnectWithoutPaidByInput = {
 
 export type ProjectWageDisbursementCreateManyPaidByInputEnvelope = {
   data: Prisma.ProjectWageDisbursementCreateManyPaidByInput | Prisma.ProjectWageDisbursementCreateManyPaidByInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWageDisbursementUpsertWithWhereUniqueWithoutPaidByInput = {
@@ -565,7 +560,7 @@ export type ProjectWageDisbursementScalarWhereInput = {
   NOT?: Prisma.ProjectWageDisbursementScalarWhereInput | Prisma.ProjectWageDisbursementScalarWhereInput[]
   id?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
   projectId?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
-  amount?: Prisma.DecimalFilter<"ProjectWageDisbursement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFilter<"ProjectWageDisbursement"> | bigint | number
   receiptNumber?: Prisma.StringFilter<"ProjectWageDisbursement"> | string
   paidAt?: Prisma.DateTimeFilter<"ProjectWageDisbursement"> | Date | string
   notes?: Prisma.StringNullableFilter<"ProjectWageDisbursement"> | string | null
@@ -575,7 +570,7 @@ export type ProjectWageDisbursementScalarWhereInput = {
 
 export type ProjectWageDisbursementCreateWithoutProjectInput = {
   id?: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -585,7 +580,7 @@ export type ProjectWageDisbursementCreateWithoutProjectInput = {
 
 export type ProjectWageDisbursementUncheckedCreateWithoutProjectInput = {
   id?: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -600,7 +595,6 @@ export type ProjectWageDisbursementCreateOrConnectWithoutProjectInput = {
 
 export type ProjectWageDisbursementCreateManyProjectInputEnvelope = {
   data: Prisma.ProjectWageDisbursementCreateManyProjectInput | Prisma.ProjectWageDisbursementCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWageDisbursementUpsertWithWhereUniqueWithoutProjectInput = {
@@ -622,7 +616,7 @@ export type ProjectWageDisbursementUpdateManyWithWhereWithoutProjectInput = {
 export type ProjectWageDisbursementCreateManyPaidByInput = {
   id?: string
   projectId: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -630,8 +624,7 @@ export type ProjectWageDisbursementCreateManyPaidByInput = {
 }
 
 export type ProjectWageDisbursementUpdateWithoutPaidByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -640,9 +633,8 @@ export type ProjectWageDisbursementUpdateWithoutPaidByInput = {
 }
 
 export type ProjectWageDisbursementUncheckedUpdateWithoutPaidByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -650,9 +642,8 @@ export type ProjectWageDisbursementUncheckedUpdateWithoutPaidByInput = {
 }
 
 export type ProjectWageDisbursementUncheckedUpdateManyWithoutPaidByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -661,7 +652,7 @@ export type ProjectWageDisbursementUncheckedUpdateManyWithoutPaidByInput = {
 
 export type ProjectWageDisbursementCreateManyProjectInput = {
   id?: string
-  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount: bigint | number
   receiptNumber: string
   paidAt: Date | string
   notes?: string | null
@@ -670,8 +661,7 @@ export type ProjectWageDisbursementCreateManyProjectInput = {
 }
 
 export type ProjectWageDisbursementUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -680,8 +670,7 @@ export type ProjectWageDisbursementUpdateWithoutProjectInput = {
 }
 
 export type ProjectWageDisbursementUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -690,8 +679,7 @@ export type ProjectWageDisbursementUncheckedUpdateWithoutProjectInput = {
 }
 
 export type ProjectWageDisbursementUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  amount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   receiptNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paidAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -714,31 +702,7 @@ export type ProjectWageDisbursementSelect<ExtArgs extends runtime.Types.Extensio
   paidBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectWageDisbursement"]>
 
-export type ProjectWageDisbursementSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  amount?: boolean
-  receiptNumber?: boolean
-  paidAt?: boolean
-  notes?: boolean
-  paidById?: boolean
-  createdAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  paidBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["projectWageDisbursement"]>
 
-export type ProjectWageDisbursementSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  amount?: boolean
-  receiptNumber?: boolean
-  paidAt?: boolean
-  notes?: boolean
-  paidById?: boolean
-  createdAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  paidBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["projectWageDisbursement"]>
 
 export type ProjectWageDisbursementSelectScalar = {
   id?: boolean
@@ -756,14 +720,6 @@ export type ProjectWageDisbursementInclude<ExtArgs extends runtime.Types.Extensi
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   paidBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
-export type ProjectWageDisbursementIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  paidBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type ProjectWageDisbursementIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  paidBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $ProjectWageDisbursementPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ProjectWageDisbursement"
@@ -774,7 +730,7 @@ export type $ProjectWageDisbursementPayload<ExtArgs extends runtime.Types.Extens
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     projectId: string
-    amount: runtime.Decimal
+    amount: bigint
     receiptNumber: string
     paidAt: Date
     notes: string | null
@@ -898,30 +854,6 @@ export interface ProjectWageDisbursementDelegate<ExtArgs extends runtime.Types.E
   createMany<T extends ProjectWageDisbursementCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectWageDisbursementCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many ProjectWageDisbursements and returns the data saved in the database.
-   * @param {ProjectWageDisbursementCreateManyAndReturnArgs} args - Arguments to create many ProjectWageDisbursements.
-   * @example
-   * // Create many ProjectWageDisbursements
-   * const projectWageDisbursement = await prisma.projectWageDisbursement.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many ProjectWageDisbursements and only return the `id`
-   * const projectWageDisbursementWithIdOnly = await prisma.projectWageDisbursement.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectWageDisbursementCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectWageDisbursementCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWageDisbursementPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a ProjectWageDisbursement.
    * @param {ProjectWageDisbursementDeleteArgs} args - Arguments to delete one ProjectWageDisbursement.
    * @example
@@ -986,36 +918,6 @@ export interface ProjectWageDisbursementDelegate<ExtArgs extends runtime.Types.E
   updateMany<T extends ProjectWageDisbursementUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectWageDisbursementUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more ProjectWageDisbursements and returns the data updated in the database.
-   * @param {ProjectWageDisbursementUpdateManyAndReturnArgs} args - Arguments to update many ProjectWageDisbursements.
-   * @example
-   * // Update many ProjectWageDisbursements
-   * const projectWageDisbursement = await prisma.projectWageDisbursement.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more ProjectWageDisbursements and only return the `id`
-   * const projectWageDisbursementWithIdOnly = await prisma.projectWageDisbursement.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectWageDisbursementUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectWageDisbursementUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWageDisbursementPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one ProjectWageDisbursement.
    * @param {ProjectWageDisbursementUpsertArgs} args - Arguments to update or create a ProjectWageDisbursement.
    * @example
@@ -1033,6 +935,29 @@ export interface ProjectWageDisbursementDelegate<ExtArgs extends runtime.Types.E
    * })
    */
   upsert<T extends ProjectWageDisbursementUpsertArgs>(args: Prisma.SelectSubset<T, ProjectWageDisbursementUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectWageDisbursementClient<runtime.Types.Result.GetResult<Prisma.$ProjectWageDisbursementPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more ProjectWageDisbursements that matches the filter.
+   * @param {ProjectWageDisbursementFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const projectWageDisbursement = await prisma.projectWageDisbursement.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectWageDisbursementFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a ProjectWageDisbursement.
+   * @param {ProjectWageDisbursementAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const projectWageDisbursement = await prisma.projectWageDisbursement.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectWageDisbursementAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1207,7 +1132,7 @@ export interface Prisma__ProjectWageDisbursementClient<T, Null = never, ExtArgs 
 export interface ProjectWageDisbursementFieldRefs {
   readonly id: Prisma.FieldRef<"ProjectWageDisbursement", 'String'>
   readonly projectId: Prisma.FieldRef<"ProjectWageDisbursement", 'String'>
-  readonly amount: Prisma.FieldRef<"ProjectWageDisbursement", 'Decimal'>
+  readonly amount: Prisma.FieldRef<"ProjectWageDisbursement", 'BigInt'>
   readonly receiptNumber: Prisma.FieldRef<"ProjectWageDisbursement", 'String'>
   readonly paidAt: Prisma.FieldRef<"ProjectWageDisbursement", 'DateTime'>
   readonly notes: Prisma.FieldRef<"ProjectWageDisbursement", 'String'>
@@ -1409,11 +1334,6 @@ export type ProjectWageDisbursementFindManyArgs<ExtArgs extends runtime.Types.Ex
    * Skip the first `n` ProjectWageDisbursements.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ProjectWageDisbursements.
-   */
   distinct?: Prisma.ProjectWageDisbursementScalarFieldEnum | Prisma.ProjectWageDisbursementScalarFieldEnum[]
 }
 
@@ -1447,30 +1367,6 @@ export type ProjectWageDisbursementCreateManyArgs<ExtArgs extends runtime.Types.
    * The data used to create many ProjectWageDisbursements.
    */
   data: Prisma.ProjectWageDisbursementCreateManyInput | Prisma.ProjectWageDisbursementCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * ProjectWageDisbursement createManyAndReturn
- */
-export type ProjectWageDisbursementCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWageDisbursement
-   */
-  select?: Prisma.ProjectWageDisbursementSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWageDisbursement
-   */
-  omit?: Prisma.ProjectWageDisbursementOmit<ExtArgs> | null
-  /**
-   * The data used to create many ProjectWageDisbursements.
-   */
-  data: Prisma.ProjectWageDisbursementCreateManyInput | Prisma.ProjectWageDisbursementCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWageDisbursementIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1515,36 +1411,6 @@ export type ProjectWageDisbursementUpdateManyArgs<ExtArgs extends runtime.Types.
    * Limit how many ProjectWageDisbursements to update.
    */
   limit?: number
-}
-
-/**
- * ProjectWageDisbursement updateManyAndReturn
- */
-export type ProjectWageDisbursementUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWageDisbursement
-   */
-  select?: Prisma.ProjectWageDisbursementSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWageDisbursement
-   */
-  omit?: Prisma.ProjectWageDisbursementOmit<ExtArgs> | null
-  /**
-   * The data used to update ProjectWageDisbursements.
-   */
-  data: Prisma.XOR<Prisma.ProjectWageDisbursementUpdateManyMutationInput, Prisma.ProjectWageDisbursementUncheckedUpdateManyInput>
-  /**
-   * Filter which ProjectWageDisbursements to update
-   */
-  where?: Prisma.ProjectWageDisbursementWhereInput
-  /**
-   * Limit how many ProjectWageDisbursements to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWageDisbursementIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1611,6 +1477,34 @@ export type ProjectWageDisbursementDeleteManyArgs<ExtArgs extends runtime.Types.
    * Limit how many ProjectWageDisbursements to delete.
    */
   limit?: number
+}
+
+/**
+ * ProjectWageDisbursement findRaw
+ */
+export type ProjectWageDisbursementFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * ProjectWageDisbursement aggregateRaw
+ */
+export type ProjectWageDisbursementAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

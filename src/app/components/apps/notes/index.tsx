@@ -20,7 +20,7 @@ const NotesApp = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [notes, setNotes] = useState<NotesType[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedNoteId, setSelectedNoteId] = useState<number | null>(null)
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
 
   const handleClose = () => setIsOpen(false)
@@ -42,7 +42,7 @@ const NotesApp = () => {
     }
   }
 
-  const deleteNote = async (id: number) => {
+  const deleteNote = async (id: string) => {
     try {
       const response = await fetch('/api/notes', {
         method: 'DELETE',
@@ -77,7 +77,7 @@ const NotesApp = () => {
     void fetchNotes()
   }, [])
 
-  const updateNote = async (id: number, title: string, color: string) => {
+  const updateNote = async (id: string, title: string, color: string) => {
     try {
       const response = await fetch('/api/notes', {
         method: 'PUT',
@@ -135,7 +135,7 @@ const NotesApp = () => {
                 notes={notes}
                 loading={loading}
                 selectedNoteId={selectedNoteId}
-                onSelectNote={(id: number) => setSelectedNoteId(id)}
+                onSelectNote={(id: string) => setSelectedNoteId(id)}
                 onDeleteNote={deleteNote}
               />
             </SheetContent>
@@ -145,7 +145,7 @@ const NotesApp = () => {
               notes={notes}
               loading={loading}
               selectedNoteId={selectedNoteId}
-              onSelectNote={(id: number) => setSelectedNoteId(id)}
+              onSelectNote={(id: string) => setSelectedNoteId(id)}
               onDeleteNote={deleteNote}
             />
           </div>

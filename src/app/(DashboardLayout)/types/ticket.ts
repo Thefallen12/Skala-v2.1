@@ -30,6 +30,7 @@ export type TicketRow = {
   status: TicketStatus;
   fulfillmentStatus: TicketFulfillmentStatus;
   canSubmit: boolean;
+  canRequesterEdit: boolean;
   totalAmount: string | null;
   paymentTransactions?: {
     id: string;

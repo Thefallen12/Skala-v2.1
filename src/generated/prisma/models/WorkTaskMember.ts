@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -151,7 +151,7 @@ export type WorkTaskMemberGroupByOutputType = {
   _max: WorkTaskMemberMaxAggregateOutputType | null
 }
 
-export type GetWorkTaskMemberGroupByPayload<T extends WorkTaskMemberGroupByArgs> = Prisma.PrismaPromise<
+type GetWorkTaskMemberGroupByPayload<T extends WorkTaskMemberGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<WorkTaskMemberGroupByOutputType, T['by']> &
       {
@@ -235,14 +235,12 @@ export type WorkTaskMemberUncheckedCreateInput = {
 }
 
 export type WorkTaskMemberUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workTask?: Prisma.WorkTaskUpdateOneRequiredWithoutMembersNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutWorkTaskMembershipsNestedInput
 }
 
 export type WorkTaskMemberUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workTaskId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -256,12 +254,10 @@ export type WorkTaskMemberCreateManyInput = {
 }
 
 export type WorkTaskMemberUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WorkTaskMemberUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workTaskId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -406,7 +402,6 @@ export type WorkTaskMemberCreateOrConnectWithoutUserInput = {
 
 export type WorkTaskMemberCreateManyUserInputEnvelope = {
   data: Prisma.WorkTaskMemberCreateManyUserInput | Prisma.WorkTaskMemberCreateManyUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type WorkTaskMemberUpsertWithWhereUniqueWithoutUserInput = {
@@ -454,7 +449,6 @@ export type WorkTaskMemberCreateOrConnectWithoutWorkTaskInput = {
 
 export type WorkTaskMemberCreateManyWorkTaskInputEnvelope = {
   data: Prisma.WorkTaskMemberCreateManyWorkTaskInput | Prisma.WorkTaskMemberCreateManyWorkTaskInput[]
-  skipDuplicates?: boolean
 }
 
 export type WorkTaskMemberUpsertWithWhereUniqueWithoutWorkTaskInput = {
@@ -480,19 +474,16 @@ export type WorkTaskMemberCreateManyUserInput = {
 }
 
 export type WorkTaskMemberUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   workTask?: Prisma.WorkTaskUpdateOneRequiredWithoutMembersNestedInput
 }
 
 export type WorkTaskMemberUncheckedUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workTaskId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WorkTaskMemberUncheckedUpdateManyWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workTaskId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -504,19 +495,16 @@ export type WorkTaskMemberCreateManyWorkTaskInput = {
 }
 
 export type WorkTaskMemberUpdateWithoutWorkTaskInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutWorkTaskMembershipsNestedInput
 }
 
 export type WorkTaskMemberUncheckedUpdateWithoutWorkTaskInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type WorkTaskMemberUncheckedUpdateManyWithoutWorkTaskInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -532,23 +520,7 @@ export type WorkTaskMemberSelect<ExtArgs extends runtime.Types.Extensions.Intern
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["workTaskMember"]>
 
-export type WorkTaskMemberSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  workTaskId?: boolean
-  userId?: boolean
-  createdAt?: boolean
-  workTask?: boolean | Prisma.WorkTaskDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["workTaskMember"]>
 
-export type WorkTaskMemberSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  workTaskId?: boolean
-  userId?: boolean
-  createdAt?: boolean
-  workTask?: boolean | Prisma.WorkTaskDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["workTaskMember"]>
 
 export type WorkTaskMemberSelectScalar = {
   id?: boolean
@@ -559,14 +531,6 @@ export type WorkTaskMemberSelectScalar = {
 
 export type WorkTaskMemberOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workTaskId" | "userId" | "createdAt", ExtArgs["result"]["workTaskMember"]>
 export type WorkTaskMemberInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  workTask?: boolean | Prisma.WorkTaskDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type WorkTaskMemberIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  workTask?: boolean | Prisma.WorkTaskDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type WorkTaskMemberIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workTask?: boolean | Prisma.WorkTaskDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -700,30 +664,6 @@ export interface WorkTaskMemberDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends WorkTaskMemberCreateManyArgs>(args?: Prisma.SelectSubset<T, WorkTaskMemberCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many WorkTaskMembers and returns the data saved in the database.
-   * @param {WorkTaskMemberCreateManyAndReturnArgs} args - Arguments to create many WorkTaskMembers.
-   * @example
-   * // Create many WorkTaskMembers
-   * const workTaskMember = await prisma.workTaskMember.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many WorkTaskMembers and only return the `id`
-   * const workTaskMemberWithIdOnly = await prisma.workTaskMember.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends WorkTaskMemberCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, WorkTaskMemberCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkTaskMemberPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a WorkTaskMember.
    * @param {WorkTaskMemberDeleteArgs} args - Arguments to delete one WorkTaskMember.
    * @example
@@ -788,36 +728,6 @@ export interface WorkTaskMemberDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends WorkTaskMemberUpdateManyArgs>(args: Prisma.SelectSubset<T, WorkTaskMemberUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more WorkTaskMembers and returns the data updated in the database.
-   * @param {WorkTaskMemberUpdateManyAndReturnArgs} args - Arguments to update many WorkTaskMembers.
-   * @example
-   * // Update many WorkTaskMembers
-   * const workTaskMember = await prisma.workTaskMember.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more WorkTaskMembers and only return the `id`
-   * const workTaskMemberWithIdOnly = await prisma.workTaskMember.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends WorkTaskMemberUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, WorkTaskMemberUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WorkTaskMemberPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one WorkTaskMember.
    * @param {WorkTaskMemberUpsertArgs} args - Arguments to update or create a WorkTaskMember.
    * @example
@@ -835,6 +745,29 @@ export interface WorkTaskMemberDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends WorkTaskMemberUpsertArgs>(args: Prisma.SelectSubset<T, WorkTaskMemberUpsertArgs<ExtArgs>>): Prisma.Prisma__WorkTaskMemberClient<runtime.Types.Result.GetResult<Prisma.$WorkTaskMemberPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more WorkTaskMembers that matches the filter.
+   * @param {WorkTaskMemberFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const workTaskMember = await prisma.workTaskMember.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.WorkTaskMemberFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a WorkTaskMember.
+   * @param {WorkTaskMemberAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const workTaskMember = await prisma.workTaskMember.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.WorkTaskMemberAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1207,11 +1140,6 @@ export type WorkTaskMemberFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` WorkTaskMembers.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of WorkTaskMembers.
-   */
   distinct?: Prisma.WorkTaskMemberScalarFieldEnum | Prisma.WorkTaskMemberScalarFieldEnum[]
 }
 
@@ -1245,30 +1173,6 @@ export type WorkTaskMemberCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many WorkTaskMembers.
    */
   data: Prisma.WorkTaskMemberCreateManyInput | Prisma.WorkTaskMemberCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * WorkTaskMember createManyAndReturn
- */
-export type WorkTaskMemberCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the WorkTaskMember
-   */
-  select?: Prisma.WorkTaskMemberSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the WorkTaskMember
-   */
-  omit?: Prisma.WorkTaskMemberOmit<ExtArgs> | null
-  /**
-   * The data used to create many WorkTaskMembers.
-   */
-  data: Prisma.WorkTaskMemberCreateManyInput | Prisma.WorkTaskMemberCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.WorkTaskMemberIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1313,36 +1217,6 @@ export type WorkTaskMemberUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many WorkTaskMembers to update.
    */
   limit?: number
-}
-
-/**
- * WorkTaskMember updateManyAndReturn
- */
-export type WorkTaskMemberUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the WorkTaskMember
-   */
-  select?: Prisma.WorkTaskMemberSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the WorkTaskMember
-   */
-  omit?: Prisma.WorkTaskMemberOmit<ExtArgs> | null
-  /**
-   * The data used to update WorkTaskMembers.
-   */
-  data: Prisma.XOR<Prisma.WorkTaskMemberUpdateManyMutationInput, Prisma.WorkTaskMemberUncheckedUpdateManyInput>
-  /**
-   * Filter which WorkTaskMembers to update
-   */
-  where?: Prisma.WorkTaskMemberWhereInput
-  /**
-   * Limit how many WorkTaskMembers to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.WorkTaskMemberIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1409,6 +1283,34 @@ export type WorkTaskMemberDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many WorkTaskMembers to delete.
    */
   limit?: number
+}
+
+/**
+ * WorkTaskMember findRaw
+ */
+export type WorkTaskMemberFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * WorkTaskMember aggregateRaw
+ */
+export type WorkTaskMemberAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

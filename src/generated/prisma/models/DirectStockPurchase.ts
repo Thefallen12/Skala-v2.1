@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,11 +27,11 @@ export type AggregateDirectStockPurchase = {
 }
 
 export type DirectStockPurchaseAvgAggregateOutputType = {
-  totalAmount: runtime.Decimal | null
+  totalAmount: number | null
 }
 
 export type DirectStockPurchaseSumAggregateOutputType = {
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
 }
 
 export type DirectStockPurchaseMinAggregateOutputType = {
@@ -46,7 +46,7 @@ export type DirectStockPurchaseMinAggregateOutputType = {
   paymentAccountName: string | null
   paymentTerms: string | null
   includeTax: boolean | null
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
   paidAt: Date | null
   reference: string | null
   notes: string | null
@@ -77,7 +77,7 @@ export type DirectStockPurchaseMaxAggregateOutputType = {
   paymentAccountName: string | null
   paymentTerms: string | null
   includeTax: boolean | null
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
   paidAt: Date | null
   reference: string | null
   notes: string | null
@@ -331,7 +331,7 @@ export type DirectStockPurchaseGroupByOutputType = {
   paymentAccountName: string | null
   paymentTerms: string | null
   includeTax: boolean
-  totalAmount: runtime.Decimal
+  totalAmount: bigint
   paidAt: Date | null
   reference: string | null
   notes: string | null
@@ -356,7 +356,7 @@ export type DirectStockPurchaseGroupByOutputType = {
   _max: DirectStockPurchaseMaxAggregateOutputType | null
 }
 
-export type GetDirectStockPurchaseGroupByPayload<T extends DirectStockPurchaseGroupByArgs> = Prisma.PrismaPromise<
+type GetDirectStockPurchaseGroupByPayload<T extends DirectStockPurchaseGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DirectStockPurchaseGroupByOutputType, T['by']> &
       {
@@ -386,7 +386,7 @@ export type DirectStockPurchaseWhereInput = {
   paymentAccountName?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   paymentTerms?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   includeTax?: Prisma.BoolFilter<"DirectStockPurchase"> | boolean
-  totalAmount?: Prisma.DecimalFilter<"DirectStockPurchase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFilter<"DirectStockPurchase"> | bigint | number
   paidAt?: Prisma.DateTimeNullableFilter<"DirectStockPurchase"> | Date | string | null
   reference?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   notes?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
@@ -417,29 +417,29 @@ export type DirectStockPurchaseWhereInput = {
 export type DirectStockPurchaseOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   purchaseNumber?: Prisma.SortOrder
-  vendorId?: Prisma.SortOrderInput | Prisma.SortOrder
-  ticketId?: Prisma.SortOrderInput | Prisma.SortOrder
+  vendorId?: Prisma.SortOrder
+  ticketId?: Prisma.SortOrder
   vendorName?: Prisma.SortOrder
   paymentMethod?: Prisma.SortOrder
-  paymentBankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTerms?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentBankName?: Prisma.SortOrder
+  paymentAccountNumber?: Prisma.SortOrder
+  paymentAccountName?: Prisma.SortOrder
+  paymentTerms?: Prisma.SortOrder
   includeTax?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  reference?: Prisma.SortOrderInput | Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
+  reference?: Prisma.SortOrder
+  notes?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isApprovedByDirector?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  receivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  receivedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  arrivalPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  vendorInvoiceUrl?: Prisma.SortOrder
+  vendorInvoiceUploadedById?: Prisma.SortOrder
+  vendorInvoiceUploadedAt?: Prisma.SortOrder
+  receivedAt?: Prisma.SortOrder
+  receivedById?: Prisma.SortOrder
+  arrivalPhotoUrl?: Prisma.SortOrder
   receivedPhotos?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -469,7 +469,7 @@ export type DirectStockPurchaseWhereUniqueInput = Prisma.AtLeast<{
   paymentAccountName?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   paymentTerms?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   includeTax?: Prisma.BoolFilter<"DirectStockPurchase"> | boolean
-  totalAmount?: Prisma.DecimalFilter<"DirectStockPurchase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFilter<"DirectStockPurchase"> | bigint | number
   paidAt?: Prisma.DateTimeNullableFilter<"DirectStockPurchase"> | Date | string | null
   reference?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   notes?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
@@ -500,29 +500,29 @@ export type DirectStockPurchaseWhereUniqueInput = Prisma.AtLeast<{
 export type DirectStockPurchaseOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   purchaseNumber?: Prisma.SortOrder
-  vendorId?: Prisma.SortOrderInput | Prisma.SortOrder
-  ticketId?: Prisma.SortOrderInput | Prisma.SortOrder
+  vendorId?: Prisma.SortOrder
+  ticketId?: Prisma.SortOrder
   vendorName?: Prisma.SortOrder
   paymentMethod?: Prisma.SortOrder
-  paymentBankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAccountName?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTerms?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentBankName?: Prisma.SortOrder
+  paymentAccountNumber?: Prisma.SortOrder
+  paymentAccountName?: Prisma.SortOrder
+  paymentTerms?: Prisma.SortOrder
   includeTax?: Prisma.SortOrder
   totalAmount?: Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  reference?: Prisma.SortOrderInput | Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
+  reference?: Prisma.SortOrder
+  notes?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isApprovedByDirector?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorInvoiceUploadedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  receivedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  receivedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  arrivalPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  vendorInvoiceUrl?: Prisma.SortOrder
+  vendorInvoiceUploadedById?: Prisma.SortOrder
+  vendorInvoiceUploadedAt?: Prisma.SortOrder
+  receivedAt?: Prisma.SortOrder
+  receivedById?: Prisma.SortOrder
+  arrivalPhotoUrl?: Prisma.SortOrder
   receivedPhotos?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -549,7 +549,7 @@ export type DirectStockPurchaseScalarWhereWithAggregatesInput = {
   paymentAccountName?: Prisma.StringNullableWithAggregatesFilter<"DirectStockPurchase"> | string | null
   paymentTerms?: Prisma.StringNullableWithAggregatesFilter<"DirectStockPurchase"> | string | null
   includeTax?: Prisma.BoolWithAggregatesFilter<"DirectStockPurchase"> | boolean
-  totalAmount?: Prisma.DecimalWithAggregatesFilter<"DirectStockPurchase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntWithAggregatesFilter<"DirectStockPurchase"> | bigint | number
   paidAt?: Prisma.DateTimeNullableWithAggregatesFilter<"DirectStockPurchase"> | Date | string | null
   reference?: Prisma.StringNullableWithAggregatesFilter<"DirectStockPurchase"> | string | null
   notes?: Prisma.StringNullableWithAggregatesFilter<"DirectStockPurchase"> | string | null
@@ -579,7 +579,7 @@ export type DirectStockPurchaseCreateInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -615,7 +615,7 @@ export type DirectStockPurchaseUncheckedCreateInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -638,7 +638,6 @@ export type DirectStockPurchaseUncheckedCreateInput = {
 }
 
 export type DirectStockPurchaseUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -647,7 +646,7 @@ export type DirectStockPurchaseUpdateInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -672,7 +671,6 @@ export type DirectStockPurchaseUpdateInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -683,7 +681,7 @@ export type DirectStockPurchaseUncheckedUpdateInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -717,7 +715,7 @@ export type DirectStockPurchaseCreateManyInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -738,7 +736,6 @@ export type DirectStockPurchaseCreateManyInput = {
 }
 
 export type DirectStockPurchaseUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -747,7 +744,7 @@ export type DirectStockPurchaseUpdateManyMutationInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -764,7 +761,6 @@ export type DirectStockPurchaseUpdateManyMutationInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -775,7 +771,7 @@ export type DirectStockPurchaseUncheckedUpdateManyInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1210,7 +1206,7 @@ export type DirectStockPurchaseUpdateOneWithoutPaymentTransactionsNestedInput = 
   create?: Prisma.XOR<Prisma.DirectStockPurchaseCreateWithoutPaymentTransactionsInput, Prisma.DirectStockPurchaseUncheckedCreateWithoutPaymentTransactionsInput>
   connectOrCreate?: Prisma.DirectStockPurchaseCreateOrConnectWithoutPaymentTransactionsInput
   upsert?: Prisma.DirectStockPurchaseUpsertWithoutPaymentTransactionsInput
-  disconnect?: Prisma.DirectStockPurchaseWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.DirectStockPurchaseWhereInput | boolean
   connect?: Prisma.DirectStockPurchaseWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.DirectStockPurchaseUpdateToOneWithWhereWithoutPaymentTransactionsInput, Prisma.DirectStockPurchaseUpdateWithoutPaymentTransactionsInput>, Prisma.DirectStockPurchaseUncheckedUpdateWithoutPaymentTransactionsInput>
@@ -1226,7 +1222,7 @@ export type DirectStockPurchaseCreateWithoutApprovedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1261,7 +1257,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutApprovedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1289,7 +1285,6 @@ export type DirectStockPurchaseCreateOrConnectWithoutApprovedByInput = {
 
 export type DirectStockPurchaseCreateManyApprovedByInputEnvelope = {
   data: Prisma.DirectStockPurchaseCreateManyApprovedByInput | Prisma.DirectStockPurchaseCreateManyApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseCreateWithoutVendorInvoiceUploadedByInput = {
@@ -1302,7 +1297,7 @@ export type DirectStockPurchaseCreateWithoutVendorInvoiceUploadedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1337,7 +1332,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutVendorInvoiceUploadedByInpu
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1365,7 +1360,6 @@ export type DirectStockPurchaseCreateOrConnectWithoutVendorInvoiceUploadedByInpu
 
 export type DirectStockPurchaseCreateManyVendorInvoiceUploadedByInputEnvelope = {
   data: Prisma.DirectStockPurchaseCreateManyVendorInvoiceUploadedByInput | Prisma.DirectStockPurchaseCreateManyVendorInvoiceUploadedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseCreateWithoutCreatedByInput = {
@@ -1378,7 +1372,7 @@ export type DirectStockPurchaseCreateWithoutCreatedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1413,7 +1407,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutCreatedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1441,7 +1435,6 @@ export type DirectStockPurchaseCreateOrConnectWithoutCreatedByInput = {
 
 export type DirectStockPurchaseCreateManyCreatedByInputEnvelope = {
   data: Prisma.DirectStockPurchaseCreateManyCreatedByInput | Prisma.DirectStockPurchaseCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseCreateWithoutReceivedByInput = {
@@ -1454,7 +1447,7 @@ export type DirectStockPurchaseCreateWithoutReceivedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1489,7 +1482,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutReceivedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1517,7 +1510,6 @@ export type DirectStockPurchaseCreateOrConnectWithoutReceivedByInput = {
 
 export type DirectStockPurchaseCreateManyReceivedByInputEnvelope = {
   data: Prisma.DirectStockPurchaseCreateManyReceivedByInput | Prisma.DirectStockPurchaseCreateManyReceivedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseUpsertWithWhereUniqueWithoutApprovedByInput = {
@@ -1551,7 +1543,7 @@ export type DirectStockPurchaseScalarWhereInput = {
   paymentAccountName?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   paymentTerms?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   includeTax?: Prisma.BoolFilter<"DirectStockPurchase"> | boolean
-  totalAmount?: Prisma.DecimalFilter<"DirectStockPurchase"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFilter<"DirectStockPurchase"> | bigint | number
   paidAt?: Prisma.DateTimeNullableFilter<"DirectStockPurchase"> | Date | string | null
   reference?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
   notes?: Prisma.StringNullableFilter<"DirectStockPurchase"> | string | null
@@ -1629,7 +1621,7 @@ export type DirectStockPurchaseCreateWithoutItemsInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1664,7 +1656,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutItemsInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1702,7 +1694,6 @@ export type DirectStockPurchaseUpdateToOneWithWhereWithoutItemsInput = {
 }
 
 export type DirectStockPurchaseUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -1711,7 +1702,7 @@ export type DirectStockPurchaseUpdateWithoutItemsInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1735,7 +1726,6 @@ export type DirectStockPurchaseUpdateWithoutItemsInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1746,7 +1736,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutItemsInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1777,7 +1767,7 @@ export type DirectStockPurchaseCreateWithoutVendorInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1811,7 +1801,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutVendorInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1840,7 +1830,6 @@ export type DirectStockPurchaseCreateOrConnectWithoutVendorInput = {
 
 export type DirectStockPurchaseCreateManyVendorInputEnvelope = {
   data: Prisma.DirectStockPurchaseCreateManyVendorInput | Prisma.DirectStockPurchaseCreateManyVendorInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseUpsertWithWhereUniqueWithoutVendorInput = {
@@ -1869,7 +1858,7 @@ export type DirectStockPurchaseCreateWithoutTicketInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1903,7 +1892,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutTicketInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1932,7 +1921,6 @@ export type DirectStockPurchaseCreateOrConnectWithoutTicketInput = {
 
 export type DirectStockPurchaseCreateManyTicketInputEnvelope = {
   data: Prisma.DirectStockPurchaseCreateManyTicketInput | Prisma.DirectStockPurchaseCreateManyTicketInput[]
-  skipDuplicates?: boolean
 }
 
 export type DirectStockPurchaseUpsertWithWhereUniqueWithoutTicketInput = {
@@ -1961,7 +1949,7 @@ export type DirectStockPurchaseCreateWithoutPaymentTransactionsInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -1996,7 +1984,7 @@ export type DirectStockPurchaseUncheckedCreateWithoutPaymentTransactionsInput = 
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2034,7 +2022,6 @@ export type DirectStockPurchaseUpdateToOneWithWhereWithoutPaymentTransactionsInp
 }
 
 export type DirectStockPurchaseUpdateWithoutPaymentTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2043,7 +2030,7 @@ export type DirectStockPurchaseUpdateWithoutPaymentTransactionsInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2067,7 +2054,6 @@ export type DirectStockPurchaseUpdateWithoutPaymentTransactionsInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutPaymentTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2078,7 +2064,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutPaymentTransactionsInput = 
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2111,7 +2097,7 @@ export type DirectStockPurchaseCreateManyApprovedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2142,7 +2128,7 @@ export type DirectStockPurchaseCreateManyVendorInvoiceUploadedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2173,7 +2159,7 @@ export type DirectStockPurchaseCreateManyCreatedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2204,7 +2190,7 @@ export type DirectStockPurchaseCreateManyReceivedByInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2224,7 +2210,6 @@ export type DirectStockPurchaseCreateManyReceivedByInput = {
 }
 
 export type DirectStockPurchaseUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2233,7 +2218,7 @@ export type DirectStockPurchaseUpdateWithoutApprovedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2257,7 +2242,6 @@ export type DirectStockPurchaseUpdateWithoutApprovedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2268,7 +2252,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutApprovedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2290,7 +2274,6 @@ export type DirectStockPurchaseUncheckedUpdateWithoutApprovedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2301,7 +2284,7 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutApprovedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2321,7 +2304,6 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutApprovedByInput = {
 }
 
 export type DirectStockPurchaseUpdateWithoutVendorInvoiceUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2330,7 +2312,7 @@ export type DirectStockPurchaseUpdateWithoutVendorInvoiceUploadedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2354,7 +2336,6 @@ export type DirectStockPurchaseUpdateWithoutVendorInvoiceUploadedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutVendorInvoiceUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2365,7 +2346,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutVendorInvoiceUploadedByInpu
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2387,7 +2368,6 @@ export type DirectStockPurchaseUncheckedUpdateWithoutVendorInvoiceUploadedByInpu
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyWithoutVendorInvoiceUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2398,7 +2378,7 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutVendorInvoiceUploadedBy
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2418,7 +2398,6 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutVendorInvoiceUploadedBy
 }
 
 export type DirectStockPurchaseUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2427,7 +2406,7 @@ export type DirectStockPurchaseUpdateWithoutCreatedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2451,7 +2430,6 @@ export type DirectStockPurchaseUpdateWithoutCreatedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2462,7 +2440,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutCreatedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2484,7 +2462,6 @@ export type DirectStockPurchaseUncheckedUpdateWithoutCreatedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2495,7 +2472,7 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutCreatedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2515,7 +2492,6 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutCreatedByInput = {
 }
 
 export type DirectStockPurchaseUpdateWithoutReceivedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2524,7 +2500,7 @@ export type DirectStockPurchaseUpdateWithoutReceivedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2548,7 +2524,6 @@ export type DirectStockPurchaseUpdateWithoutReceivedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutReceivedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2559,7 +2534,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutReceivedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2581,7 +2556,6 @@ export type DirectStockPurchaseUncheckedUpdateWithoutReceivedByInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyWithoutReceivedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2592,7 +2566,7 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutReceivedByInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2622,7 +2596,7 @@ export type DirectStockPurchaseCreateManyVendorInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2643,7 +2617,6 @@ export type DirectStockPurchaseCreateManyVendorInput = {
 }
 
 export type DirectStockPurchaseUpdateWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2652,7 +2625,7 @@ export type DirectStockPurchaseUpdateWithoutVendorInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2676,7 +2649,6 @@ export type DirectStockPurchaseUpdateWithoutVendorInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2686,7 +2658,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutVendorInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2709,7 +2681,6 @@ export type DirectStockPurchaseUncheckedUpdateWithoutVendorInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2719,7 +2690,7 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutVendorInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2750,7 +2721,7 @@ export type DirectStockPurchaseCreateManyTicketInput = {
   paymentAccountName?: string | null
   paymentTerms?: string | null
   includeTax?: boolean
-  totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount: bigint | number
   paidAt?: Date | string | null
   reference?: string | null
   notes?: string | null
@@ -2771,7 +2742,6 @@ export type DirectStockPurchaseCreateManyTicketInput = {
 }
 
 export type DirectStockPurchaseUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
   paymentMethod?: Prisma.EnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod
@@ -2780,7 +2750,7 @@ export type DirectStockPurchaseUpdateWithoutTicketInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2804,7 +2774,6 @@ export type DirectStockPurchaseUpdateWithoutTicketInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2814,7 +2783,7 @@ export type DirectStockPurchaseUncheckedUpdateWithoutTicketInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2837,7 +2806,6 @@ export type DirectStockPurchaseUncheckedUpdateWithoutTicketInput = {
 }
 
 export type DirectStockPurchaseUncheckedUpdateManyWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   purchaseNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2847,7 +2815,7 @@ export type DirectStockPurchaseUncheckedUpdateManyWithoutTicketInput = {
   paymentAccountName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentTerms?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   includeTax?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  totalAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   paidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2948,81 +2916,7 @@ export type DirectStockPurchaseSelect<ExtArgs extends runtime.Types.Extensions.I
   _count?: boolean | Prisma.DirectStockPurchaseCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["directStockPurchase"]>
 
-export type DirectStockPurchaseSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  purchaseNumber?: boolean
-  vendorId?: boolean
-  ticketId?: boolean
-  vendorName?: boolean
-  paymentMethod?: boolean
-  paymentBankName?: boolean
-  paymentAccountNumber?: boolean
-  paymentAccountName?: boolean
-  paymentTerms?: boolean
-  includeTax?: boolean
-  totalAmount?: boolean
-  paidAt?: boolean
-  reference?: boolean
-  notes?: boolean
-  status?: boolean
-  isApprovedByDirector?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  vendorInvoiceUrl?: boolean
-  vendorInvoiceUploadedById?: boolean
-  vendorInvoiceUploadedAt?: boolean
-  receivedAt?: boolean
-  receivedById?: boolean
-  arrivalPhotoUrl?: boolean
-  receivedPhotos?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  vendor?: boolean | Prisma.DirectStockPurchase$vendorArgs<ExtArgs>
-  ticket?: boolean | Prisma.DirectStockPurchase$ticketArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.DirectStockPurchase$approvedByArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.DirectStockPurchase$vendorInvoiceUploadedByArgs<ExtArgs>
-  receivedBy?: boolean | Prisma.DirectStockPurchase$receivedByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["directStockPurchase"]>
 
-export type DirectStockPurchaseSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  purchaseNumber?: boolean
-  vendorId?: boolean
-  ticketId?: boolean
-  vendorName?: boolean
-  paymentMethod?: boolean
-  paymentBankName?: boolean
-  paymentAccountNumber?: boolean
-  paymentAccountName?: boolean
-  paymentTerms?: boolean
-  includeTax?: boolean
-  totalAmount?: boolean
-  paidAt?: boolean
-  reference?: boolean
-  notes?: boolean
-  status?: boolean
-  isApprovedByDirector?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  vendorInvoiceUrl?: boolean
-  vendorInvoiceUploadedById?: boolean
-  vendorInvoiceUploadedAt?: boolean
-  receivedAt?: boolean
-  receivedById?: boolean
-  arrivalPhotoUrl?: boolean
-  receivedPhotos?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  vendor?: boolean | Prisma.DirectStockPurchase$vendorArgs<ExtArgs>
-  ticket?: boolean | Prisma.DirectStockPurchase$ticketArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.DirectStockPurchase$approvedByArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.DirectStockPurchase$vendorInvoiceUploadedByArgs<ExtArgs>
-  receivedBy?: boolean | Prisma.DirectStockPurchase$receivedByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["directStockPurchase"]>
 
 export type DirectStockPurchaseSelectScalar = {
   id?: boolean
@@ -3068,22 +2962,6 @@ export type DirectStockPurchaseInclude<ExtArgs extends runtime.Types.Extensions.
   paymentTransactions?: boolean | Prisma.DirectStockPurchase$paymentTransactionsArgs<ExtArgs>
   _count?: boolean | Prisma.DirectStockPurchaseCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type DirectStockPurchaseIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vendor?: boolean | Prisma.DirectStockPurchase$vendorArgs<ExtArgs>
-  ticket?: boolean | Prisma.DirectStockPurchase$ticketArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.DirectStockPurchase$approvedByArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.DirectStockPurchase$vendorInvoiceUploadedByArgs<ExtArgs>
-  receivedBy?: boolean | Prisma.DirectStockPurchase$receivedByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type DirectStockPurchaseIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vendor?: boolean | Prisma.DirectStockPurchase$vendorArgs<ExtArgs>
-  ticket?: boolean | Prisma.DirectStockPurchase$ticketArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.DirectStockPurchase$approvedByArgs<ExtArgs>
-  vendorInvoiceUploadedBy?: boolean | Prisma.DirectStockPurchase$vendorInvoiceUploadedByArgs<ExtArgs>
-  receivedBy?: boolean | Prisma.DirectStockPurchase$receivedByArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $DirectStockPurchasePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "DirectStockPurchase"
@@ -3109,7 +2987,7 @@ export type $DirectStockPurchasePayload<ExtArgs extends runtime.Types.Extensions
     paymentAccountName: string | null
     paymentTerms: string | null
     includeTax: boolean
-    totalAmount: runtime.Decimal
+    totalAmount: bigint
     paidAt: Date | null
     reference: string | null
     notes: string | null
@@ -3245,30 +3123,6 @@ export interface DirectStockPurchaseDelegate<ExtArgs extends runtime.Types.Exten
   createMany<T extends DirectStockPurchaseCreateManyArgs>(args?: Prisma.SelectSubset<T, DirectStockPurchaseCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DirectStockPurchases and returns the data saved in the database.
-   * @param {DirectStockPurchaseCreateManyAndReturnArgs} args - Arguments to create many DirectStockPurchases.
-   * @example
-   * // Create many DirectStockPurchases
-   * const directStockPurchase = await prisma.directStockPurchase.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DirectStockPurchases and only return the `id`
-   * const directStockPurchaseWithIdOnly = await prisma.directStockPurchase.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DirectStockPurchaseCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DirectStockPurchaseCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DirectStockPurchasePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DirectStockPurchase.
    * @param {DirectStockPurchaseDeleteArgs} args - Arguments to delete one DirectStockPurchase.
    * @example
@@ -3333,36 +3187,6 @@ export interface DirectStockPurchaseDelegate<ExtArgs extends runtime.Types.Exten
   updateMany<T extends DirectStockPurchaseUpdateManyArgs>(args: Prisma.SelectSubset<T, DirectStockPurchaseUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DirectStockPurchases and returns the data updated in the database.
-   * @param {DirectStockPurchaseUpdateManyAndReturnArgs} args - Arguments to update many DirectStockPurchases.
-   * @example
-   * // Update many DirectStockPurchases
-   * const directStockPurchase = await prisma.directStockPurchase.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DirectStockPurchases and only return the `id`
-   * const directStockPurchaseWithIdOnly = await prisma.directStockPurchase.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DirectStockPurchaseUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DirectStockPurchaseUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DirectStockPurchasePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DirectStockPurchase.
    * @param {DirectStockPurchaseUpsertArgs} args - Arguments to update or create a DirectStockPurchase.
    * @example
@@ -3380,6 +3204,29 @@ export interface DirectStockPurchaseDelegate<ExtArgs extends runtime.Types.Exten
    * })
    */
   upsert<T extends DirectStockPurchaseUpsertArgs>(args: Prisma.SelectSubset<T, DirectStockPurchaseUpsertArgs<ExtArgs>>): Prisma.Prisma__DirectStockPurchaseClient<runtime.Types.Result.GetResult<Prisma.$DirectStockPurchasePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DirectStockPurchases that matches the filter.
+   * @param {DirectStockPurchaseFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const directStockPurchase = await prisma.directStockPurchase.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DirectStockPurchaseFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DirectStockPurchase.
+   * @param {DirectStockPurchaseAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const directStockPurchase = await prisma.directStockPurchase.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DirectStockPurchaseAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -3569,7 +3416,7 @@ export interface DirectStockPurchaseFieldRefs {
   readonly paymentAccountName: Prisma.FieldRef<"DirectStockPurchase", 'String'>
   readonly paymentTerms: Prisma.FieldRef<"DirectStockPurchase", 'String'>
   readonly includeTax: Prisma.FieldRef<"DirectStockPurchase", 'Boolean'>
-  readonly totalAmount: Prisma.FieldRef<"DirectStockPurchase", 'Decimal'>
+  readonly totalAmount: Prisma.FieldRef<"DirectStockPurchase", 'BigInt'>
   readonly paidAt: Prisma.FieldRef<"DirectStockPurchase", 'DateTime'>
   readonly reference: Prisma.FieldRef<"DirectStockPurchase", 'String'>
   readonly notes: Prisma.FieldRef<"DirectStockPurchase", 'String'>
@@ -3783,11 +3630,6 @@ export type DirectStockPurchaseFindManyArgs<ExtArgs extends runtime.Types.Extens
    * Skip the first `n` DirectStockPurchases.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DirectStockPurchases.
-   */
   distinct?: Prisma.DirectStockPurchaseScalarFieldEnum | Prisma.DirectStockPurchaseScalarFieldEnum[]
 }
 
@@ -3821,30 +3663,6 @@ export type DirectStockPurchaseCreateManyArgs<ExtArgs extends runtime.Types.Exte
    * The data used to create many DirectStockPurchases.
    */
   data: Prisma.DirectStockPurchaseCreateManyInput | Prisma.DirectStockPurchaseCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DirectStockPurchase createManyAndReturn
- */
-export type DirectStockPurchaseCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DirectStockPurchase
-   */
-  select?: Prisma.DirectStockPurchaseSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DirectStockPurchase
-   */
-  omit?: Prisma.DirectStockPurchaseOmit<ExtArgs> | null
-  /**
-   * The data used to create many DirectStockPurchases.
-   */
-  data: Prisma.DirectStockPurchaseCreateManyInput | Prisma.DirectStockPurchaseCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DirectStockPurchaseIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3889,36 +3707,6 @@ export type DirectStockPurchaseUpdateManyArgs<ExtArgs extends runtime.Types.Exte
    * Limit how many DirectStockPurchases to update.
    */
   limit?: number
-}
-
-/**
- * DirectStockPurchase updateManyAndReturn
- */
-export type DirectStockPurchaseUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DirectStockPurchase
-   */
-  select?: Prisma.DirectStockPurchaseSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DirectStockPurchase
-   */
-  omit?: Prisma.DirectStockPurchaseOmit<ExtArgs> | null
-  /**
-   * The data used to update DirectStockPurchases.
-   */
-  data: Prisma.XOR<Prisma.DirectStockPurchaseUpdateManyMutationInput, Prisma.DirectStockPurchaseUncheckedUpdateManyInput>
-  /**
-   * Filter which DirectStockPurchases to update
-   */
-  where?: Prisma.DirectStockPurchaseWhereInput
-  /**
-   * Limit how many DirectStockPurchases to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DirectStockPurchaseIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3985,6 +3773,34 @@ export type DirectStockPurchaseDeleteManyArgs<ExtArgs extends runtime.Types.Exte
    * Limit how many DirectStockPurchases to delete.
    */
   limit?: number
+}
+
+/**
+ * DirectStockPurchase findRaw
+ */
+export type DirectStockPurchaseFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DirectStockPurchase aggregateRaw
+ */
+export type DirectStockPurchaseAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

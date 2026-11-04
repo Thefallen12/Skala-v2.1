@@ -61,6 +61,7 @@ import {
   photoDownloadLinkProps,
   withLocalPhotoPreview,
 } from "@/lib/photo-urls";
+import { printUrlInFrame } from "@/lib/print-url";
 import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
 
 const statusLabels: Record<TicketStatus, string> = {
@@ -469,12 +470,8 @@ export default function TicketListing({
   };
 
   const printPurchaseOrder = async (ticketId: string, publicCode?: string) => {
-    const pdfWindow = window.open("", "_blank");
-    if (!pdfWindow) {
-      setPrintMessage("Izinkan pop-up browser untuk membuka PDF PO.");
-      return;
-    }
     setPrintMessage("Menyiapkan PDF Purchase Order...");
+    let pdfUrl: string | null = null;
     try {
       const response = publicCode
         ? await fetch(
@@ -494,18 +491,20 @@ export default function TicketListing({
           typeof body.message === "string"
             ? body.message
             : "PDF PO gagal dibuat.";
-        pdfWindow.close();
         setPrintMessage(errorMessage);
         return;
       }
-      const pdfUrl = URL.createObjectURL(await response.blob());
-      pdfWindow.location.href = pdfUrl;
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
+      pdfUrl = URL.createObjectURL(await response.blob());
+      await printUrlInFrame(pdfUrl);
       setPrintMessage("");
     } catch (error) {
       console.error("Purchase order PDF download failed:", error);
-      pdfWindow.close();
-      setPrintMessage("PDF PO gagal dibuat. Silakan coba kembali.");
+      setPrintMessage("PDF PO gagal disiapkan untuk dicetak. Silakan coba kembali.");
+    } finally {
+      if (pdfUrl) {
+        const urlToRevoke = pdfUrl;
+        window.setTimeout(() => URL.revokeObjectURL(urlToRevoke), 60_000);
+      }
     }
   };
 
@@ -981,6 +980,7 @@ export default function TicketListing({
                     ))}
                 </section>
 
+                {selectedTicket.items.length > 0 && (
                 <section className="space-y-3">
                   <h3 className="font-semibold">Rincian item</h3>
                   {canSplitFulfillment && (
@@ -1104,6 +1104,7 @@ export default function TicketListing({
                     </Table>
                   </div>
                 </section>
+                )}
 
                 <section className="space-y-3">
                   <h3 className="font-semibold">Aktivitas</h3>

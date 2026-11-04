@@ -1,5 +1,5 @@
 export interface NotesType {
-  id: number
+  id: string
   color?: string
   title?: string
   datef?: string

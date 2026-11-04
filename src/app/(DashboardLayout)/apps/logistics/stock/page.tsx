@@ -10,6 +10,7 @@ import {
 } from "@/generated/prisma/enums";
 import { auth } from "../../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const metadata: Metadata = {
   title: "Stok Logistik",
@@ -135,14 +136,14 @@ export default async function LogisticsStockPage({
         vendors={vendors}
         stockItems={stockItems.map((item) => ({
           ...item,
-          stockQuantity: item.stockQuantity.toString(),
-          minimumStock: item.minimumStock.toString(),
-          unitPrice: item.unitPrice.toString(),
+          stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
+          minimumStock: decimalStringFromScaledInteger(item.minimumStock),
+          unitPrice: decimalStringFromScaledInteger(item.unitPrice),
           createdAt: item.createdAt.toISOString(),
         }))}
         stockPurchases={directStockPurchases.map((purchase) => ({
           ...purchase,
-          totalAmount: purchase.totalAmount.toString(),
+          totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
           hasFinanceProof: purchase.paymentTransactions.some(
             (payment) => Boolean(payment.proofOfTransferUrl),
           ),
@@ -152,7 +153,7 @@ export default async function LogisticsStockPage({
             purchase.vendorInvoiceUploadedAt?.toISOString() ?? null,
           items: purchase.items.map((item) => ({
             ...item,
-            quantity: item.quantity.toString(),
+            quantity: decimalStringFromScaledInteger(item.quantity),
           })),
         }))}
       />

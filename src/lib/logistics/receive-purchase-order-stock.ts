@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import type { Prisma as PrismaTypes } from "@/generated/prisma/client";
 import { nextDocumentNumber } from "@/lib/documents/numbering";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
+import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
 
 type PurchaseOrderStockLine = {
   stockItemId?: string | null;
@@ -47,7 +52,7 @@ export async function receivePurchaseOrderStock(
     let stockItem = stockItemsByKey.get(stockKey);
     if (!stockItem) {
       if (orderItem.stockItemId) {
-        stockItem = await transaction.stockItem.findUnique({
+        const foundStockItem = await transaction.stockItem.findUnique({
           where: { id: orderItem.stockItemId },
           select: {
             id: true,
@@ -56,51 +61,30 @@ export async function receivePurchaseOrderStock(
             stockQuantity: true,
             unitPrice: true,
           },
-        }) ?? undefined;
-        if (!stockItem) {
+        });
+        if (!foundStockItem) {
           throw new Error(
             `Barang katalog "${normalizedName}" tidak ditemukan saat menerima PO.`,
           );
         }
+        stockItem = {
+          ...foundStockItem,
+          stockQuantity: decimalFromScaledInteger(foundStockItem.stockQuantity),
+          unitPrice: decimalFromScaledInteger(foundStockItem.unitPrice),
+        };
       } else {
-      const advisoryLockKey = JSON.stringify([
-        normalizedName.toLocaleLowerCase("id-ID"),
-        normalizedUnit.toLocaleLowerCase("id-ID"),
-      ]);
-      await transaction.$queryRaw`
-        WITH stock_item_lock AS MATERIALIZED (
-          SELECT pg_advisory_xact_lock(hashtext(${advisoryLockKey})::bigint)
-        )
-        SELECT TRUE AS locked FROM stock_item_lock
-      `;
-      const matches = await transaction.stockItem.findMany({
-        where: {
-          name: { equals: normalizedName, mode: "insensitive" },
-          unit: { equals: normalizedUnit, mode: "insensitive" },
-        },
-        select: {
-          id: true,
-          name: true,
-          unit: true,
-          stockQuantity: true,
-          unitPrice: true,
-        },
-        take: 2,
-      });
-      if (matches.length > 1) {
-        throw new Error(
-          `Barang "${normalizedName}" (${normalizedUnit}) memiliki data stok ganda; rapikan katalog terlebih dahulu.`,
+        const advisoryLockKey = JSON.stringify([
+          normalizedName.toLocaleLowerCase("id-ID"),
+          normalizedUnit.toLocaleLowerCase("id-ID"),
+        ]);
+        await acquireMongoTransactionLock(
+          transaction,
+          `stock-item:${advisoryLockKey}`,
         );
-      }
-      stockItem =
-        matches[0] ??
-        (await transaction.stockItem.create({
-          data: {
-            sku: `MAT-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
-            name: normalizedName,
-            unit: normalizedUnit,
-            stockQuantity: new Prisma.Decimal(0),
-            unitPrice: new Prisma.Decimal(0),
+        const matches = await transaction.stockItem.findMany({
+          where: {
+            name: { equals: normalizedName, mode: "insensitive" },
+            unit: { equals: normalizedUnit, mode: "insensitive" },
           },
           select: {
             id: true,
@@ -109,8 +93,46 @@ export async function receivePurchaseOrderStock(
             stockQuantity: true,
             unitPrice: true,
           },
-        }));
+          take: 2,
+        });
+        if (matches.length > 1) {
+          throw new Error(
+            `Barang "${normalizedName}" (${normalizedUnit}) memiliki data stok ganda; rapikan katalog terlebih dahulu.`,
+          );
+        }
+        if (matches[0]) {
+          stockItem = {
+            ...matches[0],
+            stockQuantity: decimalFromScaledInteger(matches[0].stockQuantity),
+            unitPrice: decimalFromScaledInteger(matches[0].unitPrice),
+          };
+        } else {
+          const created = await transaction.stockItem.create({
+            data: {
+              sku: `MAT-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+              name: normalizedName,
+              unit: normalizedUnit,
+              stockQuantity: BigInt(0),
+              unitPrice: BigInt(0),
+            },
+            select: {
+              id: true,
+              name: true,
+              unit: true,
+              stockQuantity: true,
+              unitPrice: true,
+            },
+          });
+          stockItem = {
+            ...created,
+            stockQuantity: decimalFromScaledInteger(created.stockQuantity),
+            unitPrice: decimalFromScaledInteger(created.unitPrice),
+          };
+        }
       }
+    }
+    if (!stockItem) {
+      throw new Error(`Barang katalog "${normalizedName}" tidak tersedia.`);
     }
 
     const quantity = new Prisma.Decimal(orderItem.quantity);
@@ -123,15 +145,18 @@ export async function receivePurchaseOrderStock(
       .toDecimalPlaces(2);
     await transaction.stockItem.update({
       where: { id: stockItem.id },
-      data: { stockQuantity: newQuantity, unitPrice: averageUnitPrice },
+      data: {
+        stockQuantity: scaledIntegerFromDecimal(newQuantity),
+        unitPrice: scaledIntegerFromDecimal(averageUnitPrice),
+      },
     });
     await transaction.stockPurchase.create({
       data: {
         purchaseNumber: await nextDocumentNumber(transaction, "STOCK"),
         purchaseOrderId: input.purchaseOrderId,
         stockItemId: stockItem.id,
-        quantity,
-        unitPrice,
+        quantity: scaledIntegerFromDecimal(quantity),
+        unitPrice: scaledIntegerFromDecimal(unitPrice),
         supplierName: input.vendorName,
         reference: input.poNumber,
         notes: input.notes,
@@ -144,7 +169,7 @@ export async function receivePurchaseOrderStock(
         stockItemId: stockItem.id,
         type: "IN",
         materialName: stockItem.name,
-        quantity,
+        quantity: scaledIntegerFromDecimal(quantity),
         unit: stockItem.unit,
         reference: input.poNumber,
         notes: input.notes,

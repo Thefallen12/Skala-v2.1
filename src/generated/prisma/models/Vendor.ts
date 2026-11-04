@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -255,7 +255,7 @@ export type VendorGroupByOutputType = {
   _max: VendorMaxAggregateOutputType | null
 }
 
-export type GetVendorGroupByPayload<T extends VendorGroupByArgs> = Prisma.PrismaPromise<
+type GetVendorGroupByPayload<T extends VendorGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<VendorGroupByOutputType, T['by']> &
       {
@@ -298,12 +298,12 @@ export type VendorOrderByWithRelationInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   category?: Prisma.SortOrder
-  address?: Prisma.SortOrderInput | Prisma.SortOrder
-  phone?: Prisma.SortOrderInput | Prisma.SortOrder
-  email?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankAccount?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankHolder?: Prisma.SortOrderInput | Prisma.SortOrder
+  address?: Prisma.SortOrder
+  phone?: Prisma.SortOrder
+  email?: Prisma.SortOrder
+  bankName?: Prisma.SortOrder
+  bankAccount?: Prisma.SortOrder
+  bankHolder?: Prisma.SortOrder
   rating?: Prisma.SortOrder
   isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -341,12 +341,12 @@ export type VendorOrderByWithAggregationInput = {
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
   category?: Prisma.SortOrder
-  address?: Prisma.SortOrderInput | Prisma.SortOrder
-  phone?: Prisma.SortOrderInput | Prisma.SortOrder
-  email?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankAccount?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankHolder?: Prisma.SortOrderInput | Prisma.SortOrder
+  address?: Prisma.SortOrder
+  phone?: Prisma.SortOrder
+  email?: Prisma.SortOrder
+  bankName?: Prisma.SortOrder
+  bankAccount?: Prisma.SortOrder
+  bankHolder?: Prisma.SortOrder
   rating?: Prisma.SortOrder
   isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -419,7 +419,6 @@ export type VendorUncheckedCreateInput = {
 }
 
 export type VendorUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -439,7 +438,6 @@ export type VendorUpdateInput = {
 }
 
 export type VendorUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -476,7 +474,6 @@ export type VendorCreateManyInput = {
 }
 
 export type VendorUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -493,7 +490,6 @@ export type VendorUpdateManyMutationInput = {
 }
 
 export type VendorUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -588,7 +584,7 @@ export type VendorUpdateOneWithoutDirectStockPurchasesNestedInput = {
   create?: Prisma.XOR<Prisma.VendorCreateWithoutDirectStockPurchasesInput, Prisma.VendorUncheckedCreateWithoutDirectStockPurchasesInput>
   connectOrCreate?: Prisma.VendorCreateOrConnectWithoutDirectStockPurchasesInput
   upsert?: Prisma.VendorUpsertWithoutDirectStockPurchasesInput
-  disconnect?: Prisma.VendorWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.VendorWhereInput | boolean
   connect?: Prisma.VendorWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.VendorUpdateToOneWithWhereWithoutDirectStockPurchasesInput, Prisma.VendorUpdateWithoutDirectStockPurchasesInput>, Prisma.VendorUncheckedUpdateWithoutDirectStockPurchasesInput>
@@ -618,7 +614,7 @@ export type VendorUpdateOneWithoutPurchaseOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.VendorCreateWithoutPurchaseOrdersInput, Prisma.VendorUncheckedCreateWithoutPurchaseOrdersInput>
   connectOrCreate?: Prisma.VendorCreateOrConnectWithoutPurchaseOrdersInput
   upsert?: Prisma.VendorUpsertWithoutPurchaseOrdersInput
-  disconnect?: Prisma.VendorWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.VendorWhereInput | boolean
   connect?: Prisma.VendorWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.VendorUpdateToOneWithWhereWithoutPurchaseOrdersInput, Prisma.VendorUpdateWithoutPurchaseOrdersInput>, Prisma.VendorUncheckedUpdateWithoutPurchaseOrdersInput>
@@ -679,7 +675,6 @@ export type VendorUpdateToOneWithWhereWithoutDirectStockPurchasesInput = {
 }
 
 export type VendorUpdateWithoutDirectStockPurchasesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -698,7 +693,6 @@ export type VendorUpdateWithoutDirectStockPurchasesInput = {
 }
 
 export type VendorUncheckedUpdateWithoutDirectStockPurchasesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -771,7 +765,6 @@ export type VendorUpdateToOneWithWhereWithoutBankAccountsInput = {
 }
 
 export type VendorUpdateWithoutBankAccountsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -790,7 +783,6 @@ export type VendorUpdateWithoutBankAccountsInput = {
 }
 
 export type VendorUncheckedUpdateWithoutBankAccountsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -863,7 +855,6 @@ export type VendorUpdateToOneWithWhereWithoutPurchaseOrdersInput = {
 }
 
 export type VendorUpdateWithoutPurchaseOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -882,7 +873,6 @@ export type VendorUpdateWithoutPurchaseOrdersInput = {
 }
 
 export type VendorUncheckedUpdateWithoutPurchaseOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -970,39 +960,7 @@ export type VendorSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   _count?: boolean | Prisma.VendorCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["vendor"]>
 
-export type VendorSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  code?: boolean
-  name?: boolean
-  category?: boolean
-  address?: boolean
-  phone?: boolean
-  email?: boolean
-  bankName?: boolean
-  bankAccount?: boolean
-  bankHolder?: boolean
-  rating?: boolean
-  isApproved?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["vendor"]>
 
-export type VendorSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  code?: boolean
-  name?: boolean
-  category?: boolean
-  address?: boolean
-  phone?: boolean
-  email?: boolean
-  bankName?: boolean
-  bankAccount?: boolean
-  bankHolder?: boolean
-  rating?: boolean
-  isApproved?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["vendor"]>
 
 export type VendorSelectScalar = {
   id?: boolean
@@ -1028,8 +986,6 @@ export type VendorInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   bankAccounts?: boolean | Prisma.Vendor$bankAccountsArgs<ExtArgs>
   _count?: boolean | Prisma.VendorCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type VendorIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type VendorIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $VendorPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Vendor"
@@ -1171,30 +1127,6 @@ export interface VendorDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   createMany<T extends VendorCreateManyArgs>(args?: Prisma.SelectSubset<T, VendorCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Vendors and returns the data saved in the database.
-   * @param {VendorCreateManyAndReturnArgs} args - Arguments to create many Vendors.
-   * @example
-   * // Create many Vendors
-   * const vendor = await prisma.vendor.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Vendors and only return the `id`
-   * const vendorWithIdOnly = await prisma.vendor.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends VendorCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, VendorCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VendorPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Vendor.
    * @param {VendorDeleteArgs} args - Arguments to delete one Vendor.
    * @example
@@ -1259,36 +1191,6 @@ export interface VendorDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   updateMany<T extends VendorUpdateManyArgs>(args: Prisma.SelectSubset<T, VendorUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Vendors and returns the data updated in the database.
-   * @param {VendorUpdateManyAndReturnArgs} args - Arguments to update many Vendors.
-   * @example
-   * // Update many Vendors
-   * const vendor = await prisma.vendor.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Vendors and only return the `id`
-   * const vendorWithIdOnly = await prisma.vendor.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends VendorUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, VendorUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VendorPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Vendor.
    * @param {VendorUpsertArgs} args - Arguments to update or create a Vendor.
    * @example
@@ -1306,6 +1208,29 @@ export interface VendorDelegate<ExtArgs extends runtime.Types.Extensions.Interna
    * })
    */
   upsert<T extends VendorUpsertArgs>(args: Prisma.SelectSubset<T, VendorUpsertArgs<ExtArgs>>): Prisma.Prisma__VendorClient<runtime.Types.Result.GetResult<Prisma.$VendorPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Vendors that matches the filter.
+   * @param {VendorFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const vendor = await prisma.vendor.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.VendorFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Vendor.
+   * @param {VendorAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const vendor = await prisma.vendor.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.VendorAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1689,11 +1614,6 @@ export type VendorFindManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Skip the first `n` Vendors.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Vendors.
-   */
   distinct?: Prisma.VendorScalarFieldEnum | Prisma.VendorScalarFieldEnum[]
 }
 
@@ -1727,26 +1647,6 @@ export type VendorCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many Vendors.
    */
   data: Prisma.VendorCreateManyInput | Prisma.VendorCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Vendor createManyAndReturn
- */
-export type VendorCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Vendor
-   */
-  select?: Prisma.VendorSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Vendor
-   */
-  omit?: Prisma.VendorOmit<ExtArgs> | null
-  /**
-   * The data used to create many Vendors.
-   */
-  data: Prisma.VendorCreateManyInput | Prisma.VendorCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1779,32 +1679,6 @@ export type VendorUpdateArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
  * Vendor updateMany
  */
 export type VendorUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update Vendors.
-   */
-  data: Prisma.XOR<Prisma.VendorUpdateManyMutationInput, Prisma.VendorUncheckedUpdateManyInput>
-  /**
-   * Filter which Vendors to update
-   */
-  where?: Prisma.VendorWhereInput
-  /**
-   * Limit how many Vendors to update.
-   */
-  limit?: number
-}
-
-/**
- * Vendor updateManyAndReturn
- */
-export type VendorUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Vendor
-   */
-  select?: Prisma.VendorSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Vendor
-   */
-  omit?: Prisma.VendorOmit<ExtArgs> | null
   /**
    * The data used to update Vendors.
    */
@@ -1883,6 +1757,34 @@ export type VendorDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many Vendors to delete.
    */
   limit?: number
+}
+
+/**
+ * Vendor findRaw
+ */
+export type VendorFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Vendor aggregateRaw
+ */
+export type VendorAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,13 +27,13 @@ export type AggregateSubkonContract = {
 }
 
 export type SubkonContractAvgAggregateOutputType = {
-  contractValue: runtime.Decimal | null
-  retentionPct: runtime.Decimal | null
+  contractValue: number | null
+  retentionPct: number | null
 }
 
 export type SubkonContractSumAggregateOutputType = {
-  contractValue: runtime.Decimal | null
-  retentionPct: runtime.Decimal | null
+  contractValue: bigint | null
+  retentionPct: bigint | null
 }
 
 export type SubkonContractMinAggregateOutputType = {
@@ -43,8 +43,8 @@ export type SubkonContractMinAggregateOutputType = {
   projectId: string | null
   subkonName: string | null
   workScope: string | null
-  contractValue: runtime.Decimal | null
-  retentionPct: runtime.Decimal | null
+  contractValue: bigint | null
+  retentionPct: bigint | null
   status: $Enums.SPKStatus | null
   createdById: string | null
   approvedById: string | null
@@ -63,8 +63,8 @@ export type SubkonContractMaxAggregateOutputType = {
   projectId: string | null
   subkonName: string | null
   workScope: string | null
-  contractValue: runtime.Decimal | null
-  retentionPct: runtime.Decimal | null
+  contractValue: bigint | null
+  retentionPct: bigint | null
   status: $Enums.SPKStatus | null
   createdById: string | null
   approvedById: string | null
@@ -262,8 +262,8 @@ export type SubkonContractGroupByOutputType = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal
-  retentionPct: runtime.Decimal
+  contractValue: bigint
+  retentionPct: bigint
   status: $Enums.SPKStatus
   createdById: string
   approvedById: string | null
@@ -280,7 +280,7 @@ export type SubkonContractGroupByOutputType = {
   _max: SubkonContractMaxAggregateOutputType | null
 }
 
-export type GetSubkonContractGroupByPayload<T extends SubkonContractGroupByArgs> = Prisma.PrismaPromise<
+type GetSubkonContractGroupByPayload<T extends SubkonContractGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<SubkonContractGroupByOutputType, T['by']> &
       {
@@ -305,8 +305,8 @@ export type SubkonContractWhereInput = {
   projectId?: Prisma.StringFilter<"SubkonContract"> | string
   subkonName?: Prisma.StringFilter<"SubkonContract"> | string
   workScope?: Prisma.StringFilter<"SubkonContract"> | string
-  contractValue?: Prisma.DecimalFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFilter<"SubkonContract"> | bigint | number
+  retentionPct?: Prisma.BigIntFilter<"SubkonContract"> | bigint | number
   status?: Prisma.EnumSPKStatusFilter<"SubkonContract"> | $Enums.SPKStatus
   createdById?: Prisma.StringFilter<"SubkonContract"> | string
   approvedById?: Prisma.StringNullableFilter<"SubkonContract"> | string | null
@@ -334,11 +334,11 @@ export type SubkonContractOrderByWithRelationInput = {
   retentionPct?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  retentionReleasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  retentionReleaseProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  retentionReleasedById?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  retentionReleasedAt?: Prisma.SortOrder
+  retentionReleaseProofUrl?: Prisma.SortOrder
+  retentionReleasedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -358,8 +358,8 @@ export type SubkonContractWhereUniqueInput = Prisma.AtLeast<{
   projectId?: Prisma.StringFilter<"SubkonContract"> | string
   subkonName?: Prisma.StringFilter<"SubkonContract"> | string
   workScope?: Prisma.StringFilter<"SubkonContract"> | string
-  contractValue?: Prisma.DecimalFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFilter<"SubkonContract"> | bigint | number
+  retentionPct?: Prisma.BigIntFilter<"SubkonContract"> | bigint | number
   status?: Prisma.EnumSPKStatusFilter<"SubkonContract"> | $Enums.SPKStatus
   createdById?: Prisma.StringFilter<"SubkonContract"> | string
   approvedById?: Prisma.StringNullableFilter<"SubkonContract"> | string | null
@@ -387,11 +387,11 @@ export type SubkonContractOrderByWithAggregationInput = {
   retentionPct?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  retentionReleasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  retentionReleaseProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  retentionReleasedById?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
+  retentionReleasedAt?: Prisma.SortOrder
+  retentionReleaseProofUrl?: Prisma.SortOrder
+  retentionReleasedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SubkonContractCountOrderByAggregateInput
@@ -411,8 +411,8 @@ export type SubkonContractScalarWhereWithAggregatesInput = {
   projectId?: Prisma.StringWithAggregatesFilter<"SubkonContract"> | string
   subkonName?: Prisma.StringWithAggregatesFilter<"SubkonContract"> | string
   workScope?: Prisma.StringWithAggregatesFilter<"SubkonContract"> | string
-  contractValue?: Prisma.DecimalWithAggregatesFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalWithAggregatesFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntWithAggregatesFilter<"SubkonContract"> | bigint | number
+  retentionPct?: Prisma.BigIntWithAggregatesFilter<"SubkonContract"> | bigint | number
   status?: Prisma.EnumSPKStatusWithAggregatesFilter<"SubkonContract"> | $Enums.SPKStatus
   createdById?: Prisma.StringWithAggregatesFilter<"SubkonContract"> | string
   approvedById?: Prisma.StringNullableWithAggregatesFilter<"SubkonContract"> | string | null
@@ -430,8 +430,8 @@ export type SubkonContractCreateInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedAt?: Date | string | null
   retentionReleasedAt?: Date | string | null
@@ -452,8 +452,8 @@ export type SubkonContractUncheckedCreateInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -467,13 +467,12 @@ export type SubkonContractUncheckedCreateInput = {
 }
 
 export type SubkonContractUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -488,14 +487,13 @@ export type SubkonContractUpdateInput = {
 }
 
 export type SubkonContractUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -515,8 +513,8 @@ export type SubkonContractCreateManyInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -529,13 +527,12 @@ export type SubkonContractCreateManyInput = {
 }
 
 export type SubkonContractUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -545,14 +542,13 @@ export type SubkonContractUpdateManyMutationInput = {
 }
 
 export type SubkonContractUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -841,8 +837,8 @@ export type SubkonContractCreateWithoutCreatedByInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedAt?: Date | string | null
   retentionReleasedAt?: Date | string | null
@@ -862,8 +858,8 @@ export type SubkonContractUncheckedCreateWithoutCreatedByInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedById?: string | null
   approvedAt?: Date | string | null
@@ -882,7 +878,6 @@ export type SubkonContractCreateOrConnectWithoutCreatedByInput = {
 
 export type SubkonContractCreateManyCreatedByInputEnvelope = {
   data: Prisma.SubkonContractCreateManyCreatedByInput | Prisma.SubkonContractCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonContractCreateWithoutApprovedByInput = {
@@ -891,8 +886,8 @@ export type SubkonContractCreateWithoutApprovedByInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedAt?: Date | string | null
   retentionReleasedAt?: Date | string | null
@@ -912,8 +907,8 @@ export type SubkonContractUncheckedCreateWithoutApprovedByInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedAt?: Date | string | null
@@ -932,7 +927,6 @@ export type SubkonContractCreateOrConnectWithoutApprovedByInput = {
 
 export type SubkonContractCreateManyApprovedByInputEnvelope = {
   data: Prisma.SubkonContractCreateManyApprovedByInput | Prisma.SubkonContractCreateManyApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonContractCreateWithoutRetentionReleasedByInput = {
@@ -941,8 +935,8 @@ export type SubkonContractCreateWithoutRetentionReleasedByInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedAt?: Date | string | null
   retentionReleasedAt?: Date | string | null
@@ -962,8 +956,8 @@ export type SubkonContractUncheckedCreateWithoutRetentionReleasedByInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -982,7 +976,6 @@ export type SubkonContractCreateOrConnectWithoutRetentionReleasedByInput = {
 
 export type SubkonContractCreateManyRetentionReleasedByInputEnvelope = {
   data: Prisma.SubkonContractCreateManyRetentionReleasedByInput | Prisma.SubkonContractCreateManyRetentionReleasedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonContractUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -1011,8 +1004,8 @@ export type SubkonContractScalarWhereInput = {
   projectId?: Prisma.StringFilter<"SubkonContract"> | string
   subkonName?: Prisma.StringFilter<"SubkonContract"> | string
   workScope?: Prisma.StringFilter<"SubkonContract"> | string
-  contractValue?: Prisma.DecimalFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFilter<"SubkonContract"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFilter<"SubkonContract"> | bigint | number
+  retentionPct?: Prisma.BigIntFilter<"SubkonContract"> | bigint | number
   status?: Prisma.EnumSPKStatusFilter<"SubkonContract"> | $Enums.SPKStatus
   createdById?: Prisma.StringFilter<"SubkonContract"> | string
   approvedById?: Prisma.StringNullableFilter<"SubkonContract"> | string | null
@@ -1062,8 +1055,8 @@ export type SubkonContractCreateWithoutProjectInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedAt?: Date | string | null
   retentionReleasedAt?: Date | string | null
@@ -1082,8 +1075,8 @@ export type SubkonContractUncheckedCreateWithoutProjectInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -1103,7 +1096,6 @@ export type SubkonContractCreateOrConnectWithoutProjectInput = {
 
 export type SubkonContractCreateManyProjectInputEnvelope = {
   data: Prisma.SubkonContractCreateManyProjectInput | Prisma.SubkonContractCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type SubkonContractUpsertWithWhereUniqueWithoutProjectInput = {
@@ -1128,8 +1120,8 @@ export type SubkonContractCreateWithoutTermynsInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedAt?: Date | string | null
   retentionReleasedAt?: Date | string | null
@@ -1149,8 +1141,8 @@ export type SubkonContractUncheckedCreateWithoutTermynsInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -1179,13 +1171,12 @@ export type SubkonContractUpdateToOneWithWhereWithoutTermynsInput = {
 }
 
 export type SubkonContractUpdateWithoutTermynsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1199,14 +1190,13 @@ export type SubkonContractUpdateWithoutTermynsInput = {
 }
 
 export type SubkonContractUncheckedUpdateWithoutTermynsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1225,8 +1215,8 @@ export type SubkonContractCreateManyCreatedByInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   approvedById?: string | null
   approvedAt?: Date | string | null
@@ -1244,8 +1234,8 @@ export type SubkonContractCreateManyApprovedByInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedAt?: Date | string | null
@@ -1263,8 +1253,8 @@ export type SubkonContractCreateManyRetentionReleasedByInput = {
   projectId: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -1276,13 +1266,12 @@ export type SubkonContractCreateManyRetentionReleasedByInput = {
 }
 
 export type SubkonContractUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1296,14 +1285,13 @@ export type SubkonContractUpdateWithoutCreatedByInput = {
 }
 
 export type SubkonContractUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1316,14 +1304,13 @@ export type SubkonContractUncheckedUpdateWithoutCreatedByInput = {
 }
 
 export type SubkonContractUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1335,13 +1322,12 @@ export type SubkonContractUncheckedUpdateManyWithoutCreatedByInput = {
 }
 
 export type SubkonContractUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1355,14 +1341,13 @@ export type SubkonContractUpdateWithoutApprovedByInput = {
 }
 
 export type SubkonContractUncheckedUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1375,14 +1360,13 @@ export type SubkonContractUncheckedUpdateWithoutApprovedByInput = {
 }
 
 export type SubkonContractUncheckedUpdateManyWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1394,13 +1378,12 @@ export type SubkonContractUncheckedUpdateManyWithoutApprovedByInput = {
 }
 
 export type SubkonContractUpdateWithoutRetentionReleasedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1414,14 +1397,13 @@ export type SubkonContractUpdateWithoutRetentionReleasedByInput = {
 }
 
 export type SubkonContractUncheckedUpdateWithoutRetentionReleasedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1434,14 +1416,13 @@ export type SubkonContractUncheckedUpdateWithoutRetentionReleasedByInput = {
 }
 
 export type SubkonContractUncheckedUpdateManyWithoutRetentionReleasedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1458,8 +1439,8 @@ export type SubkonContractCreateManyProjectInput = {
   contractNumber: string
   subkonName: string
   workScope: string
-  contractValue: runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue: bigint | number
+  retentionPct?: bigint | number
   status?: $Enums.SPKStatus
   createdById: string
   approvedById?: string | null
@@ -1472,13 +1453,12 @@ export type SubkonContractCreateManyProjectInput = {
 }
 
 export type SubkonContractUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   retentionReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1492,13 +1472,12 @@ export type SubkonContractUpdateWithoutProjectInput = {
 }
 
 export type SubkonContractUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1512,13 +1491,12 @@ export type SubkonContractUncheckedUpdateWithoutProjectInput = {
 }
 
 export type SubkonContractUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   contractNumber?: Prisma.StringFieldUpdateOperationsInput | string
   subkonName?: Prisma.StringFieldUpdateOperationsInput | string
   workScope?: Prisma.StringFieldUpdateOperationsInput | string
-  contractValue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  retentionPct?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  contractValue?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  retentionPct?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumSPKStatusFieldUpdateOperationsInput | $Enums.SPKStatus
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   approvedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1587,53 +1565,7 @@ export type SubkonContractSelect<ExtArgs extends runtime.Types.Extensions.Intern
   _count?: boolean | Prisma.SubkonContractCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["subkonContract"]>
 
-export type SubkonContractSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  contractNumber?: boolean
-  projectId?: boolean
-  subkonName?: boolean
-  workScope?: boolean
-  contractValue?: boolean
-  retentionPct?: boolean
-  status?: boolean
-  createdById?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  retentionReleasedAt?: boolean
-  retentionReleaseProofUrl?: boolean
-  retentionReleasedById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonContract$approvedByArgs<ExtArgs>
-  retentionReleasedBy?: boolean | Prisma.SubkonContract$retentionReleasedByArgs<ExtArgs>
-}, ExtArgs["result"]["subkonContract"]>
 
-export type SubkonContractSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  contractNumber?: boolean
-  projectId?: boolean
-  subkonName?: boolean
-  workScope?: boolean
-  contractValue?: boolean
-  retentionPct?: boolean
-  status?: boolean
-  createdById?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  retentionReleasedAt?: boolean
-  retentionReleaseProofUrl?: boolean
-  retentionReleasedById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonContract$approvedByArgs<ExtArgs>
-  retentionReleasedBy?: boolean | Prisma.SubkonContract$retentionReleasedByArgs<ExtArgs>
-}, ExtArgs["result"]["subkonContract"]>
 
 export type SubkonContractSelectScalar = {
   id?: boolean
@@ -1664,18 +1596,6 @@ export type SubkonContractInclude<ExtArgs extends runtime.Types.Extensions.Inter
   termyns?: boolean | Prisma.SubkonContract$termynsArgs<ExtArgs>
   _count?: boolean | Prisma.SubkonContractCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type SubkonContractIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonContract$approvedByArgs<ExtArgs>
-  retentionReleasedBy?: boolean | Prisma.SubkonContract$retentionReleasedByArgs<ExtArgs>
-}
-export type SubkonContractIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.SubkonContract$approvedByArgs<ExtArgs>
-  retentionReleasedBy?: boolean | Prisma.SubkonContract$retentionReleasedByArgs<ExtArgs>
-}
 
 export type $SubkonContractPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "SubkonContract"
@@ -1693,8 +1613,8 @@ export type $SubkonContractPayload<ExtArgs extends runtime.Types.Extensions.Inte
     projectId: string
     subkonName: string
     workScope: string
-    contractValue: runtime.Decimal
-    retentionPct: runtime.Decimal
+    contractValue: bigint
+    retentionPct: bigint
     status: $Enums.SPKStatus
     createdById: string
     approvedById: string | null
@@ -1822,30 +1742,6 @@ export interface SubkonContractDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends SubkonContractCreateManyArgs>(args?: Prisma.SelectSubset<T, SubkonContractCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many SubkonContracts and returns the data saved in the database.
-   * @param {SubkonContractCreateManyAndReturnArgs} args - Arguments to create many SubkonContracts.
-   * @example
-   * // Create many SubkonContracts
-   * const subkonContract = await prisma.subkonContract.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many SubkonContracts and only return the `id`
-   * const subkonContractWithIdOnly = await prisma.subkonContract.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends SubkonContractCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, SubkonContractCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SubkonContractPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a SubkonContract.
    * @param {SubkonContractDeleteArgs} args - Arguments to delete one SubkonContract.
    * @example
@@ -1910,36 +1806,6 @@ export interface SubkonContractDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends SubkonContractUpdateManyArgs>(args: Prisma.SelectSubset<T, SubkonContractUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more SubkonContracts and returns the data updated in the database.
-   * @param {SubkonContractUpdateManyAndReturnArgs} args - Arguments to update many SubkonContracts.
-   * @example
-   * // Update many SubkonContracts
-   * const subkonContract = await prisma.subkonContract.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more SubkonContracts and only return the `id`
-   * const subkonContractWithIdOnly = await prisma.subkonContract.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends SubkonContractUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, SubkonContractUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SubkonContractPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one SubkonContract.
    * @param {SubkonContractUpsertArgs} args - Arguments to update or create a SubkonContract.
    * @example
@@ -1957,6 +1823,29 @@ export interface SubkonContractDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends SubkonContractUpsertArgs>(args: Prisma.SelectSubset<T, SubkonContractUpsertArgs<ExtArgs>>): Prisma.Prisma__SubkonContractClient<runtime.Types.Result.GetResult<Prisma.$SubkonContractPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more SubkonContracts that matches the filter.
+   * @param {SubkonContractFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const subkonContract = await prisma.subkonContract.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.SubkonContractFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a SubkonContract.
+   * @param {SubkonContractAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const subkonContract = await prisma.subkonContract.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.SubkonContractAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2138,8 +2027,8 @@ export interface SubkonContractFieldRefs {
   readonly projectId: Prisma.FieldRef<"SubkonContract", 'String'>
   readonly subkonName: Prisma.FieldRef<"SubkonContract", 'String'>
   readonly workScope: Prisma.FieldRef<"SubkonContract", 'String'>
-  readonly contractValue: Prisma.FieldRef<"SubkonContract", 'Decimal'>
-  readonly retentionPct: Prisma.FieldRef<"SubkonContract", 'Decimal'>
+  readonly contractValue: Prisma.FieldRef<"SubkonContract", 'BigInt'>
+  readonly retentionPct: Prisma.FieldRef<"SubkonContract", 'BigInt'>
   readonly status: Prisma.FieldRef<"SubkonContract", 'SPKStatus'>
   readonly createdById: Prisma.FieldRef<"SubkonContract", 'String'>
   readonly approvedById: Prisma.FieldRef<"SubkonContract", 'String'>
@@ -2345,11 +2234,6 @@ export type SubkonContractFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` SubkonContracts.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of SubkonContracts.
-   */
   distinct?: Prisma.SubkonContractScalarFieldEnum | Prisma.SubkonContractScalarFieldEnum[]
 }
 
@@ -2383,30 +2267,6 @@ export type SubkonContractCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many SubkonContracts.
    */
   data: Prisma.SubkonContractCreateManyInput | Prisma.SubkonContractCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * SubkonContract createManyAndReturn
- */
-export type SubkonContractCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SubkonContract
-   */
-  select?: Prisma.SubkonContractSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SubkonContract
-   */
-  omit?: Prisma.SubkonContractOmit<ExtArgs> | null
-  /**
-   * The data used to create many SubkonContracts.
-   */
-  data: Prisma.SubkonContractCreateManyInput | Prisma.SubkonContractCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SubkonContractIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2451,36 +2311,6 @@ export type SubkonContractUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many SubkonContracts to update.
    */
   limit?: number
-}
-
-/**
- * SubkonContract updateManyAndReturn
- */
-export type SubkonContractUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SubkonContract
-   */
-  select?: Prisma.SubkonContractSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SubkonContract
-   */
-  omit?: Prisma.SubkonContractOmit<ExtArgs> | null
-  /**
-   * The data used to update SubkonContracts.
-   */
-  data: Prisma.XOR<Prisma.SubkonContractUpdateManyMutationInput, Prisma.SubkonContractUncheckedUpdateManyInput>
-  /**
-   * Filter which SubkonContracts to update
-   */
-  where?: Prisma.SubkonContractWhereInput
-  /**
-   * Limit how many SubkonContracts to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SubkonContractIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2547,6 +2377,34 @@ export type SubkonContractDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many SubkonContracts to delete.
    */
   limit?: number
+}
+
+/**
+ * SubkonContract findRaw
+ */
+export type SubkonContractFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * SubkonContract aggregateRaw
+ */
+export type SubkonContractAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -207,7 +207,7 @@ export type BASTDocumentGroupByOutputType = {
   _max: BASTDocumentMaxAggregateOutputType | null
 }
 
-export type GetBASTDocumentGroupByPayload<T extends BASTDocumentGroupByArgs> = Prisma.PrismaPromise<
+type GetBASTDocumentGroupByPayload<T extends BASTDocumentGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<BASTDocumentGroupByOutputType, T['by']> &
       {
@@ -249,11 +249,11 @@ export type BASTDocumentOrderByWithRelationInput = {
   projectId?: Prisma.SortOrder
   type?: Prisma.SortOrder
   date?: Prisma.SortOrder
-  maintenanceEndsAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  maintenanceEndsAt?: Prisma.SortOrder
+  notes?: Prisma.SortOrder
   isApproved?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
   approvedBy?: Prisma.UserOrderByWithRelationInput
@@ -286,11 +286,11 @@ export type BASTDocumentOrderByWithAggregationInput = {
   projectId?: Prisma.SortOrder
   type?: Prisma.SortOrder
   date?: Prisma.SortOrder
-  maintenanceEndsAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  maintenanceEndsAt?: Prisma.SortOrder
+  notes?: Prisma.SortOrder
   isApproved?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.BASTDocumentCountOrderByAggregateInput
   _max?: Prisma.BASTDocumentMaxOrderByAggregateInput
@@ -346,7 +346,6 @@ export type BASTDocumentUncheckedCreateInput = {
 }
 
 export type BASTDocumentUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumBASTTypeFieldUpdateOperationsInput | $Enums.BASTType
@@ -361,7 +360,6 @@ export type BASTDocumentUpdateInput = {
 }
 
 export type BASTDocumentUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -391,7 +389,6 @@ export type BASTDocumentCreateManyInput = {
 }
 
 export type BASTDocumentUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumBASTTypeFieldUpdateOperationsInput | $Enums.BASTType
@@ -404,7 +401,6 @@ export type BASTDocumentUpdateManyMutationInput = {
 }
 
 export type BASTDocumentUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -596,7 +592,6 @@ export type BASTDocumentCreateOrConnectWithoutApprovedByInput = {
 
 export type BASTDocumentCreateManyApprovedByInputEnvelope = {
   data: Prisma.BASTDocumentCreateManyApprovedByInput | Prisma.BASTDocumentCreateManyApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type BASTDocumentUpsertWithWhereUniqueWithoutApprovedByInput = {
@@ -668,7 +663,6 @@ export type BASTDocumentCreateOrConnectWithoutProjectInput = {
 
 export type BASTDocumentCreateManyProjectInputEnvelope = {
   data: Prisma.BASTDocumentCreateManyProjectInput | Prisma.BASTDocumentCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type BASTDocumentUpsertWithWhereUniqueWithoutProjectInput = {
@@ -702,7 +696,6 @@ export type BASTDocumentCreateManyApprovedByInput = {
 }
 
 export type BASTDocumentUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumBASTTypeFieldUpdateOperationsInput | $Enums.BASTType
@@ -716,7 +709,6 @@ export type BASTDocumentUpdateWithoutApprovedByInput = {
 }
 
 export type BASTDocumentUncheckedUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -730,7 +722,6 @@ export type BASTDocumentUncheckedUpdateWithoutApprovedByInput = {
 }
 
 export type BASTDocumentUncheckedUpdateManyWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -758,7 +749,6 @@ export type BASTDocumentCreateManyProjectInput = {
 }
 
 export type BASTDocumentUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumBASTTypeFieldUpdateOperationsInput | $Enums.BASTType
@@ -772,7 +762,6 @@ export type BASTDocumentUpdateWithoutProjectInput = {
 }
 
 export type BASTDocumentUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumBASTTypeFieldUpdateOperationsInput | $Enums.BASTType
@@ -786,7 +775,6 @@ export type BASTDocumentUncheckedUpdateWithoutProjectInput = {
 }
 
 export type BASTDocumentUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   bastNumber?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumBASTTypeFieldUpdateOperationsInput | $Enums.BASTType
@@ -818,39 +806,7 @@ export type BASTDocumentSelect<ExtArgs extends runtime.Types.Extensions.Internal
   approvedBy?: boolean | Prisma.BASTDocument$approvedByArgs<ExtArgs>
 }, ExtArgs["result"]["bASTDocument"]>
 
-export type BASTDocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  bastNumber?: boolean
-  projectId?: boolean
-  type?: boolean
-  date?: boolean
-  maintenanceEndsAt?: boolean
-  notes?: boolean
-  isApproved?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  createdAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.BASTDocument$approvedByArgs<ExtArgs>
-}, ExtArgs["result"]["bASTDocument"]>
 
-export type BASTDocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  bastNumber?: boolean
-  projectId?: boolean
-  type?: boolean
-  date?: boolean
-  maintenanceEndsAt?: boolean
-  notes?: boolean
-  isApproved?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  createdAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.BASTDocument$approvedByArgs<ExtArgs>
-}, ExtArgs["result"]["bASTDocument"]>
 
 export type BASTDocumentSelectScalar = {
   id?: boolean
@@ -869,14 +825,6 @@ export type BASTDocumentSelectScalar = {
 
 export type BASTDocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publicCode" | "bastNumber" | "projectId" | "type" | "date" | "maintenanceEndsAt" | "notes" | "isApproved" | "approvedById" | "approvedAt" | "createdAt", ExtArgs["result"]["bASTDocument"]>
 export type BASTDocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.BASTDocument$approvedByArgs<ExtArgs>
-}
-export type BASTDocumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.BASTDocument$approvedByArgs<ExtArgs>
-}
-export type BASTDocumentIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   approvedBy?: boolean | Prisma.BASTDocument$approvedByArgs<ExtArgs>
 }
@@ -1018,30 +966,6 @@ export interface BASTDocumentDelegate<ExtArgs extends runtime.Types.Extensions.I
   createMany<T extends BASTDocumentCreateManyArgs>(args?: Prisma.SelectSubset<T, BASTDocumentCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many BASTDocuments and returns the data saved in the database.
-   * @param {BASTDocumentCreateManyAndReturnArgs} args - Arguments to create many BASTDocuments.
-   * @example
-   * // Create many BASTDocuments
-   * const bASTDocument = await prisma.bASTDocument.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many BASTDocuments and only return the `id`
-   * const bASTDocumentWithIdOnly = await prisma.bASTDocument.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends BASTDocumentCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, BASTDocumentCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BASTDocumentPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a BASTDocument.
    * @param {BASTDocumentDeleteArgs} args - Arguments to delete one BASTDocument.
    * @example
@@ -1106,36 +1030,6 @@ export interface BASTDocumentDelegate<ExtArgs extends runtime.Types.Extensions.I
   updateMany<T extends BASTDocumentUpdateManyArgs>(args: Prisma.SelectSubset<T, BASTDocumentUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more BASTDocuments and returns the data updated in the database.
-   * @param {BASTDocumentUpdateManyAndReturnArgs} args - Arguments to update many BASTDocuments.
-   * @example
-   * // Update many BASTDocuments
-   * const bASTDocument = await prisma.bASTDocument.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more BASTDocuments and only return the `id`
-   * const bASTDocumentWithIdOnly = await prisma.bASTDocument.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends BASTDocumentUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, BASTDocumentUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BASTDocumentPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one BASTDocument.
    * @param {BASTDocumentUpsertArgs} args - Arguments to update or create a BASTDocument.
    * @example
@@ -1153,6 +1047,29 @@ export interface BASTDocumentDelegate<ExtArgs extends runtime.Types.Extensions.I
    * })
    */
   upsert<T extends BASTDocumentUpsertArgs>(args: Prisma.SelectSubset<T, BASTDocumentUpsertArgs<ExtArgs>>): Prisma.Prisma__BASTDocumentClient<runtime.Types.Result.GetResult<Prisma.$BASTDocumentPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more BASTDocuments that matches the filter.
+   * @param {BASTDocumentFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const bASTDocument = await prisma.bASTDocument.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.BASTDocumentFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a BASTDocument.
+   * @param {BASTDocumentAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const bASTDocument = await prisma.bASTDocument.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.BASTDocumentAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1533,11 +1450,6 @@ export type BASTDocumentFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` BASTDocuments.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of BASTDocuments.
-   */
   distinct?: Prisma.BASTDocumentScalarFieldEnum | Prisma.BASTDocumentScalarFieldEnum[]
 }
 
@@ -1571,30 +1483,6 @@ export type BASTDocumentCreateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * The data used to create many BASTDocuments.
    */
   data: Prisma.BASTDocumentCreateManyInput | Prisma.BASTDocumentCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * BASTDocument createManyAndReturn
- */
-export type BASTDocumentCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the BASTDocument
-   */
-  select?: Prisma.BASTDocumentSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the BASTDocument
-   */
-  omit?: Prisma.BASTDocumentOmit<ExtArgs> | null
-  /**
-   * The data used to create many BASTDocuments.
-   */
-  data: Prisma.BASTDocumentCreateManyInput | Prisma.BASTDocumentCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.BASTDocumentIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1639,36 +1527,6 @@ export type BASTDocumentUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many BASTDocuments to update.
    */
   limit?: number
-}
-
-/**
- * BASTDocument updateManyAndReturn
- */
-export type BASTDocumentUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the BASTDocument
-   */
-  select?: Prisma.BASTDocumentSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the BASTDocument
-   */
-  omit?: Prisma.BASTDocumentOmit<ExtArgs> | null
-  /**
-   * The data used to update BASTDocuments.
-   */
-  data: Prisma.XOR<Prisma.BASTDocumentUpdateManyMutationInput, Prisma.BASTDocumentUncheckedUpdateManyInput>
-  /**
-   * Filter which BASTDocuments to update
-   */
-  where?: Prisma.BASTDocumentWhereInput
-  /**
-   * Limit how many BASTDocuments to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.BASTDocumentIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1735,6 +1593,34 @@ export type BASTDocumentDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many BASTDocuments to delete.
    */
   limit?: number
+}
+
+/**
+ * BASTDocument findRaw
+ */
+export type BASTDocumentFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * BASTDocument aggregateRaw
+ */
+export type BASTDocumentAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

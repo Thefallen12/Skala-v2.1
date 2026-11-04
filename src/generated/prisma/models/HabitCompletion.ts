@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -151,7 +151,7 @@ export type HabitCompletionGroupByOutputType = {
   _max: HabitCompletionMaxAggregateOutputType | null
 }
 
-export type GetHabitCompletionGroupByPayload<T extends HabitCompletionGroupByArgs> = Prisma.PrismaPromise<
+type GetHabitCompletionGroupByPayload<T extends HabitCompletionGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<HabitCompletionGroupByOutputType, T['by']> &
       {
@@ -232,14 +232,12 @@ export type HabitCompletionUncheckedCreateInput = {
 }
 
 export type HabitCompletionUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   habit?: Prisma.HabitUpdateOneRequiredWithoutCompletionsNestedInput
 }
 
 export type HabitCompletionUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   habitId?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -253,13 +251,11 @@ export type HabitCompletionCreateManyInput = {
 }
 
 export type HabitCompletionUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type HabitCompletionUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   habitId?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -362,7 +358,6 @@ export type HabitCompletionCreateOrConnectWithoutHabitInput = {
 
 export type HabitCompletionCreateManyHabitInputEnvelope = {
   data: Prisma.HabitCompletionCreateManyHabitInput | Prisma.HabitCompletionCreateManyHabitInput[]
-  skipDuplicates?: boolean
 }
 
 export type HabitCompletionUpsertWithWhereUniqueWithoutHabitInput = {
@@ -398,19 +393,16 @@ export type HabitCompletionCreateManyHabitInput = {
 }
 
 export type HabitCompletionUpdateWithoutHabitInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type HabitCompletionUncheckedUpdateWithoutHabitInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type HabitCompletionUncheckedUpdateManyWithoutHabitInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -425,21 +417,7 @@ export type HabitCompletionSelect<ExtArgs extends runtime.Types.Extensions.Inter
   habit?: boolean | Prisma.HabitDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["habitCompletion"]>
 
-export type HabitCompletionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  habitId?: boolean
-  date?: boolean
-  completedAt?: boolean
-  habit?: boolean | Prisma.HabitDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["habitCompletion"]>
 
-export type HabitCompletionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  habitId?: boolean
-  date?: boolean
-  completedAt?: boolean
-  habit?: boolean | Prisma.HabitDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["habitCompletion"]>
 
 export type HabitCompletionSelectScalar = {
   id?: boolean
@@ -450,12 +428,6 @@ export type HabitCompletionSelectScalar = {
 
 export type HabitCompletionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "habitId" | "date" | "completedAt", ExtArgs["result"]["habitCompletion"]>
 export type HabitCompletionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  habit?: boolean | Prisma.HabitDefaultArgs<ExtArgs>
-}
-export type HabitCompletionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  habit?: boolean | Prisma.HabitDefaultArgs<ExtArgs>
-}
-export type HabitCompletionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   habit?: boolean | Prisma.HabitDefaultArgs<ExtArgs>
 }
 
@@ -587,30 +559,6 @@ export interface HabitCompletionDelegate<ExtArgs extends runtime.Types.Extension
   createMany<T extends HabitCompletionCreateManyArgs>(args?: Prisma.SelectSubset<T, HabitCompletionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many HabitCompletions and returns the data saved in the database.
-   * @param {HabitCompletionCreateManyAndReturnArgs} args - Arguments to create many HabitCompletions.
-   * @example
-   * // Create many HabitCompletions
-   * const habitCompletion = await prisma.habitCompletion.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many HabitCompletions and only return the `id`
-   * const habitCompletionWithIdOnly = await prisma.habitCompletion.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends HabitCompletionCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, HabitCompletionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HabitCompletionPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a HabitCompletion.
    * @param {HabitCompletionDeleteArgs} args - Arguments to delete one HabitCompletion.
    * @example
@@ -675,36 +623,6 @@ export interface HabitCompletionDelegate<ExtArgs extends runtime.Types.Extension
   updateMany<T extends HabitCompletionUpdateManyArgs>(args: Prisma.SelectSubset<T, HabitCompletionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more HabitCompletions and returns the data updated in the database.
-   * @param {HabitCompletionUpdateManyAndReturnArgs} args - Arguments to update many HabitCompletions.
-   * @example
-   * // Update many HabitCompletions
-   * const habitCompletion = await prisma.habitCompletion.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more HabitCompletions and only return the `id`
-   * const habitCompletionWithIdOnly = await prisma.habitCompletion.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends HabitCompletionUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, HabitCompletionUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HabitCompletionPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one HabitCompletion.
    * @param {HabitCompletionUpsertArgs} args - Arguments to update or create a HabitCompletion.
    * @example
@@ -722,6 +640,29 @@ export interface HabitCompletionDelegate<ExtArgs extends runtime.Types.Extension
    * })
    */
   upsert<T extends HabitCompletionUpsertArgs>(args: Prisma.SelectSubset<T, HabitCompletionUpsertArgs<ExtArgs>>): Prisma.Prisma__HabitCompletionClient<runtime.Types.Result.GetResult<Prisma.$HabitCompletionPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more HabitCompletions that matches the filter.
+   * @param {HabitCompletionFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const habitCompletion = await prisma.habitCompletion.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.HabitCompletionFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a HabitCompletion.
+   * @param {HabitCompletionAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const habitCompletion = await prisma.habitCompletion.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.HabitCompletionAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1093,11 +1034,6 @@ export type HabitCompletionFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` HabitCompletions.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of HabitCompletions.
-   */
   distinct?: Prisma.HabitCompletionScalarFieldEnum | Prisma.HabitCompletionScalarFieldEnum[]
 }
 
@@ -1131,30 +1067,6 @@ export type HabitCompletionCreateManyArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many HabitCompletions.
    */
   data: Prisma.HabitCompletionCreateManyInput | Prisma.HabitCompletionCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * HabitCompletion createManyAndReturn
- */
-export type HabitCompletionCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the HabitCompletion
-   */
-  select?: Prisma.HabitCompletionSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the HabitCompletion
-   */
-  omit?: Prisma.HabitCompletionOmit<ExtArgs> | null
-  /**
-   * The data used to create many HabitCompletions.
-   */
-  data: Prisma.HabitCompletionCreateManyInput | Prisma.HabitCompletionCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.HabitCompletionIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1199,36 +1111,6 @@ export type HabitCompletionUpdateManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many HabitCompletions to update.
    */
   limit?: number
-}
-
-/**
- * HabitCompletion updateManyAndReturn
- */
-export type HabitCompletionUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the HabitCompletion
-   */
-  select?: Prisma.HabitCompletionSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the HabitCompletion
-   */
-  omit?: Prisma.HabitCompletionOmit<ExtArgs> | null
-  /**
-   * The data used to update HabitCompletions.
-   */
-  data: Prisma.XOR<Prisma.HabitCompletionUpdateManyMutationInput, Prisma.HabitCompletionUncheckedUpdateManyInput>
-  /**
-   * Filter which HabitCompletions to update
-   */
-  where?: Prisma.HabitCompletionWhereInput
-  /**
-   * Limit how many HabitCompletions to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.HabitCompletionIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1295,6 +1177,34 @@ export type HabitCompletionDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many HabitCompletions to delete.
    */
   limit?: number
+}
+
+/**
+ * HabitCompletion findRaw
+ */
+export type HabitCompletionFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * HabitCompletion aggregateRaw
+ */
+export type HabitCompletionAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -182,7 +182,7 @@ export type ProjectPolygonGroupByOutputType = {
   _max: ProjectPolygonMaxAggregateOutputType | null
 }
 
-export type GetProjectPolygonGroupByPayload<T extends ProjectPolygonGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectPolygonGroupByPayload<T extends ProjectPolygonGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectPolygonGroupByOutputType, T['by']> &
       {
@@ -217,7 +217,7 @@ export type ProjectPolygonWhereInput = {
 export type ProjectPolygonOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
-  surveyId?: Prisma.SortOrderInput | Prisma.SortOrder
+  surveyId?: Prisma.SortOrder
   type?: Prisma.SortOrder
   name?: Prisma.SortOrder
   geometryType?: Prisma.SortOrder
@@ -248,7 +248,7 @@ export type ProjectPolygonWhereUniqueInput = Prisma.AtLeast<{
 export type ProjectPolygonOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
-  surveyId?: Prisma.SortOrderInput | Prisma.SortOrder
+  surveyId?: Prisma.SortOrder
   type?: Prisma.SortOrder
   name?: Prisma.SortOrder
   geometryType?: Prisma.SortOrder
@@ -280,7 +280,7 @@ export type ProjectPolygonCreateInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutPolygonsInput
@@ -294,17 +294,16 @@ export type ProjectPolygonUncheckedCreateInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type ProjectPolygonUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutPolygonsNestedInput
@@ -312,13 +311,12 @@ export type ProjectPolygonUpdateInput = {
 }
 
 export type ProjectPolygonUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -330,29 +328,27 @@ export type ProjectPolygonCreateManyInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type ProjectPolygonUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectPolygonUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -494,7 +490,7 @@ export type ProjectPolygonCreateWithoutProjectInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   survey?: Prisma.FieldSurveyCreateNestedOneWithoutPolygonsInput
@@ -506,7 +502,7 @@ export type ProjectPolygonUncheckedCreateWithoutProjectInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -518,7 +514,6 @@ export type ProjectPolygonCreateOrConnectWithoutProjectInput = {
 
 export type ProjectPolygonCreateManyProjectInputEnvelope = {
   data: Prisma.ProjectPolygonCreateManyProjectInput | Prisma.ProjectPolygonCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectPolygonUpsertWithWhereUniqueWithoutProjectInput = {
@@ -557,7 +552,7 @@ export type ProjectPolygonCreateWithoutSurveyInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutPolygonsInput
@@ -569,7 +564,7 @@ export type ProjectPolygonUncheckedCreateWithoutSurveyInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -581,7 +576,6 @@ export type ProjectPolygonCreateOrConnectWithoutSurveyInput = {
 
 export type ProjectPolygonCreateManySurveyInputEnvelope = {
   data: Prisma.ProjectPolygonCreateManySurveyInput | Prisma.ProjectPolygonCreateManySurveyInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectPolygonUpsertWithWhereUniqueWithoutSurveyInput = {
@@ -606,40 +600,37 @@ export type ProjectPolygonCreateManyProjectInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type ProjectPolygonUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   survey?: Prisma.FieldSurveyUpdateOneWithoutPolygonsNestedInput
 }
 
 export type ProjectPolygonUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectPolygonUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -650,40 +641,37 @@ export type ProjectPolygonCreateManySurveyInput = {
   type: $Enums.ProjectPolygonType
   name: string
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type ProjectPolygonUpdateWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutPolygonsNestedInput
 }
 
 export type ProjectPolygonUncheckedUpdateWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type ProjectPolygonUncheckedUpdateManyWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.EnumProjectPolygonTypeFieldUpdateOperationsInput | $Enums.ProjectPolygonType
   name?: Prisma.StringFieldUpdateOperationsInput | string
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -704,33 +692,7 @@ export type ProjectPolygonSelect<ExtArgs extends runtime.Types.Extensions.Intern
   survey?: boolean | Prisma.ProjectPolygon$surveyArgs<ExtArgs>
 }, ExtArgs["result"]["projectPolygon"]>
 
-export type ProjectPolygonSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  surveyId?: boolean
-  type?: boolean
-  name?: boolean
-  geometryType?: boolean
-  geoJsonData?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  survey?: boolean | Prisma.ProjectPolygon$surveyArgs<ExtArgs>
-}, ExtArgs["result"]["projectPolygon"]>
 
-export type ProjectPolygonSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  surveyId?: boolean
-  type?: boolean
-  name?: boolean
-  geometryType?: boolean
-  geoJsonData?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  survey?: boolean | Prisma.ProjectPolygon$surveyArgs<ExtArgs>
-}, ExtArgs["result"]["projectPolygon"]>
 
 export type ProjectPolygonSelectScalar = {
   id?: boolean
@@ -746,14 +708,6 @@ export type ProjectPolygonSelectScalar = {
 
 export type ProjectPolygonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "surveyId" | "type" | "name" | "geometryType" | "geoJsonData" | "createdAt" | "updatedAt", ExtArgs["result"]["projectPolygon"]>
 export type ProjectPolygonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  survey?: boolean | Prisma.ProjectPolygon$surveyArgs<ExtArgs>
-}
-export type ProjectPolygonIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  survey?: boolean | Prisma.ProjectPolygon$surveyArgs<ExtArgs>
-}
-export type ProjectPolygonIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   survey?: boolean | Prisma.ProjectPolygon$surveyArgs<ExtArgs>
 }
@@ -892,30 +846,6 @@ export interface ProjectPolygonDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends ProjectPolygonCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectPolygonCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many ProjectPolygons and returns the data saved in the database.
-   * @param {ProjectPolygonCreateManyAndReturnArgs} args - Arguments to create many ProjectPolygons.
-   * @example
-   * // Create many ProjectPolygons
-   * const projectPolygon = await prisma.projectPolygon.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many ProjectPolygons and only return the `id`
-   * const projectPolygonWithIdOnly = await prisma.projectPolygon.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectPolygonCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectPolygonCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectPolygonPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a ProjectPolygon.
    * @param {ProjectPolygonDeleteArgs} args - Arguments to delete one ProjectPolygon.
    * @example
@@ -980,36 +910,6 @@ export interface ProjectPolygonDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends ProjectPolygonUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectPolygonUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more ProjectPolygons and returns the data updated in the database.
-   * @param {ProjectPolygonUpdateManyAndReturnArgs} args - Arguments to update many ProjectPolygons.
-   * @example
-   * // Update many ProjectPolygons
-   * const projectPolygon = await prisma.projectPolygon.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more ProjectPolygons and only return the `id`
-   * const projectPolygonWithIdOnly = await prisma.projectPolygon.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectPolygonUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectPolygonUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectPolygonPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one ProjectPolygon.
    * @param {ProjectPolygonUpsertArgs} args - Arguments to update or create a ProjectPolygon.
    * @example
@@ -1027,6 +927,29 @@ export interface ProjectPolygonDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends ProjectPolygonUpsertArgs>(args: Prisma.SelectSubset<T, ProjectPolygonUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectPolygonClient<runtime.Types.Result.GetResult<Prisma.$ProjectPolygonPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more ProjectPolygons that matches the filter.
+   * @param {ProjectPolygonFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const projectPolygon = await prisma.projectPolygon.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectPolygonFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a ProjectPolygon.
+   * @param {ProjectPolygonAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const projectPolygon = await prisma.projectPolygon.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectPolygonAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1404,11 +1327,6 @@ export type ProjectPolygonFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` ProjectPolygons.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ProjectPolygons.
-   */
   distinct?: Prisma.ProjectPolygonScalarFieldEnum | Prisma.ProjectPolygonScalarFieldEnum[]
 }
 
@@ -1442,30 +1360,6 @@ export type ProjectPolygonCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many ProjectPolygons.
    */
   data: Prisma.ProjectPolygonCreateManyInput | Prisma.ProjectPolygonCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * ProjectPolygon createManyAndReturn
- */
-export type ProjectPolygonCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectPolygon
-   */
-  select?: Prisma.ProjectPolygonSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectPolygon
-   */
-  omit?: Prisma.ProjectPolygonOmit<ExtArgs> | null
-  /**
-   * The data used to create many ProjectPolygons.
-   */
-  data: Prisma.ProjectPolygonCreateManyInput | Prisma.ProjectPolygonCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectPolygonIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1510,36 +1404,6 @@ export type ProjectPolygonUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many ProjectPolygons to update.
    */
   limit?: number
-}
-
-/**
- * ProjectPolygon updateManyAndReturn
- */
-export type ProjectPolygonUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectPolygon
-   */
-  select?: Prisma.ProjectPolygonSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectPolygon
-   */
-  omit?: Prisma.ProjectPolygonOmit<ExtArgs> | null
-  /**
-   * The data used to update ProjectPolygons.
-   */
-  data: Prisma.XOR<Prisma.ProjectPolygonUpdateManyMutationInput, Prisma.ProjectPolygonUncheckedUpdateManyInput>
-  /**
-   * Filter which ProjectPolygons to update
-   */
-  where?: Prisma.ProjectPolygonWhereInput
-  /**
-   * Limit how many ProjectPolygons to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectPolygonIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1606,6 +1470,34 @@ export type ProjectPolygonDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many ProjectPolygons to delete.
    */
   limit?: number
+}
+
+/**
+ * ProjectPolygon findRaw
+ */
+export type ProjectPolygonFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * ProjectPolygon aggregateRaw
+ */
+export type ProjectPolygonAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

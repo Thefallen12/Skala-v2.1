@@ -1,15 +1,13 @@
 import "dotenv/config";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
+import { scaledIntegerFromDecimal } from "../src/lib/scaled-decimal";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.MONGODB_URL;
 if (!connectionString) {
-  throw new Error("DATABASE_URL is required to seed logistics inventory.");
+  throw new Error("MONGODB_URL is required to seed logistics inventory.");
 }
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+const prisma = new PrismaClient();
 
 const inventoryItems = [
   {
@@ -62,9 +60,9 @@ async function seedInventory() {
         update: {},
         create: {
           ...item,
-          stockQuantity: new Prisma.Decimal(item.stockQuantity),
-          minimumStock: new Prisma.Decimal(item.minimumStock),
-          unitPrice: new Prisma.Decimal(item.unitPrice),
+          stockQuantity: scaledIntegerFromDecimal(item.stockQuantity),
+          minimumStock: scaledIntegerFromDecimal(item.minimumStock),
+          unitPrice: scaledIntegerFromDecimal(item.unitPrice),
         },
       });
     }

@@ -5,6 +5,7 @@ import {
   TicketFulfillmentStatus,
   TicketStatus,
 } from "@/generated/prisma/enums";
+import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
 
 export async function syncTicketStatus(
   transaction: Prisma.TransactionClient,
@@ -92,12 +93,5 @@ export async function lockTicketFulfillment(
   transaction: Prisma.TransactionClient,
   ticketId: string,
 ): Promise<void> {
-  await transaction.$queryRaw<{ locked: boolean }[]>`
-    WITH ticket_fulfillment_lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(
-        hashtext(${`ticket-fulfillment:${ticketId}`}::text)::bigint
-      )
-    )
-    SELECT TRUE AS locked FROM ticket_fulfillment_lock
-  `;
+  await acquireMongoTransactionLock(transaction, `ticket-fulfillment:${ticketId}`);
 }

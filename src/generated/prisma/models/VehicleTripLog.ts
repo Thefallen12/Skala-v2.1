@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,19 +27,19 @@ export type AggregateVehicleTripLog = {
 }
 
 export type VehicleTripLogAvgAggregateOutputType = {
-  kilometerStart: runtime.Decimal | null
-  kilometerEnd: runtime.Decimal | null
-  distanceKm: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  kilometerStart: number | null
+  kilometerEnd: number | null
+  distanceKm: number | null
+  fuelLiter: number | null
+  fuelEfficiencyKmPerL: number | null
 }
 
 export type VehicleTripLogSumAggregateOutputType = {
-  kilometerStart: runtime.Decimal | null
-  kilometerEnd: runtime.Decimal | null
-  distanceKm: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  kilometerStart: bigint | null
+  kilometerEnd: bigint | null
+  distanceKm: bigint | null
+  fuelLiter: bigint | null
+  fuelEfficiencyKmPerL: bigint | null
 }
 
 export type VehicleTripLogMinAggregateOutputType = {
@@ -47,11 +47,11 @@ export type VehicleTripLogMinAggregateOutputType = {
   vehicleId: string | null
   deliveryOrderId: string | null
   projectId: string | null
-  kilometerStart: runtime.Decimal | null
-  kilometerEnd: runtime.Decimal | null
-  distanceKm: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  kilometerStart: bigint | null
+  kilometerEnd: bigint | null
+  distanceKm: bigint | null
+  fuelLiter: bigint | null
+  fuelEfficiencyKmPerL: bigint | null
   createdById: string | null
   createdAt: Date | null
 }
@@ -61,11 +61,11 @@ export type VehicleTripLogMaxAggregateOutputType = {
   vehicleId: string | null
   deliveryOrderId: string | null
   projectId: string | null
-  kilometerStart: runtime.Decimal | null
-  kilometerEnd: runtime.Decimal | null
-  distanceKm: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  kilometerStart: bigint | null
+  kilometerEnd: bigint | null
+  distanceKm: bigint | null
+  fuelLiter: bigint | null
+  fuelEfficiencyKmPerL: bigint | null
   createdById: string | null
   createdAt: Date | null
 }
@@ -236,11 +236,11 @@ export type VehicleTripLogGroupByOutputType = {
   vehicleId: string
   deliveryOrderId: string | null
   projectId: string | null
-  kilometerStart: runtime.Decimal
-  kilometerEnd: runtime.Decimal
-  distanceKm: runtime.Decimal
-  fuelLiter: runtime.Decimal
-  fuelEfficiencyKmPerL: runtime.Decimal
+  kilometerStart: bigint
+  kilometerEnd: bigint
+  distanceKm: bigint
+  fuelLiter: bigint
+  fuelEfficiencyKmPerL: bigint
   createdById: string
   createdAt: Date
   _count: VehicleTripLogCountAggregateOutputType | null
@@ -250,7 +250,7 @@ export type VehicleTripLogGroupByOutputType = {
   _max: VehicleTripLogMaxAggregateOutputType | null
 }
 
-export type GetVehicleTripLogGroupByPayload<T extends VehicleTripLogGroupByArgs> = Prisma.PrismaPromise<
+type GetVehicleTripLogGroupByPayload<T extends VehicleTripLogGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<VehicleTripLogGroupByOutputType, T['by']> &
       {
@@ -273,11 +273,11 @@ export type VehicleTripLogWhereInput = {
   vehicleId?: Prisma.StringFilter<"VehicleTripLog"> | string
   deliveryOrderId?: Prisma.StringNullableFilter<"VehicleTripLog"> | string | null
   projectId?: Prisma.StringNullableFilter<"VehicleTripLog"> | string | null
-  kilometerStart?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  kilometerEnd?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  distanceKm?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
   createdById?: Prisma.StringFilter<"VehicleTripLog"> | string
   createdAt?: Prisma.DateTimeFilter<"VehicleTripLog"> | Date | string
   vehicle?: Prisma.XOR<Prisma.VehicleScalarRelationFilter, Prisma.VehicleWhereInput>
@@ -289,8 +289,8 @@ export type VehicleTripLogWhereInput = {
 export type VehicleTripLogOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   vehicleId?: Prisma.SortOrder
-  deliveryOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  deliveryOrderId?: Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   kilometerStart?: Prisma.SortOrder
   kilometerEnd?: Prisma.SortOrder
   distanceKm?: Prisma.SortOrder
@@ -312,11 +312,11 @@ export type VehicleTripLogWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.VehicleTripLogWhereInput | Prisma.VehicleTripLogWhereInput[]
   vehicleId?: Prisma.StringFilter<"VehicleTripLog"> | string
   projectId?: Prisma.StringNullableFilter<"VehicleTripLog"> | string | null
-  kilometerStart?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  kilometerEnd?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  distanceKm?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
   createdById?: Prisma.StringFilter<"VehicleTripLog"> | string
   createdAt?: Prisma.DateTimeFilter<"VehicleTripLog"> | Date | string
   vehicle?: Prisma.XOR<Prisma.VehicleScalarRelationFilter, Prisma.VehicleWhereInput>
@@ -328,8 +328,8 @@ export type VehicleTripLogWhereUniqueInput = Prisma.AtLeast<{
 export type VehicleTripLogOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   vehicleId?: Prisma.SortOrder
-  deliveryOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  deliveryOrderId?: Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   kilometerStart?: Prisma.SortOrder
   kilometerEnd?: Prisma.SortOrder
   distanceKm?: Prisma.SortOrder
@@ -352,22 +352,22 @@ export type VehicleTripLogScalarWhereWithAggregatesInput = {
   vehicleId?: Prisma.StringWithAggregatesFilter<"VehicleTripLog"> | string
   deliveryOrderId?: Prisma.StringNullableWithAggregatesFilter<"VehicleTripLog"> | string | null
   projectId?: Prisma.StringNullableWithAggregatesFilter<"VehicleTripLog"> | string | null
-  kilometerStart?: Prisma.DecimalWithAggregatesFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalWithAggregatesFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalWithAggregatesFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalWithAggregatesFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalWithAggregatesFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntWithAggregatesFilter<"VehicleTripLog"> | bigint | number
+  kilometerEnd?: Prisma.BigIntWithAggregatesFilter<"VehicleTripLog"> | bigint | number
+  distanceKm?: Prisma.BigIntWithAggregatesFilter<"VehicleTripLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntWithAggregatesFilter<"VehicleTripLog"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntWithAggregatesFilter<"VehicleTripLog"> | bigint | number
   createdById?: Prisma.StringWithAggregatesFilter<"VehicleTripLog"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"VehicleTripLog"> | Date | string
 }
 
 export type VehicleTripLogCreateInput = {
   id?: string
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
   vehicle: Prisma.VehicleCreateNestedOneWithoutTripLogsInput
   deliveryOrder?: Prisma.DeliveryOrderCreateNestedOneWithoutVehicleTripLogInput
@@ -380,22 +380,21 @@ export type VehicleTripLogUncheckedCreateInput = {
   vehicleId: string
   deliveryOrderId?: string | null
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
 
 export type VehicleTripLogUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vehicle?: Prisma.VehicleUpdateOneRequiredWithoutTripLogsNestedInput
   deliveryOrder?: Prisma.DeliveryOrderUpdateOneWithoutVehicleTripLogNestedInput
@@ -404,15 +403,14 @@ export type VehicleTripLogUpdateInput = {
 }
 
 export type VehicleTripLogUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -422,35 +420,33 @@ export type VehicleTripLogCreateManyInput = {
   vehicleId: string
   deliveryOrderId?: string | null
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
 
 export type VehicleTripLogUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type VehicleTripLogUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -688,11 +684,11 @@ export type VehicleTripLogUncheckedUpdateManyWithoutVehicleNestedInput = {
 
 export type VehicleTripLogCreateWithoutCreatedByInput = {
   id?: string
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
   vehicle: Prisma.VehicleCreateNestedOneWithoutTripLogsInput
   deliveryOrder?: Prisma.DeliveryOrderCreateNestedOneWithoutVehicleTripLogInput
@@ -704,11 +700,11 @@ export type VehicleTripLogUncheckedCreateWithoutCreatedByInput = {
   vehicleId: string
   deliveryOrderId?: string | null
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
 }
 
@@ -719,7 +715,6 @@ export type VehicleTripLogCreateOrConnectWithoutCreatedByInput = {
 
 export type VehicleTripLogCreateManyCreatedByInputEnvelope = {
   data: Prisma.VehicleTripLogCreateManyCreatedByInput | Prisma.VehicleTripLogCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleTripLogUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -746,22 +741,22 @@ export type VehicleTripLogScalarWhereInput = {
   vehicleId?: Prisma.StringFilter<"VehicleTripLog"> | string
   deliveryOrderId?: Prisma.StringNullableFilter<"VehicleTripLog"> | string | null
   projectId?: Prisma.StringNullableFilter<"VehicleTripLog"> | string | null
-  kilometerStart?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFilter<"VehicleTripLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  kilometerEnd?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  distanceKm?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFilter<"VehicleTripLog"> | bigint | number
   createdById?: Prisma.StringFilter<"VehicleTripLog"> | string
   createdAt?: Prisma.DateTimeFilter<"VehicleTripLog"> | Date | string
 }
 
 export type VehicleTripLogCreateWithoutProjectInput = {
   id?: string
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
   vehicle: Prisma.VehicleCreateNestedOneWithoutTripLogsInput
   deliveryOrder?: Prisma.DeliveryOrderCreateNestedOneWithoutVehicleTripLogInput
@@ -772,11 +767,11 @@ export type VehicleTripLogUncheckedCreateWithoutProjectInput = {
   id?: string
   vehicleId: string
   deliveryOrderId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
@@ -788,7 +783,6 @@ export type VehicleTripLogCreateOrConnectWithoutProjectInput = {
 
 export type VehicleTripLogCreateManyProjectInputEnvelope = {
   data: Prisma.VehicleTripLogCreateManyProjectInput | Prisma.VehicleTripLogCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleTripLogUpsertWithWhereUniqueWithoutProjectInput = {
@@ -809,11 +803,11 @@ export type VehicleTripLogUpdateManyWithWhereWithoutProjectInput = {
 
 export type VehicleTripLogCreateWithoutDeliveryOrderInput = {
   id?: string
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
   vehicle: Prisma.VehicleCreateNestedOneWithoutTripLogsInput
   project?: Prisma.ProjectCreateNestedOneWithoutVehicleTripLogsInput
@@ -824,11 +818,11 @@ export type VehicleTripLogUncheckedCreateWithoutDeliveryOrderInput = {
   id?: string
   vehicleId: string
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
@@ -850,12 +844,11 @@ export type VehicleTripLogUpdateToOneWithWhereWithoutDeliveryOrderInput = {
 }
 
 export type VehicleTripLogUpdateWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vehicle?: Prisma.VehicleUpdateOneRequiredWithoutTripLogsNestedInput
   project?: Prisma.ProjectUpdateOneWithoutVehicleTripLogsNestedInput
@@ -863,25 +856,24 @@ export type VehicleTripLogUpdateWithoutDeliveryOrderInput = {
 }
 
 export type VehicleTripLogUncheckedUpdateWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type VehicleTripLogCreateWithoutVehicleInput = {
   id?: string
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
   deliveryOrder?: Prisma.DeliveryOrderCreateNestedOneWithoutVehicleTripLogInput
   project?: Prisma.ProjectCreateNestedOneWithoutVehicleTripLogsInput
@@ -892,11 +884,11 @@ export type VehicleTripLogUncheckedCreateWithoutVehicleInput = {
   id?: string
   deliveryOrderId?: string | null
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
@@ -908,7 +900,6 @@ export type VehicleTripLogCreateOrConnectWithoutVehicleInput = {
 
 export type VehicleTripLogCreateManyVehicleInputEnvelope = {
   data: Prisma.VehicleTripLogCreateManyVehicleInput | Prisma.VehicleTripLogCreateManyVehicleInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleTripLogUpsertWithWhereUniqueWithoutVehicleInput = {
@@ -932,21 +923,20 @@ export type VehicleTripLogCreateManyCreatedByInput = {
   vehicleId: string
   deliveryOrderId?: string | null
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdAt?: Date | string
 }
 
 export type VehicleTripLogUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vehicle?: Prisma.VehicleUpdateOneRequiredWithoutTripLogsNestedInput
   deliveryOrder?: Prisma.DeliveryOrderUpdateOneWithoutVehicleTripLogNestedInput
@@ -954,28 +944,26 @@ export type VehicleTripLogUpdateWithoutCreatedByInput = {
 }
 
 export type VehicleTripLogUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type VehicleTripLogUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -983,22 +971,21 @@ export type VehicleTripLogCreateManyProjectInput = {
   id?: string
   vehicleId: string
   deliveryOrderId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
 
 export type VehicleTripLogUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   vehicle?: Prisma.VehicleUpdateOneRequiredWithoutTripLogsNestedInput
   deliveryOrder?: Prisma.DeliveryOrderUpdateOneWithoutVehicleTripLogNestedInput
@@ -1006,27 +993,25 @@ export type VehicleTripLogUpdateWithoutProjectInput = {
 }
 
 export type VehicleTripLogUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type VehicleTripLogUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1035,22 +1020,21 @@ export type VehicleTripLogCreateManyVehicleInput = {
   id?: string
   deliveryOrderId?: string | null
   projectId?: string | null
-  kilometerStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart: bigint | number
+  kilometerEnd: bigint | number
+  distanceKm: bigint | number
+  fuelLiter: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   createdById: string
   createdAt?: Date | string
 }
 
 export type VehicleTripLogUpdateWithoutVehicleInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deliveryOrder?: Prisma.DeliveryOrderUpdateOneWithoutVehicleTripLogNestedInput
   project?: Prisma.ProjectUpdateOneWithoutVehicleTripLogsNestedInput
@@ -1058,27 +1042,25 @@ export type VehicleTripLogUpdateWithoutVehicleInput = {
 }
 
 export type VehicleTripLogUncheckedUpdateWithoutVehicleInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type VehicleTripLogUncheckedUpdateManyWithoutVehicleInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  kilometerStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  kilometerEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  distanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  kilometerStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  kilometerEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  distanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -1103,41 +1085,7 @@ export type VehicleTripLogSelect<ExtArgs extends runtime.Types.Extensions.Intern
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["vehicleTripLog"]>
 
-export type VehicleTripLogSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  vehicleId?: boolean
-  deliveryOrderId?: boolean
-  projectId?: boolean
-  kilometerStart?: boolean
-  kilometerEnd?: boolean
-  distanceKm?: boolean
-  fuelLiter?: boolean
-  fuelEfficiencyKmPerL?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.VehicleTripLog$deliveryOrderArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleTripLog$projectArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["vehicleTripLog"]>
 
-export type VehicleTripLogSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  vehicleId?: boolean
-  deliveryOrderId?: boolean
-  projectId?: boolean
-  kilometerStart?: boolean
-  kilometerEnd?: boolean
-  distanceKm?: boolean
-  fuelLiter?: boolean
-  fuelEfficiencyKmPerL?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.VehicleTripLog$deliveryOrderArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleTripLog$projectArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["vehicleTripLog"]>
 
 export type VehicleTripLogSelectScalar = {
   id?: boolean
@@ -1160,18 +1108,6 @@ export type VehicleTripLogInclude<ExtArgs extends runtime.Types.Extensions.Inter
   project?: boolean | Prisma.VehicleTripLog$projectArgs<ExtArgs>
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
-export type VehicleTripLogIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.VehicleTripLog$deliveryOrderArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleTripLog$projectArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type VehicleTripLogIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.VehicleTripLog$deliveryOrderArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleTripLog$projectArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $VehicleTripLogPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "VehicleTripLog"
@@ -1186,11 +1122,11 @@ export type $VehicleTripLogPayload<ExtArgs extends runtime.Types.Extensions.Inte
     vehicleId: string
     deliveryOrderId: string | null
     projectId: string | null
-    kilometerStart: runtime.Decimal
-    kilometerEnd: runtime.Decimal
-    distanceKm: runtime.Decimal
-    fuelLiter: runtime.Decimal
-    fuelEfficiencyKmPerL: runtime.Decimal
+    kilometerStart: bigint
+    kilometerEnd: bigint
+    distanceKm: bigint
+    fuelLiter: bigint
+    fuelEfficiencyKmPerL: bigint
     createdById: string
     createdAt: Date
   }, ExtArgs["result"]["vehicleTripLog"]>
@@ -1311,30 +1247,6 @@ export interface VehicleTripLogDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends VehicleTripLogCreateManyArgs>(args?: Prisma.SelectSubset<T, VehicleTripLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many VehicleTripLogs and returns the data saved in the database.
-   * @param {VehicleTripLogCreateManyAndReturnArgs} args - Arguments to create many VehicleTripLogs.
-   * @example
-   * // Create many VehicleTripLogs
-   * const vehicleTripLog = await prisma.vehicleTripLog.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many VehicleTripLogs and only return the `id`
-   * const vehicleTripLogWithIdOnly = await prisma.vehicleTripLog.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends VehicleTripLogCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, VehicleTripLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VehicleTripLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a VehicleTripLog.
    * @param {VehicleTripLogDeleteArgs} args - Arguments to delete one VehicleTripLog.
    * @example
@@ -1399,36 +1311,6 @@ export interface VehicleTripLogDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends VehicleTripLogUpdateManyArgs>(args: Prisma.SelectSubset<T, VehicleTripLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more VehicleTripLogs and returns the data updated in the database.
-   * @param {VehicleTripLogUpdateManyAndReturnArgs} args - Arguments to update many VehicleTripLogs.
-   * @example
-   * // Update many VehicleTripLogs
-   * const vehicleTripLog = await prisma.vehicleTripLog.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more VehicleTripLogs and only return the `id`
-   * const vehicleTripLogWithIdOnly = await prisma.vehicleTripLog.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends VehicleTripLogUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, VehicleTripLogUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VehicleTripLogPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one VehicleTripLog.
    * @param {VehicleTripLogUpsertArgs} args - Arguments to update or create a VehicleTripLog.
    * @example
@@ -1446,6 +1328,29 @@ export interface VehicleTripLogDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends VehicleTripLogUpsertArgs>(args: Prisma.SelectSubset<T, VehicleTripLogUpsertArgs<ExtArgs>>): Prisma.Prisma__VehicleTripLogClient<runtime.Types.Result.GetResult<Prisma.$VehicleTripLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more VehicleTripLogs that matches the filter.
+   * @param {VehicleTripLogFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const vehicleTripLog = await prisma.vehicleTripLog.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.VehicleTripLogFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a VehicleTripLog.
+   * @param {VehicleTripLogAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const vehicleTripLog = await prisma.vehicleTripLog.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.VehicleTripLogAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1624,11 +1529,11 @@ export interface VehicleTripLogFieldRefs {
   readonly vehicleId: Prisma.FieldRef<"VehicleTripLog", 'String'>
   readonly deliveryOrderId: Prisma.FieldRef<"VehicleTripLog", 'String'>
   readonly projectId: Prisma.FieldRef<"VehicleTripLog", 'String'>
-  readonly kilometerStart: Prisma.FieldRef<"VehicleTripLog", 'Decimal'>
-  readonly kilometerEnd: Prisma.FieldRef<"VehicleTripLog", 'Decimal'>
-  readonly distanceKm: Prisma.FieldRef<"VehicleTripLog", 'Decimal'>
-  readonly fuelLiter: Prisma.FieldRef<"VehicleTripLog", 'Decimal'>
-  readonly fuelEfficiencyKmPerL: Prisma.FieldRef<"VehicleTripLog", 'Decimal'>
+  readonly kilometerStart: Prisma.FieldRef<"VehicleTripLog", 'BigInt'>
+  readonly kilometerEnd: Prisma.FieldRef<"VehicleTripLog", 'BigInt'>
+  readonly distanceKm: Prisma.FieldRef<"VehicleTripLog", 'BigInt'>
+  readonly fuelLiter: Prisma.FieldRef<"VehicleTripLog", 'BigInt'>
+  readonly fuelEfficiencyKmPerL: Prisma.FieldRef<"VehicleTripLog", 'BigInt'>
   readonly createdById: Prisma.FieldRef<"VehicleTripLog", 'String'>
   readonly createdAt: Prisma.FieldRef<"VehicleTripLog", 'DateTime'>
 }
@@ -1827,11 +1732,6 @@ export type VehicleTripLogFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` VehicleTripLogs.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of VehicleTripLogs.
-   */
   distinct?: Prisma.VehicleTripLogScalarFieldEnum | Prisma.VehicleTripLogScalarFieldEnum[]
 }
 
@@ -1865,30 +1765,6 @@ export type VehicleTripLogCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many VehicleTripLogs.
    */
   data: Prisma.VehicleTripLogCreateManyInput | Prisma.VehicleTripLogCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * VehicleTripLog createManyAndReturn
- */
-export type VehicleTripLogCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the VehicleTripLog
-   */
-  select?: Prisma.VehicleTripLogSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the VehicleTripLog
-   */
-  omit?: Prisma.VehicleTripLogOmit<ExtArgs> | null
-  /**
-   * The data used to create many VehicleTripLogs.
-   */
-  data: Prisma.VehicleTripLogCreateManyInput | Prisma.VehicleTripLogCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.VehicleTripLogIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1933,36 +1809,6 @@ export type VehicleTripLogUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many VehicleTripLogs to update.
    */
   limit?: number
-}
-
-/**
- * VehicleTripLog updateManyAndReturn
- */
-export type VehicleTripLogUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the VehicleTripLog
-   */
-  select?: Prisma.VehicleTripLogSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the VehicleTripLog
-   */
-  omit?: Prisma.VehicleTripLogOmit<ExtArgs> | null
-  /**
-   * The data used to update VehicleTripLogs.
-   */
-  data: Prisma.XOR<Prisma.VehicleTripLogUpdateManyMutationInput, Prisma.VehicleTripLogUncheckedUpdateManyInput>
-  /**
-   * Filter which VehicleTripLogs to update
-   */
-  where?: Prisma.VehicleTripLogWhereInput
-  /**
-   * Limit how many VehicleTripLogs to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.VehicleTripLogIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2029,6 +1875,34 @@ export type VehicleTripLogDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many VehicleTripLogs to delete.
    */
   limit?: number
+}
+
+/**
+ * VehicleTripLog findRaw
+ */
+export type VehicleTripLogFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * VehicleTripLog aggregateRaw
+ */
+export type VehicleTripLogAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

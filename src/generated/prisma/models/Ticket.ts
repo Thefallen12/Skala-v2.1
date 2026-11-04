@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,12 +27,12 @@ export type AggregateTicket = {
 }
 
 export type TicketAvgAggregateOutputType = {
-  totalAmount: runtime.Decimal | null
+  totalAmount: number | null
   requestedAmount: number | null
 }
 
 export type TicketSumAggregateOutputType = {
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
   requestedAmount: number | null
 }
 
@@ -45,7 +45,7 @@ export type TicketMinAggregateOutputType = {
   priority: $Enums.TicketPriority | null
   status: $Enums.TicketStatus | null
   fulfillmentStatus: $Enums.TicketFulfillmentStatus | null
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
   requestedAmount: number | null
   isApprovedByDirector: boolean | null
   attachmentUrl: string | null
@@ -78,7 +78,7 @@ export type TicketMaxAggregateOutputType = {
   priority: $Enums.TicketPriority | null
   status: $Enums.TicketStatus | null
   fulfillmentStatus: $Enums.TicketFulfillmentStatus | null
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
   requestedAmount: number | null
   isApprovedByDirector: boolean | null
   attachmentUrl: string | null
@@ -344,7 +344,7 @@ export type TicketGroupByOutputType = {
   priority: $Enums.TicketPriority
   status: $Enums.TicketStatus
   fulfillmentStatus: $Enums.TicketFulfillmentStatus
-  totalAmount: runtime.Decimal | null
+  totalAmount: bigint | null
   requestedAmount: number | null
   isApprovedByDirector: boolean
   attachmentUrl: string | null
@@ -374,7 +374,7 @@ export type TicketGroupByOutputType = {
   _max: TicketMaxAggregateOutputType | null
 }
 
-export type GetTicketGroupByPayload<T extends TicketGroupByArgs> = Prisma.PrismaPromise<
+type GetTicketGroupByPayload<T extends TicketGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<TicketGroupByOutputType, T['by']> &
       {
@@ -401,7 +401,7 @@ export type TicketWhereInput = {
   priority?: Prisma.EnumTicketPriorityFilter<"Ticket"> | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFilter<"Ticket"> | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFilter<"Ticket"> | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.DecimalNullableFilter<"Ticket"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.BigIntNullableFilter<"Ticket"> | bigint | number | null
   requestedAmount?: Prisma.FloatNullableFilter<"Ticket"> | number | null
   isApprovedByDirector?: Prisma.BoolFilter<"Ticket"> | boolean
   attachmentUrl?: Prisma.StringNullableFilter<"Ticket"> | string | null
@@ -440,32 +440,32 @@ export type TicketOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   ticketNumber?: Prisma.SortOrder
   title?: Prisma.SortOrder
-  description?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrder
   type?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentStatus?: Prisma.SortOrder
-  totalAmount?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  totalAmount?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
   isApprovedByDirector?: Prisma.SortOrder
-  attachmentUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  attachmentUrl?: Prisma.SortOrder
   receiptUrls?: Prisma.SortOrder
-  paymentProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestCategory?: Prisma.SortOrderInput | Prisma.SortOrder
-  fieldCategory?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestPaymentMethod?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestPaymentDescription?: Prisma.SortOrderInput | Prisma.SortOrder
-  recipientName?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  accountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  purchaseReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  deliveryReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  deliveryOrderReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  moverAssigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentProofUrl?: Prisma.SortOrder
+  requestCategory?: Prisma.SortOrder
+  fieldCategory?: Prisma.SortOrder
+  requestPaymentMethod?: Prisma.SortOrder
+  requestPaymentDescription?: Prisma.SortOrder
+  recipientName?: Prisma.SortOrder
+  bankName?: Prisma.SortOrder
+  accountNumber?: Prisma.SortOrder
+  purchaseReceiptUrl?: Prisma.SortOrder
+  transferReceiptUrl?: Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  deliveryReceiptUrl?: Prisma.SortOrder
+  deliveryOrderReceiptUrl?: Prisma.SortOrder
+  moverAssigneeId?: Prisma.SortOrder
   requesterId?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   requester?: Prisma.UserOrderByWithRelationInput
@@ -492,7 +492,7 @@ export type TicketWhereUniqueInput = Prisma.AtLeast<{
   priority?: Prisma.EnumTicketPriorityFilter<"Ticket"> | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFilter<"Ticket"> | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFilter<"Ticket"> | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.DecimalNullableFilter<"Ticket"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.BigIntNullableFilter<"Ticket"> | bigint | number | null
   requestedAmount?: Prisma.FloatNullableFilter<"Ticket"> | number | null
   isApprovedByDirector?: Prisma.BoolFilter<"Ticket"> | boolean
   attachmentUrl?: Prisma.StringNullableFilter<"Ticket"> | string | null
@@ -531,32 +531,32 @@ export type TicketOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   ticketNumber?: Prisma.SortOrder
   title?: Prisma.SortOrder
-  description?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrder
   type?: Prisma.SortOrder
   priority?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentStatus?: Prisma.SortOrder
-  totalAmount?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestedAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  totalAmount?: Prisma.SortOrder
+  requestedAmount?: Prisma.SortOrder
   isApprovedByDirector?: Prisma.SortOrder
-  attachmentUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  attachmentUrl?: Prisma.SortOrder
   receiptUrls?: Prisma.SortOrder
-  paymentProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestCategory?: Prisma.SortOrderInput | Prisma.SortOrder
-  fieldCategory?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestPaymentMethod?: Prisma.SortOrderInput | Prisma.SortOrder
-  requestPaymentDescription?: Prisma.SortOrderInput | Prisma.SortOrder
-  recipientName?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankName?: Prisma.SortOrderInput | Prisma.SortOrder
-  accountNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  purchaseReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  deliveryReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  deliveryOrderReceiptUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  moverAssigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentProofUrl?: Prisma.SortOrder
+  requestCategory?: Prisma.SortOrder
+  fieldCategory?: Prisma.SortOrder
+  requestPaymentMethod?: Prisma.SortOrder
+  requestPaymentDescription?: Prisma.SortOrder
+  recipientName?: Prisma.SortOrder
+  bankName?: Prisma.SortOrder
+  accountNumber?: Prisma.SortOrder
+  purchaseReceiptUrl?: Prisma.SortOrder
+  transferReceiptUrl?: Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  deliveryReceiptUrl?: Prisma.SortOrder
+  deliveryOrderReceiptUrl?: Prisma.SortOrder
+  moverAssigneeId?: Prisma.SortOrder
   requesterId?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.TicketCountOrderByAggregateInput
@@ -578,7 +578,7 @@ export type TicketScalarWhereWithAggregatesInput = {
   priority?: Prisma.EnumTicketPriorityWithAggregatesFilter<"Ticket"> | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusWithAggregatesFilter<"Ticket"> | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusWithAggregatesFilter<"Ticket"> | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Ticket"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.BigIntNullableWithAggregatesFilter<"Ticket"> | bigint | number | null
   requestedAmount?: Prisma.FloatNullableWithAggregatesFilter<"Ticket"> | number | null
   isApprovedByDirector?: Prisma.BoolWithAggregatesFilter<"Ticket"> | boolean
   attachmentUrl?: Prisma.StringNullableWithAggregatesFilter<"Ticket"> | string | null
@@ -612,7 +612,7 @@ export type TicketCreateInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -653,7 +653,7 @@ export type TicketUncheckedCreateInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -686,7 +686,6 @@ export type TicketUncheckedCreateInput = {
 }
 
 export type TicketUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -694,7 +693,7 @@ export type TicketUpdateInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -727,7 +726,6 @@ export type TicketUpdateInput = {
 }
 
 export type TicketUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -735,7 +733,7 @@ export type TicketUncheckedUpdateInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -776,7 +774,7 @@ export type TicketCreateManyInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -802,7 +800,6 @@ export type TicketCreateManyInput = {
 }
 
 export type TicketUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -810,7 +807,7 @@ export type TicketUpdateManyMutationInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -833,7 +830,6 @@ export type TicketUpdateManyMutationInput = {
 }
 
 export type TicketUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -841,7 +837,7 @@ export type TicketUncheckedUpdateManyInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1132,7 +1128,7 @@ export type TicketUpdateOneWithoutDirectStockPurchasesNestedInput = {
   create?: Prisma.XOR<Prisma.TicketCreateWithoutDirectStockPurchasesInput, Prisma.TicketUncheckedCreateWithoutDirectStockPurchasesInput>
   connectOrCreate?: Prisma.TicketCreateOrConnectWithoutDirectStockPurchasesInput
   upsert?: Prisma.TicketUpsertWithoutDirectStockPurchasesInput
-  disconnect?: Prisma.TicketWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.TicketWhereInput | boolean
   connect?: Prisma.TicketWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TicketUpdateToOneWithWhereWithoutDirectStockPurchasesInput, Prisma.TicketUpdateWithoutDirectStockPurchasesInput>, Prisma.TicketUncheckedUpdateWithoutDirectStockPurchasesInput>
@@ -1165,14 +1161,17 @@ export type TicketUpdatereceiptUrlsInput = {
 
 export type NullableEnumTicketRequestCategoryFieldUpdateOperationsInput = {
   set?: $Enums.TicketRequestCategory | null
+  unset?: boolean
 }
 
 export type NullableEnumTicketFieldCategoryFieldUpdateOperationsInput = {
   set?: $Enums.TicketFieldCategory | null
+  unset?: boolean
 }
 
 export type NullableEnumPOPaymentMethodFieldUpdateOperationsInput = {
   set?: $Enums.POPaymentMethod | null
+  unset?: boolean
 }
 
 export type TicketCreateNestedOneWithoutPurchaseOrdersInput = {
@@ -1185,7 +1184,7 @@ export type TicketUpdateOneWithoutPurchaseOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.TicketCreateWithoutPurchaseOrdersInput, Prisma.TicketUncheckedCreateWithoutPurchaseOrdersInput>
   connectOrCreate?: Prisma.TicketCreateOrConnectWithoutPurchaseOrdersInput
   upsert?: Prisma.TicketUpsertWithoutPurchaseOrdersInput
-  disconnect?: Prisma.TicketWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.TicketWhereInput | boolean
   connect?: Prisma.TicketWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TicketUpdateToOneWithWhereWithoutPurchaseOrdersInput, Prisma.TicketUpdateWithoutPurchaseOrdersInput>, Prisma.TicketUncheckedUpdateWithoutPurchaseOrdersInput>
@@ -1201,7 +1200,7 @@ export type TicketUpdateOneWithoutPaymentTransactionsNestedInput = {
   create?: Prisma.XOR<Prisma.TicketCreateWithoutPaymentTransactionsInput, Prisma.TicketUncheckedCreateWithoutPaymentTransactionsInput>
   connectOrCreate?: Prisma.TicketCreateOrConnectWithoutPaymentTransactionsInput
   upsert?: Prisma.TicketUpsertWithoutPaymentTransactionsInput
-  disconnect?: Prisma.TicketWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.TicketWhereInput | boolean
   connect?: Prisma.TicketWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TicketUpdateToOneWithWhereWithoutPaymentTransactionsInput, Prisma.TicketUpdateWithoutPaymentTransactionsInput>, Prisma.TicketUncheckedUpdateWithoutPaymentTransactionsInput>
@@ -1217,7 +1216,7 @@ export type TicketUpdateOneWithoutDeliveryOrdersNestedInput = {
   create?: Prisma.XOR<Prisma.TicketCreateWithoutDeliveryOrdersInput, Prisma.TicketUncheckedCreateWithoutDeliveryOrdersInput>
   connectOrCreate?: Prisma.TicketCreateOrConnectWithoutDeliveryOrdersInput
   upsert?: Prisma.TicketUpsertWithoutDeliveryOrdersInput
-  disconnect?: Prisma.TicketWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.TicketWhereInput | boolean
   connect?: Prisma.TicketWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.TicketUpdateToOneWithWhereWithoutDeliveryOrdersInput, Prisma.TicketUpdateWithoutDeliveryOrdersInput>, Prisma.TicketUncheckedUpdateWithoutDeliveryOrdersInput>
@@ -1274,7 +1273,7 @@ export type TicketCreateWithoutRequesterInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1314,7 +1313,7 @@ export type TicketUncheckedCreateWithoutRequesterInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1352,7 +1351,6 @@ export type TicketCreateOrConnectWithoutRequesterInput = {
 
 export type TicketCreateManyRequesterInputEnvelope = {
   data: Prisma.TicketCreateManyRequesterInput | Prisma.TicketCreateManyRequesterInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketCreateWithoutMoverAssigneeInput = {
@@ -1364,7 +1362,7 @@ export type TicketCreateWithoutMoverAssigneeInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1404,7 +1402,7 @@ export type TicketUncheckedCreateWithoutMoverAssigneeInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1442,7 +1440,6 @@ export type TicketCreateOrConnectWithoutMoverAssigneeInput = {
 
 export type TicketCreateManyMoverAssigneeInputEnvelope = {
   data: Prisma.TicketCreateManyMoverAssigneeInput | Prisma.TicketCreateManyMoverAssigneeInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketUpsertWithWhereUniqueWithoutRequesterInput = {
@@ -1473,7 +1470,7 @@ export type TicketScalarWhereInput = {
   priority?: Prisma.EnumTicketPriorityFilter<"Ticket"> | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFilter<"Ticket"> | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFilter<"Ticket"> | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.DecimalNullableFilter<"Ticket"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.BigIntNullableFilter<"Ticket"> | bigint | number | null
   requestedAmount?: Prisma.FloatNullableFilter<"Ticket"> | number | null
   isApprovedByDirector?: Prisma.BoolFilter<"Ticket"> | boolean
   attachmentUrl?: Prisma.StringNullableFilter<"Ticket"> | string | null
@@ -1523,7 +1520,7 @@ export type TicketCreateWithoutProjectInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1563,7 +1560,7 @@ export type TicketUncheckedCreateWithoutProjectInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1601,7 +1598,6 @@ export type TicketCreateOrConnectWithoutProjectInput = {
 
 export type TicketCreateManyProjectInputEnvelope = {
   data: Prisma.TicketCreateManyProjectInput | Prisma.TicketCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketUpsertWithWhereUniqueWithoutProjectInput = {
@@ -1629,7 +1625,7 @@ export type TicketCreateWithoutDirectStockPurchasesInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1669,7 +1665,7 @@ export type TicketUncheckedCreateWithoutDirectStockPurchasesInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1717,7 +1713,6 @@ export type TicketUpdateToOneWithWhereWithoutDirectStockPurchasesInput = {
 }
 
 export type TicketUpdateWithoutDirectStockPurchasesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1725,7 +1720,7 @@ export type TicketUpdateWithoutDirectStockPurchasesInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1757,7 +1752,6 @@ export type TicketUpdateWithoutDirectStockPurchasesInput = {
 }
 
 export type TicketUncheckedUpdateWithoutDirectStockPurchasesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1765,7 +1759,7 @@ export type TicketUncheckedUpdateWithoutDirectStockPurchasesInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1805,7 +1799,7 @@ export type TicketCreateWithoutPurchaseOrdersInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1845,7 +1839,7 @@ export type TicketUncheckedCreateWithoutPurchaseOrdersInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -1893,7 +1887,6 @@ export type TicketUpdateToOneWithWhereWithoutPurchaseOrdersInput = {
 }
 
 export type TicketUpdateWithoutPurchaseOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1901,7 +1894,7 @@ export type TicketUpdateWithoutPurchaseOrdersInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1933,7 +1926,6 @@ export type TicketUpdateWithoutPurchaseOrdersInput = {
 }
 
 export type TicketUncheckedUpdateWithoutPurchaseOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1941,7 +1933,7 @@ export type TicketUncheckedUpdateWithoutPurchaseOrdersInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1981,7 +1973,7 @@ export type TicketCreateWithoutPaymentTransactionsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2021,7 +2013,7 @@ export type TicketUncheckedCreateWithoutPaymentTransactionsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2069,7 +2061,6 @@ export type TicketUpdateToOneWithWhereWithoutPaymentTransactionsInput = {
 }
 
 export type TicketUpdateWithoutPaymentTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2077,7 +2068,7 @@ export type TicketUpdateWithoutPaymentTransactionsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2109,7 +2100,6 @@ export type TicketUpdateWithoutPaymentTransactionsInput = {
 }
 
 export type TicketUncheckedUpdateWithoutPaymentTransactionsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2117,7 +2107,7 @@ export type TicketUncheckedUpdateWithoutPaymentTransactionsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2157,7 +2147,7 @@ export type TicketCreateWithoutDeliveryOrdersInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2197,7 +2187,7 @@ export type TicketUncheckedCreateWithoutDeliveryOrdersInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2245,7 +2235,6 @@ export type TicketUpdateToOneWithWhereWithoutDeliveryOrdersInput = {
 }
 
 export type TicketUpdateWithoutDeliveryOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2253,7 +2242,7 @@ export type TicketUpdateWithoutDeliveryOrdersInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2285,7 +2274,6 @@ export type TicketUpdateWithoutDeliveryOrdersInput = {
 }
 
 export type TicketUncheckedUpdateWithoutDeliveryOrdersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2293,7 +2281,7 @@ export type TicketUncheckedUpdateWithoutDeliveryOrdersInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2333,7 +2321,7 @@ export type TicketCreateWithoutOperationalDocumentsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2373,7 +2361,7 @@ export type TicketUncheckedCreateWithoutOperationalDocumentsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2421,7 +2409,6 @@ export type TicketUpdateToOneWithWhereWithoutOperationalDocumentsInput = {
 }
 
 export type TicketUpdateWithoutOperationalDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2429,7 +2416,7 @@ export type TicketUpdateWithoutOperationalDocumentsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2461,7 +2448,6 @@ export type TicketUpdateWithoutOperationalDocumentsInput = {
 }
 
 export type TicketUncheckedUpdateWithoutOperationalDocumentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2469,7 +2455,7 @@ export type TicketUncheckedUpdateWithoutOperationalDocumentsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2509,7 +2495,7 @@ export type TicketCreateWithoutItemsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2549,7 +2535,7 @@ export type TicketUncheckedCreateWithoutItemsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2597,7 +2583,6 @@ export type TicketUpdateToOneWithWhereWithoutItemsInput = {
 }
 
 export type TicketUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2605,7 +2590,7 @@ export type TicketUpdateWithoutItemsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2637,7 +2622,6 @@ export type TicketUpdateWithoutItemsInput = {
 }
 
 export type TicketUncheckedUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2645,7 +2629,7 @@ export type TicketUncheckedUpdateWithoutItemsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2685,7 +2669,7 @@ export type TicketCreateWithoutAuditLogsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2725,7 +2709,7 @@ export type TicketUncheckedCreateWithoutAuditLogsInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2773,7 +2757,6 @@ export type TicketUpdateToOneWithWhereWithoutAuditLogsInput = {
 }
 
 export type TicketUpdateWithoutAuditLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2781,7 +2764,7 @@ export type TicketUpdateWithoutAuditLogsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2813,7 +2796,6 @@ export type TicketUpdateWithoutAuditLogsInput = {
 }
 
 export type TicketUncheckedUpdateWithoutAuditLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2821,7 +2803,7 @@ export type TicketUncheckedUpdateWithoutAuditLogsInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2861,7 +2843,7 @@ export type TicketCreateManyRequesterInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2894,7 +2876,7 @@ export type TicketCreateManyMoverAssigneeInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -2919,7 +2901,6 @@ export type TicketCreateManyMoverAssigneeInput = {
 }
 
 export type TicketUpdateWithoutRequesterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2927,7 +2908,7 @@ export type TicketUpdateWithoutRequesterInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2959,7 +2940,6 @@ export type TicketUpdateWithoutRequesterInput = {
 }
 
 export type TicketUncheckedUpdateWithoutRequesterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2967,7 +2947,7 @@ export type TicketUncheckedUpdateWithoutRequesterInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2999,7 +2979,6 @@ export type TicketUncheckedUpdateWithoutRequesterInput = {
 }
 
 export type TicketUncheckedUpdateManyWithoutRequesterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3007,7 +2986,7 @@ export type TicketUncheckedUpdateManyWithoutRequesterInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3032,7 +3011,6 @@ export type TicketUncheckedUpdateManyWithoutRequesterInput = {
 }
 
 export type TicketUpdateWithoutMoverAssigneeInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3040,7 +3018,7 @@ export type TicketUpdateWithoutMoverAssigneeInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3072,7 +3050,6 @@ export type TicketUpdateWithoutMoverAssigneeInput = {
 }
 
 export type TicketUncheckedUpdateWithoutMoverAssigneeInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3080,7 +3057,7 @@ export type TicketUncheckedUpdateWithoutMoverAssigneeInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3112,7 +3089,6 @@ export type TicketUncheckedUpdateWithoutMoverAssigneeInput = {
 }
 
 export type TicketUncheckedUpdateManyWithoutMoverAssigneeInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3120,7 +3096,7 @@ export type TicketUncheckedUpdateManyWithoutMoverAssigneeInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3153,7 +3129,7 @@ export type TicketCreateManyProjectInput = {
   priority?: $Enums.TicketPriority
   status?: $Enums.TicketStatus
   fulfillmentStatus?: $Enums.TicketFulfillmentStatus
-  totalAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: bigint | number | null
   requestedAmount?: number | null
   isApprovedByDirector?: boolean
   attachmentUrl?: string | null
@@ -3178,7 +3154,6 @@ export type TicketCreateManyProjectInput = {
 }
 
 export type TicketUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3186,7 +3161,7 @@ export type TicketUpdateWithoutProjectInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3218,7 +3193,6 @@ export type TicketUpdateWithoutProjectInput = {
 }
 
 export type TicketUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3226,7 +3200,7 @@ export type TicketUncheckedUpdateWithoutProjectInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3258,7 +3232,6 @@ export type TicketUncheckedUpdateWithoutProjectInput = {
 }
 
 export type TicketUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3266,7 +3239,7 @@ export type TicketUncheckedUpdateManyWithoutProjectInput = {
   priority?: Prisma.EnumTicketPriorityFieldUpdateOperationsInput | $Enums.TicketPriority
   status?: Prisma.EnumTicketStatusFieldUpdateOperationsInput | $Enums.TicketStatus
   fulfillmentStatus?: Prisma.EnumTicketFulfillmentStatusFieldUpdateOperationsInput | $Enums.TicketFulfillmentStatus
-  totalAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalAmount?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   requestedAmount?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   isApprovedByDirector?: Prisma.BoolFieldUpdateOperationsInput | boolean
   attachmentUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3420,79 +3393,7 @@ export type TicketSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   _count?: boolean | Prisma.TicketCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["ticket"]>
 
-export type TicketSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  ticketNumber?: boolean
-  title?: boolean
-  description?: boolean
-  type?: boolean
-  priority?: boolean
-  status?: boolean
-  fulfillmentStatus?: boolean
-  totalAmount?: boolean
-  requestedAmount?: boolean
-  isApprovedByDirector?: boolean
-  attachmentUrl?: boolean
-  receiptUrls?: boolean
-  paymentProofUrl?: boolean
-  requestCategory?: boolean
-  fieldCategory?: boolean
-  requestPaymentMethod?: boolean
-  requestPaymentDescription?: boolean
-  recipientName?: boolean
-  bankName?: boolean
-  accountNumber?: boolean
-  purchaseReceiptUrl?: boolean
-  transferReceiptUrl?: boolean
-  transferDestination?: boolean
-  deliveryReceiptUrl?: boolean
-  deliveryOrderReceiptUrl?: boolean
-  moverAssigneeId?: boolean
-  requesterId?: boolean
-  projectId?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  requester?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  moverAssignee?: boolean | Prisma.Ticket$moverAssigneeArgs<ExtArgs>
-  project?: boolean | Prisma.Ticket$projectArgs<ExtArgs>
-}, ExtArgs["result"]["ticket"]>
 
-export type TicketSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  ticketNumber?: boolean
-  title?: boolean
-  description?: boolean
-  type?: boolean
-  priority?: boolean
-  status?: boolean
-  fulfillmentStatus?: boolean
-  totalAmount?: boolean
-  requestedAmount?: boolean
-  isApprovedByDirector?: boolean
-  attachmentUrl?: boolean
-  receiptUrls?: boolean
-  paymentProofUrl?: boolean
-  requestCategory?: boolean
-  fieldCategory?: boolean
-  requestPaymentMethod?: boolean
-  requestPaymentDescription?: boolean
-  recipientName?: boolean
-  bankName?: boolean
-  accountNumber?: boolean
-  purchaseReceiptUrl?: boolean
-  transferReceiptUrl?: boolean
-  transferDestination?: boolean
-  deliveryReceiptUrl?: boolean
-  deliveryOrderReceiptUrl?: boolean
-  moverAssigneeId?: boolean
-  requesterId?: boolean
-  projectId?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  requester?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  moverAssignee?: boolean | Prisma.Ticket$moverAssigneeArgs<ExtArgs>
-  project?: boolean | Prisma.Ticket$projectArgs<ExtArgs>
-}, ExtArgs["result"]["ticket"]>
 
 export type TicketSelectScalar = {
   id?: boolean
@@ -3542,16 +3443,6 @@ export type TicketInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   deliveryOrders?: boolean | Prisma.Ticket$deliveryOrdersArgs<ExtArgs>
   _count?: boolean | Prisma.TicketCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type TicketIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  requester?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  moverAssignee?: boolean | Prisma.Ticket$moverAssigneeArgs<ExtArgs>
-  project?: boolean | Prisma.Ticket$projectArgs<ExtArgs>
-}
-export type TicketIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  requester?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  moverAssignee?: boolean | Prisma.Ticket$moverAssigneeArgs<ExtArgs>
-  project?: boolean | Prisma.Ticket$projectArgs<ExtArgs>
-}
 
 export type $TicketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Ticket"
@@ -3576,7 +3467,7 @@ export type $TicketPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     priority: $Enums.TicketPriority
     status: $Enums.TicketStatus
     fulfillmentStatus: $Enums.TicketFulfillmentStatus
-    totalAmount: runtime.Decimal | null
+    totalAmount: bigint | null
     requestedAmount: number | null
     isApprovedByDirector: boolean
     attachmentUrl: string | null
@@ -3717,30 +3608,6 @@ export interface TicketDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   createMany<T extends TicketCreateManyArgs>(args?: Prisma.SelectSubset<T, TicketCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Tickets and returns the data saved in the database.
-   * @param {TicketCreateManyAndReturnArgs} args - Arguments to create many Tickets.
-   * @example
-   * // Create many Tickets
-   * const ticket = await prisma.ticket.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Tickets and only return the `id`
-   * const ticketWithIdOnly = await prisma.ticket.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends TicketCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, TicketCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Ticket.
    * @param {TicketDeleteArgs} args - Arguments to delete one Ticket.
    * @example
@@ -3805,36 +3672,6 @@ export interface TicketDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   updateMany<T extends TicketUpdateManyArgs>(args: Prisma.SelectSubset<T, TicketUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Tickets and returns the data updated in the database.
-   * @param {TicketUpdateManyAndReturnArgs} args - Arguments to update many Tickets.
-   * @example
-   * // Update many Tickets
-   * const ticket = await prisma.ticket.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Tickets and only return the `id`
-   * const ticketWithIdOnly = await prisma.ticket.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends TicketUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, TicketUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Ticket.
    * @param {TicketUpsertArgs} args - Arguments to update or create a Ticket.
    * @example
@@ -3852,6 +3689,29 @@ export interface TicketDelegate<ExtArgs extends runtime.Types.Extensions.Interna
    * })
    */
   upsert<T extends TicketUpsertArgs>(args: Prisma.SelectSubset<T, TicketUpsertArgs<ExtArgs>>): Prisma.Prisma__TicketClient<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Tickets that matches the filter.
+   * @param {TicketFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const ticket = await prisma.ticket.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.TicketFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Ticket.
+   * @param {TicketAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const ticket = await prisma.ticket.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.TicketAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -4040,7 +3900,7 @@ export interface TicketFieldRefs {
   readonly priority: Prisma.FieldRef<"Ticket", 'TicketPriority'>
   readonly status: Prisma.FieldRef<"Ticket", 'TicketStatus'>
   readonly fulfillmentStatus: Prisma.FieldRef<"Ticket", 'TicketFulfillmentStatus'>
-  readonly totalAmount: Prisma.FieldRef<"Ticket", 'Decimal'>
+  readonly totalAmount: Prisma.FieldRef<"Ticket", 'BigInt'>
   readonly requestedAmount: Prisma.FieldRef<"Ticket", 'Float'>
   readonly isApprovedByDirector: Prisma.FieldRef<"Ticket", 'Boolean'>
   readonly attachmentUrl: Prisma.FieldRef<"Ticket", 'String'>
@@ -4259,11 +4119,6 @@ export type TicketFindManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Skip the first `n` Tickets.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Tickets.
-   */
   distinct?: Prisma.TicketScalarFieldEnum | Prisma.TicketScalarFieldEnum[]
 }
 
@@ -4297,30 +4152,6 @@ export type TicketCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many Tickets.
    */
   data: Prisma.TicketCreateManyInput | Prisma.TicketCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Ticket createManyAndReturn
- */
-export type TicketCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Ticket
-   */
-  select?: Prisma.TicketSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Ticket
-   */
-  omit?: Prisma.TicketOmit<ExtArgs> | null
-  /**
-   * The data used to create many Tickets.
-   */
-  data: Prisma.TicketCreateManyInput | Prisma.TicketCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TicketIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -4365,36 +4196,6 @@ export type TicketUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many Tickets to update.
    */
   limit?: number
-}
-
-/**
- * Ticket updateManyAndReturn
- */
-export type TicketUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Ticket
-   */
-  select?: Prisma.TicketSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Ticket
-   */
-  omit?: Prisma.TicketOmit<ExtArgs> | null
-  /**
-   * The data used to update Tickets.
-   */
-  data: Prisma.XOR<Prisma.TicketUpdateManyMutationInput, Prisma.TicketUncheckedUpdateManyInput>
-  /**
-   * Filter which Tickets to update
-   */
-  where?: Prisma.TicketWhereInput
-  /**
-   * Limit how many Tickets to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TicketIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -4461,6 +4262,34 @@ export type TicketDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many Tickets to delete.
    */
   limit?: number
+}
+
+/**
+ * Ticket findRaw
+ */
+export type TicketFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Ticket aggregateRaw
+ */
+export type TicketAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

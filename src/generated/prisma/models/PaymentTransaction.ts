@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -262,7 +262,7 @@ export type PaymentTransactionGroupByOutputType = {
   _max: PaymentTransactionMaxAggregateOutputType | null
 }
 
-export type GetPaymentTransactionGroupByPayload<T extends PaymentTransactionGroupByArgs> = Prisma.PrismaPromise<
+type GetPaymentTransactionGroupByPayload<T extends PaymentTransactionGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<PaymentTransactionGroupByOutputType, T['by']> &
       {
@@ -307,19 +307,19 @@ export type PaymentTransactionWhereInput = {
 
 export type PaymentTransactionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  poId?: Prisma.SortOrderInput | Prisma.SortOrder
-  ticketId?: Prisma.SortOrderInput | Prisma.SortOrder
-  directStockPurchaseId?: Prisma.SortOrderInput | Prisma.SortOrder
+  poId?: Prisma.SortOrder
+  ticketId?: Prisma.SortOrder
+  directStockPurchaseId?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   transferDestination?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  processedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofOfTransferUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  confirmationOrderNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentById?: Prisma.SortOrderInput | Prisma.SortOrder
+  processedById?: Prisma.SortOrder
+  proofOfTransferUrl?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
+  confirmationOrderNumber?: Prisma.SortOrder
+  vendorSentAt?: Prisma.SortOrder
+  vendorSentById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   po?: Prisma.PurchaseOrderOrderByWithRelationInput
   ticket?: Prisma.TicketOrderByWithRelationInput
@@ -360,19 +360,19 @@ export type PaymentTransactionWhereUniqueInput = Prisma.AtLeast<{
 
 export type PaymentTransactionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  poId?: Prisma.SortOrderInput | Prisma.SortOrder
-  ticketId?: Prisma.SortOrderInput | Prisma.SortOrder
-  directStockPurchaseId?: Prisma.SortOrderInput | Prisma.SortOrder
+  poId?: Prisma.SortOrder
+  ticketId?: Prisma.SortOrder
+  directStockPurchaseId?: Prisma.SortOrder
   paymentType?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   transferDestination?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  processedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofOfTransferUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  confirmationOrderNumber?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentById?: Prisma.SortOrderInput | Prisma.SortOrder
+  processedById?: Prisma.SortOrder
+  proofOfTransferUrl?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
+  confirmationOrderNumber?: Prisma.SortOrder
+  vendorSentAt?: Prisma.SortOrder
+  vendorSentById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.PaymentTransactionCountOrderByAggregateInput
   _avg?: Prisma.PaymentTransactionAvgOrderByAggregateInput
@@ -443,7 +443,6 @@ export type PaymentTransactionUncheckedCreateInput = {
 }
 
 export type PaymentTransactionUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -463,7 +462,6 @@ export type PaymentTransactionUpdateInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -501,7 +499,6 @@ export type PaymentTransactionCreateManyInput = {
 }
 
 export type PaymentTransactionUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -514,7 +511,6 @@ export type PaymentTransactionUpdateManyMutationInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -836,7 +832,7 @@ export type PaymentTransactionUpdateOneWithoutCashflowNestedInput = {
   create?: Prisma.XOR<Prisma.PaymentTransactionCreateWithoutCashflowInput, Prisma.PaymentTransactionUncheckedCreateWithoutCashflowInput>
   connectOrCreate?: Prisma.PaymentTransactionCreateOrConnectWithoutCashflowInput
   upsert?: Prisma.PaymentTransactionUpsertWithoutCashflowInput
-  disconnect?: Prisma.PaymentTransactionWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.PaymentTransactionWhereInput | boolean
   connect?: Prisma.PaymentTransactionWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PaymentTransactionUpdateToOneWithWhereWithoutCashflowInput, Prisma.PaymentTransactionUpdateWithoutCashflowInput>, Prisma.PaymentTransactionUncheckedUpdateWithoutCashflowInput>
@@ -852,7 +848,7 @@ export type PaymentTransactionUpdateOneWithoutOrderConfirmationNestedInput = {
   create?: Prisma.XOR<Prisma.PaymentTransactionCreateWithoutOrderConfirmationInput, Prisma.PaymentTransactionUncheckedCreateWithoutOrderConfirmationInput>
   connectOrCreate?: Prisma.PaymentTransactionCreateOrConnectWithoutOrderConfirmationInput
   upsert?: Prisma.PaymentTransactionUpsertWithoutOrderConfirmationInput
-  disconnect?: Prisma.PaymentTransactionWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.PaymentTransactionWhereInput | boolean
   connect?: Prisma.PaymentTransactionWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PaymentTransactionUpdateToOneWithWhereWithoutOrderConfirmationInput, Prisma.PaymentTransactionUpdateWithoutOrderConfirmationInput>, Prisma.PaymentTransactionUncheckedUpdateWithoutOrderConfirmationInput>
@@ -903,7 +899,6 @@ export type PaymentTransactionCreateOrConnectWithoutProcessedByInput = {
 
 export type PaymentTransactionCreateManyProcessedByInputEnvelope = {
   data: Prisma.PaymentTransactionCreateManyProcessedByInput | Prisma.PaymentTransactionCreateManyProcessedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PaymentTransactionCreateWithoutVendorSentByInput = {
@@ -951,7 +946,6 @@ export type PaymentTransactionCreateOrConnectWithoutVendorSentByInput = {
 
 export type PaymentTransactionCreateManyVendorSentByInputEnvelope = {
   data: Prisma.PaymentTransactionCreateManyVendorSentByInput | Prisma.PaymentTransactionCreateManyVendorSentByInput[]
-  skipDuplicates?: boolean
 }
 
 export type PaymentTransactionUpsertWithWhereUniqueWithoutProcessedByInput = {
@@ -1052,7 +1046,6 @@ export type PaymentTransactionCreateOrConnectWithoutDirectStockPurchaseInput = {
 
 export type PaymentTransactionCreateManyDirectStockPurchaseInputEnvelope = {
   data: Prisma.PaymentTransactionCreateManyDirectStockPurchaseInput | Prisma.PaymentTransactionCreateManyDirectStockPurchaseInput[]
-  skipDuplicates?: boolean
 }
 
 export type PaymentTransactionUpsertWithWhereUniqueWithoutDirectStockPurchaseInput = {
@@ -1116,7 +1109,6 @@ export type PaymentTransactionCreateOrConnectWithoutTicketInput = {
 
 export type PaymentTransactionCreateManyTicketInputEnvelope = {
   data: Prisma.PaymentTransactionCreateManyTicketInput | Prisma.PaymentTransactionCreateManyTicketInput[]
-  skipDuplicates?: boolean
 }
 
 export type PaymentTransactionUpsertWithWhereUniqueWithoutTicketInput = {
@@ -1180,7 +1172,6 @@ export type PaymentTransactionCreateOrConnectWithoutPoInput = {
 
 export type PaymentTransactionCreateManyPoInputEnvelope = {
   data: Prisma.PaymentTransactionCreateManyPoInput | Prisma.PaymentTransactionCreateManyPoInput[]
-  skipDuplicates?: boolean
 }
 
 export type PaymentTransactionUpsertWithWhereUniqueWithoutPoInput = {
@@ -1254,7 +1245,6 @@ export type PaymentTransactionUpdateToOneWithWhereWithoutCashflowInput = {
 }
 
 export type PaymentTransactionUpdateWithoutCashflowInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1273,7 +1263,6 @@ export type PaymentTransactionUpdateWithoutCashflowInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutCashflowInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1346,7 +1335,6 @@ export type PaymentTransactionUpdateToOneWithWhereWithoutOrderConfirmationInput 
 }
 
 export type PaymentTransactionUpdateWithoutOrderConfirmationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1365,7 +1353,6 @@ export type PaymentTransactionUpdateWithoutOrderConfirmationInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutOrderConfirmationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1418,7 +1405,6 @@ export type PaymentTransactionCreateManyVendorSentByInput = {
 }
 
 export type PaymentTransactionUpdateWithoutProcessedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1437,7 +1423,6 @@ export type PaymentTransactionUpdateWithoutProcessedByInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutProcessedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1456,7 +1441,6 @@ export type PaymentTransactionUncheckedUpdateWithoutProcessedByInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateManyWithoutProcessedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1473,7 +1457,6 @@ export type PaymentTransactionUncheckedUpdateManyWithoutProcessedByInput = {
 }
 
 export type PaymentTransactionUpdateWithoutVendorSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1492,7 +1475,6 @@ export type PaymentTransactionUpdateWithoutVendorSentByInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutVendorSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1511,7 +1493,6 @@ export type PaymentTransactionUncheckedUpdateWithoutVendorSentByInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateManyWithoutVendorSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1545,7 +1526,6 @@ export type PaymentTransactionCreateManyDirectStockPurchaseInput = {
 }
 
 export type PaymentTransactionUpdateWithoutDirectStockPurchaseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1564,7 +1544,6 @@ export type PaymentTransactionUpdateWithoutDirectStockPurchaseInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutDirectStockPurchaseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
@@ -1583,7 +1562,6 @@ export type PaymentTransactionUncheckedUpdateWithoutDirectStockPurchaseInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateManyWithoutDirectStockPurchaseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
@@ -1617,7 +1595,6 @@ export type PaymentTransactionCreateManyTicketInput = {
 }
 
 export type PaymentTransactionUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1636,7 +1613,6 @@ export type PaymentTransactionUpdateWithoutTicketInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
@@ -1655,7 +1631,6 @@ export type PaymentTransactionUncheckedUpdateWithoutTicketInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateManyWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
@@ -1689,7 +1664,6 @@ export type PaymentTransactionCreateManyPoInput = {
 }
 
 export type PaymentTransactionUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   transferDestination?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1708,7 +1682,6 @@ export type PaymentTransactionUpdateWithoutPoInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
@@ -1727,7 +1700,6 @@ export type PaymentTransactionUncheckedUpdateWithoutPoInput = {
 }
 
 export type PaymentTransactionUncheckedUpdateManyWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   directStockPurchaseId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
@@ -1770,51 +1742,7 @@ export type PaymentTransactionSelect<ExtArgs extends runtime.Types.Extensions.In
   cashflow?: boolean | Prisma.PaymentTransaction$cashflowArgs<ExtArgs>
 }, ExtArgs["result"]["paymentTransaction"]>
 
-export type PaymentTransactionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  poId?: boolean
-  ticketId?: boolean
-  directStockPurchaseId?: boolean
-  paymentType?: boolean
-  amount?: boolean
-  transferDestination?: boolean
-  status?: boolean
-  processedById?: boolean
-  proofOfTransferUrl?: boolean
-  paidAt?: boolean
-  confirmationOrderNumber?: boolean
-  vendorSentAt?: boolean
-  vendorSentById?: boolean
-  createdAt?: boolean
-  po?: boolean | Prisma.PaymentTransaction$poArgs<ExtArgs>
-  ticket?: boolean | Prisma.PaymentTransaction$ticketArgs<ExtArgs>
-  directStockPurchase?: boolean | Prisma.PaymentTransaction$directStockPurchaseArgs<ExtArgs>
-  processedBy?: boolean | Prisma.PaymentTransaction$processedByArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.PaymentTransaction$vendorSentByArgs<ExtArgs>
-}, ExtArgs["result"]["paymentTransaction"]>
 
-export type PaymentTransactionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  poId?: boolean
-  ticketId?: boolean
-  directStockPurchaseId?: boolean
-  paymentType?: boolean
-  amount?: boolean
-  transferDestination?: boolean
-  status?: boolean
-  processedById?: boolean
-  proofOfTransferUrl?: boolean
-  paidAt?: boolean
-  confirmationOrderNumber?: boolean
-  vendorSentAt?: boolean
-  vendorSentById?: boolean
-  createdAt?: boolean
-  po?: boolean | Prisma.PaymentTransaction$poArgs<ExtArgs>
-  ticket?: boolean | Prisma.PaymentTransaction$ticketArgs<ExtArgs>
-  directStockPurchase?: boolean | Prisma.PaymentTransaction$directStockPurchaseArgs<ExtArgs>
-  processedBy?: boolean | Prisma.PaymentTransaction$processedByArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.PaymentTransaction$vendorSentByArgs<ExtArgs>
-}, ExtArgs["result"]["paymentTransaction"]>
 
 export type PaymentTransactionSelectScalar = {
   id?: boolean
@@ -1843,20 +1771,6 @@ export type PaymentTransactionInclude<ExtArgs extends runtime.Types.Extensions.I
   vendorSentBy?: boolean | Prisma.PaymentTransaction$vendorSentByArgs<ExtArgs>
   orderConfirmation?: boolean | Prisma.PaymentTransaction$orderConfirmationArgs<ExtArgs>
   cashflow?: boolean | Prisma.PaymentTransaction$cashflowArgs<ExtArgs>
-}
-export type PaymentTransactionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.PaymentTransaction$poArgs<ExtArgs>
-  ticket?: boolean | Prisma.PaymentTransaction$ticketArgs<ExtArgs>
-  directStockPurchase?: boolean | Prisma.PaymentTransaction$directStockPurchaseArgs<ExtArgs>
-  processedBy?: boolean | Prisma.PaymentTransaction$processedByArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.PaymentTransaction$vendorSentByArgs<ExtArgs>
-}
-export type PaymentTransactionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.PaymentTransaction$poArgs<ExtArgs>
-  ticket?: boolean | Prisma.PaymentTransaction$ticketArgs<ExtArgs>
-  directStockPurchase?: boolean | Prisma.PaymentTransaction$directStockPurchaseArgs<ExtArgs>
-  processedBy?: boolean | Prisma.PaymentTransaction$processedByArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.PaymentTransaction$vendorSentByArgs<ExtArgs>
 }
 
 export type $PaymentTransactionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2004,30 +1918,6 @@ export interface PaymentTransactionDelegate<ExtArgs extends runtime.Types.Extens
   createMany<T extends PaymentTransactionCreateManyArgs>(args?: Prisma.SelectSubset<T, PaymentTransactionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many PaymentTransactions and returns the data saved in the database.
-   * @param {PaymentTransactionCreateManyAndReturnArgs} args - Arguments to create many PaymentTransactions.
-   * @example
-   * // Create many PaymentTransactions
-   * const paymentTransaction = await prisma.paymentTransaction.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many PaymentTransactions and only return the `id`
-   * const paymentTransactionWithIdOnly = await prisma.paymentTransaction.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends PaymentTransactionCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, PaymentTransactionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentTransactionPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a PaymentTransaction.
    * @param {PaymentTransactionDeleteArgs} args - Arguments to delete one PaymentTransaction.
    * @example
@@ -2092,36 +1982,6 @@ export interface PaymentTransactionDelegate<ExtArgs extends runtime.Types.Extens
   updateMany<T extends PaymentTransactionUpdateManyArgs>(args: Prisma.SelectSubset<T, PaymentTransactionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more PaymentTransactions and returns the data updated in the database.
-   * @param {PaymentTransactionUpdateManyAndReturnArgs} args - Arguments to update many PaymentTransactions.
-   * @example
-   * // Update many PaymentTransactions
-   * const paymentTransaction = await prisma.paymentTransaction.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more PaymentTransactions and only return the `id`
-   * const paymentTransactionWithIdOnly = await prisma.paymentTransaction.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends PaymentTransactionUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, PaymentTransactionUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentTransactionPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one PaymentTransaction.
    * @param {PaymentTransactionUpsertArgs} args - Arguments to update or create a PaymentTransaction.
    * @example
@@ -2139,6 +1999,29 @@ export interface PaymentTransactionDelegate<ExtArgs extends runtime.Types.Extens
    * })
    */
   upsert<T extends PaymentTransactionUpsertArgs>(args: Prisma.SelectSubset<T, PaymentTransactionUpsertArgs<ExtArgs>>): Prisma.Prisma__PaymentTransactionClient<runtime.Types.Result.GetResult<Prisma.$PaymentTransactionPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more PaymentTransactions that matches the filter.
+   * @param {PaymentTransactionFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const paymentTransaction = await prisma.paymentTransaction.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.PaymentTransactionFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a PaymentTransaction.
+   * @param {PaymentTransactionAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const paymentTransaction = await prisma.paymentTransaction.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.PaymentTransactionAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2527,11 +2410,6 @@ export type PaymentTransactionFindManyArgs<ExtArgs extends runtime.Types.Extensi
    * Skip the first `n` PaymentTransactions.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of PaymentTransactions.
-   */
   distinct?: Prisma.PaymentTransactionScalarFieldEnum | Prisma.PaymentTransactionScalarFieldEnum[]
 }
 
@@ -2565,30 +2443,6 @@ export type PaymentTransactionCreateManyArgs<ExtArgs extends runtime.Types.Exten
    * The data used to create many PaymentTransactions.
    */
   data: Prisma.PaymentTransactionCreateManyInput | Prisma.PaymentTransactionCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * PaymentTransaction createManyAndReturn
- */
-export type PaymentTransactionCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PaymentTransaction
-   */
-  select?: Prisma.PaymentTransactionSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the PaymentTransaction
-   */
-  omit?: Prisma.PaymentTransactionOmit<ExtArgs> | null
-  /**
-   * The data used to create many PaymentTransactions.
-   */
-  data: Prisma.PaymentTransactionCreateManyInput | Prisma.PaymentTransactionCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.PaymentTransactionIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2633,36 +2487,6 @@ export type PaymentTransactionUpdateManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many PaymentTransactions to update.
    */
   limit?: number
-}
-
-/**
- * PaymentTransaction updateManyAndReturn
- */
-export type PaymentTransactionUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PaymentTransaction
-   */
-  select?: Prisma.PaymentTransactionSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the PaymentTransaction
-   */
-  omit?: Prisma.PaymentTransactionOmit<ExtArgs> | null
-  /**
-   * The data used to update PaymentTransactions.
-   */
-  data: Prisma.XOR<Prisma.PaymentTransactionUpdateManyMutationInput, Prisma.PaymentTransactionUncheckedUpdateManyInput>
-  /**
-   * Filter which PaymentTransactions to update
-   */
-  where?: Prisma.PaymentTransactionWhereInput
-  /**
-   * Limit how many PaymentTransactions to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.PaymentTransactionIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2729,6 +2553,34 @@ export type PaymentTransactionDeleteManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many PaymentTransactions to delete.
    */
   limit?: number
+}
+
+/**
+ * PaymentTransaction findRaw
+ */
+export type PaymentTransactionFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * PaymentTransaction aggregateRaw
+ */
+export type PaymentTransactionAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

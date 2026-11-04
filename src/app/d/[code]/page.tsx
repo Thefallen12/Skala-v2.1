@@ -11,6 +11,7 @@ import { projectSiteName } from "@/lib/documents/project-site-name";
 import { isValidPublicCode } from "@/lib/documents/random-code";
 import { resolvePublicAppUrl } from "@/lib/documents/public-app-url";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const metadata: Metadata = {
   title: "Dokumen Operasional Skala Prioritas",
@@ -365,7 +366,9 @@ export default async function OrderEditPage({
           canAssignVehicle={canAssignVehicle}
           availableVehicles={availableVehicles.map((vehicle) => ({
             ...vehicle,
-            currentKilometer: vehicle.currentKilometer.toString(),
+            currentKilometer: decimalStringFromScaledInteger(
+              vehicle.currentKilometer,
+            ),
           }))}
           items={deliveryOrder.items.map((item) => ({
             ...item,

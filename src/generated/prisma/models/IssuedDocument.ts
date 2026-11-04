@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -172,7 +172,7 @@ export type IssuedDocumentGroupByOutputType = {
   _max: IssuedDocumentMaxAggregateOutputType | null
 }
 
-export type GetIssuedDocumentGroupByPayload<T extends IssuedDocumentGroupByArgs> = Prisma.PrismaPromise<
+type GetIssuedDocumentGroupByPayload<T extends IssuedDocumentGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<IssuedDocumentGroupByOutputType, T['by']> &
       {
@@ -206,7 +206,7 @@ export type IssuedDocumentOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   documentNumber?: Prisma.SortOrder
   templateId?: Prisma.SortOrder
-  relatedRecordId?: Prisma.SortOrderInput | Prisma.SortOrder
+  relatedRecordId?: Prisma.SortOrder
   issuedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -233,7 +233,7 @@ export type IssuedDocumentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   documentNumber?: Prisma.SortOrder
   templateId?: Prisma.SortOrder
-  relatedRecordId?: Prisma.SortOrderInput | Prisma.SortOrder
+  relatedRecordId?: Prisma.SortOrder
   issuedById?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -276,7 +276,6 @@ export type IssuedDocumentUncheckedCreateInput = {
 }
 
 export type IssuedDocumentUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -286,7 +285,6 @@ export type IssuedDocumentUpdateInput = {
 }
 
 export type IssuedDocumentUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   templateId?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -306,7 +304,6 @@ export type IssuedDocumentCreateManyInput = {
 }
 
 export type IssuedDocumentUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -314,7 +311,6 @@ export type IssuedDocumentUpdateManyMutationInput = {
 }
 
 export type IssuedDocumentUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   templateId?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -472,7 +468,6 @@ export type IssuedDocumentCreateOrConnectWithoutIssuerInput = {
 
 export type IssuedDocumentCreateManyIssuerInputEnvelope = {
   data: Prisma.IssuedDocumentCreateManyIssuerInput | Prisma.IssuedDocumentCreateManyIssuerInput[]
-  skipDuplicates?: boolean
 }
 
 export type IssuedDocumentUpsertWithWhereUniqueWithoutIssuerInput = {
@@ -529,7 +524,6 @@ export type IssuedDocumentCreateOrConnectWithoutTemplateInput = {
 
 export type IssuedDocumentCreateManyTemplateInputEnvelope = {
   data: Prisma.IssuedDocumentCreateManyTemplateInput | Prisma.IssuedDocumentCreateManyTemplateInput[]
-  skipDuplicates?: boolean
 }
 
 export type IssuedDocumentUpsertWithWhereUniqueWithoutTemplateInput = {
@@ -558,7 +552,6 @@ export type IssuedDocumentCreateManyIssuerInput = {
 }
 
 export type IssuedDocumentUpdateWithoutIssuerInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -567,7 +560,6 @@ export type IssuedDocumentUpdateWithoutIssuerInput = {
 }
 
 export type IssuedDocumentUncheckedUpdateWithoutIssuerInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   templateId?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -576,7 +568,6 @@ export type IssuedDocumentUncheckedUpdateWithoutIssuerInput = {
 }
 
 export type IssuedDocumentUncheckedUpdateManyWithoutIssuerInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   templateId?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -594,7 +585,6 @@ export type IssuedDocumentCreateManyTemplateInput = {
 }
 
 export type IssuedDocumentUpdateWithoutTemplateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -603,7 +593,6 @@ export type IssuedDocumentUpdateWithoutTemplateInput = {
 }
 
 export type IssuedDocumentUncheckedUpdateWithoutTemplateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   issuedById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -612,7 +601,6 @@ export type IssuedDocumentUncheckedUpdateWithoutTemplateInput = {
 }
 
 export type IssuedDocumentUncheckedUpdateManyWithoutTemplateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   documentNumber?: Prisma.StringFieldUpdateOperationsInput | string
   relatedRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   issuedById?: Prisma.StringFieldUpdateOperationsInput | string
@@ -634,29 +622,7 @@ export type IssuedDocumentSelect<ExtArgs extends runtime.Types.Extensions.Intern
   issuer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["issuedDocument"]>
 
-export type IssuedDocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  documentNumber?: boolean
-  templateId?: boolean
-  relatedRecordId?: boolean
-  issuedById?: boolean
-  status?: boolean
-  createdAt?: boolean
-  template?: boolean | Prisma.DocumentTemplateDefaultArgs<ExtArgs>
-  issuer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["issuedDocument"]>
 
-export type IssuedDocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  documentNumber?: boolean
-  templateId?: boolean
-  relatedRecordId?: boolean
-  issuedById?: boolean
-  status?: boolean
-  createdAt?: boolean
-  template?: boolean | Prisma.DocumentTemplateDefaultArgs<ExtArgs>
-  issuer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["issuedDocument"]>
 
 export type IssuedDocumentSelectScalar = {
   id?: boolean
@@ -670,14 +636,6 @@ export type IssuedDocumentSelectScalar = {
 
 export type IssuedDocumentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "documentNumber" | "templateId" | "relatedRecordId" | "issuedById" | "status" | "createdAt", ExtArgs["result"]["issuedDocument"]>
 export type IssuedDocumentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  template?: boolean | Prisma.DocumentTemplateDefaultArgs<ExtArgs>
-  issuer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type IssuedDocumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  template?: boolean | Prisma.DocumentTemplateDefaultArgs<ExtArgs>
-  issuer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type IssuedDocumentIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   template?: boolean | Prisma.DocumentTemplateDefaultArgs<ExtArgs>
   issuer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -814,30 +772,6 @@ export interface IssuedDocumentDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends IssuedDocumentCreateManyArgs>(args?: Prisma.SelectSubset<T, IssuedDocumentCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many IssuedDocuments and returns the data saved in the database.
-   * @param {IssuedDocumentCreateManyAndReturnArgs} args - Arguments to create many IssuedDocuments.
-   * @example
-   * // Create many IssuedDocuments
-   * const issuedDocument = await prisma.issuedDocument.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many IssuedDocuments and only return the `id`
-   * const issuedDocumentWithIdOnly = await prisma.issuedDocument.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends IssuedDocumentCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, IssuedDocumentCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$IssuedDocumentPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a IssuedDocument.
    * @param {IssuedDocumentDeleteArgs} args - Arguments to delete one IssuedDocument.
    * @example
@@ -902,36 +836,6 @@ export interface IssuedDocumentDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends IssuedDocumentUpdateManyArgs>(args: Prisma.SelectSubset<T, IssuedDocumentUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more IssuedDocuments and returns the data updated in the database.
-   * @param {IssuedDocumentUpdateManyAndReturnArgs} args - Arguments to update many IssuedDocuments.
-   * @example
-   * // Update many IssuedDocuments
-   * const issuedDocument = await prisma.issuedDocument.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more IssuedDocuments and only return the `id`
-   * const issuedDocumentWithIdOnly = await prisma.issuedDocument.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends IssuedDocumentUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, IssuedDocumentUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$IssuedDocumentPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one IssuedDocument.
    * @param {IssuedDocumentUpsertArgs} args - Arguments to update or create a IssuedDocument.
    * @example
@@ -949,6 +853,29 @@ export interface IssuedDocumentDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends IssuedDocumentUpsertArgs>(args: Prisma.SelectSubset<T, IssuedDocumentUpsertArgs<ExtArgs>>): Prisma.Prisma__IssuedDocumentClient<runtime.Types.Result.GetResult<Prisma.$IssuedDocumentPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more IssuedDocuments that matches the filter.
+   * @param {IssuedDocumentFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const issuedDocument = await prisma.issuedDocument.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.IssuedDocumentFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a IssuedDocument.
+   * @param {IssuedDocumentAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const issuedDocument = await prisma.issuedDocument.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.IssuedDocumentAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1324,11 +1251,6 @@ export type IssuedDocumentFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` IssuedDocuments.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of IssuedDocuments.
-   */
   distinct?: Prisma.IssuedDocumentScalarFieldEnum | Prisma.IssuedDocumentScalarFieldEnum[]
 }
 
@@ -1362,30 +1284,6 @@ export type IssuedDocumentCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many IssuedDocuments.
    */
   data: Prisma.IssuedDocumentCreateManyInput | Prisma.IssuedDocumentCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * IssuedDocument createManyAndReturn
- */
-export type IssuedDocumentCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the IssuedDocument
-   */
-  select?: Prisma.IssuedDocumentSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the IssuedDocument
-   */
-  omit?: Prisma.IssuedDocumentOmit<ExtArgs> | null
-  /**
-   * The data used to create many IssuedDocuments.
-   */
-  data: Prisma.IssuedDocumentCreateManyInput | Prisma.IssuedDocumentCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.IssuedDocumentIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1430,36 +1328,6 @@ export type IssuedDocumentUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many IssuedDocuments to update.
    */
   limit?: number
-}
-
-/**
- * IssuedDocument updateManyAndReturn
- */
-export type IssuedDocumentUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the IssuedDocument
-   */
-  select?: Prisma.IssuedDocumentSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the IssuedDocument
-   */
-  omit?: Prisma.IssuedDocumentOmit<ExtArgs> | null
-  /**
-   * The data used to update IssuedDocuments.
-   */
-  data: Prisma.XOR<Prisma.IssuedDocumentUpdateManyMutationInput, Prisma.IssuedDocumentUncheckedUpdateManyInput>
-  /**
-   * Filter which IssuedDocuments to update
-   */
-  where?: Prisma.IssuedDocumentWhereInput
-  /**
-   * Limit how many IssuedDocuments to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.IssuedDocumentIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1526,6 +1394,34 @@ export type IssuedDocumentDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many IssuedDocuments to delete.
    */
   limit?: number
+}
+
+/**
+ * IssuedDocument findRaw
+ */
+export type IssuedDocumentFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * IssuedDocument aggregateRaw
+ */
+export type IssuedDocumentAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

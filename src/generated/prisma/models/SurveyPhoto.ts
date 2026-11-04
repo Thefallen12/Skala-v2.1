@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -224,7 +224,7 @@ export type SurveyPhotoGroupByOutputType = {
   _max: SurveyPhotoMaxAggregateOutputType | null
 }
 
-export type GetSurveyPhotoGroupByPayload<T extends SurveyPhotoGroupByArgs> = Prisma.PrismaPromise<
+type GetSurveyPhotoGroupByPayload<T extends SurveyPhotoGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<SurveyPhotoGroupByOutputType, T['by']> &
       {
@@ -259,7 +259,7 @@ export type SurveyPhotoWhereInput = {
 export type SurveyPhotoOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   surveyId?: Prisma.SortOrder
-  featureId?: Prisma.SortOrderInput | Prisma.SortOrder
+  featureId?: Prisma.SortOrder
   url?: Prisma.SortOrder
   caption?: Prisma.SortOrder
   latitude?: Prisma.SortOrder
@@ -290,7 +290,7 @@ export type SurveyPhotoWhereUniqueInput = Prisma.AtLeast<{
 export type SurveyPhotoOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   surveyId?: Prisma.SortOrder
-  featureId?: Prisma.SortOrderInput | Prisma.SortOrder
+  featureId?: Prisma.SortOrder
   url?: Prisma.SortOrder
   caption?: Prisma.SortOrder
   latitude?: Prisma.SortOrder
@@ -344,7 +344,6 @@ export type SurveyPhotoUncheckedCreateInput = {
 }
 
 export type SurveyPhotoUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
   latitude?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -356,7 +355,6 @@ export type SurveyPhotoUpdateInput = {
 }
 
 export type SurveyPhotoUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   featureId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   url?: Prisma.StringFieldUpdateOperationsInput | string
@@ -380,7 +378,6 @@ export type SurveyPhotoCreateManyInput = {
 }
 
 export type SurveyPhotoUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
   latitude?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -390,7 +387,6 @@ export type SurveyPhotoUpdateManyMutationInput = {
 }
 
 export type SurveyPhotoUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   featureId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   url?: Prisma.StringFieldUpdateOperationsInput | string
@@ -570,7 +566,6 @@ export type SurveyPhotoCreateOrConnectWithoutSurveyInput = {
 
 export type SurveyPhotoCreateManySurveyInputEnvelope = {
   data: Prisma.SurveyPhotoCreateManySurveyInput | Prisma.SurveyPhotoCreateManySurveyInput[]
-  skipDuplicates?: boolean
 }
 
 export type SurveyPhotoUpsertWithWhereUniqueWithoutSurveyInput = {
@@ -633,7 +628,6 @@ export type SurveyPhotoCreateOrConnectWithoutFeatureInput = {
 
 export type SurveyPhotoCreateManyFeatureInputEnvelope = {
   data: Prisma.SurveyPhotoCreateManyFeatureInput | Prisma.SurveyPhotoCreateManyFeatureInput[]
-  skipDuplicates?: boolean
 }
 
 export type SurveyPhotoUpsertWithWhereUniqueWithoutFeatureInput = {
@@ -664,7 +658,6 @@ export type SurveyPhotoCreateManySurveyInput = {
 }
 
 export type SurveyPhotoUpdateWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
   latitude?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -675,7 +668,6 @@ export type SurveyPhotoUpdateWithoutSurveyInput = {
 }
 
 export type SurveyPhotoUncheckedUpdateWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
@@ -686,7 +678,6 @@ export type SurveyPhotoUncheckedUpdateWithoutSurveyInput = {
 }
 
 export type SurveyPhotoUncheckedUpdateManyWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
@@ -708,7 +699,6 @@ export type SurveyPhotoCreateManyFeatureInput = {
 }
 
 export type SurveyPhotoUpdateWithoutFeatureInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
   latitude?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -719,7 +709,6 @@ export type SurveyPhotoUpdateWithoutFeatureInput = {
 }
 
 export type SurveyPhotoUncheckedUpdateWithoutFeatureInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
@@ -730,7 +719,6 @@ export type SurveyPhotoUncheckedUpdateWithoutFeatureInput = {
 }
 
 export type SurveyPhotoUncheckedUpdateManyWithoutFeatureInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   caption?: Prisma.StringFieldUpdateOperationsInput | string
@@ -756,33 +744,7 @@ export type SurveyPhotoSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   feature?: boolean | Prisma.SurveyPhoto$featureArgs<ExtArgs>
 }, ExtArgs["result"]["surveyPhoto"]>
 
-export type SurveyPhotoSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  surveyId?: boolean
-  featureId?: boolean
-  url?: boolean
-  caption?: boolean
-  latitude?: boolean
-  longitude?: boolean
-  capturedAt?: boolean
-  createdAt?: boolean
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-  feature?: boolean | Prisma.SurveyPhoto$featureArgs<ExtArgs>
-}, ExtArgs["result"]["surveyPhoto"]>
 
-export type SurveyPhotoSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  surveyId?: boolean
-  featureId?: boolean
-  url?: boolean
-  caption?: boolean
-  latitude?: boolean
-  longitude?: boolean
-  capturedAt?: boolean
-  createdAt?: boolean
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-  feature?: boolean | Prisma.SurveyPhoto$featureArgs<ExtArgs>
-}, ExtArgs["result"]["surveyPhoto"]>
 
 export type SurveyPhotoSelectScalar = {
   id?: boolean
@@ -798,14 +760,6 @@ export type SurveyPhotoSelectScalar = {
 
 export type SurveyPhotoOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "surveyId" | "featureId" | "url" | "caption" | "latitude" | "longitude" | "capturedAt" | "createdAt", ExtArgs["result"]["surveyPhoto"]>
 export type SurveyPhotoInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-  feature?: boolean | Prisma.SurveyPhoto$featureArgs<ExtArgs>
-}
-export type SurveyPhotoIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-  feature?: boolean | Prisma.SurveyPhoto$featureArgs<ExtArgs>
-}
-export type SurveyPhotoIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
   feature?: boolean | Prisma.SurveyPhoto$featureArgs<ExtArgs>
 }
@@ -944,30 +898,6 @@ export interface SurveyPhotoDelegate<ExtArgs extends runtime.Types.Extensions.In
   createMany<T extends SurveyPhotoCreateManyArgs>(args?: Prisma.SelectSubset<T, SurveyPhotoCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many SurveyPhotos and returns the data saved in the database.
-   * @param {SurveyPhotoCreateManyAndReturnArgs} args - Arguments to create many SurveyPhotos.
-   * @example
-   * // Create many SurveyPhotos
-   * const surveyPhoto = await prisma.surveyPhoto.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many SurveyPhotos and only return the `id`
-   * const surveyPhotoWithIdOnly = await prisma.surveyPhoto.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends SurveyPhotoCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, SurveyPhotoCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SurveyPhotoPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a SurveyPhoto.
    * @param {SurveyPhotoDeleteArgs} args - Arguments to delete one SurveyPhoto.
    * @example
@@ -1032,36 +962,6 @@ export interface SurveyPhotoDelegate<ExtArgs extends runtime.Types.Extensions.In
   updateMany<T extends SurveyPhotoUpdateManyArgs>(args: Prisma.SelectSubset<T, SurveyPhotoUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more SurveyPhotos and returns the data updated in the database.
-   * @param {SurveyPhotoUpdateManyAndReturnArgs} args - Arguments to update many SurveyPhotos.
-   * @example
-   * // Update many SurveyPhotos
-   * const surveyPhoto = await prisma.surveyPhoto.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more SurveyPhotos and only return the `id`
-   * const surveyPhotoWithIdOnly = await prisma.surveyPhoto.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends SurveyPhotoUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, SurveyPhotoUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SurveyPhotoPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one SurveyPhoto.
    * @param {SurveyPhotoUpsertArgs} args - Arguments to update or create a SurveyPhoto.
    * @example
@@ -1079,6 +979,29 @@ export interface SurveyPhotoDelegate<ExtArgs extends runtime.Types.Extensions.In
    * })
    */
   upsert<T extends SurveyPhotoUpsertArgs>(args: Prisma.SelectSubset<T, SurveyPhotoUpsertArgs<ExtArgs>>): Prisma.Prisma__SurveyPhotoClient<runtime.Types.Result.GetResult<Prisma.$SurveyPhotoPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more SurveyPhotos that matches the filter.
+   * @param {SurveyPhotoFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const surveyPhoto = await prisma.surveyPhoto.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.SurveyPhotoFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a SurveyPhoto.
+   * @param {SurveyPhotoAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const surveyPhoto = await prisma.surveyPhoto.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.SurveyPhotoAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1456,11 +1379,6 @@ export type SurveyPhotoFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` SurveyPhotos.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of SurveyPhotos.
-   */
   distinct?: Prisma.SurveyPhotoScalarFieldEnum | Prisma.SurveyPhotoScalarFieldEnum[]
 }
 
@@ -1494,30 +1412,6 @@ export type SurveyPhotoCreateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * The data used to create many SurveyPhotos.
    */
   data: Prisma.SurveyPhotoCreateManyInput | Prisma.SurveyPhotoCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * SurveyPhoto createManyAndReturn
- */
-export type SurveyPhotoCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SurveyPhoto
-   */
-  select?: Prisma.SurveyPhotoSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SurveyPhoto
-   */
-  omit?: Prisma.SurveyPhotoOmit<ExtArgs> | null
-  /**
-   * The data used to create many SurveyPhotos.
-   */
-  data: Prisma.SurveyPhotoCreateManyInput | Prisma.SurveyPhotoCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SurveyPhotoIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1562,36 +1456,6 @@ export type SurveyPhotoUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many SurveyPhotos to update.
    */
   limit?: number
-}
-
-/**
- * SurveyPhoto updateManyAndReturn
- */
-export type SurveyPhotoUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SurveyPhoto
-   */
-  select?: Prisma.SurveyPhotoSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SurveyPhoto
-   */
-  omit?: Prisma.SurveyPhotoOmit<ExtArgs> | null
-  /**
-   * The data used to update SurveyPhotos.
-   */
-  data: Prisma.XOR<Prisma.SurveyPhotoUpdateManyMutationInput, Prisma.SurveyPhotoUncheckedUpdateManyInput>
-  /**
-   * Filter which SurveyPhotos to update
-   */
-  where?: Prisma.SurveyPhotoWhereInput
-  /**
-   * Limit how many SurveyPhotos to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SurveyPhotoIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1658,6 +1522,34 @@ export type SurveyPhotoDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many SurveyPhotos to delete.
    */
   limit?: number
+}
+
+/**
+ * SurveyPhoto findRaw
+ */
+export type SurveyPhotoFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * SurveyPhoto aggregateRaw
+ */
+export type SurveyPhotoAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

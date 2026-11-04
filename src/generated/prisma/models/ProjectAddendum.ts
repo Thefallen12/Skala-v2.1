@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,12 +27,12 @@ export type AggregateProjectAddendum = {
 }
 
 export type ProjectAddendumAvgAggregateOutputType = {
-  budgetChange: runtime.Decimal | null
+  budgetChange: number | null
   timeExtension: number | null
 }
 
 export type ProjectAddendumSumAggregateOutputType = {
-  budgetChange: runtime.Decimal | null
+  budgetChange: bigint | null
   timeExtension: number | null
 }
 
@@ -40,7 +40,7 @@ export type ProjectAddendumMinAggregateOutputType = {
   id: string | null
   projectId: string | null
   addendumNumber: string | null
-  budgetChange: runtime.Decimal | null
+  budgetChange: bigint | null
   timeExtension: number | null
   reason: string | null
   status: $Enums.ProjectAddendumStatus | null
@@ -55,7 +55,7 @@ export type ProjectAddendumMaxAggregateOutputType = {
   id: string | null
   projectId: string | null
   addendumNumber: string | null
-  budgetChange: runtime.Decimal | null
+  budgetChange: bigint | null
   timeExtension: number | null
   reason: string | null
   status: $Enums.ProjectAddendumStatus | null
@@ -229,7 +229,7 @@ export type ProjectAddendumGroupByOutputType = {
   id: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal
+  budgetChange: bigint
   timeExtension: number
   reason: string
   status: $Enums.ProjectAddendumStatus
@@ -245,7 +245,7 @@ export type ProjectAddendumGroupByOutputType = {
   _max: ProjectAddendumMaxAggregateOutputType | null
 }
 
-export type GetProjectAddendumGroupByPayload<T extends ProjectAddendumGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectAddendumGroupByPayload<T extends ProjectAddendumGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectAddendumGroupByOutputType, T['by']> &
       {
@@ -267,7 +267,7 @@ export type ProjectAddendumWhereInput = {
   id?: Prisma.StringFilter<"ProjectAddendum"> | string
   projectId?: Prisma.StringFilter<"ProjectAddendum"> | string
   addendumNumber?: Prisma.StringFilter<"ProjectAddendum"> | string
-  budgetChange?: Prisma.DecimalFilter<"ProjectAddendum"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFilter<"ProjectAddendum"> | bigint | number
   timeExtension?: Prisma.IntFilter<"ProjectAddendum"> | number
   reason?: Prisma.StringFilter<"ProjectAddendum"> | string
   status?: Prisma.EnumProjectAddendumStatusFilter<"ProjectAddendum"> | $Enums.ProjectAddendumStatus
@@ -290,8 +290,8 @@ export type ProjectAddendumOrderByWithRelationInput = {
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -306,7 +306,7 @@ export type ProjectAddendumWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.ProjectAddendumWhereInput[]
   NOT?: Prisma.ProjectAddendumWhereInput | Prisma.ProjectAddendumWhereInput[]
   projectId?: Prisma.StringFilter<"ProjectAddendum"> | string
-  budgetChange?: Prisma.DecimalFilter<"ProjectAddendum"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFilter<"ProjectAddendum"> | bigint | number
   timeExtension?: Prisma.IntFilter<"ProjectAddendum"> | number
   reason?: Prisma.StringFilter<"ProjectAddendum"> | string
   status?: Prisma.EnumProjectAddendumStatusFilter<"ProjectAddendum"> | $Enums.ProjectAddendumStatus
@@ -329,8 +329,8 @@ export type ProjectAddendumOrderByWithAggregationInput = {
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
-  approvedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approvedById?: Prisma.SortOrder
+  approvedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.ProjectAddendumCountOrderByAggregateInput
@@ -347,7 +347,7 @@ export type ProjectAddendumScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"ProjectAddendum"> | string
   projectId?: Prisma.StringWithAggregatesFilter<"ProjectAddendum"> | string
   addendumNumber?: Prisma.StringWithAggregatesFilter<"ProjectAddendum"> | string
-  budgetChange?: Prisma.DecimalWithAggregatesFilter<"ProjectAddendum"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntWithAggregatesFilter<"ProjectAddendum"> | bigint | number
   timeExtension?: Prisma.IntWithAggregatesFilter<"ProjectAddendum"> | number
   reason?: Prisma.StringWithAggregatesFilter<"ProjectAddendum"> | string
   status?: Prisma.EnumProjectAddendumStatusWithAggregatesFilter<"ProjectAddendum"> | $Enums.ProjectAddendumStatus
@@ -361,7 +361,7 @@ export type ProjectAddendumScalarWhereWithAggregatesInput = {
 export type ProjectAddendumCreateInput = {
   id?: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -377,7 +377,7 @@ export type ProjectAddendumUncheckedCreateInput = {
   id?: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -389,9 +389,8 @@ export type ProjectAddendumUncheckedCreateInput = {
 }
 
 export type ProjectAddendumUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -404,10 +403,9 @@ export type ProjectAddendumUpdateInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -422,7 +420,7 @@ export type ProjectAddendumCreateManyInput = {
   id?: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -434,9 +432,8 @@ export type ProjectAddendumCreateManyInput = {
 }
 
 export type ProjectAddendumUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -446,10 +443,9 @@ export type ProjectAddendumUpdateManyMutationInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -658,7 +654,7 @@ export type EnumProjectAddendumStatusFieldUpdateOperationsInput = {
 export type ProjectAddendumCreateWithoutCreatedByInput = {
   id?: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -673,7 +669,7 @@ export type ProjectAddendumUncheckedCreateWithoutCreatedByInput = {
   id?: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -690,13 +686,12 @@ export type ProjectAddendumCreateOrConnectWithoutCreatedByInput = {
 
 export type ProjectAddendumCreateManyCreatedByInputEnvelope = {
   data: Prisma.ProjectAddendumCreateManyCreatedByInput | Prisma.ProjectAddendumCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectAddendumCreateWithoutApprovedByInput = {
   id?: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -711,7 +706,7 @@ export type ProjectAddendumUncheckedCreateWithoutApprovedByInput = {
   id?: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -728,7 +723,6 @@ export type ProjectAddendumCreateOrConnectWithoutApprovedByInput = {
 
 export type ProjectAddendumCreateManyApprovedByInputEnvelope = {
   data: Prisma.ProjectAddendumCreateManyApprovedByInput | Prisma.ProjectAddendumCreateManyApprovedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectAddendumUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -754,7 +748,7 @@ export type ProjectAddendumScalarWhereInput = {
   id?: Prisma.StringFilter<"ProjectAddendum"> | string
   projectId?: Prisma.StringFilter<"ProjectAddendum"> | string
   addendumNumber?: Prisma.StringFilter<"ProjectAddendum"> | string
-  budgetChange?: Prisma.DecimalFilter<"ProjectAddendum"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFilter<"ProjectAddendum"> | bigint | number
   timeExtension?: Prisma.IntFilter<"ProjectAddendum"> | number
   reason?: Prisma.StringFilter<"ProjectAddendum"> | string
   status?: Prisma.EnumProjectAddendumStatusFilter<"ProjectAddendum"> | $Enums.ProjectAddendumStatus
@@ -784,7 +778,7 @@ export type ProjectAddendumUpdateManyWithWhereWithoutApprovedByInput = {
 export type ProjectAddendumCreateWithoutProjectInput = {
   id?: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -798,7 +792,7 @@ export type ProjectAddendumCreateWithoutProjectInput = {
 export type ProjectAddendumUncheckedCreateWithoutProjectInput = {
   id?: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -816,7 +810,6 @@ export type ProjectAddendumCreateOrConnectWithoutProjectInput = {
 
 export type ProjectAddendumCreateManyProjectInputEnvelope = {
   data: Prisma.ProjectAddendumCreateManyProjectInput | Prisma.ProjectAddendumCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectAddendumUpsertWithWhereUniqueWithoutProjectInput = {
@@ -839,7 +832,7 @@ export type ProjectAddendumCreateManyCreatedByInput = {
   id?: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -853,7 +846,7 @@ export type ProjectAddendumCreateManyApprovedByInput = {
   id?: string
   projectId: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -864,9 +857,8 @@ export type ProjectAddendumCreateManyApprovedByInput = {
 }
 
 export type ProjectAddendumUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -878,10 +870,9 @@ export type ProjectAddendumUpdateWithoutCreatedByInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -892,10 +883,9 @@ export type ProjectAddendumUncheckedUpdateWithoutCreatedByInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -906,9 +896,8 @@ export type ProjectAddendumUncheckedUpdateManyWithoutCreatedByInput = {
 }
 
 export type ProjectAddendumUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -920,10 +909,9 @@ export type ProjectAddendumUpdateWithoutApprovedByInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -934,10 +922,9 @@ export type ProjectAddendumUncheckedUpdateWithoutApprovedByInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateManyWithoutApprovedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -950,7 +937,7 @@ export type ProjectAddendumUncheckedUpdateManyWithoutApprovedByInput = {
 export type ProjectAddendumCreateManyProjectInput = {
   id?: string
   addendumNumber: string
-  budgetChange: runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange: bigint | number
   timeExtension: number
   reason: string
   status?: $Enums.ProjectAddendumStatus
@@ -962,9 +949,8 @@ export type ProjectAddendumCreateManyProjectInput = {
 }
 
 export type ProjectAddendumUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -976,9 +962,8 @@ export type ProjectAddendumUpdateWithoutProjectInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -990,9 +975,8 @@ export type ProjectAddendumUncheckedUpdateWithoutProjectInput = {
 }
 
 export type ProjectAddendumUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   addendumNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  budgetChange?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  budgetChange?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   timeExtension?: Prisma.IntFieldUpdateOperationsInput | number
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumProjectAddendumStatusFieldUpdateOperationsInput | $Enums.ProjectAddendumStatus
@@ -1023,41 +1007,7 @@ export type ProjectAddendumSelect<ExtArgs extends runtime.Types.Extensions.Inter
   approvedBy?: boolean | Prisma.ProjectAddendum$approvedByArgs<ExtArgs>
 }, ExtArgs["result"]["projectAddendum"]>
 
-export type ProjectAddendumSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  addendumNumber?: boolean
-  budgetChange?: boolean
-  timeExtension?: boolean
-  reason?: boolean
-  status?: boolean
-  createdById?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.ProjectAddendum$approvedByArgs<ExtArgs>
-}, ExtArgs["result"]["projectAddendum"]>
 
-export type ProjectAddendumSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  addendumNumber?: boolean
-  budgetChange?: boolean
-  timeExtension?: boolean
-  reason?: boolean
-  status?: boolean
-  createdById?: boolean
-  approvedById?: boolean
-  approvedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.ProjectAddendum$approvedByArgs<ExtArgs>
-}, ExtArgs["result"]["projectAddendum"]>
 
 export type ProjectAddendumSelectScalar = {
   id?: boolean
@@ -1080,16 +1030,6 @@ export type ProjectAddendumInclude<ExtArgs extends runtime.Types.Extensions.Inte
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   approvedBy?: boolean | Prisma.ProjectAddendum$approvedByArgs<ExtArgs>
 }
-export type ProjectAddendumIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.ProjectAddendum$approvedByArgs<ExtArgs>
-}
-export type ProjectAddendumIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  approvedBy?: boolean | Prisma.ProjectAddendum$approvedByArgs<ExtArgs>
-}
 
 export type $ProjectAddendumPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ProjectAddendum"
@@ -1102,7 +1042,7 @@ export type $ProjectAddendumPayload<ExtArgs extends runtime.Types.Extensions.Int
     id: string
     projectId: string
     addendumNumber: string
-    budgetChange: runtime.Decimal
+    budgetChange: bigint
     timeExtension: number
     reason: string
     status: $Enums.ProjectAddendumStatus
@@ -1229,30 +1169,6 @@ export interface ProjectAddendumDelegate<ExtArgs extends runtime.Types.Extension
   createMany<T extends ProjectAddendumCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectAddendumCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many ProjectAddenda and returns the data saved in the database.
-   * @param {ProjectAddendumCreateManyAndReturnArgs} args - Arguments to create many ProjectAddenda.
-   * @example
-   * // Create many ProjectAddenda
-   * const projectAddendum = await prisma.projectAddendum.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many ProjectAddenda and only return the `id`
-   * const projectAddendumWithIdOnly = await prisma.projectAddendum.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectAddendumCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectAddendumCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectAddendumPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a ProjectAddendum.
    * @param {ProjectAddendumDeleteArgs} args - Arguments to delete one ProjectAddendum.
    * @example
@@ -1317,36 +1233,6 @@ export interface ProjectAddendumDelegate<ExtArgs extends runtime.Types.Extension
   updateMany<T extends ProjectAddendumUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectAddendumUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more ProjectAddenda and returns the data updated in the database.
-   * @param {ProjectAddendumUpdateManyAndReturnArgs} args - Arguments to update many ProjectAddenda.
-   * @example
-   * // Update many ProjectAddenda
-   * const projectAddendum = await prisma.projectAddendum.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more ProjectAddenda and only return the `id`
-   * const projectAddendumWithIdOnly = await prisma.projectAddendum.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectAddendumUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectAddendumUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectAddendumPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one ProjectAddendum.
    * @param {ProjectAddendumUpsertArgs} args - Arguments to update or create a ProjectAddendum.
    * @example
@@ -1364,6 +1250,29 @@ export interface ProjectAddendumDelegate<ExtArgs extends runtime.Types.Extension
    * })
    */
   upsert<T extends ProjectAddendumUpsertArgs>(args: Prisma.SelectSubset<T, ProjectAddendumUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectAddendumClient<runtime.Types.Result.GetResult<Prisma.$ProjectAddendumPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more ProjectAddenda that matches the filter.
+   * @param {ProjectAddendumFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const projectAddendum = await prisma.projectAddendum.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectAddendumFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a ProjectAddendum.
+   * @param {ProjectAddendumAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const projectAddendum = await prisma.projectAddendum.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectAddendumAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1540,7 +1449,7 @@ export interface ProjectAddendumFieldRefs {
   readonly id: Prisma.FieldRef<"ProjectAddendum", 'String'>
   readonly projectId: Prisma.FieldRef<"ProjectAddendum", 'String'>
   readonly addendumNumber: Prisma.FieldRef<"ProjectAddendum", 'String'>
-  readonly budgetChange: Prisma.FieldRef<"ProjectAddendum", 'Decimal'>
+  readonly budgetChange: Prisma.FieldRef<"ProjectAddendum", 'BigInt'>
   readonly timeExtension: Prisma.FieldRef<"ProjectAddendum", 'Int'>
   readonly reason: Prisma.FieldRef<"ProjectAddendum", 'String'>
   readonly status: Prisma.FieldRef<"ProjectAddendum", 'ProjectAddendumStatus'>
@@ -1745,11 +1654,6 @@ export type ProjectAddendumFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` ProjectAddenda.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ProjectAddenda.
-   */
   distinct?: Prisma.ProjectAddendumScalarFieldEnum | Prisma.ProjectAddendumScalarFieldEnum[]
 }
 
@@ -1783,30 +1687,6 @@ export type ProjectAddendumCreateManyArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many ProjectAddenda.
    */
   data: Prisma.ProjectAddendumCreateManyInput | Prisma.ProjectAddendumCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * ProjectAddendum createManyAndReturn
- */
-export type ProjectAddendumCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectAddendum
-   */
-  select?: Prisma.ProjectAddendumSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectAddendum
-   */
-  omit?: Prisma.ProjectAddendumOmit<ExtArgs> | null
-  /**
-   * The data used to create many ProjectAddenda.
-   */
-  data: Prisma.ProjectAddendumCreateManyInput | Prisma.ProjectAddendumCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectAddendumIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1851,36 +1731,6 @@ export type ProjectAddendumUpdateManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many ProjectAddenda to update.
    */
   limit?: number
-}
-
-/**
- * ProjectAddendum updateManyAndReturn
- */
-export type ProjectAddendumUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectAddendum
-   */
-  select?: Prisma.ProjectAddendumSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectAddendum
-   */
-  omit?: Prisma.ProjectAddendumOmit<ExtArgs> | null
-  /**
-   * The data used to update ProjectAddenda.
-   */
-  data: Prisma.XOR<Prisma.ProjectAddendumUpdateManyMutationInput, Prisma.ProjectAddendumUncheckedUpdateManyInput>
-  /**
-   * Filter which ProjectAddenda to update
-   */
-  where?: Prisma.ProjectAddendumWhereInput
-  /**
-   * Limit how many ProjectAddenda to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectAddendumIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1947,6 +1797,34 @@ export type ProjectAddendumDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many ProjectAddenda to delete.
    */
   limit?: number
+}
+
+/**
+ * ProjectAddendum findRaw
+ */
+export type ProjectAddendumFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * ProjectAddendum aggregateRaw
+ */
+export type ProjectAddendumAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

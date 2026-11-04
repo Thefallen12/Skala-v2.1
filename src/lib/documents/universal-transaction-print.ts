@@ -26,7 +26,13 @@ export type UniversalDocumentData = {
   summary?: UniversalDocumentSummary[];
   terms?: string[];
   notes?: string;
-  signatures: { heading: string; name?: string; role: string }[];
+  signatures: {
+    heading: string;
+    name?: string;
+    role: string;
+    approvalStatus?: "approved" | "pending";
+    approvalDate?: string;
+  }[];
   logoDataUrl: string;
   verificationPublicCode?: string | null;
   qrDataUrl?: string | null;
@@ -114,19 +120,37 @@ export function renderUniversalTransactionDocument(
         .join("")}</ol></section>`
     : "";
   const approval = [
-    document.approvalQrDataUrl
+    document.approvalQrDataUrl && document.kind !== "PO"
       ? `<section class="approval"><strong>Verifikasi persetujuan PO</strong><img src="${escapeHtml(document.approvalQrDataUrl)}" alt="QR verifikasi persetujuan PO" /></section>`
       : "",
   ].join("");
   const signatures = document.signatures
     .map((signature, index) => {
+      const signatureQrDataUrl =
+        document.kind === "PO"
+          ? index === 2
+            ? document.approvalQrDataUrl
+            : null
+          : index === 0
+            ? document.qrDataUrl
+            : null;
       const signatureQr =
-        index === 0 && document.qrDataUrl
-          ? `<span class="signature-qr"><img src="${escapeHtml(document.qrDataUrl)}" alt="QR verifikasi dokumen" /></span>`
+        signatureQrDataUrl
+          ? `<span class="signature-qr"><img src="${escapeHtml(signatureQrDataUrl)}" alt="${document.kind === "PO" ? "QR tanda tangan persetujuan Direktur/Wakil Direktur" : "QR verifikasi dokumen"}" /></span>`
           : "";
+      const approvalQrClass =
+        document.kind === "PO" && index === 2 ? " signature-approval-qr" : "";
+      const approvalStatus = signature.approvalStatus
+        ? `<span class="signature-approval"><span class="signature-approval-status ${signature.approvalStatus}">${signature.approvalStatus === "approved" ? "✓ TELAH DISETUJUI" : "MENUNGGU PERSETUJUAN"}</span>${
+            signature.approvalDate
+              ? `<span class="signature-approval-date">${escapeHtml(signature.approvalDate)}</span>`
+              : ""
+          }</span>`
+        : "";
       return `
-        <div class="signature${signatureQr ? " signature-with-qr" : ""}">
+        <div class="signature${signatureQr ? " signature-with-qr" : ""}${approvalQrClass}${approvalStatus ? " signature-with-approval" : ""}">
           ${bilingualText(signature.heading, "signature-heading")}
+          ${approvalStatus}
           ${signatureQr}
           <span class="signature-name">${
             signature.name
@@ -192,10 +216,17 @@ export function renderUniversalTransactionDocument(
           .signature-heading, .signature-role { display: flex; width: 100%; flex-direction: column; align-items: center; line-height: 1.25; text-align: center; }
           .signature-heading { min-height: 26px; font-weight: 700; }
           .signature-heading small, .signature-role small { margin-top: 2px; color: #64748b; font-size: 7.5pt; font-weight: 400; }
+          .signature-approval-status { display: inline-block; margin: 4px 0; border-radius: 999px; padding: 3px 8px; font-size: 7pt; font-weight: 800; letter-spacing: .3px; }
+          .signature-approval-status.approved { border: 1px solid #15803d; background: #f0fdf4; color: #166534; }
+          .signature-approval-status.pending { border: 1px solid #b45309; background: #fffbeb; color: #92400e; }
+          .signature-approval-date { color: #64748b; font-size: 7pt; }
+          .signature-with-approval .signature-approval { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+          .signature-with-approval .signature-name { margin-top: 0; }
           .signature-name { min-height: 42px; display: flex; align-items: end; justify-content: center; margin-top: auto; }
           .signature-with-qr { min-height: 160px; }
           .signature-qr { display: flex; width: 100%; align-self: stretch; align-items: center; justify-content: center; margin: 4px 0 0; text-align: center; }
           .signature-qr img { display: block; width: 84px; height: 84px; margin-inline: auto; object-fit: contain; }
+          .signature-approval-qr .signature-name { min-height: 30px; margin-top: 4px; }
           .doc-footer { display: flex; align-items: center; gap: 10px; margin-top: 18px; color: #c9772d; font-weight: 900; letter-spacing: 1.5px; }
           .doc-footer::before { content: ""; height: 4px; flex: 1; background: #c9772d; }
           @media print {

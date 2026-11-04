@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
 import { getJakartaDateKey, getJakartaDayRange, shiftDateKey } from "@/lib/habit-date";
 import {
@@ -102,7 +103,8 @@ export default async function DashboardPage() {
     monthlyStockMovements,
     timesheetTotal,
     timesheetByDay,
-    monthlyActivity,
+    projectsCreatedThisYear,
+    ticketsCreatedThisYear,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
@@ -187,21 +189,14 @@ export default async function DashboardPage() {
       where: { workDate: { gte: weekStart, lt: tomorrowDate } },
       _sum: { durationMinutes: true },
     }),
-    prisma.$queryRaw<{ category: string; month: number; count: number }[]>`
-      SELECT 'project' AS category,
-        EXTRACT(MONTH FROM ("createdAt" AT TIME ZONE 'Asia/Jakarta'))::int AS month,
-        COUNT(*)::int AS count
-      FROM "Project"
-      WHERE "createdAt" >= ${yearStart} AND "createdAt" < ${nextYearStart}
-      GROUP BY month
-      UNION ALL
-      SELECT 'ticket' AS category,
-        EXTRACT(MONTH FROM ("createdAt" AT TIME ZONE 'Asia/Jakarta'))::int AS month,
-        COUNT(*)::int AS count
-      FROM "Ticket"
-      WHERE "createdAt" >= ${yearStart} AND "createdAt" < ${nextYearStart}
-      GROUP BY month
-    `,
+    prisma.project.findMany({
+      where: { createdAt: { gte: yearStart, lt: nextYearStart } },
+      select: { createdAt: true },
+    }),
+    prisma.ticket.findMany({
+      where: { createdAt: { gte: yearStart, lt: nextYearStart } },
+      select: { createdAt: true },
+    }),
   ]);
 
   if (!user) redirect("/auth/login");
@@ -220,10 +215,13 @@ export default async function DashboardPage() {
   const activeTickets = visibleActiveTicketCount;
   const monthlyProjectCounts = Array(12).fill(0) as number[];
   const monthlyTicketCounts = Array(12).fill(0) as number[];
-  for (const item of monthlyActivity) {
-    const target =
-      item.category === "project" ? monthlyProjectCounts : monthlyTicketCounts;
-    target[item.month - 1] = item.count;
+  for (const project of projectsCreatedThisYear) {
+    const jakartaDate = new Date(project.createdAt.getTime() + 7 * 60 * 60 * 1000);
+    monthlyProjectCounts[jakartaDate.getUTCMonth()] += 1;
+  }
+  for (const ticket of ticketsCreatedThisYear) {
+    const jakartaDate = new Date(ticket.createdAt.getTime() + 7 * 60 * 60 * 1000);
+    monthlyTicketCounts[jakartaDate.getUTCMonth()] += 1;
   }
 
   const days = Array.from({ length: 7 }, (_, index) =>
@@ -368,7 +366,9 @@ export default async function DashboardPage() {
               ...ticket,
               createdAt: dateTimeFormatter.format(ticket.createdAt),
               totalAmount: ticket.totalAmount
-                ? rupiah.format(Number(ticket.totalAmount))
+                ? rupiah.format(
+                    decimalNumberFromScaledInteger(ticket.totalAmount),
+                  )
                 : "—",
               statusLabel: ticketStatusLabels[ticket.status],
               requesterName: ticket.requester?.name ?? "Pemohon",
@@ -381,7 +381,9 @@ export default async function DashboardPage() {
             projects={recentProjects.map((project) => ({
               ...project,
               statusLabel: projectStatusLabels[project.status],
-              budget: project.budget ? rupiah.format(Number(project.budget)) : "—",
+              budget: project.budget
+                ? rupiah.format(decimalNumberFromScaledInteger(project.budget))
+                : "—",
             }))}
             averageProgress={totalProjectProgress}
           />

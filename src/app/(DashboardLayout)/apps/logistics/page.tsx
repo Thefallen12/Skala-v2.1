@@ -19,6 +19,7 @@ import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const metadata: Metadata = {
   title: "Logistik Lapangan",
@@ -217,30 +218,57 @@ export default async function LogisticsPage({
           deliveryOrders={deliveryOrders.map((order) => ({
             ...order,
             createdAt: order.createdAt.toISOString(),
-            departureKilometer: order.departureKilometer?.toString() ?? null,
+            departureKilometer:
+              order.departureKilometer !== null
+                ? decimalStringFromScaledInteger(order.departureKilometer)
+                : null,
             vehicleCurrentKilometer:
-              order.vehicle?.currentKilometer.toString() ?? null,
+              order.vehicle
+                ? decimalStringFromScaledInteger(
+                    order.vehicle.currentKilometer,
+                  )
+                : null,
             vehicleType: order.vehicle?.vehicleType ?? null,
             vehicleTripLog: order.vehicleTripLog
               ? {
-                  kilometerStart: order.vehicleTripLog.kilometerStart.toString(),
-                  kilometerEnd: order.vehicleTripLog.kilometerEnd.toString(),
-                  distanceKm: order.vehicleTripLog.distanceKm.toString(),
-                  fuelLiter: order.vehicleTripLog.fuelLiter.toString(),
+                  kilometerStart: decimalStringFromScaledInteger(
+                    order.vehicleTripLog.kilometerStart,
+                  ),
+                  kilometerEnd: decimalStringFromScaledInteger(
+                    order.vehicleTripLog.kilometerEnd,
+                  ),
+                  distanceKm: decimalStringFromScaledInteger(
+                    order.vehicleTripLog.distanceKm,
+                  ),
+                  fuelLiter: decimalStringFromScaledInteger(
+                    order.vehicleTripLog.fuelLiter,
+                  ),
                 }
               : null,
             fuelRequests: order.fuelRequests.map((request) => ({
               id: request.id,
               status: request.status,
               source: request.source,
-              estimatedDistanceKm: request.estimatedDistanceKm.toString(),
+              estimatedDistanceKm: decimalStringFromScaledInteger(
+                request.estimatedDistanceKm,
+              ),
               tripDistanceKm:
-                order.vehicleTripLog?.distanceKm.toString() ?? null,
-              exceptionDistanceKm: request.exceptionDistanceKm.toString(),
+                order.vehicleTripLog
+                  ? decimalStringFromScaledInteger(
+                      order.vehicleTripLog.distanceKm,
+                    )
+                  : null,
+              exceptionDistanceKm: decimalStringFromScaledInteger(
+                request.exceptionDistanceKm,
+              ),
               exceptionReason: request.exceptionReason,
-              estimatedFuelLiter: request.estimatedFuelLiter.toString(),
-              unitPrice: request.unitPrice.toString(),
-              requestedAmount: request.requestedAmount.toString(),
+              estimatedFuelLiter: decimalStringFromScaledInteger(
+                request.estimatedFuelLiter,
+              ),
+              unitPrice: decimalStringFromScaledInteger(request.unitPrice),
+              requestedAmount: decimalStringFromScaledInteger(
+                request.requestedAmount,
+              ),
               disbursementMethod: request.disbursementMethod,
               transferDestination: request.transferDestination,
               transferProofUrl: request.transferProofUrl,
@@ -277,15 +305,15 @@ export default async function LogisticsPage({
           projects={projects}
           equipmentMasters={equipmentMasters.map((equipment) => ({
             ...equipment,
-            currentHM: equipment.currentHM.toString(),
+            currentHM: decimalStringFromScaledInteger(equipment.currentHM),
           }))}
           equipmentLogs={equipmentLogs.map((log) => ({
             ...log,
             date: log.date.toISOString().slice(0, 10),
-            hmStart: log.hmStart.toString(),
-            hmEnd: log.hmEnd.toString(),
-            effectiveHours: log.effectiveHours.toString(),
-            fuelLiter: log.fuelLiter.toString(),
+            hmStart: decimalStringFromScaledInteger(log.hmStart),
+            hmEnd: decimalStringFromScaledInteger(log.hmEnd),
+            effectiveHours: decimalStringFromScaledInteger(log.effectiveHours),
+            fuelLiter: decimalStringFromScaledInteger(log.fuelLiter),
             projectName: `${log.project.kelompokTani} · ${log.project.title}`,
           }))}
           initialTab={tab}
@@ -694,7 +722,15 @@ export default async function LogisticsPage({
     status: ticket.status,
     fulfillmentStatus: ticket.fulfillmentStatus,
     canSubmit: ticket.requesterId === session.user.id,
-    totalAmount: ticket.totalAmount?.toString() ?? null,
+    canRequesterEdit: !ticket.auditLogs.some(
+      (audit) =>
+        audit.userId === ticket.requesterId &&
+        (audit.action === "UPDATED" || audit.action === "REQUESTER_EDITED"),
+    ),
+    totalAmount:
+      ticket.totalAmount !== null
+        ? decimalStringFromScaledInteger(ticket.totalAmount)
+        : null,
     attachmentUrl: ticket.attachmentUrl,
     receiptUrls: ticket.receiptUrls,
     paymentProofUrl: ticket.paymentProofUrl,
@@ -721,7 +757,10 @@ export default async function LogisticsPage({
     project: ticket.project,
     items: ticket.items.map((item) => ({
       ...item,
-      estimatedCost: item.estimatedCost?.toString() ?? null,
+      estimatedCost:
+        item.estimatedCost !== null
+          ? decimalStringFromScaledInteger(item.estimatedCost)
+          : null,
       expectedDeliveryDate:
         item.expectedDeliveryDate?.toISOString().slice(0, 10) ?? null,
     })),
@@ -741,13 +780,13 @@ export default async function LogisticsPage({
     })),
     directStockPurchases: ticket.directStockPurchases.map((purchase) => ({
       ...purchase,
-      totalAmount: purchase.totalAmount.toString(),
+      totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
       createdAt: purchase.createdAt.toISOString(),
       vendorInvoiceUploadedAt:
         purchase.vendorInvoiceUploadedAt?.toISOString() ?? null,
       items: purchase.items.map((item) => ({
         ...item,
-        quantity: item.quantity.toString(),
+        quantity: decimalStringFromScaledInteger(item.quantity),
       })),
     })),
     deliveryOrders: ticket.deliveryOrders.map((deliveryOrder) => ({
@@ -773,7 +812,7 @@ export default async function LogisticsPage({
         vendors={vendors}
         stockPurchases={directStockPurchases.map((purchase) => ({
           ...purchase,
-          totalAmount: purchase.totalAmount.toString(),
+          totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
           hasFinanceProof: purchase.paymentTransactions.some(
             (payment) => Boolean(payment.proofOfTransferUrl),
           ),
@@ -783,7 +822,7 @@ export default async function LogisticsPage({
             purchase.vendorInvoiceUploadedAt?.toISOString() ?? null,
           items: purchase.items.map((item) => ({
             ...item,
-            quantity: item.quantity.toString(),
+            quantity: decimalStringFromScaledInteger(item.quantity),
           })),
         }))}
         purchaseOrderConfirmations={purchaseOrderConfirmations.flatMap(
@@ -839,9 +878,9 @@ export default async function LogisticsPage({
         initialOpenSheet={openSheet}
         stockItems={stockItems.map((item) => ({
           ...item,
-          stockQuantity: item.stockQuantity.toString(),
-          minimumStock: item.minimumStock.toString(),
-          unitPrice: item.unitPrice.toString(),
+          stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
+          minimumStock: decimalStringFromScaledInteger(item.minimumStock),
+          unitPrice: decimalStringFromScaledInteger(item.unitPrice),
           createdAt: item.createdAt.toISOString(),
         }))}
         purchaseOrders={purchaseOrders.map((order) => ({
@@ -881,16 +920,16 @@ export default async function LogisticsPage({
           equipmentName: log.equipmentName,
           operatorName: log.operatorName,
           date: log.date.toISOString().slice(0, 10),
-          hmStart: log.hmStart.toString(),
-          hmEnd: log.hmEnd.toString(),
-          effectiveHours: log.effectiveHours.toString(),
-          fuelLiter: log.fuelLiter.toString(),
+          hmStart: decimalStringFromScaledInteger(log.hmStart),
+          hmEnd: decimalStringFromScaledInteger(log.hmEnd),
+          effectiveHours: decimalStringFromScaledInteger(log.effectiveHours),
+          fuelLiter: decimalStringFromScaledInteger(log.fuelLiter),
           notes: log.notes,
           projectName: `${log.project.kelompokTani} · ${log.project.title}`,
         }))}
         equipmentMasters={equipmentMasters.map((equipment) => ({
           ...equipment,
-          currentHM: equipment.currentHM.toString(),
+          currentHM: decimalStringFromScaledInteger(equipment.currentHM),
         }))}
         vehicleTripLogs={vehicleTripLogs.map((log) => ({
           id: log.id,
@@ -901,15 +940,17 @@ export default async function LogisticsPage({
             : "Proyek tidak terhubung",
           plateNumber: log.vehicle.plateNumber,
           vehicleType: log.vehicle.vehicleType,
-          kilometerStart: log.kilometerStart.toString(),
-          kilometerEnd: log.kilometerEnd.toString(),
-          distanceKm: log.distanceKm.toString(),
-          fuelLiter: log.fuelLiter.toString(),
+          kilometerStart: decimalStringFromScaledInteger(log.kilometerStart),
+          kilometerEnd: decimalStringFromScaledInteger(log.kilometerEnd),
+          distanceKm: decimalStringFromScaledInteger(log.distanceKm),
+          fuelLiter: decimalStringFromScaledInteger(log.fuelLiter),
           createdByName: log.createdBy.name,
         }))}
         vehicles={vehicles.map((vehicle) => ({
           ...vehicle,
-          currentKilometer: vehicle.currentKilometer.toString(),
+          currentKilometer: decimalStringFromScaledInteger(
+            vehicle.currentKilometer,
+          ),
           status:
             vehicle.status === "AVAILABLE" ||
             vehicle.status === "RESERVED" ||

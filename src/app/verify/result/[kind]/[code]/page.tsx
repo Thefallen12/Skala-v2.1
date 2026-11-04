@@ -71,21 +71,34 @@ async function loadPurchaseOrder(code: string) {
       createdAt: true,
       approvedAt: true,
       approvedBy: { select: { name: true } },
+      reviewedBy: { select: { name: true } },
       createdBy: { select: { name: true } },
     },
   });
   if (!order) return null;
 
-  const isValid = Boolean(order.publicCode);
+  const isValid = Boolean(order.approvedAt && order.approvedBy);
   return createDocument("po", code, {
     type: "PURCHASE ORDER (PO)",
     documentNumber: order.poNumber,
     issueDate: formatDate(order.approvedAt ?? order.createdAt),
     partner: order.vendorName,
     createdBy: order.createdBy?.name ?? "Logistik",
-    status: "Terverifikasi · QR tersedia",
+    status: isValid
+      ? "Disetujui Direktur/Wakil Direktur · QR tersedia"
+      : "Menunggu persetujuan Direktur/Wakil Direktur",
     isValid,
     previewUrl: `/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(code)}`,
+    details: [
+      {
+        label: "Disetujui Oleh",
+        value: order.approvedBy?.name ?? "Belum disetujui",
+      },
+      {
+        label: "Diperiksa Oleh · Keuangan",
+        value: order.reviewedBy?.name ?? "Belum diperiksa",
+      },
+    ],
   });
 }
 

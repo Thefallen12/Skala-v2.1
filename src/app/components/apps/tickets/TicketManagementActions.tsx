@@ -16,13 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-const editableRoles: UserRole[] = [
-  UserRole.LOGISTICS,
-  UserRole.FINANCE,
-  UserRole.ADMINISTRATIONS,
-  UserRole.DIRECTOR,
-];
-
 const priorities: { value: TicketPriority; label: string }[] = [
   { value: TicketPriority.LOW, label: "Rendah" },
   { value: TicketPriority.MEDIUM, label: "Sedang" },
@@ -44,17 +37,19 @@ export default function TicketManagementActions({
   const [priority, setPriority] = useState(ticket.priority);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
-  const canManage = editableRoles.includes(role);
-  const canEditDraft = canManage || ticket.canSubmit;
+  const isDirector = role === UserRole.DIRECTOR;
   const canEdit =
+    isDirector || (ticket.canSubmit && ticket.canRequesterEdit);
+  const canDelete =
     ticket.status === TicketStatus.DRAFT &&
     (ticket.purchaseOrders?.length ?? 0) === 0 &&
     (ticket.directStockPurchases?.length ?? 0) === 0 &&
     (ticket.paymentTransactions?.length ?? 0) === 0 &&
     (ticket.deliveryOrders?.length ?? 0) === 0 &&
+    (ticket.operationalDocuments?.length ?? 0) === 0 &&
     ticket.items.every((item) => !item.poItemId && !item.doItemId);
 
-  if (!canEditDraft && !canManage) return null;
+  if (!canEdit && !isDirector) return null;
 
   const openEditor = () => {
     setTitle(ticket.title);
@@ -87,7 +82,7 @@ export default function TicketManagementActions({
 
   const handleDelete = () => {
     if (
-      !canEdit ||
+      !canDelete ||
       !window.confirm(
         `Hapus tiket ${ticket.ticketNumber}? Penghapusan hanya tersedia untuk tiket Draft yang belum diproses.`,
       )
@@ -110,33 +105,29 @@ export default function TicketManagementActions({
 
   return (
     <div className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
-      {canEditDraft && (
+      {canEdit && (
         <Button
           type="button"
           size="sm"
           variant="outline"
           className="h-7 gap-1 px-2 text-xs"
-          disabled={!canEdit || isPending}
-          title={
-            canEdit
-              ? "Edit tiket"
-              : "Tiket hanya dapat diedit selama masih berstatus Draft"
-          }
+          disabled={isPending}
+          title="Edit tiket"
           onClick={openEditor}
         >
           <Pencil aria-hidden="true" className="size-3" />
           Edit
         </Button>
       )}
-      {canManage && (
+      {isDirector && (
         <Button
           type="button"
           size="sm"
           variant="destructive"
           className="h-7 gap-1 px-2 text-xs"
-          disabled={!canEdit || isPending}
+          disabled={!canDelete || isPending}
           title={
-            canEdit
+            canDelete
               ? "Hapus tiket Draft"
               : "Tiket hanya dapat dihapus selama masih berstatus Draft"
           }
@@ -155,7 +146,7 @@ export default function TicketManagementActions({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         title={`Edit tiket ${ticket.ticketNumber}`}
-        description="Perubahan hanya dapat dilakukan selama tiket masih berstatus Draft."
+        description="Ubah judul, deskripsi, atau prioritas tiket."
         footer={
           <>
             <Button

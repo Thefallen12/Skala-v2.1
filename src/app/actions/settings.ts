@@ -68,10 +68,11 @@ async function ensureDefaults() {
     }
   }
 
-  if (rows.length > 0) {
-    await prisma.menuAccess.createMany({
-      data: rows,
-      skipDuplicates: true,
+  for (const row of rows) {
+    await prisma.menuAccess.upsert({
+      where: { role_menuKey: { role: row.role, menuKey: row.menuKey } },
+      create: row,
+      update: {},
     });
   }
 }

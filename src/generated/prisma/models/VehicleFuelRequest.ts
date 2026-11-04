@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,21 +27,21 @@ export type AggregateVehicleFuelRequest = {
 }
 
 export type VehicleFuelRequestAvgAggregateOutputType = {
-  estimatedDistanceKm: runtime.Decimal | null
-  exceptionDistanceKm: runtime.Decimal | null
-  estimatedFuelLiter: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  requestedAmount: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  estimatedDistanceKm: number | null
+  exceptionDistanceKm: number | null
+  estimatedFuelLiter: number | null
+  unitPrice: number | null
+  requestedAmount: number | null
+  fuelEfficiencyKmPerL: number | null
 }
 
 export type VehicleFuelRequestSumAggregateOutputType = {
-  estimatedDistanceKm: runtime.Decimal | null
-  exceptionDistanceKm: runtime.Decimal | null
-  estimatedFuelLiter: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  requestedAmount: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  estimatedDistanceKm: bigint | null
+  exceptionDistanceKm: bigint | null
+  estimatedFuelLiter: bigint | null
+  unitPrice: bigint | null
+  requestedAmount: bigint | null
+  fuelEfficiencyKmPerL: bigint | null
 }
 
 export type VehicleFuelRequestMinAggregateOutputType = {
@@ -52,13 +52,13 @@ export type VehicleFuelRequestMinAggregateOutputType = {
   requestedById: string | null
   reviewedById: string | null
   source: $Enums.VehicleFuelSource | null
-  estimatedDistanceKm: runtime.Decimal | null
-  exceptionDistanceKm: runtime.Decimal | null
+  estimatedDistanceKm: bigint | null
+  exceptionDistanceKm: bigint | null
   exceptionReason: string | null
-  estimatedFuelLiter: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  requestedAmount: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  estimatedFuelLiter: bigint | null
+  unitPrice: bigint | null
+  requestedAmount: bigint | null
+  fuelEfficiencyKmPerL: bigint | null
   disbursementMethod: $Enums.POPaymentMethod | null
   transferDestination: string | null
   transferProofUrl: string | null
@@ -82,13 +82,13 @@ export type VehicleFuelRequestMaxAggregateOutputType = {
   requestedById: string | null
   reviewedById: string | null
   source: $Enums.VehicleFuelSource | null
-  estimatedDistanceKm: runtime.Decimal | null
-  exceptionDistanceKm: runtime.Decimal | null
+  estimatedDistanceKm: bigint | null
+  exceptionDistanceKm: bigint | null
   exceptionReason: string | null
-  estimatedFuelLiter: runtime.Decimal | null
-  unitPrice: runtime.Decimal | null
-  requestedAmount: runtime.Decimal | null
-  fuelEfficiencyKmPerL: runtime.Decimal | null
+  estimatedFuelLiter: bigint | null
+  unitPrice: bigint | null
+  requestedAmount: bigint | null
+  fuelEfficiencyKmPerL: bigint | null
   disbursementMethod: $Enums.POPaymentMethod | null
   transferDestination: string | null
   transferProofUrl: string | null
@@ -339,13 +339,13 @@ export type VehicleFuelRequestGroupByOutputType = {
   requestedById: string
   reviewedById: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal
-  exceptionDistanceKm: runtime.Decimal
+  estimatedDistanceKm: bigint
+  exceptionDistanceKm: bigint
   exceptionReason: string | null
-  estimatedFuelLiter: runtime.Decimal
-  unitPrice: runtime.Decimal
-  requestedAmount: runtime.Decimal
-  fuelEfficiencyKmPerL: runtime.Decimal
+  estimatedFuelLiter: bigint
+  unitPrice: bigint
+  requestedAmount: bigint
+  fuelEfficiencyKmPerL: bigint
   disbursementMethod: $Enums.POPaymentMethod | null
   transferDestination: string | null
   transferProofUrl: string | null
@@ -366,7 +366,7 @@ export type VehicleFuelRequestGroupByOutputType = {
   _max: VehicleFuelRequestMaxAggregateOutputType | null
 }
 
-export type GetVehicleFuelRequestGroupByPayload<T extends VehicleFuelRequestGroupByArgs> = Prisma.PrismaPromise<
+type GetVehicleFuelRequestGroupByPayload<T extends VehicleFuelRequestGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<VehicleFuelRequestGroupByOutputType, T['by']> &
       {
@@ -392,13 +392,13 @@ export type VehicleFuelRequestWhereInput = {
   requestedById?: Prisma.StringFilter<"VehicleFuelRequest"> | string
   reviewedById?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
   source?: Prisma.EnumVehicleFuelSourceFilter<"VehicleFuelRequest"> | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
   exceptionReason?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
-  estimatedFuelLiter?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  unitPrice?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  requestedAmount?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
   disbursementMethod?: Prisma.EnumPOPaymentMethodNullableFilter<"VehicleFuelRequest"> | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
   transferProofUrl?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
@@ -423,28 +423,28 @@ export type VehicleFuelRequestOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   vehicleId?: Prisma.SortOrder
   deliveryOrderId?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   requestedById?: Prisma.SortOrder
-  reviewedById?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewedById?: Prisma.SortOrder
   source?: Prisma.SortOrder
   estimatedDistanceKm?: Prisma.SortOrder
   exceptionDistanceKm?: Prisma.SortOrder
-  exceptionReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  exceptionReason?: Prisma.SortOrder
   estimatedFuelLiter?: Prisma.SortOrder
   unitPrice?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   fuelEfficiencyKmPerL?: Prisma.SortOrder
-  disbursementMethod?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  disbursementMethod?: Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  transferProofUrl?: Prisma.SortOrder
   beforeFillingPhotoUrl?: Prisma.SortOrder
-  afterFillingPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  receiptPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  afterFillingPhotoUrl?: Prisma.SortOrder
+  receiptPhotoUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  financeNote?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  disbursedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofSubmittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  financeNote?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
+  disbursedAt?: Prisma.SortOrder
+  proofSubmittedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   vehicle?: Prisma.VehicleOrderByWithRelationInput
@@ -465,13 +465,13 @@ export type VehicleFuelRequestWhereUniqueInput = Prisma.AtLeast<{
   requestedById?: Prisma.StringFilter<"VehicleFuelRequest"> | string
   reviewedById?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
   source?: Prisma.EnumVehicleFuelSourceFilter<"VehicleFuelRequest"> | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
   exceptionReason?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
-  estimatedFuelLiter?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  unitPrice?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  requestedAmount?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
   disbursementMethod?: Prisma.EnumPOPaymentMethodNullableFilter<"VehicleFuelRequest"> | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
   transferProofUrl?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
@@ -496,28 +496,28 @@ export type VehicleFuelRequestOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   vehicleId?: Prisma.SortOrder
   deliveryOrderId?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   requestedById?: Prisma.SortOrder
-  reviewedById?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewedById?: Prisma.SortOrder
   source?: Prisma.SortOrder
   estimatedDistanceKm?: Prisma.SortOrder
   exceptionDistanceKm?: Prisma.SortOrder
-  exceptionReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  exceptionReason?: Prisma.SortOrder
   estimatedFuelLiter?: Prisma.SortOrder
   unitPrice?: Prisma.SortOrder
   requestedAmount?: Prisma.SortOrder
   fuelEfficiencyKmPerL?: Prisma.SortOrder
-  disbursementMethod?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferProofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  disbursementMethod?: Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  transferProofUrl?: Prisma.SortOrder
   beforeFillingPhotoUrl?: Prisma.SortOrder
-  afterFillingPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  receiptPhotoUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  afterFillingPhotoUrl?: Prisma.SortOrder
+  receiptPhotoUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  financeNote?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  disbursedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofSubmittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  financeNote?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
+  disbursedAt?: Prisma.SortOrder
+  proofSubmittedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.VehicleFuelRequestCountOrderByAggregateInput
@@ -538,13 +538,13 @@ export type VehicleFuelRequestScalarWhereWithAggregatesInput = {
   requestedById?: Prisma.StringWithAggregatesFilter<"VehicleFuelRequest"> | string
   reviewedById?: Prisma.StringNullableWithAggregatesFilter<"VehicleFuelRequest"> | string | null
   source?: Prisma.EnumVehicleFuelSourceWithAggregatesFilter<"VehicleFuelRequest"> | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalWithAggregatesFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalWithAggregatesFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntWithAggregatesFilter<"VehicleFuelRequest"> | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntWithAggregatesFilter<"VehicleFuelRequest"> | bigint | number
   exceptionReason?: Prisma.StringNullableWithAggregatesFilter<"VehicleFuelRequest"> | string | null
-  estimatedFuelLiter?: Prisma.DecimalWithAggregatesFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalWithAggregatesFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalWithAggregatesFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalWithAggregatesFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntWithAggregatesFilter<"VehicleFuelRequest"> | bigint | number
+  unitPrice?: Prisma.BigIntWithAggregatesFilter<"VehicleFuelRequest"> | bigint | number
+  requestedAmount?: Prisma.BigIntWithAggregatesFilter<"VehicleFuelRequest"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntWithAggregatesFilter<"VehicleFuelRequest"> | bigint | number
   disbursementMethod?: Prisma.EnumPOPaymentMethodNullableWithAggregatesFilter<"VehicleFuelRequest"> | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.StringNullableWithAggregatesFilter<"VehicleFuelRequest"> | string | null
   transferProofUrl?: Prisma.StringNullableWithAggregatesFilter<"VehicleFuelRequest"> | string | null
@@ -563,13 +563,13 @@ export type VehicleFuelRequestScalarWhereWithAggregatesInput = {
 export type VehicleFuelRequestCreateInput = {
   id?: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -598,13 +598,13 @@ export type VehicleFuelRequestUncheckedCreateInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -621,15 +621,14 @@ export type VehicleFuelRequestUncheckedCreateInput = {
 }
 
 export type VehicleFuelRequestUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -651,20 +650,19 @@ export type VehicleFuelRequestUpdateInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -688,13 +686,13 @@ export type VehicleFuelRequestCreateManyInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -711,15 +709,14 @@ export type VehicleFuelRequestCreateManyInput = {
 }
 
 export type VehicleFuelRequestUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -736,20 +733,19 @@ export type VehicleFuelRequestUpdateManyMutationInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1104,13 +1100,13 @@ export type EnumVehicleFuelRequestStatusFieldUpdateOperationsInput = {
 export type VehicleFuelRequestCreateWithoutRequestedByInput = {
   id?: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1137,13 +1133,13 @@ export type VehicleFuelRequestUncheckedCreateWithoutRequestedByInput = {
   projectId?: string | null
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1166,19 +1162,18 @@ export type VehicleFuelRequestCreateOrConnectWithoutRequestedByInput = {
 
 export type VehicleFuelRequestCreateManyRequestedByInputEnvelope = {
   data: Prisma.VehicleFuelRequestCreateManyRequestedByInput | Prisma.VehicleFuelRequestCreateManyRequestedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleFuelRequestCreateWithoutReviewedByInput = {
   id?: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1205,13 +1200,13 @@ export type VehicleFuelRequestUncheckedCreateWithoutReviewedByInput = {
   projectId?: string | null
   requestedById: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1234,7 +1229,6 @@ export type VehicleFuelRequestCreateOrConnectWithoutReviewedByInput = {
 
 export type VehicleFuelRequestCreateManyReviewedByInputEnvelope = {
   data: Prisma.VehicleFuelRequestCreateManyReviewedByInput | Prisma.VehicleFuelRequestCreateManyReviewedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleFuelRequestUpsertWithWhereUniqueWithoutRequestedByInput = {
@@ -1264,13 +1258,13 @@ export type VehicleFuelRequestScalarWhereInput = {
   requestedById?: Prisma.StringFilter<"VehicleFuelRequest"> | string
   reviewedById?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
   source?: Prisma.EnumVehicleFuelSourceFilter<"VehicleFuelRequest"> | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
   exceptionReason?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
-  estimatedFuelLiter?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFilter<"VehicleFuelRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  unitPrice?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  requestedAmount?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFilter<"VehicleFuelRequest"> | bigint | number
   disbursementMethod?: Prisma.EnumPOPaymentMethodNullableFilter<"VehicleFuelRequest"> | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
   transferProofUrl?: Prisma.StringNullableFilter<"VehicleFuelRequest"> | string | null
@@ -1305,13 +1299,13 @@ export type VehicleFuelRequestUpdateManyWithWhereWithoutReviewedByInput = {
 export type VehicleFuelRequestCreateWithoutProjectInput = {
   id?: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1338,13 +1332,13 @@ export type VehicleFuelRequestUncheckedCreateWithoutProjectInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1367,7 +1361,6 @@ export type VehicleFuelRequestCreateOrConnectWithoutProjectInput = {
 
 export type VehicleFuelRequestCreateManyProjectInputEnvelope = {
   data: Prisma.VehicleFuelRequestCreateManyProjectInput | Prisma.VehicleFuelRequestCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleFuelRequestUpsertWithWhereUniqueWithoutProjectInput = {
@@ -1389,13 +1382,13 @@ export type VehicleFuelRequestUpdateManyWithWhereWithoutProjectInput = {
 export type VehicleFuelRequestCreateWithoutDeliveryOrderInput = {
   id?: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1422,13 +1415,13 @@ export type VehicleFuelRequestUncheckedCreateWithoutDeliveryOrderInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1451,7 +1444,6 @@ export type VehicleFuelRequestCreateOrConnectWithoutDeliveryOrderInput = {
 
 export type VehicleFuelRequestCreateManyDeliveryOrderInputEnvelope = {
   data: Prisma.VehicleFuelRequestCreateManyDeliveryOrderInput | Prisma.VehicleFuelRequestCreateManyDeliveryOrderInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleFuelRequestUpsertWithWhereUniqueWithoutDeliveryOrderInput = {
@@ -1473,13 +1465,13 @@ export type VehicleFuelRequestUpdateManyWithWhereWithoutDeliveryOrderInput = {
 export type VehicleFuelRequestCreateWithoutVehicleInput = {
   id?: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1506,13 +1498,13 @@ export type VehicleFuelRequestUncheckedCreateWithoutVehicleInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1535,7 +1527,6 @@ export type VehicleFuelRequestCreateOrConnectWithoutVehicleInput = {
 
 export type VehicleFuelRequestCreateManyVehicleInputEnvelope = {
   data: Prisma.VehicleFuelRequestCreateManyVehicleInput | Prisma.VehicleFuelRequestCreateManyVehicleInput[]
-  skipDuplicates?: boolean
 }
 
 export type VehicleFuelRequestUpsertWithWhereUniqueWithoutVehicleInput = {
@@ -1561,13 +1552,13 @@ export type VehicleFuelRequestCreateManyRequestedByInput = {
   projectId?: string | null
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1590,13 +1581,13 @@ export type VehicleFuelRequestCreateManyReviewedByInput = {
   projectId?: string | null
   requestedById: string
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1613,15 +1604,14 @@ export type VehicleFuelRequestCreateManyReviewedByInput = {
 }
 
 export type VehicleFuelRequestUpdateWithoutRequestedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1642,19 +1632,18 @@ export type VehicleFuelRequestUpdateWithoutRequestedByInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateWithoutRequestedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1671,19 +1660,18 @@ export type VehicleFuelRequestUncheckedUpdateWithoutRequestedByInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateManyWithoutRequestedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1700,15 +1688,14 @@ export type VehicleFuelRequestUncheckedUpdateManyWithoutRequestedByInput = {
 }
 
 export type VehicleFuelRequestUpdateWithoutReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1729,19 +1716,18 @@ export type VehicleFuelRequestUpdateWithoutReviewedByInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateWithoutReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1758,19 +1744,18 @@ export type VehicleFuelRequestUncheckedUpdateWithoutReviewedByInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateManyWithoutReviewedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1793,13 +1778,13 @@ export type VehicleFuelRequestCreateManyProjectInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1816,15 +1801,14 @@ export type VehicleFuelRequestCreateManyProjectInput = {
 }
 
 export type VehicleFuelRequestUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1845,19 +1829,18 @@ export type VehicleFuelRequestUpdateWithoutProjectInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1874,19 +1857,18 @@ export type VehicleFuelRequestUncheckedUpdateWithoutProjectInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1909,13 +1891,13 @@ export type VehicleFuelRequestCreateManyDeliveryOrderInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -1932,15 +1914,14 @@ export type VehicleFuelRequestCreateManyDeliveryOrderInput = {
 }
 
 export type VehicleFuelRequestUpdateWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1961,19 +1942,18 @@ export type VehicleFuelRequestUpdateWithoutDeliveryOrderInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1990,19 +1970,18 @@ export type VehicleFuelRequestUncheckedUpdateWithoutDeliveryOrderInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateManyWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vehicleId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2025,13 +2004,13 @@ export type VehicleFuelRequestCreateManyVehicleInput = {
   requestedById: string
   reviewedById?: string | null
   source: $Enums.VehicleFuelSource
-  estimatedDistanceKm: runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm: bigint | number
+  exceptionDistanceKm?: bigint | number
   exceptionReason?: string | null
-  estimatedFuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter: bigint | number
+  unitPrice: bigint | number
+  requestedAmount: bigint | number
+  fuelEfficiencyKmPerL?: bigint | number
   disbursementMethod?: $Enums.POPaymentMethod | null
   transferDestination?: string | null
   transferProofUrl?: string | null
@@ -2048,15 +2027,14 @@ export type VehicleFuelRequestCreateManyVehicleInput = {
 }
 
 export type VehicleFuelRequestUpdateWithoutVehicleInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2077,19 +2055,18 @@ export type VehicleFuelRequestUpdateWithoutVehicleInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateWithoutVehicleInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2106,19 +2083,18 @@ export type VehicleFuelRequestUncheckedUpdateWithoutVehicleInput = {
 }
 
 export type VehicleFuelRequestUncheckedUpdateManyWithoutVehicleInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestedById?: Prisma.StringFieldUpdateOperationsInput | string
   reviewedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.EnumVehicleFuelSourceFieldUpdateOperationsInput | $Enums.VehicleFuelSource
-  estimatedDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  exceptionDistanceKm?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  exceptionDistanceKm?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   exceptionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedFuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  unitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  requestedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelEfficiencyKmPerL?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  estimatedFuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  unitPrice?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  requestedAmount?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelEfficiencyKmPerL?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   disbursementMethod?: Prisma.NullableEnumPOPaymentMethodFieldUpdateOperationsInput | $Enums.POPaymentMethod | null
   transferDestination?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   transferProofUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2171,75 +2147,7 @@ export type VehicleFuelRequestSelect<ExtArgs extends runtime.Types.Extensions.In
   reviewedBy?: boolean | Prisma.VehicleFuelRequest$reviewedByArgs<ExtArgs>
 }, ExtArgs["result"]["vehicleFuelRequest"]>
 
-export type VehicleFuelRequestSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  vehicleId?: boolean
-  deliveryOrderId?: boolean
-  projectId?: boolean
-  requestedById?: boolean
-  reviewedById?: boolean
-  source?: boolean
-  estimatedDistanceKm?: boolean
-  exceptionDistanceKm?: boolean
-  exceptionReason?: boolean
-  estimatedFuelLiter?: boolean
-  unitPrice?: boolean
-  requestedAmount?: boolean
-  fuelEfficiencyKmPerL?: boolean
-  disbursementMethod?: boolean
-  transferDestination?: boolean
-  transferProofUrl?: boolean
-  beforeFillingPhotoUrl?: boolean
-  afterFillingPhotoUrl?: boolean
-  receiptPhotoUrl?: boolean
-  status?: boolean
-  financeNote?: boolean
-  reviewedAt?: boolean
-  disbursedAt?: boolean
-  proofSubmittedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleFuelRequest$projectArgs<ExtArgs>
-  requestedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.VehicleFuelRequest$reviewedByArgs<ExtArgs>
-}, ExtArgs["result"]["vehicleFuelRequest"]>
 
-export type VehicleFuelRequestSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  vehicleId?: boolean
-  deliveryOrderId?: boolean
-  projectId?: boolean
-  requestedById?: boolean
-  reviewedById?: boolean
-  source?: boolean
-  estimatedDistanceKm?: boolean
-  exceptionDistanceKm?: boolean
-  exceptionReason?: boolean
-  estimatedFuelLiter?: boolean
-  unitPrice?: boolean
-  requestedAmount?: boolean
-  fuelEfficiencyKmPerL?: boolean
-  disbursementMethod?: boolean
-  transferDestination?: boolean
-  transferProofUrl?: boolean
-  beforeFillingPhotoUrl?: boolean
-  afterFillingPhotoUrl?: boolean
-  receiptPhotoUrl?: boolean
-  status?: boolean
-  financeNote?: boolean
-  reviewedAt?: boolean
-  disbursedAt?: boolean
-  proofSubmittedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleFuelRequest$projectArgs<ExtArgs>
-  requestedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.VehicleFuelRequest$reviewedByArgs<ExtArgs>
-}, ExtArgs["result"]["vehicleFuelRequest"]>
 
 export type VehicleFuelRequestSelectScalar = {
   id?: boolean
@@ -2279,20 +2187,6 @@ export type VehicleFuelRequestInclude<ExtArgs extends runtime.Types.Extensions.I
   requestedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   reviewedBy?: boolean | Prisma.VehicleFuelRequest$reviewedByArgs<ExtArgs>
 }
-export type VehicleFuelRequestIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleFuelRequest$projectArgs<ExtArgs>
-  requestedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.VehicleFuelRequest$reviewedByArgs<ExtArgs>
-}
-export type VehicleFuelRequestIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vehicle?: boolean | Prisma.VehicleDefaultArgs<ExtArgs>
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.VehicleFuelRequest$projectArgs<ExtArgs>
-  requestedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewedBy?: boolean | Prisma.VehicleFuelRequest$reviewedByArgs<ExtArgs>
-}
 
 export type $VehicleFuelRequestPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "VehicleFuelRequest"
@@ -2311,13 +2205,13 @@ export type $VehicleFuelRequestPayload<ExtArgs extends runtime.Types.Extensions.
     requestedById: string
     reviewedById: string | null
     source: $Enums.VehicleFuelSource
-    estimatedDistanceKm: runtime.Decimal
-    exceptionDistanceKm: runtime.Decimal
+    estimatedDistanceKm: bigint
+    exceptionDistanceKm: bigint
     exceptionReason: string | null
-    estimatedFuelLiter: runtime.Decimal
-    unitPrice: runtime.Decimal
-    requestedAmount: runtime.Decimal
-    fuelEfficiencyKmPerL: runtime.Decimal
+    estimatedFuelLiter: bigint
+    unitPrice: bigint
+    requestedAmount: bigint
+    fuelEfficiencyKmPerL: bigint
     disbursementMethod: $Enums.POPaymentMethod | null
     transferDestination: string | null
     transferProofUrl: string | null
@@ -2449,30 +2343,6 @@ export interface VehicleFuelRequestDelegate<ExtArgs extends runtime.Types.Extens
   createMany<T extends VehicleFuelRequestCreateManyArgs>(args?: Prisma.SelectSubset<T, VehicleFuelRequestCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many VehicleFuelRequests and returns the data saved in the database.
-   * @param {VehicleFuelRequestCreateManyAndReturnArgs} args - Arguments to create many VehicleFuelRequests.
-   * @example
-   * // Create many VehicleFuelRequests
-   * const vehicleFuelRequest = await prisma.vehicleFuelRequest.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many VehicleFuelRequests and only return the `id`
-   * const vehicleFuelRequestWithIdOnly = await prisma.vehicleFuelRequest.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends VehicleFuelRequestCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, VehicleFuelRequestCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VehicleFuelRequestPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a VehicleFuelRequest.
    * @param {VehicleFuelRequestDeleteArgs} args - Arguments to delete one VehicleFuelRequest.
    * @example
@@ -2537,36 +2407,6 @@ export interface VehicleFuelRequestDelegate<ExtArgs extends runtime.Types.Extens
   updateMany<T extends VehicleFuelRequestUpdateManyArgs>(args: Prisma.SelectSubset<T, VehicleFuelRequestUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more VehicleFuelRequests and returns the data updated in the database.
-   * @param {VehicleFuelRequestUpdateManyAndReturnArgs} args - Arguments to update many VehicleFuelRequests.
-   * @example
-   * // Update many VehicleFuelRequests
-   * const vehicleFuelRequest = await prisma.vehicleFuelRequest.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more VehicleFuelRequests and only return the `id`
-   * const vehicleFuelRequestWithIdOnly = await prisma.vehicleFuelRequest.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends VehicleFuelRequestUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, VehicleFuelRequestUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VehicleFuelRequestPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one VehicleFuelRequest.
    * @param {VehicleFuelRequestUpsertArgs} args - Arguments to update or create a VehicleFuelRequest.
    * @example
@@ -2584,6 +2424,29 @@ export interface VehicleFuelRequestDelegate<ExtArgs extends runtime.Types.Extens
    * })
    */
   upsert<T extends VehicleFuelRequestUpsertArgs>(args: Prisma.SelectSubset<T, VehicleFuelRequestUpsertArgs<ExtArgs>>): Prisma.Prisma__VehicleFuelRequestClient<runtime.Types.Result.GetResult<Prisma.$VehicleFuelRequestPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more VehicleFuelRequests that matches the filter.
+   * @param {VehicleFuelRequestFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const vehicleFuelRequest = await prisma.vehicleFuelRequest.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.VehicleFuelRequestFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a VehicleFuelRequest.
+   * @param {VehicleFuelRequestAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const vehicleFuelRequest = await prisma.vehicleFuelRequest.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.VehicleFuelRequestAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2766,13 +2629,13 @@ export interface VehicleFuelRequestFieldRefs {
   readonly requestedById: Prisma.FieldRef<"VehicleFuelRequest", 'String'>
   readonly reviewedById: Prisma.FieldRef<"VehicleFuelRequest", 'String'>
   readonly source: Prisma.FieldRef<"VehicleFuelRequest", 'VehicleFuelSource'>
-  readonly estimatedDistanceKm: Prisma.FieldRef<"VehicleFuelRequest", 'Decimal'>
-  readonly exceptionDistanceKm: Prisma.FieldRef<"VehicleFuelRequest", 'Decimal'>
+  readonly estimatedDistanceKm: Prisma.FieldRef<"VehicleFuelRequest", 'BigInt'>
+  readonly exceptionDistanceKm: Prisma.FieldRef<"VehicleFuelRequest", 'BigInt'>
   readonly exceptionReason: Prisma.FieldRef<"VehicleFuelRequest", 'String'>
-  readonly estimatedFuelLiter: Prisma.FieldRef<"VehicleFuelRequest", 'Decimal'>
-  readonly unitPrice: Prisma.FieldRef<"VehicleFuelRequest", 'Decimal'>
-  readonly requestedAmount: Prisma.FieldRef<"VehicleFuelRequest", 'Decimal'>
-  readonly fuelEfficiencyKmPerL: Prisma.FieldRef<"VehicleFuelRequest", 'Decimal'>
+  readonly estimatedFuelLiter: Prisma.FieldRef<"VehicleFuelRequest", 'BigInt'>
+  readonly unitPrice: Prisma.FieldRef<"VehicleFuelRequest", 'BigInt'>
+  readonly requestedAmount: Prisma.FieldRef<"VehicleFuelRequest", 'BigInt'>
+  readonly fuelEfficiencyKmPerL: Prisma.FieldRef<"VehicleFuelRequest", 'BigInt'>
   readonly disbursementMethod: Prisma.FieldRef<"VehicleFuelRequest", 'POPaymentMethod'>
   readonly transferDestination: Prisma.FieldRef<"VehicleFuelRequest", 'String'>
   readonly transferProofUrl: Prisma.FieldRef<"VehicleFuelRequest", 'String'>
@@ -2982,11 +2845,6 @@ export type VehicleFuelRequestFindManyArgs<ExtArgs extends runtime.Types.Extensi
    * Skip the first `n` VehicleFuelRequests.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of VehicleFuelRequests.
-   */
   distinct?: Prisma.VehicleFuelRequestScalarFieldEnum | Prisma.VehicleFuelRequestScalarFieldEnum[]
 }
 
@@ -3020,30 +2878,6 @@ export type VehicleFuelRequestCreateManyArgs<ExtArgs extends runtime.Types.Exten
    * The data used to create many VehicleFuelRequests.
    */
   data: Prisma.VehicleFuelRequestCreateManyInput | Prisma.VehicleFuelRequestCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * VehicleFuelRequest createManyAndReturn
- */
-export type VehicleFuelRequestCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the VehicleFuelRequest
-   */
-  select?: Prisma.VehicleFuelRequestSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the VehicleFuelRequest
-   */
-  omit?: Prisma.VehicleFuelRequestOmit<ExtArgs> | null
-  /**
-   * The data used to create many VehicleFuelRequests.
-   */
-  data: Prisma.VehicleFuelRequestCreateManyInput | Prisma.VehicleFuelRequestCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.VehicleFuelRequestIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3088,36 +2922,6 @@ export type VehicleFuelRequestUpdateManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many VehicleFuelRequests to update.
    */
   limit?: number
-}
-
-/**
- * VehicleFuelRequest updateManyAndReturn
- */
-export type VehicleFuelRequestUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the VehicleFuelRequest
-   */
-  select?: Prisma.VehicleFuelRequestSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the VehicleFuelRequest
-   */
-  omit?: Prisma.VehicleFuelRequestOmit<ExtArgs> | null
-  /**
-   * The data used to update VehicleFuelRequests.
-   */
-  data: Prisma.XOR<Prisma.VehicleFuelRequestUpdateManyMutationInput, Prisma.VehicleFuelRequestUncheckedUpdateManyInput>
-  /**
-   * Filter which VehicleFuelRequests to update
-   */
-  where?: Prisma.VehicleFuelRequestWhereInput
-  /**
-   * Limit how many VehicleFuelRequests to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.VehicleFuelRequestIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3184,6 +2988,34 @@ export type VehicleFuelRequestDeleteManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many VehicleFuelRequests to delete.
    */
   limit?: number
+}
+
+/**
+ * VehicleFuelRequest findRaw
+ */
+export type VehicleFuelRequestFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * VehicleFuelRequest aggregateRaw
+ */
+export type VehicleFuelRequestAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -42,10 +42,11 @@ export async function ensureMenuAccessDefaults() {
     }
   }
 
-  if (rowsToCreate.length > 0) {
-    await prisma.menuAccess.createMany({
-      data: rowsToCreate,
-      skipDuplicates: true,
+  for (const row of rowsToCreate) {
+    await prisma.menuAccess.upsert({
+      where: { role_menuKey: { role: row.role, menuKey: row.menuKey } },
+      create: row,
+      update: {},
     });
   }
 }

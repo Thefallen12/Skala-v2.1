@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import { photoDownloadHref } from "@/lib/photo-urls";
+import { printUrlInFrame } from "@/lib/print-url";
 
 export type PurchaseOrderConfirmationRow = {
   id: string;
@@ -165,11 +166,12 @@ export default function PurchaseOrderConfirmationQueue({
             type="button"
             onClick={() => {
               if (!selected) return;
-              window.open(
+              void printUrlInFrame(
                 `/api/documents/transactions?kind=KO&id=${encodeURIComponent(selected.id)}`,
-                "_blank",
-                "noopener,noreferrer",
-              );
+              ).catch((error: unknown) => {
+                console.error("KO print failed:", error);
+                setMessage("KO gagal disiapkan untuk dicetak. Silakan coba kembali.");
+              });
             }}
             disabled={!selected}
           >

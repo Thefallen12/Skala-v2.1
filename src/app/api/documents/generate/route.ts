@@ -9,6 +9,7 @@ import type {
   DocumentData,
   DocumentLineItem,
 } from "@/lib/documents/generate-document";
+import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const runtime = "nodejs";
 
@@ -325,7 +326,10 @@ export async function POST(request: NextRequest) {
         return responseError("Tiket tidak ditemukan.", 404);
       }
 
-      const total = Number(ticket.totalAmount ?? ticket.requestedAmount ?? 0);
+      const total =
+        ticket.totalAmount !== null
+          ? decimalNumberFromScaledInteger(ticket.totalAmount)
+          : ticket.requestedAmount ?? 0;
       relatedRecordId = ticket.id;
       documentData = {
         nomor_request: ticket.ticketNumber,
@@ -348,7 +352,10 @@ export async function POST(request: NextRequest) {
         nama_penerima: ticket.recipientName ?? "—",
         items: ticket.items.map(
           (item): DocumentLineItem => {
-            const unitPrice = Number(item.estimatedCost ?? 0);
+            const unitPrice =
+              item.estimatedCost === null
+                ? 0
+                : decimalNumberFromScaledInteger(item.estimatedCost);
             return {
               description: item.itemName,
               quantity: item.quantity,

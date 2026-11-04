@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -165,7 +165,7 @@ export type PageMaintenanceGroupByOutputType = {
   _max: PageMaintenanceMaxAggregateOutputType | null
 }
 
-export type GetPageMaintenanceGroupByPayload<T extends PageMaintenanceGroupByArgs> = Prisma.PrismaPromise<
+type GetPageMaintenanceGroupByPayload<T extends PageMaintenanceGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<PageMaintenanceGroupByOutputType, T['by']> &
       {
@@ -256,7 +256,6 @@ export type PageMaintenanceUncheckedCreateInput = {
 }
 
 export type PageMaintenanceUpdateInput = {
-  pageKey?: Prisma.StringFieldUpdateOperationsInput | string
   pageName?: Prisma.StringFieldUpdateOperationsInput | string
   path?: Prisma.StringFieldUpdateOperationsInput | string
   isUnderMaintenance?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -265,7 +264,6 @@ export type PageMaintenanceUpdateInput = {
 }
 
 export type PageMaintenanceUncheckedUpdateInput = {
-  pageKey?: Prisma.StringFieldUpdateOperationsInput | string
   pageName?: Prisma.StringFieldUpdateOperationsInput | string
   path?: Prisma.StringFieldUpdateOperationsInput | string
   isUnderMaintenance?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -283,7 +281,6 @@ export type PageMaintenanceCreateManyInput = {
 }
 
 export type PageMaintenanceUpdateManyMutationInput = {
-  pageKey?: Prisma.StringFieldUpdateOperationsInput | string
   pageName?: Prisma.StringFieldUpdateOperationsInput | string
   path?: Prisma.StringFieldUpdateOperationsInput | string
   isUnderMaintenance?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -292,7 +289,6 @@ export type PageMaintenanceUpdateManyMutationInput = {
 }
 
 export type PageMaintenanceUncheckedUpdateManyInput = {
-  pageKey?: Prisma.StringFieldUpdateOperationsInput | string
   pageName?: Prisma.StringFieldUpdateOperationsInput | string
   path?: Prisma.StringFieldUpdateOperationsInput | string
   isUnderMaintenance?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -338,23 +334,7 @@ export type PageMaintenanceSelect<ExtArgs extends runtime.Types.Extensions.Inter
   updatedAt?: boolean
 }, ExtArgs["result"]["pageMaintenance"]>
 
-export type PageMaintenanceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  pageKey?: boolean
-  pageName?: boolean
-  path?: boolean
-  isUnderMaintenance?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["pageMaintenance"]>
 
-export type PageMaintenanceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  pageKey?: boolean
-  pageName?: boolean
-  path?: boolean
-  isUnderMaintenance?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["pageMaintenance"]>
 
 export type PageMaintenanceSelectScalar = {
   pageKey?: boolean
@@ -495,30 +475,6 @@ export interface PageMaintenanceDelegate<ExtArgs extends runtime.Types.Extension
   createMany<T extends PageMaintenanceCreateManyArgs>(args?: Prisma.SelectSubset<T, PageMaintenanceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many PageMaintenances and returns the data saved in the database.
-   * @param {PageMaintenanceCreateManyAndReturnArgs} args - Arguments to create many PageMaintenances.
-   * @example
-   * // Create many PageMaintenances
-   * const pageMaintenance = await prisma.pageMaintenance.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many PageMaintenances and only return the `pageKey`
-   * const pageMaintenanceWithPageKeyOnly = await prisma.pageMaintenance.createManyAndReturn({
-   *   select: { pageKey: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends PageMaintenanceCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, PageMaintenanceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PageMaintenancePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a PageMaintenance.
    * @param {PageMaintenanceDeleteArgs} args - Arguments to delete one PageMaintenance.
    * @example
@@ -583,36 +539,6 @@ export interface PageMaintenanceDelegate<ExtArgs extends runtime.Types.Extension
   updateMany<T extends PageMaintenanceUpdateManyArgs>(args: Prisma.SelectSubset<T, PageMaintenanceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more PageMaintenances and returns the data updated in the database.
-   * @param {PageMaintenanceUpdateManyAndReturnArgs} args - Arguments to update many PageMaintenances.
-   * @example
-   * // Update many PageMaintenances
-   * const pageMaintenance = await prisma.pageMaintenance.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more PageMaintenances and only return the `pageKey`
-   * const pageMaintenanceWithPageKeyOnly = await prisma.pageMaintenance.updateManyAndReturn({
-   *   select: { pageKey: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends PageMaintenanceUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, PageMaintenanceUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PageMaintenancePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one PageMaintenance.
    * @param {PageMaintenanceUpsertArgs} args - Arguments to update or create a PageMaintenance.
    * @example
@@ -630,6 +556,29 @@ export interface PageMaintenanceDelegate<ExtArgs extends runtime.Types.Extension
    * })
    */
   upsert<T extends PageMaintenanceUpsertArgs>(args: Prisma.SelectSubset<T, PageMaintenanceUpsertArgs<ExtArgs>>): Prisma.Prisma__PageMaintenanceClient<runtime.Types.Result.GetResult<Prisma.$PageMaintenancePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more PageMaintenances that matches the filter.
+   * @param {PageMaintenanceFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const pageMaintenance = await prisma.pageMaintenance.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.PageMaintenanceFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a PageMaintenance.
+   * @param {PageMaintenanceAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const pageMaintenance = await prisma.pageMaintenance.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.PageMaintenanceAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -982,11 +931,6 @@ export type PageMaintenanceFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` PageMaintenances.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of PageMaintenances.
-   */
   distinct?: Prisma.PageMaintenanceScalarFieldEnum | Prisma.PageMaintenanceScalarFieldEnum[]
 }
 
@@ -1016,26 +960,6 @@ export type PageMaintenanceCreateManyArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many PageMaintenances.
    */
   data: Prisma.PageMaintenanceCreateManyInput | Prisma.PageMaintenanceCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * PageMaintenance createManyAndReturn
- */
-export type PageMaintenanceCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PageMaintenance
-   */
-  select?: Prisma.PageMaintenanceSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the PageMaintenance
-   */
-  omit?: Prisma.PageMaintenanceOmit<ExtArgs> | null
-  /**
-   * The data used to create many PageMaintenances.
-   */
-  data: Prisma.PageMaintenanceCreateManyInput | Prisma.PageMaintenanceCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1064,32 +988,6 @@ export type PageMaintenanceUpdateArgs<ExtArgs extends runtime.Types.Extensions.I
  * PageMaintenance updateMany
  */
 export type PageMaintenanceUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update PageMaintenances.
-   */
-  data: Prisma.XOR<Prisma.PageMaintenanceUpdateManyMutationInput, Prisma.PageMaintenanceUncheckedUpdateManyInput>
-  /**
-   * Filter which PageMaintenances to update
-   */
-  where?: Prisma.PageMaintenanceWhereInput
-  /**
-   * Limit how many PageMaintenances to update.
-   */
-  limit?: number
-}
-
-/**
- * PageMaintenance updateManyAndReturn
- */
-export type PageMaintenanceUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PageMaintenance
-   */
-  select?: Prisma.PageMaintenanceSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the PageMaintenance
-   */
-  omit?: Prisma.PageMaintenanceOmit<ExtArgs> | null
   /**
    * The data used to update PageMaintenances.
    */
@@ -1160,6 +1058,34 @@ export type PageMaintenanceDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many PageMaintenances to delete.
    */
   limit?: number
+}
+
+/**
+ * PageMaintenance findRaw
+ */
+export type PageMaintenanceFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * PageMaintenance aggregateRaw
+ */
+export type PageMaintenanceAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

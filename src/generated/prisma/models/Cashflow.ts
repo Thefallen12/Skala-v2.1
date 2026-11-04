@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -248,7 +248,7 @@ export type CashflowGroupByOutputType = {
   _max: CashflowMaxAggregateOutputType | null
 }
 
-export type GetCashflowGroupByPayload<T extends CashflowGroupByArgs> = Prisma.PrismaPromise<
+type GetCashflowGroupByPayload<T extends CashflowGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<CashflowGroupByOutputType, T['by']> &
       {
@@ -292,14 +292,14 @@ export type CashflowOrderByWithRelationInput = {
   type?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   sourceDesc?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   paymentMethod?: Prisma.SortOrder
-  senderName?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  senderName?: Prisma.SortOrder
+  proofUrl?: Prisma.SortOrder
   accountId?: Prisma.SortOrder
   recordedBy?: Prisma.SortOrder
-  transferGroupId?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
+  transferGroupId?: Prisma.SortOrder
+  paymentTransactionId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
   account?: Prisma.FinanceAccountOrderByWithRelationInput
@@ -337,14 +337,14 @@ export type CashflowOrderByWithAggregationInput = {
   type?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   sourceDesc?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   paymentMethod?: Prisma.SortOrder
-  senderName?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  senderName?: Prisma.SortOrder
+  proofUrl?: Prisma.SortOrder
   accountId?: Prisma.SortOrder
   recordedBy?: Prisma.SortOrder
-  transferGroupId?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
+  transferGroupId?: Prisma.SortOrder
+  paymentTransactionId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.CashflowCountOrderByAggregateInput
   _avg?: Prisma.CashflowAvgOrderByAggregateInput
@@ -407,7 +407,6 @@ export type CashflowUncheckedCreateInput = {
 }
 
 export type CashflowUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -424,7 +423,6 @@ export type CashflowUpdateInput = {
 }
 
 export type CashflowUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -457,7 +455,6 @@ export type CashflowCreateManyInput = {
 }
 
 export type CashflowUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -469,7 +466,6 @@ export type CashflowUpdateManyMutationInput = {
 }
 
 export type CashflowUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -771,7 +767,6 @@ export type CashflowCreateOrConnectWithoutRecorderInput = {
 
 export type CashflowCreateManyRecorderInputEnvelope = {
   data: Prisma.CashflowCreateManyRecorderInput | Prisma.CashflowCreateManyRecorderInput[]
-  skipDuplicates?: boolean
 }
 
 export type CashflowUpsertWithWhereUniqueWithoutRecorderInput = {
@@ -848,7 +843,6 @@ export type CashflowCreateOrConnectWithoutProjectInput = {
 
 export type CashflowCreateManyProjectInputEnvelope = {
   data: Prisma.CashflowCreateManyProjectInput | Prisma.CashflowCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type CashflowUpsertWithWhereUniqueWithoutProjectInput = {
@@ -916,7 +910,6 @@ export type CashflowUpdateToOneWithWhereWithoutPaymentTransactionInput = {
 }
 
 export type CashflowUpdateWithoutPaymentTransactionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -932,7 +925,6 @@ export type CashflowUpdateWithoutPaymentTransactionInput = {
 }
 
 export type CashflowUncheckedUpdateWithoutPaymentTransactionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -986,7 +978,6 @@ export type CashflowCreateOrConnectWithoutAccountInput = {
 
 export type CashflowCreateManyAccountInputEnvelope = {
   data: Prisma.CashflowCreateManyAccountInput | Prisma.CashflowCreateManyAccountInput[]
-  skipDuplicates?: boolean
 }
 
 export type CashflowUpsertWithWhereUniqueWithoutAccountInput = {
@@ -1054,7 +1045,6 @@ export type CashflowUpdateToOneWithWhereWithoutOfficeExpenseInput = {
 }
 
 export type CashflowUpdateWithoutOfficeExpenseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1070,7 +1060,6 @@ export type CashflowUpdateWithoutOfficeExpenseInput = {
 }
 
 export type CashflowUncheckedUpdateWithoutOfficeExpenseInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1101,7 +1090,6 @@ export type CashflowCreateManyRecorderInput = {
 }
 
 export type CashflowUpdateWithoutRecorderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1117,7 +1105,6 @@ export type CashflowUpdateWithoutRecorderInput = {
 }
 
 export type CashflowUncheckedUpdateWithoutRecorderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1133,7 +1120,6 @@ export type CashflowUncheckedUpdateWithoutRecorderInput = {
 }
 
 export type CashflowUncheckedUpdateManyWithoutRecorderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1163,7 +1149,6 @@ export type CashflowCreateManyProjectInput = {
 }
 
 export type CashflowUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1179,7 +1164,6 @@ export type CashflowUpdateWithoutProjectInput = {
 }
 
 export type CashflowUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1195,7 +1179,6 @@ export type CashflowUncheckedUpdateWithoutProjectInput = {
 }
 
 export type CashflowUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1225,7 +1208,6 @@ export type CashflowCreateManyAccountInput = {
 }
 
 export type CashflowUpdateWithoutAccountInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1241,7 +1223,6 @@ export type CashflowUpdateWithoutAccountInput = {
 }
 
 export type CashflowUncheckedUpdateWithoutAccountInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1257,7 +1238,6 @@ export type CashflowUncheckedUpdateWithoutAccountInput = {
 }
 
 export type CashflowUncheckedUpdateManyWithoutAccountInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.FloatFieldUpdateOperationsInput | number
   sourceDesc?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1294,45 +1274,7 @@ export type CashflowSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   officeExpense?: boolean | Prisma.Cashflow$officeExpenseArgs<ExtArgs>
 }, ExtArgs["result"]["cashflow"]>
 
-export type CashflowSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  type?: boolean
-  amount?: boolean
-  sourceDesc?: boolean
-  projectId?: boolean
-  paymentMethod?: boolean
-  senderName?: boolean
-  proofUrl?: boolean
-  accountId?: boolean
-  recordedBy?: boolean
-  transferGroupId?: boolean
-  paymentTransactionId?: boolean
-  createdAt?: boolean
-  project?: boolean | Prisma.Cashflow$projectArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.Cashflow$paymentTransactionArgs<ExtArgs>
-}, ExtArgs["result"]["cashflow"]>
 
-export type CashflowSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  type?: boolean
-  amount?: boolean
-  sourceDesc?: boolean
-  projectId?: boolean
-  paymentMethod?: boolean
-  senderName?: boolean
-  proofUrl?: boolean
-  accountId?: boolean
-  recordedBy?: boolean
-  transferGroupId?: boolean
-  paymentTransactionId?: boolean
-  createdAt?: boolean
-  project?: boolean | Prisma.Cashflow$projectArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.Cashflow$paymentTransactionArgs<ExtArgs>
-}, ExtArgs["result"]["cashflow"]>
 
 export type CashflowSelectScalar = {
   id?: boolean
@@ -1357,18 +1299,6 @@ export type CashflowInclude<ExtArgs extends runtime.Types.Extensions.InternalArg
   recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   paymentTransaction?: boolean | Prisma.Cashflow$paymentTransactionArgs<ExtArgs>
   officeExpense?: boolean | Prisma.Cashflow$officeExpenseArgs<ExtArgs>
-}
-export type CashflowIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.Cashflow$projectArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.Cashflow$paymentTransactionArgs<ExtArgs>
-}
-export type CashflowIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.Cashflow$projectArgs<ExtArgs>
-  account?: boolean | Prisma.FinanceAccountDefaultArgs<ExtArgs>
-  recorder?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.Cashflow$paymentTransactionArgs<ExtArgs>
 }
 
 export type $CashflowPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1512,30 +1442,6 @@ export interface CashflowDelegate<ExtArgs extends runtime.Types.Extensions.Inter
   createMany<T extends CashflowCreateManyArgs>(args?: Prisma.SelectSubset<T, CashflowCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Cashflows and returns the data saved in the database.
-   * @param {CashflowCreateManyAndReturnArgs} args - Arguments to create many Cashflows.
-   * @example
-   * // Create many Cashflows
-   * const cashflow = await prisma.cashflow.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Cashflows and only return the `id`
-   * const cashflowWithIdOnly = await prisma.cashflow.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends CashflowCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, CashflowCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CashflowPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Cashflow.
    * @param {CashflowDeleteArgs} args - Arguments to delete one Cashflow.
    * @example
@@ -1600,36 +1506,6 @@ export interface CashflowDelegate<ExtArgs extends runtime.Types.Extensions.Inter
   updateMany<T extends CashflowUpdateManyArgs>(args: Prisma.SelectSubset<T, CashflowUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Cashflows and returns the data updated in the database.
-   * @param {CashflowUpdateManyAndReturnArgs} args - Arguments to update many Cashflows.
-   * @example
-   * // Update many Cashflows
-   * const cashflow = await prisma.cashflow.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Cashflows and only return the `id`
-   * const cashflowWithIdOnly = await prisma.cashflow.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends CashflowUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, CashflowUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CashflowPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Cashflow.
    * @param {CashflowUpsertArgs} args - Arguments to update or create a Cashflow.
    * @example
@@ -1647,6 +1523,29 @@ export interface CashflowDelegate<ExtArgs extends runtime.Types.Extensions.Inter
    * })
    */
   upsert<T extends CashflowUpsertArgs>(args: Prisma.SelectSubset<T, CashflowUpsertArgs<ExtArgs>>): Prisma.Prisma__CashflowClient<runtime.Types.Result.GetResult<Prisma.$CashflowPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Cashflows that matches the filter.
+   * @param {CashflowFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const cashflow = await prisma.cashflow.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.CashflowFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Cashflow.
+   * @param {CashflowAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const cashflow = await prisma.cashflow.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.CashflowAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2031,11 +1930,6 @@ export type CashflowFindManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Skip the first `n` Cashflows.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Cashflows.
-   */
   distinct?: Prisma.CashflowScalarFieldEnum | Prisma.CashflowScalarFieldEnum[]
 }
 
@@ -2069,30 +1963,6 @@ export type CashflowCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * The data used to create many Cashflows.
    */
   data: Prisma.CashflowCreateManyInput | Prisma.CashflowCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Cashflow createManyAndReturn
- */
-export type CashflowCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Cashflow
-   */
-  select?: Prisma.CashflowSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Cashflow
-   */
-  omit?: Prisma.CashflowOmit<ExtArgs> | null
-  /**
-   * The data used to create many Cashflows.
-   */
-  data: Prisma.CashflowCreateManyInput | Prisma.CashflowCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.CashflowIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2137,36 +2007,6 @@ export type CashflowUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Limit how many Cashflows to update.
    */
   limit?: number
-}
-
-/**
- * Cashflow updateManyAndReturn
- */
-export type CashflowUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Cashflow
-   */
-  select?: Prisma.CashflowSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Cashflow
-   */
-  omit?: Prisma.CashflowOmit<ExtArgs> | null
-  /**
-   * The data used to update Cashflows.
-   */
-  data: Prisma.XOR<Prisma.CashflowUpdateManyMutationInput, Prisma.CashflowUncheckedUpdateManyInput>
-  /**
-   * Filter which Cashflows to update
-   */
-  where?: Prisma.CashflowWhereInput
-  /**
-   * Limit how many Cashflows to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.CashflowIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2233,6 +2073,34 @@ export type CashflowDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Limit how many Cashflows to delete.
    */
   limit?: number
+}
+
+/**
+ * Cashflow findRaw
+ */
+export type CashflowFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Cashflow aggregateRaw
+ */
+export type CashflowAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

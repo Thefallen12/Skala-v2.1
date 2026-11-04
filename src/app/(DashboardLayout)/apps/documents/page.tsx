@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { canManageUsers } from "@/lib/user-access";
 import { TicketStatus, TicketType } from "@/generated/prisma/enums";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
@@ -101,10 +102,16 @@ export default async function DocumentsPage() {
         }))}
         tickets={tickets.map((ticket) => ({
           ...ticket,
-          totalAmount: ticket.totalAmount?.toString() ?? null,
+          totalAmount:
+            ticket.totalAmount !== null
+              ? decimalStringFromScaledInteger(ticket.totalAmount)
+              : null,
           items: ticket.items.map((item) => ({
             ...item,
-            estimatedCost: item.estimatedCost?.toString() ?? null,
+            estimatedCost:
+              item.estimatedCost !== null
+                ? decimalStringFromScaledInteger(item.estimatedCost)
+                : null,
           })),
         }))}
         documents={documents.map((document) => ({

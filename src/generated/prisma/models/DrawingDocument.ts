@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -241,7 +241,7 @@ export type DrawingDocumentGroupByOutputType = {
   _max: DrawingDocumentMaxAggregateOutputType | null
 }
 
-export type GetDrawingDocumentGroupByPayload<T extends DrawingDocumentGroupByArgs> = Prisma.PrismaPromise<
+type GetDrawingDocumentGroupByPayload<T extends DrawingDocumentGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DrawingDocumentGroupByOutputType, T['by']> &
       {
@@ -280,13 +280,13 @@ export type DrawingDocumentWhereInput = {
 export type DrawingDocumentOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   drawingCode?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   category?: Prisma.SortOrder
   version?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  thumbnailUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  fileUrl?: Prisma.SortOrder
+  thumbnailUrl?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -319,13 +319,13 @@ export type DrawingDocumentWhereUniqueInput = Prisma.AtLeast<{
 export type DrawingDocumentOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   drawingCode?: Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
+  projectId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   category?: Prisma.SortOrder
   version?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  thumbnailUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  fileUrl?: Prisma.SortOrder
+  thumbnailUrl?: Prisma.SortOrder
   uploadedById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -387,7 +387,6 @@ export type DrawingDocumentUncheckedCreateInput = {
 }
 
 export type DrawingDocumentUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -403,7 +402,6 @@ export type DrawingDocumentUpdateInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -434,7 +432,6 @@ export type DrawingDocumentCreateManyInput = {
 }
 
 export type DrawingDocumentUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -447,7 +444,6 @@ export type DrawingDocumentUpdateManyMutationInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -664,7 +660,6 @@ export type DrawingDocumentCreateOrConnectWithoutUploadedByInput = {
 
 export type DrawingDocumentCreateManyUploadedByInputEnvelope = {
   data: Prisma.DrawingDocumentCreateManyUploadedByInput | Prisma.DrawingDocumentCreateManyUploadedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type DrawingDocumentUpsertWithWhereUniqueWithoutUploadedByInput = {
@@ -738,7 +733,6 @@ export type DrawingDocumentCreateOrConnectWithoutProjectInput = {
 
 export type DrawingDocumentCreateManyProjectInputEnvelope = {
   data: Prisma.DrawingDocumentCreateManyProjectInput | Prisma.DrawingDocumentCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type DrawingDocumentUpsertWithWhereUniqueWithoutProjectInput = {
@@ -804,7 +798,6 @@ export type DrawingDocumentUpdateToOneWithWhereWithoutLogsInput = {
 }
 
 export type DrawingDocumentUpdateWithoutLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -819,7 +812,6 @@ export type DrawingDocumentUpdateWithoutLogsInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateWithoutLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -848,7 +840,6 @@ export type DrawingDocumentCreateManyUploadedByInput = {
 }
 
 export type DrawingDocumentUpdateWithoutUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -863,7 +854,6 @@ export type DrawingDocumentUpdateWithoutUploadedByInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateWithoutUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -878,7 +868,6 @@ export type DrawingDocumentUncheckedUpdateWithoutUploadedByInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateManyWithoutUploadedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -906,7 +895,6 @@ export type DrawingDocumentCreateManyProjectInput = {
 }
 
 export type DrawingDocumentUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -921,7 +909,6 @@ export type DrawingDocumentUpdateWithoutProjectInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -936,7 +923,6 @@ export type DrawingDocumentUncheckedUpdateWithoutProjectInput = {
 }
 
 export type DrawingDocumentUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   drawingCode?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   category?: Prisma.StringFieldUpdateOperationsInput | string
@@ -999,39 +985,7 @@ export type DrawingDocumentSelect<ExtArgs extends runtime.Types.Extensions.Inter
   _count?: boolean | Prisma.DrawingDocumentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["drawingDocument"]>
 
-export type DrawingDocumentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  drawingCode?: boolean
-  projectId?: boolean
-  title?: boolean
-  category?: boolean
-  version?: boolean
-  status?: boolean
-  fileUrl?: boolean
-  thumbnailUrl?: boolean
-  uploadedById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.DrawingDocument$projectArgs<ExtArgs>
-  uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["drawingDocument"]>
 
-export type DrawingDocumentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  drawingCode?: boolean
-  projectId?: boolean
-  title?: boolean
-  category?: boolean
-  version?: boolean
-  status?: boolean
-  fileUrl?: boolean
-  thumbnailUrl?: boolean
-  uploadedById?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.DrawingDocument$projectArgs<ExtArgs>
-  uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["drawingDocument"]>
 
 export type DrawingDocumentSelectScalar = {
   id?: boolean
@@ -1054,14 +1008,6 @@ export type DrawingDocumentInclude<ExtArgs extends runtime.Types.Extensions.Inte
   uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   logs?: boolean | Prisma.DrawingDocument$logsArgs<ExtArgs>
   _count?: boolean | Prisma.DrawingDocumentCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type DrawingDocumentIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.DrawingDocument$projectArgs<ExtArgs>
-  uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type DrawingDocumentIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.DrawingDocument$projectArgs<ExtArgs>
-  uploadedBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 
 export type $DrawingDocumentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1202,30 +1148,6 @@ export interface DrawingDocumentDelegate<ExtArgs extends runtime.Types.Extension
   createMany<T extends DrawingDocumentCreateManyArgs>(args?: Prisma.SelectSubset<T, DrawingDocumentCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DrawingDocuments and returns the data saved in the database.
-   * @param {DrawingDocumentCreateManyAndReturnArgs} args - Arguments to create many DrawingDocuments.
-   * @example
-   * // Create many DrawingDocuments
-   * const drawingDocument = await prisma.drawingDocument.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DrawingDocuments and only return the `id`
-   * const drawingDocumentWithIdOnly = await prisma.drawingDocument.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DrawingDocumentCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DrawingDocumentCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DrawingDocumentPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DrawingDocument.
    * @param {DrawingDocumentDeleteArgs} args - Arguments to delete one DrawingDocument.
    * @example
@@ -1290,36 +1212,6 @@ export interface DrawingDocumentDelegate<ExtArgs extends runtime.Types.Extension
   updateMany<T extends DrawingDocumentUpdateManyArgs>(args: Prisma.SelectSubset<T, DrawingDocumentUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DrawingDocuments and returns the data updated in the database.
-   * @param {DrawingDocumentUpdateManyAndReturnArgs} args - Arguments to update many DrawingDocuments.
-   * @example
-   * // Update many DrawingDocuments
-   * const drawingDocument = await prisma.drawingDocument.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DrawingDocuments and only return the `id`
-   * const drawingDocumentWithIdOnly = await prisma.drawingDocument.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DrawingDocumentUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DrawingDocumentUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DrawingDocumentPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DrawingDocument.
    * @param {DrawingDocumentUpsertArgs} args - Arguments to update or create a DrawingDocument.
    * @example
@@ -1337,6 +1229,29 @@ export interface DrawingDocumentDelegate<ExtArgs extends runtime.Types.Extension
    * })
    */
   upsert<T extends DrawingDocumentUpsertArgs>(args: Prisma.SelectSubset<T, DrawingDocumentUpsertArgs<ExtArgs>>): Prisma.Prisma__DrawingDocumentClient<runtime.Types.Result.GetResult<Prisma.$DrawingDocumentPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DrawingDocuments that matches the filter.
+   * @param {DrawingDocumentFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const drawingDocument = await prisma.drawingDocument.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DrawingDocumentFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DrawingDocument.
+   * @param {DrawingDocumentAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const drawingDocument = await prisma.drawingDocument.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DrawingDocumentAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1718,11 +1633,6 @@ export type DrawingDocumentFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` DrawingDocuments.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DrawingDocuments.
-   */
   distinct?: Prisma.DrawingDocumentScalarFieldEnum | Prisma.DrawingDocumentScalarFieldEnum[]
 }
 
@@ -1756,30 +1666,6 @@ export type DrawingDocumentCreateManyArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many DrawingDocuments.
    */
   data: Prisma.DrawingDocumentCreateManyInput | Prisma.DrawingDocumentCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DrawingDocument createManyAndReturn
- */
-export type DrawingDocumentCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DrawingDocument
-   */
-  select?: Prisma.DrawingDocumentSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DrawingDocument
-   */
-  omit?: Prisma.DrawingDocumentOmit<ExtArgs> | null
-  /**
-   * The data used to create many DrawingDocuments.
-   */
-  data: Prisma.DrawingDocumentCreateManyInput | Prisma.DrawingDocumentCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DrawingDocumentIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1824,36 +1710,6 @@ export type DrawingDocumentUpdateManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many DrawingDocuments to update.
    */
   limit?: number
-}
-
-/**
- * DrawingDocument updateManyAndReturn
- */
-export type DrawingDocumentUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DrawingDocument
-   */
-  select?: Prisma.DrawingDocumentSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DrawingDocument
-   */
-  omit?: Prisma.DrawingDocumentOmit<ExtArgs> | null
-  /**
-   * The data used to update DrawingDocuments.
-   */
-  data: Prisma.XOR<Prisma.DrawingDocumentUpdateManyMutationInput, Prisma.DrawingDocumentUncheckedUpdateManyInput>
-  /**
-   * Filter which DrawingDocuments to update
-   */
-  where?: Prisma.DrawingDocumentWhereInput
-  /**
-   * Limit how many DrawingDocuments to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DrawingDocumentIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1920,6 +1776,34 @@ export type DrawingDocumentDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many DrawingDocuments to delete.
    */
   limit?: number
+}
+
+/**
+ * DrawingDocument findRaw
+ */
+export type DrawingDocumentFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DrawingDocument aggregateRaw
+ */
+export type DrawingDocumentAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

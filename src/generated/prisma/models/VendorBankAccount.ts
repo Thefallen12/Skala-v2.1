@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -186,7 +186,7 @@ export type VendorBankAccountGroupByOutputType = {
   _max: VendorBankAccountMaxAggregateOutputType | null
 }
 
-export type GetVendorBankAccountGroupByPayload<T extends VendorBankAccountGroupByArgs> = Prisma.PrismaPromise<
+type GetVendorBankAccountGroupByPayload<T extends VendorBankAccountGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<VendorBankAccountGroupByOutputType, T['by']> &
       {
@@ -220,7 +220,7 @@ export type VendorBankAccountWhereInput = {
 export type VendorBankAccountOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   vendorId?: Prisma.SortOrder
-  label?: Prisma.SortOrderInput | Prisma.SortOrder
+  label?: Prisma.SortOrder
   bankName?: Prisma.SortOrder
   bankAccount?: Prisma.SortOrder
   bankHolder?: Prisma.SortOrder
@@ -249,7 +249,7 @@ export type VendorBankAccountWhereUniqueInput = Prisma.AtLeast<{
 export type VendorBankAccountOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   vendorId?: Prisma.SortOrder
-  label?: Prisma.SortOrderInput | Prisma.SortOrder
+  label?: Prisma.SortOrder
   bankName?: Prisma.SortOrder
   bankAccount?: Prisma.SortOrder
   bankHolder?: Prisma.SortOrder
@@ -301,7 +301,6 @@ export type VendorBankAccountUncheckedCreateInput = {
 }
 
 export type VendorBankAccountUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
   bankAccount?: Prisma.StringFieldUpdateOperationsInput | string
@@ -313,7 +312,6 @@ export type VendorBankAccountUpdateInput = {
 }
 
 export type VendorBankAccountUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -337,7 +335,6 @@ export type VendorBankAccountCreateManyInput = {
 }
 
 export type VendorBankAccountUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
   bankAccount?: Prisma.StringFieldUpdateOperationsInput | string
@@ -348,7 +345,6 @@ export type VendorBankAccountUpdateManyMutationInput = {
 }
 
 export type VendorBankAccountUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   vendorId?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -476,7 +472,6 @@ export type VendorBankAccountCreateOrConnectWithoutVendorInput = {
 
 export type VendorBankAccountCreateManyVendorInputEnvelope = {
   data: Prisma.VendorBankAccountCreateManyVendorInput | Prisma.VendorBankAccountCreateManyVendorInput[]
-  skipDuplicates?: boolean
 }
 
 export type VendorBankAccountUpsertWithWhereUniqueWithoutVendorInput = {
@@ -522,7 +517,6 @@ export type VendorBankAccountCreateManyVendorInput = {
 }
 
 export type VendorBankAccountUpdateWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
   bankAccount?: Prisma.StringFieldUpdateOperationsInput | string
@@ -533,7 +527,6 @@ export type VendorBankAccountUpdateWithoutVendorInput = {
 }
 
 export type VendorBankAccountUncheckedUpdateWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
   bankAccount?: Prisma.StringFieldUpdateOperationsInput | string
@@ -544,7 +537,6 @@ export type VendorBankAccountUncheckedUpdateWithoutVendorInput = {
 }
 
 export type VendorBankAccountUncheckedUpdateManyWithoutVendorInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   bankName?: Prisma.StringFieldUpdateOperationsInput | string
   bankAccount?: Prisma.StringFieldUpdateOperationsInput | string
@@ -569,31 +561,7 @@ export type VendorBankAccountSelect<ExtArgs extends runtime.Types.Extensions.Int
   vendor?: boolean | Prisma.VendorDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["vendorBankAccount"]>
 
-export type VendorBankAccountSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  vendorId?: boolean
-  label?: boolean
-  bankName?: boolean
-  bankAccount?: boolean
-  bankHolder?: boolean
-  isPrimary?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  vendor?: boolean | Prisma.VendorDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["vendorBankAccount"]>
 
-export type VendorBankAccountSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  vendorId?: boolean
-  label?: boolean
-  bankName?: boolean
-  bankAccount?: boolean
-  bankHolder?: boolean
-  isPrimary?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  vendor?: boolean | Prisma.VendorDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["vendorBankAccount"]>
 
 export type VendorBankAccountSelectScalar = {
   id?: boolean
@@ -609,12 +577,6 @@ export type VendorBankAccountSelectScalar = {
 
 export type VendorBankAccountOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "vendorId" | "label" | "bankName" | "bankAccount" | "bankHolder" | "isPrimary" | "createdAt" | "updatedAt", ExtArgs["result"]["vendorBankAccount"]>
 export type VendorBankAccountInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vendor?: boolean | Prisma.VendorDefaultArgs<ExtArgs>
-}
-export type VendorBankAccountIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  vendor?: boolean | Prisma.VendorDefaultArgs<ExtArgs>
-}
-export type VendorBankAccountIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   vendor?: boolean | Prisma.VendorDefaultArgs<ExtArgs>
 }
 
@@ -751,30 +713,6 @@ export interface VendorBankAccountDelegate<ExtArgs extends runtime.Types.Extensi
   createMany<T extends VendorBankAccountCreateManyArgs>(args?: Prisma.SelectSubset<T, VendorBankAccountCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many VendorBankAccounts and returns the data saved in the database.
-   * @param {VendorBankAccountCreateManyAndReturnArgs} args - Arguments to create many VendorBankAccounts.
-   * @example
-   * // Create many VendorBankAccounts
-   * const vendorBankAccount = await prisma.vendorBankAccount.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many VendorBankAccounts and only return the `id`
-   * const vendorBankAccountWithIdOnly = await prisma.vendorBankAccount.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends VendorBankAccountCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, VendorBankAccountCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VendorBankAccountPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a VendorBankAccount.
    * @param {VendorBankAccountDeleteArgs} args - Arguments to delete one VendorBankAccount.
    * @example
@@ -839,36 +777,6 @@ export interface VendorBankAccountDelegate<ExtArgs extends runtime.Types.Extensi
   updateMany<T extends VendorBankAccountUpdateManyArgs>(args: Prisma.SelectSubset<T, VendorBankAccountUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more VendorBankAccounts and returns the data updated in the database.
-   * @param {VendorBankAccountUpdateManyAndReturnArgs} args - Arguments to update many VendorBankAccounts.
-   * @example
-   * // Update many VendorBankAccounts
-   * const vendorBankAccount = await prisma.vendorBankAccount.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more VendorBankAccounts and only return the `id`
-   * const vendorBankAccountWithIdOnly = await prisma.vendorBankAccount.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends VendorBankAccountUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, VendorBankAccountUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VendorBankAccountPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one VendorBankAccount.
    * @param {VendorBankAccountUpsertArgs} args - Arguments to update or create a VendorBankAccount.
    * @example
@@ -886,6 +794,29 @@ export interface VendorBankAccountDelegate<ExtArgs extends runtime.Types.Extensi
    * })
    */
   upsert<T extends VendorBankAccountUpsertArgs>(args: Prisma.SelectSubset<T, VendorBankAccountUpsertArgs<ExtArgs>>): Prisma.Prisma__VendorBankAccountClient<runtime.Types.Result.GetResult<Prisma.$VendorBankAccountPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more VendorBankAccounts that matches the filter.
+   * @param {VendorBankAccountFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const vendorBankAccount = await prisma.vendorBankAccount.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.VendorBankAccountFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a VendorBankAccount.
+   * @param {VendorBankAccountAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const vendorBankAccount = await prisma.vendorBankAccount.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.VendorBankAccountAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1262,11 +1193,6 @@ export type VendorBankAccountFindManyArgs<ExtArgs extends runtime.Types.Extensio
    * Skip the first `n` VendorBankAccounts.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of VendorBankAccounts.
-   */
   distinct?: Prisma.VendorBankAccountScalarFieldEnum | Prisma.VendorBankAccountScalarFieldEnum[]
 }
 
@@ -1300,30 +1226,6 @@ export type VendorBankAccountCreateManyArgs<ExtArgs extends runtime.Types.Extens
    * The data used to create many VendorBankAccounts.
    */
   data: Prisma.VendorBankAccountCreateManyInput | Prisma.VendorBankAccountCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * VendorBankAccount createManyAndReturn
- */
-export type VendorBankAccountCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the VendorBankAccount
-   */
-  select?: Prisma.VendorBankAccountSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the VendorBankAccount
-   */
-  omit?: Prisma.VendorBankAccountOmit<ExtArgs> | null
-  /**
-   * The data used to create many VendorBankAccounts.
-   */
-  data: Prisma.VendorBankAccountCreateManyInput | Prisma.VendorBankAccountCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.VendorBankAccountIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1368,36 +1270,6 @@ export type VendorBankAccountUpdateManyArgs<ExtArgs extends runtime.Types.Extens
    * Limit how many VendorBankAccounts to update.
    */
   limit?: number
-}
-
-/**
- * VendorBankAccount updateManyAndReturn
- */
-export type VendorBankAccountUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the VendorBankAccount
-   */
-  select?: Prisma.VendorBankAccountSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the VendorBankAccount
-   */
-  omit?: Prisma.VendorBankAccountOmit<ExtArgs> | null
-  /**
-   * The data used to update VendorBankAccounts.
-   */
-  data: Prisma.XOR<Prisma.VendorBankAccountUpdateManyMutationInput, Prisma.VendorBankAccountUncheckedUpdateManyInput>
-  /**
-   * Filter which VendorBankAccounts to update
-   */
-  where?: Prisma.VendorBankAccountWhereInput
-  /**
-   * Limit how many VendorBankAccounts to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.VendorBankAccountIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1464,6 +1336,34 @@ export type VendorBankAccountDeleteManyArgs<ExtArgs extends runtime.Types.Extens
    * Limit how many VendorBankAccounts to delete.
    */
   limit?: number
+}
+
+/**
+ * VendorBankAccount findRaw
+ */
+export type VendorBankAccountFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * VendorBankAccount aggregateRaw
+ */
+export type VendorBankAccountAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

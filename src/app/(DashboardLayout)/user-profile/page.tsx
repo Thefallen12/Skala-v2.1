@@ -9,6 +9,7 @@ import {
 } from "@/generated/prisma/enums";
 import { auth } from "../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import BreadcrumbComp from "../layout/shared/breadcrumb/BreadcrumbComp";
 
 export const metadata: Metadata = {
@@ -178,7 +179,10 @@ export default async function UserProfilePage() {
             title: ticket.title,
             type: ticket.type,
             status: ticket.status,
-            totalAmount: ticket.totalAmount?.toString() ?? null,
+            totalAmount:
+              ticket.totalAmount !== null
+                ? decimalStringFromScaledInteger(ticket.totalAmount)
+                : null,
             createdAt: ticket.createdAt.toISOString(),
             projectName: ticket.project?.name ?? null,
           })),

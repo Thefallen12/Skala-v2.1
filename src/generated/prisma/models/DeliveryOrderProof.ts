@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -151,7 +151,7 @@ export type DeliveryOrderProofGroupByOutputType = {
   _max: DeliveryOrderProofMaxAggregateOutputType | null
 }
 
-export type GetDeliveryOrderProofGroupByPayload<T extends DeliveryOrderProofGroupByArgs> = Prisma.PrismaPromise<
+type GetDeliveryOrderProofGroupByPayload<T extends DeliveryOrderProofGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DeliveryOrderProofGroupByOutputType, T['by']> &
       {
@@ -231,14 +231,12 @@ export type DeliveryOrderProofUncheckedCreateInput = {
 }
 
 export type DeliveryOrderProofUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deliveryOrder?: Prisma.DeliveryOrderUpdateOneRequiredWithoutReceiptPhotosNestedInput
 }
 
 export type DeliveryOrderProofUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -252,13 +250,11 @@ export type DeliveryOrderProofCreateManyInput = {
 }
 
 export type DeliveryOrderProofUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DeliveryOrderProofUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   deliveryOrderId?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -356,7 +352,6 @@ export type DeliveryOrderProofCreateOrConnectWithoutDeliveryOrderInput = {
 
 export type DeliveryOrderProofCreateManyDeliveryOrderInputEnvelope = {
   data: Prisma.DeliveryOrderProofCreateManyDeliveryOrderInput | Prisma.DeliveryOrderProofCreateManyDeliveryOrderInput[]
-  skipDuplicates?: boolean
 }
 
 export type DeliveryOrderProofUpsertWithWhereUniqueWithoutDeliveryOrderInput = {
@@ -392,19 +387,16 @@ export type DeliveryOrderProofCreateManyDeliveryOrderInput = {
 }
 
 export type DeliveryOrderProofUpdateWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DeliveryOrderProofUncheckedUpdateWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type DeliveryOrderProofUncheckedUpdateManyWithoutDeliveryOrderInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -419,21 +411,7 @@ export type DeliveryOrderProofSelect<ExtArgs extends runtime.Types.Extensions.In
   deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["deliveryOrderProof"]>
 
-export type DeliveryOrderProofSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  deliveryOrderId?: boolean
-  url?: boolean
-  createdAt?: boolean
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["deliveryOrderProof"]>
 
-export type DeliveryOrderProofSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  deliveryOrderId?: boolean
-  url?: boolean
-  createdAt?: boolean
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["deliveryOrderProof"]>
 
 export type DeliveryOrderProofSelectScalar = {
   id?: boolean
@@ -444,12 +422,6 @@ export type DeliveryOrderProofSelectScalar = {
 
 export type DeliveryOrderProofOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "deliveryOrderId" | "url" | "createdAt", ExtArgs["result"]["deliveryOrderProof"]>
 export type DeliveryOrderProofInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}
-export type DeliveryOrderProofIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}
-export type DeliveryOrderProofIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   deliveryOrder?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
 }
 
@@ -581,30 +553,6 @@ export interface DeliveryOrderProofDelegate<ExtArgs extends runtime.Types.Extens
   createMany<T extends DeliveryOrderProofCreateManyArgs>(args?: Prisma.SelectSubset<T, DeliveryOrderProofCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DeliveryOrderProofs and returns the data saved in the database.
-   * @param {DeliveryOrderProofCreateManyAndReturnArgs} args - Arguments to create many DeliveryOrderProofs.
-   * @example
-   * // Create many DeliveryOrderProofs
-   * const deliveryOrderProof = await prisma.deliveryOrderProof.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DeliveryOrderProofs and only return the `id`
-   * const deliveryOrderProofWithIdOnly = await prisma.deliveryOrderProof.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DeliveryOrderProofCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DeliveryOrderProofCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryOrderProofPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DeliveryOrderProof.
    * @param {DeliveryOrderProofDeleteArgs} args - Arguments to delete one DeliveryOrderProof.
    * @example
@@ -669,36 +617,6 @@ export interface DeliveryOrderProofDelegate<ExtArgs extends runtime.Types.Extens
   updateMany<T extends DeliveryOrderProofUpdateManyArgs>(args: Prisma.SelectSubset<T, DeliveryOrderProofUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DeliveryOrderProofs and returns the data updated in the database.
-   * @param {DeliveryOrderProofUpdateManyAndReturnArgs} args - Arguments to update many DeliveryOrderProofs.
-   * @example
-   * // Update many DeliveryOrderProofs
-   * const deliveryOrderProof = await prisma.deliveryOrderProof.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DeliveryOrderProofs and only return the `id`
-   * const deliveryOrderProofWithIdOnly = await prisma.deliveryOrderProof.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DeliveryOrderProofUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DeliveryOrderProofUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryOrderProofPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DeliveryOrderProof.
    * @param {DeliveryOrderProofUpsertArgs} args - Arguments to update or create a DeliveryOrderProof.
    * @example
@@ -716,6 +634,29 @@ export interface DeliveryOrderProofDelegate<ExtArgs extends runtime.Types.Extens
    * })
    */
   upsert<T extends DeliveryOrderProofUpsertArgs>(args: Prisma.SelectSubset<T, DeliveryOrderProofUpsertArgs<ExtArgs>>): Prisma.Prisma__DeliveryOrderProofClient<runtime.Types.Result.GetResult<Prisma.$DeliveryOrderProofPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DeliveryOrderProofs that matches the filter.
+   * @param {DeliveryOrderProofFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const deliveryOrderProof = await prisma.deliveryOrderProof.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DeliveryOrderProofFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DeliveryOrderProof.
+   * @param {DeliveryOrderProofAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const deliveryOrderProof = await prisma.deliveryOrderProof.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DeliveryOrderProofAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1087,11 +1028,6 @@ export type DeliveryOrderProofFindManyArgs<ExtArgs extends runtime.Types.Extensi
    * Skip the first `n` DeliveryOrderProofs.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DeliveryOrderProofs.
-   */
   distinct?: Prisma.DeliveryOrderProofScalarFieldEnum | Prisma.DeliveryOrderProofScalarFieldEnum[]
 }
 
@@ -1125,30 +1061,6 @@ export type DeliveryOrderProofCreateManyArgs<ExtArgs extends runtime.Types.Exten
    * The data used to create many DeliveryOrderProofs.
    */
   data: Prisma.DeliveryOrderProofCreateManyInput | Prisma.DeliveryOrderProofCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DeliveryOrderProof createManyAndReturn
- */
-export type DeliveryOrderProofCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DeliveryOrderProof
-   */
-  select?: Prisma.DeliveryOrderProofSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DeliveryOrderProof
-   */
-  omit?: Prisma.DeliveryOrderProofOmit<ExtArgs> | null
-  /**
-   * The data used to create many DeliveryOrderProofs.
-   */
-  data: Prisma.DeliveryOrderProofCreateManyInput | Prisma.DeliveryOrderProofCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DeliveryOrderProofIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1193,36 +1105,6 @@ export type DeliveryOrderProofUpdateManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many DeliveryOrderProofs to update.
    */
   limit?: number
-}
-
-/**
- * DeliveryOrderProof updateManyAndReturn
- */
-export type DeliveryOrderProofUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DeliveryOrderProof
-   */
-  select?: Prisma.DeliveryOrderProofSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DeliveryOrderProof
-   */
-  omit?: Prisma.DeliveryOrderProofOmit<ExtArgs> | null
-  /**
-   * The data used to update DeliveryOrderProofs.
-   */
-  data: Prisma.XOR<Prisma.DeliveryOrderProofUpdateManyMutationInput, Prisma.DeliveryOrderProofUncheckedUpdateManyInput>
-  /**
-   * Filter which DeliveryOrderProofs to update
-   */
-  where?: Prisma.DeliveryOrderProofWhereInput
-  /**
-   * Limit how many DeliveryOrderProofs to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DeliveryOrderProofIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1289,6 +1171,34 @@ export type DeliveryOrderProofDeleteManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many DeliveryOrderProofs to delete.
    */
   limit?: number
+}
+
+/**
+ * DeliveryOrderProof findRaw
+ */
+export type DeliveryOrderProofFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DeliveryOrderProof aggregateRaw
+ */
+export type DeliveryOrderProofAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -11,9 +11,9 @@ import { Alert, AlertTitle } from "@/components/ui/alert";
 interface NotelistProps {
   notes: NotesType[];
   loading: boolean;
-  selectedNoteId: number | null;
-  onSelectNote: (noteId: number) => void;
-  onDeleteNote: (noteId: number) => void;
+  selectedNoteId: string | null;
+  onSelectNote: (noteId: string) => void;
+  onDeleteNote: (noteId: string) => void;
 }
 
 // Map colors to Tailwind classes
@@ -37,7 +37,7 @@ const Notelist: React.FC<NotelistProps> = ({ notes, loading, selectedNoteId, onS
     return note.title.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const handleNoteClick = (noteId: number) => {
+  const handleNoteClick = (noteId: string) => {
     onSelectNote(noteId);
   };
 

@@ -19,6 +19,10 @@ import {
   VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
   VEHICLE_FUEL_PRICE_PER_LITER,
 } from "@/lib/vehicle-fuel";
+import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
 import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
 
 export type VehicleFuelActionResult = {
@@ -218,7 +222,9 @@ export async function createVehicleFuelRequest(
           session.user.id,
           session.user.name ?? null,
         );
-        const tripDistance = order.vehicleTripLog!.distanceKm;
+        const tripDistance = decimalFromScaledInteger(
+          order.vehicleTripLog!.distanceKm,
+        );
         if (tripDistance.lte(0)) {
           throw new Error(
             "Jarak ODO perjalanan 0 km. Request BBM tidak diperlukan.",
@@ -253,15 +259,17 @@ export async function createVehicleFuelRequest(
             projectId,
             requestedById: session.user.id,
             source: input.source,
-            estimatedDistanceKm,
-            exceptionDistanceKm: exceptionDistance,
+            estimatedDistanceKm: scaledIntegerFromDecimal(estimatedDistanceKm),
+            exceptionDistanceKm: scaledIntegerFromDecimal(exceptionDistance),
             exceptionReason: input.includeExceptionAllowance
               ? input.exceptionReason!.trim()
               : null,
-            estimatedFuelLiter,
-            unitPrice,
-            requestedAmount,
-            fuelEfficiencyKmPerL: VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+            estimatedFuelLiter: scaledIntegerFromDecimal(estimatedFuelLiter),
+            unitPrice: scaledIntegerFromDecimal(unitPrice),
+            requestedAmount: scaledIntegerFromDecimal(requestedAmount),
+            fuelEfficiencyKmPerL: scaledIntegerFromDecimal(
+              VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+            ),
             beforeFillingPhotoUrl: savedPhotoUrls[0],
             afterFillingPhotoUrl: savedPhotoUrls[1],
             receiptPhotoUrl: savedPhotoUrls[2] ?? null,
@@ -283,7 +291,6 @@ export async function createVehicleFuelRequest(
         });
         return summary;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
     await Promise.all(
@@ -529,7 +536,7 @@ export async function processVehicleFuelRequest(
       if (approve) {
         await recordFinanceCashflowOutflow(transaction, {
           financeAccountId: input!.financeAccountId!,
-          amount: request.requestedAmount.toNumber(),
+          amount: decimalFromScaledInteger(request.requestedAmount).toNumber(),
           sourceDesc: `Reimbursement BBM ${request.deliveryOrder.doNumber}`,
           projectId: request.projectId,
           paymentMethod:

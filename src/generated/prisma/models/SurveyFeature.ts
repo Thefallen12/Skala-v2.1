@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -230,7 +230,7 @@ export type SurveyFeatureGroupByOutputType = {
   _max: SurveyFeatureMaxAggregateOutputType | null
 }
 
-export type GetSurveyFeatureGroupByPayload<T extends SurveyFeatureGroupByArgs> = Prisma.PrismaPromise<
+type GetSurveyFeatureGroupByPayload<T extends SurveyFeatureGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<SurveyFeatureGroupByOutputType, T['by']> &
       {
@@ -269,11 +269,11 @@ export type SurveyFeatureOrderByWithRelationInput = {
   surveyId?: Prisma.SortOrder
   featureCategory?: Prisma.SortOrder
   name?: Prisma.SortOrder
-  description?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrder
   geometryType?: Prisma.SortOrder
   geoJsonData?: Prisma.SortOrder
-  areaSqm?: Prisma.SortOrderInput | Prisma.SortOrder
-  lengthM?: Prisma.SortOrderInput | Prisma.SortOrder
+  areaSqm?: Prisma.SortOrder
+  lengthM?: Prisma.SortOrder
   photoUrls?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   survey?: Prisma.FieldSurveyOrderByWithRelationInput
@@ -304,11 +304,11 @@ export type SurveyFeatureOrderByWithAggregationInput = {
   surveyId?: Prisma.SortOrder
   featureCategory?: Prisma.SortOrder
   name?: Prisma.SortOrder
-  description?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrder
   geometryType?: Prisma.SortOrder
   geoJsonData?: Prisma.SortOrder
-  areaSqm?: Prisma.SortOrderInput | Prisma.SortOrder
-  lengthM?: Prisma.SortOrderInput | Prisma.SortOrder
+  areaSqm?: Prisma.SortOrder
+  lengthM?: Prisma.SortOrder
   photoUrls?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.SurveyFeatureCountOrderByAggregateInput
@@ -341,7 +341,7 @@ export type SurveyFeatureCreateInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -357,7 +357,7 @@ export type SurveyFeatureUncheckedCreateInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -366,12 +366,11 @@ export type SurveyFeatureUncheckedCreateInput = {
 }
 
 export type SurveyFeatureUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -381,13 +380,12 @@ export type SurveyFeatureUpdateInput = {
 }
 
 export type SurveyFeatureUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -402,7 +400,7 @@ export type SurveyFeatureCreateManyInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -410,12 +408,11 @@ export type SurveyFeatureCreateManyInput = {
 }
 
 export type SurveyFeatureUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -423,13 +420,12 @@ export type SurveyFeatureUpdateManyMutationInput = {
 }
 
 export type SurveyFeatureUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -560,7 +556,7 @@ export type SurveyFeatureUpdateOneWithoutPhotosNestedInput = {
   create?: Prisma.XOR<Prisma.SurveyFeatureCreateWithoutPhotosInput, Prisma.SurveyFeatureUncheckedCreateWithoutPhotosInput>
   connectOrCreate?: Prisma.SurveyFeatureCreateOrConnectWithoutPhotosInput
   upsert?: Prisma.SurveyFeatureUpsertWithoutPhotosInput
-  disconnect?: Prisma.SurveyFeatureWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.SurveyFeatureWhereInput | boolean
   connect?: Prisma.SurveyFeatureWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.SurveyFeatureUpdateToOneWithWhereWithoutPhotosInput, Prisma.SurveyFeatureUpdateWithoutPhotosInput>, Prisma.SurveyFeatureUncheckedUpdateWithoutPhotosInput>
@@ -572,7 +568,7 @@ export type SurveyFeatureCreateWithoutSurveyInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -586,7 +582,7 @@ export type SurveyFeatureUncheckedCreateWithoutSurveyInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -601,7 +597,6 @@ export type SurveyFeatureCreateOrConnectWithoutSurveyInput = {
 
 export type SurveyFeatureCreateManySurveyInputEnvelope = {
   data: Prisma.SurveyFeatureCreateManySurveyInput | Prisma.SurveyFeatureCreateManySurveyInput[]
-  skipDuplicates?: boolean
 }
 
 export type SurveyFeatureUpsertWithWhereUniqueWithoutSurveyInput = {
@@ -643,7 +638,7 @@ export type SurveyFeatureCreateWithoutPhotosInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -658,7 +653,7 @@ export type SurveyFeatureUncheckedCreateWithoutPhotosInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -682,12 +677,11 @@ export type SurveyFeatureUpdateToOneWithWhereWithoutPhotosInput = {
 }
 
 export type SurveyFeatureUpdateWithoutPhotosInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -696,13 +690,12 @@ export type SurveyFeatureUpdateWithoutPhotosInput = {
 }
 
 export type SurveyFeatureUncheckedUpdateWithoutPhotosInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   surveyId?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -715,7 +708,7 @@ export type SurveyFeatureCreateManySurveyInput = {
   name: string
   description?: string | null
   geometryType: string
-  geoJsonData: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData: runtime.InputJsonValue
   areaSqm?: number | null
   lengthM?: number | null
   photoUrls?: Prisma.SurveyFeatureCreatephotoUrlsInput | string[]
@@ -723,12 +716,11 @@ export type SurveyFeatureCreateManySurveyInput = {
 }
 
 export type SurveyFeatureUpdateWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -737,12 +729,11 @@ export type SurveyFeatureUpdateWithoutSurveyInput = {
 }
 
 export type SurveyFeatureUncheckedUpdateWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -751,12 +742,11 @@ export type SurveyFeatureUncheckedUpdateWithoutSurveyInput = {
 }
 
 export type SurveyFeatureUncheckedUpdateManyWithoutSurveyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   featureCategory?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   geometryType?: Prisma.StringFieldUpdateOperationsInput | string
-  geoJsonData?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  geoJsonData?: runtime.InputJsonValue | runtime.InputJsonValue
   areaSqm?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   lengthM?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   photoUrls?: Prisma.SurveyFeatureUpdatephotoUrlsInput | string[]
@@ -811,35 +801,7 @@ export type SurveyFeatureSelect<ExtArgs extends runtime.Types.Extensions.Interna
   _count?: boolean | Prisma.SurveyFeatureCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["surveyFeature"]>
 
-export type SurveyFeatureSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  surveyId?: boolean
-  featureCategory?: boolean
-  name?: boolean
-  description?: boolean
-  geometryType?: boolean
-  geoJsonData?: boolean
-  areaSqm?: boolean
-  lengthM?: boolean
-  photoUrls?: boolean
-  createdAt?: boolean
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["surveyFeature"]>
 
-export type SurveyFeatureSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  surveyId?: boolean
-  featureCategory?: boolean
-  name?: boolean
-  description?: boolean
-  geometryType?: boolean
-  geoJsonData?: boolean
-  areaSqm?: boolean
-  lengthM?: boolean
-  photoUrls?: boolean
-  createdAt?: boolean
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["surveyFeature"]>
 
 export type SurveyFeatureSelectScalar = {
   id?: boolean
@@ -860,12 +822,6 @@ export type SurveyFeatureInclude<ExtArgs extends runtime.Types.Extensions.Intern
   survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
   photos?: boolean | Prisma.SurveyFeature$photosArgs<ExtArgs>
   _count?: boolean | Prisma.SurveyFeatureCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type SurveyFeatureIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
-}
-export type SurveyFeatureIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  survey?: boolean | Prisma.FieldSurveyDefaultArgs<ExtArgs>
 }
 
 export type $SurveyFeaturePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1004,30 +960,6 @@ export interface SurveyFeatureDelegate<ExtArgs extends runtime.Types.Extensions.
   createMany<T extends SurveyFeatureCreateManyArgs>(args?: Prisma.SelectSubset<T, SurveyFeatureCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many SurveyFeatures and returns the data saved in the database.
-   * @param {SurveyFeatureCreateManyAndReturnArgs} args - Arguments to create many SurveyFeatures.
-   * @example
-   * // Create many SurveyFeatures
-   * const surveyFeature = await prisma.surveyFeature.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many SurveyFeatures and only return the `id`
-   * const surveyFeatureWithIdOnly = await prisma.surveyFeature.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends SurveyFeatureCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, SurveyFeatureCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SurveyFeaturePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a SurveyFeature.
    * @param {SurveyFeatureDeleteArgs} args - Arguments to delete one SurveyFeature.
    * @example
@@ -1092,36 +1024,6 @@ export interface SurveyFeatureDelegate<ExtArgs extends runtime.Types.Extensions.
   updateMany<T extends SurveyFeatureUpdateManyArgs>(args: Prisma.SelectSubset<T, SurveyFeatureUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more SurveyFeatures and returns the data updated in the database.
-   * @param {SurveyFeatureUpdateManyAndReturnArgs} args - Arguments to update many SurveyFeatures.
-   * @example
-   * // Update many SurveyFeatures
-   * const surveyFeature = await prisma.surveyFeature.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more SurveyFeatures and only return the `id`
-   * const surveyFeatureWithIdOnly = await prisma.surveyFeature.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends SurveyFeatureUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, SurveyFeatureUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SurveyFeaturePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one SurveyFeature.
    * @param {SurveyFeatureUpsertArgs} args - Arguments to update or create a SurveyFeature.
    * @example
@@ -1139,6 +1041,29 @@ export interface SurveyFeatureDelegate<ExtArgs extends runtime.Types.Extensions.
    * })
    */
   upsert<T extends SurveyFeatureUpsertArgs>(args: Prisma.SelectSubset<T, SurveyFeatureUpsertArgs<ExtArgs>>): Prisma.Prisma__SurveyFeatureClient<runtime.Types.Result.GetResult<Prisma.$SurveyFeaturePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more SurveyFeatures that matches the filter.
+   * @param {SurveyFeatureFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const surveyFeature = await prisma.surveyFeature.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.SurveyFeatureFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a SurveyFeature.
+   * @param {SurveyFeatureAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const surveyFeature = await prisma.surveyFeature.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.SurveyFeatureAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1518,11 +1443,6 @@ export type SurveyFeatureFindManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Skip the first `n` SurveyFeatures.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of SurveyFeatures.
-   */
   distinct?: Prisma.SurveyFeatureScalarFieldEnum | Prisma.SurveyFeatureScalarFieldEnum[]
 }
 
@@ -1556,30 +1476,6 @@ export type SurveyFeatureCreateManyArgs<ExtArgs extends runtime.Types.Extensions
    * The data used to create many SurveyFeatures.
    */
   data: Prisma.SurveyFeatureCreateManyInput | Prisma.SurveyFeatureCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * SurveyFeature createManyAndReturn
- */
-export type SurveyFeatureCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SurveyFeature
-   */
-  select?: Prisma.SurveyFeatureSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SurveyFeature
-   */
-  omit?: Prisma.SurveyFeatureOmit<ExtArgs> | null
-  /**
-   * The data used to create many SurveyFeatures.
-   */
-  data: Prisma.SurveyFeatureCreateManyInput | Prisma.SurveyFeatureCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SurveyFeatureIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1624,36 +1520,6 @@ export type SurveyFeatureUpdateManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many SurveyFeatures to update.
    */
   limit?: number
-}
-
-/**
- * SurveyFeature updateManyAndReturn
- */
-export type SurveyFeatureUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the SurveyFeature
-   */
-  select?: Prisma.SurveyFeatureSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the SurveyFeature
-   */
-  omit?: Prisma.SurveyFeatureOmit<ExtArgs> | null
-  /**
-   * The data used to update SurveyFeatures.
-   */
-  data: Prisma.XOR<Prisma.SurveyFeatureUpdateManyMutationInput, Prisma.SurveyFeatureUncheckedUpdateManyInput>
-  /**
-   * Filter which SurveyFeatures to update
-   */
-  where?: Prisma.SurveyFeatureWhereInput
-  /**
-   * Limit how many SurveyFeatures to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.SurveyFeatureIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1720,6 +1586,34 @@ export type SurveyFeatureDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many SurveyFeatures to delete.
    */
   limit?: number
+}
+
+/**
+ * SurveyFeature findRaw
+ */
+export type SurveyFeatureFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * SurveyFeature aggregateRaw
+ */
+export type SurveyFeatureAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

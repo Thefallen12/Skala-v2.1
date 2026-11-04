@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -192,7 +192,7 @@ export type RequestItemGroupByOutputType = {
   _max: RequestItemMaxAggregateOutputType | null
 }
 
-export type GetRequestItemGroupByPayload<T extends RequestItemGroupByArgs> = Prisma.PrismaPromise<
+type GetRequestItemGroupByPayload<T extends RequestItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<RequestItemGroupByOutputType, T['by']> &
       {
@@ -281,7 +281,6 @@ export type RequestItemUncheckedCreateInput = {
 }
 
 export type RequestItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
@@ -289,7 +288,6 @@ export type RequestItemUpdateInput = {
 }
 
 export type RequestItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
@@ -305,14 +303,12 @@ export type RequestItemCreateManyInput = {
 }
 
 export type RequestItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type RequestItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
@@ -403,6 +399,14 @@ export type RequestItemUncheckedUpdateManyWithoutMaterialRequestNestedInput = {
   deleteMany?: Prisma.RequestItemScalarWhereInput | Prisma.RequestItemScalarWhereInput[]
 }
 
+export type IntFieldUpdateOperationsInput = {
+  set?: number
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
 export type RequestItemCreateWithoutMaterialRequestInput = {
   id: string
   materialName: string
@@ -424,7 +428,6 @@ export type RequestItemCreateOrConnectWithoutMaterialRequestInput = {
 
 export type RequestItemCreateManyMaterialRequestInputEnvelope = {
   data: Prisma.RequestItemCreateManyMaterialRequestInput | Prisma.RequestItemCreateManyMaterialRequestInput[]
-  skipDuplicates?: boolean
 }
 
 export type RequestItemUpsertWithWhereUniqueWithoutMaterialRequestInput = {
@@ -462,21 +465,18 @@ export type RequestItemCreateManyMaterialRequestInput = {
 }
 
 export type RequestItemUpdateWithoutMaterialRequestInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type RequestItemUncheckedUpdateWithoutMaterialRequestInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type RequestItemUncheckedUpdateManyWithoutMaterialRequestInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   materialName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
@@ -493,23 +493,7 @@ export type RequestItemSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   MaterialRequest?: boolean | Prisma.MaterialRequestDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["requestItem"]>
 
-export type RequestItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  materialName?: boolean
-  quantity?: boolean
-  unit?: boolean
-  requestId?: boolean
-  MaterialRequest?: boolean | Prisma.MaterialRequestDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["requestItem"]>
 
-export type RequestItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  materialName?: boolean
-  quantity?: boolean
-  unit?: boolean
-  requestId?: boolean
-  MaterialRequest?: boolean | Prisma.MaterialRequestDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["requestItem"]>
 
 export type RequestItemSelectScalar = {
   id?: boolean
@@ -521,12 +505,6 @@ export type RequestItemSelectScalar = {
 
 export type RequestItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "materialName" | "quantity" | "unit" | "requestId", ExtArgs["result"]["requestItem"]>
 export type RequestItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  MaterialRequest?: boolean | Prisma.MaterialRequestDefaultArgs<ExtArgs>
-}
-export type RequestItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  MaterialRequest?: boolean | Prisma.MaterialRequestDefaultArgs<ExtArgs>
-}
-export type RequestItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   MaterialRequest?: boolean | Prisma.MaterialRequestDefaultArgs<ExtArgs>
 }
 
@@ -659,30 +637,6 @@ export interface RequestItemDelegate<ExtArgs extends runtime.Types.Extensions.In
   createMany<T extends RequestItemCreateManyArgs>(args?: Prisma.SelectSubset<T, RequestItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many RequestItems and returns the data saved in the database.
-   * @param {RequestItemCreateManyAndReturnArgs} args - Arguments to create many RequestItems.
-   * @example
-   * // Create many RequestItems
-   * const requestItem = await prisma.requestItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many RequestItems and only return the `id`
-   * const requestItemWithIdOnly = await prisma.requestItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends RequestItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, RequestItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RequestItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a RequestItem.
    * @param {RequestItemDeleteArgs} args - Arguments to delete one RequestItem.
    * @example
@@ -747,36 +701,6 @@ export interface RequestItemDelegate<ExtArgs extends runtime.Types.Extensions.In
   updateMany<T extends RequestItemUpdateManyArgs>(args: Prisma.SelectSubset<T, RequestItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more RequestItems and returns the data updated in the database.
-   * @param {RequestItemUpdateManyAndReturnArgs} args - Arguments to update many RequestItems.
-   * @example
-   * // Update many RequestItems
-   * const requestItem = await prisma.requestItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more RequestItems and only return the `id`
-   * const requestItemWithIdOnly = await prisma.requestItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends RequestItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, RequestItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RequestItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one RequestItem.
    * @param {RequestItemUpsertArgs} args - Arguments to update or create a RequestItem.
    * @example
@@ -794,6 +718,29 @@ export interface RequestItemDelegate<ExtArgs extends runtime.Types.Extensions.In
    * })
    */
   upsert<T extends RequestItemUpsertArgs>(args: Prisma.SelectSubset<T, RequestItemUpsertArgs<ExtArgs>>): Prisma.Prisma__RequestItemClient<runtime.Types.Result.GetResult<Prisma.$RequestItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more RequestItems that matches the filter.
+   * @param {RequestItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const requestItem = await prisma.requestItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.RequestItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a RequestItem.
+   * @param {RequestItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const requestItem = await prisma.requestItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.RequestItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1166,11 +1113,6 @@ export type RequestItemFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` RequestItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of RequestItems.
-   */
   distinct?: Prisma.RequestItemScalarFieldEnum | Prisma.RequestItemScalarFieldEnum[]
 }
 
@@ -1204,30 +1146,6 @@ export type RequestItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * The data used to create many RequestItems.
    */
   data: Prisma.RequestItemCreateManyInput | Prisma.RequestItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * RequestItem createManyAndReturn
- */
-export type RequestItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the RequestItem
-   */
-  select?: Prisma.RequestItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the RequestItem
-   */
-  omit?: Prisma.RequestItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many RequestItems.
-   */
-  data: Prisma.RequestItemCreateManyInput | Prisma.RequestItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.RequestItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1272,36 +1190,6 @@ export type RequestItemUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many RequestItems to update.
    */
   limit?: number
-}
-
-/**
- * RequestItem updateManyAndReturn
- */
-export type RequestItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the RequestItem
-   */
-  select?: Prisma.RequestItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the RequestItem
-   */
-  omit?: Prisma.RequestItemOmit<ExtArgs> | null
-  /**
-   * The data used to update RequestItems.
-   */
-  data: Prisma.XOR<Prisma.RequestItemUpdateManyMutationInput, Prisma.RequestItemUncheckedUpdateManyInput>
-  /**
-   * Filter which RequestItems to update
-   */
-  where?: Prisma.RequestItemWhereInput
-  /**
-   * Limit how many RequestItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.RequestItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1368,6 +1256,34 @@ export type RequestItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many RequestItems to delete.
    */
   limit?: number
+}
+
+/**
+ * RequestItem findRaw
+ */
+export type RequestItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * RequestItem aggregateRaw
+ */
+export type RequestItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

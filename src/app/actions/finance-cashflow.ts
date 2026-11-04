@@ -166,6 +166,15 @@ export async function createFinanceAccount(
   }
 
   try {
+    if (input.accountName.trim() === "Kas Tunai") {
+      const existingCashAccount = await prisma.financeAccount.findFirst({
+        where: { accountName: "Kas Tunai" },
+        select: { id: true },
+      });
+      if (existingCashAccount) {
+        return { success: true, message: "Akun Kas Tunai sudah tersedia." };
+      }
+    }
     await prisma.financeAccount.create({
       data: {
         accountName: input.accountName.trim(),
@@ -263,7 +272,6 @@ export async function recordIncomingFund(
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
     console.error("Incoming fund recording failed:", error);
@@ -404,7 +412,6 @@ export async function recordHistoricalPaymentCashflow(
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
     console.error("Historical payment cashflow recording failed:", error);
@@ -524,7 +531,6 @@ export async function transferBetweenFinanceAccounts(
           ],
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
     console.error("Finance account transfer failed:", error);

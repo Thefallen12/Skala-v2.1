@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -323,7 +323,7 @@ export type InvoiceGroupByOutputType = {
   _max: InvoiceMaxAggregateOutputType | null
 }
 
-export type GetInvoiceGroupByPayload<T extends InvoiceGroupByArgs> = Prisma.PrismaPromise<
+type GetInvoiceGroupByPayload<T extends InvoiceGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<InvoiceGroupByOutputType, T['by']> &
       {
@@ -374,25 +374,25 @@ export type InvoiceWhereInput = {
 
 export type InvoiceOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  publicCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  publicCode?: Prisma.SortOrder
   invoiceNumber?: Prisma.SortOrder
-  poId?: Prisma.SortOrderInput | Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
-  subkonTermynId?: Prisma.SortOrderInput | Prisma.SortOrder
+  poId?: Prisma.SortOrder
+  projectId?: Prisma.SortOrder
+  subkonTermynId?: Prisma.SortOrder
   vendorName?: Prisma.SortOrder
-  periodOrDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentMethod?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankAccount?: Prisma.SortOrderInput | Prisma.SortOrder
-  documentUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  periodOrDate?: Prisma.SortOrder
+  paymentMethod?: Prisma.SortOrder
+  bankAccount?: Prisma.SortOrder
+  documentUrl?: Prisma.SortOrder
   subTotal?: Prisma.SortOrder
-  tax?: Prisma.SortOrderInput | Prisma.SortOrder
-  deduction?: Prisma.SortOrderInput | Prisma.SortOrder
+  tax?: Prisma.SortOrder
+  deduction?: Prisma.SortOrder
   grandTotal?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  signedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  signedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  signedById?: Prisma.SortOrder
+  signedAt?: Prisma.SortOrder
+  acknowledgedById?: Prisma.SortOrder
+  acknowledgedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   po?: Prisma.PurchaseOrderOrderByWithRelationInput
@@ -439,25 +439,25 @@ export type InvoiceWhereUniqueInput = Prisma.AtLeast<{
 
 export type InvoiceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  publicCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  publicCode?: Prisma.SortOrder
   invoiceNumber?: Prisma.SortOrder
-  poId?: Prisma.SortOrderInput | Prisma.SortOrder
-  projectId?: Prisma.SortOrderInput | Prisma.SortOrder
-  subkonTermynId?: Prisma.SortOrderInput | Prisma.SortOrder
+  poId?: Prisma.SortOrder
+  projectId?: Prisma.SortOrder
+  subkonTermynId?: Prisma.SortOrder
   vendorName?: Prisma.SortOrder
-  periodOrDate?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentMethod?: Prisma.SortOrderInput | Prisma.SortOrder
-  bankAccount?: Prisma.SortOrderInput | Prisma.SortOrder
-  documentUrl?: Prisma.SortOrderInput | Prisma.SortOrder
+  periodOrDate?: Prisma.SortOrder
+  paymentMethod?: Prisma.SortOrder
+  bankAccount?: Prisma.SortOrder
+  documentUrl?: Prisma.SortOrder
   subTotal?: Prisma.SortOrder
-  tax?: Prisma.SortOrderInput | Prisma.SortOrder
-  deduction?: Prisma.SortOrderInput | Prisma.SortOrder
+  tax?: Prisma.SortOrder
+  deduction?: Prisma.SortOrder
   grandTotal?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  signedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  signedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  signedById?: Prisma.SortOrder
+  signedAt?: Prisma.SortOrder
+  acknowledgedById?: Prisma.SortOrder
+  acknowledgedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.InvoiceCountOrderByAggregateInput
@@ -548,7 +548,6 @@ export type InvoiceUncheckedCreateInput = {
 }
 
 export type InvoiceUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -574,7 +573,6 @@ export type InvoiceUpdateInput = {
 }
 
 export type InvoiceUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -625,7 +623,6 @@ export type InvoiceCreateManyInput = {
 }
 
 export type InvoiceUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -645,7 +642,6 @@ export type InvoiceUpdateManyMutationInput = {
 }
 
 export type InvoiceUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1049,7 +1045,6 @@ export type InvoiceCreateOrConnectWithoutSignedByInput = {
 
 export type InvoiceCreateManySignedByInputEnvelope = {
   data: Prisma.InvoiceCreateManySignedByInput | Prisma.InvoiceCreateManySignedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type InvoiceCreateWithoutAcknowledgedByInput = {
@@ -1109,7 +1104,6 @@ export type InvoiceCreateOrConnectWithoutAcknowledgedByInput = {
 
 export type InvoiceCreateManyAcknowledgedByInputEnvelope = {
   data: Prisma.InvoiceCreateManyAcknowledgedByInput | Prisma.InvoiceCreateManyAcknowledgedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type InvoiceUpsertWithWhereUniqueWithoutSignedByInput = {
@@ -1229,7 +1223,6 @@ export type InvoiceCreateOrConnectWithoutProjectInput = {
 
 export type InvoiceCreateManyProjectInputEnvelope = {
   data: Prisma.InvoiceCreateManyProjectInput | Prisma.InvoiceCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type InvoiceUpsertWithWhereUniqueWithoutProjectInput = {
@@ -1315,7 +1308,6 @@ export type InvoiceUpdateToOneWithWhereWithoutSubkonTermynInput = {
 }
 
 export type InvoiceUpdateWithoutSubkonTermynInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1340,7 +1332,6 @@ export type InvoiceUpdateWithoutSubkonTermynInput = {
 }
 
 export type InvoiceUncheckedUpdateWithoutSubkonTermynInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1421,7 +1412,6 @@ export type InvoiceCreateOrConnectWithoutPoInput = {
 
 export type InvoiceCreateManyPoInputEnvelope = {
   data: Prisma.InvoiceCreateManyPoInput | Prisma.InvoiceCreateManyPoInput[]
-  skipDuplicates?: boolean
 }
 
 export type InvoiceUpsertWithWhereUniqueWithoutPoInput = {
@@ -1507,7 +1497,6 @@ export type InvoiceUpdateToOneWithWhereWithoutItemsInput = {
 }
 
 export type InvoiceUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1532,7 +1521,6 @@ export type InvoiceUpdateWithoutItemsInput = {
 }
 
 export type InvoiceUncheckedUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1605,7 +1593,6 @@ export type InvoiceCreateManyAcknowledgedByInput = {
 }
 
 export type InvoiceUpdateWithoutSignedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1630,7 +1617,6 @@ export type InvoiceUpdateWithoutSignedByInput = {
 }
 
 export type InvoiceUncheckedUpdateWithoutSignedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1655,7 +1641,6 @@ export type InvoiceUncheckedUpdateWithoutSignedByInput = {
 }
 
 export type InvoiceUncheckedUpdateManyWithoutSignedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1679,7 +1664,6 @@ export type InvoiceUncheckedUpdateManyWithoutSignedByInput = {
 }
 
 export type InvoiceUpdateWithoutAcknowledgedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1704,7 +1688,6 @@ export type InvoiceUpdateWithoutAcknowledgedByInput = {
 }
 
 export type InvoiceUncheckedUpdateWithoutAcknowledgedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1729,7 +1712,6 @@ export type InvoiceUncheckedUpdateWithoutAcknowledgedByInput = {
 }
 
 export type InvoiceUncheckedUpdateManyWithoutAcknowledgedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1777,7 +1759,6 @@ export type InvoiceCreateManyProjectInput = {
 }
 
 export type InvoiceUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1802,7 +1783,6 @@ export type InvoiceUpdateWithoutProjectInput = {
 }
 
 export type InvoiceUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1827,7 +1807,6 @@ export type InvoiceUncheckedUpdateWithoutProjectInput = {
 }
 
 export type InvoiceUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1875,7 +1854,6 @@ export type InvoiceCreateManyPoInput = {
 }
 
 export type InvoiceUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   vendorName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1900,7 +1878,6 @@ export type InvoiceUpdateWithoutPoInput = {
 }
 
 export type InvoiceUncheckedUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1925,7 +1902,6 @@ export type InvoiceUncheckedUpdateWithoutPoInput = {
 }
 
 export type InvoiceUncheckedUpdateManyWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   invoiceNumber?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2011,65 +1987,7 @@ export type InvoiceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   _count?: boolean | Prisma.InvoiceCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["invoice"]>
 
-export type InvoiceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  invoiceNumber?: boolean
-  poId?: boolean
-  projectId?: boolean
-  subkonTermynId?: boolean
-  vendorName?: boolean
-  periodOrDate?: boolean
-  paymentMethod?: boolean
-  bankAccount?: boolean
-  documentUrl?: boolean
-  subTotal?: boolean
-  tax?: boolean
-  deduction?: boolean
-  grandTotal?: boolean
-  status?: boolean
-  signedById?: boolean
-  signedAt?: boolean
-  acknowledgedById?: boolean
-  acknowledgedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  po?: boolean | Prisma.Invoice$poArgs<ExtArgs>
-  project?: boolean | Prisma.Invoice$projectArgs<ExtArgs>
-  subkonTermyn?: boolean | Prisma.Invoice$subkonTermynArgs<ExtArgs>
-  signedBy?: boolean | Prisma.Invoice$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.Invoice$acknowledgedByArgs<ExtArgs>
-}, ExtArgs["result"]["invoice"]>
 
-export type InvoiceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  invoiceNumber?: boolean
-  poId?: boolean
-  projectId?: boolean
-  subkonTermynId?: boolean
-  vendorName?: boolean
-  periodOrDate?: boolean
-  paymentMethod?: boolean
-  bankAccount?: boolean
-  documentUrl?: boolean
-  subTotal?: boolean
-  tax?: boolean
-  deduction?: boolean
-  grandTotal?: boolean
-  status?: boolean
-  signedById?: boolean
-  signedAt?: boolean
-  acknowledgedById?: boolean
-  acknowledgedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  po?: boolean | Prisma.Invoice$poArgs<ExtArgs>
-  project?: boolean | Prisma.Invoice$projectArgs<ExtArgs>
-  subkonTermyn?: boolean | Prisma.Invoice$subkonTermynArgs<ExtArgs>
-  signedBy?: boolean | Prisma.Invoice$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.Invoice$acknowledgedByArgs<ExtArgs>
-}, ExtArgs["result"]["invoice"]>
 
 export type InvoiceSelectScalar = {
   id?: boolean
@@ -2105,20 +2023,6 @@ export type InvoiceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   acknowledgedBy?: boolean | Prisma.Invoice$acknowledgedByArgs<ExtArgs>
   items?: boolean | Prisma.Invoice$itemsArgs<ExtArgs>
   _count?: boolean | Prisma.InvoiceCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type InvoiceIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.Invoice$poArgs<ExtArgs>
-  project?: boolean | Prisma.Invoice$projectArgs<ExtArgs>
-  subkonTermyn?: boolean | Prisma.Invoice$subkonTermynArgs<ExtArgs>
-  signedBy?: boolean | Prisma.Invoice$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.Invoice$acknowledgedByArgs<ExtArgs>
-}
-export type InvoiceIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.Invoice$poArgs<ExtArgs>
-  project?: boolean | Prisma.Invoice$projectArgs<ExtArgs>
-  subkonTermyn?: boolean | Prisma.Invoice$subkonTermynArgs<ExtArgs>
-  signedBy?: boolean | Prisma.Invoice$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.Invoice$acknowledgedByArgs<ExtArgs>
 }
 
 export type $InvoicePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2272,30 +2176,6 @@ export interface InvoiceDelegate<ExtArgs extends runtime.Types.Extensions.Intern
   createMany<T extends InvoiceCreateManyArgs>(args?: Prisma.SelectSubset<T, InvoiceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Invoices and returns the data saved in the database.
-   * @param {InvoiceCreateManyAndReturnArgs} args - Arguments to create many Invoices.
-   * @example
-   * // Create many Invoices
-   * const invoice = await prisma.invoice.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Invoices and only return the `id`
-   * const invoiceWithIdOnly = await prisma.invoice.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends InvoiceCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, InvoiceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvoicePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Invoice.
    * @param {InvoiceDeleteArgs} args - Arguments to delete one Invoice.
    * @example
@@ -2360,36 +2240,6 @@ export interface InvoiceDelegate<ExtArgs extends runtime.Types.Extensions.Intern
   updateMany<T extends InvoiceUpdateManyArgs>(args: Prisma.SelectSubset<T, InvoiceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Invoices and returns the data updated in the database.
-   * @param {InvoiceUpdateManyAndReturnArgs} args - Arguments to update many Invoices.
-   * @example
-   * // Update many Invoices
-   * const invoice = await prisma.invoice.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Invoices and only return the `id`
-   * const invoiceWithIdOnly = await prisma.invoice.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends InvoiceUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, InvoiceUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvoicePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Invoice.
    * @param {InvoiceUpsertArgs} args - Arguments to update or create a Invoice.
    * @example
@@ -2407,6 +2257,29 @@ export interface InvoiceDelegate<ExtArgs extends runtime.Types.Extensions.Intern
    * })
    */
   upsert<T extends InvoiceUpsertArgs>(args: Prisma.SelectSubset<T, InvoiceUpsertArgs<ExtArgs>>): Prisma.Prisma__InvoiceClient<runtime.Types.Result.GetResult<Prisma.$InvoicePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Invoices that matches the filter.
+   * @param {InvoiceFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const invoice = await prisma.invoice.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.InvoiceFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Invoice.
+   * @param {InvoiceAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const invoice = await prisma.invoice.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.InvoiceAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2801,11 +2674,6 @@ export type InvoiceFindManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Skip the first `n` Invoices.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Invoices.
-   */
   distinct?: Prisma.InvoiceScalarFieldEnum | Prisma.InvoiceScalarFieldEnum[]
 }
 
@@ -2839,30 +2707,6 @@ export type InvoiceCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * The data used to create many Invoices.
    */
   data: Prisma.InvoiceCreateManyInput | Prisma.InvoiceCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Invoice createManyAndReturn
- */
-export type InvoiceCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Invoice
-   */
-  select?: Prisma.InvoiceSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Invoice
-   */
-  omit?: Prisma.InvoiceOmit<ExtArgs> | null
-  /**
-   * The data used to create many Invoices.
-   */
-  data: Prisma.InvoiceCreateManyInput | Prisma.InvoiceCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.InvoiceIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2907,36 +2751,6 @@ export type InvoiceUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Invoices to update.
    */
   limit?: number
-}
-
-/**
- * Invoice updateManyAndReturn
- */
-export type InvoiceUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Invoice
-   */
-  select?: Prisma.InvoiceSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Invoice
-   */
-  omit?: Prisma.InvoiceOmit<ExtArgs> | null
-  /**
-   * The data used to update Invoices.
-   */
-  data: Prisma.XOR<Prisma.InvoiceUpdateManyMutationInput, Prisma.InvoiceUncheckedUpdateManyInput>
-  /**
-   * Filter which Invoices to update
-   */
-  where?: Prisma.InvoiceWhereInput
-  /**
-   * Limit how many Invoices to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.InvoiceIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3003,6 +2817,34 @@ export type InvoiceDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Invoices to delete.
    */
   limit?: number
+}
+
+/**
+ * Invoice findRaw
+ */
+export type InvoiceFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Invoice aggregateRaw
+ */
+export type InvoiceAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

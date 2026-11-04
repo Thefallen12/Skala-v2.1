@@ -215,9 +215,11 @@ async function loadDocument(
         paymentAccountName: true,
         includeTax: true,
         createdAt: true,
+        approvedAt: true,
+        reviewedAt: true,
         createdBy: { select: { name: true, role: true } },
         reviewedBy: { select: { name: true } },
-        approvedBy: { select: { name: true } },
+        approvedBy: { select: { name: true, role: true } },
         vendor: {
           select: { address: true, phone: true, email: true },
         },
@@ -282,8 +284,24 @@ async function loadDocument(
       ],
       signatures: [
         { heading: "Dibuat Oleh / Prepared By", name: order.createdBy?.name ?? undefined, role: order.createdBy?.role === UserRole.LOGISTICS ? "Koordinator Logistik / Logistics Coordinator" : "Logistik / Logistics" },
-        { heading: "Diperiksa Oleh / Checked By", name: order.reviewedBy?.name ?? undefined, role: "Keuangan / Finance" },
-        { heading: "Disetujui Oleh / Approved By", name: order.approvedBy?.name ?? undefined, role: "Direktur / Director" },
+        {
+          heading: "Persetujuan Keuangan / Finance Approval",
+          name: order.reviewedBy?.name ?? undefined,
+          role: "Keuangan / Finance",
+          approvalStatus:
+            order.reviewedBy && order.reviewedAt ? "approved" : "pending",
+          approvalDate: order.reviewedAt
+            ? formatDateTime(order.reviewedAt)
+            : undefined,
+        },
+        {
+          heading: "Disetujui Oleh / Approved By",
+          name: order.approvedAt ? order.approvedBy?.name ?? undefined : undefined,
+          role:
+            order.approvedBy?.role === UserRole.DEPUTY_DIRECTOR
+              ? "Wakil Direktur / Deputy Director"
+              : "Direktur / Director",
+        },
       ],
       logoDataUrl: "",
     };
@@ -877,7 +895,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: "Dokumen tidak ditemukan." }, { status: 404 });
     }
     const verificationCode =
-      kind === "PO" ? publicCode : document.verificationPublicCode;
+      kind === "PO" ? null : document.verificationPublicCode;
     const verificationPath = verificationCode
       ? documentVerificationPath(
           kind.toLowerCase() as "po" | "do" | "invoice" | "ko",
@@ -894,7 +912,15 @@ export async function GET(request: NextRequest) {
             260,
           )
         : Promise.resolve(null),
-      kind === "DO" && document.approvalPublicCode
+      kind === "PO" && document.signatures[2]?.name
+        ? createBrandedQrDataUrl(
+            new URL(
+              documentVerificationPath("po", publicCode),
+              publicAppUrl,
+            ).toString(),
+            240,
+          )
+        : kind === "DO" && document.approvalPublicCode
         ? createBrandedQrDataUrl(
             new URL(
               documentVerificationPath("po", document.approvalPublicCode),

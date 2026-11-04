@@ -12,6 +12,7 @@ import {
 import { auth } from "../../../../../../auth";
 import { canManageUsers } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 
 export const metadata: Metadata = {
@@ -119,7 +120,9 @@ export default async function NewOrderPage({
             createdAt={new Date().toLocaleDateString("id-ID")}
             availableVehicles={availableVehicles.map((vehicle) => ({
               ...vehicle,
-              currentKilometer: vehicle.currentKilometer.toString(),
+              currentKilometer: decimalStringFromScaledInteger(
+                vehicle.currentKilometer,
+              ),
             }))}
             canCreateInternalDelivery={
               session.user.role === UserRole.LOGISTICS

@@ -1,14 +1,10 @@
 import "dotenv/config";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { DocType } from "../src/generated/prisma/enums";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is not set");
+if (!process.env.MONGODB_URL) throw new Error("MONGODB_URL is not set");
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+const prisma = new PrismaClient();
 
 const name = "Template Purchase Order Material";
 const contentHtml = `

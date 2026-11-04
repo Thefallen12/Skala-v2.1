@@ -1,17 +1,15 @@
 import "dotenv/config";
 import { createInterface } from "node:readline";
 import { hash } from "bcryptjs";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.MONGODB_URL;
 if (!connectionString) {
-  throw new Error("DATABASE_URL is not set.");
+  throw new Error("MONGODB_URL is not set.");
 }
 
-const databaseHost = new URL(connectionString).hostname;
-if (!databaseHost.endsWith(".prisma.io")) {
-  throw new Error("Refusing to reset a user outside Prisma Postgres.");
+if (!/^mongodb(?:\+srv)?:\/\//i.test(connectionString)) {
+  throw new Error("Refusing to reset a user outside MongoDB.");
 }
 
 function askHidden(prompt: string): Promise<string> {
@@ -85,16 +83,14 @@ async function main() {
     throw new Error("Password confirmation does not match.");
   }
 
-  const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
-  });
+  const prisma = new PrismaClient();
   try {
     const user = await prisma.user.findUnique({
       where: { email },
       select: { id: true, isActive: true },
     });
     if (!user) {
-      throw new Error("No account matched that email in Prisma Postgres.");
+      throw new Error("No account matched that email in MongoDB.");
     }
     if (!user.isActive) {
       throw new Error("The account is inactive; password was not changed.");

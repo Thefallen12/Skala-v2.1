@@ -1,14 +1,10 @@
 import "dotenv/config";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "./src/generated/prisma/client";
 import { DocType } from "./src/generated/prisma/enums";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is not set");
+if (!process.env.MONGODB_URL) throw new Error("MONGODB_URL is not set");
 
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+const prisma = new PrismaClient();
 
 const editableTable = `<table class="items po-items"><thead><tr><th>DESCRIPTION</th><th class="number">QTY</th><th class="money">UNIT PRICE</th><th class="money">AMOUNT</th></tr></thead><tbody><tr><td>Contoh material</td><td>1</td><td>Rp 0</td><td>Rp 0</td></tr></tbody></table>`;
 

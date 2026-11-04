@@ -20,7 +20,7 @@ const colorClassMap: Record<string, string> = {
 
 interface NoteContentProps {
   note: NotesType | null;
-  updateNote: (id: number, title: string, color: string) => void;
+  updateNote: (id: string, title: string, color: string) => void;
 }
 
 const NoteContent: React.FC<NoteContentProps> = ({ note, updateNote }) => {

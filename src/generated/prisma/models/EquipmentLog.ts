@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,17 +27,17 @@ export type AggregateEquipmentLog = {
 }
 
 export type EquipmentLogAvgAggregateOutputType = {
-  hmStart: runtime.Decimal | null
-  hmEnd: runtime.Decimal | null
-  effectiveHours: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
+  hmStart: number | null
+  hmEnd: number | null
+  effectiveHours: number | null
+  fuelLiter: number | null
 }
 
 export type EquipmentLogSumAggregateOutputType = {
-  hmStart: runtime.Decimal | null
-  hmEnd: runtime.Decimal | null
-  effectiveHours: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
+  hmStart: bigint | null
+  hmEnd: bigint | null
+  effectiveHours: bigint | null
+  fuelLiter: bigint | null
 }
 
 export type EquipmentLogMinAggregateOutputType = {
@@ -47,10 +47,10 @@ export type EquipmentLogMinAggregateOutputType = {
   equipmentName: string | null
   operatorName: string | null
   date: Date | null
-  hmStart: runtime.Decimal | null
-  hmEnd: runtime.Decimal | null
-  effectiveHours: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
+  hmStart: bigint | null
+  hmEnd: bigint | null
+  effectiveHours: bigint | null
+  fuelLiter: bigint | null
   notes: string | null
   createdById: string | null
   createdAt: Date | null
@@ -63,10 +63,10 @@ export type EquipmentLogMaxAggregateOutputType = {
   equipmentName: string | null
   operatorName: string | null
   date: Date | null
-  hmStart: runtime.Decimal | null
-  hmEnd: runtime.Decimal | null
-  effectiveHours: runtime.Decimal | null
-  fuelLiter: runtime.Decimal | null
+  hmStart: bigint | null
+  hmEnd: bigint | null
+  effectiveHours: bigint | null
+  fuelLiter: bigint | null
   notes: string | null
   createdById: string | null
   createdAt: Date | null
@@ -246,10 +246,10 @@ export type EquipmentLogGroupByOutputType = {
   equipmentName: string
   operatorName: string | null
   date: Date
-  hmStart: runtime.Decimal
-  hmEnd: runtime.Decimal
-  effectiveHours: runtime.Decimal
-  fuelLiter: runtime.Decimal
+  hmStart: bigint
+  hmEnd: bigint
+  effectiveHours: bigint
+  fuelLiter: bigint
   notes: string | null
   createdById: string
   createdAt: Date
@@ -260,7 +260,7 @@ export type EquipmentLogGroupByOutputType = {
   _max: EquipmentLogMaxAggregateOutputType | null
 }
 
-export type GetEquipmentLogGroupByPayload<T extends EquipmentLogGroupByArgs> = Prisma.PrismaPromise<
+type GetEquipmentLogGroupByPayload<T extends EquipmentLogGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<EquipmentLogGroupByOutputType, T['by']> &
       {
@@ -285,10 +285,10 @@ export type EquipmentLogWhereInput = {
   equipmentName?: Prisma.StringFilter<"EquipmentLog"> | string
   operatorName?: Prisma.StringNullableFilter<"EquipmentLog"> | string | null
   date?: Prisma.DateTimeFilter<"EquipmentLog"> | Date | string
-  hmStart?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  hmEnd?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  effectiveHours?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
   notes?: Prisma.StringNullableFilter<"EquipmentLog"> | string | null
   createdById?: Prisma.StringFilter<"EquipmentLog"> | string
   createdAt?: Prisma.DateTimeFilter<"EquipmentLog"> | Date | string
@@ -299,16 +299,16 @@ export type EquipmentLogWhereInput = {
 
 export type EquipmentLogOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  equipmentMasterId?: Prisma.SortOrderInput | Prisma.SortOrder
+  equipmentMasterId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   equipmentName?: Prisma.SortOrder
-  operatorName?: Prisma.SortOrderInput | Prisma.SortOrder
+  operatorName?: Prisma.SortOrder
   date?: Prisma.SortOrder
   hmStart?: Prisma.SortOrder
   hmEnd?: Prisma.SortOrder
   effectiveHours?: Prisma.SortOrder
   fuelLiter?: Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  notes?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   equipmentMaster?: Prisma.EquipmentMasterOrderByWithRelationInput
@@ -326,10 +326,10 @@ export type EquipmentLogWhereUniqueInput = Prisma.AtLeast<{
   equipmentName?: Prisma.StringFilter<"EquipmentLog"> | string
   operatorName?: Prisma.StringNullableFilter<"EquipmentLog"> | string | null
   date?: Prisma.DateTimeFilter<"EquipmentLog"> | Date | string
-  hmStart?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  hmEnd?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  effectiveHours?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
   notes?: Prisma.StringNullableFilter<"EquipmentLog"> | string | null
   createdById?: Prisma.StringFilter<"EquipmentLog"> | string
   createdAt?: Prisma.DateTimeFilter<"EquipmentLog"> | Date | string
@@ -340,16 +340,16 @@ export type EquipmentLogWhereUniqueInput = Prisma.AtLeast<{
 
 export type EquipmentLogOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  equipmentMasterId?: Prisma.SortOrderInput | Prisma.SortOrder
+  equipmentMasterId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   equipmentName?: Prisma.SortOrder
-  operatorName?: Prisma.SortOrderInput | Prisma.SortOrder
+  operatorName?: Prisma.SortOrder
   date?: Prisma.SortOrder
   hmStart?: Prisma.SortOrder
   hmEnd?: Prisma.SortOrder
   effectiveHours?: Prisma.SortOrder
   fuelLiter?: Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  notes?: Prisma.SortOrder
   createdById?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.EquipmentLogCountOrderByAggregateInput
@@ -369,10 +369,10 @@ export type EquipmentLogScalarWhereWithAggregatesInput = {
   equipmentName?: Prisma.StringWithAggregatesFilter<"EquipmentLog"> | string
   operatorName?: Prisma.StringNullableWithAggregatesFilter<"EquipmentLog"> | string | null
   date?: Prisma.DateTimeWithAggregatesFilter<"EquipmentLog"> | Date | string
-  hmStart?: Prisma.DecimalWithAggregatesFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalWithAggregatesFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalWithAggregatesFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalWithAggregatesFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntWithAggregatesFilter<"EquipmentLog"> | bigint | number
+  hmEnd?: Prisma.BigIntWithAggregatesFilter<"EquipmentLog"> | bigint | number
+  effectiveHours?: Prisma.BigIntWithAggregatesFilter<"EquipmentLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntWithAggregatesFilter<"EquipmentLog"> | bigint | number
   notes?: Prisma.StringNullableWithAggregatesFilter<"EquipmentLog"> | string | null
   createdById?: Prisma.StringWithAggregatesFilter<"EquipmentLog"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"EquipmentLog"> | Date | string
@@ -383,10 +383,10 @@ export type EquipmentLogCreateInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdAt?: Date | string
   equipmentMaster?: Prisma.EquipmentMasterCreateNestedOneWithoutLogsInput
@@ -401,24 +401,23 @@ export type EquipmentLogUncheckedCreateInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdById: string
   createdAt?: Date | string
 }
 
 export type EquipmentLogUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   equipmentMaster?: Prisma.EquipmentMasterUpdateOneWithoutLogsNestedInput
@@ -427,16 +426,15 @@ export type EquipmentLogUpdateInput = {
 }
 
 export type EquipmentLogUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentMasterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -449,39 +447,37 @@ export type EquipmentLogCreateManyInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdById: string
   createdAt?: Date | string
 }
 
 export type EquipmentLogUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type EquipmentLogUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentMasterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -690,10 +686,10 @@ export type EquipmentLogCreateWithoutCreatedByInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdAt?: Date | string
   equipmentMaster?: Prisma.EquipmentMasterCreateNestedOneWithoutLogsInput
@@ -707,10 +703,10 @@ export type EquipmentLogUncheckedCreateWithoutCreatedByInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdAt?: Date | string
 }
@@ -722,7 +718,6 @@ export type EquipmentLogCreateOrConnectWithoutCreatedByInput = {
 
 export type EquipmentLogCreateManyCreatedByInputEnvelope = {
   data: Prisma.EquipmentLogCreateManyCreatedByInput | Prisma.EquipmentLogCreateManyCreatedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type EquipmentLogUpsertWithWhereUniqueWithoutCreatedByInput = {
@@ -751,10 +746,10 @@ export type EquipmentLogScalarWhereInput = {
   equipmentName?: Prisma.StringFilter<"EquipmentLog"> | string
   operatorName?: Prisma.StringNullableFilter<"EquipmentLog"> | string | null
   date?: Prisma.DateTimeFilter<"EquipmentLog"> | Date | string
-  hmStart?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFilter<"EquipmentLog"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  hmEnd?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  effectiveHours?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
+  fuelLiter?: Prisma.BigIntFilter<"EquipmentLog"> | bigint | number
   notes?: Prisma.StringNullableFilter<"EquipmentLog"> | string | null
   createdById?: Prisma.StringFilter<"EquipmentLog"> | string
   createdAt?: Prisma.DateTimeFilter<"EquipmentLog"> | Date | string
@@ -765,10 +760,10 @@ export type EquipmentLogCreateWithoutProjectInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdAt?: Date | string
   equipmentMaster?: Prisma.EquipmentMasterCreateNestedOneWithoutLogsInput
@@ -781,10 +776,10 @@ export type EquipmentLogUncheckedCreateWithoutProjectInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdById: string
   createdAt?: Date | string
@@ -797,7 +792,6 @@ export type EquipmentLogCreateOrConnectWithoutProjectInput = {
 
 export type EquipmentLogCreateManyProjectInputEnvelope = {
   data: Prisma.EquipmentLogCreateManyProjectInput | Prisma.EquipmentLogCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type EquipmentLogUpsertWithWhereUniqueWithoutProjectInput = {
@@ -821,10 +815,10 @@ export type EquipmentLogCreateWithoutEquipmentMasterInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutEquipmentLogsInput
@@ -837,10 +831,10 @@ export type EquipmentLogUncheckedCreateWithoutEquipmentMasterInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdById: string
   createdAt?: Date | string
@@ -853,7 +847,6 @@ export type EquipmentLogCreateOrConnectWithoutEquipmentMasterInput = {
 
 export type EquipmentLogCreateManyEquipmentMasterInputEnvelope = {
   data: Prisma.EquipmentLogCreateManyEquipmentMasterInput | Prisma.EquipmentLogCreateManyEquipmentMasterInput[]
-  skipDuplicates?: boolean
 }
 
 export type EquipmentLogUpsertWithWhereUniqueWithoutEquipmentMasterInput = {
@@ -879,23 +872,22 @@ export type EquipmentLogCreateManyCreatedByInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdAt?: Date | string
 }
 
 export type EquipmentLogUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   equipmentMaster?: Prisma.EquipmentMasterUpdateOneWithoutLogsNestedInput
@@ -903,31 +895,29 @@ export type EquipmentLogUpdateWithoutCreatedByInput = {
 }
 
 export type EquipmentLogUncheckedUpdateWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentMasterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type EquipmentLogUncheckedUpdateManyWithoutCreatedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentMasterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -938,24 +928,23 @@ export type EquipmentLogCreateManyProjectInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdById: string
   createdAt?: Date | string
 }
 
 export type EquipmentLogUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   equipmentMaster?: Prisma.EquipmentMasterUpdateOneWithoutLogsNestedInput
@@ -963,30 +952,28 @@ export type EquipmentLogUpdateWithoutProjectInput = {
 }
 
 export type EquipmentLogUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentMasterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type EquipmentLogUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentMasterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -998,24 +985,23 @@ export type EquipmentLogCreateManyEquipmentMasterInput = {
   equipmentName: string
   operatorName?: string | null
   date: Date | string
-  hmStart: runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd: runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours: runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart: bigint | number
+  hmEnd: bigint | number
+  effectiveHours: bigint | number
+  fuelLiter: bigint | number
   notes?: string | null
   createdById: string
   createdAt?: Date | string
 }
 
 export type EquipmentLogUpdateWithoutEquipmentMasterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutEquipmentLogsNestedInput
@@ -1023,30 +1009,28 @@ export type EquipmentLogUpdateWithoutEquipmentMasterInput = {
 }
 
 export type EquipmentLogUncheckedUpdateWithoutEquipmentMasterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type EquipmentLogUncheckedUpdateManyWithoutEquipmentMasterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   equipmentName?: Prisma.StringFieldUpdateOperationsInput | string
   operatorName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  hmStart?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  hmEnd?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  effectiveHours?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  fuelLiter?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hmStart?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  hmEnd?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  effectiveHours?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
+  fuelLiter?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdById?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1073,43 +1057,7 @@ export type EquipmentLogSelect<ExtArgs extends runtime.Types.Extensions.Internal
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["equipmentLog"]>
 
-export type EquipmentLogSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  equipmentMasterId?: boolean
-  projectId?: boolean
-  equipmentName?: boolean
-  operatorName?: boolean
-  date?: boolean
-  hmStart?: boolean
-  hmEnd?: boolean
-  effectiveHours?: boolean
-  fuelLiter?: boolean
-  notes?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  equipmentMaster?: boolean | Prisma.EquipmentLog$equipmentMasterArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["equipmentLog"]>
 
-export type EquipmentLogSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  equipmentMasterId?: boolean
-  projectId?: boolean
-  equipmentName?: boolean
-  operatorName?: boolean
-  date?: boolean
-  hmStart?: boolean
-  hmEnd?: boolean
-  effectiveHours?: boolean
-  fuelLiter?: boolean
-  notes?: boolean
-  createdById?: boolean
-  createdAt?: boolean
-  equipmentMaster?: boolean | Prisma.EquipmentLog$equipmentMasterArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["equipmentLog"]>
 
 export type EquipmentLogSelectScalar = {
   id?: boolean
@@ -1133,16 +1081,6 @@ export type EquipmentLogInclude<ExtArgs extends runtime.Types.Extensions.Interna
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
-export type EquipmentLogIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  equipmentMaster?: boolean | Prisma.EquipmentLog$equipmentMasterArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type EquipmentLogIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  equipmentMaster?: boolean | Prisma.EquipmentLog$equipmentMasterArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  createdBy?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $EquipmentLogPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "EquipmentLog"
@@ -1158,10 +1096,10 @@ export type $EquipmentLogPayload<ExtArgs extends runtime.Types.Extensions.Intern
     equipmentName: string
     operatorName: string | null
     date: Date
-    hmStart: runtime.Decimal
-    hmEnd: runtime.Decimal
-    effectiveHours: runtime.Decimal
-    fuelLiter: runtime.Decimal
+    hmStart: bigint
+    hmEnd: bigint
+    effectiveHours: bigint
+    fuelLiter: bigint
     notes: string | null
     createdById: string
     createdAt: Date
@@ -1283,30 +1221,6 @@ export interface EquipmentLogDelegate<ExtArgs extends runtime.Types.Extensions.I
   createMany<T extends EquipmentLogCreateManyArgs>(args?: Prisma.SelectSubset<T, EquipmentLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many EquipmentLogs and returns the data saved in the database.
-   * @param {EquipmentLogCreateManyAndReturnArgs} args - Arguments to create many EquipmentLogs.
-   * @example
-   * // Create many EquipmentLogs
-   * const equipmentLog = await prisma.equipmentLog.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many EquipmentLogs and only return the `id`
-   * const equipmentLogWithIdOnly = await prisma.equipmentLog.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends EquipmentLogCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, EquipmentLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EquipmentLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a EquipmentLog.
    * @param {EquipmentLogDeleteArgs} args - Arguments to delete one EquipmentLog.
    * @example
@@ -1371,36 +1285,6 @@ export interface EquipmentLogDelegate<ExtArgs extends runtime.Types.Extensions.I
   updateMany<T extends EquipmentLogUpdateManyArgs>(args: Prisma.SelectSubset<T, EquipmentLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more EquipmentLogs and returns the data updated in the database.
-   * @param {EquipmentLogUpdateManyAndReturnArgs} args - Arguments to update many EquipmentLogs.
-   * @example
-   * // Update many EquipmentLogs
-   * const equipmentLog = await prisma.equipmentLog.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more EquipmentLogs and only return the `id`
-   * const equipmentLogWithIdOnly = await prisma.equipmentLog.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends EquipmentLogUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, EquipmentLogUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EquipmentLogPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one EquipmentLog.
    * @param {EquipmentLogUpsertArgs} args - Arguments to update or create a EquipmentLog.
    * @example
@@ -1418,6 +1302,29 @@ export interface EquipmentLogDelegate<ExtArgs extends runtime.Types.Extensions.I
    * })
    */
   upsert<T extends EquipmentLogUpsertArgs>(args: Prisma.SelectSubset<T, EquipmentLogUpsertArgs<ExtArgs>>): Prisma.Prisma__EquipmentLogClient<runtime.Types.Result.GetResult<Prisma.$EquipmentLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more EquipmentLogs that matches the filter.
+   * @param {EquipmentLogFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const equipmentLog = await prisma.equipmentLog.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.EquipmentLogFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a EquipmentLog.
+   * @param {EquipmentLogAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const equipmentLog = await prisma.equipmentLog.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.EquipmentLogAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1597,10 +1504,10 @@ export interface EquipmentLogFieldRefs {
   readonly equipmentName: Prisma.FieldRef<"EquipmentLog", 'String'>
   readonly operatorName: Prisma.FieldRef<"EquipmentLog", 'String'>
   readonly date: Prisma.FieldRef<"EquipmentLog", 'DateTime'>
-  readonly hmStart: Prisma.FieldRef<"EquipmentLog", 'Decimal'>
-  readonly hmEnd: Prisma.FieldRef<"EquipmentLog", 'Decimal'>
-  readonly effectiveHours: Prisma.FieldRef<"EquipmentLog", 'Decimal'>
-  readonly fuelLiter: Prisma.FieldRef<"EquipmentLog", 'Decimal'>
+  readonly hmStart: Prisma.FieldRef<"EquipmentLog", 'BigInt'>
+  readonly hmEnd: Prisma.FieldRef<"EquipmentLog", 'BigInt'>
+  readonly effectiveHours: Prisma.FieldRef<"EquipmentLog", 'BigInt'>
+  readonly fuelLiter: Prisma.FieldRef<"EquipmentLog", 'BigInt'>
   readonly notes: Prisma.FieldRef<"EquipmentLog", 'String'>
   readonly createdById: Prisma.FieldRef<"EquipmentLog", 'String'>
   readonly createdAt: Prisma.FieldRef<"EquipmentLog", 'DateTime'>
@@ -1800,11 +1707,6 @@ export type EquipmentLogFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` EquipmentLogs.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of EquipmentLogs.
-   */
   distinct?: Prisma.EquipmentLogScalarFieldEnum | Prisma.EquipmentLogScalarFieldEnum[]
 }
 
@@ -1838,30 +1740,6 @@ export type EquipmentLogCreateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * The data used to create many EquipmentLogs.
    */
   data: Prisma.EquipmentLogCreateManyInput | Prisma.EquipmentLogCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * EquipmentLog createManyAndReturn
- */
-export type EquipmentLogCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the EquipmentLog
-   */
-  select?: Prisma.EquipmentLogSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the EquipmentLog
-   */
-  omit?: Prisma.EquipmentLogOmit<ExtArgs> | null
-  /**
-   * The data used to create many EquipmentLogs.
-   */
-  data: Prisma.EquipmentLogCreateManyInput | Prisma.EquipmentLogCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.EquipmentLogIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1906,36 +1784,6 @@ export type EquipmentLogUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many EquipmentLogs to update.
    */
   limit?: number
-}
-
-/**
- * EquipmentLog updateManyAndReturn
- */
-export type EquipmentLogUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the EquipmentLog
-   */
-  select?: Prisma.EquipmentLogSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the EquipmentLog
-   */
-  omit?: Prisma.EquipmentLogOmit<ExtArgs> | null
-  /**
-   * The data used to update EquipmentLogs.
-   */
-  data: Prisma.XOR<Prisma.EquipmentLogUpdateManyMutationInput, Prisma.EquipmentLogUncheckedUpdateManyInput>
-  /**
-   * Filter which EquipmentLogs to update
-   */
-  where?: Prisma.EquipmentLogWhereInput
-  /**
-   * Limit how many EquipmentLogs to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.EquipmentLogIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2002,6 +1850,34 @@ export type EquipmentLogDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many EquipmentLogs to delete.
    */
   limit?: number
+}
+
+/**
+ * EquipmentLog findRaw
+ */
+export type EquipmentLogFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * EquipmentLog aggregateRaw
+ */
+export type EquipmentLogAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

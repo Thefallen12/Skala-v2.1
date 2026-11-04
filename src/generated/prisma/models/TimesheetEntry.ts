@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -213,7 +213,7 @@ export type TimesheetEntryGroupByOutputType = {
   _max: TimesheetEntryMaxAggregateOutputType | null
 }
 
-export type GetTimesheetEntryGroupByPayload<T extends TimesheetEntryGroupByArgs> = Prisma.PrismaPromise<
+type GetTimesheetEntryGroupByPayload<T extends TimesheetEntryGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<TimesheetEntryGroupByOutputType, T['by']> &
       {
@@ -250,7 +250,7 @@ export type TimesheetEntryOrderByWithRelationInput = {
   projectId?: Prisma.SortOrder
   workDate?: Prisma.SortOrder
   durationMinutes?: Prisma.SortOrder
-  note?: Prisma.SortOrderInput | Prisma.SortOrder
+  note?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -279,7 +279,7 @@ export type TimesheetEntryOrderByWithAggregationInput = {
   projectId?: Prisma.SortOrder
   workDate?: Prisma.SortOrder
   durationMinutes?: Prisma.SortOrder
-  note?: Prisma.SortOrderInput | Prisma.SortOrder
+  note?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.TimesheetEntryCountOrderByAggregateInput
@@ -326,7 +326,6 @@ export type TimesheetEntryUncheckedCreateInput = {
 }
 
 export type TimesheetEntryUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -337,7 +336,6 @@ export type TimesheetEntryUpdateInput = {
 }
 
 export type TimesheetEntryUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -359,7 +357,6 @@ export type TimesheetEntryCreateManyInput = {
 }
 
 export type TimesheetEntryUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -368,7 +365,6 @@ export type TimesheetEntryUpdateManyMutationInput = {
 }
 
 export type TimesheetEntryUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -540,7 +536,6 @@ export type TimesheetEntryCreateOrConnectWithoutUserInput = {
 
 export type TimesheetEntryCreateManyUserInputEnvelope = {
   data: Prisma.TimesheetEntryCreateManyUserInput | Prisma.TimesheetEntryCreateManyUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type TimesheetEntryUpsertWithWhereUniqueWithoutUserInput = {
@@ -600,7 +595,6 @@ export type TimesheetEntryCreateOrConnectWithoutProjectInput = {
 
 export type TimesheetEntryCreateManyProjectInputEnvelope = {
   data: Prisma.TimesheetEntryCreateManyProjectInput | Prisma.TimesheetEntryCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type TimesheetEntryUpsertWithWhereUniqueWithoutProjectInput = {
@@ -630,7 +624,6 @@ export type TimesheetEntryCreateManyUserInput = {
 }
 
 export type TimesheetEntryUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -640,7 +633,6 @@ export type TimesheetEntryUpdateWithoutUserInput = {
 }
 
 export type TimesheetEntryUncheckedUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
@@ -650,7 +642,6 @@ export type TimesheetEntryUncheckedUpdateWithoutUserInput = {
 }
 
 export type TimesheetEntryUncheckedUpdateManyWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
@@ -670,7 +661,6 @@ export type TimesheetEntryCreateManyProjectInput = {
 }
 
 export type TimesheetEntryUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -680,7 +670,6 @@ export type TimesheetEntryUpdateWithoutProjectInput = {
 }
 
 export type TimesheetEntryUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
@@ -690,7 +679,6 @@ export type TimesheetEntryUncheckedUpdateWithoutProjectInput = {
 }
 
 export type TimesheetEntryUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   workDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   durationMinutes?: Prisma.IntFieldUpdateOperationsInput | number
@@ -714,31 +702,7 @@ export type TimesheetEntrySelect<ExtArgs extends runtime.Types.Extensions.Intern
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["timesheetEntry"]>
 
-export type TimesheetEntrySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  userId?: boolean
-  projectId?: boolean
-  workDate?: boolean
-  durationMinutes?: boolean
-  note?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["timesheetEntry"]>
 
-export type TimesheetEntrySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  userId?: boolean
-  projectId?: boolean
-  workDate?: boolean
-  durationMinutes?: boolean
-  note?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["timesheetEntry"]>
 
 export type TimesheetEntrySelectScalar = {
   id?: boolean
@@ -753,14 +717,6 @@ export type TimesheetEntrySelectScalar = {
 
 export type TimesheetEntryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "projectId" | "workDate" | "durationMinutes" | "note" | "createdAt" | "updatedAt", ExtArgs["result"]["timesheetEntry"]>
 export type TimesheetEntryInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}
-export type TimesheetEntryIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}
-export type TimesheetEntryIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }
@@ -898,30 +854,6 @@ export interface TimesheetEntryDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends TimesheetEntryCreateManyArgs>(args?: Prisma.SelectSubset<T, TimesheetEntryCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many TimesheetEntries and returns the data saved in the database.
-   * @param {TimesheetEntryCreateManyAndReturnArgs} args - Arguments to create many TimesheetEntries.
-   * @example
-   * // Create many TimesheetEntries
-   * const timesheetEntry = await prisma.timesheetEntry.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many TimesheetEntries and only return the `id`
-   * const timesheetEntryWithIdOnly = await prisma.timesheetEntry.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends TimesheetEntryCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, TimesheetEntryCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TimesheetEntryPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a TimesheetEntry.
    * @param {TimesheetEntryDeleteArgs} args - Arguments to delete one TimesheetEntry.
    * @example
@@ -986,36 +918,6 @@ export interface TimesheetEntryDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends TimesheetEntryUpdateManyArgs>(args: Prisma.SelectSubset<T, TimesheetEntryUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more TimesheetEntries and returns the data updated in the database.
-   * @param {TimesheetEntryUpdateManyAndReturnArgs} args - Arguments to update many TimesheetEntries.
-   * @example
-   * // Update many TimesheetEntries
-   * const timesheetEntry = await prisma.timesheetEntry.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more TimesheetEntries and only return the `id`
-   * const timesheetEntryWithIdOnly = await prisma.timesheetEntry.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends TimesheetEntryUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, TimesheetEntryUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TimesheetEntryPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one TimesheetEntry.
    * @param {TimesheetEntryUpsertArgs} args - Arguments to update or create a TimesheetEntry.
    * @example
@@ -1033,6 +935,29 @@ export interface TimesheetEntryDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends TimesheetEntryUpsertArgs>(args: Prisma.SelectSubset<T, TimesheetEntryUpsertArgs<ExtArgs>>): Prisma.Prisma__TimesheetEntryClient<runtime.Types.Result.GetResult<Prisma.$TimesheetEntryPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more TimesheetEntries that matches the filter.
+   * @param {TimesheetEntryFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const timesheetEntry = await prisma.timesheetEntry.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.TimesheetEntryFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a TimesheetEntry.
+   * @param {TimesheetEntryAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const timesheetEntry = await prisma.timesheetEntry.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.TimesheetEntryAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1409,11 +1334,6 @@ export type TimesheetEntryFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` TimesheetEntries.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of TimesheetEntries.
-   */
   distinct?: Prisma.TimesheetEntryScalarFieldEnum | Prisma.TimesheetEntryScalarFieldEnum[]
 }
 
@@ -1447,30 +1367,6 @@ export type TimesheetEntryCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many TimesheetEntries.
    */
   data: Prisma.TimesheetEntryCreateManyInput | Prisma.TimesheetEntryCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * TimesheetEntry createManyAndReturn
- */
-export type TimesheetEntryCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TimesheetEntry
-   */
-  select?: Prisma.TimesheetEntrySelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the TimesheetEntry
-   */
-  omit?: Prisma.TimesheetEntryOmit<ExtArgs> | null
-  /**
-   * The data used to create many TimesheetEntries.
-   */
-  data: Prisma.TimesheetEntryCreateManyInput | Prisma.TimesheetEntryCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TimesheetEntryIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1515,36 +1411,6 @@ export type TimesheetEntryUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many TimesheetEntries to update.
    */
   limit?: number
-}
-
-/**
- * TimesheetEntry updateManyAndReturn
- */
-export type TimesheetEntryUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TimesheetEntry
-   */
-  select?: Prisma.TimesheetEntrySelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the TimesheetEntry
-   */
-  omit?: Prisma.TimesheetEntryOmit<ExtArgs> | null
-  /**
-   * The data used to update TimesheetEntries.
-   */
-  data: Prisma.XOR<Prisma.TimesheetEntryUpdateManyMutationInput, Prisma.TimesheetEntryUncheckedUpdateManyInput>
-  /**
-   * Filter which TimesheetEntries to update
-   */
-  where?: Prisma.TimesheetEntryWhereInput
-  /**
-   * Limit how many TimesheetEntries to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TimesheetEntryIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1611,6 +1477,34 @@ export type TimesheetEntryDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many TimesheetEntries to delete.
    */
   limit?: number
+}
+
+/**
+ * TimesheetEntry findRaw
+ */
+export type TimesheetEntryFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * TimesheetEntry aggregateRaw
+ */
+export type TimesheetEntryAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

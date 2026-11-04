@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -165,7 +165,7 @@ export type TicketAuditLogGroupByOutputType = {
   _max: TicketAuditLogMaxAggregateOutputType | null
 }
 
-export type GetTicketAuditLogGroupByPayload<T extends TicketAuditLogGroupByArgs> = Prisma.PrismaPromise<
+type GetTicketAuditLogGroupByPayload<T extends TicketAuditLogGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<TicketAuditLogGroupByOutputType, T['by']> &
       {
@@ -199,7 +199,7 @@ export type TicketAuditLogOrderByWithRelationInput = {
   ticketId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   action?: Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  notes?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   ticket?: Prisma.TicketOrderByWithRelationInput
   user?: Prisma.UserOrderByWithRelationInput
@@ -224,7 +224,7 @@ export type TicketAuditLogOrderByWithAggregationInput = {
   ticketId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   action?: Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
+  notes?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.TicketAuditLogCountOrderByAggregateInput
   _max?: Prisma.TicketAuditLogMaxOrderByAggregateInput
@@ -262,7 +262,6 @@ export type TicketAuditLogUncheckedCreateInput = {
 }
 
 export type TicketAuditLogUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -271,7 +270,6 @@ export type TicketAuditLogUpdateInput = {
 }
 
 export type TicketAuditLogUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
@@ -289,14 +287,12 @@ export type TicketAuditLogCreateManyInput = {
 }
 
 export type TicketAuditLogUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type TicketAuditLogUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
@@ -448,7 +444,6 @@ export type TicketAuditLogCreateOrConnectWithoutUserInput = {
 
 export type TicketAuditLogCreateManyUserInputEnvelope = {
   data: Prisma.TicketAuditLogCreateManyUserInput | Prisma.TicketAuditLogCreateManyUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketAuditLogUpsertWithWhereUniqueWithoutUserInput = {
@@ -502,7 +497,6 @@ export type TicketAuditLogCreateOrConnectWithoutTicketInput = {
 
 export type TicketAuditLogCreateManyTicketInputEnvelope = {
   data: Prisma.TicketAuditLogCreateManyTicketInput | Prisma.TicketAuditLogCreateManyTicketInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketAuditLogUpsertWithWhereUniqueWithoutTicketInput = {
@@ -530,7 +524,6 @@ export type TicketAuditLogCreateManyUserInput = {
 }
 
 export type TicketAuditLogUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -538,7 +531,6 @@ export type TicketAuditLogUpdateWithoutUserInput = {
 }
 
 export type TicketAuditLogUncheckedUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -546,7 +538,6 @@ export type TicketAuditLogUncheckedUpdateWithoutUserInput = {
 }
 
 export type TicketAuditLogUncheckedUpdateManyWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -562,7 +553,6 @@ export type TicketAuditLogCreateManyTicketInput = {
 }
 
 export type TicketAuditLogUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -570,7 +560,6 @@ export type TicketAuditLogUpdateWithoutTicketInput = {
 }
 
 export type TicketAuditLogUncheckedUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -578,7 +567,6 @@ export type TicketAuditLogUncheckedUpdateWithoutTicketInput = {
 }
 
 export type TicketAuditLogUncheckedUpdateManyWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -598,27 +586,7 @@ export type TicketAuditLogSelect<ExtArgs extends runtime.Types.Extensions.Intern
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["ticketAuditLog"]>
 
-export type TicketAuditLogSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  ticketId?: boolean
-  userId?: boolean
-  action?: boolean
-  notes?: boolean
-  createdAt?: boolean
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["ticketAuditLog"]>
 
-export type TicketAuditLogSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  ticketId?: boolean
-  userId?: boolean
-  action?: boolean
-  notes?: boolean
-  createdAt?: boolean
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["ticketAuditLog"]>
 
 export type TicketAuditLogSelectScalar = {
   id?: boolean
@@ -631,14 +599,6 @@ export type TicketAuditLogSelectScalar = {
 
 export type TicketAuditLogOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "ticketId" | "userId" | "action" | "notes" | "createdAt", ExtArgs["result"]["ticketAuditLog"]>
 export type TicketAuditLogInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type TicketAuditLogIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type TicketAuditLogIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -774,30 +734,6 @@ export interface TicketAuditLogDelegate<ExtArgs extends runtime.Types.Extensions
   createMany<T extends TicketAuditLogCreateManyArgs>(args?: Prisma.SelectSubset<T, TicketAuditLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many TicketAuditLogs and returns the data saved in the database.
-   * @param {TicketAuditLogCreateManyAndReturnArgs} args - Arguments to create many TicketAuditLogs.
-   * @example
-   * // Create many TicketAuditLogs
-   * const ticketAuditLog = await prisma.ticketAuditLog.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many TicketAuditLogs and only return the `id`
-   * const ticketAuditLogWithIdOnly = await prisma.ticketAuditLog.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends TicketAuditLogCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, TicketAuditLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketAuditLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a TicketAuditLog.
    * @param {TicketAuditLogDeleteArgs} args - Arguments to delete one TicketAuditLog.
    * @example
@@ -862,36 +798,6 @@ export interface TicketAuditLogDelegate<ExtArgs extends runtime.Types.Extensions
   updateMany<T extends TicketAuditLogUpdateManyArgs>(args: Prisma.SelectSubset<T, TicketAuditLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more TicketAuditLogs and returns the data updated in the database.
-   * @param {TicketAuditLogUpdateManyAndReturnArgs} args - Arguments to update many TicketAuditLogs.
-   * @example
-   * // Update many TicketAuditLogs
-   * const ticketAuditLog = await prisma.ticketAuditLog.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more TicketAuditLogs and only return the `id`
-   * const ticketAuditLogWithIdOnly = await prisma.ticketAuditLog.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends TicketAuditLogUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, TicketAuditLogUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketAuditLogPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one TicketAuditLog.
    * @param {TicketAuditLogUpsertArgs} args - Arguments to update or create a TicketAuditLog.
    * @example
@@ -909,6 +815,29 @@ export interface TicketAuditLogDelegate<ExtArgs extends runtime.Types.Extensions
    * })
    */
   upsert<T extends TicketAuditLogUpsertArgs>(args: Prisma.SelectSubset<T, TicketAuditLogUpsertArgs<ExtArgs>>): Prisma.Prisma__TicketAuditLogClient<runtime.Types.Result.GetResult<Prisma.$TicketAuditLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more TicketAuditLogs that matches the filter.
+   * @param {TicketAuditLogFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const ticketAuditLog = await prisma.ticketAuditLog.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.TicketAuditLogFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a TicketAuditLog.
+   * @param {TicketAuditLogAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const ticketAuditLog = await prisma.ticketAuditLog.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.TicketAuditLogAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1283,11 +1212,6 @@ export type TicketAuditLogFindManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Skip the first `n` TicketAuditLogs.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of TicketAuditLogs.
-   */
   distinct?: Prisma.TicketAuditLogScalarFieldEnum | Prisma.TicketAuditLogScalarFieldEnum[]
 }
 
@@ -1321,30 +1245,6 @@ export type TicketAuditLogCreateManyArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many TicketAuditLogs.
    */
   data: Prisma.TicketAuditLogCreateManyInput | Prisma.TicketAuditLogCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * TicketAuditLog createManyAndReturn
- */
-export type TicketAuditLogCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TicketAuditLog
-   */
-  select?: Prisma.TicketAuditLogSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the TicketAuditLog
-   */
-  omit?: Prisma.TicketAuditLogOmit<ExtArgs> | null
-  /**
-   * The data used to create many TicketAuditLogs.
-   */
-  data: Prisma.TicketAuditLogCreateManyInput | Prisma.TicketAuditLogCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TicketAuditLogIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1389,36 +1289,6 @@ export type TicketAuditLogUpdateManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many TicketAuditLogs to update.
    */
   limit?: number
-}
-
-/**
- * TicketAuditLog updateManyAndReturn
- */
-export type TicketAuditLogUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TicketAuditLog
-   */
-  select?: Prisma.TicketAuditLogSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the TicketAuditLog
-   */
-  omit?: Prisma.TicketAuditLogOmit<ExtArgs> | null
-  /**
-   * The data used to update TicketAuditLogs.
-   */
-  data: Prisma.XOR<Prisma.TicketAuditLogUpdateManyMutationInput, Prisma.TicketAuditLogUncheckedUpdateManyInput>
-  /**
-   * Filter which TicketAuditLogs to update
-   */
-  where?: Prisma.TicketAuditLogWhereInput
-  /**
-   * Limit how many TicketAuditLogs to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TicketAuditLogIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1485,6 +1355,34 @@ export type TicketAuditLogDeleteManyArgs<ExtArgs extends runtime.Types.Extension
    * Limit how many TicketAuditLogs to delete.
    */
   limit?: number
+}
+
+/**
+ * TicketAuditLog findRaw
+ */
+export type TicketAuditLogFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * TicketAuditLog aggregateRaw
+ */
+export type TicketAuditLogAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -1,10 +1,9 @@
 import "dotenv/config";
 import { hash } from "bcryptjs";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { UserRole } from "../src/generated/prisma/enums";
 
-const requiredEnv = ["DATABASE_URL", "ADMIN_EMAIL", "ADMIN_NAME", "ADMIN_PASSWORD"] as const;
+const requiredEnv = ["MONGODB_URL", "ADMIN_EMAIL", "ADMIN_NAME", "ADMIN_PASSWORD"] as const;
 const missingEnv = requiredEnv.filter((key) => !process.env[key]);
 
 if (missingEnv.length > 0) {
@@ -22,10 +21,7 @@ if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   throw new Error("ADMIN_EMAIL must be a valid email address");
 }
 
-const connectionString = process.env.DATABASE_URL!;
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+const prisma = new PrismaClient();
 
 try {
   const existing = await prisma.user.findUnique({ where: { email } });

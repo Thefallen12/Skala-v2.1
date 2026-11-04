@@ -6,9 +6,9 @@ import { NotesType } from "@/app/(DashboardLayout)/types/apps/notes";
 interface NotesSidebarProps {
   notes: NotesType[];
   loading: boolean;
-  selectedNoteId: number | null;
-  onSelectNote: (noteId: number) => void;
-  onDeleteNote: (noteId: number) => void;
+  selectedNoteId: string | null;
+  onSelectNote: (noteId: string) => void;
+  onDeleteNote: (noteId: string) => void;
 }
 
 const NotesSidebar: React.FC<NotesSidebarProps> = ({ notes, loading, selectedNoteId, onSelectNote, onDeleteNote }) => {

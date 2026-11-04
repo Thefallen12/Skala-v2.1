@@ -37,6 +37,7 @@ import type {
   FieldSurveySummary,
   SurveyProjectOption,
 } from "@/app/components/apps/gis/SurveySidebar";
+import { printUrlInFrame } from "@/lib/print-url";
 
 const ReadOnlyMap = dynamic(() => import("@/components/gis/ReadOnlyMap"), {
   ssr: false,
@@ -136,6 +137,7 @@ export default function SurveyDetailModal({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [printMessage, setPrintMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showPhotoNameDialog, setShowPhotoNameDialog] = useState(false);
   const [pendingPhoto, setPendingPhoto] = useState<{
@@ -389,6 +391,19 @@ export default function SurveyDetailModal({
     );
   };
 
+  const printReport = async () => {
+    if (!survey?.id) return;
+    setPrintMessage("");
+    try {
+      await printUrlInFrame(
+        `/apps/projects/map/report/${encodeURIComponent(survey.id)}`,
+      );
+    } catch (error) {
+      console.error("Survey report print failed:", error);
+      setPrintMessage("Laporan survei gagal disiapkan untuk dicetak.");
+    }
+  };
+
   return (
     <>
       <GlobalModal
@@ -430,7 +445,7 @@ export default function SurveyDetailModal({
               type="button"
               variant="outline"
               className="h-10 border-slate-700 bg-slate-900/80 text-[11px] font-semibold text-slate-100 hover:bg-slate-800"
-              onClick={openReport}
+              onClick={printReport}
             >
               <Printer className="mr-1.5 size-3.5" />
               Cetak / Print
@@ -443,6 +458,11 @@ export default function SurveyDetailModal({
             >
               Tutup
             </Button>
+            {printMessage && (
+              <p className="w-full text-xs text-red-400" role="alert">
+                {printMessage}
+              </p>
+            )}
           </>
         }
       >

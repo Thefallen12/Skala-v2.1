@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -323,7 +323,7 @@ export type OrderConfirmationGroupByOutputType = {
   _max: OrderConfirmationMaxAggregateOutputType | null
 }
 
-export type GetOrderConfirmationGroupByPayload<T extends OrderConfirmationGroupByArgs> = Prisma.PrismaPromise<
+type GetOrderConfirmationGroupByPayload<T extends OrderConfirmationGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OrderConfirmationGroupByOutputType, T['by']> &
       {
@@ -374,25 +374,25 @@ export type OrderConfirmationWhereInput = {
 
 export type OrderConfirmationOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  publicCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  publicCode?: Prisma.SortOrder
   koNumber?: Prisma.SortOrder
   poId?: Prisma.SortOrder
-  paymentTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
-  estDelivery?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTerms?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentType?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAmount?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofOfTransferUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentById?: Prisma.SortOrderInput | Prisma.SortOrder
-  signedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  signedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentTransactionId?: Prisma.SortOrder
+  estDelivery?: Prisma.SortOrder
+  paymentTerms?: Prisma.SortOrder
+  paymentType?: Prisma.SortOrder
+  paymentAmount?: Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  proofOfTransferUrl?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
+  vendorSentAt?: Prisma.SortOrder
+  vendorSentById?: Prisma.SortOrder
+  signedById?: Prisma.SortOrder
+  signedAt?: Prisma.SortOrder
+  acknowledgedById?: Prisma.SortOrder
+  acknowledgedAt?: Prisma.SortOrder
   subTotal?: Prisma.SortOrder
-  tax?: Prisma.SortOrderInput | Prisma.SortOrder
+  tax?: Prisma.SortOrder
   grandTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   po?: Prisma.PurchaseOrderOrderByWithRelationInput
@@ -439,25 +439,25 @@ export type OrderConfirmationWhereUniqueInput = Prisma.AtLeast<{
 
 export type OrderConfirmationOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  publicCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  publicCode?: Prisma.SortOrder
   koNumber?: Prisma.SortOrder
   poId?: Prisma.SortOrder
-  paymentTransactionId?: Prisma.SortOrderInput | Prisma.SortOrder
-  estDelivery?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentTerms?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentType?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentAmount?: Prisma.SortOrderInput | Prisma.SortOrder
-  transferDestination?: Prisma.SortOrderInput | Prisma.SortOrder
-  proofOfTransferUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  paidAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  vendorSentById?: Prisma.SortOrderInput | Prisma.SortOrder
-  signedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  signedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedById?: Prisma.SortOrderInput | Prisma.SortOrder
-  acknowledgedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentTransactionId?: Prisma.SortOrder
+  estDelivery?: Prisma.SortOrder
+  paymentTerms?: Prisma.SortOrder
+  paymentType?: Prisma.SortOrder
+  paymentAmount?: Prisma.SortOrder
+  transferDestination?: Prisma.SortOrder
+  proofOfTransferUrl?: Prisma.SortOrder
+  paidAt?: Prisma.SortOrder
+  vendorSentAt?: Prisma.SortOrder
+  vendorSentById?: Prisma.SortOrder
+  signedById?: Prisma.SortOrder
+  signedAt?: Prisma.SortOrder
+  acknowledgedById?: Prisma.SortOrder
+  acknowledgedAt?: Prisma.SortOrder
   subTotal?: Prisma.SortOrder
-  tax?: Prisma.SortOrderInput | Prisma.SortOrder
+  tax?: Prisma.SortOrder
   grandTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.OrderConfirmationCountOrderByAggregateInput
@@ -548,7 +548,6 @@ export type OrderConfirmationUncheckedCreateInput = {
 }
 
 export type OrderConfirmationUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -574,7 +573,6 @@ export type OrderConfirmationUpdateInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -625,7 +623,6 @@ export type OrderConfirmationCreateManyInput = {
 }
 
 export type OrderConfirmationUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -645,7 +642,6 @@ export type OrderConfirmationUpdateManyMutationInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1049,7 +1045,6 @@ export type OrderConfirmationCreateOrConnectWithoutVendorSentByInput = {
 
 export type OrderConfirmationCreateManyVendorSentByInputEnvelope = {
   data: Prisma.OrderConfirmationCreateManyVendorSentByInput | Prisma.OrderConfirmationCreateManyVendorSentByInput[]
-  skipDuplicates?: boolean
 }
 
 export type OrderConfirmationCreateWithoutSignedByInput = {
@@ -1109,7 +1104,6 @@ export type OrderConfirmationCreateOrConnectWithoutSignedByInput = {
 
 export type OrderConfirmationCreateManySignedByInputEnvelope = {
   data: Prisma.OrderConfirmationCreateManySignedByInput | Prisma.OrderConfirmationCreateManySignedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type OrderConfirmationCreateWithoutAcknowledgedByInput = {
@@ -1169,7 +1163,6 @@ export type OrderConfirmationCreateOrConnectWithoutAcknowledgedByInput = {
 
 export type OrderConfirmationCreateManyAcknowledgedByInputEnvelope = {
   data: Prisma.OrderConfirmationCreateManyAcknowledgedByInput | Prisma.OrderConfirmationCreateManyAcknowledgedByInput[]
-  skipDuplicates?: boolean
 }
 
 export type OrderConfirmationUpsertWithWhereUniqueWithoutVendorSentByInput = {
@@ -1305,7 +1298,6 @@ export type OrderConfirmationCreateOrConnectWithoutPoInput = {
 
 export type OrderConfirmationCreateManyPoInputEnvelope = {
   data: Prisma.OrderConfirmationCreateManyPoInput | Prisma.OrderConfirmationCreateManyPoInput[]
-  skipDuplicates?: boolean
 }
 
 export type OrderConfirmationUpsertWithWhereUniqueWithoutPoInput = {
@@ -1391,7 +1383,6 @@ export type OrderConfirmationUpdateToOneWithWhereWithoutPaymentTransactionInput 
 }
 
 export type OrderConfirmationUpdateWithoutPaymentTransactionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1416,7 +1407,6 @@ export type OrderConfirmationUpdateWithoutPaymentTransactionInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateWithoutPaymentTransactionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1507,7 +1497,6 @@ export type OrderConfirmationUpdateToOneWithWhereWithoutItemsInput = {
 }
 
 export type OrderConfirmationUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1532,7 +1521,6 @@ export type OrderConfirmationUpdateWithoutItemsInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateWithoutItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1629,7 +1617,6 @@ export type OrderConfirmationCreateManyAcknowledgedByInput = {
 }
 
 export type OrderConfirmationUpdateWithoutVendorSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1654,7 +1641,6 @@ export type OrderConfirmationUpdateWithoutVendorSentByInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateWithoutVendorSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1679,7 +1665,6 @@ export type OrderConfirmationUncheckedUpdateWithoutVendorSentByInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateManyWithoutVendorSentByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1703,7 +1688,6 @@ export type OrderConfirmationUncheckedUpdateManyWithoutVendorSentByInput = {
 }
 
 export type OrderConfirmationUpdateWithoutSignedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1728,7 +1712,6 @@ export type OrderConfirmationUpdateWithoutSignedByInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateWithoutSignedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1753,7 +1736,6 @@ export type OrderConfirmationUncheckedUpdateWithoutSignedByInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateManyWithoutSignedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1777,7 +1759,6 @@ export type OrderConfirmationUncheckedUpdateManyWithoutSignedByInput = {
 }
 
 export type OrderConfirmationUpdateWithoutAcknowledgedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1802,7 +1783,6 @@ export type OrderConfirmationUpdateWithoutAcknowledgedByInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateWithoutAcknowledgedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1827,7 +1807,6 @@ export type OrderConfirmationUncheckedUpdateWithoutAcknowledgedByInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateManyWithoutAcknowledgedByInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   poId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1875,7 +1854,6 @@ export type OrderConfirmationCreateManyPoInput = {
 }
 
 export type OrderConfirmationUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   estDelivery?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1900,7 +1878,6 @@ export type OrderConfirmationUpdateWithoutPoInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paymentTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1925,7 +1902,6 @@ export type OrderConfirmationUncheckedUpdateWithoutPoInput = {
 }
 
 export type OrderConfirmationUncheckedUpdateManyWithoutPoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   koNumber?: Prisma.StringFieldUpdateOperationsInput | string
   paymentTransactionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2011,65 +1987,7 @@ export type OrderConfirmationSelect<ExtArgs extends runtime.Types.Extensions.Int
   _count?: boolean | Prisma.OrderConfirmationCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["orderConfirmation"]>
 
-export type OrderConfirmationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  koNumber?: boolean
-  poId?: boolean
-  paymentTransactionId?: boolean
-  estDelivery?: boolean
-  paymentTerms?: boolean
-  paymentType?: boolean
-  paymentAmount?: boolean
-  transferDestination?: boolean
-  proofOfTransferUrl?: boolean
-  paidAt?: boolean
-  vendorSentAt?: boolean
-  vendorSentById?: boolean
-  signedById?: boolean
-  signedAt?: boolean
-  acknowledgedById?: boolean
-  acknowledgedAt?: boolean
-  subTotal?: boolean
-  tax?: boolean
-  grandTotal?: boolean
-  createdAt?: boolean
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.OrderConfirmation$paymentTransactionArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.OrderConfirmation$vendorSentByArgs<ExtArgs>
-  signedBy?: boolean | Prisma.OrderConfirmation$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.OrderConfirmation$acknowledgedByArgs<ExtArgs>
-}, ExtArgs["result"]["orderConfirmation"]>
 
-export type OrderConfirmationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  koNumber?: boolean
-  poId?: boolean
-  paymentTransactionId?: boolean
-  estDelivery?: boolean
-  paymentTerms?: boolean
-  paymentType?: boolean
-  paymentAmount?: boolean
-  transferDestination?: boolean
-  proofOfTransferUrl?: boolean
-  paidAt?: boolean
-  vendorSentAt?: boolean
-  vendorSentById?: boolean
-  signedById?: boolean
-  signedAt?: boolean
-  acknowledgedById?: boolean
-  acknowledgedAt?: boolean
-  subTotal?: boolean
-  tax?: boolean
-  grandTotal?: boolean
-  createdAt?: boolean
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.OrderConfirmation$paymentTransactionArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.OrderConfirmation$vendorSentByArgs<ExtArgs>
-  signedBy?: boolean | Prisma.OrderConfirmation$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.OrderConfirmation$acknowledgedByArgs<ExtArgs>
-}, ExtArgs["result"]["orderConfirmation"]>
 
 export type OrderConfirmationSelectScalar = {
   id?: boolean
@@ -2105,20 +2023,6 @@ export type OrderConfirmationInclude<ExtArgs extends runtime.Types.Extensions.In
   acknowledgedBy?: boolean | Prisma.OrderConfirmation$acknowledgedByArgs<ExtArgs>
   items?: boolean | Prisma.OrderConfirmation$itemsArgs<ExtArgs>
   _count?: boolean | Prisma.OrderConfirmationCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type OrderConfirmationIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.OrderConfirmation$paymentTransactionArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.OrderConfirmation$vendorSentByArgs<ExtArgs>
-  signedBy?: boolean | Prisma.OrderConfirmation$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.OrderConfirmation$acknowledgedByArgs<ExtArgs>
-}
-export type OrderConfirmationIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  po?: boolean | Prisma.PurchaseOrderDefaultArgs<ExtArgs>
-  paymentTransaction?: boolean | Prisma.OrderConfirmation$paymentTransactionArgs<ExtArgs>
-  vendorSentBy?: boolean | Prisma.OrderConfirmation$vendorSentByArgs<ExtArgs>
-  signedBy?: boolean | Prisma.OrderConfirmation$signedByArgs<ExtArgs>
-  acknowledgedBy?: boolean | Prisma.OrderConfirmation$acknowledgedByArgs<ExtArgs>
 }
 
 export type $OrderConfirmationPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2272,30 +2176,6 @@ export interface OrderConfirmationDelegate<ExtArgs extends runtime.Types.Extensi
   createMany<T extends OrderConfirmationCreateManyArgs>(args?: Prisma.SelectSubset<T, OrderConfirmationCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many OrderConfirmations and returns the data saved in the database.
-   * @param {OrderConfirmationCreateManyAndReturnArgs} args - Arguments to create many OrderConfirmations.
-   * @example
-   * // Create many OrderConfirmations
-   * const orderConfirmation = await prisma.orderConfirmation.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many OrderConfirmations and only return the `id`
-   * const orderConfirmationWithIdOnly = await prisma.orderConfirmation.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends OrderConfirmationCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, OrderConfirmationCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderConfirmationPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a OrderConfirmation.
    * @param {OrderConfirmationDeleteArgs} args - Arguments to delete one OrderConfirmation.
    * @example
@@ -2360,36 +2240,6 @@ export interface OrderConfirmationDelegate<ExtArgs extends runtime.Types.Extensi
   updateMany<T extends OrderConfirmationUpdateManyArgs>(args: Prisma.SelectSubset<T, OrderConfirmationUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more OrderConfirmations and returns the data updated in the database.
-   * @param {OrderConfirmationUpdateManyAndReturnArgs} args - Arguments to update many OrderConfirmations.
-   * @example
-   * // Update many OrderConfirmations
-   * const orderConfirmation = await prisma.orderConfirmation.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more OrderConfirmations and only return the `id`
-   * const orderConfirmationWithIdOnly = await prisma.orderConfirmation.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends OrderConfirmationUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, OrderConfirmationUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderConfirmationPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one OrderConfirmation.
    * @param {OrderConfirmationUpsertArgs} args - Arguments to update or create a OrderConfirmation.
    * @example
@@ -2407,6 +2257,29 @@ export interface OrderConfirmationDelegate<ExtArgs extends runtime.Types.Extensi
    * })
    */
   upsert<T extends OrderConfirmationUpsertArgs>(args: Prisma.SelectSubset<T, OrderConfirmationUpsertArgs<ExtArgs>>): Prisma.Prisma__OrderConfirmationClient<runtime.Types.Result.GetResult<Prisma.$OrderConfirmationPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more OrderConfirmations that matches the filter.
+   * @param {OrderConfirmationFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const orderConfirmation = await prisma.orderConfirmation.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.OrderConfirmationFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a OrderConfirmation.
+   * @param {OrderConfirmationAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const orderConfirmation = await prisma.orderConfirmation.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.OrderConfirmationAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -2801,11 +2674,6 @@ export type OrderConfirmationFindManyArgs<ExtArgs extends runtime.Types.Extensio
    * Skip the first `n` OrderConfirmations.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of OrderConfirmations.
-   */
   distinct?: Prisma.OrderConfirmationScalarFieldEnum | Prisma.OrderConfirmationScalarFieldEnum[]
 }
 
@@ -2839,30 +2707,6 @@ export type OrderConfirmationCreateManyArgs<ExtArgs extends runtime.Types.Extens
    * The data used to create many OrderConfirmations.
    */
   data: Prisma.OrderConfirmationCreateManyInput | Prisma.OrderConfirmationCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * OrderConfirmation createManyAndReturn
- */
-export type OrderConfirmationCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OrderConfirmation
-   */
-  select?: Prisma.OrderConfirmationSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the OrderConfirmation
-   */
-  omit?: Prisma.OrderConfirmationOmit<ExtArgs> | null
-  /**
-   * The data used to create many OrderConfirmations.
-   */
-  data: Prisma.OrderConfirmationCreateManyInput | Prisma.OrderConfirmationCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OrderConfirmationIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -2907,36 +2751,6 @@ export type OrderConfirmationUpdateManyArgs<ExtArgs extends runtime.Types.Extens
    * Limit how many OrderConfirmations to update.
    */
   limit?: number
-}
-
-/**
- * OrderConfirmation updateManyAndReturn
- */
-export type OrderConfirmationUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the OrderConfirmation
-   */
-  select?: Prisma.OrderConfirmationSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the OrderConfirmation
-   */
-  omit?: Prisma.OrderConfirmationOmit<ExtArgs> | null
-  /**
-   * The data used to update OrderConfirmations.
-   */
-  data: Prisma.XOR<Prisma.OrderConfirmationUpdateManyMutationInput, Prisma.OrderConfirmationUncheckedUpdateManyInput>
-  /**
-   * Filter which OrderConfirmations to update
-   */
-  where?: Prisma.OrderConfirmationWhereInput
-  /**
-   * Limit how many OrderConfirmations to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.OrderConfirmationIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -3003,6 +2817,34 @@ export type OrderConfirmationDeleteManyArgs<ExtArgs extends runtime.Types.Extens
    * Limit how many OrderConfirmations to delete.
    */
   limit?: number
+}
+
+/**
+ * OrderConfirmation findRaw
+ */
+export type OrderConfirmationFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * OrderConfirmation aggregateRaw
+ */
+export type OrderConfirmationAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

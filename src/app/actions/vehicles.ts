@@ -5,6 +5,10 @@ import { Prisma } from "@/generated/prisma/client";
 import { UserRole } from "@/generated/prisma/enums";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import {
+  decimalStringFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
 
 export type VehicleStatus =
   | "AVAILABLE"
@@ -81,13 +85,15 @@ function toVehicleSummary(vehicle: {
   vehicleType: string;
   brand: string | null;
   modelName: string | null;
-  currentKilometer: { toString(): string };
+  currentKilometer: bigint;
   odometerInitialized: boolean;
   status: string;
 }): VehicleSummary {
   return {
     ...vehicle,
-    currentKilometer: vehicle.currentKilometer.toString(),
+    currentKilometer: decimalStringFromScaledInteger(
+      vehicle.currentKilometer,
+    ),
     status: isVehicleStatus(vehicle.status) ? vehicle.status : "MAINTENANCE",
   };
 }
@@ -148,7 +154,9 @@ export async function addVehicle(
         vehicleType: input.vehicleType.trim(),
         brand: input.brand?.trim() || null,
         modelName: input.modelName?.trim() || null,
-        currentKilometer: input.initialKilometer?.toString() ?? "0",
+        currentKilometer: scaledIntegerFromDecimal(
+          input.initialKilometer ?? 0,
+        ),
         odometerInitialized: true,
         status: input.status ?? "AVAILABLE",
       },
@@ -261,7 +269,6 @@ export async function updateVehicle(
           },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
     if (updated.count !== 1) {
       return { success: false, message: "Kendaraan tidak ditemukan." };

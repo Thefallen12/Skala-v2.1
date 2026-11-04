@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,18 +27,18 @@ export type AggregateMaterialRequest = {
 }
 
 export type MaterialRequestAvgAggregateOutputType = {
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: number | null
 }
 
 export type MaterialRequestSumAggregateOutputType = {
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
 }
 
 export type MaterialRequestMinAggregateOutputType = {
   id: string | null
   title: string | null
   description: string | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
   status: $Enums.RequestStatus | null
   requesterId: string | null
   approverId: string | null
@@ -54,7 +54,7 @@ export type MaterialRequestMaxAggregateOutputType = {
   id: string | null
   title: string | null
   description: string | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
   status: $Enums.RequestStatus | null
   requesterId: string | null
   approverId: string | null
@@ -231,7 +231,7 @@ export type MaterialRequestGroupByOutputType = {
   id: string
   title: string
   description: string | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
   status: $Enums.RequestStatus
   requesterId: string
   approverId: string | null
@@ -248,7 +248,7 @@ export type MaterialRequestGroupByOutputType = {
   _max: MaterialRequestMaxAggregateOutputType | null
 }
 
-export type GetMaterialRequestGroupByPayload<T extends MaterialRequestGroupByArgs> = Prisma.PrismaPromise<
+type GetMaterialRequestGroupByPayload<T extends MaterialRequestGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MaterialRequestGroupByOutputType, T['by']> &
       {
@@ -270,7 +270,7 @@ export type MaterialRequestWhereInput = {
   id?: Prisma.StringFilter<"MaterialRequest"> | string
   title?: Prisma.StringFilter<"MaterialRequest"> | string
   description?: Prisma.StringNullableFilter<"MaterialRequest"> | string | null
-  estimatedCost?: Prisma.DecimalNullableFilter<"MaterialRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableFilter<"MaterialRequest"> | bigint | number | null
   status?: Prisma.EnumRequestStatusFilter<"MaterialRequest"> | $Enums.RequestStatus
   requesterId?: Prisma.StringFilter<"MaterialRequest"> | string
   approverId?: Prisma.StringNullableFilter<"MaterialRequest"> | string | null
@@ -288,15 +288,15 @@ export type MaterialRequestWhereInput = {
 export type MaterialRequestOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   title?: Prisma.SortOrder
-  description?: Prisma.SortOrderInput | Prisma.SortOrder
-  estimatedCost?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrder
+  estimatedCost?: Prisma.SortOrder
   status?: Prisma.SortOrder
   requesterId?: Prisma.SortOrder
-  approverId?: Prisma.SortOrderInput | Prisma.SortOrder
-  fundsApprovedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  fundsDisbursedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  purchasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  deliveredAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approverId?: Prisma.SortOrder
+  fundsApprovedAt?: Prisma.SortOrder
+  fundsDisbursedAt?: Prisma.SortOrder
+  purchasedAt?: Prisma.SortOrder
+  deliveredAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   User_MaterialRequest_approverIdToUser?: Prisma.UserOrderByWithRelationInput
@@ -311,7 +311,7 @@ export type MaterialRequestWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.MaterialRequestWhereInput | Prisma.MaterialRequestWhereInput[]
   title?: Prisma.StringFilter<"MaterialRequest"> | string
   description?: Prisma.StringNullableFilter<"MaterialRequest"> | string | null
-  estimatedCost?: Prisma.DecimalNullableFilter<"MaterialRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableFilter<"MaterialRequest"> | bigint | number | null
   status?: Prisma.EnumRequestStatusFilter<"MaterialRequest"> | $Enums.RequestStatus
   requesterId?: Prisma.StringFilter<"MaterialRequest"> | string
   approverId?: Prisma.StringNullableFilter<"MaterialRequest"> | string | null
@@ -329,15 +329,15 @@ export type MaterialRequestWhereUniqueInput = Prisma.AtLeast<{
 export type MaterialRequestOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   title?: Prisma.SortOrder
-  description?: Prisma.SortOrderInput | Prisma.SortOrder
-  estimatedCost?: Prisma.SortOrderInput | Prisma.SortOrder
+  description?: Prisma.SortOrder
+  estimatedCost?: Prisma.SortOrder
   status?: Prisma.SortOrder
   requesterId?: Prisma.SortOrder
-  approverId?: Prisma.SortOrderInput | Prisma.SortOrder
-  fundsApprovedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  fundsDisbursedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  purchasedAt?: Prisma.SortOrderInput | Prisma.SortOrder
-  deliveredAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  approverId?: Prisma.SortOrder
+  fundsApprovedAt?: Prisma.SortOrder
+  fundsDisbursedAt?: Prisma.SortOrder
+  purchasedAt?: Prisma.SortOrder
+  deliveredAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.MaterialRequestCountOrderByAggregateInput
@@ -354,7 +354,7 @@ export type MaterialRequestScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"MaterialRequest"> | string
   title?: Prisma.StringWithAggregatesFilter<"MaterialRequest"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"MaterialRequest"> | string | null
-  estimatedCost?: Prisma.DecimalNullableWithAggregatesFilter<"MaterialRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableWithAggregatesFilter<"MaterialRequest"> | bigint | number | null
   status?: Prisma.EnumRequestStatusWithAggregatesFilter<"MaterialRequest"> | $Enums.RequestStatus
   requesterId?: Prisma.StringWithAggregatesFilter<"MaterialRequest"> | string
   approverId?: Prisma.StringNullableWithAggregatesFilter<"MaterialRequest"> | string | null
@@ -370,7 +370,7 @@ export type MaterialRequestCreateInput = {
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   fundsApprovedAt?: Date | string | null
   fundsDisbursedAt?: Date | string | null
@@ -387,7 +387,7 @@ export type MaterialRequestUncheckedCreateInput = {
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   requesterId: string
   approverId?: string | null
@@ -401,10 +401,9 @@ export type MaterialRequestUncheckedCreateInput = {
 }
 
 export type MaterialRequestUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   fundsDisbursedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -418,10 +417,9 @@ export type MaterialRequestUpdateInput = {
 }
 
 export type MaterialRequestUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   requesterId?: Prisma.StringFieldUpdateOperationsInput | string
   approverId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -438,7 +436,7 @@ export type MaterialRequestCreateManyInput = {
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   requesterId: string
   approverId?: string | null
@@ -451,10 +449,9 @@ export type MaterialRequestCreateManyInput = {
 }
 
 export type MaterialRequestUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   fundsDisbursedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -465,10 +462,9 @@ export type MaterialRequestUpdateManyMutationInput = {
 }
 
 export type MaterialRequestUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   requesterId?: Prisma.StringFieldUpdateOperationsInput | string
   approverId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -635,12 +631,13 @@ export type MaterialRequestUncheckedUpdateManyWithoutUser_MaterialRequest_reques
   deleteMany?: Prisma.MaterialRequestScalarWhereInput | Prisma.MaterialRequestScalarWhereInput[]
 }
 
-export type NullableDecimalFieldUpdateOperationsInput = {
-  set?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  increment?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  divide?: runtime.Decimal | runtime.DecimalJsLike | number | string
+export type NullableBigIntFieldUpdateOperationsInput = {
+  set?: bigint | number | null
+  increment?: bigint | number
+  decrement?: bigint | number
+  multiply?: bigint | number
+  divide?: bigint | number
+  unset?: boolean
 }
 
 export type EnumRequestStatusFieldUpdateOperationsInput = {
@@ -665,7 +662,7 @@ export type MaterialRequestCreateWithoutUser_MaterialRequest_approverIdToUserInp
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   fundsApprovedAt?: Date | string | null
   fundsDisbursedAt?: Date | string | null
@@ -681,7 +678,7 @@ export type MaterialRequestUncheckedCreateWithoutUser_MaterialRequest_approverId
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   requesterId: string
   fundsApprovedAt?: Date | string | null
@@ -700,14 +697,13 @@ export type MaterialRequestCreateOrConnectWithoutUser_MaterialRequest_approverId
 
 export type MaterialRequestCreateManyUser_MaterialRequest_approverIdToUserInputEnvelope = {
   data: Prisma.MaterialRequestCreateManyUser_MaterialRequest_approverIdToUserInput | Prisma.MaterialRequestCreateManyUser_MaterialRequest_approverIdToUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type MaterialRequestCreateWithoutUser_MaterialRequest_requesterIdToUserInput = {
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   fundsApprovedAt?: Date | string | null
   fundsDisbursedAt?: Date | string | null
@@ -723,7 +719,7 @@ export type MaterialRequestUncheckedCreateWithoutUser_MaterialRequest_requesterI
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   approverId?: string | null
   fundsApprovedAt?: Date | string | null
@@ -742,7 +738,6 @@ export type MaterialRequestCreateOrConnectWithoutUser_MaterialRequest_requesterI
 
 export type MaterialRequestCreateManyUser_MaterialRequest_requesterIdToUserInputEnvelope = {
   data: Prisma.MaterialRequestCreateManyUser_MaterialRequest_requesterIdToUserInput | Prisma.MaterialRequestCreateManyUser_MaterialRequest_requesterIdToUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type MaterialRequestUpsertWithWhereUniqueWithoutUser_MaterialRequest_approverIdToUserInput = {
@@ -768,7 +763,7 @@ export type MaterialRequestScalarWhereInput = {
   id?: Prisma.StringFilter<"MaterialRequest"> | string
   title?: Prisma.StringFilter<"MaterialRequest"> | string
   description?: Prisma.StringNullableFilter<"MaterialRequest"> | string | null
-  estimatedCost?: Prisma.DecimalNullableFilter<"MaterialRequest"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableFilter<"MaterialRequest"> | bigint | number | null
   status?: Prisma.EnumRequestStatusFilter<"MaterialRequest"> | $Enums.RequestStatus
   requesterId?: Prisma.StringFilter<"MaterialRequest"> | string
   approverId?: Prisma.StringNullableFilter<"MaterialRequest"> | string | null
@@ -800,7 +795,7 @@ export type MaterialRequestCreateWithoutRequestItemInput = {
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   fundsApprovedAt?: Date | string | null
   fundsDisbursedAt?: Date | string | null
@@ -816,7 +811,7 @@ export type MaterialRequestUncheckedCreateWithoutRequestItemInput = {
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   requesterId: string
   approverId?: string | null
@@ -845,10 +840,9 @@ export type MaterialRequestUpdateToOneWithWhereWithoutRequestItemInput = {
 }
 
 export type MaterialRequestUpdateWithoutRequestItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   fundsDisbursedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -861,10 +855,9 @@ export type MaterialRequestUpdateWithoutRequestItemInput = {
 }
 
 export type MaterialRequestUncheckedUpdateWithoutRequestItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   requesterId?: Prisma.StringFieldUpdateOperationsInput | string
   approverId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -880,7 +873,7 @@ export type MaterialRequestCreateManyUser_MaterialRequest_approverIdToUserInput 
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   requesterId: string
   fundsApprovedAt?: Date | string | null
@@ -895,7 +888,7 @@ export type MaterialRequestCreateManyUser_MaterialRequest_requesterIdToUserInput
   id: string
   title: string
   description?: string | null
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   status?: $Enums.RequestStatus
   approverId?: string | null
   fundsApprovedAt?: Date | string | null
@@ -907,10 +900,9 @@ export type MaterialRequestCreateManyUser_MaterialRequest_requesterIdToUserInput
 }
 
 export type MaterialRequestUpdateWithoutUser_MaterialRequest_approverIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   fundsDisbursedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -923,10 +915,9 @@ export type MaterialRequestUpdateWithoutUser_MaterialRequest_approverIdToUserInp
 }
 
 export type MaterialRequestUncheckedUpdateWithoutUser_MaterialRequest_approverIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   requesterId?: Prisma.StringFieldUpdateOperationsInput | string
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -939,10 +930,9 @@ export type MaterialRequestUncheckedUpdateWithoutUser_MaterialRequest_approverId
 }
 
 export type MaterialRequestUncheckedUpdateManyWithoutUser_MaterialRequest_approverIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   requesterId?: Prisma.StringFieldUpdateOperationsInput | string
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -954,10 +944,9 @@ export type MaterialRequestUncheckedUpdateManyWithoutUser_MaterialRequest_approv
 }
 
 export type MaterialRequestUpdateWithoutUser_MaterialRequest_requesterIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   fundsDisbursedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -970,10 +959,9 @@ export type MaterialRequestUpdateWithoutUser_MaterialRequest_requesterIdToUserIn
 }
 
 export type MaterialRequestUncheckedUpdateWithoutUser_MaterialRequest_requesterIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   approverId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -986,10 +974,9 @@ export type MaterialRequestUncheckedUpdateWithoutUser_MaterialRequest_requesterI
 }
 
 export type MaterialRequestUncheckedUpdateManyWithoutUser_MaterialRequest_requesterIdToUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   status?: Prisma.EnumRequestStatusFieldUpdateOperationsInput | $Enums.RequestStatus
   approverId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fundsApprovedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1051,41 +1038,7 @@ export type MaterialRequestSelect<ExtArgs extends runtime.Types.Extensions.Inter
   _count?: boolean | Prisma.MaterialRequestCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["materialRequest"]>
 
-export type MaterialRequestSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  title?: boolean
-  description?: boolean
-  estimatedCost?: boolean
-  status?: boolean
-  requesterId?: boolean
-  approverId?: boolean
-  fundsApprovedAt?: boolean
-  fundsDisbursedAt?: boolean
-  purchasedAt?: boolean
-  deliveredAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  User_MaterialRequest_approverIdToUser?: boolean | Prisma.MaterialRequest$User_MaterialRequest_approverIdToUserArgs<ExtArgs>
-  User_MaterialRequest_requesterIdToUser?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["materialRequest"]>
 
-export type MaterialRequestSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  title?: boolean
-  description?: boolean
-  estimatedCost?: boolean
-  status?: boolean
-  requesterId?: boolean
-  approverId?: boolean
-  fundsApprovedAt?: boolean
-  fundsDisbursedAt?: boolean
-  purchasedAt?: boolean
-  deliveredAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  User_MaterialRequest_approverIdToUser?: boolean | Prisma.MaterialRequest$User_MaterialRequest_approverIdToUserArgs<ExtArgs>
-  User_MaterialRequest_requesterIdToUser?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["materialRequest"]>
 
 export type MaterialRequestSelectScalar = {
   id?: boolean
@@ -1110,14 +1063,6 @@ export type MaterialRequestInclude<ExtArgs extends runtime.Types.Extensions.Inte
   RequestItem?: boolean | Prisma.MaterialRequest$RequestItemArgs<ExtArgs>
   _count?: boolean | Prisma.MaterialRequestCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type MaterialRequestIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  User_MaterialRequest_approverIdToUser?: boolean | Prisma.MaterialRequest$User_MaterialRequest_approverIdToUserArgs<ExtArgs>
-  User_MaterialRequest_requesterIdToUser?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type MaterialRequestIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  User_MaterialRequest_approverIdToUser?: boolean | Prisma.MaterialRequest$User_MaterialRequest_approverIdToUserArgs<ExtArgs>
-  User_MaterialRequest_requesterIdToUser?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
 
 export type $MaterialRequestPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "MaterialRequest"
@@ -1130,7 +1075,7 @@ export type $MaterialRequestPayload<ExtArgs extends runtime.Types.Extensions.Int
     id: string
     title: string
     description: string | null
-    estimatedCost: runtime.Decimal | null
+    estimatedCost: bigint | null
     status: $Enums.RequestStatus
     requesterId: string
     approverId: string | null
@@ -1258,30 +1203,6 @@ export interface MaterialRequestDelegate<ExtArgs extends runtime.Types.Extension
   createMany<T extends MaterialRequestCreateManyArgs>(args?: Prisma.SelectSubset<T, MaterialRequestCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many MaterialRequests and returns the data saved in the database.
-   * @param {MaterialRequestCreateManyAndReturnArgs} args - Arguments to create many MaterialRequests.
-   * @example
-   * // Create many MaterialRequests
-   * const materialRequest = await prisma.materialRequest.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many MaterialRequests and only return the `id`
-   * const materialRequestWithIdOnly = await prisma.materialRequest.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends MaterialRequestCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, MaterialRequestCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MaterialRequestPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a MaterialRequest.
    * @param {MaterialRequestDeleteArgs} args - Arguments to delete one MaterialRequest.
    * @example
@@ -1346,36 +1267,6 @@ export interface MaterialRequestDelegate<ExtArgs extends runtime.Types.Extension
   updateMany<T extends MaterialRequestUpdateManyArgs>(args: Prisma.SelectSubset<T, MaterialRequestUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more MaterialRequests and returns the data updated in the database.
-   * @param {MaterialRequestUpdateManyAndReturnArgs} args - Arguments to update many MaterialRequests.
-   * @example
-   * // Update many MaterialRequests
-   * const materialRequest = await prisma.materialRequest.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more MaterialRequests and only return the `id`
-   * const materialRequestWithIdOnly = await prisma.materialRequest.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends MaterialRequestUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, MaterialRequestUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MaterialRequestPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one MaterialRequest.
    * @param {MaterialRequestUpsertArgs} args - Arguments to update or create a MaterialRequest.
    * @example
@@ -1393,6 +1284,29 @@ export interface MaterialRequestDelegate<ExtArgs extends runtime.Types.Extension
    * })
    */
   upsert<T extends MaterialRequestUpsertArgs>(args: Prisma.SelectSubset<T, MaterialRequestUpsertArgs<ExtArgs>>): Prisma.Prisma__MaterialRequestClient<runtime.Types.Result.GetResult<Prisma.$MaterialRequestPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more MaterialRequests that matches the filter.
+   * @param {MaterialRequestFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const materialRequest = await prisma.materialRequest.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.MaterialRequestFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a MaterialRequest.
+   * @param {MaterialRequestAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const materialRequest = await prisma.materialRequest.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.MaterialRequestAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1569,7 +1483,7 @@ export interface MaterialRequestFieldRefs {
   readonly id: Prisma.FieldRef<"MaterialRequest", 'String'>
   readonly title: Prisma.FieldRef<"MaterialRequest", 'String'>
   readonly description: Prisma.FieldRef<"MaterialRequest", 'String'>
-  readonly estimatedCost: Prisma.FieldRef<"MaterialRequest", 'Decimal'>
+  readonly estimatedCost: Prisma.FieldRef<"MaterialRequest", 'BigInt'>
   readonly status: Prisma.FieldRef<"MaterialRequest", 'RequestStatus'>
   readonly requesterId: Prisma.FieldRef<"MaterialRequest", 'String'>
   readonly approverId: Prisma.FieldRef<"MaterialRequest", 'String'>
@@ -1775,11 +1689,6 @@ export type MaterialRequestFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` MaterialRequests.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of MaterialRequests.
-   */
   distinct?: Prisma.MaterialRequestScalarFieldEnum | Prisma.MaterialRequestScalarFieldEnum[]
 }
 
@@ -1813,30 +1722,6 @@ export type MaterialRequestCreateManyArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many MaterialRequests.
    */
   data: Prisma.MaterialRequestCreateManyInput | Prisma.MaterialRequestCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * MaterialRequest createManyAndReturn
- */
-export type MaterialRequestCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the MaterialRequest
-   */
-  select?: Prisma.MaterialRequestSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the MaterialRequest
-   */
-  omit?: Prisma.MaterialRequestOmit<ExtArgs> | null
-  /**
-   * The data used to create many MaterialRequests.
-   */
-  data: Prisma.MaterialRequestCreateManyInput | Prisma.MaterialRequestCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.MaterialRequestIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1881,36 +1766,6 @@ export type MaterialRequestUpdateManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many MaterialRequests to update.
    */
   limit?: number
-}
-
-/**
- * MaterialRequest updateManyAndReturn
- */
-export type MaterialRequestUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the MaterialRequest
-   */
-  select?: Prisma.MaterialRequestSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the MaterialRequest
-   */
-  omit?: Prisma.MaterialRequestOmit<ExtArgs> | null
-  /**
-   * The data used to update MaterialRequests.
-   */
-  data: Prisma.XOR<Prisma.MaterialRequestUpdateManyMutationInput, Prisma.MaterialRequestUncheckedUpdateManyInput>
-  /**
-   * Filter which MaterialRequests to update
-   */
-  where?: Prisma.MaterialRequestWhereInput
-  /**
-   * Limit how many MaterialRequests to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.MaterialRequestIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1977,6 +1832,34 @@ export type MaterialRequestDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many MaterialRequests to delete.
    */
   limit?: number
+}
+
+/**
+ * MaterialRequest findRaw
+ */
+export type MaterialRequestFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * MaterialRequest aggregateRaw
+ */
+export type MaterialRequestAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

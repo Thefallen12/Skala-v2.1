@@ -59,7 +59,7 @@ export function GlobalModal({
           overlayClassName,
         )}
         className={cn(
-          "flex max-h-[90vh] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border bg-popover p-0 text-popover-foreground shadow-2xl",
+          "flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border bg-popover p-0 text-popover-foreground shadow-2xl",
           "[&>button:last-child]:right-4 [&>button:last-child]:top-4 [&>button:last-child]:rounded-lg [&>button:last-child]:bg-muted [&>button:last-child]:p-2 [&>button:last-child]:text-muted-foreground [&>button:last-child]:hover:bg-accent [&>button:last-child]:hover:text-accent-foreground",
           className,
         )}
@@ -88,7 +88,7 @@ export function GlobalModal({
         </DialogHeader>
         <div
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto space-y-5 p-6",
+            "min-h-0 flex-1 overflow-y-auto overscroll-y-contain space-y-5 p-6",
             bodyClassName,
           )}
         >

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -27,13 +27,13 @@ export type AggregateEquipmentMaster = {
 }
 
 export type EquipmentMasterAvgAggregateOutputType = {
-  hourlyRate: runtime.Decimal | null
-  currentHM: runtime.Decimal | null
+  hourlyRate: number | null
+  currentHM: number | null
 }
 
 export type EquipmentMasterSumAggregateOutputType = {
-  hourlyRate: runtime.Decimal | null
-  currentHM: runtime.Decimal | null
+  hourlyRate: bigint | null
+  currentHM: bigint | null
 }
 
 export type EquipmentMasterMinAggregateOutputType = {
@@ -42,9 +42,9 @@ export type EquipmentMasterMinAggregateOutputType = {
   name: string | null
   brand: string | null
   licensePlate: string | null
-  hourlyRate: runtime.Decimal | null
+  hourlyRate: bigint | null
   status: $Enums.EquipmentStatus | null
-  currentHM: runtime.Decimal | null
+  currentHM: bigint | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -55,9 +55,9 @@ export type EquipmentMasterMaxAggregateOutputType = {
   name: string | null
   brand: string | null
   licensePlate: string | null
-  hourlyRate: runtime.Decimal | null
+  hourlyRate: bigint | null
   status: $Enums.EquipmentStatus | null
-  currentHM: runtime.Decimal | null
+  currentHM: bigint | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -219,9 +219,9 @@ export type EquipmentMasterGroupByOutputType = {
   name: string
   brand: string | null
   licensePlate: string | null
-  hourlyRate: runtime.Decimal
+  hourlyRate: bigint
   status: $Enums.EquipmentStatus
-  currentHM: runtime.Decimal
+  currentHM: bigint
   createdAt: Date
   updatedAt: Date
   _count: EquipmentMasterCountAggregateOutputType | null
@@ -231,7 +231,7 @@ export type EquipmentMasterGroupByOutputType = {
   _max: EquipmentMasterMaxAggregateOutputType | null
 }
 
-export type GetEquipmentMasterGroupByPayload<T extends EquipmentMasterGroupByArgs> = Prisma.PrismaPromise<
+type GetEquipmentMasterGroupByPayload<T extends EquipmentMasterGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<EquipmentMasterGroupByOutputType, T['by']> &
       {
@@ -255,9 +255,9 @@ export type EquipmentMasterWhereInput = {
   name?: Prisma.StringFilter<"EquipmentMaster"> | string
   brand?: Prisma.StringNullableFilter<"EquipmentMaster"> | string | null
   licensePlate?: Prisma.StringNullableFilter<"EquipmentMaster"> | string | null
-  hourlyRate?: Prisma.DecimalFilter<"EquipmentMaster"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFilter<"EquipmentMaster"> | bigint | number
   status?: Prisma.EnumEquipmentStatusFilter<"EquipmentMaster"> | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFilter<"EquipmentMaster"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFilter<"EquipmentMaster"> | bigint | number
   createdAt?: Prisma.DateTimeFilter<"EquipmentMaster"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"EquipmentMaster"> | Date | string
   logs?: Prisma.EquipmentLogListRelationFilter
@@ -267,8 +267,8 @@ export type EquipmentMasterOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
-  brand?: Prisma.SortOrderInput | Prisma.SortOrder
-  licensePlate?: Prisma.SortOrderInput | Prisma.SortOrder
+  brand?: Prisma.SortOrder
+  licensePlate?: Prisma.SortOrder
   hourlyRate?: Prisma.SortOrder
   status?: Prisma.SortOrder
   currentHM?: Prisma.SortOrder
@@ -286,9 +286,9 @@ export type EquipmentMasterWhereUniqueInput = Prisma.AtLeast<{
   name?: Prisma.StringFilter<"EquipmentMaster"> | string
   brand?: Prisma.StringNullableFilter<"EquipmentMaster"> | string | null
   licensePlate?: Prisma.StringNullableFilter<"EquipmentMaster"> | string | null
-  hourlyRate?: Prisma.DecimalFilter<"EquipmentMaster"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFilter<"EquipmentMaster"> | bigint | number
   status?: Prisma.EnumEquipmentStatusFilter<"EquipmentMaster"> | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFilter<"EquipmentMaster"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFilter<"EquipmentMaster"> | bigint | number
   createdAt?: Prisma.DateTimeFilter<"EquipmentMaster"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"EquipmentMaster"> | Date | string
   logs?: Prisma.EquipmentLogListRelationFilter
@@ -298,8 +298,8 @@ export type EquipmentMasterOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   code?: Prisma.SortOrder
   name?: Prisma.SortOrder
-  brand?: Prisma.SortOrderInput | Prisma.SortOrder
-  licensePlate?: Prisma.SortOrderInput | Prisma.SortOrder
+  brand?: Prisma.SortOrder
+  licensePlate?: Prisma.SortOrder
   hourlyRate?: Prisma.SortOrder
   status?: Prisma.SortOrder
   currentHM?: Prisma.SortOrder
@@ -321,9 +321,9 @@ export type EquipmentMasterScalarWhereWithAggregatesInput = {
   name?: Prisma.StringWithAggregatesFilter<"EquipmentMaster"> | string
   brand?: Prisma.StringNullableWithAggregatesFilter<"EquipmentMaster"> | string | null
   licensePlate?: Prisma.StringNullableWithAggregatesFilter<"EquipmentMaster"> | string | null
-  hourlyRate?: Prisma.DecimalWithAggregatesFilter<"EquipmentMaster"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntWithAggregatesFilter<"EquipmentMaster"> | bigint | number
   status?: Prisma.EnumEquipmentStatusWithAggregatesFilter<"EquipmentMaster"> | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalWithAggregatesFilter<"EquipmentMaster"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntWithAggregatesFilter<"EquipmentMaster"> | bigint | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"EquipmentMaster"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"EquipmentMaster"> | Date | string
 }
@@ -334,9 +334,9 @@ export type EquipmentMasterCreateInput = {
   name: string
   brand?: string | null
   licensePlate?: string | null
-  hourlyRate?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: bigint | number
   status?: $Enums.EquipmentStatus
-  currentHM?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: bigint | number
   createdAt?: Date | string
   updatedAt?: Date | string
   logs?: Prisma.EquipmentLogCreateNestedManyWithoutEquipmentMasterInput
@@ -348,37 +348,35 @@ export type EquipmentMasterUncheckedCreateInput = {
   name: string
   brand?: string | null
   licensePlate?: string | null
-  hourlyRate?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: bigint | number
   status?: $Enums.EquipmentStatus
-  currentHM?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: bigint | number
   createdAt?: Date | string
   updatedAt?: Date | string
   logs?: Prisma.EquipmentLogUncheckedCreateNestedManyWithoutEquipmentMasterInput
 }
 
 export type EquipmentMasterUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   licensePlate?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  hourlyRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumEquipmentStatusFieldUpdateOperationsInput | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   logs?: Prisma.EquipmentLogUpdateManyWithoutEquipmentMasterNestedInput
 }
 
 export type EquipmentMasterUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   licensePlate?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  hourlyRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumEquipmentStatusFieldUpdateOperationsInput | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   logs?: Prisma.EquipmentLogUncheckedUpdateManyWithoutEquipmentMasterNestedInput
@@ -390,35 +388,33 @@ export type EquipmentMasterCreateManyInput = {
   name: string
   brand?: string | null
   licensePlate?: string | null
-  hourlyRate?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: bigint | number
   status?: $Enums.EquipmentStatus
-  currentHM?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: bigint | number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type EquipmentMasterUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   licensePlate?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  hourlyRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumEquipmentStatusFieldUpdateOperationsInput | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type EquipmentMasterUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   licensePlate?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  hourlyRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumEquipmentStatusFieldUpdateOperationsInput | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -491,7 +487,7 @@ export type EquipmentMasterUpdateOneWithoutLogsNestedInput = {
   create?: Prisma.XOR<Prisma.EquipmentMasterCreateWithoutLogsInput, Prisma.EquipmentMasterUncheckedCreateWithoutLogsInput>
   connectOrCreate?: Prisma.EquipmentMasterCreateOrConnectWithoutLogsInput
   upsert?: Prisma.EquipmentMasterUpsertWithoutLogsInput
-  disconnect?: Prisma.EquipmentMasterWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.EquipmentMasterWhereInput | boolean
   connect?: Prisma.EquipmentMasterWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.EquipmentMasterUpdateToOneWithWhereWithoutLogsInput, Prisma.EquipmentMasterUpdateWithoutLogsInput>, Prisma.EquipmentMasterUncheckedUpdateWithoutLogsInput>
@@ -503,9 +499,9 @@ export type EquipmentMasterCreateWithoutLogsInput = {
   name: string
   brand?: string | null
   licensePlate?: string | null
-  hourlyRate?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: bigint | number
   status?: $Enums.EquipmentStatus
-  currentHM?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: bigint | number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -516,9 +512,9 @@ export type EquipmentMasterUncheckedCreateWithoutLogsInput = {
   name: string
   brand?: string | null
   licensePlate?: string | null
-  hourlyRate?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: bigint | number
   status?: $Enums.EquipmentStatus
-  currentHM?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: bigint | number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -540,27 +536,25 @@ export type EquipmentMasterUpdateToOneWithWhereWithoutLogsInput = {
 }
 
 export type EquipmentMasterUpdateWithoutLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   licensePlate?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  hourlyRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumEquipmentStatusFieldUpdateOperationsInput | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type EquipmentMasterUncheckedUpdateWithoutLogsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   code?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   licensePlate?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  hourlyRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  hourlyRate?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   status?: Prisma.EnumEquipmentStatusFieldUpdateOperationsInput | $Enums.EquipmentStatus
-  currentHM?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentHM?: Prisma.BigIntFieldUpdateOperationsInput | bigint | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -611,31 +605,7 @@ export type EquipmentMasterSelect<ExtArgs extends runtime.Types.Extensions.Inter
   _count?: boolean | Prisma.EquipmentMasterCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["equipmentMaster"]>
 
-export type EquipmentMasterSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  code?: boolean
-  name?: boolean
-  brand?: boolean
-  licensePlate?: boolean
-  hourlyRate?: boolean
-  status?: boolean
-  currentHM?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["equipmentMaster"]>
 
-export type EquipmentMasterSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  code?: boolean
-  name?: boolean
-  brand?: boolean
-  licensePlate?: boolean
-  hourlyRate?: boolean
-  status?: boolean
-  currentHM?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["equipmentMaster"]>
 
 export type EquipmentMasterSelectScalar = {
   id?: boolean
@@ -655,8 +625,6 @@ export type EquipmentMasterInclude<ExtArgs extends runtime.Types.Extensions.Inte
   logs?: boolean | Prisma.EquipmentMaster$logsArgs<ExtArgs>
   _count?: boolean | Prisma.EquipmentMasterCountOutputTypeDefaultArgs<ExtArgs>
 }
-export type EquipmentMasterIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
-export type EquipmentMasterIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $EquipmentMasterPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "EquipmentMaster"
@@ -669,9 +637,9 @@ export type $EquipmentMasterPayload<ExtArgs extends runtime.Types.Extensions.Int
     name: string
     brand: string | null
     licensePlate: string | null
-    hourlyRate: runtime.Decimal
+    hourlyRate: bigint
     status: $Enums.EquipmentStatus
-    currentHM: runtime.Decimal
+    currentHM: bigint
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["equipmentMaster"]>
@@ -792,30 +760,6 @@ export interface EquipmentMasterDelegate<ExtArgs extends runtime.Types.Extension
   createMany<T extends EquipmentMasterCreateManyArgs>(args?: Prisma.SelectSubset<T, EquipmentMasterCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many EquipmentMasters and returns the data saved in the database.
-   * @param {EquipmentMasterCreateManyAndReturnArgs} args - Arguments to create many EquipmentMasters.
-   * @example
-   * // Create many EquipmentMasters
-   * const equipmentMaster = await prisma.equipmentMaster.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many EquipmentMasters and only return the `id`
-   * const equipmentMasterWithIdOnly = await prisma.equipmentMaster.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends EquipmentMasterCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, EquipmentMasterCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EquipmentMasterPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a EquipmentMaster.
    * @param {EquipmentMasterDeleteArgs} args - Arguments to delete one EquipmentMaster.
    * @example
@@ -880,36 +824,6 @@ export interface EquipmentMasterDelegate<ExtArgs extends runtime.Types.Extension
   updateMany<T extends EquipmentMasterUpdateManyArgs>(args: Prisma.SelectSubset<T, EquipmentMasterUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more EquipmentMasters and returns the data updated in the database.
-   * @param {EquipmentMasterUpdateManyAndReturnArgs} args - Arguments to update many EquipmentMasters.
-   * @example
-   * // Update many EquipmentMasters
-   * const equipmentMaster = await prisma.equipmentMaster.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more EquipmentMasters and only return the `id`
-   * const equipmentMasterWithIdOnly = await prisma.equipmentMaster.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends EquipmentMasterUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, EquipmentMasterUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EquipmentMasterPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one EquipmentMaster.
    * @param {EquipmentMasterUpsertArgs} args - Arguments to update or create a EquipmentMaster.
    * @example
@@ -927,6 +841,29 @@ export interface EquipmentMasterDelegate<ExtArgs extends runtime.Types.Extension
    * })
    */
   upsert<T extends EquipmentMasterUpsertArgs>(args: Prisma.SelectSubset<T, EquipmentMasterUpsertArgs<ExtArgs>>): Prisma.Prisma__EquipmentMasterClient<runtime.Types.Result.GetResult<Prisma.$EquipmentMasterPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more EquipmentMasters that matches the filter.
+   * @param {EquipmentMasterFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const equipmentMaster = await prisma.equipmentMaster.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.EquipmentMasterFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a EquipmentMaster.
+   * @param {EquipmentMasterAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const equipmentMaster = await prisma.equipmentMaster.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.EquipmentMasterAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1103,9 +1040,9 @@ export interface EquipmentMasterFieldRefs {
   readonly name: Prisma.FieldRef<"EquipmentMaster", 'String'>
   readonly brand: Prisma.FieldRef<"EquipmentMaster", 'String'>
   readonly licensePlate: Prisma.FieldRef<"EquipmentMaster", 'String'>
-  readonly hourlyRate: Prisma.FieldRef<"EquipmentMaster", 'Decimal'>
+  readonly hourlyRate: Prisma.FieldRef<"EquipmentMaster", 'BigInt'>
   readonly status: Prisma.FieldRef<"EquipmentMaster", 'EquipmentStatus'>
-  readonly currentHM: Prisma.FieldRef<"EquipmentMaster", 'Decimal'>
+  readonly currentHM: Prisma.FieldRef<"EquipmentMaster", 'BigInt'>
   readonly createdAt: Prisma.FieldRef<"EquipmentMaster", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"EquipmentMaster", 'DateTime'>
 }
@@ -1304,11 +1241,6 @@ export type EquipmentMasterFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` EquipmentMasters.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of EquipmentMasters.
-   */
   distinct?: Prisma.EquipmentMasterScalarFieldEnum | Prisma.EquipmentMasterScalarFieldEnum[]
 }
 
@@ -1342,26 +1274,6 @@ export type EquipmentMasterCreateManyArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many EquipmentMasters.
    */
   data: Prisma.EquipmentMasterCreateManyInput | Prisma.EquipmentMasterCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * EquipmentMaster createManyAndReturn
- */
-export type EquipmentMasterCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the EquipmentMaster
-   */
-  select?: Prisma.EquipmentMasterSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the EquipmentMaster
-   */
-  omit?: Prisma.EquipmentMasterOmit<ExtArgs> | null
-  /**
-   * The data used to create many EquipmentMasters.
-   */
-  data: Prisma.EquipmentMasterCreateManyInput | Prisma.EquipmentMasterCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1394,32 +1306,6 @@ export type EquipmentMasterUpdateArgs<ExtArgs extends runtime.Types.Extensions.I
  * EquipmentMaster updateMany
  */
 export type EquipmentMasterUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update EquipmentMasters.
-   */
-  data: Prisma.XOR<Prisma.EquipmentMasterUpdateManyMutationInput, Prisma.EquipmentMasterUncheckedUpdateManyInput>
-  /**
-   * Filter which EquipmentMasters to update
-   */
-  where?: Prisma.EquipmentMasterWhereInput
-  /**
-   * Limit how many EquipmentMasters to update.
-   */
-  limit?: number
-}
-
-/**
- * EquipmentMaster updateManyAndReturn
- */
-export type EquipmentMasterUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the EquipmentMaster
-   */
-  select?: Prisma.EquipmentMasterSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the EquipmentMaster
-   */
-  omit?: Prisma.EquipmentMasterOmit<ExtArgs> | null
   /**
    * The data used to update EquipmentMasters.
    */
@@ -1498,6 +1384,34 @@ export type EquipmentMasterDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many EquipmentMasters to delete.
    */
   limit?: number
+}
+
+/**
+ * EquipmentMaster findRaw
+ */
+export type EquipmentMasterFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * EquipmentMaster aggregateRaw
+ */
+export type EquipmentMasterAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

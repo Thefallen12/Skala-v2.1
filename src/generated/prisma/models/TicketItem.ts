@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -28,12 +28,12 @@ export type AggregateTicketItem = {
 
 export type TicketItemAvgAggregateOutputType = {
   quantity: number | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: number | null
 }
 
 export type TicketItemSumAggregateOutputType = {
   quantity: number | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
 }
 
 export type TicketItemMinAggregateOutputType = {
@@ -42,7 +42,7 @@ export type TicketItemMinAggregateOutputType = {
   itemName: string | null
   quantity: number | null
   unit: string | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
   categoryHint: $Enums.TicketCategoryHint | null
   expectedDeliveryDate: Date | null
   status: $Enums.FulfillmentStatus | null
@@ -56,7 +56,7 @@ export type TicketItemMaxAggregateOutputType = {
   itemName: string | null
   quantity: number | null
   unit: string | null
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
   categoryHint: $Enums.TicketCategoryHint | null
   expectedDeliveryDate: Date | null
   status: $Enums.FulfillmentStatus | null
@@ -225,7 +225,7 @@ export type TicketItemGroupByOutputType = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost: runtime.Decimal | null
+  estimatedCost: bigint | null
   categoryHint: $Enums.TicketCategoryHint
   expectedDeliveryDate: Date | null
   status: $Enums.FulfillmentStatus
@@ -238,7 +238,7 @@ export type TicketItemGroupByOutputType = {
   _max: TicketItemMaxAggregateOutputType | null
 }
 
-export type GetTicketItemGroupByPayload<T extends TicketItemGroupByArgs> = Prisma.PrismaPromise<
+type GetTicketItemGroupByPayload<T extends TicketItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<TicketItemGroupByOutputType, T['by']> &
       {
@@ -262,7 +262,7 @@ export type TicketItemWhereInput = {
   itemName?: Prisma.StringFilter<"TicketItem"> | string
   quantity?: Prisma.FloatFilter<"TicketItem"> | number
   unit?: Prisma.StringFilter<"TicketItem"> | string
-  estimatedCost?: Prisma.DecimalNullableFilter<"TicketItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableFilter<"TicketItem"> | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFilter<"TicketItem"> | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.DateTimeNullableFilter<"TicketItem"> | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFilter<"TicketItem"> | $Enums.FulfillmentStatus
@@ -279,12 +279,12 @@ export type TicketItemOrderByWithRelationInput = {
   itemName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
-  estimatedCost?: Prisma.SortOrderInput | Prisma.SortOrder
+  estimatedCost?: Prisma.SortOrder
   categoryHint?: Prisma.SortOrder
-  expectedDeliveryDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  expectedDeliveryDate?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  poItemId?: Prisma.SortOrderInput | Prisma.SortOrder
-  doItemId?: Prisma.SortOrderInput | Prisma.SortOrder
+  poItemId?: Prisma.SortOrder
+  doItemId?: Prisma.SortOrder
   ticket?: Prisma.TicketOrderByWithRelationInput
   poItem?: Prisma.POItemOrderByWithRelationInput
   doItem?: Prisma.DOItemOrderByWithRelationInput
@@ -299,7 +299,7 @@ export type TicketItemWhereUniqueInput = Prisma.AtLeast<{
   itemName?: Prisma.StringFilter<"TicketItem"> | string
   quantity?: Prisma.FloatFilter<"TicketItem"> | number
   unit?: Prisma.StringFilter<"TicketItem"> | string
-  estimatedCost?: Prisma.DecimalNullableFilter<"TicketItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableFilter<"TicketItem"> | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFilter<"TicketItem"> | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.DateTimeNullableFilter<"TicketItem"> | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFilter<"TicketItem"> | $Enums.FulfillmentStatus
@@ -316,12 +316,12 @@ export type TicketItemOrderByWithAggregationInput = {
   itemName?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
-  estimatedCost?: Prisma.SortOrderInput | Prisma.SortOrder
+  estimatedCost?: Prisma.SortOrder
   categoryHint?: Prisma.SortOrder
-  expectedDeliveryDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  expectedDeliveryDate?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  poItemId?: Prisma.SortOrderInput | Prisma.SortOrder
-  doItemId?: Prisma.SortOrderInput | Prisma.SortOrder
+  poItemId?: Prisma.SortOrder
+  doItemId?: Prisma.SortOrder
   _count?: Prisma.TicketItemCountOrderByAggregateInput
   _avg?: Prisma.TicketItemAvgOrderByAggregateInput
   _max?: Prisma.TicketItemMaxOrderByAggregateInput
@@ -338,7 +338,7 @@ export type TicketItemScalarWhereWithAggregatesInput = {
   itemName?: Prisma.StringWithAggregatesFilter<"TicketItem"> | string
   quantity?: Prisma.FloatWithAggregatesFilter<"TicketItem"> | number
   unit?: Prisma.StringWithAggregatesFilter<"TicketItem"> | string
-  estimatedCost?: Prisma.DecimalNullableWithAggregatesFilter<"TicketItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableWithAggregatesFilter<"TicketItem"> | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintWithAggregatesFilter<"TicketItem"> | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.DateTimeNullableWithAggregatesFilter<"TicketItem"> | Date | string | null
   status?: Prisma.EnumFulfillmentStatusWithAggregatesFilter<"TicketItem"> | $Enums.FulfillmentStatus
@@ -351,7 +351,7 @@ export type TicketItemCreateInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -366,7 +366,7 @@ export type TicketItemUncheckedCreateInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -375,11 +375,10 @@ export type TicketItemUncheckedCreateInput = {
 }
 
 export type TicketItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -389,12 +388,11 @@ export type TicketItemUpdateInput = {
 }
 
 export type TicketItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -408,7 +406,7 @@ export type TicketItemCreateManyInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -417,23 +415,21 @@ export type TicketItemCreateManyInput = {
 }
 
 export type TicketItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
 }
 
 export type TicketItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -642,7 +638,7 @@ export type TicketItemCreateWithoutTicketInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -655,7 +651,7 @@ export type TicketItemUncheckedCreateWithoutTicketInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -670,7 +666,6 @@ export type TicketItemCreateOrConnectWithoutTicketInput = {
 
 export type TicketItemCreateManyTicketInputEnvelope = {
   data: Prisma.TicketItemCreateManyTicketInput | Prisma.TicketItemCreateManyTicketInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketItemUpsertWithWhereUniqueWithoutTicketInput = {
@@ -698,7 +693,7 @@ export type TicketItemScalarWhereInput = {
   itemName?: Prisma.StringFilter<"TicketItem"> | string
   quantity?: Prisma.FloatFilter<"TicketItem"> | number
   unit?: Prisma.StringFilter<"TicketItem"> | string
-  estimatedCost?: Prisma.DecimalNullableFilter<"TicketItem"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.BigIntNullableFilter<"TicketItem"> | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFilter<"TicketItem"> | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.DateTimeNullableFilter<"TicketItem"> | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFilter<"TicketItem"> | $Enums.FulfillmentStatus
@@ -711,7 +706,7 @@ export type TicketItemCreateWithoutPoItemInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -725,7 +720,7 @@ export type TicketItemUncheckedCreateWithoutPoItemInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -739,7 +734,6 @@ export type TicketItemCreateOrConnectWithoutPoItemInput = {
 
 export type TicketItemCreateManyPoItemInputEnvelope = {
   data: Prisma.TicketItemCreateManyPoItemInput | Prisma.TicketItemCreateManyPoItemInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketItemUpsertWithWhereUniqueWithoutPoItemInput = {
@@ -763,7 +757,7 @@ export type TicketItemCreateWithoutDoItemInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -777,7 +771,7 @@ export type TicketItemUncheckedCreateWithoutDoItemInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -791,7 +785,6 @@ export type TicketItemCreateOrConnectWithoutDoItemInput = {
 
 export type TicketItemCreateManyDoItemInputEnvelope = {
   data: Prisma.TicketItemCreateManyDoItemInput | Prisma.TicketItemCreateManyDoItemInput[]
-  skipDuplicates?: boolean
 }
 
 export type TicketItemUpsertWithWhereUniqueWithoutDoItemInput = {
@@ -815,7 +808,7 @@ export type TicketItemCreateManyTicketInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -824,11 +817,10 @@ export type TicketItemCreateManyTicketInput = {
 }
 
 export type TicketItemUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -837,11 +829,10 @@ export type TicketItemUpdateWithoutTicketInput = {
 }
 
 export type TicketItemUncheckedUpdateWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -850,11 +841,10 @@ export type TicketItemUncheckedUpdateWithoutTicketInput = {
 }
 
 export type TicketItemUncheckedUpdateManyWithoutTicketInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -868,7 +858,7 @@ export type TicketItemCreateManyPoItemInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -876,11 +866,10 @@ export type TicketItemCreateManyPoItemInput = {
 }
 
 export type TicketItemUpdateWithoutPoItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -889,12 +878,11 @@ export type TicketItemUpdateWithoutPoItemInput = {
 }
 
 export type TicketItemUncheckedUpdateWithoutPoItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -902,12 +890,11 @@ export type TicketItemUncheckedUpdateWithoutPoItemInput = {
 }
 
 export type TicketItemUncheckedUpdateManyWithoutPoItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -920,7 +907,7 @@ export type TicketItemCreateManyDoItemInput = {
   itemName: string
   quantity: number
   unit: string
-  estimatedCost?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: bigint | number | null
   categoryHint?: $Enums.TicketCategoryHint
   expectedDeliveryDate?: Date | string | null
   status?: $Enums.FulfillmentStatus
@@ -928,11 +915,10 @@ export type TicketItemCreateManyDoItemInput = {
 }
 
 export type TicketItemUpdateWithoutDoItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -941,12 +927,11 @@ export type TicketItemUpdateWithoutDoItemInput = {
 }
 
 export type TicketItemUncheckedUpdateWithoutDoItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -954,12 +939,11 @@ export type TicketItemUncheckedUpdateWithoutDoItemInput = {
 }
 
 export type TicketItemUncheckedUpdateManyWithoutDoItemInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   ticketId?: Prisma.StringFieldUpdateOperationsInput | string
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
   unit?: Prisma.StringFieldUpdateOperationsInput | string
-  estimatedCost?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  estimatedCost?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   categoryHint?: Prisma.EnumTicketCategoryHintFieldUpdateOperationsInput | $Enums.TicketCategoryHint
   expectedDeliveryDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   status?: Prisma.EnumFulfillmentStatusFieldUpdateOperationsInput | $Enums.FulfillmentStatus
@@ -985,39 +969,7 @@ export type TicketItemSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   doItem?: boolean | Prisma.TicketItem$doItemArgs<ExtArgs>
 }, ExtArgs["result"]["ticketItem"]>
 
-export type TicketItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  ticketId?: boolean
-  itemName?: boolean
-  quantity?: boolean
-  unit?: boolean
-  estimatedCost?: boolean
-  categoryHint?: boolean
-  expectedDeliveryDate?: boolean
-  status?: boolean
-  poItemId?: boolean
-  doItemId?: boolean
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  poItem?: boolean | Prisma.TicketItem$poItemArgs<ExtArgs>
-  doItem?: boolean | Prisma.TicketItem$doItemArgs<ExtArgs>
-}, ExtArgs["result"]["ticketItem"]>
 
-export type TicketItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  ticketId?: boolean
-  itemName?: boolean
-  quantity?: boolean
-  unit?: boolean
-  estimatedCost?: boolean
-  categoryHint?: boolean
-  expectedDeliveryDate?: boolean
-  status?: boolean
-  poItemId?: boolean
-  doItemId?: boolean
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  poItem?: boolean | Prisma.TicketItem$poItemArgs<ExtArgs>
-  doItem?: boolean | Prisma.TicketItem$doItemArgs<ExtArgs>
-}, ExtArgs["result"]["ticketItem"]>
 
 export type TicketItemSelectScalar = {
   id?: boolean
@@ -1039,16 +991,6 @@ export type TicketItemInclude<ExtArgs extends runtime.Types.Extensions.InternalA
   poItem?: boolean | Prisma.TicketItem$poItemArgs<ExtArgs>
   doItem?: boolean | Prisma.TicketItem$doItemArgs<ExtArgs>
 }
-export type TicketItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  poItem?: boolean | Prisma.TicketItem$poItemArgs<ExtArgs>
-  doItem?: boolean | Prisma.TicketItem$doItemArgs<ExtArgs>
-}
-export type TicketItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ticket?: boolean | Prisma.TicketDefaultArgs<ExtArgs>
-  poItem?: boolean | Prisma.TicketItem$poItemArgs<ExtArgs>
-  doItem?: boolean | Prisma.TicketItem$doItemArgs<ExtArgs>
-}
 
 export type $TicketItemPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "TicketItem"
@@ -1063,7 +1005,7 @@ export type $TicketItemPayload<ExtArgs extends runtime.Types.Extensions.Internal
     itemName: string
     quantity: number
     unit: string
-    estimatedCost: runtime.Decimal | null
+    estimatedCost: bigint | null
     categoryHint: $Enums.TicketCategoryHint
     expectedDeliveryDate: Date | null
     status: $Enums.FulfillmentStatus
@@ -1187,30 +1129,6 @@ export interface TicketItemDelegate<ExtArgs extends runtime.Types.Extensions.Int
   createMany<T extends TicketItemCreateManyArgs>(args?: Prisma.SelectSubset<T, TicketItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many TicketItems and returns the data saved in the database.
-   * @param {TicketItemCreateManyAndReturnArgs} args - Arguments to create many TicketItems.
-   * @example
-   * // Create many TicketItems
-   * const ticketItem = await prisma.ticketItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many TicketItems and only return the `id`
-   * const ticketItemWithIdOnly = await prisma.ticketItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends TicketItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, TicketItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a TicketItem.
    * @param {TicketItemDeleteArgs} args - Arguments to delete one TicketItem.
    * @example
@@ -1275,36 +1193,6 @@ export interface TicketItemDelegate<ExtArgs extends runtime.Types.Extensions.Int
   updateMany<T extends TicketItemUpdateManyArgs>(args: Prisma.SelectSubset<T, TicketItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more TicketItems and returns the data updated in the database.
-   * @param {TicketItemUpdateManyAndReturnArgs} args - Arguments to update many TicketItems.
-   * @example
-   * // Update many TicketItems
-   * const ticketItem = await prisma.ticketItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more TicketItems and only return the `id`
-   * const ticketItemWithIdOnly = await prisma.ticketItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends TicketItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, TicketItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one TicketItem.
    * @param {TicketItemUpsertArgs} args - Arguments to update or create a TicketItem.
    * @example
@@ -1322,6 +1210,29 @@ export interface TicketItemDelegate<ExtArgs extends runtime.Types.Extensions.Int
    * })
    */
   upsert<T extends TicketItemUpsertArgs>(args: Prisma.SelectSubset<T, TicketItemUpsertArgs<ExtArgs>>): Prisma.Prisma__TicketItemClient<runtime.Types.Result.GetResult<Prisma.$TicketItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more TicketItems that matches the filter.
+   * @param {TicketItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const ticketItem = await prisma.ticketItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.TicketItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a TicketItem.
+   * @param {TicketItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const ticketItem = await prisma.ticketItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.TicketItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1500,7 +1411,7 @@ export interface TicketItemFieldRefs {
   readonly itemName: Prisma.FieldRef<"TicketItem", 'String'>
   readonly quantity: Prisma.FieldRef<"TicketItem", 'Float'>
   readonly unit: Prisma.FieldRef<"TicketItem", 'String'>
-  readonly estimatedCost: Prisma.FieldRef<"TicketItem", 'Decimal'>
+  readonly estimatedCost: Prisma.FieldRef<"TicketItem", 'BigInt'>
   readonly categoryHint: Prisma.FieldRef<"TicketItem", 'TicketCategoryHint'>
   readonly expectedDeliveryDate: Prisma.FieldRef<"TicketItem", 'DateTime'>
   readonly status: Prisma.FieldRef<"TicketItem", 'FulfillmentStatus'>
@@ -1702,11 +1613,6 @@ export type TicketItemFindManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Skip the first `n` TicketItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of TicketItems.
-   */
   distinct?: Prisma.TicketItemScalarFieldEnum | Prisma.TicketItemScalarFieldEnum[]
 }
 
@@ -1740,30 +1646,6 @@ export type TicketItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * The data used to create many TicketItems.
    */
   data: Prisma.TicketItemCreateManyInput | Prisma.TicketItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * TicketItem createManyAndReturn
- */
-export type TicketItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TicketItem
-   */
-  select?: Prisma.TicketItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the TicketItem
-   */
-  omit?: Prisma.TicketItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many TicketItems.
-   */
-  data: Prisma.TicketItemCreateManyInput | Prisma.TicketItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TicketItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1808,36 +1690,6 @@ export type TicketItemUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Limit how many TicketItems to update.
    */
   limit?: number
-}
-
-/**
- * TicketItem updateManyAndReturn
- */
-export type TicketItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TicketItem
-   */
-  select?: Prisma.TicketItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the TicketItem
-   */
-  omit?: Prisma.TicketItemOmit<ExtArgs> | null
-  /**
-   * The data used to update TicketItems.
-   */
-  data: Prisma.XOR<Prisma.TicketItemUpdateManyMutationInput, Prisma.TicketItemUncheckedUpdateManyInput>
-  /**
-   * Filter which TicketItems to update
-   */
-  where?: Prisma.TicketItemWhereInput
-  /**
-   * Limit how many TicketItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TicketItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1904,6 +1756,34 @@ export type TicketItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Limit how many TicketItems to delete.
    */
   limit?: number
+}
+
+/**
+ * TicketItem findRaw
+ */
+export type TicketItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * TicketItem aggregateRaw
+ */
+export type TicketItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

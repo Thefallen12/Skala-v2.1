@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -37,18 +37,21 @@ export type DocumentNumberSequenceSumAggregateOutputType = {
 }
 
 export type DocumentNumberSequenceMinAggregateOutputType = {
+  id: string | null
   kind: string | null
   year: number | null
   value: number | null
 }
 
 export type DocumentNumberSequenceMaxAggregateOutputType = {
+  id: string | null
   kind: string | null
   year: number | null
   value: number | null
 }
 
 export type DocumentNumberSequenceCountAggregateOutputType = {
+  id: number
   kind: number
   year: number
   value: number
@@ -67,18 +70,21 @@ export type DocumentNumberSequenceSumAggregateInputType = {
 }
 
 export type DocumentNumberSequenceMinAggregateInputType = {
+  id?: true
   kind?: true
   year?: true
   value?: true
 }
 
 export type DocumentNumberSequenceMaxAggregateInputType = {
+  id?: true
   kind?: true
   year?: true
   value?: true
 }
 
 export type DocumentNumberSequenceCountAggregateInputType = {
+  id?: true
   kind?: true
   year?: true
   value?: true
@@ -172,6 +178,7 @@ export type DocumentNumberSequenceGroupByArgs<ExtArgs extends runtime.Types.Exte
 }
 
 export type DocumentNumberSequenceGroupByOutputType = {
+  id: string
   kind: string
   year: number
   value: number
@@ -182,7 +189,7 @@ export type DocumentNumberSequenceGroupByOutputType = {
   _max: DocumentNumberSequenceMaxAggregateOutputType | null
 }
 
-export type GetDocumentNumberSequenceGroupByPayload<T extends DocumentNumberSequenceGroupByArgs> = Prisma.PrismaPromise<
+type GetDocumentNumberSequenceGroupByPayload<T extends DocumentNumberSequenceGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DocumentNumberSequenceGroupByOutputType, T['by']> &
       {
@@ -201,18 +208,21 @@ export type DocumentNumberSequenceWhereInput = {
   AND?: Prisma.DocumentNumberSequenceWhereInput | Prisma.DocumentNumberSequenceWhereInput[]
   OR?: Prisma.DocumentNumberSequenceWhereInput[]
   NOT?: Prisma.DocumentNumberSequenceWhereInput | Prisma.DocumentNumberSequenceWhereInput[]
+  id?: Prisma.StringFilter<"DocumentNumberSequence"> | string
   kind?: Prisma.StringFilter<"DocumentNumberSequence"> | string
   year?: Prisma.IntFilter<"DocumentNumberSequence"> | number
   value?: Prisma.IntFilter<"DocumentNumberSequence"> | number
 }
 
 export type DocumentNumberSequenceOrderByWithRelationInput = {
+  id?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   year?: Prisma.SortOrder
   value?: Prisma.SortOrder
 }
 
 export type DocumentNumberSequenceWhereUniqueInput = Prisma.AtLeast<{
+  id?: string
   kind_year?: Prisma.DocumentNumberSequenceKindYearCompoundUniqueInput
   AND?: Prisma.DocumentNumberSequenceWhereInput | Prisma.DocumentNumberSequenceWhereInput[]
   OR?: Prisma.DocumentNumberSequenceWhereInput[]
@@ -220,9 +230,10 @@ export type DocumentNumberSequenceWhereUniqueInput = Prisma.AtLeast<{
   kind?: Prisma.StringFilter<"DocumentNumberSequence"> | string
   year?: Prisma.IntFilter<"DocumentNumberSequence"> | number
   value?: Prisma.IntFilter<"DocumentNumberSequence"> | number
-}, "kind_year">
+}, "id" | "kind_year">
 
 export type DocumentNumberSequenceOrderByWithAggregationInput = {
+  id?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   year?: Prisma.SortOrder
   value?: Prisma.SortOrder
@@ -237,18 +248,21 @@ export type DocumentNumberSequenceScalarWhereWithAggregatesInput = {
   AND?: Prisma.DocumentNumberSequenceScalarWhereWithAggregatesInput | Prisma.DocumentNumberSequenceScalarWhereWithAggregatesInput[]
   OR?: Prisma.DocumentNumberSequenceScalarWhereWithAggregatesInput[]
   NOT?: Prisma.DocumentNumberSequenceScalarWhereWithAggregatesInput | Prisma.DocumentNumberSequenceScalarWhereWithAggregatesInput[]
+  id?: Prisma.StringWithAggregatesFilter<"DocumentNumberSequence"> | string
   kind?: Prisma.StringWithAggregatesFilter<"DocumentNumberSequence"> | string
   year?: Prisma.IntWithAggregatesFilter<"DocumentNumberSequence"> | number
   value?: Prisma.IntWithAggregatesFilter<"DocumentNumberSequence"> | number
 }
 
 export type DocumentNumberSequenceCreateInput = {
+  id?: string
   kind: string
   year: number
   value?: number
 }
 
 export type DocumentNumberSequenceUncheckedCreateInput = {
+  id?: string
   kind: string
   year: number
   value?: number
@@ -267,6 +281,7 @@ export type DocumentNumberSequenceUncheckedUpdateInput = {
 }
 
 export type DocumentNumberSequenceCreateManyInput = {
+  id?: string
   kind: string
   year: number
   value?: number
@@ -290,6 +305,7 @@ export type DocumentNumberSequenceKindYearCompoundUniqueInput = {
 }
 
 export type DocumentNumberSequenceCountOrderByAggregateInput = {
+  id?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   year?: Prisma.SortOrder
   value?: Prisma.SortOrder
@@ -301,12 +317,14 @@ export type DocumentNumberSequenceAvgOrderByAggregateInput = {
 }
 
 export type DocumentNumberSequenceMaxOrderByAggregateInput = {
+  id?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   year?: Prisma.SortOrder
   value?: Prisma.SortOrder
 }
 
 export type DocumentNumberSequenceMinOrderByAggregateInput = {
+  id?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   year?: Prisma.SortOrder
   value?: Prisma.SortOrder
@@ -320,35 +338,28 @@ export type DocumentNumberSequenceSumOrderByAggregateInput = {
 
 
 export type DocumentNumberSequenceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  id?: boolean
   kind?: boolean
   year?: boolean
   value?: boolean
 }, ExtArgs["result"]["documentNumberSequence"]>
 
-export type DocumentNumberSequenceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  kind?: boolean
-  year?: boolean
-  value?: boolean
-}, ExtArgs["result"]["documentNumberSequence"]>
 
-export type DocumentNumberSequenceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  kind?: boolean
-  year?: boolean
-  value?: boolean
-}, ExtArgs["result"]["documentNumberSequence"]>
 
 export type DocumentNumberSequenceSelectScalar = {
+  id?: boolean
   kind?: boolean
   year?: boolean
   value?: boolean
 }
 
-export type DocumentNumberSequenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"kind" | "year" | "value", ExtArgs["result"]["documentNumberSequence"]>
+export type DocumentNumberSequenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "kind" | "year" | "value", ExtArgs["result"]["documentNumberSequence"]>
 
 export type $DocumentNumberSequencePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "DocumentNumberSequence"
   objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
+    id: string
     kind: string
     year: number
     value: number
@@ -435,8 +446,8 @@ export interface DocumentNumberSequenceDelegate<ExtArgs extends runtime.Types.Ex
    * // Get first 10 DocumentNumberSequences
    * const documentNumberSequences = await prisma.documentNumberSequence.findMany({ take: 10 })
    * 
-   * // Only select the `kind`
-   * const documentNumberSequenceWithKindOnly = await prisma.documentNumberSequence.findMany({ select: { kind: true } })
+   * // Only select the `id`
+   * const documentNumberSequenceWithIdOnly = await prisma.documentNumberSequence.findMany({ select: { id: true } })
    * 
    */
   findMany<T extends DocumentNumberSequenceFindManyArgs>(args?: Prisma.SelectSubset<T, DocumentNumberSequenceFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DocumentNumberSequencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
@@ -468,30 +479,6 @@ export interface DocumentNumberSequenceDelegate<ExtArgs extends runtime.Types.Ex
    *     
    */
   createMany<T extends DocumentNumberSequenceCreateManyArgs>(args?: Prisma.SelectSubset<T, DocumentNumberSequenceCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
-
-  /**
-   * Create many DocumentNumberSequences and returns the data saved in the database.
-   * @param {DocumentNumberSequenceCreateManyAndReturnArgs} args - Arguments to create many DocumentNumberSequences.
-   * @example
-   * // Create many DocumentNumberSequences
-   * const documentNumberSequence = await prisma.documentNumberSequence.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DocumentNumberSequences and only return the `kind`
-   * const documentNumberSequenceWithKindOnly = await prisma.documentNumberSequence.createManyAndReturn({
-   *   select: { kind: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DocumentNumberSequenceCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DocumentNumberSequenceCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DocumentNumberSequencePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
 
   /**
    * Delete a DocumentNumberSequence.
@@ -558,36 +545,6 @@ export interface DocumentNumberSequenceDelegate<ExtArgs extends runtime.Types.Ex
   updateMany<T extends DocumentNumberSequenceUpdateManyArgs>(args: Prisma.SelectSubset<T, DocumentNumberSequenceUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DocumentNumberSequences and returns the data updated in the database.
-   * @param {DocumentNumberSequenceUpdateManyAndReturnArgs} args - Arguments to update many DocumentNumberSequences.
-   * @example
-   * // Update many DocumentNumberSequences
-   * const documentNumberSequence = await prisma.documentNumberSequence.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DocumentNumberSequences and only return the `kind`
-   * const documentNumberSequenceWithKindOnly = await prisma.documentNumberSequence.updateManyAndReturn({
-   *   select: { kind: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DocumentNumberSequenceUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DocumentNumberSequenceUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DocumentNumberSequencePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DocumentNumberSequence.
    * @param {DocumentNumberSequenceUpsertArgs} args - Arguments to update or create a DocumentNumberSequence.
    * @example
@@ -605,6 +562,29 @@ export interface DocumentNumberSequenceDelegate<ExtArgs extends runtime.Types.Ex
    * })
    */
   upsert<T extends DocumentNumberSequenceUpsertArgs>(args: Prisma.SelectSubset<T, DocumentNumberSequenceUpsertArgs<ExtArgs>>): Prisma.Prisma__DocumentNumberSequenceClient<runtime.Types.Result.GetResult<Prisma.$DocumentNumberSequencePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DocumentNumberSequences that matches the filter.
+   * @param {DocumentNumberSequenceFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const documentNumberSequence = await prisma.documentNumberSequence.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DocumentNumberSequenceFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DocumentNumberSequence.
+   * @param {DocumentNumberSequenceAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const documentNumberSequence = await prisma.documentNumberSequence.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DocumentNumberSequenceAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -775,6 +755,7 @@ export interface Prisma__DocumentNumberSequenceClient<T, Null = never, ExtArgs e
  * Fields of the DocumentNumberSequence model
  */
 export interface DocumentNumberSequenceFieldRefs {
+  readonly id: Prisma.FieldRef<"DocumentNumberSequence", 'String'>
   readonly kind: Prisma.FieldRef<"DocumentNumberSequence", 'String'>
   readonly year: Prisma.FieldRef<"DocumentNumberSequence", 'Int'>
   readonly value: Prisma.FieldRef<"DocumentNumberSequence", 'Int'>
@@ -954,11 +935,6 @@ export type DocumentNumberSequenceFindManyArgs<ExtArgs extends runtime.Types.Ext
    * Skip the first `n` DocumentNumberSequences.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DocumentNumberSequences.
-   */
   distinct?: Prisma.DocumentNumberSequenceScalarFieldEnum | Prisma.DocumentNumberSequenceScalarFieldEnum[]
 }
 
@@ -988,26 +964,6 @@ export type DocumentNumberSequenceCreateManyArgs<ExtArgs extends runtime.Types.E
    * The data used to create many DocumentNumberSequences.
    */
   data: Prisma.DocumentNumberSequenceCreateManyInput | Prisma.DocumentNumberSequenceCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DocumentNumberSequence createManyAndReturn
- */
-export type DocumentNumberSequenceCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DocumentNumberSequence
-   */
-  select?: Prisma.DocumentNumberSequenceSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DocumentNumberSequence
-   */
-  omit?: Prisma.DocumentNumberSequenceOmit<ExtArgs> | null
-  /**
-   * The data used to create many DocumentNumberSequences.
-   */
-  data: Prisma.DocumentNumberSequenceCreateManyInput | Prisma.DocumentNumberSequenceCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1036,32 +992,6 @@ export type DocumentNumberSequenceUpdateArgs<ExtArgs extends runtime.Types.Exten
  * DocumentNumberSequence updateMany
  */
 export type DocumentNumberSequenceUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update DocumentNumberSequences.
-   */
-  data: Prisma.XOR<Prisma.DocumentNumberSequenceUpdateManyMutationInput, Prisma.DocumentNumberSequenceUncheckedUpdateManyInput>
-  /**
-   * Filter which DocumentNumberSequences to update
-   */
-  where?: Prisma.DocumentNumberSequenceWhereInput
-  /**
-   * Limit how many DocumentNumberSequences to update.
-   */
-  limit?: number
-}
-
-/**
- * DocumentNumberSequence updateManyAndReturn
- */
-export type DocumentNumberSequenceUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DocumentNumberSequence
-   */
-  select?: Prisma.DocumentNumberSequenceSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DocumentNumberSequence
-   */
-  omit?: Prisma.DocumentNumberSequenceOmit<ExtArgs> | null
   /**
    * The data used to update DocumentNumberSequences.
    */
@@ -1132,6 +1062,34 @@ export type DocumentNumberSequenceDeleteManyArgs<ExtArgs extends runtime.Types.E
    * Limit how many DocumentNumberSequences to delete.
    */
   limit?: number
+}
+
+/**
+ * DocumentNumberSequence findRaw
+ */
+export type DocumentNumberSequenceFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DocumentNumberSequence aggregateRaw
+ */
+export type DocumentNumberSequenceAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

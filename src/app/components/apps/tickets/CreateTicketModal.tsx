@@ -357,14 +357,20 @@ const ticketFormSchema = z
         });
       }
       values.items.forEach((item, index) => {
-        if (!item.itemName?.trim() || item.itemName.trim().length > 160) {
+        if (
+          !usesItemDeliveryDates &&
+          (!item.itemName?.trim() || item.itemName.trim().length > 160)
+        ) {
           context.addIssue({
             code: "custom",
             path: ["items", index, "itemName"],
             message: "Nama item wajib diisi (maksimal 160 karakter).",
           });
         }
-        if (!item.unit?.trim() || item.unit.trim().length > 32) {
+        if (
+          !usesItemDeliveryDates &&
+          (!item.unit?.trim() || item.unit.trim().length > 32)
+        ) {
           context.addIssue({
             code: "custom",
             path: ["items", index, "unit"],
@@ -514,8 +520,9 @@ export default function CreateTicketModal({
       itemSource: TicketCategoryHint.WAREHOUSE,
       itemsExpectedDeliveryDate: "",
       items: [{
+        stockItemId: "",
         itemName: "",
-        unit: "pcs",
+        unit: "",
         quantity: 1,
         estimatedCost: undefined,
         categoryHint: TicketCategoryHint.WAREHOUSE,
@@ -602,8 +609,9 @@ export default function CreateTicketModal({
         "items",
         [
           {
+            stockItemId: "",
             itemName: "",
-            unit: "pcs",
+            unit: "",
             quantity: 1,
             estimatedCost: undefined,
             categoryHint:
@@ -840,6 +848,7 @@ export default function CreateTicketModal({
       invalidFields.items?.message,
       ...(Array.isArray(invalidFields.items)
         ? invalidFields.items.flatMap((item) => [
+            item?.stockItemId?.message,
             item?.itemName?.message,
             item?.unit?.message,
             item?.quantity?.message,
@@ -1013,8 +1022,9 @@ export default function CreateTicketModal({
                         form.setValue(
                           "items",
                           [{
+                            stockItemId: "",
                             itemName: "",
-                            unit: "pcs",
+                            unit: "",
                             quantity: 1,
                             estimatedCost: undefined,
                             categoryHint: TicketCategoryHint.PURCHASE,
@@ -1738,15 +1748,24 @@ export default function CreateTicketModal({
                               form.setValue(
                                 `items.${index}.itemName`,
                                 stockItem?.name ?? "",
+                                { shouldDirty: true, shouldValidate: true },
                               );
                               form.setValue(
                                 `items.${index}.unit`,
                                 stockItem?.unit ?? "",
+                                { shouldDirty: true, shouldValidate: true },
                               );
                               form.setValue(
                                 `items.${index}.estimatedCost`,
                                 undefined,
                               );
+                              if (stockItem) {
+                                form.clearErrors([
+                                  `items.${index}.stockItemId`,
+                                  `items.${index}.itemName`,
+                                  `items.${index}.unit`,
+                                ]);
+                              }
                             }}
                           >
                             <SelectTrigger

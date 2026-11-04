@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -695,6 +696,23 @@ export default function ExecutiveApprovalHub({
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border bg-muted/40 p-4">
+              <Image
+                src={signedPo.qrDataUrl}
+                alt={`QR persetujuan PO ${signedPo.order.poNumber}`}
+                width={96}
+                height={96}
+                className="size-24 rounded bg-white p-1"
+              />
+              <div className="text-sm">
+                <p>
+                  Disetujui oleh: <strong>{signedPo.approvedByName}</strong>
+                </p>
+                <p className="text-muted-foreground">
+                  Waktu persetujuan: {signedPo.approvedAt}
+                </p>
+              </div>
+            </div>
             <UniversalDocumentPreview
               title={`Purchase Order ${signedPo.order.poNumber}`}
               documentNumber={signedPo.order.poNumber}

@@ -4,7 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
+  url      = env("MONGODB_URL")
 }
 
 // Project lifecycle and planning.
@@ -289,7 +290,7 @@ enum UserRole {
 }
 
 model MenuAccess {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   role      String
   menuKey   String
   menuName  String
@@ -302,7 +303,7 @@ model MenuAccess {
 }
 
 model PageMaintenance {
-  pageKey            String   @id
+  pageKey            String   @id @map("_id")
   pageName           String
   path               String
   isUnderMaintenance Boolean  @default(false)
@@ -314,7 +315,7 @@ model PageMaintenance {
 
 // Identity, access, and user-owned records.
 model User {
-  id                                                String                        @id @default(cuid())
+  id                                                String                        @id @default(cuid()) @map("_id")
   name                                              String
   email                                             String                        @unique
   phone                                             String?
@@ -402,11 +403,11 @@ model User {
 }
 
 model UserNote {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid()) @map("_id")
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String   @db.Text
-  color     String   @default("primary") @db.VarChar(20)
+  title     String
+  color     String   @default("primary")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -414,7 +415,7 @@ model UserNote {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
+  id        String           @id @default(cuid()) @map("_id")
   userId    String
   user      User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
   title     String
@@ -429,7 +430,7 @@ model Notification {
 
 // Scheduling and collaboration.
 model CalendarEvent {
-  id              String                     @id
+  id              String                     @id @map("_id")
   title           String
   description     String?
   type            CalendarEventType          @default(PROJECT)
@@ -455,7 +456,7 @@ model CalendarEvent {
 }
 
 model CalendarEventReminder {
-  id        String        @id @default(cuid())
+  id        String        @id @default(cuid()) @map("_id")
   eventId   String
   userId    String
   createdAt DateTime      @default(now())
@@ -467,7 +468,7 @@ model CalendarEventReminder {
 }
 
 model CalendarEventParticipant {
-  id        String        @id @default(cuid())
+  id        String        @id @default(cuid()) @map("_id")
   eventId   String
   userId    String
   createdAt DateTime      @default(now())
@@ -479,10 +480,10 @@ model CalendarEventParticipant {
 }
 
 model MaterialRequest {
-  id                                     String        @id
+  id                                     String        @id @map("_id")
   title                                  String
   description                            String?
-  estimatedCost                          Decimal?      @db.Decimal(14, 2)
+  estimatedCost                          BigInt?
   status                                 RequestStatus @default(PENDING_KOORDINATOR)
   requesterId                            String
   approverId                             String?
@@ -501,7 +502,7 @@ model MaterialRequest {
 }
 
 model RequestItem {
-  id              String          @id
+  id              String          @id @map("_id")
   materialName    String
   quantity        Int
   unit            String
@@ -512,7 +513,7 @@ model RequestItem {
 }
 
 model Session {
-  id        String   @id
+  id        String   @id @map("_id")
   tokenHash String   @unique
   userId    String
   expiresAt DateTime
@@ -524,7 +525,7 @@ model Session {
 }
 
 model VerificationToken {
-  identifier String   @id
+  identifier String   @id @map("_id")
   token      String   @unique
   expires    DateTime
   attempts   Int      @default(0)
@@ -535,7 +536,7 @@ model VerificationToken {
 
 // Personal productivity and time tracking.
 model Habit {
-  id          String            @id @default(cuid())
+  id          String            @id @default(cuid()) @map("_id")
   userId      String
   title       String
   description String?
@@ -549,9 +550,9 @@ model Habit {
 }
 
 model HabitCompletion {
-  id          String   @id @default(cuid())
+  id          String   @id @default(cuid()) @map("_id")
   habitId     String
-  date        DateTime @db.Date
+  date        DateTime
   completedAt DateTime @default(now())
   habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
 
@@ -560,13 +561,13 @@ model HabitCompletion {
 }
 
 model WorkTask {
-  id          String           @id @default(cuid())
+  id          String           @id @default(cuid()) @map("_id")
   title       String
   description String?
   startsAt    DateTime
   endsAt      DateTime
   status      WorkTaskStatus   @default(TODO)
-  color       String           @default("blue") @db.VarChar(20)
+  color       String           @default("blue")
   projectId   String
   project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   creatorId   String
@@ -582,7 +583,7 @@ model WorkTask {
 }
 
 model WorkTaskMember {
-  id         String   @id @default(cuid())
+  id         String   @id @default(cuid()) @map("_id")
   workTaskId String
   userId     String
   createdAt  DateTime @default(now())
@@ -594,12 +595,12 @@ model WorkTaskMember {
 }
 
 model TimesheetEntry {
-  id              String   @id @default(cuid())
+  id              String   @id @default(cuid()) @map("_id")
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   projectId       String
   project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  workDate        DateTime @db.Date
+  workDate        DateTime
   durationMinutes Int
   note            String?
   createdAt       DateTime @default(now())
@@ -611,7 +612,7 @@ model TimesheetEntry {
 
 // Projects, field operations, and progress evidence.
 model Project {
-  id                  String                    @id @default(cuid())
+  id                  String                    @id @default(cuid()) @map("_id")
   code                String                    @unique
   name                String
   title               String
@@ -619,8 +620,8 @@ model Project {
   kelompokTani        String
   address             String
   jenisPekerjaan      String?
-  pagu                Decimal                   @db.Decimal(18, 2)
-  landArea            Decimal?                  @db.Decimal(12, 2)
+  pagu                BigInt
+  landArea            BigInt?
   progress            Float                     @default(0)
   priority            ProjectPriority           @default(MEDIUM)
   vendor              String?
@@ -629,7 +630,7 @@ model Project {
   status              ProjectStatus             @default(PENDING_SETUP)
   startDate           DateTime?
   endDate             DateTime?
-  budget              Decimal?                  @db.Decimal(18, 2)
+  budget              BigInt?
   fieldPicId          String?
   fieldPic            User?                     @relation("ProjectFieldPic", fields: [fieldPicId], references: [id], onDelete: SetNull)
   fieldSurveys        FieldSurvey[]
@@ -660,7 +661,7 @@ model Project {
 }
 
 model FieldSurvey {
-  id                String           @id @default(cuid())
+  id                String           @id @default(cuid()) @map("_id")
   projectId         String?
   project           Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   projectName       String
@@ -682,8 +683,8 @@ model FieldSurvey {
   areaSqm           Float?
   lengthM           Float?
   perimeterM        Float?
-  notes             String?          @db.Text
-  generalNotes      String?          @db.Text
+  notes             String?
+  generalNotes      String?
   features          SurveyFeature[]
   photos            SurveyPhoto[]
   polygons          ProjectPolygon[]
@@ -695,7 +696,7 @@ model FieldSurvey {
 }
 
 model ProjectPolygon {
-  id           String             @id @default(cuid())
+  id           String             @id @default(cuid()) @map("_id")
   projectId    String
   project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   surveyId     String?
@@ -712,12 +713,12 @@ model ProjectPolygon {
 }
 
 model SurveyFeature {
-  id              String        @id @default(cuid())
+  id              String        @id @default(cuid()) @map("_id")
   surveyId        String
   survey          FieldSurvey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   featureCategory String
   name            String
-  description     String?       @db.Text
+  description     String?
   geometryType    String
   geoJsonData     Json
   areaSqm         Float?
@@ -730,13 +731,13 @@ model SurveyFeature {
 }
 
 model SurveyPhoto {
-  id         String         @id @default(cuid())
+  id         String         @id @default(cuid()) @map("_id")
   surveyId   String
   survey     FieldSurvey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   featureId  String?
   feature    SurveyFeature? @relation(fields: [featureId], references: [id], onDelete: Cascade)
   url        String
-  caption    String         @db.Text
+  caption    String
   latitude   Float
   longitude  Float
   capturedAt DateTime       @default(now())
@@ -747,17 +748,17 @@ model SurveyPhoto {
 }
 
 model DailyReport {
-  id             String                 @id @default(cuid())
+  id             String                 @id @default(cuid()) @map("_id")
   projectId      String
   project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  reportDate     DateTime               @db.Date
+  reportDate     DateTime
   weather        String?
   workersCount   Int                    @default(0)
   progress       Float?
   equipment      Json?
   workSummary    String?
   notes          String?
-  k3SafetyLog    String?                @db.Text
+  k3SafetyLog    String?
   progressPhotos ProjectProgressPhoto[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
@@ -767,7 +768,7 @@ model DailyReport {
 }
 
 model ProjectProgressPhoto {
-  id            String      @id @default(cuid())
+  id            String      @id @default(cuid()) @map("_id")
   dailyReportId String
   dailyReport   DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
   url           String      @unique
@@ -779,18 +780,18 @@ model ProjectProgressPhoto {
 }
 
 model ProjectWorkPoint {
-  id                String                     @id @default(cuid())
+  id                String                     @id @default(cuid()) @map("_id")
   projectId         String
   project           Project                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   title             String
   location          String?
-  plannedStartDate  DateTime?                  @db.Date
-  targetDate        DateTime?                  @db.Date
-  proposedVolume    Decimal?                   @db.Decimal(14, 3)
+  plannedStartDate  DateTime?
+  targetDate        DateTime?
+  proposedVolume    BigInt?
   proposedUnit      String?
-  proposedUnitPrice Decimal?                   @db.Decimal(18, 2)
-  proposedTotalWage Decimal                    @db.Decimal(18, 2)
-  approvedTotalWage Decimal?                   @db.Decimal(18, 2)
+  proposedUnitPrice BigInt?
+  proposedTotalWage BigInt
+  approvedTotalWage BigInt?
   wageApprovedAt    DateTime?
   proposedById      String
   proposedBy        User                       @relation("WorkPointWageProposer", fields: [proposedById], references: [id], onDelete: Restrict)
@@ -807,7 +808,7 @@ model ProjectWorkPoint {
 }
 
 model Blueprint {
-  id            String            @id @default(cuid())
+  id            String            @id @default(cuid()) @map("_id")
   publicCode    String            @unique
   projectId     String
   project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -830,7 +831,7 @@ model Blueprint {
 }
 
 model DrawingDocument {
-  id           String       @id @default(cuid())
+  id           String       @id @default(cuid()) @map("_id")
   drawingCode  String       @unique
   projectId    String?
   project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -851,11 +852,11 @@ model DrawingDocument {
 }
 
 model DrawingLog {
-  id          String          @id @default(cuid())
+  id          String          @id @default(cuid()) @map("_id")
   drawingId   String
   drawing     DrawingDocument @relation(fields: [drawingId], references: [id], onDelete: Cascade)
   action      String
-  notes       String?         @db.Text
+  notes       String?
   version     Int
   fileUrl     String?
   createdById String
@@ -866,10 +867,10 @@ model DrawingLog {
 }
 
 model ProjectWorkPointProgress {
-  id          String                          @id @default(cuid())
+  id          String                          @id @default(cuid()) @map("_id")
   workPointId String
   workPoint   ProjectWorkPoint                @relation(fields: [workPointId], references: [id], onDelete: Cascade)
-  reportDate  DateTime                        @db.Date
+  reportDate  DateTime
   progress    Float
   workSummary String?
   photos      ProjectWorkPointProgressPhoto[]
@@ -879,7 +880,7 @@ model ProjectWorkPointProgress {
 }
 
 model ProjectWorkPointProgressPhoto {
-  id               String                   @id @default(cuid())
+  id               String                   @id @default(cuid()) @map("_id")
   progressReportId String
   progressReport   ProjectWorkPointProgress @relation(fields: [progressReportId], references: [id], onDelete: Cascade)
   url              String                   @unique
@@ -892,15 +893,15 @@ model ProjectWorkPointProgressPhoto {
 
 // Inventory and purchasing.
 model StockMovement {
-  id           String            @id @default(cuid())
+  id           String            @id @default(cuid()) @map("_id")
   projectId    String?
   project      Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
   stockItemId  String?
   stockItem    StockItem?        @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
   type         StockMovementType
   materialName String
-  quantity     Decimal           @db.Decimal(14, 3)
-  totalCost    Decimal?          @db.Decimal(18, 2)
+  quantity     BigInt
+  totalCost    BigInt?
   unit         String
   occurredAt   DateTime          @default(now())
   reference    String?
@@ -915,14 +916,14 @@ model StockMovement {
 }
 
 model StockItem {
-  id                  String                    @id @default(cuid())
+  id                  String                    @id @default(cuid()) @map("_id")
   sku                 String                    @unique
   name                String
   category            String                    @default("MATERIAL")
   unit                String
-  stockQuantity       Decimal                   @default(0) @db.Decimal(14, 3)
-  minimumStock        Decimal                   @default(0) @db.Decimal(14, 3)
-  unitPrice           Decimal                   @default(0) @db.Decimal(18, 2)
+  stockQuantity       BigInt                    @default(0)
+  minimumStock        BigInt                    @default(0)
+  unitPrice           BigInt                    @default(0)
   purchases           StockPurchase[]
   directPurchaseItems DirectStockPurchaseItem[]
   movements           StockMovement[]
@@ -935,17 +936,17 @@ model StockItem {
 }
 
 model StockPurchase {
-  id              String         @id @default(cuid())
+  id              String         @id @default(cuid()) @map("_id")
   purchaseNumber  String         @unique
   purchaseOrderId String?
   purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   stockItemId     String
   stockItem       StockItem      @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
-  quantity        Decimal        @db.Decimal(14, 3)
-  unitPrice       Decimal        @db.Decimal(18, 2)
+  quantity        BigInt
+  unitPrice       BigInt
   supplierName    String?
   reference       String?
-  notes           String?        @db.Text
+  notes           String?
   createdById     String
   createdBy       User           @relation("StockPurchaseCreator", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt       DateTime       @default(now())
@@ -956,7 +957,7 @@ model StockPurchase {
 }
 
 model DirectStockPurchase {
-  id                        String                    @id @default(cuid())
+  id                        String                    @id @default(cuid()) @map("_id")
   purchaseNumber            String                    @unique
   vendorId                  String?
   vendor                    Vendor?                   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
@@ -969,10 +970,10 @@ model DirectStockPurchase {
   paymentAccountName        String?
   paymentTerms              String?
   includeTax                Boolean                   @default(false)
-  totalAmount               Decimal                   @db.Decimal(18, 2)
+  totalAmount               BigInt
   paidAt                    DateTime?
   reference                 String?
-  notes                     String?                   @db.Text
+  notes                     String?
   status                    DirectStockPurchaseStatus @default(PENDING_RECEIPT)
   isApprovedByDirector      Boolean                   @default(false)
   approvedById              String?
@@ -1003,23 +1004,23 @@ model DirectStockPurchase {
 }
 
 model DirectStockPurchaseItem {
-  id          String              @id @default(cuid())
+  id          String              @id @default(cuid()) @map("_id")
   purchaseId  String
   purchase    DirectStockPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   stockItemId String
   stockItem   StockItem           @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
   itemName    String
   unit        String
-  quantity    Decimal             @db.Decimal(14, 3)
-  unitPrice   Decimal             @db.Decimal(18, 2)
-  totalPrice  Decimal             @db.Decimal(18, 2)
+  quantity    BigInt
+  unitPrice   BigInt
+  totalPrice  BigInt
 
   @@index([purchaseId])
   @@index([stockItemId])
 }
 
 model Vendor {
-  id                   String                @id @default(cuid())
+  id                   String                @id @default(cuid()) @map("_id")
   code                 String                @unique
   name                 String
   category             String
@@ -1042,7 +1043,7 @@ model Vendor {
 }
 
 model VendorBankAccount {
-  id          String   @id @default(cuid())
+  id          String   @id @default(cuid()) @map("_id")
   vendorId    String
   vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   label       String?
@@ -1058,14 +1059,14 @@ model VendorBankAccount {
 
 // Labor, equipment, and subcontract lifecycle.
 model WageAuditLog {
-  id          String           @id @default(cuid())
+  id          String           @id @default(cuid()) @map("_id")
   workPointId String
   workPoint   ProjectWorkPoint @relation(fields: [workPointId], references: [id], onDelete: Cascade)
-  oldWage     Decimal          @db.Decimal(18, 2)
-  newWage     Decimal          @db.Decimal(18, 2)
+  oldWage     BigInt
+  newWage     BigInt
   changedById String
   changedBy   User             @relation("WageAuditChanger", fields: [changedById], references: [id], onDelete: Restrict)
-  reason      String?          @db.Text
+  reason      String?
   createdAt   DateTime         @default(now())
 
   @@index([workPointId, createdAt])
@@ -1073,13 +1074,13 @@ model WageAuditLog {
 }
 
 model ProjectWageDisbursement {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) @map("_id")
   projectId     String
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  amount        Decimal  @db.Decimal(18, 2)
+  amount        BigInt
   receiptNumber String
-  paidAt        DateTime @db.Date
-  notes         String?  @db.Text
+  paidAt        DateTime
+  notes         String?
   paidById      String
   paidBy        User     @relation("ProjectWageDisbursementCreator", fields: [paidById], references: [id], onDelete: Restrict)
   createdAt     DateTime @default(now())
@@ -1089,14 +1090,14 @@ model ProjectWageDisbursement {
 }
 
 model EquipmentMaster {
-  id           String          @id @default(cuid())
+  id           String          @id @default(cuid()) @map("_id")
   code         String          @unique
   name         String
   brand        String?
   licensePlate String?
-  hourlyRate   Decimal         @default(0) @db.Decimal(18, 2)
+  hourlyRate   BigInt          @default(0)
   status       EquipmentStatus @default(READY)
-  currentHM    Decimal         @default(0) @db.Decimal(12, 2)
+  currentHM    BigInt          @default(0)
   logs         EquipmentLog[]
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
@@ -1106,15 +1107,15 @@ model EquipmentMaster {
 }
 
 model SubkonContract {
-  id                       String         @id @default(cuid())
+  id                       String         @id @default(cuid()) @map("_id")
   publicCode               String         @unique
   contractNumber           String         @unique
   projectId                String
   project                  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   subkonName               String
-  workScope                String         @db.Text
-  contractValue            Decimal        @db.Decimal(18, 2)
-  retentionPct             Decimal        @default(5) @db.Decimal(5, 2)
+  workScope                String
+  contractValue            BigInt
+  retentionPct             BigInt          @default(5000)
   status                   SPKStatus      @default(DRAFT)
   createdById              String
   createdBy                User           @relation("SubkonContractCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -1134,14 +1135,14 @@ model SubkonContract {
 }
 
 model SubkonTermyn {
-  id                  String             @id @default(cuid())
+  id                  String             @id @default(cuid()) @map("_id")
   subkonContractId    String
   subkonContract      SubkonContract     @relation(fields: [subkonContractId], references: [id], onDelete: Cascade)
   termynNumber        Int
-  claimedPercent      Decimal            @db.Decimal(5, 2)
-  grossAmount         Decimal            @db.Decimal(18, 2)
-  retentionAmount     Decimal            @db.Decimal(18, 2)
-  netAmount           Decimal            @db.Decimal(18, 2)
+  claimedPercent      BigInt
+  grossAmount         BigInt
+  retentionAmount     BigInt
+  netAmount           BigInt
   status              SubkonTermynStatus @default(SUBMITTED)
   paymentProofUrl     String?
   createdById         String
@@ -1167,19 +1168,19 @@ model SubkonTermyn {
 }
 
 model EquipmentLog {
-  id                String           @id @default(cuid())
+  id                String           @id @default(cuid()) @map("_id")
   equipmentMasterId String?
   equipmentMaster   EquipmentMaster? @relation(fields: [equipmentMasterId], references: [id], onDelete: SetNull)
   projectId         String
   project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   equipmentName     String
   operatorName      String?
-  date              DateTime         @db.Date
-  hmStart           Decimal          @db.Decimal(12, 2)
-  hmEnd             Decimal          @db.Decimal(12, 2)
-  effectiveHours    Decimal          @db.Decimal(8, 2)
-  fuelLiter         Decimal          @db.Decimal(10, 2)
-  notes             String?          @db.Text
+  date              DateTime
+  hmStart           BigInt
+  hmEnd             BigInt
+  effectiveHours    BigInt
+  fuelLiter         BigInt
+  notes             String?
   createdById       String
   createdBy         User             @relation("EquipmentLogCreator", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt         DateTime         @default(now())
@@ -1189,13 +1190,13 @@ model EquipmentLog {
 
 // Project approvals, handover, and document numbering.
 model ProjectAddendum {
-  id             String                @id @default(cuid())
+  id             String                @id @default(cuid()) @map("_id")
   projectId      String
   project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   addendumNumber String                @unique
-  budgetChange   Decimal               @db.Decimal(18, 2)
+  budgetChange   BigInt
   timeExtension  Int
-  reason         String                @db.Text
+  reason         String
   status         ProjectAddendumStatus @default(DRAFT)
   createdById    String
   createdBy      User                  @relation("ProjectAddendumCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -1209,15 +1210,15 @@ model ProjectAddendum {
 }
 
 model BASTDocument {
-  id                String    @id @default(cuid())
+  id                String    @id @default(cuid()) @map("_id")
   publicCode        String    @unique
   bastNumber        String    @unique
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   type              BASTType  @default(PHO)
-  date              DateTime  @db.Date
-  maintenanceEndsAt DateTime? @db.Date
-  notes             String?   @db.Text
+  date              DateTime
+  maintenanceEndsAt DateTime?
+  notes             String?
   isApproved        Boolean   @default(false)
   approvedById      String?
   approvedBy        User?     @relation("BASTApprover", fields: [approvedById], references: [id], onDelete: SetNull)
@@ -1228,24 +1229,25 @@ model BASTDocument {
 }
 
 model DocumentNumberSequence {
+  id    String @id @default(cuid()) @map("_id")
   kind  String
   year  Int
   value Int    @default(0)
 
-  @@id([kind, year])
+  @@unique([kind, year])
 }
 
 // Ticket intake and fulfillment.
 model Ticket {
-  id                        String                  @id @default(cuid())
+  id                        String                  @id @default(cuid()) @map("_id")
   ticketNumber              String                  @unique
   title                     String
-  description               String?                 @db.Text
+  description               String?
   type                      TicketType
   priority                  TicketPriority          @default(MEDIUM)
   status                    TicketStatus            @default(DRAFT)
   fulfillmentStatus         TicketFulfillmentStatus @default(PENDING)
-  totalAmount               Decimal?                @db.Decimal(18, 2)
+  totalAmount               BigInt?
   requestedAmount           Float?
   isApprovedByDirector      Boolean                 @default(false)
   attachmentUrl             String?
@@ -1254,7 +1256,7 @@ model Ticket {
   requestCategory           TicketRequestCategory?
   fieldCategory             TicketFieldCategory?
   requestPaymentMethod      POPaymentMethod?
-  requestPaymentDescription String?                 @db.Text
+  requestPaymentDescription String?
   recipientName             String?
   bankName                  String?
   accountNumber             String?
@@ -1288,11 +1290,11 @@ model Ticket {
 
 // Purchase orders, delivery orders, and digital documents.
 model OperationalDocumentTemplate {
-  id          String                  @id @default(cuid())
+  id          String                  @id @default(cuid()) @map("_id")
   name        String
   kind        OperationalDocumentKind
   title       String
-  content     String                  @db.Text
+  content     String
   isActive    Boolean                 @default(true)
   createdById String
   createdBy   User                    @relation("DocumentTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -1305,10 +1307,10 @@ model OperationalDocumentTemplate {
 }
 
 model DocumentTemplate {
-  id              String           @id @default(cuid())
+  id              String           @id @default(cuid()) @map("_id")
   name            String
   type            DocType
-  contentHtml     String           @db.Text
+  contentHtml     String
   contentJson     Json?
   variables       String
   issuedDocuments IssuedDocument[]
@@ -1317,7 +1319,7 @@ model DocumentTemplate {
 }
 
 model PurchaseOrder {
-  id                        String               @id @default(cuid())
+  id                        String               @id @default(cuid()) @map("_id")
   publicCode                String               @unique
   poNumber                  String               @unique
   projectId                 String?
@@ -1371,7 +1373,7 @@ model PurchaseOrder {
 }
 
 model PaymentTransaction {
-  id                      String               @id @default(cuid())
+  id                      String               @id @default(cuid()) @map("_id")
   poId                    String?
   po                      PurchaseOrder?       @relation(fields: [poId], references: [id], onDelete: SetNull)
   ticketId                String?
@@ -1402,7 +1404,7 @@ model PaymentTransaction {
 }
 
 model DeliveryOrder {
-  id                    String               @id @default(cuid())
+  id                    String               @id @default(cuid()) @map("_id")
   publicCode            String               @unique
   doNumber              String               @unique
   ticketId              String?
@@ -1423,7 +1425,7 @@ model DeliveryOrder {
   vehicleId             String?
   vehicle               Vehicle?             @relation("DeliveryOrderVehicle", fields: [vehicleId], references: [id], onDelete: SetNull)
   vehiclePlateNumber    String?
-  departureKilometer    Decimal?             @db.Decimal(12, 2)
+  departureKilometer    BigInt?
   vehicleDocumentNumber String?
   vehiclePlate          String?
   driverName            String?
@@ -1452,7 +1454,7 @@ model DeliveryOrder {
 }
 
 model DeliveryOrderProof {
-  id              String        @id @default(cuid())
+  id              String        @id @default(cuid()) @map("_id")
   deliveryOrderId String
   deliveryOrder   DeliveryOrder @relation(fields: [deliveryOrderId], references: [id], onDelete: Cascade)
   url             String        @unique
@@ -1462,12 +1464,12 @@ model DeliveryOrderProof {
 }
 
 model Vehicle {
-  id                  String               @id @default(cuid())
+  id                  String               @id @default(cuid()) @map("_id")
   plateNumber         String               @unique
   vehicleType         String
   brand               String?
   modelName           String?
-  currentKilometer    Decimal              @default(0) @db.Decimal(12, 2)
+  currentKilometer    BigInt                @default(0)
   odometerInitialized Boolean              @default(false)
   status              String               @default("AVAILABLE")
   deliveryOrders      DeliveryOrder[]      @relation("DeliveryOrderVehicle")
@@ -1480,18 +1482,18 @@ model Vehicle {
 }
 
 model VehicleTripLog {
-  id                   String         @id @default(cuid())
+  id                   String         @id @default(cuid()) @map("_id")
   vehicleId            String
   vehicle              Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   deliveryOrderId      String?        @unique
   deliveryOrder        DeliveryOrder? @relation(fields: [deliveryOrderId], references: [id], onDelete: SetNull)
   projectId            String?
   project              Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  kilometerStart       Decimal        @db.Decimal(12, 2)
-  kilometerEnd         Decimal        @db.Decimal(12, 2)
-  distanceKm           Decimal        @db.Decimal(12, 2)
-  fuelLiter            Decimal        @db.Decimal(10, 2)
-  fuelEfficiencyKmPerL Decimal        @default(12) @db.Decimal(5, 2)
+  kilometerStart       BigInt
+  kilometerEnd         BigInt
+  distanceKm           BigInt
+  fuelLiter            BigInt
+  fuelEfficiencyKmPerL BigInt         @default(12000)
   createdById          String
   createdBy            User           @relation("VehicleTripLogCreator", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt            DateTime       @default(now())
@@ -1502,7 +1504,7 @@ model VehicleTripLog {
 }
 
 model VehicleFuelRequest {
-  id                    String                   @id @default(cuid())
+  id                    String                   @id @default(cuid()) @map("_id")
   vehicleId             String
   vehicle               Vehicle                  @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   deliveryOrderId       String
@@ -1514,21 +1516,21 @@ model VehicleFuelRequest {
   reviewedById          String?
   reviewedBy            User?                    @relation("VehicleFuelReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   source                VehicleFuelSource
-  estimatedDistanceKm   Decimal                  @db.Decimal(12, 2)
-  exceptionDistanceKm   Decimal                  @default(0) @db.Decimal(12, 2)
-  exceptionReason       String?                  @db.VarChar(300)
-  estimatedFuelLiter    Decimal                  @db.Decimal(10, 2)
-  unitPrice             Decimal                  @db.Decimal(12, 2)
-  requestedAmount       Decimal                  @db.Decimal(18, 2)
-  fuelEfficiencyKmPerL  Decimal                  @default(12) @db.Decimal(5, 2)
+  estimatedDistanceKm   BigInt
+  exceptionDistanceKm   BigInt                   @default(0)
+  exceptionReason       String?
+  estimatedFuelLiter    BigInt
+  unitPrice             BigInt
+  requestedAmount       BigInt
+  fuelEfficiencyKmPerL  BigInt                   @default(12000)
   disbursementMethod    POPaymentMethod?
-  transferDestination   String?                  @db.VarChar(300)
+  transferDestination   String?
   transferProofUrl      String?
   beforeFillingPhotoUrl String
   afterFillingPhotoUrl  String?
   receiptPhotoUrl       String?
   status                VehicleFuelRequestStatus @default(PENDING_FINANCE)
-  financeNote           String?                  @db.Text
+  financeNote           String?
   reviewedAt            DateTime?
   disbursedAt           DateTime?
   proofSubmittedAt      DateTime?
@@ -1542,7 +1544,7 @@ model VehicleFuelRequest {
 }
 
 model POItem {
-  id          String        @id @default(cuid())
+  id          String        @id @default(cuid()) @map("_id")
   poId        String
   po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
   itemCode    String?
@@ -1560,7 +1562,7 @@ model POItem {
 }
 
 model DOItem {
-  id           String        @id @default(cuid())
+  id           String        @id @default(cuid()) @map("_id")
   doId         String
   do           DeliveryOrder @relation(fields: [doId], references: [id], onDelete: Cascade)
   itemCode     String?
@@ -1575,7 +1577,7 @@ model DOItem {
 }
 
 model Invoice {
-  id               String         @id @default(cuid())
+  id               String         @id @default(cuid()) @map("_id")
   publicCode       String?        @unique
   invoiceNumber    String         @unique
   poId             String?
@@ -1611,7 +1613,7 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id          String  @id @default(cuid())
+  id          String  @id @default(cuid()) @map("_id")
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   itemCode    String?
@@ -1625,7 +1627,7 @@ model InvoiceItem {
 }
 
 model FinanceAccount {
-  id             String          @id @default(cuid())
+  id             String          @id @default(cuid()) @map("_id")
   accountName    String
   accountNumber  String?
   holderName     String
@@ -1637,7 +1639,7 @@ model FinanceAccount {
 }
 
 model Cashflow {
-  id                   String              @id @default(cuid())
+  id                   String              @id @default(cuid()) @map("_id")
   type                 String
   amount               Float
   sourceDesc           String
@@ -1662,7 +1664,7 @@ model Cashflow {
 }
 
 model OfficeExpense {
-  id            String         @id @default(cuid())
+  id            String         @id @default(cuid()) @map("_id")
   expenseType   String
   description   String
   amount        Float
@@ -1683,7 +1685,7 @@ model OfficeExpense {
 }
 
 model OrderConfirmation {
-  id                   String              @id @default(cuid())
+  id                   String              @id @default(cuid()) @map("_id")
   publicCode           String?             @unique
   koNumber             String              @unique
   poId                 String
@@ -1719,7 +1721,7 @@ model OrderConfirmation {
 }
 
 model KOItem {
-  id          String            @id @default(cuid())
+  id          String            @id @default(cuid()) @map("_id")
   koId        String
   ko          OrderConfirmation @relation(fields: [koId], references: [id], onDelete: Cascade)
   itemCode    String?
@@ -1733,7 +1735,7 @@ model KOItem {
 }
 
 model IssuedDocument {
-  id              String           @id @default(cuid())
+  id              String           @id @default(cuid()) @map("_id")
   documentNumber  String           @unique
   templateId      String
   template        DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
@@ -1748,13 +1750,13 @@ model IssuedDocument {
 }
 
 model OperationalDocument {
-  id             String                       @id @default(cuid())
+  id             String                       @id @default(cuid()) @map("_id")
   documentNumber String                       @unique
   kind           OperationalDocumentKind
   status         OperationalDocumentStatus    @default(SIGNED)
   title          String
-  content        String                       @db.Text
-  signatureImage String                       @db.Text
+  content        String
+  signatureImage String
   signerName     String
   signerRole     UserRole
   signedAt       DateTime                     @default(now())
@@ -1778,15 +1780,15 @@ model OperationalDocument {
 }
 
 model TicketItem {
-  id                   String             @id @default(cuid())
+  id                   String             @id @default(cuid()) @map("_id")
   ticketId             String
   ticket               Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   itemName             String
   quantity             Float
   unit                 String
-  estimatedCost        Decimal?           @db.Decimal(18, 2)
+  estimatedCost        BigInt?
   categoryHint         TicketCategoryHint @default(WAREHOUSE)
-  expectedDeliveryDate DateTime?          @db.Date
+  expectedDeliveryDate DateTime?
   status               FulfillmentStatus  @default(PENDING)
   poItemId             String?
   poItem               POItem?            @relation(fields: [poItemId], references: [id], onDelete: SetNull)
@@ -1799,13 +1801,13 @@ model TicketItem {
 }
 
 model TicketAuditLog {
-  id        String   @id @default(cuid())
+  id        String   @id @default(cuid()) @map("_id")
   ticketId  String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   action    String
-  notes     String?  @db.Text
+  notes     String?
   createdAt DateTime @default(now())
 
   @@index([ticketId, createdAt])

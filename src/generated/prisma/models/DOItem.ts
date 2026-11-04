@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -217,7 +217,7 @@ export type DOItemGroupByOutputType = {
   _max: DOItemMaxAggregateOutputType | null
 }
 
-export type GetDOItemGroupByPayload<T extends DOItemGroupByArgs> = Prisma.PrismaPromise<
+type GetDOItemGroupByPayload<T extends DOItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DOItemGroupByOutputType, T['by']> &
       {
@@ -251,12 +251,12 @@ export type DOItemWhereInput = {
 export type DOItemOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   doId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
   itemName?: Prisma.SortOrder
   qtyOrdered?: Prisma.SortOrder
   qtyDelivered?: Prisma.SortOrder
   unit?: Prisma.SortOrder
-  remarks?: Prisma.SortOrderInput | Prisma.SortOrder
+  remarks?: Prisma.SortOrder
   do?: Prisma.DeliveryOrderOrderByWithRelationInput
   ticketItems?: Prisma.TicketItemOrderByRelationAggregateInput
 }
@@ -280,12 +280,12 @@ export type DOItemWhereUniqueInput = Prisma.AtLeast<{
 export type DOItemOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   doId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
   itemName?: Prisma.SortOrder
   qtyOrdered?: Prisma.SortOrder
   qtyDelivered?: Prisma.SortOrder
   unit?: Prisma.SortOrder
-  remarks?: Prisma.SortOrderInput | Prisma.SortOrder
+  remarks?: Prisma.SortOrder
   _count?: Prisma.DOItemCountOrderByAggregateInput
   _avg?: Prisma.DOItemAvgOrderByAggregateInput
   _max?: Prisma.DOItemMaxOrderByAggregateInput
@@ -332,7 +332,6 @@ export type DOItemUncheckedCreateInput = {
 }
 
 export type DOItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   qtyOrdered?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -344,7 +343,6 @@ export type DOItemUpdateInput = {
 }
 
 export type DOItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   doId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -367,7 +365,6 @@ export type DOItemCreateManyInput = {
 }
 
 export type DOItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   qtyOrdered?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -377,7 +374,6 @@ export type DOItemUpdateManyMutationInput = {
 }
 
 export type DOItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   doId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -497,7 +493,7 @@ export type DOItemUpdateOneWithoutTicketItemsNestedInput = {
   create?: Prisma.XOR<Prisma.DOItemCreateWithoutTicketItemsInput, Prisma.DOItemUncheckedCreateWithoutTicketItemsInput>
   connectOrCreate?: Prisma.DOItemCreateOrConnectWithoutTicketItemsInput
   upsert?: Prisma.DOItemUpsertWithoutTicketItemsInput
-  disconnect?: Prisma.DOItemWhereInput | boolean
+  disconnect?: boolean
   delete?: Prisma.DOItemWhereInput | boolean
   connect?: Prisma.DOItemWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.DOItemUpdateToOneWithWhereWithoutTicketItemsInput, Prisma.DOItemUpdateWithoutTicketItemsInput>, Prisma.DOItemUncheckedUpdateWithoutTicketItemsInput>
@@ -532,7 +528,6 @@ export type DOItemCreateOrConnectWithoutDoInput = {
 
 export type DOItemCreateManyDoInputEnvelope = {
   data: Prisma.DOItemCreateManyDoInput | Prisma.DOItemCreateManyDoInput[]
-  skipDuplicates?: boolean
 }
 
 export type DOItemUpsertWithWhereUniqueWithoutDoInput = {
@@ -604,7 +599,6 @@ export type DOItemUpdateToOneWithWhereWithoutTicketItemsInput = {
 }
 
 export type DOItemUpdateWithoutTicketItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   qtyOrdered?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -615,7 +609,6 @@ export type DOItemUpdateWithoutTicketItemsInput = {
 }
 
 export type DOItemUncheckedUpdateWithoutTicketItemsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   doId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -636,7 +629,6 @@ export type DOItemCreateManyDoInput = {
 }
 
 export type DOItemUpdateWithoutDoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   qtyOrdered?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -647,7 +639,6 @@ export type DOItemUpdateWithoutDoInput = {
 }
 
 export type DOItemUncheckedUpdateWithoutDoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   qtyOrdered?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -658,7 +649,6 @@ export type DOItemUncheckedUpdateWithoutDoInput = {
 }
 
 export type DOItemUncheckedUpdateManyWithoutDoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   itemName?: Prisma.StringFieldUpdateOperationsInput | string
   qtyOrdered?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -712,29 +702,7 @@ export type DOItemSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   _count?: boolean | Prisma.DOItemCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dOItem"]>
 
-export type DOItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  doId?: boolean
-  itemCode?: boolean
-  itemName?: boolean
-  qtyOrdered?: boolean
-  qtyDelivered?: boolean
-  unit?: boolean
-  remarks?: boolean
-  do?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["dOItem"]>
 
-export type DOItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  doId?: boolean
-  itemCode?: boolean
-  itemName?: boolean
-  qtyOrdered?: boolean
-  qtyDelivered?: boolean
-  unit?: boolean
-  remarks?: boolean
-  do?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["dOItem"]>
 
 export type DOItemSelectScalar = {
   id?: boolean
@@ -752,12 +720,6 @@ export type DOItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   do?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
   ticketItems?: boolean | Prisma.DOItem$ticketItemsArgs<ExtArgs>
   _count?: boolean | Prisma.DOItemCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type DOItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  do?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
-}
-export type DOItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  do?: boolean | Prisma.DeliveryOrderDefaultArgs<ExtArgs>
 }
 
 export type $DOItemPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -893,30 +855,6 @@ export interface DOItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   createMany<T extends DOItemCreateManyArgs>(args?: Prisma.SelectSubset<T, DOItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DOItems and returns the data saved in the database.
-   * @param {DOItemCreateManyAndReturnArgs} args - Arguments to create many DOItems.
-   * @example
-   * // Create many DOItems
-   * const dOItem = await prisma.dOItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DOItems and only return the `id`
-   * const dOItemWithIdOnly = await prisma.dOItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DOItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DOItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DOItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DOItem.
    * @param {DOItemDeleteArgs} args - Arguments to delete one DOItem.
    * @example
@@ -981,36 +919,6 @@ export interface DOItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   updateMany<T extends DOItemUpdateManyArgs>(args: Prisma.SelectSubset<T, DOItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DOItems and returns the data updated in the database.
-   * @param {DOItemUpdateManyAndReturnArgs} args - Arguments to update many DOItems.
-   * @example
-   * // Update many DOItems
-   * const dOItem = await prisma.dOItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DOItems and only return the `id`
-   * const dOItemWithIdOnly = await prisma.dOItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DOItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DOItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DOItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DOItem.
    * @param {DOItemUpsertArgs} args - Arguments to update or create a DOItem.
    * @example
@@ -1028,6 +936,29 @@ export interface DOItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
    * })
    */
   upsert<T extends DOItemUpsertArgs>(args: Prisma.SelectSubset<T, DOItemUpsertArgs<ExtArgs>>): Prisma.Prisma__DOItemClient<runtime.Types.Result.GetResult<Prisma.$DOItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DOItems that matches the filter.
+   * @param {DOItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const dOItem = await prisma.dOItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DOItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DOItem.
+   * @param {DOItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const dOItem = await prisma.dOItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DOItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1404,11 +1335,6 @@ export type DOItemFindManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Skip the first `n` DOItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DOItems.
-   */
   distinct?: Prisma.DOItemScalarFieldEnum | Prisma.DOItemScalarFieldEnum[]
 }
 
@@ -1442,30 +1368,6 @@ export type DOItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many DOItems.
    */
   data: Prisma.DOItemCreateManyInput | Prisma.DOItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DOItem createManyAndReturn
- */
-export type DOItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DOItem
-   */
-  select?: Prisma.DOItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DOItem
-   */
-  omit?: Prisma.DOItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many DOItems.
-   */
-  data: Prisma.DOItemCreateManyInput | Prisma.DOItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DOItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1510,36 +1412,6 @@ export type DOItemUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many DOItems to update.
    */
   limit?: number
-}
-
-/**
- * DOItem updateManyAndReturn
- */
-export type DOItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DOItem
-   */
-  select?: Prisma.DOItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DOItem
-   */
-  omit?: Prisma.DOItemOmit<ExtArgs> | null
-  /**
-   * The data used to update DOItems.
-   */
-  data: Prisma.XOR<Prisma.DOItemUpdateManyMutationInput, Prisma.DOItemUncheckedUpdateManyInput>
-  /**
-   * Filter which DOItems to update
-   */
-  where?: Prisma.DOItemWhereInput
-  /**
-   * Limit how many DOItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DOItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1606,6 +1478,34 @@ export type DOItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many DOItems to delete.
    */
   limit?: number
+}
+
+/**
+ * DOItem findRaw
+ */
+export type DOItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DOItem aggregateRaw
+ */
+export type DOItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

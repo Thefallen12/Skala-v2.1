@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { center } from "@turf/turf";
 import {
   ArrowUpRight,
@@ -80,6 +80,9 @@ function getDefaultFeatureTitle(geometryType: string | undefined) {
   return "Titik survei";
 }
 
+const REPORT_PAGE_WIDTH = (210 * 96) / 25.4;
+const REPORT_PAGE_HEIGHT = (297 * 96) / 25.4;
+
 export default function GISWorkspace({
   projects,
   surveys,
@@ -142,6 +145,37 @@ export default function GISWorkspace({
   const [detailSurveyId, setDetailSurveyId] = useState<string | null>(null);
   const [showAllProjects, setShowAllProjects] = useState(true);
   const reportFrameRef = useRef<HTMLIFrameElement>(null);
+  const reportViewerRef = useRef<HTMLDivElement>(null);
+  const [reportFitScale, setReportFitScale] = useState(1);
+  const reportScale = reportFitScale;
+  const reportPageSize = {
+    width: REPORT_PAGE_WIDTH * reportScale,
+    height: REPORT_PAGE_HEIGHT * reportScale,
+  };
+  const selectedReportSurvey =
+    surveys.find((survey) => survey.id === reportSurveyId) ?? null;
+  const selectedReportProject = selectedReportSurvey?.projectId
+    ? projects.find((project) => project.id === selectedReportSurvey.projectId)
+    : null;
+
+  useEffect(() => {
+    const viewer = reportViewerRef.current;
+    if (!viewer) return;
+
+    const updateFitScale = (availableWidth: number) => {
+      setReportFitScale(
+        Math.min(1, Math.max(0.1, (availableWidth - 16) / REPORT_PAGE_WIDTH)),
+      );
+    };
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) updateFitScale(entry.contentRect.width);
+    });
+    observer.observe(viewer);
+    updateFitScale(viewer.clientWidth);
+
+    return () => observer.disconnect();
+  }, [reportPreviewOpen]);
+
   const detailSurvey =
     detailSurveyId === null
       ? null
@@ -835,36 +869,60 @@ export default function GISWorkspace({
         onClose={() => setReportPreviewOpen(false)}
         title="Pratinjau PDF: Rekap Hasil Survei Lapangan"
         description="Laporan mengikuti template A4. Gunakan cetak untuk menyimpan sebagai PDF."
-        className="z-[2100] max-w-[calc(210mm+3rem)]"
+        hideHeader
+        footerNote=""
+        className="z-[2100] h-[min(90dvh,900px)] w-[calc(100vw-24px)] max-w-5xl rounded-lg"
         overlayClassName="z-[2099]"
-        bodyClassName="overflow-auto bg-slate-950/30 p-3 sm:p-4"
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => reportFrameRef.current?.contentWindow?.print()}
-            >
-              <Printer className="mr-2 size-4" />
-              Cetak / Simpan PDF
-            </Button>
-            <Button type="button" onClick={() => setReportPreviewOpen(false)}>
-              Tutup
-            </Button>
-          </>
-        }
+        bodyClassName="!flex !flex-col !space-y-0 !overflow-hidden !p-0 bg-[#303030]"
       >
-        <div className="flex min-h-0 min-w-0 justify-center overflow-auto">
-          <iframe
-            ref={reportFrameRef}
-            title="Laporan survei A4"
-            src={
-              reportSurveyId
-                ? `/report/${encodeURIComponent(reportSurveyId)}`
-                : undefined
-            }
-            className="h-[297mm] w-[210mm] max-w-none shrink-0 rounded-sm bg-white shadow-xl"
-          />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 sm:p-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-700 bg-[#3f4145] shadow-inner">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-600 bg-[#25272b] px-3 py-2 text-slate-100">
+              <span className="mr-auto min-w-0 flex-1 basis-40 truncate text-sm font-medium">
+                Vendor: {selectedReportProject?.vendor || "Belum ditentukan"}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 bg-secondary px-3 text-secondary-foreground hover:bg-secondaryemphasis"
+                onClick={() => reportFrameRef.current?.contentWindow?.print()}
+              >
+                <Download className="mr-1.5 size-4" />
+                <span className="whitespace-nowrap">Unduh / Download</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 border-primary px-3 text-primary hover:bg-primary hover:text-primary-foreground"
+                onClick={() => reportFrameRef.current?.contentWindow?.print()}
+              >
+                <Printer className="mr-1.5 size-4" />
+                <span className="whitespace-nowrap">Cetak / Print</span>
+              </Button>
+            </div>
+            <div
+              ref={reportViewerRef}
+              className="flex min-h-0 flex-1 justify-center overflow-auto p-3 sm:p-6"
+            >
+              <div
+                className="relative mx-auto shrink-0"
+                style={reportPageSize}
+              >
+                <iframe
+                  ref={reportFrameRef}
+                  title="Laporan survei A4"
+                  src={
+                    reportSurveyId
+                      ? `/report/${encodeURIComponent(reportSurveyId)}`
+                      : undefined
+                  }
+                  className="absolute left-0 top-0 h-[297mm] w-[210mm] origin-top-left border-0 bg-white shadow-2xl"
+                  style={{ transform: `scale(${reportScale})` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </GlobalModal>
       <GlobalModal

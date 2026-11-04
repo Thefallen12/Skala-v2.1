@@ -20,6 +20,11 @@ import {
 } from "@/generated/prisma/enums";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import {
+  decimalFromScaledInteger,
+  decimalNumberFromScaledInteger,
+  decimalStringFromScaledInteger,
+} from "@/lib/scaled-decimal";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 
 export const metadata: Metadata = {
@@ -88,7 +93,9 @@ export default async function FinancePage({
     vehicleFuelRequests,
     documentSignoffInvoices,
     documentSignoffConfirmations,
-    cashflowMonthlyAggregates,
+    dashboardIncomingFlows,
+    dashboardPaidFlows,
+    dashboardOfficeExpenses,
   ] = await Promise.all([
     prisma.purchaseOrder.findMany({
       where: { status: POStatus.DRAFT },
@@ -499,7 +506,7 @@ export default async function FinancePage({
         transferGroupId: true,
         proofUrl: true,
         createdAt: true,
-        account: { select: { accountName: true } },
+        account: { select: { id: true, accountName: true } },
         project: { select: { kelompokTani: true } },
         recorder: { select: { name: true } },
       },
@@ -713,67 +720,79 @@ export default async function FinancePage({
           },
         })
       : Promise.resolve([]),
-    prisma.$queryRaw<
-      {
-        monthKey: string;
-        flowType: string;
-        sourceCategory: string;
-        totalAmount: number;
-      }[]
-    >`
-      SELECT "monthKey", "flowType", "sourceCategory",
-        SUM("totalAmount")::double precision AS "totalAmount"
-      FROM (
-        SELECT
-          to_char(date_trunc('month', "createdAt" AT TIME ZONE 'UTC'), 'YYYY-MM') AS "monthKey",
-          'IN'::text AS "flowType",
-          'incoming'::text AS "sourceCategory",
-          SUM(amount)::double precision AS "totalAmount"
-        FROM "Cashflow"
-        WHERE type = 'IN'
-          AND "transferGroupId" IS NULL
-          AND "createdAt" >= ${cashflowDashboardStart}
-          AND "createdAt" <= ${currentDate}
-        GROUP BY 1
-
-        UNION ALL
-
-        SELECT
-          to_char(date_trunc('month', "paidAt" AT TIME ZONE 'UTC'), 'YYYY-MM') AS "monthKey",
-          'OUT'::text AS "flowType",
-          CASE
-            WHEN "ticketId" IS NOT NULL THEN 'ticket'
-            WHEN "poId" IS NOT NULL THEN 'purchase-order'
-            ELSE 'direct-material'
-          END AS "sourceCategory",
-          SUM(amount)::double precision AS "totalAmount"
-        FROM "PaymentTransaction"
-        WHERE status = ${PaymentStatus.PAID}
-          AND "paidAt" >= ${cashflowDashboardStart}
-          AND "paidAt" <= ${currentDate}
-          AND (
-            "ticketId" IS NOT NULL
-            OR "poId" IS NOT NULL
-            OR "directStockPurchaseId" IS NOT NULL
-          )
-        GROUP BY 1, 3
-
-          UNION ALL
-
-          SELECT
-            to_char(date_trunc('month', "createdAt" AT TIME ZONE 'UTC'), 'YYYY-MM') AS "monthKey",
-            'OUT'::text AS "flowType",
-            'office-expense'::text AS "sourceCategory",
-            SUM(amount)::double precision AS "totalAmount"
-          FROM "OfficeExpense"
-          WHERE "createdAt" >= ${cashflowDashboardStart}
-            AND "createdAt" <= ${currentDate}
-          GROUP BY 1
-      ) AS "financeFlows"
-      GROUP BY 1, 2, 3
-      ORDER BY 1 ASC
-    `,
+    prisma.cashflow.findMany({
+      where: {
+        type: "IN",
+        transferGroupId: null,
+        createdAt: { gte: cashflowDashboardStart, lte: currentDate },
+      },
+      select: { createdAt: true, amount: true },
+    }),
+    prisma.paymentTransaction.findMany({
+      where: {
+        status: PaymentStatus.PAID,
+        paidAt: { gte: cashflowDashboardStart, lte: currentDate },
+        OR: [
+          { ticketId: { not: null } },
+          { poId: { not: null } },
+          { directStockPurchaseId: { not: null } },
+        ],
+      },
+      select: {
+        paidAt: true,
+        amount: true,
+        ticketId: true,
+        poId: true,
+      },
+    }),
+    prisma.officeExpense.findMany({
+      where: { createdAt: { gte: cashflowDashboardStart, lte: currentDate } },
+      select: { createdAt: true, amount: true },
+    }),
   ]);
+
+  const monthlyFlowMap = new Map<
+    string,
+    {
+      monthKey: string;
+      flowType: string;
+      sourceCategory: string;
+      totalAmount: number;
+    }
+  >();
+  const addMonthlyFlow = (
+    date: Date,
+    flowType: "IN" | "OUT",
+    sourceCategory: string,
+    amount: number,
+  ) => {
+    const monthKey = date.toISOString().slice(0, 7);
+    const key = `${monthKey}:${flowType}:${sourceCategory}`;
+    const aggregate = monthlyFlowMap.get(key);
+    if (aggregate) {
+      aggregate.totalAmount += amount;
+    } else {
+      monthlyFlowMap.set(key, { monthKey, flowType, sourceCategory, totalAmount: amount });
+    }
+  };
+  for (const flow of dashboardIncomingFlows) {
+    addMonthlyFlow(flow.createdAt, "IN", "incoming", flow.amount);
+  }
+  for (const flow of dashboardPaidFlows) {
+    if (!flow.paidAt) continue;
+    const sourceCategory = flow.ticketId
+      ? "ticket"
+      : flow.poId
+        ? "purchase-order"
+        : "direct-material";
+    addMonthlyFlow(flow.paidAt, "OUT", sourceCategory, flow.amount);
+  }
+  for (const expense of dashboardOfficeExpenses) {
+    addMonthlyFlow(expense.createdAt, "OUT", "office-expense", expense.amount);
+  }
+  const cashflowMonthlyAggregates = [...monthlyFlowMap.values()].sort((a, b) =>
+    a.monthKey.localeCompare(b.monthKey),
+  );
 
   const dashboardMonths: FinanceDashboardMonth[] = Array.from(
     { length: 6 },
@@ -1097,7 +1116,7 @@ export default async function FinancePage({
           id: purchase.id,
           purchaseNumber: purchase.purchaseNumber,
           vendorName: purchase.vendorName,
-          totalAmount: purchase.totalAmount.toString(),
+          totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
           paymentBankName: purchase.paymentBankName,
           paymentAccountNumber: purchase.paymentAccountNumber,
           paymentAccountName: purchase.paymentAccountName,
@@ -1105,10 +1124,10 @@ export default async function FinancePage({
           createdAt: purchase.createdAt.toISOString(),
           items: purchase.items.map((item) => ({
             itemName: item.itemName,
-            quantity: Number(item.quantity),
+            quantity: decimalNumberFromScaledInteger(item.quantity),
             unit: item.unit,
-            unitPrice: Number(item.unitPrice),
-            totalPrice: Number(item.totalPrice),
+            unitPrice: decimalNumberFromScaledInteger(item.unitPrice),
+            totalPrice: decimalNumberFromScaledInteger(item.totalPrice),
           })),
           paymentTransactions: purchase.paymentTransactions.map((payment) => ({
             ...payment,
@@ -1131,7 +1150,9 @@ export default async function FinancePage({
                 ) / 100
               : null)?.toString() ??
             ticket.requestedAmount?.toString() ??
-            ticket.totalAmount?.toString() ??
+            (ticket.totalAmount !== null
+              ? decimalStringFromScaledInteger(ticket.totalAmount)
+              : null) ??
             null,
           purchaseReceiptUrl: ticket.purchaseReceiptUrl,
           requestCategory: ticket.requestCategory,
@@ -1189,10 +1210,10 @@ export default async function FinancePage({
           subkonName: termyn.subkonContract.subkonName,
           projectName: `${termyn.subkonContract.project.kelompokTani} · ${termyn.subkonContract.project.title}`,
           termynNumber: termyn.termynNumber,
-          claimedPercent: termyn.claimedPercent.toString(),
-          grossAmount: termyn.grossAmount.toString(),
-          retentionAmount: termyn.retentionAmount.toString(),
-          netAmount: termyn.netAmount.toString(),
+          claimedPercent: decimalStringFromScaledInteger(termyn.claimedPercent),
+          grossAmount: decimalStringFromScaledInteger(termyn.grossAmount),
+          retentionAmount: decimalStringFromScaledInteger(termyn.retentionAmount),
+          netAmount: decimalStringFromScaledInteger(termyn.netAmount),
           status: termyn.status,
         }))}
         retentionContracts={retentionContracts.map((contract) => ({
@@ -1202,7 +1223,8 @@ export default async function FinancePage({
           projectName: `${contract.project.kelompokTani} · ${contract.project.title}`,
           retainedAmount: contract.termyns
             .reduce(
-              (total, termyn) => total.plus(termyn.retentionAmount),
+              (total, termyn) =>
+                total.plus(decimalFromScaledInteger(termyn.retentionAmount)),
               new Prisma.Decimal(0),
             )
             .toString(),
@@ -1223,24 +1245,36 @@ export default async function FinancePage({
             : "Proyek tidak terhubung",
           plateNumber: log.vehicle.plateNumber,
           vehicleType: log.vehicle.vehicleType,
-          kilometerStart: log.kilometerStart.toString(),
-          kilometerEnd: log.kilometerEnd.toString(),
-          distanceKm: log.distanceKm.toString(),
-          fuelLiter: log.fuelLiter.toString(),
+          kilometerStart: decimalStringFromScaledInteger(log.kilometerStart),
+          kilometerEnd: decimalStringFromScaledInteger(log.kilometerEnd),
+          distanceKm: decimalStringFromScaledInteger(log.distanceKm),
+          fuelLiter: decimalStringFromScaledInteger(log.fuelLiter),
           createdByName: log.createdBy.name,
         }))}
         vehicleFuelRequests={vehicleFuelRequests.map((request) => ({
           id: request.id,
           status: request.status,
           source: request.source,
-          estimatedDistanceKm: request.estimatedDistanceKm.toString(),
+          estimatedDistanceKm: decimalStringFromScaledInteger(
+            request.estimatedDistanceKm,
+          ),
           tripDistanceKm:
-            request.deliveryOrder.vehicleTripLog?.distanceKm.toString() ?? null,
-          exceptionDistanceKm: request.exceptionDistanceKm.toString(),
+            request.deliveryOrder.vehicleTripLog
+              ? decimalStringFromScaledInteger(
+                  request.deliveryOrder.vehicleTripLog.distanceKm,
+                )
+              : null,
+          exceptionDistanceKm: decimalStringFromScaledInteger(
+            request.exceptionDistanceKm,
+          ),
           exceptionReason: request.exceptionReason,
-          estimatedFuelLiter: request.estimatedFuelLiter.toString(),
-          unitPrice: request.unitPrice.toString(),
-          requestedAmount: request.requestedAmount.toString(),
+          estimatedFuelLiter: decimalStringFromScaledInteger(
+            request.estimatedFuelLiter,
+          ),
+          unitPrice: decimalStringFromScaledInteger(request.unitPrice),
+          requestedAmount: decimalStringFromScaledInteger(
+            request.requestedAmount,
+          ),
           disbursementMethod: request.disbursementMethod,
           transferDestination: request.transferDestination,
           transferProofUrl: request.transferProofUrl,

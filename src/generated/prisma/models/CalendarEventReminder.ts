@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -151,7 +151,7 @@ export type CalendarEventReminderGroupByOutputType = {
   _max: CalendarEventReminderMaxAggregateOutputType | null
 }
 
-export type GetCalendarEventReminderGroupByPayload<T extends CalendarEventReminderGroupByArgs> = Prisma.PrismaPromise<
+type GetCalendarEventReminderGroupByPayload<T extends CalendarEventReminderGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<CalendarEventReminderGroupByOutputType, T['by']> &
       {
@@ -235,14 +235,12 @@ export type CalendarEventReminderUncheckedCreateInput = {
 }
 
 export type CalendarEventReminderUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   event?: Prisma.CalendarEventUpdateOneRequiredWithoutRemindersNestedInput
   user?: Prisma.UserUpdateOneRequiredWithoutCalendarRemindersNestedInput
 }
 
 export type CalendarEventReminderUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -256,12 +254,10 @@ export type CalendarEventReminderCreateManyInput = {
 }
 
 export type CalendarEventReminderUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CalendarEventReminderUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -406,7 +402,6 @@ export type CalendarEventReminderCreateOrConnectWithoutUserInput = {
 
 export type CalendarEventReminderCreateManyUserInputEnvelope = {
   data: Prisma.CalendarEventReminderCreateManyUserInput | Prisma.CalendarEventReminderCreateManyUserInput[]
-  skipDuplicates?: boolean
 }
 
 export type CalendarEventReminderUpsertWithWhereUniqueWithoutUserInput = {
@@ -454,7 +449,6 @@ export type CalendarEventReminderCreateOrConnectWithoutEventInput = {
 
 export type CalendarEventReminderCreateManyEventInputEnvelope = {
   data: Prisma.CalendarEventReminderCreateManyEventInput | Prisma.CalendarEventReminderCreateManyEventInput[]
-  skipDuplicates?: boolean
 }
 
 export type CalendarEventReminderUpsertWithWhereUniqueWithoutEventInput = {
@@ -480,19 +474,16 @@ export type CalendarEventReminderCreateManyUserInput = {
 }
 
 export type CalendarEventReminderUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   event?: Prisma.CalendarEventUpdateOneRequiredWithoutRemindersNestedInput
 }
 
 export type CalendarEventReminderUncheckedUpdateWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CalendarEventReminderUncheckedUpdateManyWithoutUserInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -504,19 +495,16 @@ export type CalendarEventReminderCreateManyEventInput = {
 }
 
 export type CalendarEventReminderUpdateWithoutEventInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutCalendarRemindersNestedInput
 }
 
 export type CalendarEventReminderUncheckedUpdateWithoutEventInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CalendarEventReminderUncheckedUpdateManyWithoutEventInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -532,23 +520,7 @@ export type CalendarEventReminderSelect<ExtArgs extends runtime.Types.Extensions
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["calendarEventReminder"]>
 
-export type CalendarEventReminderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  eventId?: boolean
-  userId?: boolean
-  createdAt?: boolean
-  event?: boolean | Prisma.CalendarEventDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["calendarEventReminder"]>
 
-export type CalendarEventReminderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  eventId?: boolean
-  userId?: boolean
-  createdAt?: boolean
-  event?: boolean | Prisma.CalendarEventDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["calendarEventReminder"]>
 
 export type CalendarEventReminderSelectScalar = {
   id?: boolean
@@ -559,14 +531,6 @@ export type CalendarEventReminderSelectScalar = {
 
 export type CalendarEventReminderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "userId" | "createdAt", ExtArgs["result"]["calendarEventReminder"]>
 export type CalendarEventReminderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  event?: boolean | Prisma.CalendarEventDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type CalendarEventReminderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  event?: boolean | Prisma.CalendarEventDefaultArgs<ExtArgs>
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-}
-export type CalendarEventReminderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   event?: boolean | Prisma.CalendarEventDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -700,30 +664,6 @@ export interface CalendarEventReminderDelegate<ExtArgs extends runtime.Types.Ext
   createMany<T extends CalendarEventReminderCreateManyArgs>(args?: Prisma.SelectSubset<T, CalendarEventReminderCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many CalendarEventReminders and returns the data saved in the database.
-   * @param {CalendarEventReminderCreateManyAndReturnArgs} args - Arguments to create many CalendarEventReminders.
-   * @example
-   * // Create many CalendarEventReminders
-   * const calendarEventReminder = await prisma.calendarEventReminder.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many CalendarEventReminders and only return the `id`
-   * const calendarEventReminderWithIdOnly = await prisma.calendarEventReminder.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends CalendarEventReminderCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, CalendarEventReminderCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CalendarEventReminderPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a CalendarEventReminder.
    * @param {CalendarEventReminderDeleteArgs} args - Arguments to delete one CalendarEventReminder.
    * @example
@@ -788,36 +728,6 @@ export interface CalendarEventReminderDelegate<ExtArgs extends runtime.Types.Ext
   updateMany<T extends CalendarEventReminderUpdateManyArgs>(args: Prisma.SelectSubset<T, CalendarEventReminderUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more CalendarEventReminders and returns the data updated in the database.
-   * @param {CalendarEventReminderUpdateManyAndReturnArgs} args - Arguments to update many CalendarEventReminders.
-   * @example
-   * // Update many CalendarEventReminders
-   * const calendarEventReminder = await prisma.calendarEventReminder.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more CalendarEventReminders and only return the `id`
-   * const calendarEventReminderWithIdOnly = await prisma.calendarEventReminder.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends CalendarEventReminderUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, CalendarEventReminderUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CalendarEventReminderPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one CalendarEventReminder.
    * @param {CalendarEventReminderUpsertArgs} args - Arguments to update or create a CalendarEventReminder.
    * @example
@@ -835,6 +745,29 @@ export interface CalendarEventReminderDelegate<ExtArgs extends runtime.Types.Ext
    * })
    */
   upsert<T extends CalendarEventReminderUpsertArgs>(args: Prisma.SelectSubset<T, CalendarEventReminderUpsertArgs<ExtArgs>>): Prisma.Prisma__CalendarEventReminderClient<runtime.Types.Result.GetResult<Prisma.$CalendarEventReminderPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more CalendarEventReminders that matches the filter.
+   * @param {CalendarEventReminderFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const calendarEventReminder = await prisma.calendarEventReminder.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.CalendarEventReminderFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a CalendarEventReminder.
+   * @param {CalendarEventReminderAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const calendarEventReminder = await prisma.calendarEventReminder.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.CalendarEventReminderAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1207,11 +1140,6 @@ export type CalendarEventReminderFindManyArgs<ExtArgs extends runtime.Types.Exte
    * Skip the first `n` CalendarEventReminders.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of CalendarEventReminders.
-   */
   distinct?: Prisma.CalendarEventReminderScalarFieldEnum | Prisma.CalendarEventReminderScalarFieldEnum[]
 }
 
@@ -1245,30 +1173,6 @@ export type CalendarEventReminderCreateManyArgs<ExtArgs extends runtime.Types.Ex
    * The data used to create many CalendarEventReminders.
    */
   data: Prisma.CalendarEventReminderCreateManyInput | Prisma.CalendarEventReminderCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * CalendarEventReminder createManyAndReturn
- */
-export type CalendarEventReminderCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the CalendarEventReminder
-   */
-  select?: Prisma.CalendarEventReminderSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the CalendarEventReminder
-   */
-  omit?: Prisma.CalendarEventReminderOmit<ExtArgs> | null
-  /**
-   * The data used to create many CalendarEventReminders.
-   */
-  data: Prisma.CalendarEventReminderCreateManyInput | Prisma.CalendarEventReminderCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.CalendarEventReminderIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1313,36 +1217,6 @@ export type CalendarEventReminderUpdateManyArgs<ExtArgs extends runtime.Types.Ex
    * Limit how many CalendarEventReminders to update.
    */
   limit?: number
-}
-
-/**
- * CalendarEventReminder updateManyAndReturn
- */
-export type CalendarEventReminderUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the CalendarEventReminder
-   */
-  select?: Prisma.CalendarEventReminderSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the CalendarEventReminder
-   */
-  omit?: Prisma.CalendarEventReminderOmit<ExtArgs> | null
-  /**
-   * The data used to update CalendarEventReminders.
-   */
-  data: Prisma.XOR<Prisma.CalendarEventReminderUpdateManyMutationInput, Prisma.CalendarEventReminderUncheckedUpdateManyInput>
-  /**
-   * Filter which CalendarEventReminders to update
-   */
-  where?: Prisma.CalendarEventReminderWhereInput
-  /**
-   * Limit how many CalendarEventReminders to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.CalendarEventReminderIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1409,6 +1283,34 @@ export type CalendarEventReminderDeleteManyArgs<ExtArgs extends runtime.Types.Ex
    * Limit how many CalendarEventReminders to delete.
    */
   limit?: number
+}
+
+/**
+ * CalendarEventReminder findRaw
+ */
+export type CalendarEventReminderFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * CalendarEventReminder aggregateRaw
+ */
+export type CalendarEventReminderAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -221,7 +221,7 @@ export type BlueprintGroupByOutputType = {
   _max: BlueprintMaxAggregateOutputType | null
 }
 
-export type GetBlueprintGroupByPayload<T extends BlueprintGroupByArgs> = Prisma.PrismaPromise<
+type GetBlueprintGroupByPayload<T extends BlueprintGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<BlueprintGroupByOutputType, T['by']> &
       {
@@ -270,8 +270,8 @@ export type BlueprintOrderByWithRelationInput = {
   fileUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
   drafterId?: Prisma.SortOrder
-  reviewerId?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewerId?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -313,8 +313,8 @@ export type BlueprintOrderByWithAggregationInput = {
   fileUrl?: Prisma.SortOrder
   status?: Prisma.SortOrder
   drafterId?: Prisma.SortOrder
-  reviewerId?: Prisma.SortOrderInput | Prisma.SortOrder
-  reviewedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  reviewerId?: Prisma.SortOrder
+  reviewedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.BlueprintCountOrderByAggregateInput
@@ -377,7 +377,6 @@ export type BlueprintUncheckedCreateInput = {
 }
 
 export type BlueprintUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -394,7 +393,6 @@ export type BlueprintUpdateInput = {
 }
 
 export type BlueprintUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
@@ -428,7 +426,6 @@ export type BlueprintCreateManyInput = {
 }
 
 export type BlueprintUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -442,7 +439,6 @@ export type BlueprintUpdateManyMutationInput = {
 }
 
 export type BlueprintUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
@@ -692,7 +688,6 @@ export type BlueprintCreateOrConnectWithoutDrafterInput = {
 
 export type BlueprintCreateManyDrafterInputEnvelope = {
   data: Prisma.BlueprintCreateManyDrafterInput | Prisma.BlueprintCreateManyDrafterInput[]
-  skipDuplicates?: boolean
 }
 
 export type BlueprintCreateWithoutReviewerInput = {
@@ -734,7 +729,6 @@ export type BlueprintCreateOrConnectWithoutReviewerInput = {
 
 export type BlueprintCreateManyReviewerInputEnvelope = {
   data: Prisma.BlueprintCreateManyReviewerInput | Prisma.BlueprintCreateManyReviewerInput[]
-  skipDuplicates?: boolean
 }
 
 export type BlueprintUpsertWithWhereUniqueWithoutDrafterInput = {
@@ -828,7 +822,6 @@ export type BlueprintCreateOrConnectWithoutProjectInput = {
 
 export type BlueprintCreateManyProjectInputEnvelope = {
   data: Prisma.BlueprintCreateManyProjectInput | Prisma.BlueprintCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type BlueprintUpsertWithWhereUniqueWithoutProjectInput = {
@@ -880,7 +873,6 @@ export type BlueprintCreateManyReviewerInput = {
 }
 
 export type BlueprintUpdateWithoutDrafterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -896,7 +888,6 @@ export type BlueprintUpdateWithoutDrafterInput = {
 }
 
 export type BlueprintUncheckedUpdateWithoutDrafterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
@@ -912,7 +903,6 @@ export type BlueprintUncheckedUpdateWithoutDrafterInput = {
 }
 
 export type BlueprintUncheckedUpdateManyWithoutDrafterInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
@@ -928,7 +918,6 @@ export type BlueprintUncheckedUpdateManyWithoutDrafterInput = {
 }
 
 export type BlueprintUpdateWithoutReviewerInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -944,7 +933,6 @@ export type BlueprintUpdateWithoutReviewerInput = {
 }
 
 export type BlueprintUncheckedUpdateWithoutReviewerInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
@@ -960,7 +948,6 @@ export type BlueprintUncheckedUpdateWithoutReviewerInput = {
 }
 
 export type BlueprintUncheckedUpdateManyWithoutReviewerInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
@@ -992,7 +979,6 @@ export type BlueprintCreateManyProjectInput = {
 }
 
 export type BlueprintUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1008,7 +994,6 @@ export type BlueprintUpdateWithoutProjectInput = {
 }
 
 export type BlueprintUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1024,7 +1009,6 @@ export type BlueprintUncheckedUpdateWithoutProjectInput = {
 }
 
 export type BlueprintUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   publicCode?: Prisma.StringFieldUpdateOperationsInput | string
   drawingNumber?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1061,45 +1045,7 @@ export type BlueprintSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   reviewer?: boolean | Prisma.Blueprint$reviewerArgs<ExtArgs>
 }, ExtArgs["result"]["blueprint"]>
 
-export type BlueprintSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  projectId?: boolean
-  drawingNumber?: boolean
-  title?: boolean
-  category?: boolean
-  revision?: boolean
-  fileUrl?: boolean
-  status?: boolean
-  drafterId?: boolean
-  reviewerId?: boolean
-  reviewedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  drafter?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewer?: boolean | Prisma.Blueprint$reviewerArgs<ExtArgs>
-}, ExtArgs["result"]["blueprint"]>
 
-export type BlueprintSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  publicCode?: boolean
-  projectId?: boolean
-  drawingNumber?: boolean
-  title?: boolean
-  category?: boolean
-  revision?: boolean
-  fileUrl?: boolean
-  status?: boolean
-  drafterId?: boolean
-  reviewerId?: boolean
-  reviewedAt?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  drafter?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewer?: boolean | Prisma.Blueprint$reviewerArgs<ExtArgs>
-}, ExtArgs["result"]["blueprint"]>
 
 export type BlueprintSelectScalar = {
   id?: boolean
@@ -1120,16 +1066,6 @@ export type BlueprintSelectScalar = {
 
 export type BlueprintOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publicCode" | "projectId" | "drawingNumber" | "title" | "category" | "revision" | "fileUrl" | "status" | "drafterId" | "reviewerId" | "reviewedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["blueprint"]>
 export type BlueprintInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  drafter?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewer?: boolean | Prisma.Blueprint$reviewerArgs<ExtArgs>
-}
-export type BlueprintIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-  drafter?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  reviewer?: boolean | Prisma.Blueprint$reviewerArgs<ExtArgs>
-}
-export type BlueprintIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   drafter?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   reviewer?: boolean | Prisma.Blueprint$reviewerArgs<ExtArgs>
@@ -1275,30 +1211,6 @@ export interface BlueprintDelegate<ExtArgs extends runtime.Types.Extensions.Inte
   createMany<T extends BlueprintCreateManyArgs>(args?: Prisma.SelectSubset<T, BlueprintCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many Blueprints and returns the data saved in the database.
-   * @param {BlueprintCreateManyAndReturnArgs} args - Arguments to create many Blueprints.
-   * @example
-   * // Create many Blueprints
-   * const blueprint = await prisma.blueprint.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many Blueprints and only return the `id`
-   * const blueprintWithIdOnly = await prisma.blueprint.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends BlueprintCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, BlueprintCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BlueprintPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a Blueprint.
    * @param {BlueprintDeleteArgs} args - Arguments to delete one Blueprint.
    * @example
@@ -1363,36 +1275,6 @@ export interface BlueprintDelegate<ExtArgs extends runtime.Types.Extensions.Inte
   updateMany<T extends BlueprintUpdateManyArgs>(args: Prisma.SelectSubset<T, BlueprintUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more Blueprints and returns the data updated in the database.
-   * @param {BlueprintUpdateManyAndReturnArgs} args - Arguments to update many Blueprints.
-   * @example
-   * // Update many Blueprints
-   * const blueprint = await prisma.blueprint.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more Blueprints and only return the `id`
-   * const blueprintWithIdOnly = await prisma.blueprint.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends BlueprintUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, BlueprintUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BlueprintPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one Blueprint.
    * @param {BlueprintUpsertArgs} args - Arguments to update or create a Blueprint.
    * @example
@@ -1410,6 +1292,29 @@ export interface BlueprintDelegate<ExtArgs extends runtime.Types.Extensions.Inte
    * })
    */
   upsert<T extends BlueprintUpsertArgs>(args: Prisma.SelectSubset<T, BlueprintUpsertArgs<ExtArgs>>): Prisma.Prisma__BlueprintClient<runtime.Types.Result.GetResult<Prisma.$BlueprintPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more Blueprints that matches the filter.
+   * @param {BlueprintFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const blueprint = await prisma.blueprint.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.BlueprintFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a Blueprint.
+   * @param {BlueprintAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const blueprint = await prisma.blueprint.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.BlueprintAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1793,11 +1698,6 @@ export type BlueprintFindManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Skip the first `n` Blueprints.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of Blueprints.
-   */
   distinct?: Prisma.BlueprintScalarFieldEnum | Prisma.BlueprintScalarFieldEnum[]
 }
 
@@ -1831,30 +1731,6 @@ export type BlueprintCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * The data used to create many Blueprints.
    */
   data: Prisma.BlueprintCreateManyInput | Prisma.BlueprintCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * Blueprint createManyAndReturn
- */
-export type BlueprintCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Blueprint
-   */
-  select?: Prisma.BlueprintSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Blueprint
-   */
-  omit?: Prisma.BlueprintOmit<ExtArgs> | null
-  /**
-   * The data used to create many Blueprints.
-   */
-  data: Prisma.BlueprintCreateManyInput | Prisma.BlueprintCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.BlueprintIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1899,36 +1775,6 @@ export type BlueprintUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Limit how many Blueprints to update.
    */
   limit?: number
-}
-
-/**
- * Blueprint updateManyAndReturn
- */
-export type BlueprintUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Blueprint
-   */
-  select?: Prisma.BlueprintSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the Blueprint
-   */
-  omit?: Prisma.BlueprintOmit<ExtArgs> | null
-  /**
-   * The data used to update Blueprints.
-   */
-  data: Prisma.XOR<Prisma.BlueprintUpdateManyMutationInput, Prisma.BlueprintUncheckedUpdateManyInput>
-  /**
-   * Filter which Blueprints to update
-   */
-  where?: Prisma.BlueprintWhereInput
-  /**
-   * Limit how many Blueprints to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.BlueprintIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1995,6 +1841,34 @@ export type BlueprintDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Limit how many Blueprints to delete.
    */
   limit?: number
+}
+
+/**
+ * Blueprint findRaw
+ */
+export type BlueprintFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * Blueprint aggregateRaw
+ */
+export type BlueprintAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -241,7 +241,7 @@ export type DailyReportGroupByOutputType = {
   _max: DailyReportMaxAggregateOutputType | null
 }
 
-export type GetDailyReportGroupByPayload<T extends DailyReportGroupByArgs> = Prisma.PrismaPromise<
+type GetDailyReportGroupByPayload<T extends DailyReportGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DailyReportGroupByOutputType, T['by']> &
       {
@@ -280,13 +280,13 @@ export type DailyReportOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   reportDate?: Prisma.SortOrder
-  weather?: Prisma.SortOrderInput | Prisma.SortOrder
+  weather?: Prisma.SortOrder
   workersCount?: Prisma.SortOrder
-  progress?: Prisma.SortOrderInput | Prisma.SortOrder
-  equipment?: Prisma.SortOrderInput | Prisma.SortOrder
-  workSummary?: Prisma.SortOrderInput | Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
-  k3SafetyLog?: Prisma.SortOrderInput | Prisma.SortOrder
+  progress?: Prisma.SortOrder
+  equipment?: Prisma.SortOrder
+  workSummary?: Prisma.SortOrder
+  notes?: Prisma.SortOrder
+  k3SafetyLog?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
@@ -318,13 +318,13 @@ export type DailyReportOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   reportDate?: Prisma.SortOrder
-  weather?: Prisma.SortOrderInput | Prisma.SortOrder
+  weather?: Prisma.SortOrder
   workersCount?: Prisma.SortOrder
-  progress?: Prisma.SortOrderInput | Prisma.SortOrder
-  equipment?: Prisma.SortOrderInput | Prisma.SortOrder
-  workSummary?: Prisma.SortOrderInput | Prisma.SortOrder
-  notes?: Prisma.SortOrderInput | Prisma.SortOrder
-  k3SafetyLog?: Prisma.SortOrderInput | Prisma.SortOrder
+  progress?: Prisma.SortOrder
+  equipment?: Prisma.SortOrder
+  workSummary?: Prisma.SortOrder
+  notes?: Prisma.SortOrder
+  k3SafetyLog?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.DailyReportCountOrderByAggregateInput
@@ -358,7 +358,7 @@ export type DailyReportCreateInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -375,7 +375,7 @@ export type DailyReportUncheckedCreateInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -385,12 +385,11 @@ export type DailyReportUncheckedCreateInput = {
 }
 
 export type DailyReportUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -401,13 +400,12 @@ export type DailyReportUpdateInput = {
 }
 
 export type DailyReportUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -423,7 +421,7 @@ export type DailyReportCreateManyInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -432,12 +430,11 @@ export type DailyReportCreateManyInput = {
 }
 
 export type DailyReportUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -446,13 +443,12 @@ export type DailyReportUpdateManyMutationInput = {
 }
 
 export type DailyReportUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -595,7 +591,7 @@ export type DailyReportCreateWithoutProjectInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -610,7 +606,7 @@ export type DailyReportUncheckedCreateWithoutProjectInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -626,7 +622,6 @@ export type DailyReportCreateOrConnectWithoutProjectInput = {
 
 export type DailyReportCreateManyProjectInputEnvelope = {
   data: Prisma.DailyReportCreateManyProjectInput | Prisma.DailyReportCreateManyProjectInput[]
-  skipDuplicates?: boolean
 }
 
 export type DailyReportUpsertWithWhereUniqueWithoutProjectInput = {
@@ -669,7 +664,7 @@ export type DailyReportCreateWithoutProgressPhotosInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -685,7 +680,7 @@ export type DailyReportUncheckedCreateWithoutProgressPhotosInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -710,12 +705,11 @@ export type DailyReportUpdateToOneWithWhereWithoutProgressPhotosInput = {
 }
 
 export type DailyReportUpdateWithoutProgressPhotosInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -725,13 +719,12 @@ export type DailyReportUpdateWithoutProgressPhotosInput = {
 }
 
 export type DailyReportUncheckedUpdateWithoutProgressPhotosInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -745,7 +738,7 @@ export type DailyReportCreateManyProjectInput = {
   weather?: string | null
   workersCount?: number
   progress?: number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | null
   workSummary?: string | null
   notes?: string | null
   k3SafetyLog?: string | null
@@ -754,12 +747,11 @@ export type DailyReportCreateManyProjectInput = {
 }
 
 export type DailyReportUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -769,12 +761,11 @@ export type DailyReportUpdateWithoutProjectInput = {
 }
 
 export type DailyReportUncheckedUpdateWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -784,12 +775,11 @@ export type DailyReportUncheckedUpdateWithoutProjectInput = {
 }
 
 export type DailyReportUncheckedUpdateManyWithoutProjectInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   reportDate?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   weather?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   workersCount?: Prisma.IntFieldUpdateOperationsInput | number
   progress?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
-  equipment?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  equipment?: runtime.InputJsonValue | runtime.InputJsonValue | null
   workSummary?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   k3SafetyLog?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -846,37 +836,7 @@ export type DailyReportSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   _count?: boolean | Prisma.DailyReportCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["dailyReport"]>
 
-export type DailyReportSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  reportDate?: boolean
-  weather?: boolean
-  workersCount?: boolean
-  progress?: boolean
-  equipment?: boolean
-  workSummary?: boolean
-  notes?: boolean
-  k3SafetyLog?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["dailyReport"]>
 
-export type DailyReportSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  projectId?: boolean
-  reportDate?: boolean
-  weather?: boolean
-  workersCount?: boolean
-  progress?: boolean
-  equipment?: boolean
-  workSummary?: boolean
-  notes?: boolean
-  k3SafetyLog?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["dailyReport"]>
 
 export type DailyReportSelectScalar = {
   id?: boolean
@@ -898,12 +858,6 @@ export type DailyReportInclude<ExtArgs extends runtime.Types.Extensions.Internal
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   progressPhotos?: boolean | Prisma.DailyReport$progressPhotosArgs<ExtArgs>
   _count?: boolean | Prisma.DailyReportCountOutputTypeDefaultArgs<ExtArgs>
-}
-export type DailyReportIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
-}
-export type DailyReportIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }
 
 export type $DailyReportPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1043,30 +997,6 @@ export interface DailyReportDelegate<ExtArgs extends runtime.Types.Extensions.In
   createMany<T extends DailyReportCreateManyArgs>(args?: Prisma.SelectSubset<T, DailyReportCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many DailyReports and returns the data saved in the database.
-   * @param {DailyReportCreateManyAndReturnArgs} args - Arguments to create many DailyReports.
-   * @example
-   * // Create many DailyReports
-   * const dailyReport = await prisma.dailyReport.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many DailyReports and only return the `id`
-   * const dailyReportWithIdOnly = await prisma.dailyReport.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends DailyReportCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, DailyReportCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DailyReportPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a DailyReport.
    * @param {DailyReportDeleteArgs} args - Arguments to delete one DailyReport.
    * @example
@@ -1131,36 +1061,6 @@ export interface DailyReportDelegate<ExtArgs extends runtime.Types.Extensions.In
   updateMany<T extends DailyReportUpdateManyArgs>(args: Prisma.SelectSubset<T, DailyReportUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more DailyReports and returns the data updated in the database.
-   * @param {DailyReportUpdateManyAndReturnArgs} args - Arguments to update many DailyReports.
-   * @example
-   * // Update many DailyReports
-   * const dailyReport = await prisma.dailyReport.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more DailyReports and only return the `id`
-   * const dailyReportWithIdOnly = await prisma.dailyReport.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends DailyReportUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, DailyReportUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DailyReportPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one DailyReport.
    * @param {DailyReportUpsertArgs} args - Arguments to update or create a DailyReport.
    * @example
@@ -1178,6 +1078,29 @@ export interface DailyReportDelegate<ExtArgs extends runtime.Types.Extensions.In
    * })
    */
   upsert<T extends DailyReportUpsertArgs>(args: Prisma.SelectSubset<T, DailyReportUpsertArgs<ExtArgs>>): Prisma.Prisma__DailyReportClient<runtime.Types.Result.GetResult<Prisma.$DailyReportPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more DailyReports that matches the filter.
+   * @param {DailyReportFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const dailyReport = await prisma.dailyReport.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.DailyReportFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a DailyReport.
+   * @param {DailyReportAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const dailyReport = await prisma.dailyReport.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.DailyReportAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1558,11 +1481,6 @@ export type DailyReportFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` DailyReports.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of DailyReports.
-   */
   distinct?: Prisma.DailyReportScalarFieldEnum | Prisma.DailyReportScalarFieldEnum[]
 }
 
@@ -1596,30 +1514,6 @@ export type DailyReportCreateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * The data used to create many DailyReports.
    */
   data: Prisma.DailyReportCreateManyInput | Prisma.DailyReportCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * DailyReport createManyAndReturn
- */
-export type DailyReportCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DailyReport
-   */
-  select?: Prisma.DailyReportSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DailyReport
-   */
-  omit?: Prisma.DailyReportOmit<ExtArgs> | null
-  /**
-   * The data used to create many DailyReports.
-   */
-  data: Prisma.DailyReportCreateManyInput | Prisma.DailyReportCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DailyReportIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1664,36 +1558,6 @@ export type DailyReportUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many DailyReports to update.
    */
   limit?: number
-}
-
-/**
- * DailyReport updateManyAndReturn
- */
-export type DailyReportUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the DailyReport
-   */
-  select?: Prisma.DailyReportSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the DailyReport
-   */
-  omit?: Prisma.DailyReportOmit<ExtArgs> | null
-  /**
-   * The data used to update DailyReports.
-   */
-  data: Prisma.XOR<Prisma.DailyReportUpdateManyMutationInput, Prisma.DailyReportUncheckedUpdateManyInput>
-  /**
-   * Filter which DailyReports to update
-   */
-  where?: Prisma.DailyReportWhereInput
-  /**
-   * Limit how many DailyReports to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.DailyReportIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1760,6 +1624,34 @@ export type DailyReportDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many DailyReports to delete.
    */
   limit?: number
+}
+
+/**
+ * DailyReport findRaw
+ */
+export type DailyReportFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * DailyReport aggregateRaw
+ */
+export type DailyReportAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

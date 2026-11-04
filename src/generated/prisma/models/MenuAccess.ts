@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -172,7 +172,7 @@ export type MenuAccessGroupByOutputType = {
   _max: MenuAccessMaxAggregateOutputType | null
 }
 
-export type GetMenuAccessGroupByPayload<T extends MenuAccessGroupByArgs> = Prisma.PrismaPromise<
+type GetMenuAccessGroupByPayload<T extends MenuAccessGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MenuAccessGroupByOutputType, T['by']> &
       {
@@ -271,7 +271,6 @@ export type MenuAccessUncheckedCreateInput = {
 }
 
 export type MenuAccessUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   menuKey?: Prisma.StringFieldUpdateOperationsInput | string
   menuName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -281,7 +280,6 @@ export type MenuAccessUpdateInput = {
 }
 
 export type MenuAccessUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   menuKey?: Prisma.StringFieldUpdateOperationsInput | string
   menuName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -301,7 +299,6 @@ export type MenuAccessCreateManyInput = {
 }
 
 export type MenuAccessUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   menuKey?: Prisma.StringFieldUpdateOperationsInput | string
   menuName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -311,7 +308,6 @@ export type MenuAccessUpdateManyMutationInput = {
 }
 
 export type MenuAccessUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.StringFieldUpdateOperationsInput | string
   menuKey?: Prisma.StringFieldUpdateOperationsInput | string
   menuName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -379,25 +375,7 @@ export type MenuAccessSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   updatedAt?: boolean
 }, ExtArgs["result"]["menuAccess"]>
 
-export type MenuAccessSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  role?: boolean
-  menuKey?: boolean
-  menuName?: boolean
-  isAllowed?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["menuAccess"]>
 
-export type MenuAccessSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  role?: boolean
-  menuKey?: boolean
-  menuName?: boolean
-  isAllowed?: boolean
-  createdAt?: boolean
-  updatedAt?: boolean
-}, ExtArgs["result"]["menuAccess"]>
 
 export type MenuAccessSelectScalar = {
   id?: boolean
@@ -540,30 +518,6 @@ export interface MenuAccessDelegate<ExtArgs extends runtime.Types.Extensions.Int
   createMany<T extends MenuAccessCreateManyArgs>(args?: Prisma.SelectSubset<T, MenuAccessCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many MenuAccesses and returns the data saved in the database.
-   * @param {MenuAccessCreateManyAndReturnArgs} args - Arguments to create many MenuAccesses.
-   * @example
-   * // Create many MenuAccesses
-   * const menuAccess = await prisma.menuAccess.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many MenuAccesses and only return the `id`
-   * const menuAccessWithIdOnly = await prisma.menuAccess.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends MenuAccessCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, MenuAccessCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MenuAccessPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a MenuAccess.
    * @param {MenuAccessDeleteArgs} args - Arguments to delete one MenuAccess.
    * @example
@@ -628,36 +582,6 @@ export interface MenuAccessDelegate<ExtArgs extends runtime.Types.Extensions.Int
   updateMany<T extends MenuAccessUpdateManyArgs>(args: Prisma.SelectSubset<T, MenuAccessUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more MenuAccesses and returns the data updated in the database.
-   * @param {MenuAccessUpdateManyAndReturnArgs} args - Arguments to update many MenuAccesses.
-   * @example
-   * // Update many MenuAccesses
-   * const menuAccess = await prisma.menuAccess.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more MenuAccesses and only return the `id`
-   * const menuAccessWithIdOnly = await prisma.menuAccess.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends MenuAccessUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, MenuAccessUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MenuAccessPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one MenuAccess.
    * @param {MenuAccessUpsertArgs} args - Arguments to update or create a MenuAccess.
    * @example
@@ -675,6 +599,29 @@ export interface MenuAccessDelegate<ExtArgs extends runtime.Types.Extensions.Int
    * })
    */
   upsert<T extends MenuAccessUpsertArgs>(args: Prisma.SelectSubset<T, MenuAccessUpsertArgs<ExtArgs>>): Prisma.Prisma__MenuAccessClient<runtime.Types.Result.GetResult<Prisma.$MenuAccessPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more MenuAccesses that matches the filter.
+   * @param {MenuAccessFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const menuAccess = await prisma.menuAccess.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.MenuAccessFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a MenuAccess.
+   * @param {MenuAccessAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const menuAccess = await prisma.menuAccess.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.MenuAccessAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1028,11 +975,6 @@ export type MenuAccessFindManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Skip the first `n` MenuAccesses.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of MenuAccesses.
-   */
   distinct?: Prisma.MenuAccessScalarFieldEnum | Prisma.MenuAccessScalarFieldEnum[]
 }
 
@@ -1062,26 +1004,6 @@ export type MenuAccessCreateManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * The data used to create many MenuAccesses.
    */
   data: Prisma.MenuAccessCreateManyInput | Prisma.MenuAccessCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * MenuAccess createManyAndReturn
- */
-export type MenuAccessCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the MenuAccess
-   */
-  select?: Prisma.MenuAccessSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the MenuAccess
-   */
-  omit?: Prisma.MenuAccessOmit<ExtArgs> | null
-  /**
-   * The data used to create many MenuAccesses.
-   */
-  data: Prisma.MenuAccessCreateManyInput | Prisma.MenuAccessCreateManyInput[]
-  skipDuplicates?: boolean
 }
 
 /**
@@ -1110,32 +1032,6 @@ export type MenuAccessUpdateArgs<ExtArgs extends runtime.Types.Extensions.Intern
  * MenuAccess updateMany
  */
 export type MenuAccessUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * The data used to update MenuAccesses.
-   */
-  data: Prisma.XOR<Prisma.MenuAccessUpdateManyMutationInput, Prisma.MenuAccessUncheckedUpdateManyInput>
-  /**
-   * Filter which MenuAccesses to update
-   */
-  where?: Prisma.MenuAccessWhereInput
-  /**
-   * Limit how many MenuAccesses to update.
-   */
-  limit?: number
-}
-
-/**
- * MenuAccess updateManyAndReturn
- */
-export type MenuAccessUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the MenuAccess
-   */
-  select?: Prisma.MenuAccessSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the MenuAccess
-   */
-  omit?: Prisma.MenuAccessOmit<ExtArgs> | null
   /**
    * The data used to update MenuAccesses.
    */
@@ -1206,6 +1102,34 @@ export type MenuAccessDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Limit how many MenuAccesses to delete.
    */
   limit?: number
+}
+
+/**
+ * MenuAccess findRaw
+ */
+export type MenuAccessFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * MenuAccess aggregateRaw
+ */
+export type MenuAccessAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -221,7 +221,7 @@ export type KOItemGroupByOutputType = {
   _max: KOItemMaxAggregateOutputType | null
 }
 
-export type GetKOItemGroupByPayload<T extends KOItemGroupByArgs> = Prisma.PrismaPromise<
+type GetKOItemGroupByPayload<T extends KOItemGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<KOItemGroupByOutputType, T['by']> &
       {
@@ -254,7 +254,7 @@ export type KOItemWhereInput = {
 export type KOItemOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   koId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
   description?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
@@ -281,7 +281,7 @@ export type KOItemWhereUniqueInput = Prisma.AtLeast<{
 export type KOItemOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   koId?: Prisma.SortOrder
-  itemCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemCode?: Prisma.SortOrder
   description?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   unit?: Prisma.SortOrder
@@ -331,7 +331,6 @@ export type KOItemUncheckedCreateInput = {
 }
 
 export type KOItemUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -342,7 +341,6 @@ export type KOItemUpdateInput = {
 }
 
 export type KOItemUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   koId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
@@ -364,7 +362,6 @@ export type KOItemCreateManyInput = {
 }
 
 export type KOItemUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -374,7 +371,6 @@ export type KOItemUpdateManyMutationInput = {
 }
 
 export type KOItemUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   koId?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
@@ -508,7 +504,6 @@ export type KOItemCreateOrConnectWithoutKoInput = {
 
 export type KOItemCreateManyKoInputEnvelope = {
   data: Prisma.KOItemCreateManyKoInput | Prisma.KOItemCreateManyKoInput[]
-  skipDuplicates?: boolean
 }
 
 export type KOItemUpsertWithWhereUniqueWithoutKoInput = {
@@ -552,7 +547,6 @@ export type KOItemCreateManyKoInput = {
 }
 
 export type KOItemUpdateWithoutKoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -562,7 +556,6 @@ export type KOItemUpdateWithoutKoInput = {
 }
 
 export type KOItemUncheckedUpdateWithoutKoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -572,7 +565,6 @@ export type KOItemUncheckedUpdateWithoutKoInput = {
 }
 
 export type KOItemUncheckedUpdateManyWithoutKoInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   itemCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.StringFieldUpdateOperationsInput | string
   quantity?: Prisma.FloatFieldUpdateOperationsInput | number
@@ -595,29 +587,7 @@ export type KOItemSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   ko?: boolean | Prisma.OrderConfirmationDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["kOItem"]>
 
-export type KOItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  koId?: boolean
-  itemCode?: boolean
-  description?: boolean
-  quantity?: boolean
-  unit?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  ko?: boolean | Prisma.OrderConfirmationDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["kOItem"]>
 
-export type KOItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  koId?: boolean
-  itemCode?: boolean
-  description?: boolean
-  quantity?: boolean
-  unit?: boolean
-  unitPrice?: boolean
-  totalPrice?: boolean
-  ko?: boolean | Prisma.OrderConfirmationDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["kOItem"]>
 
 export type KOItemSelectScalar = {
   id?: boolean
@@ -632,12 +602,6 @@ export type KOItemSelectScalar = {
 
 export type KOItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "koId" | "itemCode" | "description" | "quantity" | "unit" | "unitPrice" | "totalPrice", ExtArgs["result"]["kOItem"]>
 export type KOItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ko?: boolean | Prisma.OrderConfirmationDefaultArgs<ExtArgs>
-}
-export type KOItemIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  ko?: boolean | Prisma.OrderConfirmationDefaultArgs<ExtArgs>
-}
-export type KOItemIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   ko?: boolean | Prisma.OrderConfirmationDefaultArgs<ExtArgs>
 }
 
@@ -773,30 +737,6 @@ export interface KOItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   createMany<T extends KOItemCreateManyArgs>(args?: Prisma.SelectSubset<T, KOItemCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many KOItems and returns the data saved in the database.
-   * @param {KOItemCreateManyAndReturnArgs} args - Arguments to create many KOItems.
-   * @example
-   * // Create many KOItems
-   * const kOItem = await prisma.kOItem.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many KOItems and only return the `id`
-   * const kOItemWithIdOnly = await prisma.kOItem.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends KOItemCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, KOItemCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$KOItemPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a KOItem.
    * @param {KOItemDeleteArgs} args - Arguments to delete one KOItem.
    * @example
@@ -861,36 +801,6 @@ export interface KOItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
   updateMany<T extends KOItemUpdateManyArgs>(args: Prisma.SelectSubset<T, KOItemUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more KOItems and returns the data updated in the database.
-   * @param {KOItemUpdateManyAndReturnArgs} args - Arguments to update many KOItems.
-   * @example
-   * // Update many KOItems
-   * const kOItem = await prisma.kOItem.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more KOItems and only return the `id`
-   * const kOItemWithIdOnly = await prisma.kOItem.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends KOItemUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, KOItemUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$KOItemPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one KOItem.
    * @param {KOItemUpsertArgs} args - Arguments to update or create a KOItem.
    * @example
@@ -908,6 +818,29 @@ export interface KOItemDelegate<ExtArgs extends runtime.Types.Extensions.Interna
    * })
    */
   upsert<T extends KOItemUpsertArgs>(args: Prisma.SelectSubset<T, KOItemUpsertArgs<ExtArgs>>): Prisma.Prisma__KOItemClient<runtime.Types.Result.GetResult<Prisma.$KOItemPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more KOItems that matches the filter.
+   * @param {KOItemFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const kOItem = await prisma.kOItem.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.KOItemFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a KOItem.
+   * @param {KOItemAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const kOItem = await prisma.kOItem.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.KOItemAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1283,11 +1216,6 @@ export type KOItemFindManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Skip the first `n` KOItems.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of KOItems.
-   */
   distinct?: Prisma.KOItemScalarFieldEnum | Prisma.KOItemScalarFieldEnum[]
 }
 
@@ -1321,30 +1249,6 @@ export type KOItemCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many KOItems.
    */
   data: Prisma.KOItemCreateManyInput | Prisma.KOItemCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * KOItem createManyAndReturn
- */
-export type KOItemCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the KOItem
-   */
-  select?: Prisma.KOItemSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the KOItem
-   */
-  omit?: Prisma.KOItemOmit<ExtArgs> | null
-  /**
-   * The data used to create many KOItems.
-   */
-  data: Prisma.KOItemCreateManyInput | Prisma.KOItemCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.KOItemIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1389,36 +1293,6 @@ export type KOItemUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many KOItems to update.
    */
   limit?: number
-}
-
-/**
- * KOItem updateManyAndReturn
- */
-export type KOItemUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the KOItem
-   */
-  select?: Prisma.KOItemSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the KOItem
-   */
-  omit?: Prisma.KOItemOmit<ExtArgs> | null
-  /**
-   * The data used to update KOItems.
-   */
-  data: Prisma.XOR<Prisma.KOItemUpdateManyMutationInput, Prisma.KOItemUncheckedUpdateManyInput>
-  /**
-   * Filter which KOItems to update
-   */
-  where?: Prisma.KOItemWhereInput
-  /**
-   * Limit how many KOItems to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.KOItemIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1485,6 +1359,34 @@ export type KOItemDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * Limit how many KOItems to delete.
    */
   limit?: number
+}
+
+/**
+ * KOItem findRaw
+ */
+export type KOItemFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * KOItem aggregateRaw
+ */
+export type KOItemAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

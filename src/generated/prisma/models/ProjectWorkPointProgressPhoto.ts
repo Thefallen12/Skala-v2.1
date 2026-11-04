@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/library"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -165,7 +165,7 @@ export type ProjectWorkPointProgressPhotoGroupByOutputType = {
   _max: ProjectWorkPointProgressPhotoMaxAggregateOutputType | null
 }
 
-export type GetProjectWorkPointProgressPhotoGroupByPayload<T extends ProjectWorkPointProgressPhotoGroupByArgs> = Prisma.PrismaPromise<
+type GetProjectWorkPointProgressPhotoGroupByPayload<T extends ProjectWorkPointProgressPhotoGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ProjectWorkPointProgressPhotoGroupByOutputType, T['by']> &
       {
@@ -197,8 +197,8 @@ export type ProjectWorkPointProgressPhotoOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   progressReportId?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  publicId?: Prisma.SortOrderInput | Prisma.SortOrder
+  fileUrl?: Prisma.SortOrder
+  publicId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   progressReport?: Prisma.ProjectWorkPointProgressOrderByWithRelationInput
 }
@@ -220,8 +220,8 @@ export type ProjectWorkPointProgressPhotoOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   progressReportId?: Prisma.SortOrder
   url?: Prisma.SortOrder
-  fileUrl?: Prisma.SortOrderInput | Prisma.SortOrder
-  publicId?: Prisma.SortOrderInput | Prisma.SortOrder
+  fileUrl?: Prisma.SortOrder
+  publicId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.ProjectWorkPointProgressPhotoCountOrderByAggregateInput
   _max?: Prisma.ProjectWorkPointProgressPhotoMaxOrderByAggregateInput
@@ -259,7 +259,6 @@ export type ProjectWorkPointProgressPhotoUncheckedCreateInput = {
 }
 
 export type ProjectWorkPointProgressPhotoUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -268,7 +267,6 @@ export type ProjectWorkPointProgressPhotoUpdateInput = {
 }
 
 export type ProjectWorkPointProgressPhotoUncheckedUpdateInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   progressReportId?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -286,7 +284,6 @@ export type ProjectWorkPointProgressPhotoCreateManyInput = {
 }
 
 export type ProjectWorkPointProgressPhotoUpdateManyMutationInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -294,7 +291,6 @@ export type ProjectWorkPointProgressPhotoUpdateManyMutationInput = {
 }
 
 export type ProjectWorkPointProgressPhotoUncheckedUpdateManyInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   progressReportId?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -404,7 +400,6 @@ export type ProjectWorkPointProgressPhotoCreateOrConnectWithoutProgressReportInp
 
 export type ProjectWorkPointProgressPhotoCreateManyProgressReportInputEnvelope = {
   data: Prisma.ProjectWorkPointProgressPhotoCreateManyProgressReportInput | Prisma.ProjectWorkPointProgressPhotoCreateManyProgressReportInput[]
-  skipDuplicates?: boolean
 }
 
 export type ProjectWorkPointProgressPhotoUpsertWithWhereUniqueWithoutProgressReportInput = {
@@ -444,7 +439,6 @@ export type ProjectWorkPointProgressPhotoCreateManyProgressReportInput = {
 }
 
 export type ProjectWorkPointProgressPhotoUpdateWithoutProgressReportInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -452,7 +446,6 @@ export type ProjectWorkPointProgressPhotoUpdateWithoutProgressReportInput = {
 }
 
 export type ProjectWorkPointProgressPhotoUncheckedUpdateWithoutProgressReportInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -460,7 +453,6 @@ export type ProjectWorkPointProgressPhotoUncheckedUpdateWithoutProgressReportInp
 }
 
 export type ProjectWorkPointProgressPhotoUncheckedUpdateManyWithoutProgressReportInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   fileUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publicId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -479,25 +471,7 @@ export type ProjectWorkPointProgressPhotoSelect<ExtArgs extends runtime.Types.Ex
   progressReport?: boolean | Prisma.ProjectWorkPointProgressDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["projectWorkPointProgressPhoto"]>
 
-export type ProjectWorkPointProgressPhotoSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  progressReportId?: boolean
-  url?: boolean
-  fileUrl?: boolean
-  publicId?: boolean
-  createdAt?: boolean
-  progressReport?: boolean | Prisma.ProjectWorkPointProgressDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["projectWorkPointProgressPhoto"]>
 
-export type ProjectWorkPointProgressPhotoSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
-  id?: boolean
-  progressReportId?: boolean
-  url?: boolean
-  fileUrl?: boolean
-  publicId?: boolean
-  createdAt?: boolean
-  progressReport?: boolean | Prisma.ProjectWorkPointProgressDefaultArgs<ExtArgs>
-}, ExtArgs["result"]["projectWorkPointProgressPhoto"]>
 
 export type ProjectWorkPointProgressPhotoSelectScalar = {
   id?: boolean
@@ -510,12 +484,6 @@ export type ProjectWorkPointProgressPhotoSelectScalar = {
 
 export type ProjectWorkPointProgressPhotoOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "progressReportId" | "url" | "fileUrl" | "publicId" | "createdAt", ExtArgs["result"]["projectWorkPointProgressPhoto"]>
 export type ProjectWorkPointProgressPhotoInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  progressReport?: boolean | Prisma.ProjectWorkPointProgressDefaultArgs<ExtArgs>
-}
-export type ProjectWorkPointProgressPhotoIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  progressReport?: boolean | Prisma.ProjectWorkPointProgressDefaultArgs<ExtArgs>
-}
-export type ProjectWorkPointProgressPhotoIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   progressReport?: boolean | Prisma.ProjectWorkPointProgressDefaultArgs<ExtArgs>
 }
 
@@ -649,30 +617,6 @@ export interface ProjectWorkPointProgressPhotoDelegate<ExtArgs extends runtime.T
   createMany<T extends ProjectWorkPointProgressPhotoCreateManyArgs>(args?: Prisma.SelectSubset<T, ProjectWorkPointProgressPhotoCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Create many ProjectWorkPointProgressPhotos and returns the data saved in the database.
-   * @param {ProjectWorkPointProgressPhotoCreateManyAndReturnArgs} args - Arguments to create many ProjectWorkPointProgressPhotos.
-   * @example
-   * // Create many ProjectWorkPointProgressPhotos
-   * const projectWorkPointProgressPhoto = await prisma.projectWorkPointProgressPhoto.createManyAndReturn({
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Create many ProjectWorkPointProgressPhotos and only return the `id`
-   * const projectWorkPointProgressPhotoWithIdOnly = await prisma.projectWorkPointProgressPhoto.createManyAndReturn({
-   *   select: { id: true },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  createManyAndReturn<T extends ProjectWorkPointProgressPhotoCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, ProjectWorkPointProgressPhotoCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointProgressPhotoPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Delete a ProjectWorkPointProgressPhoto.
    * @param {ProjectWorkPointProgressPhotoDeleteArgs} args - Arguments to delete one ProjectWorkPointProgressPhoto.
    * @example
@@ -737,36 +681,6 @@ export interface ProjectWorkPointProgressPhotoDelegate<ExtArgs extends runtime.T
   updateMany<T extends ProjectWorkPointProgressPhotoUpdateManyArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointProgressPhotoUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
 
   /**
-   * Update zero or more ProjectWorkPointProgressPhotos and returns the data updated in the database.
-   * @param {ProjectWorkPointProgressPhotoUpdateManyAndReturnArgs} args - Arguments to update many ProjectWorkPointProgressPhotos.
-   * @example
-   * // Update many ProjectWorkPointProgressPhotos
-   * const projectWorkPointProgressPhoto = await prisma.projectWorkPointProgressPhoto.updateManyAndReturn({
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * 
-   * // Update zero or more ProjectWorkPointProgressPhotos and only return the `id`
-   * const projectWorkPointProgressPhotoWithIdOnly = await prisma.projectWorkPointProgressPhoto.updateManyAndReturn({
-   *   select: { id: true },
-   *   where: {
-   *     // ... provide filter here
-   *   },
-   *   data: [
-   *     // ... provide data here
-   *   ]
-   * })
-   * Note, that providing `undefined` is treated as the value not being there.
-   * Read more here: https://pris.ly/d/null-undefined
-   * 
-   */
-  updateManyAndReturn<T extends ProjectWorkPointProgressPhotoUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointProgressPhotoUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointProgressPhotoPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
-
-  /**
    * Create or update one ProjectWorkPointProgressPhoto.
    * @param {ProjectWorkPointProgressPhotoUpsertArgs} args - Arguments to update or create a ProjectWorkPointProgressPhoto.
    * @example
@@ -784,6 +698,29 @@ export interface ProjectWorkPointProgressPhotoDelegate<ExtArgs extends runtime.T
    * })
    */
   upsert<T extends ProjectWorkPointProgressPhotoUpsertArgs>(args: Prisma.SelectSubset<T, ProjectWorkPointProgressPhotoUpsertArgs<ExtArgs>>): Prisma.Prisma__ProjectWorkPointProgressPhotoClient<runtime.Types.Result.GetResult<Prisma.$ProjectWorkPointProgressPhotoPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+  /**
+   * Find zero or more ProjectWorkPointProgressPhotos that matches the filter.
+   * @param {ProjectWorkPointProgressPhotoFindRawArgs} args - Select which filters you would like to apply.
+   * @example
+   * const projectWorkPointProgressPhoto = await prisma.projectWorkPointProgressPhoto.findRaw({
+   *   filter: { age: { $gt: 25 } }
+   * })
+   */
+  findRaw(args?: Prisma.ProjectWorkPointProgressPhotoFindRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
+
+  /**
+   * Perform aggregation operations on a ProjectWorkPointProgressPhoto.
+   * @param {ProjectWorkPointProgressPhotoAggregateRawArgs} args - Select which aggregations you would like to apply.
+   * @example
+   * const projectWorkPointProgressPhoto = await prisma.projectWorkPointProgressPhoto.aggregateRaw({
+   *   pipeline: [
+   *     { $match: { status: "registered" } },
+   *     { $group: { _id: "$country", total: { $sum: 1 } } }
+   *   ]
+   * })
+   */
+  aggregateRaw(args?: Prisma.ProjectWorkPointProgressPhotoAggregateRawArgs): Prisma.PrismaPromise<Prisma.JsonObject>
 
 
   /**
@@ -1157,11 +1094,6 @@ export type ProjectWorkPointProgressPhotoFindManyArgs<ExtArgs extends runtime.Ty
    * Skip the first `n` ProjectWorkPointProgressPhotos.
    */
   skip?: number
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
-   * 
-   * Filter by unique combinations of ProjectWorkPointProgressPhotos.
-   */
   distinct?: Prisma.ProjectWorkPointProgressPhotoScalarFieldEnum | Prisma.ProjectWorkPointProgressPhotoScalarFieldEnum[]
 }
 
@@ -1195,30 +1127,6 @@ export type ProjectWorkPointProgressPhotoCreateManyArgs<ExtArgs extends runtime.
    * The data used to create many ProjectWorkPointProgressPhotos.
    */
   data: Prisma.ProjectWorkPointProgressPhotoCreateManyInput | Prisma.ProjectWorkPointProgressPhotoCreateManyInput[]
-  skipDuplicates?: boolean
-}
-
-/**
- * ProjectWorkPointProgressPhoto createManyAndReturn
- */
-export type ProjectWorkPointProgressPhotoCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWorkPointProgressPhoto
-   */
-  select?: Prisma.ProjectWorkPointProgressPhotoSelectCreateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWorkPointProgressPhoto
-   */
-  omit?: Prisma.ProjectWorkPointProgressPhotoOmit<ExtArgs> | null
-  /**
-   * The data used to create many ProjectWorkPointProgressPhotos.
-   */
-  data: Prisma.ProjectWorkPointProgressPhotoCreateManyInput | Prisma.ProjectWorkPointProgressPhotoCreateManyInput[]
-  skipDuplicates?: boolean
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWorkPointProgressPhotoIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1263,36 +1171,6 @@ export type ProjectWorkPointProgressPhotoUpdateManyArgs<ExtArgs extends runtime.
    * Limit how many ProjectWorkPointProgressPhotos to update.
    */
   limit?: number
-}
-
-/**
- * ProjectWorkPointProgressPhoto updateManyAndReturn
- */
-export type ProjectWorkPointProgressPhotoUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the ProjectWorkPointProgressPhoto
-   */
-  select?: Prisma.ProjectWorkPointProgressPhotoSelectUpdateManyAndReturn<ExtArgs> | null
-  /**
-   * Omit specific fields from the ProjectWorkPointProgressPhoto
-   */
-  omit?: Prisma.ProjectWorkPointProgressPhotoOmit<ExtArgs> | null
-  /**
-   * The data used to update ProjectWorkPointProgressPhotos.
-   */
-  data: Prisma.XOR<Prisma.ProjectWorkPointProgressPhotoUpdateManyMutationInput, Prisma.ProjectWorkPointProgressPhotoUncheckedUpdateManyInput>
-  /**
-   * Filter which ProjectWorkPointProgressPhotos to update
-   */
-  where?: Prisma.ProjectWorkPointProgressPhotoWhereInput
-  /**
-   * Limit how many ProjectWorkPointProgressPhotos to update.
-   */
-  limit?: number
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ProjectWorkPointProgressPhotoIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1359,6 +1237,34 @@ export type ProjectWorkPointProgressPhotoDeleteManyArgs<ExtArgs extends runtime.
    * Limit how many ProjectWorkPointProgressPhotos to delete.
    */
   limit?: number
+}
+
+/**
+ * ProjectWorkPointProgressPhoto findRaw
+ */
+export type ProjectWorkPointProgressPhotoFindRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * The query predicate filter. If unspecified, then all documents in the collection will match the predicate. ${@link https://docs.mongodb.com/manual/reference/operator/query MongoDB Docs}.
+   */
+  filter?: runtime.InputJsonValue
+  /**
+   * Additional options to pass to the `find` command ${@link https://docs.mongodb.com/manual/reference/command/find/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
+}
+
+/**
+ * ProjectWorkPointProgressPhoto aggregateRaw
+ */
+export type ProjectWorkPointProgressPhotoAggregateRawArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * An array of aggregation stages to process and transform the document stream via the aggregation pipeline. ${@link https://docs.mongodb.com/manual/reference/operator/aggregation-pipeline MongoDB Docs}.
+   */
+  pipeline?: runtime.InputJsonValue[]
+  /**
+   * Additional options to pass to the `aggregate` command ${@link https://docs.mongodb.com/manual/reference/command/aggregate/#command-fields MongoDB Docs}.
+   */
+  options?: runtime.InputJsonValue
 }
 
 /**

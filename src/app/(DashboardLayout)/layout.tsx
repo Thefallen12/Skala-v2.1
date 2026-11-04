@@ -1,6 +1,6 @@
 import { auth } from "../../../auth";
 import { canManageUsers, drawingAccessRoles } from "@/lib/user-access";
-import { UserRole } from "@/generated/prisma/enums";
+import { TicketStatus, UserRole } from "@/generated/prisma/enums";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getVisibleMenuKeysForRole } from "@/lib/menu-access";
@@ -64,7 +64,12 @@ export default async function Layout({
     prisma.ticketAuditLog.findMany({
       where: {
         userId: { not: session.user.id },
-        ticket: { requesterId: session.user.id },
+        ticket: {
+          requesterId: session.user.id,
+          status: {
+            notIn: [TicketStatus.COMPLETED, TicketStatus.REJECTED],
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: 5,

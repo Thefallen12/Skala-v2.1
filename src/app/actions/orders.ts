@@ -54,6 +54,10 @@ import {
 } from "@/lib/cloudinary-raw-files";
 import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-invoice-config";
 import {
+  decimalFromScaledInteger,
+  scaledIntegerFromDecimal,
+} from "@/lib/scaled-decimal";
+import {
   vendorInvoiceInputSchema,
   type VendorInvoiceInput,
 } from "@/lib/invoice-input";
@@ -600,6 +604,7 @@ export async function reviewPurchaseOrder(
   revalidatePath(`/d/${publicCode}`);
   revalidatePath("/apps/orders");
   revalidatePath("/apps/finance");
+  revalidatePath("/apps/approvals");
   return {
     success: true,
     message: "PO telah diperiksa dan dikirim kepada Direktur/Wakil Direktur.",
@@ -633,8 +638,6 @@ export async function approvePurchaseOrder(
         where: {
           publicCode,
           status: POStatus.PENDING_APPROVAL,
-          reviewedById: { not: null },
-          reviewedAt: { not: null },
         },
         data: {
           status: POStatus.APPROVED,
@@ -1276,12 +1279,17 @@ export async function createDeliveryOrder(
           quantity: (current?.quantity ?? new Prisma.Decimal(0)).plus(
             item.quantity,
           ),
-          unitPrice: stockItem.unitPrice,
+          unitPrice: decimalFromScaledInteger(stockItem.unitPrice),
         });
       }
       for (const [stockItemId, reservation] of reservations) {
         const stockItem = stockItems.find((item) => item.id === stockItemId);
-        if (!stockItem || stockItem.stockQuantity.lessThan(reservation.quantity)) {
+        if (
+          !stockItem ||
+          decimalFromScaledInteger(stockItem.stockQuantity).lessThan(
+            reservation.quantity,
+          )
+        ) {
           throw new Error(
             `Stok gudang untuk "${reservation.name}" tidak mencukupi.`,
           );
@@ -1344,9 +1352,15 @@ export async function createDeliveryOrder(
         const updated = await transaction.stockItem.updateMany({
           where: {
             id: stockItemId,
-            stockQuantity: { gte: reservation.quantity },
+            stockQuantity: {
+              gte: scaledIntegerFromDecimal(reservation.quantity),
+            },
           },
-          data: { stockQuantity: { decrement: reservation.quantity } },
+          data: {
+            stockQuantity: {
+              decrement: scaledIntegerFromDecimal(reservation.quantity),
+            },
+          },
         });
         if (updated.count !== 1) {
           throw new Error(
@@ -1359,11 +1373,13 @@ export async function createDeliveryOrder(
             stockItemId,
             type: StockMovementType.OUT,
             materialName: reservation.name,
-            quantity: reservation.quantity,
+            quantity: scaledIntegerFromDecimal(reservation.quantity),
             unit: reservation.unit,
-            totalCost: reservation.quantity
-              .mul(reservation.unitPrice)
-              .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+            totalCost: scaledIntegerFromDecimal(
+              reservation.quantity
+                .mul(reservation.unitPrice)
+                .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+            ),
             reference: doNumber,
             notes: `Pemenuhan tiket ${ticket?.ticketNumber ?? ""} melalui DO ${doNumber}.`,
             createdById: session.user.id,
@@ -1780,8 +1796,12 @@ export async function updateDeliveryOrder(
             .reduce(
               (quantity, movement) =>
                 movement.type === StockMovementType.OUT
-                  ? quantity.plus(movement.quantity)
-                  : quantity.minus(movement.quantity),
+                  ? quantity.plus(
+                      decimalFromScaledInteger(movement.quantity),
+                    )
+                  : quantity.minus(
+                      decimalFromScaledInteger(movement.quantity),
+                    ),
               new Prisma.Decimal(0),
             );
           if (netIssued.lessThan(0)) {
@@ -1801,12 +1821,20 @@ export async function updateDeliveryOrder(
               id: stockItemId,
               ...(isRestock
                 ? {}
-                : { stockQuantity: { gte: adjustedQuantity } }),
+                : {
+                    stockQuantity: {
+                      gte: scaledIntegerFromDecimal(adjustedQuantity),
+                    },
+                  }),
             },
             data: {
               stockQuantity: isRestock
-                ? { increment: adjustedQuantity }
-                : { decrement: adjustedQuantity },
+                ? {
+                    increment: scaledIntegerFromDecimal(adjustedQuantity),
+                  }
+                : {
+                    decrement: scaledIntegerFromDecimal(adjustedQuantity),
+                  },
             },
           });
           if (updated.count !== 1) {
@@ -1822,11 +1850,13 @@ export async function updateDeliveryOrder(
                 ? StockMovementType.IN
                 : StockMovementType.OUT,
               materialName: stockItem.name,
-              quantity: adjustedQuantity,
+              quantity: scaledIntegerFromDecimal(adjustedQuantity),
               unit: stockItem.unit,
-              totalCost: adjustedQuantity
-                .mul(stockItem.unitPrice)
-                .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+              totalCost: scaledIntegerFromDecimal(
+                adjustedQuantity
+                  .mul(decimalFromScaledInteger(stockItem.unitPrice))
+                  .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+              ),
               reference: currentOrder.doNumber,
               notes: isRestock
                 ? `Restock selisih Qty DO ${currentOrder.doNumber} dari tiket ${currentOrder.ticket?.ticketNumber ?? "tanpa tiket"}.`
@@ -1929,7 +1959,7 @@ export async function updateDeliveryOrder(
           },
         });
       }
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
   } catch (error) {
     if (savedArrivalPhotoUrl) {
       try {
@@ -2049,16 +2079,20 @@ export async function startMoverDeliveryOrder(
         throw new Error("KM awal kendaraan belum diinisialisasi oleh Logistik.");
       }
       const startOdometer = new Prisma.Decimal(kilometerStart.toString());
-      if (!vehicle.currentKilometer.equals(startOdometer)) {
+      if (
+        !decimalFromScaledInteger(vehicle.currentKilometer).equals(
+          startOdometer,
+        )
+      ) {
         throw new Error(
-          `KM berangkat harus sesuai odometer kendaraan (${vehicle.currentKilometer.toString()} km).`,
+          `KM berangkat harus sesuai odometer kendaraan (${decimalFromScaledInteger(vehicle.currentKilometer).toString()} km).`,
         );
       }
       const claimedVehicle = await transaction.vehicle.updateMany({
         where: {
           id: vehicle.id,
           status: "RESERVED",
-          currentKilometer: startOdometer,
+          currentKilometer: scaledIntegerFromDecimal(startOdometer),
         },
         data: { status: "IN_USE" },
       });
@@ -2070,7 +2104,7 @@ export async function startMoverDeliveryOrder(
         where: { id: order.id, status: DOStatus.PENDING },
         data: {
           status: DOStatus.IN_TRANSIT,
-          departureKilometer: startOdometer,
+          departureKilometer: scaledIntegerFromDecimal(startOdometer),
         },
       });
       if (updated.count !== 1) {
@@ -2093,7 +2127,7 @@ export async function startMoverDeliveryOrder(
         });
       }
       return { doNumber: order.doNumber, plateNumber: vehicle.plateNumber };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
 
     revalidatePath("/apps/logistics");
     revalidatePath("/apps/tickets");
@@ -2258,7 +2292,9 @@ export async function submitMoverDeliveryProofs(
         const endOdometer = new Prisma.Decimal(kilometerEnd!.toString());
         if (
           order.departureKilometer &&
-          !order.departureKilometer.equals(startOdometer)
+          !decimalFromScaledInteger(order.departureKilometer).equals(
+            startOdometer,
+          )
         ) {
           throw new Error("KM berangkat tidak sesuai dengan data saat kendaraan dipilih.");
         }
@@ -2269,9 +2305,13 @@ export async function submitMoverDeliveryProofs(
         if (!vehicle || vehicle.status !== "IN_USE") {
           throw new Error("Status kendaraan tidak sesuai dengan DO yang berjalan.");
         }
-        if (!vehicle.currentKilometer.equals(startOdometer)) {
+        if (
+          !decimalFromScaledInteger(vehicle.currentKilometer).equals(
+            startOdometer,
+          )
+        ) {
           throw new Error(
-            `KM berangkat harus sesuai odometer kendaraan (${vehicle.currentKilometer.toString()} km).`,
+            `KM berangkat harus sesuai odometer kendaraan (${decimalFromScaledInteger(vehicle.currentKilometer).toString()} km).`,
           );
         }
         tripDistance = endOdometer.minus(startOdometer);
@@ -2282,10 +2322,10 @@ export async function submitMoverDeliveryProofs(
           where: {
             id: order.vehicleId,
             status: "IN_USE",
-            currentKilometer: startOdometer,
+            currentKilometer: scaledIntegerFromDecimal(startOdometer),
           },
           data: {
-            currentKilometer: endOdometer,
+            currentKilometer: scaledIntegerFromDecimal(endOdometer),
             status: "AVAILABLE",
           },
         });
@@ -2315,8 +2355,7 @@ export async function submitMoverDeliveryProofs(
             ? {
                 status: DOStatus.DELIVERED,
                 receivedAt: new Date(),
-                receivedById: session.user.id,
-                departureKilometer: new Prisma.Decimal(
+                departureKilometer: scaledIntegerFromDecimal(
                   kilometerStart!.toString(),
                 ),
               }
@@ -2326,6 +2365,12 @@ export async function submitMoverDeliveryProofs(
       if (updated.count !== 1) {
         throw new Error("Status DO sudah berubah. Muat ulang halaman.");
       }
+      if (completeDelivery) {
+        await transaction.deliveryOrder.update({
+          where: { id: order.id },
+          data: { receivedBy: { connect: { id: session.user.id } } },
+        });
+      }
 
       if (completeDelivery && order.vehicleId && tripDistance && tripFuelLiter) {
         await transaction.vehicleTripLog.create({
@@ -2334,11 +2379,15 @@ export async function submitMoverDeliveryProofs(
             deliveryOrderId: order.id,
             projectId:
               order.ticket?.projectId ?? order.po?.ticket?.projectId ?? null,
-            kilometerStart: new Prisma.Decimal(kilometerStart!.toString()),
-            kilometerEnd: new Prisma.Decimal(kilometerEnd!.toString()),
-            distanceKm: tripDistance,
-            fuelLiter: tripFuelLiter,
-            fuelEfficiencyKmPerL: VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+            kilometerStart: scaledIntegerFromDecimal(
+              kilometerStart!.toString(),
+            ),
+            kilometerEnd: scaledIntegerFromDecimal(kilometerEnd!.toString()),
+            distanceKm: scaledIntegerFromDecimal(tripDistance),
+            fuelLiter: scaledIntegerFromDecimal(tripFuelLiter),
+            fuelEfficiencyKmPerL: scaledIntegerFromDecimal(
+              VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+            ),
             createdById: session.user.id,
           },
         });
@@ -2375,7 +2424,7 @@ export async function submitMoverDeliveryProofs(
         doNumber: order.doNumber,
         proofCount: existingProofCount + receiptUrls.length,
       };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
     proofsCommitted = true;
 
     revalidatePath("/apps/logistics");

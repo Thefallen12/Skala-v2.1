@@ -1,6 +1,6 @@
 ## Docker deployment
 
-1. Copy `.env.example` to `.env` and set `DATABASE_URL`, a private
+1. Copy `.env.example` to `.env` and set `MONGODB_URL`, a private
    `AUTH_SECRET`, and the Cloudinary credentials. Profile photo originals are
    kept in private local storage and uploaded to Cloudinary for display.
 2. Build and start the production container:
@@ -18,8 +18,8 @@ user. Uploaded private photos and receipts, including profile photo originals,
 are stored in the persistent Compose volume `uploads`; the entrypoint
 initializes its directory permissions before starting the app. Profile photo
 Cloudinary URLs are used for display, so those copies are publicly addressable.
-The app connects to the configured PostgreSQL database; Compose does not create
-a database or apply Prisma migrations. Review and apply schema changes
+The app connects to the configured MongoDB replica set; Compose does not create
+a database or apply Prisma schema changes. Review and apply schema changes
 separately before deploying.
 
 The container includes Chromium for PDF generation. For production, provide a

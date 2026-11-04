@@ -3,6 +3,7 @@ import { UserRole } from "@/generated/prisma/enums";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
+import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 
 const exportHeaders = [
   "Kode Proyek",
@@ -116,7 +117,9 @@ export async function GET(request: Request) {
       return {
         "Kode Proyek": project.code,
         "Nama Proyek": project.title,
-        "Pagu Anggaran": isDirector ? Number(project.pagu) : "",
+        "Pagu Anggaran": isDirector
+          ? decimalNumberFromScaledInteger(project.pagu)
+          : "",
         Realisasi: realizedMap?.get(project.id)?.total.toNumber() ?? "",
         "Jenis Pekerjaan": project.jenisPekerjaan ?? "",
         Desa: address.desa || project.kelompokTani,

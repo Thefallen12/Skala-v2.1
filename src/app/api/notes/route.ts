@@ -38,7 +38,7 @@ async function readJson(request: NextRequest): Promise<unknown> {
 }
 
 function toNoteResponse(note: {
-  id: number;
+  id: string;
   title: string;
   color: string;
   createdAt: Date;
@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest) {
     const body = await readJson(request);
     const parsed = z
       .object({
-        id: z.number().int().positive(),
+        id: z.string().min(1),
         ...noteContentSchema.shape,
       })
       .safeParse(body);
@@ -169,7 +169,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const parsed = z
-      .object({ id: z.number().int().positive() })
+      .object({ id: z.string().min(1) })
       .safeParse(await readJson(request));
     if (!parsed.success) {
       return NextResponse.json(

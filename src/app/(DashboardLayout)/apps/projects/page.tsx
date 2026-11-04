@@ -15,6 +15,7 @@ import {
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
+import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const metadata: Metadata = {
   title: "Project Workstation",
@@ -310,12 +311,22 @@ export default async function ProjectsWorkstationPage({
     fieldPicPhotoUrl: project.fieldPic?.profilePhotoUrl ?? null,
     status: project.status,
     progress: project.progress,
-    pagu: isDirector ? project.pagu?.toString() ?? "0" : "0",
-    landArea: project.landArea?.toString() ?? null,
+    pagu: isDirector
+      ? project.pagu
+        ? decimalStringFromScaledInteger(project.pagu)
+        : "0"
+      : "0",
+    landArea:
+      project.landArea !== null
+        ? decimalStringFromScaledInteger(project.landArea)
+        : null,
     priority: project.priority,
     vendor: project.vendor,
     clientName: project.clientName,
-    budget: isDirector ? project.budget?.toString() ?? null : null,
+    budget:
+      isDirector && project.budget !== null
+        ? decimalStringFromScaledInteger(project.budget)
+        : null,
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
     endDate: project.endDate?.toISOString().slice(0, 10) ?? null,
     realized: realizedMap?.get(project.id)?.total.toString() ?? "0",
@@ -336,12 +347,16 @@ export default async function ProjectsWorkstationPage({
       plannedStartDate: point.plannedStartDate?.toISOString().slice(0, 10) ?? null,
       targetDate: point.targetDate?.toISOString().slice(0, 10) ?? null,
       progress: point.progress,
-      proposedTotalWage: point.proposedTotalWage.toString(),
-      approvedTotalWage: point.approvedTotalWage?.toString() ?? null,
+      proposedTotalWage: decimalStringFromScaledInteger(
+        point.proposedTotalWage,
+      ),
+      approvedTotalWage: point.approvedTotalWage !== null
+        ? decimalStringFromScaledInteger(point.approvedTotalWage)
+        : null,
       wageAuditLogs: point.wageAuditLogs.map((log) => ({
         id: log.id,
-        oldWage: log.oldWage.toString(),
-        newWage: log.newWage.toString(),
+        oldWage: decimalStringFromScaledInteger(log.oldWage),
+        newWage: decimalStringFromScaledInteger(log.newWage),
         reason: log.reason,
         createdAt: log.createdAt.toISOString(),
         changedByName: log.changedBy.name,
@@ -370,15 +385,15 @@ export default async function ProjectsWorkstationPage({
       publicCode: contract.publicCode,
       contractNumber: contract.contractNumber,
       subkonName: contract.subkonName,
-      contractValue: contract.contractValue.toString(),
+      contractValue: decimalStringFromScaledInteger(contract.contractValue),
       status: contract.status,
       termyns: contract.termyns.map((termyn) => ({
         id: termyn.id,
         termynNumber: termyn.termynNumber,
-        claimedPercent: termyn.claimedPercent.toString(),
-        grossAmount: termyn.grossAmount.toString(),
-        retentionAmount: termyn.retentionAmount.toString(),
-        netAmount: termyn.netAmount.toString(),
+        claimedPercent: decimalStringFromScaledInteger(termyn.claimedPercent),
+        grossAmount: decimalStringFromScaledInteger(termyn.grossAmount),
+        retentionAmount: decimalStringFromScaledInteger(termyn.retentionAmount),
+        netAmount: decimalStringFromScaledInteger(termyn.netAmount),
         status: termyn.status,
       })),
     })),
@@ -394,7 +409,10 @@ export default async function ProjectsWorkstationPage({
       ticketNumber: ticket.ticketNumber,
       title: ticket.title,
       status: ticket.status,
-      amount: ticket.totalAmount?.toString() ?? null,
+      amount:
+        ticket.totalAmount !== null
+          ? decimalStringFromScaledInteger(ticket.totalAmount)
+          : null,
       paid: ticket.transferReceiptUrl !== null,
       paidAt:
         ticket.auditLogs[0]?.createdAt.toISOString().slice(0, 10) ?? null,
