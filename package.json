@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node .next/standalone/server.js",
     "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
@@ -13,6 +13,7 @@
     "db:migrate:postgres-to-mongo:apply": "tsx prisma/migrate-postgres-to-mongodb.ts --apply",
     "predev": "npm run prisma:generate",
     "prebuild": "npm run prisma:generate && node scripts/generate-deployment-id.mjs",
+    "postbuild": "node scripts/prepare-standalone.mjs",
     "db:seed:po-template": "tsx prisma/seed-po-template.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:inventory": "tsx prisma/seed-inventory.ts",
