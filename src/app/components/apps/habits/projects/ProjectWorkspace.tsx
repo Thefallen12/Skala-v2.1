@@ -17,7 +17,7 @@ import {
 import {
   ProjectStatus,
   WorkTaskStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import {
   updateWorkspaceTaskSchedule,
   type WorkspaceActionResult,

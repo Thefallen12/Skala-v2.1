@@ -5,7 +5,7 @@ import LogisticsHub from "@/app/components/apps/logistics/LogisticsHub";
 import MoverWorkspace from "@/app/components/apps/logistics/MoverWorkspace";
 import DocumentSignoffQueue from "@/app/components/apps/documents/DocumentSignoffQueue";
 import type { TicketRow } from "../../types/ticket";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
   DODeliveryMethod,
   PaymentStatus,
@@ -14,7 +14,7 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { projectSiteName } from "@/lib/documents/project-site-name";

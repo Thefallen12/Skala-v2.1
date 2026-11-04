@@ -14,7 +14,7 @@ import {
 import CreateVendorInline, {
   type PurchaseVendorOption,
 } from "@/app/components/forms/CreateVendorInline";
-import { POPaymentMethod } from "@/generated/prisma/enums";
+import { POPaymentMethod } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

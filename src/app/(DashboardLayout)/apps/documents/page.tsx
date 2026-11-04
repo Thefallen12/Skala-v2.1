@@ -4,7 +4,7 @@ import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { canManageUsers } from "@/lib/user-access";
-import { TicketStatus, TicketType } from "@/generated/prisma/enums";
+import { TicketStatus, TicketType } from "@prisma/client";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import DocumentWorkspace from "@/app/components/apps/documents/DocumentWorkspace";
 

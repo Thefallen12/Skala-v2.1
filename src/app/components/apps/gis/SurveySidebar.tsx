@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ProjectStatus } from "@/generated/prisma/enums";
+import type { ProjectStatus } from "@prisma/client";
 import {
   AlertCircle,
   Check,

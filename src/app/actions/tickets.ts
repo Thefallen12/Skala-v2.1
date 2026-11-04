@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   FulfillmentStatus,
   POPaymentMethod,
@@ -20,7 +20,7 @@ import {
   TicketType,
   UserRole,
   DirectStockPurchaseStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
 import {

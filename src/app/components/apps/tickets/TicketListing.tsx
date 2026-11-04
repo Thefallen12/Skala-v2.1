@@ -32,7 +32,7 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NativeDataTable } from "@/components/ui/native-data-table";

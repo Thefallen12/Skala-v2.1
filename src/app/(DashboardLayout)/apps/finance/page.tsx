@@ -6,7 +6,7 @@ import type {
   FinanceDashboardTransaction,
   FinanceExpenseCategory,
 } from "@/app/components/apps/finance/FinanceDashboard";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   BASTType,
   DocType,
@@ -17,7 +17,7 @@ import {
   TicketStatus,
   TicketRequestCategory,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import {

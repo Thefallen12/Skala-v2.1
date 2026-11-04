@@ -1,4 +1,4 @@
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@prisma/client";
 import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
 
 export async function lockTicketDeliveryOrderCreation(

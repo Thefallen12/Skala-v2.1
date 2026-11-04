@@ -1,5 +1,5 @@
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
-import { TicketRequestCategory, TicketType } from "@/generated/prisma/enums";
+import { TicketRequestCategory, TicketType } from "@prisma/client";
 
 export type TicketStatisticsMonth = {
   key: string;

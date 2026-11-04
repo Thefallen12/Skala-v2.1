@@ -6,7 +6,7 @@ import {
   CalendarEventFormat,
   CalendarEventType,
   WorkTaskStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isValidDateKey } from "@/lib/habit-date";
 import { isHabitTaskColor } from "@/lib/habit-task-colors";

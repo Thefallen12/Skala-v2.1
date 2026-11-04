@@ -90,7 +90,7 @@ import {
   PaymentType,
   TicketRequestCategory,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import {
   Download,
   ExternalLink,

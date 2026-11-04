@@ -15,7 +15,7 @@ import {
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import {
   TicketRequestCategory,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import {
   formatTicketCurrency,
   getTicketMonthlyStatistics,

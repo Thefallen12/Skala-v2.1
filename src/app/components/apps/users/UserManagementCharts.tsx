@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 
 export type UserChartRecord = {

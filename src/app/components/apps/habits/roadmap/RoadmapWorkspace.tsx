@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { AlarmClock, ArrowUpRight, CalendarDays, CheckCircle2, Plus, TriangleAlert } from "lucide-react";
-import { WorkTaskStatus } from "@/generated/prisma/enums";
+import { WorkTaskStatus } from "@prisma/client";
 import { toggleWorkspaceEventReminder, type WorkspaceActionResult } from "@/app/actions/habit-workspace";
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";

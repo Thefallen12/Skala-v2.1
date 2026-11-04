@@ -16,7 +16,7 @@ import type {
   FieldTeamOption,
   ProjectDashboardRow,
 } from "@/app/(DashboardLayout)/types/project";
-import { ProjectStatus, UserRole } from "@/generated/prisma/enums";
+import { ProjectStatus, UserRole } from "@prisma/client";
 import ProjectFormModal from "@/app/components/project/ProjectFormModal";
 import ProjectFinancialModal from "@/app/components/project/ProjectFinancialModal";
 import ProjectProgressModal from "@/app/components/project/ProjectProgressModal";

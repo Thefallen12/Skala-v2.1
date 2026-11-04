@@ -2,7 +2,7 @@
 
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
-import { TicketRequestCategory } from "@/generated/prisma/enums";
+import { TicketRequestCategory } from "@prisma/client";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import { categoryForTicket } from "./ticket-statistics";
 

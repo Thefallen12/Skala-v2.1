@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { Eye, FilePlus2, Pencil, Plus } from "lucide-react";
-import type { DocType } from "@/generated/prisma/enums";
+import type { DocType } from "@prisma/client";
 import {
   getRichDocumentTemplate,
   saveRichDocumentTemplate,

@@ -29,7 +29,7 @@ import {
   OperationalDocumentStatus,
   TicketStatus,
   DocType,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import type { Template } from "@pdfme/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

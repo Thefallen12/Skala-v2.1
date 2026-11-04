@@ -15,7 +15,7 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
 import { resolveVendorBankAccount } from "@/lib/vendor-bank-accounts";
@@ -38,7 +38,7 @@ import {
   removeDeliveryOrderArrivalPhoto,
   saveDeliveryOrderArrivalPhoto,
 } from "@/lib/delivery-order-arrival-photos";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import { removeTicketReceipt, saveTicketReceipt } from "@/lib/ticket-receipts";
 import { VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER } from "@/lib/vehicle-fuel";
 import { isPurchaseOrderInvoiceUrl } from "@/lib/purchase-order-invoices";

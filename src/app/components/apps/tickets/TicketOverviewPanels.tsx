@@ -20,7 +20,7 @@ import {
   TicketFieldCategory,
   TicketRequestCategory,
   TicketStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { categoryForTicket } from "./ticket-statistics";
 
 const statusLabels: Record<TicketStatus, string> = {

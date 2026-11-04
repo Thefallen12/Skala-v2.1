@@ -12,7 +12,7 @@ import {
   shiftDateKey,
 } from "@/lib/habit-date";
 import { canManageUsers } from "@/lib/user-access";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 
 export const metadata: Metadata = {
   title: "Jadwal & Habit",

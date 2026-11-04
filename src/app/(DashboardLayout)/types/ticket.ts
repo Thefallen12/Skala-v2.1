@@ -13,7 +13,7 @@ import type {
   OperationalDocumentKind,
   OperationalDocumentStatus,
   POStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 
 export type TicketRow = {
   id: string;
@@ -34,7 +34,7 @@ export type TicketRow = {
   totalAmount: string | null;
   paymentTransactions?: {
     id: string;
-    paymentType: import("@/generated/prisma/enums").PaymentType;
+    paymentType: import("@prisma/client").PaymentType;
     amount: number;
     transferDestination: string;
     proofOfTransferUrl: string | null;

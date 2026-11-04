@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
-import type { DocType } from "@/generated/prisma/enums";
+import type { DocType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 
 export type DocumentTemplateOption = {

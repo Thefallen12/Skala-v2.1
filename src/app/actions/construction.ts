@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   BASTType,
   BlueprintCategory,
@@ -13,7 +13,7 @@ import {
   SPKStatus,
   SubkonTermynStatus,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";

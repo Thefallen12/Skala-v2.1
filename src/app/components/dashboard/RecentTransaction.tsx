@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Ticket } from "lucide-react";
 import CardBox from "../shared/CardBox";
 import { Badge } from "@/components/ui/badge";
-import { TicketPriority } from "@/generated/prisma/enums";
+import { TicketPriority } from "@prisma/client";
 
 type DashboardTicket = {
   id: string;

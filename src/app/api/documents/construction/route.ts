@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SPKStatus } from "@/generated/prisma/enums";
+import { SPKStatus } from "@prisma/client";
 import { isValidPublicCode } from "@/lib/documents/random-code";
 import { prisma } from "@/lib/prisma";
 import {

@@ -1,9 +1,9 @@
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   TicketFieldCategory,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { decimalFromScaledInteger } from "@/lib/scaled-decimal";
 

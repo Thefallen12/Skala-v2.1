@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { canManageUsers, userManagerRoles } from "@/lib/user-access";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";

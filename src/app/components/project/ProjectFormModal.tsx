@@ -9,7 +9,7 @@ import {
   saveProject,
   type ProjectFormInput,
 } from "@/app/actions/project";
-import { ProjectPriority } from "@/generated/prisma/enums";
+import { ProjectPriority } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";

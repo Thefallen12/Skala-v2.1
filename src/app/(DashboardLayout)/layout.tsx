@@ -1,11 +1,11 @@
 import { auth } from "../../../auth";
 import { canManageUsers, drawingAccessRoles } from "@/lib/user-access";
-import { TicketStatus, UserRole } from "@/generated/prisma/enums";
+import { TicketStatus, UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getVisibleMenuKeysForRole } from "@/lib/menu-access";
 import { getEnabledMaintenancePageKeys } from "@/lib/maintenance";
-import { HabitFrequency } from "@/generated/prisma/enums";
+import { HabitFrequency } from "@prisma/client";
 import {
   getJakartaDateKey,
   getJakartaDayRange,

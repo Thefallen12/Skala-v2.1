@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   CalendarEventFormat,
   CalendarEventType,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { createWorkspaceEvent } from "@/app/actions/habit-workspace";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

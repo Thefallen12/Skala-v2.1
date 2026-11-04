@@ -16,7 +16,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import { WorkTaskStatus } from "@/generated/prisma/enums";
+import { WorkTaskStatus } from "@prisma/client";
 import {
   createWorkspaceTask,
   deleteWorkspaceTask,

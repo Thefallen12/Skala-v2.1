@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 
 const roleLabels: Record<UserRole, string> = {
   [UserRole.DIRECTOR]: "Direktur",

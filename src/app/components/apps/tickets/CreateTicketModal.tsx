@@ -16,7 +16,7 @@ import {
   TicketType,
   UserRole,
   POPaymentMethod,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import { createTicket } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";

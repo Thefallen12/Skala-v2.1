@@ -11,8 +11,8 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
-import { Prisma } from "@/generated/prisma/client";
+} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { canManageUsers } from "@/lib/user-access";
 import {
   PrivatePhotoValidationError,

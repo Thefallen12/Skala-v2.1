@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNowStrict, isAfter, subDays } from "date-fns";
 import { id } from "date-fns/locale";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import type { UserChartRecord } from "./UserManagementCharts";
 import CardBox from "@/app/components/shared/CardBox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

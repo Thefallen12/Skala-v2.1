@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { Prisma } from "@/generated/prisma/client";
-import type { Prisma as PrismaTypes } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Prisma as PrismaTypes } from "@prisma/client";
 import { nextDocumentNumber } from "@/lib/documents/numbering";
 import {
   decimalFromScaledInteger,

@@ -12,7 +12,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import Search from "./Search";
 import type { DashboardNotification } from "./Notifications";
 import type { NotificationFeed, SidebarCounts } from "./useNotificationFeed";
-import type { UserRole } from "@/generated/prisma/enums";
+import type { UserRole } from "@prisma/client";
 
 const Header = ({
   canManageUsers,

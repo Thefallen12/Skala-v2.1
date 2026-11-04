@@ -16,7 +16,7 @@ const nextConfig = {
     output: "standalone",
     deploymentId: deploymentId || undefined,
     reactStrictMode: false,
-    serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
+    serverExternalPackages: ["@prisma/client", "puppeteer-core", "@sparticuz/chromium"],
     images: {
         unoptimized: true,
         remotePatterns: [

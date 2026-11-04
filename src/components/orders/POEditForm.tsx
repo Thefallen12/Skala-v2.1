@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { ArrowLeft, Check, Download, Plus, Printer, Save, Trash2 } from "lucide-react";
-import { POPaymentMethod, type POStatus } from "@/generated/prisma/enums";
+import { POPaymentMethod, type POStatus } from "@prisma/client";
 import {
   approvePurchaseOrder,
   createPurchaseOrder,

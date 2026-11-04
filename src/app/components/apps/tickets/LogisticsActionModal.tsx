@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { POStatus } from "@/generated/prisma/enums";
+import { POStatus } from "@prisma/client";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import {
   processLogisticsMaterial,

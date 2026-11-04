@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { DocType, SPKStatus } from "@/generated/prisma/enums";
+import { DocType, SPKStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import DocumentValidationViewer, {
   type VerificationDocument,

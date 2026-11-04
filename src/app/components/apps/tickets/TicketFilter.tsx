@@ -2,7 +2,7 @@
 
 import { Activity, CircleCheck, ClipboardList, Clock3 } from "lucide-react";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
-import { TicketStatus } from "@/generated/prisma/enums";
+import { TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
   formatTicketCurrency,

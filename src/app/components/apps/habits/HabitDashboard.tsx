@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { id } from "date-fns/locale";
-import { HabitFrequency } from "@/generated/prisma/enums";
+import { HabitFrequency } from "@prisma/client";
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

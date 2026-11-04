@@ -10,7 +10,7 @@ import { TableKit } from "@tiptap/extension-table";
 import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, FontSize, TextStyle } from "@tiptap/extension-text-style";
-import { DocType } from "@/generated/prisma/enums";
+import { DocType } from "@prisma/client";
 import { uploadDocumentTemplateImage } from "@/app/actions/documents";
 import WordToolbar from "./WordToolbar";
 

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { addProjectWorkPointProgress, approveProjectWorkPointWage, createProjectWorkPoint, editApprovedProjectWorkPointWage } from "@/app/actions/project";
 import type { ProjectDashboardRow } from "@/app/(DashboardLayout)/types/project";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";

@@ -43,7 +43,7 @@ import type {
   TicketProjectOption,
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
-import { TicketStatus } from "@/generated/prisma/enums";
+import { TicketStatus } from "@prisma/client";
 import {
   MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS,
 } from "@/lib/direct-stock-purchase-photo-config";

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { auth } from "../../../auth";
 import { generateAvailablePublicCode } from "@/lib/documents/random-code";
 import { documentVerificationPath } from "@/lib/documents/verification-url";

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ProjectPolygonType, ProjectStatus, UserRole } from "@/generated/prisma/enums";
+import { ProjectPolygonType, ProjectStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { area, center, length } from "@turf/turf";
 import {

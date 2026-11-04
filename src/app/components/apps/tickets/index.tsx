@@ -15,7 +15,7 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import type { PurchaseVendorOption } from "@/app/components/forms/CreateVendorInline";
-import { TicketStatus, TicketType, UserRole } from "@/generated/prisma/enums";
+import { TicketStatus, TicketType, UserRole } from "@prisma/client";
 import {
   formatTicketCurrency,
   getTicketMonthlyStatistics,

@@ -2,7 +2,7 @@
 
 import { useState, type ChangeEvent } from "react";
 import type { Editor } from "@tiptap/react";
-import { DocType } from "@/generated/prisma/enums";
+import { DocType } from "@prisma/client";
 import { uploadDocumentTemplateImage } from "@/app/actions/documents";
 import {
   AlignCenter,

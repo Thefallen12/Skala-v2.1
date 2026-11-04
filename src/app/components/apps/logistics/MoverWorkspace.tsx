@@ -11,7 +11,7 @@ import {
   submitVehicleFuelProof,
 } from "@/app/actions/vehicle-fuel";
 import { createEquipmentLog } from "@/app/actions/construction";
-import { DOStatus, VehicleFuelSource } from "@/generated/prisma/enums";
+import { DOStatus, VehicleFuelSource } from "@prisma/client";
 import {
   VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
   VEHICLE_FUEL_PRICE_PER_LITER,

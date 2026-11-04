@@ -7,7 +7,7 @@ import SimpleBar from 'simplebar-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { logout } from '@/app/actions/auth'
-import { UserRole } from '@/generated/prisma/enums'
+import { UserRole } from '@prisma/client'
 import { SETTINGS_MENU_ROLES } from '@/lib/config/menus'
 import {
   DropdownMenu,

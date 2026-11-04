@@ -10,7 +10,7 @@ import {
   TicketStatus,
   UserRole,
   WorkTaskStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import ProfileWelcome from "../components/dashboard/ProfileWelcome";
 import { TopCards } from "../components/dashboard/TopCards";
 import SalesOverview from "../components/dashboard/SalesOverview";

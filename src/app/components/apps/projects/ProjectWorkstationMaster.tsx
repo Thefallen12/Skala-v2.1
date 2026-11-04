@@ -75,7 +75,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ProjectPriority, ProjectStatus, UserRole } from "@/generated/prisma/enums";
+import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
 import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import {

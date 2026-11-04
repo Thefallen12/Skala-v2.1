@@ -11,7 +11,7 @@ import {
 import type {
   HabitFrequency,
   WorkTaskStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import HabitCalendar from "@/app/components/apps/habits/HabitCalendar";
 import HabitDashboard from "@/app/components/apps/habits/HabitDashboard";
 import DailyTaskBoard from "@/app/components/apps/habits/tasks/DailyTaskBoard";

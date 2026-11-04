@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DocType, UserRole } from "@/generated/prisma/enums";
+import { DocType, UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import {

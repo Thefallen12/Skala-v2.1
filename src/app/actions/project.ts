@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   NotificationType,
   ProjectPriority,
   ProjectStatus,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";

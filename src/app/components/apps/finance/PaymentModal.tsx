@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { POPaymentMethod, PaymentType } from "@/generated/prisma/enums";
+import { POPaymentMethod, PaymentType } from "@prisma/client";
 import {
   formatRupiahNumber,
   parseRupiahInput,

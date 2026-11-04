@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { DOStatus, UserRole } from "@/generated/prisma/enums";
+import { DOStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import CardBox from "@/app/components/shared/CardBox";

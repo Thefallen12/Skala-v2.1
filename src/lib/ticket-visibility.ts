@@ -1,10 +1,10 @@
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@prisma/client";
 import {
   TicketStatus,
   TicketRequestCategory,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 
 export function getTicketPageVisibilityWhere(
   role: UserRole,

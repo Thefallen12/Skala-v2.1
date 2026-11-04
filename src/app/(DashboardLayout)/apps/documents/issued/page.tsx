@@ -6,7 +6,7 @@ import {
   OperationalDocumentStatus,
   POStatus,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { canManageUsers } from "@/lib/user-access";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

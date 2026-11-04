@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { Plus, Printer, QrCode, Save, Trash2 } from "lucide-react";
-import { DODeliveryMethod, DOStatus } from "@/generated/prisma/enums";
+import { DODeliveryMethod, DOStatus } from "@prisma/client";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import { createDeliveryOrder, updateDeliveryOrder } from "@/app/actions/orders";
 import type { DeliveryOrderItemInput } from "@/app/actions/orders";

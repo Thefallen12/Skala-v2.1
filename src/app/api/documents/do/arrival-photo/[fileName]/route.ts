@@ -1,4 +1,4 @@
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { auth } from "@/../auth";
 import { prisma } from "@/lib/prisma";
 import { readDeliveryOrderArrivalPhoto } from "@/lib/delivery-order-arrival-photos";

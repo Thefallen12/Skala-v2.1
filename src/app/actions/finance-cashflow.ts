@@ -2,8 +2,8 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@/generated/prisma/client";
-import { PaymentStatus, UserRole } from "@/generated/prisma/enums";
+import { Prisma } from "@prisma/client";
+import { PaymentStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
 import {

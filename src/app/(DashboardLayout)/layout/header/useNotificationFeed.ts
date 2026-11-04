@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import type { NotificationType } from "@/generated/prisma/enums";
+import type { NotificationType } from "@prisma/client";
 
 export type NotificationFeedItem = {
   id: string;

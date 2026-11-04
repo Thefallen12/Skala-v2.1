@@ -32,7 +32,7 @@ import {
 import {
   CalendarEventFormat,
   CalendarEventType,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import {
   createWorkspaceEvent,
   deleteWorkspaceEvent,

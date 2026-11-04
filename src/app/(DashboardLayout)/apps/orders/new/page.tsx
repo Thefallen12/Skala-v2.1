@@ -8,7 +8,7 @@ import {
   TicketStatus,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { auth } from "../../../../../../auth";
 import { canManageUsers } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";

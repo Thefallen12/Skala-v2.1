@@ -9,7 +9,7 @@ import {
   SubkonTermynStatus,
   TicketStatus,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";

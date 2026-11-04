@@ -6,7 +6,7 @@ import type {
   ProjectProgressPoint,
   FieldTeamOption,
 } from "@/app/(DashboardLayout)/types/project";
-import type { UserRole } from "@/generated/prisma/enums";
+import type { UserRole } from "@prisma/client";
 import { AlertTriangle, BriefcaseBusiness, CircleDollarSign, Construction } from "lucide-react";
 import CardBox from "@/app/components/shared/CardBox";
 import ProjectMainTable from "@/app/components/project/ProjectMainTable";

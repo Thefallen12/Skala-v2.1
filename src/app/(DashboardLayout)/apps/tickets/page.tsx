@@ -2,7 +2,7 @@ import TicketsApp from "@/app/components/apps/tickets";
 import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import type { Metadata } from "next";
-import { PaymentStatus, UserRole } from "@/generated/prisma/enums";
+import { PaymentStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";

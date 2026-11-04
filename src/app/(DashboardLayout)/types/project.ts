@@ -1,7 +1,7 @@
 import type {
   ProjectPriority,
   ProjectStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 
 export type ProjectDashboardRow = {
   id: string;

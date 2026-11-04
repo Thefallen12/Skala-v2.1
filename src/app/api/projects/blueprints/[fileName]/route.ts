@@ -1,5 +1,5 @@
 import { auth } from "@/../auth";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readBlueprintFile } from "@/lib/blueprint-files";
 

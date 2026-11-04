@@ -9,7 +9,7 @@ import {
   updateTicketDetails,
   type TicketActionResult,
 } from "@/app/actions/tickets";
-import { TicketPriority, TicketStatus, UserRole } from "@/generated/prisma/enums";
+import { TicketPriority, TicketStatus, UserRole } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";

@@ -13,7 +13,7 @@ import {
   PaymentType,
   POPaymentMethod,
   TicketRequestCategory,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import {
   formatRupiahNumber,
   parseRupiahInput,

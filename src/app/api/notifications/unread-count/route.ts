@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { TicketStatus, UserRole } from "@/generated/prisma/enums";
+import { TicketStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 

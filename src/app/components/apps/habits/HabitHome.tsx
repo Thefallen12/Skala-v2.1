@@ -6,7 +6,7 @@ import HabitCalendar from "@/app/components/apps/habits/HabitCalendar";
 import HabitDashboard from "@/app/components/apps/habits/HabitDashboard";
 import CalendarEventSheet from "@/app/components/apps/habits/CalendarEventSheet";
 import { Button } from "@/components/ui/button";
-import type { HabitFrequency } from "@/generated/prisma/enums";
+import type { HabitFrequency } from "@prisma/client";
 
 type HabitItem = {
   id: string;

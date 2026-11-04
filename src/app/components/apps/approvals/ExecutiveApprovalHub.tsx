@@ -45,7 +45,7 @@ import {
   POPaymentMethod,
   TicketType,
   UserRole,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import { FileText, Wallet, HardHat } from "lucide-react";
 
 type ApprovalPurchaseOrder = {

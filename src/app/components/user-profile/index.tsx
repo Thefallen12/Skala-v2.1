@@ -23,7 +23,7 @@ import {
   TicketStatus,
   TicketType,
   WorkTaskStatus,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 import {
   changeMyPassword,
   updateMyProfile,

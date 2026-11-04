@@ -1,5 +1,5 @@
-import { Prisma } from "@/generated/prisma/client";
-import { NotificationType, UserRole } from "@/generated/prisma/enums";
+import { Prisma } from "@prisma/client";
+import { NotificationType, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 type NotificationDatabase = Pick<Prisma.TransactionClient, "user" | "notification">;

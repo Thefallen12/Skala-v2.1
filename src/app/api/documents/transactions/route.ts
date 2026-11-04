@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PaymentStatus, UserRole } from "@/generated/prisma/enums";
+import { PaymentStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { renderUniversalTransactionDocument } from "@/lib/documents/universal-transaction-print";
 import type {

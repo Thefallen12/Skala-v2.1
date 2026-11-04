@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DocType, TicketType } from "@/generated/prisma/enums";
+import { DocType, TicketType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   generateDocument,

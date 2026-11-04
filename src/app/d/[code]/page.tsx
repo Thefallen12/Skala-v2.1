@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { UserRole } from "@/generated/prisma/enums";
+import { UserRole } from "@prisma/client";
 import { auth } from "../../../../auth";
 import DOEditForm from "@/components/orders/DOEditForm";
 import POEditForm from "@/components/orders/POEditForm";
