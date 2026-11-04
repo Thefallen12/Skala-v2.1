@@ -79,7 +79,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.540.0",
     "moment": "^2.31.0",
-    "next": "^16.4.3",
+    "next": "^16.4.5",
     "next-auth": "^5.0.0-beta.32",
     "next-cloudinary": "^7.0.0",
     "next-themes": "^0.4.6",
@@ -131,7 +131,7 @@
     "@types/sanitize-html": "^2.16.2",
     "@types/shpjs": "^3.4.7",
     "eslint": "^10.13.0",
-    "eslint-config-next": "^16.4.2",
+    "eslint-config-next": "^16.4.5",
     "postcss": "8",
     "prisma": "6.19.3",
     "tailwindcss": "^4.1.6",
@@ -140,6 +140,7 @@
     "typescript": "5"
   },
   "overrides": {
+    "deepmerge-ts": "8.0.0",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "minimatch": "11.0.3",
