@@ -680,7 +680,7 @@ export default function MoverWorkspace({
                         name="kilometerStart"
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="0.001"
                         required
                         defaultValue={order.vehicleCurrentKilometer ?? ""}
                       />
@@ -717,7 +717,7 @@ export default function MoverWorkspace({
                           name="kilometerStart"
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="0.001"
                           required
                           readOnly={Boolean(order.departureKilometer)}
                           defaultValue={
@@ -733,7 +733,7 @@ export default function MoverWorkspace({
                           name="kilometerEnd"
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="0.001"
                           required
                         />
                       </label>

@@ -356,7 +356,7 @@ export default function VehicleFleetPanel({
                   name="initialKilometer"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="0.001"
                   required
                   defaultValue={editingVehicle?.currentKilometer ?? "0"}
                 />
@@ -418,7 +418,7 @@ export default function VehicleFleetPanel({
               type="number"
               min="0"
               max="9999999999"
-              step="0.01"
+              step="0.001"
               required
               autoFocus
               defaultValue={kilometerVehicle?.currentKilometer ?? "0"}

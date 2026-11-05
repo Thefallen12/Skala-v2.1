@@ -74,7 +74,7 @@ function validateVehicleInput(input: VehicleInput) {
         Number.isFinite(input.initialKilometer) &&
         input.initialKilometer >= 0 &&
         input.initialKilometer <= 9_999_999_999 &&
-        Number(input.initialKilometer.toFixed(2)) === input.initialKilometer)) &&
+        Number(input.initialKilometer.toFixed(3)) === input.initialKilometer)) &&
     (input.status === undefined || vehicleStatuses.includes(input.status))
   );
 }
@@ -318,7 +318,7 @@ export async function updateVehicleKilometer(
     !Number.isFinite(kilometer) ||
     kilometer < 0 ||
     kilometer > 9_999_999_999 ||
-    Number(kilometer.toFixed(2)) !== kilometer
+    Number(kilometer.toFixed(3)) !== kilometer
   ) {
     return { success: false, message: "Nilai kilometer tidak valid." };
   }

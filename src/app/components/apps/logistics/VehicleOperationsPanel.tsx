@@ -237,7 +237,7 @@ export default function VehicleOperationsPanel({
             </label>
             <label className="grid gap-1 text-sm">
               KM awal
-              <Input name="initialKilometer" type="number" min="0" step="0.01" required defaultValue="0" />
+              <Input name="initialKilometer" type="number" min="0" step="0.001" required defaultValue="0" />
             </label>
             <div className="flex justify-end gap-2">
               <Button
@@ -309,7 +309,7 @@ export default function VehicleOperationsPanel({
                   name="kilometerStart"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="0.001"
                   required
                   defaultValue={selectedVehicle?.currentKilometer ?? ""}
                   key={selectedVehicle?.id ?? "no-vehicle"}
@@ -317,7 +317,7 @@ export default function VehicleOperationsPanel({
               </label>
               <label className="grid gap-1 text-sm">
                 KM akhir
-                <Input name="kilometerEnd" type="number" min="0" step="0.01" required />
+                <Input name="kilometerEnd" type="number" min="0" step="0.001" required />
               </label>
             </div>
             <div className="flex justify-end gap-2">

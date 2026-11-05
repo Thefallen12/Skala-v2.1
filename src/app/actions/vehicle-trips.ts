@@ -36,7 +36,7 @@ function isValidKilometer(value: unknown): value is number {
     Number.isFinite(value) &&
     value >= 0 &&
     value <= 9_999_999_999 &&
-    Number(value.toFixed(2)) === value
+    Number(value.toFixed(3)) === value
   );
 }
 
