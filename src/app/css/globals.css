@@ -1774,6 +1774,9 @@ main {
 
   .ticket-create-top-fields {
     gap: 0.65rem;
+    grid-template-areas:
+      "request"
+      "project";
   }
 
   .ticket-create-top-fields > div {
@@ -1808,11 +1811,13 @@ main {
   }
 
   .ticket-project-field {
-    order: 2;
+    grid-area: project;
+    order: unset;
   }
 
   .ticket-request-field {
-    order: 1;
+    grid-area: request;
+    order: unset;
   }
 
   .ticket-item-source-row {
