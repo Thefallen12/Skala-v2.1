@@ -1140,6 +1140,86 @@ main {
 
 }
 
+@media (max-width: 639px) {
+  html,
+  body {
+    min-width: 320px;
+    overflow-x: hidden;
+  }
+
+  .page-wrapper {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .body-wrapper {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .body-wrapper > .container {
+    max-width: 100%;
+    padding: 1rem 0.875rem 2rem;
+  }
+
+  header nav {
+    min-height: 3.5rem;
+    padding: 0.625rem 0.5rem;
+  }
+
+  header nav > div {
+    min-width: 0;
+  }
+
+  header nav .relative.flex.shrink-0.cursor-pointer {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .card-title {
+    font-size: 1rem;
+    line-height: 1.35;
+  }
+
+  .app-data-table {
+    min-width: 42rem;
+  }
+
+  .overflow-x-auto {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  input,
+  textarea,
+  select {
+    min-height: 2.75rem;
+    max-width: 100%;
+    font-size: 1rem;
+  }
+
+  button,
+  [role="button"] {
+    min-height: 2.75rem;
+  }
+
+  .grid.grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-slot="dialog-content"] {
+    width: calc(100vw - 1.5rem);
+    max-width: calc(100vw - 1.5rem);
+    max-height: calc(100dvh - 1.5rem);
+    overflow-y: auto;
+  }
+
+  [data-testid="flowbite-drawer"] {
+    max-width: 88vw;
+  }
+}
+
 input[type="time"]::-webkit-calendar-picker-indicator {
   display: none;
   -webkit-appearance: none;

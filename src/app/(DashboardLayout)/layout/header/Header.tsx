@@ -81,8 +81,17 @@ const Header = ({
         >
           {/* Mobile Toggle Icon */}
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Buka menu navigasi"
             onClick={() => {
               setIsOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setIsOpen(true);
+              }
             }}
             className="relative flex shrink-0 cursor-pointer items-center justify-center rounded-full px-2 text-muted-foreground after:absolute after:size-10 after:rounded-full after:bg-transparent hover:after:bg-accent hover:text-accent-foreground sm:px-[15px] xl:hidden"
           >
