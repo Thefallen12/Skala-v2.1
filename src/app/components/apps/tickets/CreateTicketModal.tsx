@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, startOfDay } from "date-fns";
 import { id } from "date-fns/locale";
-import { CalendarDays, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -39,6 +39,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { formatRupiahNumber, parseRupiahInput } from "@/lib/indonesian-currency";
 
@@ -496,6 +503,7 @@ export default function CreateTicketModal({
   );
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [receiptUploadError, setReceiptUploadError] = useState("");
+  const [stockPickerIndex, setStockPickerIndex] = useState<number | null>(null);
   const router = useRouter();
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
@@ -1674,57 +1682,104 @@ export default function CreateTicketModal({
                         control={form.control}
                         name={`items.${index}.stockItemId`}
                         render={({ field: stockField }) => (
-                          <Select
-                            value={stockField.value || "none"}
-                            onValueChange={(value) => {
-                              const stockItem = stockItems.find(
-                                (item) => item.id === value,
-                              );
-                              stockField.onChange(value === "none" ? "" : value);
-                              form.setValue(
-                                `items.${index}.itemName`,
-                                stockItem?.name ?? "",
-                                { shouldDirty: true, shouldValidate: true },
-                              );
-                              form.setValue(
-                                `items.${index}.unit`,
-                                stockItem?.unit ?? "",
-                                { shouldDirty: true, shouldValidate: true },
-                              );
-                              form.setValue(
-                                `items.${index}.estimatedCost`,
-                                undefined,
-                              );
-                              if (stockItem) {
-                                form.clearErrors([
-                                  `items.${index}.stockItemId`,
-                                  `items.${index}.itemName`,
-                                  `items.${index}.unit`,
-                                ]);
-                              }
-                            }}
+                          <Popover
+                            open={stockPickerIndex === index}
+                            onOpenChange={(open) =>
+                              setStockPickerIndex(open ? index : null)
+                            }
                           >
-                            <SelectTrigger
-                              id={`ticket-stock-item-${index}`}
-                              className="w-full"
-                              aria-invalid={
-                                !!form.formState.errors.items?.[index]?.stockItemId
-                              }
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                role="combobox"
+                                aria-expanded={stockPickerIndex === index}
+                                id={`ticket-stock-item-${index}`}
+                                className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20"
+                                aria-invalid={
+                                  !!form.formState.errors.items?.[index]?.stockItemId
+                                }
+                              >
+                                <span className="truncate">
+                                  {(() => {
+                                    const selected = stockItems.find(
+                                      (item) => item.id === stockField.value,
+                                    );
+                                    return selected
+                                      ? `${selected.name} · ${selected.unit}${
+                                          itemSource === TicketCategoryHint.WAREHOUSE
+                                            ? ` · tersedia ${selected.stockQuantity}`
+                                            : ""
+                                        }`
+                                      : "Pilih barang";
+                                  })()}
+                                </span>
+                                <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              align="start"
+                              className="w-[--radix-popover-trigger-width] min-w-72 p-0"
                             >
-                              <SelectValue placeholder="Pilih barang" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Pilih barang</SelectItem>
-                              {stockItems.map((item) => (
-                                <SelectItem key={item.id} value={item.id}>
-                                  {item.name} · {item.unit}
-                                  {itemSource === TicketCategoryHint.WAREHOUSE
-                                    ? ` · tersedia ${item.stockQuantity}`
-                                    : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                              <Command>
+                                <CommandInput placeholder="Cari nama barang..." />
+                                <CommandList>
+                                  <CommandEmpty>Barang tidak ditemukan.</CommandEmpty>
+                                  <CommandItem
+                                    value="none"
+                                    onSelect={() => {
+                                      stockField.onChange("");
+                                      setStockPickerIndex(null);
+                                    }}
+                                  >
+                                    Pilih barang
+                                  </CommandItem>
+                                  {stockItems.map((item) => (
+                                    <CommandItem
+                                      key={item.id}
+                                      value={`${item.name} ${item.unit}`}
+                                      onSelect={() => {
+                                        stockField.onChange(item.id);
+                                        form.setValue(
+                                          `items.${index}.itemName`,
+                                          item.name,
+                                          { shouldDirty: true, shouldValidate: true },
+                                        );
+                                        form.setValue(
+                                          `items.${index}.unit`,
+                                          item.unit,
+                                          { shouldDirty: true, shouldValidate: true },
+                                        );
+                                        form.setValue(
+                                          `items.${index}.estimatedCost`,
+                                          undefined,
+                                        );
+                                        form.clearErrors([
+                                          `items.${index}.stockItemId`,
+                                          `items.${index}.itemName`,
+                                          `items.${index}.unit`,
+                                        ]);
+                                        setStockPickerIndex(null);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`size-4 ${
+                                          stockField.value === item.id
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        }`}
+                                      />
+                                      <span className="truncate">
+                                        {item.name} · {item.unit}
+                                        {itemSource === TicketCategoryHint.WAREHOUSE
+                                          ? ` · tersedia ${item.stockQuantity}`
+                                          : ""}
+                                      </span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       />
                       {form.formState.errors.items?.[index]?.stockItemId && (
