@@ -17,27 +17,6 @@ export default function GlobalError({
 
   return (
     <main className="error-shell" role="alert">
-      <header className="error-header">
-        <Link href="/" className="error-brand" aria-label="Skala Prioritas Engineering">
-          <Image
-            src="/images/logos/light-logo.svg"
-            alt="Skala Prioritas Engineering"
-            width={174}
-            height={42}
-            priority
-          />
-        </Link>
-        <div className="error-company">
-          <strong>PT SKALA PRIORITAS ENGINEERING - ERROR</strong>
-          <span>PT SKALA PRIORITAS ENGINEERING</span>
-        </div>
-        <div className="error-user" aria-hidden="true">
-          <span className="error-user-dot">A</span>
-          <span>Angga Okta Pratama</span>
-          <span className="error-chevron">⌄</span>
-        </div>
-      </header>
-
       <section className="error-window">
         <div className="error-window-bar" aria-hidden="true">
           <span className="window-dot window-dot-red" />

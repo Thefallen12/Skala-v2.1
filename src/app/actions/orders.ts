@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import {
   DOStatus,
   DODeliveryMethod,
@@ -23,7 +24,10 @@ import {
   generateAvailablePublicCode,
   isValidPublicCode,
 } from "@/lib/documents/random-code";
-import { resolvePublicAppUrl } from "@/lib/documents/public-app-url";
+import {
+  getRequestOrigin,
+  resolvePublicAppUrl,
+} from "@/lib/documents/public-app-url";
 import { nextDocumentNumber } from "@/lib/documents/numbering";
 import { createBrandedQrDataUrl } from "@/lib/documents/qr-code";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
@@ -165,6 +169,43 @@ function isPurchaseOrderItem(value: unknown): value is PurchaseOrderItemInput {
   );
 }
 
+function stockItemKey(name: string, unit: string): string {
+  const normalize = (value: string) =>
+    value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+  return `${normalize(name)}|${normalize(unit)}`;
+}
+
+async function findMatchingStockCodes(
+  transaction: Prisma.TransactionClient,
+  items: Pick<PurchaseOrderItemInput, "itemName" | "unit" | "stockItemId">[],
+): Promise<Map<string, string>> {
+  const unlinkedItems = items.filter((item) => !item.stockItemId);
+  if (!unlinkedItems.length) return new Map();
+
+  const stockItems = await transaction.stockItem.findMany({
+    where: {
+      OR: unlinkedItems.map((item) => ({
+        name: { equals: item.itemName.trim(), mode: "insensitive" },
+        unit: { equals: item.unit.trim(), mode: "insensitive" },
+      })),
+    },
+    select: { sku: true, name: true, unit: true },
+  });
+  const codesByItem = new Map<string, Set<string>>();
+  for (const stockItem of stockItems) {
+    const key = stockItemKey(stockItem.name, stockItem.unit);
+    const codes = codesByItem.get(key) ?? new Set<string>();
+    codes.add(stockItem.sku);
+    codesByItem.set(key, codes);
+  }
+
+  return new Map(
+    [...codesByItem]
+      .filter(([, codes]) => codes.size === 1)
+      .map(([key, codes]) => [key, [...codes][0]]),
+  );
+}
+
 function isDeliveryOrderItem(value: unknown): value is DeliveryOrderItemInput {
   if (typeof value !== "object" || value === null) return false;
   const item = value as Record<string, unknown>;
@@ -258,7 +299,8 @@ async function makePurchaseOrderQr(
   publicCode: string,
 ): Promise<{ verificationUrl: string; qrDataUrl: string } | null> {
   try {
-    const baseUrl = resolvePublicAppUrl();
+    const requestHeaders = await headers();
+    const baseUrl = resolvePublicAppUrl(getRequestOrigin(requestHeaders));
     if (!baseUrl) return null;
     const verification = new URL(
       documentVerificationPath("po", publicCode),
@@ -351,6 +393,10 @@ export async function createPurchaseOrder(
       const selectedStockById = new Map(
         selectedStockItems.map((item) => [item.id, item]),
       );
+      const stockCodeByNameAndUnit = await findMatchingStockCodes(
+        transaction,
+        input.items,
+      );
       const normalizeCatalogValue = (value: string) =>
         value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
       if (
@@ -422,7 +468,9 @@ export async function createPurchaseOrder(
               ...item,
               itemCode: item.stockItemId
                 ? (selectedStockById.get(item.stockItemId)?.sku ?? null)
-                : null,
+                : (stockCodeByNameAndUnit.get(
+                    stockItemKey(item.itemName, item.unit),
+                  ) ?? null),
               stockItemId: item.stockItemId ?? null,
               itemName: item.itemName.trim(),
               unit: item.unit.trim(),
@@ -506,6 +554,10 @@ export async function updatePurchaseOrder(
       const stockCodeById = new Map(
         stockItems.map((item) => [item.id, item.sku]),
       );
+      const stockCodeByNameAndUnit = await findMatchingStockCodes(
+        transaction,
+        input.items,
+      );
 
       await transaction.purchaseOrder.update({
         where: { publicCode },
@@ -533,7 +585,9 @@ export async function updatePurchaseOrder(
               ...item,
               itemCode: item.stockItemId
                 ? (stockCodeById.get(item.stockItemId) ?? null)
-                : null,
+                : (stockCodeByNameAndUnit.get(
+                    stockItemKey(item.itemName, item.unit),
+                  ) ?? null),
               itemName: item.itemName.trim(),
               unit: item.unit.trim(),
               totalPrice: item.quantity * item.unitPrice,
@@ -570,7 +624,12 @@ export async function reviewPurchaseOrder(
   try {
     const result = await prisma.$transaction(async (transaction) => {
       const update = await transaction.purchaseOrder.updateMany({
-        where: { publicCode, status: POStatus.DRAFT },
+        where: {
+          publicCode,
+          status: {
+            in: [POStatus.DRAFT, POStatus.PENDING_FINANCE_REVIEW],
+          },
+        },
         data: {
           status: POStatus.PENDING_APPROVAL,
           reviewedById: session.user.id,
@@ -612,9 +671,86 @@ export async function reviewPurchaseOrder(
   };
 }
 
+export async function submitPurchaseOrderForFinanceReview(
+  publicCode: string,
+): Promise<OrderActionResult> {
+  const session = await auth();
+  if (!session?.user || !canEditPurchaseOrders(session.user.role)) {
+    return fail("Hanya Logistik yang dapat mengajukan draft PO untuk pemeriksaan.");
+  }
+  if (!validPublicCode(publicCode)) {
+    return fail("Kode Purchase Order tidak valid.");
+  }
+
+  try {
+    const result = await prisma.$transaction(async (transaction) => {
+      const order = await transaction.purchaseOrder.findUnique({
+        where: { publicCode },
+        select: {
+          poNumber: true,
+          vendorName: true,
+          status: true,
+          items: {
+            select: { itemName: true, quantity: true, unit: true },
+          },
+        },
+      });
+      if (!order || order.status !== POStatus.DRAFT) return null;
+      if (
+        !order.vendorName.trim() ||
+        order.items.length === 0 ||
+        order.items.some(
+          (item) =>
+            !item.itemName.trim() ||
+            !item.unit.trim() ||
+            !Number.isFinite(item.quantity) ||
+            item.quantity <= 0,
+        )
+      ) {
+        return "invalid";
+      }
+
+      const update = await transaction.purchaseOrder.updateMany({
+        where: { publicCode, status: POStatus.DRAFT },
+        data: { status: POStatus.PENDING_FINANCE_REVIEW },
+      });
+      if (update.count !== 1) return null;
+
+      await sendNotification({
+        roleTarget: UserRole.FINANCE,
+        title: "PO Menunggu Pemeriksaan Keuangan",
+        message: `PO #${order.poNumber} diajukan Logistik untuk diperiksa.`,
+        actionUrl: `/apps/finance?tab=check&openSheet=${encodeURIComponent(publicCode)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
+      return "submitted";
+    });
+
+    if (result === "invalid") {
+      return fail("Lengkapi nama vendor dan rincian barang sebelum mengajukan PO.");
+    }
+    if (result !== "submitted") {
+      return fail("Draft PO tidak ditemukan atau sudah diajukan sebelumnya.");
+    }
+  } catch (error) {
+    console.error("Purchase Order submission for finance review failed:", error);
+    return fail("Draft PO gagal diajukan. Silakan coba kembali.");
+  }
+
+  revalidatePath(`/d/${publicCode}`);
+  revalidatePath("/apps/orders");
+  revalidatePath("/apps/finance");
+  revalidatePath("/apps/logistics");
+  revalidatePath("/apps/documents/issued");
+  return {
+    success: true,
+    message: "Draft PO berhasil diajukan ke Keuangan untuk diperiksa.",
+  };
+}
+
 export async function approvePurchaseOrder(
   publicCode: string,
-  clientOrigin?: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
   if (!session?.user || !canApprovePurchaseOrders(session.user.role)) {

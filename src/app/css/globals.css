@@ -124,73 +124,6 @@ input[type="number"]::-webkit-outer-spin-button {
   font-family: var(--font-dm-sans), sans-serif;
 }
 
-.error-header {
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  gap: 20px;
-  padding: 10px clamp(20px, 4vw, 48px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(8, 15, 25, 0.84);
-}
-
-.error-brand {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  transition: transform 180ms ease;
-}
-
-.error-brand:hover {
-  transform: translateY(-1px);
-}
-
-.error-company {
-  display: grid;
-  gap: 2px;
-  min-height: 38px;
-  padding-left: 20px;
-  border-left: 1px solid rgba(203, 213, 225, 0.5);
-  color: #e2e8f0;
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  line-height: 1.15;
-}
-
-.error-company strong {
-  font-size: 12px;
-  letter-spacing: 0.035em;
-}
-
-.error-company span {
-  color: #cbd5e1;
-}
-
-.error-user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  color: #f8fafc;
-  font-size: 12px;
-}
-
-.error-user-dot {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  place-items: center;
-  border-radius: 50%;
-  background: #d97745;
-  color: #fff;
-  font-weight: 700;
-}
-
-.error-chevron {
-  color: #94a3b8;
-  font-size: 15px;
-}
-
 .error-window {
   width: min(94vw, 1180px);
   margin: clamp(18px, 3vw, 34px) auto 0;
@@ -320,8 +253,7 @@ input[type="number"]::-webkit-outer-spin-button {
   border-color: #f97316;
 }
 
-.error-button:focus-visible,
-.error-brand:focus-visible {
+.error-button:focus-visible {
   outline: 3px solid rgba(251, 146, 60, 0.8);
   outline-offset: 3px;
 }
@@ -395,8 +327,7 @@ input[type="number"]::-webkit-outer-spin-button {
     animation: none;
   }
 
-  .error-button,
-  .error-brand {
+  .error-button {
     transition: none;
   }
 

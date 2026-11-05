@@ -131,12 +131,20 @@ export default function PurchaseOrderInvoiceUpload({
           type="button"
           size="sm"
           variant="outline"
-          className="max-w-full whitespace-normal text-left leading-tight"
+          aria-label={
+            isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
+          }
+          title={
+            isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
+          }
+          className="h-10 w-10 max-w-full px-0 py-0 text-xs"
           onClick={markPoSent}
           disabled={isPending}
         >
-          <Send className="mr-2 size-4" aria-hidden="true" />
-          {isPending ? "Menyimpan..." : "Tandai PO Dikirim ke Vendor"}
+          <Send className="size-4" aria-hidden="true" />
+          <span className="sr-only">
+            {isPending ? "Menyimpan..." : "Tandai PO Dikirim ke Vendor"}
+          </span>
         </Button>
         {message && (
           <p
@@ -193,9 +201,16 @@ export default function PurchaseOrderInvoiceUpload({
         <p className="text-xs text-muted-foreground">
           PO ditandai dikirim {new Date(vendorPoSentAt).toLocaleString("id-ID")}.
         </p>
-        <Button type="button" size="sm" onClick={() => setIsOpen(true)}>
-          <Upload className="mr-2 size-4" aria-hidden="true" />
-          Catat Invoice Vendor
+        <Button
+          type="button"
+          size="sm"
+          aria-label="Catat Invoice Vendor"
+          title="Catat Invoice Vendor"
+          className="h-10 w-10 px-0 sm:h-9 sm:w-auto sm:px-3"
+          onClick={() => setIsOpen(true)}
+        >
+          <Upload className="sm:mr-1.5 size-4" aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only">Catat Invoice Vendor</span>
         </Button>
         {message && (
           <p

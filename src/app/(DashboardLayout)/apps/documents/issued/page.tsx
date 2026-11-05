@@ -185,6 +185,11 @@ export default async function IssuedDocumentsPage() {
                     <Badge variant={order.status === POStatus.APPROVED ? "lightSuccess" : "outline"}>
                       {order.status.replaceAll("_", " ")}
                     </Badge>
+                    {order.status !== POStatus.APPROVED && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        QR aktif setelah PO disetujui.
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell>{order.approvedBy?.name ?? "—"}</TableCell>
                   <TableCell>
@@ -196,7 +201,9 @@ export default async function IssuedDocumentsPage() {
                   </TableCell>
                   <TableCell>
                     <Button size="sm" variant="outline" asChild>
-                      <Link href={`/d/${order.publicCode}`}>Buka PO</Link>
+                      <Link href={`/d/${order.publicCode}`}>
+                        {order.status === POStatus.DRAFT ? "Buka Draft" : "Buka PO"}
+                      </Link>
                     </Button>
                   </TableCell>
                 </TableRow>

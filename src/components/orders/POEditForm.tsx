@@ -10,6 +10,7 @@ import {
   approvePurchaseOrder,
   createPurchaseOrder,
   reviewPurchaseOrder,
+  submitPurchaseOrderForFinanceReview,
   updatePurchaseOrder,
 } from "@/app/actions/orders";
 import type { PurchaseOrderItemInput } from "@/app/actions/orders";
@@ -53,6 +54,7 @@ const emptyItems: PurchaseOrderItemInput[] = [];
 
 const statusLabels: Record<POStatus, string> = {
   DRAFT: "Draft",
+  PENDING_FINANCE_REVIEW: "Menunggu pemeriksaan Keuangan",
   PENDING_APPROVAL: "Menunggu persetujuan",
   APPROVED: "Disetujui",
   REJECTED: "Ditolak",
@@ -207,6 +209,41 @@ export default function POEditForm({
       console.error("Purchase Order finance review failed:", error);
       setIsError(true);
       setMessage("Pemeriksaan PO gagal. Silakan coba kembali.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmitForFinanceReview = async () => {
+    if (!publicCode) return;
+    const isValid = await form.trigger();
+    if (!isValid) {
+      setIsError(true);
+      setMessage("Lengkapi data PO sebelum mengajukan ke Keuangan.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage("");
+    try {
+      const saved = await updatePurchaseOrder(publicCode, form.getValues());
+      if (!saved.success) {
+        setIsError(true);
+        setMessage(saved.message);
+        return;
+      }
+
+      const result = await submitPurchaseOrderForFinanceReview(publicCode);
+      setIsError(!result.success);
+      setMessage(result.message);
+      if (result.success) {
+        setCurrentStatus("PENDING_FINANCE_REVIEW");
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Purchase Order submission failed:", error);
+      setIsError(true);
+      setMessage("PO gagal diajukan ke Keuangan. Silakan coba kembali.");
     } finally {
       setIsSaving(false);
     }
@@ -569,10 +606,23 @@ export default function POEditForm({
               : "Buat Purchase Order"}
           </Button>
         )}
-        {canReview && currentStatus === "DRAFT" && (
+        {canReview &&
+          (currentStatus === "DRAFT" ||
+            currentStatus === "PENDING_FINANCE_REVIEW") && (
           <Button type="button" disabled={isSaving} onClick={handleReview}>
             <Check className="mr-2 h-4 w-4" />
             Periksa PO (Manager Keuangan)
+          </Button>
+        )}
+        {publicCode && isEditable && (
+          <Button
+            type="button"
+            className="h-9"
+            disabled={isSaving}
+            onClick={handleSubmitForFinanceReview}
+          >
+            <Check className="mr-2 h-4 w-4" />
+            {isSaving ? "Mengajukan..." : "Simpan & Ajukan ke Keuangan"}
           </Button>
         )}
         {canApprove && currentStatus === "PENDING_APPROVAL" && (

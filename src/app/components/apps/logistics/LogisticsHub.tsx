@@ -8,6 +8,7 @@ import {
   createEquipmentLog,
   createEquipmentMaster,
 } from "@/app/actions/construction";
+import { submitPurchaseOrderForFinanceReview } from "@/app/actions/orders";
 import { createVendor, updateVendor } from "@/app/actions/vendors";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
 import DocumentSignoffQueue, {
@@ -30,7 +31,7 @@ import type {
   TicketProjectOption,
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
-import { UserRole } from "@prisma/client";
+import { POStatus, UserRole } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +58,20 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Boxes, FileText, Fuel, Pencil, TicketCheck, Truck } from "lucide-react";
+import {
+  Boxes,
+  Check,
+  Clock3,
+  Eye,
+  FilePenLine,
+  FileText,
+  Fuel,
+  Pencil,
+  Send,
+  Store,
+  TicketCheck,
+  Truck,
+} from "lucide-react";
 import {
   getVendorBankAccounts,
   type VendorBankAccountOption,
@@ -222,7 +236,26 @@ export default function LogisticsHub({
   const [editingVendor, setEditingVendor] = useState<LogisticsVendor | null>(null);
   const [vendorAccounts, setVendorAccounts] = useState<EditableVendorBankAccount[]>([]);
   const [vendorMessage, setVendorMessage] = useState("");
+  const [purchaseOrderMessage, setPurchaseOrderMessage] = useState("");
+  const [purchaseOrderMessageIsError, setPurchaseOrderMessageIsError] =
+    useState(false);
   const [isPending, startTransition] = useTransition();
+  const submitDraftPurchaseOrder = (publicCode: string) => {
+    setPurchaseOrderMessage("");
+    setPurchaseOrderMessageIsError(false);
+    startTransition(async () => {
+      try {
+        const result = await submitPurchaseOrderForFinanceReview(publicCode);
+        setPurchaseOrderMessage(result.message);
+        setPurchaseOrderMessageIsError(!result.success);
+        if (result.success) router.refresh();
+      } catch (error) {
+        console.error("Purchase order finance submission failed:", error);
+        setPurchaseOrderMessage("Draft PO gagal diajukan. Silakan coba kembali.");
+        setPurchaseOrderMessageIsError(true);
+      }
+    });
+  };
   const openDocumentPreview = (document: NonNullable<DocumentSelection>) => {
     setSelection(document);
   };
@@ -330,28 +363,59 @@ export default function LogisticsHub({
       onValueChange={setActiveTab}
       className="space-y-5"
     >
-      <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted p-2">
-        <TabsTrigger value="tickets" className="gap-2">
-          <TicketCheck className="size-4" />
-          Tiket Masuk
+      <TabsList className="h-auto w-full flex-wrap justify-center gap-1 rounded-lg border border-border bg-muted p-2 md:justify-start">
+        <TabsTrigger
+          value="tickets"
+          aria-label="Tiket Masuk"
+          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+        >
+          <TicketCheck className="size-4 shrink-0" aria-hidden="true" />
+          <span className="sr-only md:not-sr-only">Tiket Masuk</span>
         </TabsTrigger>
-        <TabsTrigger value="stock" className="gap-2">
-          <Boxes className="size-4" />
-          Stok Gudang
+        <TabsTrigger
+          value="stock"
+          aria-label="Stok Gudang"
+          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+        >
+          <Boxes className="size-4 shrink-0" aria-hidden="true" />
+          <span className="sr-only md:not-sr-only">Stok Gudang</span>
         </TabsTrigger>
-        <TabsTrigger value="documents" className="gap-2">
-          <FileText className="size-4" />
-          Dokumen PO & DO
+        <TabsTrigger
+          value="documents"
+          aria-label="Dokumen PO & DO"
+          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+        >
+          <FileText className="size-4 shrink-0" aria-hidden="true" />
+          <span className="sr-only md:not-sr-only">Dokumen PO & DO</span>
         </TabsTrigger>
-        <TabsTrigger value="equipment" className="gap-2">
-          <Fuel className="size-4" />
-          Logistik, Kendaraan & BBM
+        <TabsTrigger
+          value="equipment"
+          aria-label="Logistik, Kendaraan & BBM"
+          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+        >
+          <Fuel className="size-4 shrink-0" aria-hidden="true" />
+          <span className="sr-only md:not-sr-only">
+            Logistik, Kendaraan & BBM
+          </span>
         </TabsTrigger>
-        <TabsTrigger value="vehicles" className="gap-2">
-          <Truck className="size-4" />
-          Data Kendaraan & Armada
+        <TabsTrigger
+          value="vehicles"
+          aria-label="Data Kendaraan & Armada"
+          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+        >
+          <Truck className="size-4 shrink-0" aria-hidden="true" />
+          <span className="sr-only md:not-sr-only">
+            Data Kendaraan & Armada
+          </span>
         </TabsTrigger>
-        <TabsTrigger value="vendors">Katalog Vendor</TabsTrigger>
+        <TabsTrigger
+          value="vendors"
+          aria-label="Katalog Vendor"
+          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+        >
+          <Store className="size-4 shrink-0" aria-hidden="true" />
+          <span className="sr-only md:not-sr-only">Katalog Vendor</span>
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="tickets">
@@ -397,25 +461,118 @@ export default function LogisticsHub({
               <CardTitle>Purchase Order</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {purchaseOrderMessage && (
+                <p
+                  className={`text-sm ${purchaseOrderMessageIsError ? "text-destructive" : "text-muted-foreground"}`}
+                  role={purchaseOrderMessageIsError ? "alert" : "status"}
+                >
+                  {purchaseOrderMessage}
+                </p>
+              )}
               {purchaseOrders.map((order) => {
                 return (
                   <article
                     key={order.publicCode}
-                    className="flex min-w-0 flex-col gap-3 rounded-lg border p-3"
+                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-2 rounded-lg border px-3 py-2"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-primary">
+                      <p
+                        className="break-words text-sm font-semibold text-primary"
+                        title={`${order.poNumber} · ${order.vendorName}`}
+                      >
                         {order.poNumber} · {order.vendorName}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString("id-ID")}
                       </p>
                     </div>
-                    <div className="flex min-w-0 flex-wrap items-start gap-2">
-                      <Badge className="shrink-0" variant="lightSuccess">
-                        Disetujui Eksekutif
+                    <div className="flex shrink-0 items-center justify-end gap-1.5">
+                      <Badge
+                        className="h-8 shrink-0 whitespace-nowrap px-2.5 text-[0.6875rem]"
+                        variant={
+                          order.status === POStatus.APPROVED
+                            ? "lightSuccess"
+                            : "outline"
+                        }
+                      >
+                        {order.status === POStatus.APPROVED
+                          ? "Disetujui"
+                          : order.status === POStatus.PENDING_FINANCE_REVIEW ? (
+                            <>
+                              <Clock3 className="size-4" aria-hidden="true" />
+                              <span className="sr-only">
+                                Menunggu Keuangan
+                              </span>
+                            </>
+                          )
+                            : "Draft"}
                       </Badge>
-                      {role === UserRole.LOGISTICS ? (
+                      {order.status === POStatus.DRAFT ? (
+                        <>
+                          <Button
+                            asChild
+                            aria-label={
+                              role === UserRole.LOGISTICS ||
+                              role === UserRole.ADMINISTRATIONS
+                                ? "Lanjutkan Draft"
+                                : "Lihat Draft"
+                            }
+                            title={
+                              role === UserRole.LOGISTICS ||
+                              role === UserRole.ADMINISTRATIONS
+                                ? "Lanjutkan Draft"
+                                : "Lihat Draft"
+                            }
+                            className="h-10 w-10 px-0 py-0 text-xs"
+                            size="sm"
+                            variant="outline"
+                          >
+                            <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                              <FilePenLine aria-hidden="true" />
+                              {role === UserRole.LOGISTICS ||
+                              role === UserRole.ADMINISTRATIONS
+                                ? <span className="sr-only">Lanjutkan Draft</span>
+                                : <span className="sr-only">Lihat Draft</span>}
+                            </Link>
+                          </Button>
+                          {(role === UserRole.LOGISTICS ||
+                            role === UserRole.ADMINISTRATIONS) && (
+                            <Button
+                              aria-label={
+                                isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
+                              }
+                              title={
+                                isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
+                              }
+                              className="h-10 w-10 px-0 py-0 text-xs"
+                              size="sm"
+                              disabled={isPending}
+                              onClick={() =>
+                                submitDraftPurchaseOrder(order.publicCode)
+                              }
+                            >
+                              <Send aria-hidden="true" />
+                              <span className="sr-only">
+                                {isPending ? "Mengajukan..." : "Ajukan ke Keuangan"}
+                              </span>
+                            </Button>
+                          )}
+                        </>
+                      ) : order.status === POStatus.PENDING_FINANCE_REVIEW ? (
+                        <Button
+                          asChild
+                          aria-label="Lihat PO"
+                          title="Lihat PO"
+                          className="h-10 w-10 px-0 py-0 text-xs"
+                          size="sm"
+                          variant="outline"
+                        >
+                          <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                            <Eye aria-hidden="true" />
+                            <span className="sr-only">Lihat PO</span>
+                          </Link>
+                        </Button>
+                      ) : role === UserRole.LOGISTICS ? (
                         <PurchaseOrderInvoiceUpload
                           publicCode={order.publicCode}
                           invoiceUrl={order.vendorInvoiceUrl}
@@ -428,28 +585,60 @@ export default function LogisticsHub({
                         />
                       ) : (
                         <Badge
+                          aria-label={
+                            order.vendorPoSentAt
+                              ? "PO dikirim ke vendor"
+                              : "Menunggu pengiriman PO"
+                          }
+                          title={
+                            order.vendorPoSentAt
+                              ? "PO dikirim ke vendor"
+                              : "Menunggu pengiriman PO"
+                          }
+                          className="h-8 whitespace-nowrap px-2.5 text-[0.6875rem]"
                           variant={order.vendorPoSentAt ? "lightSuccess" : "outline"}
                         >
                           {order.vendorPoSentAt
-                            ? "PO dikirim ke vendor"
-                            : "Menunggu pengiriman PO"}
+                            ? (
+                                <>
+                                  <Check className="size-4" aria-hidden="true" />
+                                  <span className="sr-only">
+                                    PO dikirim ke vendor
+                                  </span>
+                                </>
+                              )
+                            : (
+                                <>
+                                  <Clock3 className="size-4" aria-hidden="true" />
+                                  <span className="sr-only">
+                                    Menunggu pengiriman PO
+                                  </span>
+                                </>
+                              )}
                         </Badge>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          openDocumentPreview({
-                            kind: "po",
-                            code: order.publicCode,
-                            number: order.poNumber,
-                            executiveApproval: "PO disetujui oleh Direksi",
-                          })
-                        }
-                        className="max-w-full whitespace-normal text-center leading-tight"
-                      >
-                        Preview PO Terbit
-                      </Button>
+                      {order.status === POStatus.APPROVED && (
+                        <Button
+                          aria-label="Preview PO Terbit"
+                          title="Preview PO Terbit"
+                          variant="outline"
+                          size="sm"
+                          className="h-10 w-10 max-w-full px-0 py-0 text-xs"
+                          onClick={() =>
+                            openDocumentPreview({
+                              kind: "po",
+                              code: order.publicCode,
+                              number: order.poNumber,
+                              executiveApproval: "PO disetujui oleh Direksi",
+                            })
+                          }
+                        >
+                          <Eye aria-hidden="true" />
+                          <span className="sr-only">
+                            Preview PO Terbit
+                          </span>
+                        </Button>
+                      )}
                     </div>
                   </article>
                 );
@@ -480,8 +669,11 @@ export default function LogisticsHub({
                       <Badge variant="outline">{order.status}</Badge>
                       {order.executiveApproved ? (
                         <Button
+                          aria-label="Preview Surat Jalan"
+                          title="Preview Surat Jalan"
                           variant="outline"
                           size="sm"
+                          className="h-10 w-10 px-0 sm:h-9 sm:w-auto sm:px-3"
                           onClick={() =>
                             openDocumentPreview({
                               kind: "do",
@@ -492,7 +684,10 @@ export default function LogisticsHub({
                             })
                           }
                         >
-                          Preview Surat Jalan
+                          <Eye className="sm:mr-1.5" aria-hidden="true" />
+                          <span className="sr-only sm:not-sr-only">
+                            Preview Surat Jalan
+                          </span>
                         </Button>
                       ) : (
                         <Button variant="outline" size="sm" disabled>

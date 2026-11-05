@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { UserRole } from "@prisma/client";
 import { auth } from "../../../../auth";
 import DOEditForm from "@/components/orders/DOEditForm";
@@ -9,7 +10,10 @@ import { prisma } from "@/lib/prisma";
 import { createBrandedQrDataUrl } from "@/lib/documents/qr-code";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import { isValidPublicCode } from "@/lib/documents/random-code";
-import { resolvePublicAppUrl } from "@/lib/documents/public-app-url";
+import {
+  getRequestOrigin,
+  resolvePublicAppUrl,
+} from "@/lib/documents/public-app-url";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
@@ -63,8 +67,9 @@ function canReadConstructionDocument(
 async function makeQrDataUrl(
   publicCode: string,
   path = `/d/${publicCode}`,
+  requestOrigin?: string | null,
 ): Promise<string | null> {
-  const baseUrl = resolvePublicAppUrl();
+  const baseUrl = resolvePublicAppUrl(requestOrigin);
   if (!baseUrl) return null;
 
   try {
@@ -88,6 +93,7 @@ export default async function OrderEditPage({
 
   const [{ code }, query] = await Promise.all([params, searchParams]);
   if (!isValidPublicCode(code)) notFound();
+  const requestOrigin = getRequestOrigin(await headers());
 
   const [purchaseOrder, deliveryOrder, subcontract, bast] = await Promise.all([
     prisma.purchaseOrder.findUnique({
@@ -275,6 +281,7 @@ export default async function OrderEditPage({
               ? await makeQrDataUrl(
                   code,
                   documentVerificationPath("po", code),
+                  requestOrigin,
                 )
               : null
           }

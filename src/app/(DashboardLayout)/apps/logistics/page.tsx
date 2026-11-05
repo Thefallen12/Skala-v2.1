@@ -489,7 +489,15 @@ export default async function LogisticsPage({
       },
     }),
     prisma.purchaseOrder.findMany({
-      where: { status: POStatus.APPROVED },
+      where: {
+        status: {
+          in: [
+            POStatus.DRAFT,
+            POStatus.PENDING_FINANCE_REVIEW,
+            POStatus.APPROVED,
+          ],
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {

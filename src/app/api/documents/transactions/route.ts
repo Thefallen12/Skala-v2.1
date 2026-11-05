@@ -197,6 +197,12 @@ function documentItems(items: {
   }));
 }
 
+function stockItemKey(name: string, unit: string): string {
+  const normalize = (value: string) =>
+    value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+  return `${normalize(name)}|${normalize(unit)}`;
+}
+
 async function loadDocument(
   kind: DocumentKind,
   recordId: string,
@@ -234,6 +240,7 @@ async function loadDocument(
           select: {
             itemCode: true,
             itemName: true,
+            stockItem: { select: { sku: true } },
             quantity: true,
             unit: true,
             unitPrice: true,
@@ -243,6 +250,40 @@ async function loadDocument(
       },
     });
     if (!order) return null;
+    const hasVendorValue = (value: string | null | undefined) =>
+      Boolean(value?.trim());
+    const vendorFallback =
+      !hasVendorValue(order.vendor?.address) ||
+      !hasVendorValue(order.vendor?.phone) ||
+      !hasVendorValue(order.vendor?.email)
+        ? await prisma.vendor.findFirst({
+            where: {
+              name: { equals: order.vendorName, mode: "insensitive" },
+            },
+            select: { address: true, phone: true, email: true },
+          })
+        : null;
+    const itemsNeedingCatalogCode = order.items.filter(
+      (item) => !item.itemCode?.trim() && !item.stockItem?.sku?.trim(),
+    );
+    const matchingStockItems = itemsNeedingCatalogCode.length
+      ? await prisma.stockItem.findMany({
+          where: {
+            OR: itemsNeedingCatalogCode.map((item) => ({
+              name: { equals: item.itemName, mode: "insensitive" },
+              unit: { equals: item.unit, mode: "insensitive" },
+            })),
+          },
+          select: { sku: true, name: true, unit: true },
+        })
+      : [];
+    const stockCodesByItem = new Map<string, Set<string>>();
+    for (const stockItem of matchingStockItems) {
+      const key = stockItemKey(stockItem.name, stockItem.unit);
+      const codes = stockCodesByItem.get(key) ?? new Set<string>();
+      codes.add(stockItem.sku);
+      stockCodesByItem.set(key, codes);
+    }
     const subtotal = order.items.reduce((total, item) => total + item.totalPrice, 0);
     const tax = order.includeTax ? Math.round(subtotal * 0.11 * 100) / 100 : 0;
     return {
@@ -253,9 +294,23 @@ async function loadDocument(
       date: formatDate(order.createdAt),
       leftDetails: [
         { label: "Kepada / Vendor", value: order.vendorName },
-        { label: "Alamat", value: order.vendor?.address ?? "-" },
-        { label: "Kontak", value: order.vendor?.email ?? "-" },
-        { label: "No. Telepon", value: order.vendor?.phone ?? "-" },
+        {
+          label: "Alamat",
+          value:
+            order.vendor?.address?.trim() ||
+            vendorFallback?.address?.trim() ||
+            "-",
+        },
+        {
+          label: "Kontak",
+          value:
+            order.vendor?.email?.trim() || vendorFallback?.email?.trim() || "-",
+        },
+        {
+          label: "No. Telepon",
+          value:
+            order.vendor?.phone?.trim() || vendorFallback?.phone?.trim() || "-",
+        },
       ],
       rightDetails: [
         { label: "Proyek / Site", value: projectSiteName(
@@ -272,10 +327,23 @@ async function loadDocument(
           : []),
         { label: "Syarat Pembayaran", value: order.paymentTerms ?? "-" },
       ],
-      items: documentItems(order.items.map((item) => ({
-        ...item,
-        description: item.itemName,
-      }))),
+      items: documentItems(
+        order.items.map((item) => {
+          const matchingCodes = stockCodesByItem.get(
+            stockItemKey(item.itemName, item.unit),
+          );
+          return {
+            ...item,
+            description: item.itemName,
+            itemCode:
+              item.itemCode?.trim() ||
+              item.stockItem?.sku ||
+              (matchingCodes?.size === 1
+                ? matchingCodes.values().next().value
+                : null),
+          };
+        }),
+      ),
       summary: summary(subtotal, tax),
       terms: [
         "Harap cantumkan nomor PO ini pada semua dokumen pengiriman dan invoice.",
@@ -903,7 +971,8 @@ export async function GET(request: NextRequest) {
         )
       : null;
     const publicAppUrl =
-      resolvePublicAppUrl() ?? new URL(request.url).origin;
+      resolvePublicAppUrl(new URL(request.url).origin) ??
+      new URL(request.url).origin;
     const [logoResult, qrResult, approvalQrResult] = await Promise.allSettled([
       getDocumentHeaderLogoDataUrl(),
       verificationPath

@@ -98,7 +98,11 @@ export default async function FinancePage({
     dashboardOfficeExpenses,
   ] = await Promise.all([
     prisma.purchaseOrder.findMany({
-      where: { status: POStatus.DRAFT },
+      where: {
+        status: {
+          in: [POStatus.DRAFT, POStatus.PENDING_FINANCE_REVIEW],
+        },
+      },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
