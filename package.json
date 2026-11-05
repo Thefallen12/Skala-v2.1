@@ -17,7 +17,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:inventory": "tsx prisma/seed-inventory.ts",
     "db:seed:projects": "tsx prisma/seed-projects.ts",
-    "db:import:rehab": "tsx prisma/import-rehab-projects.ts"
+    "db:import:rehab": "tsx prisma/import-rehab-projects.ts",
+    "db:repair:vehicle-kilometers": "node scripts/repair-vehicle-kilometers.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
