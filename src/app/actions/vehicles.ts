@@ -299,6 +299,74 @@ export async function updateVehicle(
   }
 }
 
+export async function updateVehicleKilometer(
+  id: string,
+  kilometer: number,
+): Promise<VehicleActionResult> {
+  const session = await auth();
+  if (!session?.user || !isVehicleManager(session.user.role)) {
+    return {
+      success: false,
+      message: "Anda tidak memiliki akses untuk mengelola armada.",
+    };
+  }
+  if (
+    typeof id !== "string" ||
+    id.length === 0 ||
+    id.length > 64 ||
+    typeof kilometer !== "number" ||
+    !Number.isFinite(kilometer) ||
+    kilometer < 0 ||
+    kilometer > 9_999_999_999 ||
+    Number(kilometer.toFixed(2)) !== kilometer
+  ) {
+    return { success: false, message: "Nilai kilometer tidak valid." };
+  }
+
+  try {
+    const updated = await prisma.$transaction(async (transaction) => {
+      const inTransitOrder = await transaction.deliveryOrder.findFirst({
+        where: {
+          vehicleId: id,
+          status: { in: ["PENDING", "IN_TRANSIT"] },
+        },
+        select: { id: true },
+      });
+      if (inTransitOrder) {
+        throw new Error(
+          "Kilometer tidak dapat diubah selama kendaraan terikat pada DO aktif.",
+        );
+      }
+
+      return transaction.vehicle.updateMany({
+        where: { id },
+        data: {
+          currentKilometer: scaledIntegerFromDecimal(kilometer),
+          odometerInitialized: true,
+        },
+      });
+    });
+
+    if (updated.count !== 1) {
+      return { success: false, message: "Kendaraan tidak ditemukan." };
+    }
+    revalidatePath("/apps/logistics");
+    return { success: true, message: "Kilometer kendaraan berhasil diperbarui." };
+  } catch (error) {
+    console.error("Update vehicle kilometer failed:", error);
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Kilometer tidak dapat diubah")
+    ) {
+      return { success: false, message: error.message };
+    }
+    return {
+      success: false,
+      message: "Kilometer kendaraan gagal diperbarui. Silakan coba kembali.",
+    };
+  }
+}
+
 export async function deleteVehicle(
   id: string,
 ): Promise<VehicleActionResult> {

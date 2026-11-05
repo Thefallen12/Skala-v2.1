@@ -2,11 +2,12 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2, Truck } from "lucide-react";
+import { Gauge, Pencil, Plus, Trash2, Truck } from "lucide-react";
 import {
   addVehicle,
   deleteVehicle,
   updateVehicle,
+  updateVehicleKilometer,
   type VehicleInput,
   type VehicleStatus,
   type VehicleSummary,
@@ -58,6 +59,8 @@ export default function VehicleFleetPanel({
   const [editingVehicle, setEditingVehicle] = useState<VehicleSummary | null>(
     null,
   );
+  const [kilometerVehicle, setKilometerVehicle] =
+    useState<VehicleSummary | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -72,6 +75,38 @@ export default function VehicleFleetPanel({
     setEditingVehicle(vehicle);
     setMessage("");
     setDialogOpen(true);
+  };
+
+  const openKilometerDialog = (vehicle: VehicleSummary) => {
+    setKilometerVehicle(vehicle);
+    setMessage("");
+  };
+
+  const submitKilometer = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!kilometerVehicle) return;
+
+    const formData = new FormData(event.currentTarget);
+    const kilometer = Number(formData.get("kilometer"));
+    setMessage("");
+    startTransition(async () => {
+      try {
+        const result = await updateVehicleKilometer(
+          kilometerVehicle.id,
+          kilometer,
+        );
+        setMessage(result.message);
+        setIsError(!result.success);
+        if (result.success) {
+          setKilometerVehicle(null);
+          router.refresh();
+        }
+      } catch (error) {
+        console.error("Vehicle kilometer save failed:", error);
+        setMessage("Kilometer gagal diperbarui. Silakan coba kembali.");
+        setIsError(true);
+      }
+    });
   };
 
   const submitVehicle = (event: FormEvent<HTMLFormElement>) => {
@@ -220,6 +255,17 @@ export default function VehicleFleetPanel({
                             type="button"
                             variant="outline"
                             size="sm"
+                            disabled={isPending}
+                            onClick={() => openKilometerDialog(vehicle)}
+                            aria-label={`Edit KM ${vehicle.plateNumber}`}
+                          >
+                            <Gauge className="size-4" />
+                            Edit KM
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
                             disabled={
                               isPending ||
                               vehicle.status === "IN_USE" ||
@@ -346,6 +392,63 @@ export default function VehicleFleetPanel({
               </Button>
             </div>
           </form>
+      </GlobalModal>}
+      {canManage && <GlobalModal
+        isOpen={kilometerVehicle !== null}
+        onClose={() => {
+          if (!isPending) setKilometerVehicle(null);
+        }}
+        title="Edit Kilometer Kendaraan"
+        description={
+          kilometerVehicle
+            ? `Perbarui odometer terakhir untuk ${kilometerVehicle.plateNumber}.`
+            : undefined
+        }
+        className="sm:max-w-lg"
+      >
+        <form
+          id="vehicle-kilometer-form"
+          className="mt-6 space-y-4"
+          onSubmit={submitKilometer}
+        >
+          <label className="grid gap-1.5 text-sm font-medium">
+            Kilometer saat ini
+            <Input
+              name="kilometer"
+              type="number"
+              min="0"
+              max="9999999999"
+              step="0.01"
+              required
+              autoFocus
+              defaultValue={kilometerVehicle?.currentKilometer ?? "0"}
+            />
+            <span className="text-xs font-normal text-muted-foreground">
+              Gunakan titik untuk nilai desimal, contoh: 18790.4 km.
+            </span>
+          </label>
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            Nilai ini menjadi acuan KM untuk pencatatan perjalanan berikutnya.
+            Kendaraan yang terikat DO aktif tidak dapat diubah.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setKilometerVehicle(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="vehicle-kilometer-form"
+              disabled={isPending}
+            >
+              {isPending ? "Menyimpan..." : "Simpan KM"}
+            </Button>
+          </div>
+        </form>
       </GlobalModal>}
     </>
   );
