@@ -1878,9 +1878,16 @@ export async function createTicket(
     TicketRequestCategory.KASBON,
     TicketRequestCategory.OPERATING_EXPENSE,
   ].some((category) => category === requestCategory);
+  const isFieldTeamInternalFundingRequest =
+    requestCategory === TicketRequestCategory.REIMBURSEMENT ||
+    requestCategory === TicketRequestCategory.KASBON;
   if (
     isInternalFundingRequest &&
-    session.user.role !== UserRole.DRAFTER
+    session.user.role !== UserRole.DRAFTER &&
+    !(
+      session.user.role === UserRole.FIELD_TEAM &&
+      isFieldTeamInternalFundingRequest
+    )
   ) {
     return actionFailure(
       "Pengajuan reimbursement dan kasbon hanya dapat dibuat oleh Drafter atau Tim Lapangan.",
@@ -1903,7 +1910,8 @@ export async function createTicket(
   }
   if (
     session.user.role === UserRole.FIELD_TEAM &&
-    (isFieldRequest || isInternalFundingRequest)
+    (isFieldRequest ||
+      (isInternalFundingRequest && !isFieldTeamInternalFundingRequest))
   ) {
     return actionFailure(
       "Tim Lapangan hanya dapat membuat permintaan Operasional atau Material.",

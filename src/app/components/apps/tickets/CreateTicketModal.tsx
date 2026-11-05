@@ -460,12 +460,19 @@ const getRequestTypeOptions = (
     });
   }
 
-  if (role === UserRole.DRAFTER) {
+  if (role === UserRole.DRAFTER || role === UserRole.FIELD_TEAM) {
     options.push(
-      ...internalFundingCategories.map((category) => ({
-        label: requestCategoryLabels[category],
-        value: category,
-      })),
+      ...internalFundingCategories
+        .filter(
+          (category) =>
+            role === UserRole.DRAFTER ||
+            category === TicketRequestCategory.REIMBURSEMENT ||
+            category === TicketRequestCategory.KASBON,
+        )
+        .map((category) => ({
+          label: requestCategoryLabels[category],
+          value: category,
+        })),
     );
   }
 
