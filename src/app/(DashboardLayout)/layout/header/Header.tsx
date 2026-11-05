@@ -51,46 +51,17 @@ const Header = ({
 }) => {
   const { theme, setTheme } = useTheme();
   const [isSticky, setIsSticky] = useState(false);
-  const [isDesktopHidden, setIsDesktopHidden] = useState(false);
   const [mobileMenu, setMobileMenu] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const desktopQuery = window.matchMedia("(min-width: 1280px)");
-    let previousScrollY = window.scrollY;
-
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const isDesktop = desktopQuery.matches;
-
-      if (currentScrollY > 50) {
-        setIsSticky(true);
-      } else {
-        setIsSticky(false);
-      }
-
-      if (!isDesktop || currentScrollY <= 50) {
-        setIsDesktopHidden(false);
-      } else if (currentScrollY > previousScrollY + 4) {
-        setIsDesktopHidden(true);
-      } else if (currentScrollY < previousScrollY - 4) {
-        setIsDesktopHidden(false);
-      }
-
-      previousScrollY = currentScrollY;
-    };
-
-    const handleViewportChange = () => {
-      if (!desktopQuery.matches) {
-        setIsDesktopHidden(false);
-      }
+      setIsSticky(window.scrollY > 50);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    desktopQuery.addEventListener("change", handleViewportChange);
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      desktopQuery.removeEventListener("change", handleViewportChange);
     };
   }, []);
 
@@ -101,9 +72,7 @@ const Header = ({
   return (
     <>
       <header
-        className={`sticky top-0 z-20 border-b border-border bg-background/75 text-foreground backdrop-blur-xl transition-transform duration-300 ease-out ${
-          isDesktopHidden ? "xl:-translate-y-full" : "translate-y-0"
-        } ${
+        className={`sticky top-0 z-20 border-b border-border bg-background/75 text-foreground backdrop-blur-xl ${
           isSticky ? "shadow-md" : "shadow-sm"
         }`}
       >
