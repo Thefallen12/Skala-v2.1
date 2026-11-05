@@ -1,8 +1,37 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { UserRole } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
+
+class DatabaseUnavailableError extends CredentialsSignin {
+  code = "database-unavailable";
+}
+
+function isDatabaseConnectionError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    return (
+      ["P1001", "P1002", "P1017", "P2024"].includes(error.code) ||
+      /server selection timeout|no available servers|received fatal alert/i.test(
+        error.message,
+      )
+    );
+  }
+
+  if (error instanceof Prisma.PrismaClientUnknownRequestError) {
+    return /server selection timeout|no available servers|received fatal alert|timed out/i.test(
+      error.message,
+    );
+  }
+
+  return (
+    error instanceof Error &&
+    /server selection timeout|no available servers|received fatal alert|timed out|econnrefused|enotfound/i.test(
+      error.message,
+    )
+  );
+}
 
 function isUserRole(value: unknown): value is UserRole {
   return Object.values(UserRole).some((role) => role === value);
@@ -39,18 +68,34 @@ const {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: identifier },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            passwordHash: true,
-            isActive: true,
-            role: true,
-            profilePhotoUrl: true,
-          },
-        });
+        let user;
+        try {
+          user = await prisma.user.findUnique({
+            where: { email: identifier },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              passwordHash: true,
+              isActive: true,
+              role: true,
+              profilePhotoUrl: true,
+            },
+          });
+        } catch (error) {
+          if (!isDatabaseConnectionError(error)) {
+            throw error;
+          }
+
+          console.error("Credential sign-in failed: MongoDB is unreachable", {
+            code:
+              error instanceof Prisma.PrismaClientKnownRequestError
+                ? error.code
+                : "connection-error",
+          });
+          throw new DatabaseUnavailableError();
+        }
+
         if (
           !user ||
           !user.isActive ||
@@ -59,10 +104,24 @@ const {
           return null;
         }
 
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
-        });
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          });
+        } catch (error) {
+          if (!isDatabaseConnectionError(error)) {
+            throw error;
+          }
+
+          console.error("Credential sign-in failed while updating login time", {
+            code:
+              error instanceof Prisma.PrismaClientKnownRequestError
+                ? error.code
+                : "connection-error",
+          });
+          throw new DatabaseUnavailableError();
+        }
 
         return {
           id: user.id,

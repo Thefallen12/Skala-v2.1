@@ -1,9 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 
-const connectionString = process.env.MONGODB_URL;
+const connectionString = process.env.MONGODB_URL?.trim();
 
 if (!connectionString) {
-  throw new Error("MONGODB_URL is not set");
+  throw new Error(
+    "MONGODB_URL is required. Configure the MongoDB Atlas connection string in the Hostinger environment.",
+  );
+}
+
+if (!connectionString.startsWith("mongodb://") && !connectionString.startsWith("mongodb+srv://")) {
+  throw new Error(
+    "MONGODB_URL must be a mongodb:// or mongodb+srv:// connection string.",
+  );
 }
 
 const globalForPrisma = globalThis as typeof globalThis & {
@@ -12,6 +20,8 @@ const globalForPrisma = globalThis as typeof globalThis & {
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient();
+  new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+  });
 
 globalForPrisma.prisma = prisma;

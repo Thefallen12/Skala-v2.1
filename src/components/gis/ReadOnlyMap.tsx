@@ -60,10 +60,6 @@ function ReadOnlyMapInner({
   className?: string;
   onAddPoint?: () => void;
 }) {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
   const featureCollection = useMemo(
     () => normalizeFeatureCollection(data),
     [data],
@@ -103,6 +99,10 @@ function ReadOnlyMapInner({
       center: centerPoint,
     };
   }, [featureCollection]);
+
+  if (typeof window === "undefined") {
+      return null;
+  }
 
   return (
     <div className={className}>

@@ -38,7 +38,13 @@ export const Login = () => {
         redirectTo: '/',
       })
       if (!result?.ok || result.error) {
-        setError('Email atau kata sandi tidak sesuai.')
+        const errorCode =
+          typeof result?.error === 'string' ? result.error : result?.code
+        setError(
+          errorCode === 'database-unavailable'
+            ? 'Server login tidak dapat terhubung ke database. Coba lagi nanti atau hubungi administrator.'
+            : 'Email atau kata sandi tidak sesuai.',
+        )
         return
       }
 

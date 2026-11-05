@@ -14,7 +14,7 @@ COPY . .
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
-RUN export DATABASE_URL="postgresql://localhost:5432/skala_build" \
+RUN export MONGODB_URL="mongodb://127.0.0.1:27017/skala_build" \
     AUTH_SECRET="build-only-placeholder" \
     DEPLOYMENT_VERSION="${DEPLOYMENT_VERSION:-$(date -u +%Y%m%d%H%M%S)}" \
     && npm run build

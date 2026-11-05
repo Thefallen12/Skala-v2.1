@@ -40,3 +40,47 @@ scaled by 1000, and prints row counts only. MongoDB Atlas must support
 transactions (a replica set). Optional unique values use partial unique indexes
 so multiple absent values remain valid in MongoDB. Back up both databases
 before applying.
+
+## Hostinger Node.js deployment
+
+The production database is MongoDB Atlas. Configure these variables in
+Hostinger before both the build and runtime process:
+
+```env
+MONGODB_URL=mongodb+srv://...
+AUTH_SECRET=<long-random-secret>
+AUTH_TRUST_HOST=true
+NEXTAUTH_URL=https://your-domain.example
+NEXT_PUBLIC_APP_URL=https://your-domain.example
+```
+
+`MONGODB_URL`, `AUTH_SECRET`, `AUTH_TRUST_HOST`, `NEXTAUTH_URL`, and
+`NEXT_PUBLIC_APP_URL` are required for production. Configure
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` if
+users upload profile photos, receipts, or documents. `ADMIN_EMAIL`,
+`ADMIN_PASSWORD`, and `ADMIN_NAME` are only needed when running the initial
+seed; do not leave the seed password in a long-lived production environment.
+
+Do not add `CLIENT_ID`, `CLIENT_SECRET`, `MYSQL_URL`, or `DATABASE_URL` unless a
+separate integration explicitly uses them. They are not required by the
+current NextAuth credentials login or MongoDB Prisma runtime. Migration-only
+`POSTGRES_SOURCE_URL` should be configured temporarily on a trusted machine,
+not as a normal Hostinger runtime variable.
+
+Use the repository root as the application directory, `npm ci` for dependency
+installation, `npm run build` for the build command, and `npm run start` for
+the startup command. Use Node.js 22 or newer and the port supplied by
+Hostinger. The Docker configuration is not the Hostinger deployment path.
+
+Before switching traffic, back up both databases, allow the Hostinger outbound
+IP in MongoDB Atlas, run the migration dry run, apply it only to an empty target,
+and verify `/api/auth/session`, credentials login, and an authenticated page.
+
+Rotate every credential that has previously been placed in a local `.env`
+(MongoDB Atlas, Cloudinary, Google Cloud, and provider/domain settings). Never
+commit `.env`, disclose secret values in logs, or put real values in
+`.env.example`.
+
+Hostinger local disk is not a durable shared file store. Keep uploads in
+Cloudinary or attach persistent storage before relying on `.private-data` across
+restarts.
