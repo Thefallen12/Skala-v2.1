@@ -1717,6 +1717,12 @@ main {
   }
 
   .ticket-create-modal {
+    --ticket-header-bg: var(--muted);
+    --ticket-input-bg: var(--card);
+    --ticket-section-bg: var(--muted);
+    --ticket-footer-bg: var(--muted);
+    --ticket-control-border: var(--border);
+    --ticket-accent: var(--secondary);
     width: calc(100vw - 1rem);
     max-width: 24.5rem;
     max-height: calc(100dvh - 1rem);
@@ -1724,13 +1730,21 @@ main {
     background: var(--background);
   }
 
+  .dark .ticket-create-modal {
+    --ticket-header-bg: linear-gradient(135deg, #51351f 0%, #1a2437 100%);
+    --ticket-input-bg: #1b2a40;
+    --ticket-section-bg: rgb(70 85 105 / 35%);
+    --ticket-footer-bg: #1d2b40;
+    --ticket-control-border: #3e526e;
+  }
+
   .ticket-create-modal > .ticket-create-form {
     min-width: 0;
   }
 
   .ticket-create-modal > div:first-child {
-    background: linear-gradient(135deg, #51351f 0%, #1a2437 100%);
-    border-bottom-color: #9b6739;
+    background: var(--ticket-header-bg);
+    border-bottom-color: var(--ticket-control-border);
     padding: 1.05rem 3.25rem 1rem 1rem;
   }
 
@@ -1764,6 +1778,8 @@ main {
   }
 
   .ticket-create-form {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
   }
 
@@ -1797,9 +1813,9 @@ main {
   .ticket-create-form input,
   .ticket-create-form button[role="combobox"] {
     min-height: 3rem;
-    border-color: #3e526e;
+    border-color: var(--ticket-control-border);
     border-radius: 0.65rem;
-    background: #1b2a40;
+    background: var(--ticket-input-bg);
     font-size: 0.9rem;
   }
 
@@ -1845,8 +1861,8 @@ main {
   .ticket-items-heading button {
     min-height: 2.75rem;
     padding: 0.5rem 0.8rem;
-    border-color: #c27a3c;
-    color: #e69b4d;
+    border-color: var(--ticket-accent);
+    color: var(--ticket-accent);
     font-size: 0.8rem;
   }
 
@@ -1854,9 +1870,9 @@ main {
     display: grid;
     gap: 0.8rem;
     padding: 0.8rem;
-    border-color: #4b5c73;
+    border-color: var(--ticket-control-border);
     border-radius: 0.7rem;
-    background: rgb(70 85 105 / 35%);
+    background: var(--ticket-section-bg);
   }
 
   .ticket-item-row {
@@ -1896,20 +1912,30 @@ main {
   }
 
   .ticket-priority-section {
-    gap: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-block: 0.25rem 0.5rem;
   }
 
   .ticket-priority-section [role="radiogroup"] {
     gap: 0.45rem;
   }
 
+  .ticket-needed-date-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-top: 0.75rem;
+  }
+
   .ticket-priority-section [role="radiogroup"] > label {
     min-height: 3.45rem;
     gap: 0.4rem;
     padding: 0.55rem;
-    border-color: #40526a;
+    border-color: var(--ticket-control-border);
     border-radius: 0.65rem;
-    background: #1b2a40;
+    background: var(--ticket-input-bg);
     font-size: 0.75rem;
     line-height: 1.15;
   }
@@ -1921,32 +1947,37 @@ main {
     color: #4ade80;
   }
 
-  .ticket-create-modal > div:last-child {
+  .ticket-create-modal > div:nth-of-type(3) {
+    flex: 0 0 auto;
     align-items: stretch;
-    gap: 0.65rem;
-    padding: 0.8rem 1rem 1rem;
-    background: #1d2b40;
+    gap: 0.75rem;
+    min-height: 8rem;
+    padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
+    background: var(--ticket-footer-bg);
   }
 
-  .ticket-create-modal > div:last-child > span {
+  .ticket-create-modal > div:nth-of-type(3) > span {
     width: 100%;
-    color: #c5ceda;
+    color: var(--muted-foreground);
     font-size: 0.68rem;
     line-height: 1.3;
+    text-align: center;
   }
 
-  .ticket-create-modal > div:last-child > div {
+  .ticket-create-modal > div:nth-of-type(3) > div {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     gap: 0.65rem;
+    align-items: stretch;
   }
 
-  .ticket-create-modal > div:last-child button {
+  .ticket-create-modal > div:nth-of-type(3) button {
     width: 100%;
     min-width: 0;
     flex: none;
-    min-height: 3.1rem;
+    min-height: 3rem;
+    height: 3rem;
     border-radius: 0.65rem;
     font-size: 0.9rem;
     font-weight: 800;

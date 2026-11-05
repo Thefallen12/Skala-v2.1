@@ -126,11 +126,12 @@ export default function PurchaseOrderInvoiceUpload({
 
   if (!vendorPoSentAt) {
     return (
-      <div className="space-y-2">
+      <div className="min-w-0 max-w-full space-y-2">
         <Button
           type="button"
           size="sm"
           variant="outline"
+          className="max-w-full whitespace-normal text-left leading-tight"
           onClick={markPoSent}
           disabled={isPending}
         >
@@ -139,7 +140,7 @@ export default function PurchaseOrderInvoiceUpload({
         </Button>
         {message && (
           <p
-            className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+            className={`max-w-full break-words text-sm leading-5 ${isError ? "text-destructive" : "text-muted-foreground"}`}
             role={isError ? "alert" : "status"}
           >
             {message}

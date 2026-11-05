@@ -401,7 +401,7 @@ export default function LogisticsHub({
                 return (
                   <article
                     key={order.publicCode}
-                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                    className="flex min-w-0 flex-col gap-3 rounded-lg border p-3"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-primary">
@@ -411,8 +411,10 @@ export default function LogisticsHub({
                         {new Date(order.createdAt).toLocaleDateString("id-ID")}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Badge variant="lightSuccess">Disetujui Eksekutif</Badge>
+                    <div className="flex min-w-0 flex-wrap items-start gap-2">
+                      <Badge className="shrink-0" variant="lightSuccess">
+                        Disetujui Eksekutif
+                      </Badge>
                       {role === UserRole.LOGISTICS ? (
                         <PurchaseOrderInvoiceUpload
                           publicCode={order.publicCode}
@@ -444,6 +446,7 @@ export default function LogisticsHub({
                             executiveApproval: "PO disetujui oleh Direksi",
                           })
                         }
+                        className="max-w-full whitespace-normal text-center leading-tight"
                       >
                         Preview PO Terbit
                       </Button>
