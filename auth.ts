@@ -12,22 +12,22 @@ class DatabaseUnavailableError extends CredentialsSignin {
 function isDatabaseConnectionError(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     return (
-      ["P1001", "P1002", "P1017", "P2024"].includes(error.code) ||
-      /server selection timeout|no available servers|received fatal alert/i.test(
+      ["P1001", "P1002", "P1017", "P2010", "P2024"].includes(error.code) ||
+      /server selection timeout|no available servers|received fatal alert|tls|ssl|internalerror/i.test(
         error.message,
       )
     );
   }
 
   if (error instanceof Prisma.PrismaClientUnknownRequestError) {
-    return /server selection timeout|no available servers|received fatal alert|timed out/i.test(
+    return /server selection timeout|no available servers|received fatal alert|timed out|tls|ssl|internalerror/i.test(
       error.message,
     );
   }
 
   return (
     error instanceof Error &&
-    /server selection timeout|no available servers|received fatal alert|timed out|econnrefused|enotfound/i.test(
+    /server selection timeout|no available servers|received fatal alert|timed out|econnrefused|enotfound|tls|ssl|internalerror/i.test(
       error.message,
     )
   );
