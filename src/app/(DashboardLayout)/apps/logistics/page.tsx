@@ -42,6 +42,8 @@ export default async function LogisticsPage({
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
   if (!logisticsRoles.includes(session.user.role)) redirect("/apps/tickets");
+  const today = new Date().toISOString().slice(0, 10);
+  const invoiceDate = new Date().toLocaleDateString("id-ID");
 
   if (session.user.role === UserRole.KOORDINATOR) {
     const pendingDeliveryOrderAcknowledgments =
@@ -215,6 +217,7 @@ export default async function LogisticsPage({
         />
         <MoverWorkspace
           userName={session.user.name ?? ""}
+          today={today}
           deliveryOrders={deliveryOrders.map((order) => ({
             ...order,
             createdAt: order.createdAt.toISOString(),
@@ -806,6 +809,8 @@ export default async function LogisticsPage({
       />
       <LogisticsHub
         key={`${tab ?? ""}:${openSheet ?? ""}`}
+        today={today}
+        invoiceDate={invoiceDate}
         tickets={ticketRows}
         projects={projects}
         role={session.user.role}

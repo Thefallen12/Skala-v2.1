@@ -186,6 +186,8 @@ export default function LogisticsHub({
   vehicles,
   initialTab,
   initialOpenSheet,
+  today,
+  invoiceDate,
 }: {
   tickets: TicketRow[];
   projects: TicketProjectOption[];
@@ -203,6 +205,8 @@ export default function LogisticsHub({
   vehicles: VehicleSummary[];
   initialTab?: string;
   initialOpenSheet?: string;
+  today: string;
+  invoiceDate: string;
 }) {
   const allowedTabs = ["tickets", "stock", "documents", "equipment", "vehicles"];
   const resolvedTab = allowedTabs.includes(initialTab ?? "")
@@ -418,6 +422,7 @@ export default function LogisticsHub({
                           ticketLinked={Boolean(order.ticketId)}
                           items={order.items}
                           includeTax={order.includeTax}
+                          invoiceDate={invoiceDate}
                         />
                       ) : (
                         <Badge
@@ -851,7 +856,7 @@ export default function LogisticsHub({
               </label>
               <label className="space-y-1 text-sm">
                 Tanggal
-                <input className="h-10 w-full rounded-md border bg-background px-3" name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} />
+                <input className="h-10 w-full rounded-md border bg-background px-3" name="date" type="date" required defaultValue={today} />
               </label>
               <label className="space-y-1 text-sm">
                 HM awal

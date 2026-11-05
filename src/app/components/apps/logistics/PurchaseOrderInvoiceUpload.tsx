@@ -22,10 +22,13 @@ type InvoiceItemSeed = {
   unitPrice: number;
 };
 
-function createInvoiceDraft(items: InvoiceItemSeed[]): InvoiceDraft {
+function createInvoiceDraft(
+  items: InvoiceItemSeed[],
+  invoiceDate: string,
+): InvoiceDraft {
   return {
     invoiceNumber: "",
-    periodOrDate: new Date().toLocaleDateString("id-ID"),
+    periodOrDate: invoiceDate,
     paymentMethod: "",
     bankAccount: "",
     tax: 0,
@@ -48,6 +51,7 @@ export default function PurchaseOrderInvoiceUpload({
   ticketLinked,
   items,
   includeTax,
+  invoiceDate,
 }: {
   publicCode: string;
   invoiceUrl: string | null;
@@ -56,6 +60,7 @@ export default function PurchaseOrderInvoiceUpload({
   ticketLinked: boolean;
   items: InvoiceItemSeed[];
   includeTax: boolean;
+  invoiceDate: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -64,7 +69,7 @@ export default function PurchaseOrderInvoiceUpload({
   const [isOpen, setIsOpen] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [draft, setDraft] = useState(() => {
-    const seed = createInvoiceDraft(items);
+    const seed = createInvoiceDraft(items, invoiceDate);
     if (includeTax) {
       seed.tax = Math.round(
         seed.items.reduce(

@@ -95,6 +95,7 @@ const statusLabels: Record<DOStatus, string> = {
 
 export default function MoverWorkspace({
   userName,
+  today,
   deliveryOrders,
   projects,
   equipmentMasters,
@@ -102,6 +103,7 @@ export default function MoverWorkspace({
   initialTab,
 }: {
   userName: string;
+  today: string;
   deliveryOrders: MoverDeliveryOrder[];
   projects: ProjectOption[];
   equipmentMasters: EquipmentOption[];
@@ -122,7 +124,6 @@ export default function MoverWorkspace({
   const [fuelExceptionFlags, setFuelExceptionFlags] = useState<
     Record<string, boolean>
   >({});
-
   const startDelivery = (
     event: FormEvent<HTMLFormElement>,
     publicCode: string,
@@ -842,7 +843,7 @@ export default function MoverWorkspace({
                     name="date"
                     type="date"
                     required
-                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    defaultValue={today}
                   />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
