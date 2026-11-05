@@ -47,7 +47,7 @@ The production database is MongoDB Atlas. Configure these variables in
 Hostinger before both the build and runtime process:
 
 ```env
-MONGODB_URL=mongodb+srv://...
+MONGODB_URI=mongodb+srv://...
 AUTH_SECRET=<long-random-secret>
 AUTH_TRUST_HOST=true
 NEXTAUTH_URL=https://your-domain.example
