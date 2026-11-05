@@ -2,7 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { DocType } from "../src/generated/prisma/enums";
 
-if (!process.env.MONGODB_URL) throw new Error("MONGODB_URL is not set");
+if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI is not set");
 
 const prisma = new PrismaClient();
 

@@ -1,17 +1,16 @@
 import { PrismaClient } from "@prisma/client";
 
-const connectionString =
-  process.env.MONGODB_URL?.trim() || process.env.MONGODB_URI?.trim();
+const connectionString = process.env.MONGODB_URI?.trim();
 
 if (!connectionString) {
   throw new Error(
-    "MONGODB_URL or MONGODB_URI is required. Configure the MongoDB Atlas connection string in the Hostinger environment.",
+    "MONGODB_URI is required. Configure the MongoDB Atlas connection string in the Hostinger environment.",
   );
 }
 
 if (!connectionString.startsWith("mongodb://") && !connectionString.startsWith("mongodb+srv://")) {
   throw new Error(
-    "MONGODB_URL or MONGODB_URI must be a mongodb:// or mongodb+srv:// connection string.",
+    "MONGODB_URI must be a mongodb:// or mongodb+srv:// connection string.",
   );
 }
 

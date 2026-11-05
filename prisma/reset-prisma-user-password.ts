@@ -3,9 +3,9 @@ import { createInterface } from "node:readline";
 import { hash } from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-const connectionString = process.env.MONGODB_URL;
+const connectionString = process.env.MONGODB_URI;
 if (!connectionString) {
-  throw new Error("MONGODB_URL is not set.");
+  throw new Error("MONGODB_URI is not set.");
 }
 
 if (!/^mongodb(?:\+srv)?:\/\//i.test(connectionString)) {

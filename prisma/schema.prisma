@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = env("MONGODB_URL")
+  url      = env("MONGODB_URI")
 }
 
 // Project lifecycle and planning.

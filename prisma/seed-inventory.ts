@@ -2,7 +2,7 @@ import "dotenv/config";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 import { scaledIntegerFromDecimal } from "../src/lib/scaled-decimal";
 
-const connectionString = process.env.MONGODB_URL;
+const connectionString = process.env.MONGODB_URI;
 if (!connectionString) {
   throw new Error("MONGODB_URL is required to seed logistics inventory.");
 }

@@ -6,7 +6,7 @@ import {
 } from "../src/generated/prisma/enums";
 import { scaledIntegerFromDecimal } from "../src/lib/scaled-decimal";
 
-const connectionString = process.env.MONGODB_URL;
+const connectionString = process.env.MONGODB_URI;
 if (!connectionString) {
   throw new Error("MONGODB_URL is required to seed sample projects.");
 }
