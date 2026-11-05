@@ -213,13 +213,7 @@ const Tickets = async ({
           },
         })
       : Promise.resolve([]),
-    session.user.role === UserRole.FIELD_TEAM
-      ? prisma.user.findMany({
-          where: { role: UserRole.MOVER, isActive: true },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
+    Promise.resolve([]),
   ]);
 
   const canViewPaymentDetails =

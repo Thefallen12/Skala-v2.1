@@ -1847,8 +1847,7 @@ export async function createTicket(
   ].some((category) => category === requestCategory);
   if (
     isInternalFundingRequest &&
-    session.user.role !== UserRole.DRAFTER &&
-    session.user.role !== UserRole.FIELD_TEAM
+    session.user.role !== UserRole.DRAFTER
   ) {
     return actionFailure(
       "Pengajuan reimbursement dan kasbon hanya dapat dibuat oleh Drafter atau Tim Lapangan.",
@@ -1867,6 +1866,14 @@ export async function createTicket(
   if (isFieldRequest && session.user.role !== UserRole.FIELD_TEAM) {
     return actionFailure(
       "Kebutuhan lapangan hanya dapat diajukan oleh Tim Lapangan.",
+    );
+  }
+  if (
+    session.user.role === UserRole.FIELD_TEAM &&
+    (isFieldRequest || isInternalFundingRequest)
+  ) {
+    return actionFailure(
+      "Tim Lapangan hanya dapat membuat permintaan Operasional atau Material.",
     );
   }
   const receiptFiles = input.receiptFiles ?? [];
@@ -1966,16 +1973,12 @@ export async function createTicket(
     return actionFailure("Kategori permintaan tidak sesuai dengan jenis tiket.");
   }
   if (
-    (session.user.role === UserRole.FIELD_TEAM &&
-      input.type === TicketType.MATERIAL &&
-      (!isBoundedText(input.moverAssigneeId, 64) ||
-        (requestCategory !== TicketRequestCategory.MATERIAL &&
-          requestCategory !== TicketRequestCategory.WAREHOUSE))) ||
-    (input.moverAssigneeId !== undefined &&
-      session.user.role !== UserRole.FIELD_TEAM)
+    input.moverAssigneeId !== undefined &&
+    session.user.role !== UserRole.LOGISTICS &&
+    session.user.role !== UserRole.ADMINISTRATIONS
   ) {
     return actionFailure(
-      "Pilih Mover untuk permintaan material Tim Lapangan yang valid.",
+      "Mover hanya dapat dipilih oleh Koordinator Logistik.",
     );
   }
   if (requiresRecipientPayment) {

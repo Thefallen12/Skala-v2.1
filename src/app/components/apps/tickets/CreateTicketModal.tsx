@@ -446,13 +446,6 @@ const getRequestTypeOptions = (
     });
   }
 
-  if (role === UserRole.FIELD_TEAM && selectedProjectId) {
-    options.push({
-      label: "Belanja Kebutuhan Tim Lapangan",
-      value: TicketRequestCategory.FIELD,
-    });
-  }
-
   if (role === UserRole.DIRECTOR || role === UserRole.FINANCE) {
     options.push({
       label: requestCategoryLabels[TicketRequestCategory.APH],
@@ -460,7 +453,7 @@ const getRequestTypeOptions = (
     });
   }
 
-  if (role === UserRole.DRAFTER || role === UserRole.FIELD_TEAM) {
+  if (role === UserRole.DRAFTER) {
     options.push(
       ...internalFundingCategories.map((category) => ({
         label: requestCategoryLabels[category],
@@ -635,10 +628,6 @@ export default function CreateTicketModal({
     }
     form.clearErrors(["fieldCategory", "items"]);
   }, [form, requestCategory, requestTypeOptions]);
-  const showMoverSelection =
-    requesterRole === UserRole.FIELD_TEAM &&
-    (requestCategory === TicketRequestCategory.MATERIAL ||
-      requestCategory === TicketRequestCategory.WAREHOUSE);
   const requiresRecipientPayment =
     requestCategory === TicketRequestCategory.FIELD &&
     fieldCategory !== undefined;
@@ -672,14 +661,6 @@ export default function CreateTicketModal({
       !values.neededDate
     ) {
       setError("Pilih tanggal perlu dibayarkan/disediakan terlebih dahulu.");
-      return;
-    }
-    if (
-      showMoverSelection &&
-      (!values.moverAssigneeId ||
-        !movers.some((mover) => mover.id === values.moverAssigneeId))
-    ) {
-      setError("Pilih Mover untuk permintaan material Tim Lapangan.");
       return;
     }
     const categoryLabel = requestCategoryLabels[values.requestCategory];
@@ -784,9 +765,7 @@ export default function CreateTicketModal({
           : undefined,
         priority,
         projectId: values.projectId || undefined,
-        moverAssigneeId: showMoverSelection
-          ? values.moverAssigneeId
-          : undefined,
+        moverAssigneeId: undefined,
         recipientName: requiresRecipientPayment
           ? values.recipientName
           : undefined,
@@ -1243,49 +1222,6 @@ export default function CreateTicketModal({
               </div>
             )}
 
-            {showMoverSelection && (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="ticket-mover-assignee">
-                  Mover untuk pengiriman
-                </Label>
-                <Controller
-                  control={form.control}
-                  name="moverAssigneeId"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value || "none"}
-                      onValueChange={(value) =>
-                        field.onChange(value === "none" ? "" : value)
-                      }
-                    >
-                      <SelectTrigger
-                        id="ticket-mover-assignee"
-                        className="w-full md:max-w-[calc(50%-0.5rem)]"
-                      >
-                        <SelectValue placeholder="Pilih Mover" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Pilih Mover</SelectItem>
-                        {movers.map((mover) => (
-                          <SelectItem key={mover.id} value={mover.id}>
-                            {mover.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {movers.length === 0 && (
-                  <p className="text-sm text-destructive" role="alert">
-                    Belum ada Mover aktif. Hubungi Administrator.
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Pilihan Mover hanya untuk permintaan material yang dibuat Tim
-                  Lapangan.
-                </p>
-              </div>
-            )}
           </div>
 
           {isAPHRequest && (
