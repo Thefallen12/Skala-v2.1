@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, startOfDay } from "date-fns";
 import { id } from "date-fns/locale";
-import { CalendarDays, Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
@@ -885,7 +885,14 @@ export default function CreateTicketModal({
               disabled={form.formState.isSubmitting}
               aria-busy={form.formState.isSubmitting}
             >
-              {form.formState.isSubmitting ? "Mengirim..." : "Simpan draft"}
+              {form.formState.isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Simpan draft"
+              )}
             </Button>
           </>
         }
@@ -901,6 +908,10 @@ export default function CreateTicketModal({
         )}
 
         <form id="ticket-form" onSubmit={submit} className="space-y-5">
+          <fieldset
+            disabled={form.formState.isSubmitting}
+            className="contents"
+          >
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="ticket-project">Pilih Proyek</Label>
@@ -1338,7 +1349,7 @@ export default function CreateTicketModal({
 
           {!isAPHRequest && !isInternalFunding && <section className="space-y-3">
             {requiresRecipientPayment ? (
-              <div className="space-y-4 rounded-md border p-4">
+              <div className="mb-3 space-y-4 rounded-md border p-4">
                 <div>
                   <h3 className="font-semibold">Data Penerima Pembayaran</h3>
                   <p className="text-sm text-muted-foreground">
@@ -1442,7 +1453,7 @@ export default function CreateTicketModal({
                 </div>
               </div>
             ) : isOperationalFunding ? (
-              <div className="space-y-4 rounded-md border p-4">
+              <div className="space-y-3 rounded-md border p-2 sm:space-y-4 sm:p-4">
                 <div>
                   <h3 className="font-semibold">Permintaan Dana Operasional</h3>
                   <p className="text-sm text-muted-foreground">
@@ -1567,9 +1578,11 @@ export default function CreateTicketModal({
             ) : (
               <>
             {usesItemDeliveryDates && (
-              <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 items-end gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm">
                 <div className="space-y-2">
-                  <Label htmlFor="ticket-item-source">Sumber Barang</Label>
+                  <Label className="hidden sm:flex" htmlFor="ticket-item-source">
+                    Sumber Barang
+                  </Label>
                   <Controller
                     control={form.control}
                     name="itemSource"
@@ -1598,7 +1611,7 @@ export default function CreateTicketModal({
                           ]);
                         }}
                       >
-                        <SelectTrigger id="ticket-item-source" className="w-full">
+                        <SelectTrigger id="ticket-item-source" className="h-9 w-full text-xs sm:h-10 sm:text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1615,12 +1628,13 @@ export default function CreateTicketModal({
                 </div>
                 {itemSource === TicketCategoryHint.WAREHOUSE && (
                   <div className="space-y-2">
-                    <Label htmlFor="ticket-items-delivery-date">
+                    <Label className="hidden sm:flex" htmlFor="ticket-items-delivery-date">
                       Tanggal Diperlukan
                     </Label>
                     <Input
                       id="ticket-items-delivery-date"
                       type="date"
+                      className="h-9 text-xs sm:h-10 sm:text-sm"
                       required
                       value={itemsExpectedDeliveryDate ?? ""}
                       min={format(new Date(), "yyyy-MM-dd")}
@@ -1669,15 +1683,20 @@ export default function CreateTicketModal({
               </Button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4 rounded-md border p-4">
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="grid items-start gap-3 rounded-md border p-3 sm:grid-cols-3"
+                  className={cn(
+                    "grid items-end gap-2 sm:gap-4",
+                    usesItemDeliveryDates
+                      ? "grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_2.5rem] sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]"
+                      : "grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]",
+                  )}
                 >
                   {usesItemDeliveryDates ? (
                     <div className="space-y-2">
-                      <Label htmlFor={`ticket-stock-item-${index}`}>Barang</Label>
+                      <Label className="text-xs sm:text-sm" htmlFor={`ticket-stock-item-${index}`}>Barang</Label>
                       <Controller
                         control={form.control}
                         name={`items.${index}.stockItemId`}
@@ -1694,12 +1713,12 @@ export default function CreateTicketModal({
                                 role="combobox"
                                 aria-expanded={stockPickerIndex === index}
                                 id={`ticket-stock-item-${index}`}
-                                className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20"
+                                className="flex h-9 min-w-0 w-full items-center justify-between gap-1 overflow-hidden rounded-md border border-input bg-transparent px-2 py-1.5 text-left text-xs shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20 sm:h-10 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                                 aria-invalid={
                                   !!form.formState.errors.items?.[index]?.stockItemId
                                 }
                               >
-                                <span className="truncate">
+                                <span className="min-w-0 truncate">
                                   {(() => {
                                     const selected = stockItems.find(
                                       (item) => item.id === stockField.value,
@@ -1809,7 +1828,7 @@ export default function CreateTicketModal({
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor={`ticket-quantity-${index}`}>Qty</Label>
+                    <Label className="text-xs sm:text-sm" htmlFor={`ticket-quantity-${index}`}>Qty</Label>
                     <Input
                       id={`ticket-quantity-${index}`}
                       type="number"
@@ -1830,7 +1849,7 @@ export default function CreateTicketModal({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`ticket-unit-${index}`}>Satuan</Label>
+                    <Label className="text-xs sm:text-sm" htmlFor={`ticket-unit-${index}`}>Satuan</Label>
                     {usesItemDeliveryDates ? (
                       <Controller
                         control={form.control}
@@ -1864,7 +1883,7 @@ export default function CreateTicketModal({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="justify-self-end"
+                      className="h-9 w-9 justify-self-end self-end text-red-500 hover:bg-red-500/10 hover:text-red-600 sm:h-10 sm:w-10"
                       aria-label={`Hapus item ${index + 1}`}
                       onClick={() => remove(index)}
                     >
@@ -1886,7 +1905,7 @@ export default function CreateTicketModal({
             )}
           </section>}
 
-          <div className="space-y-2">
+          <div className="space-y-3 px-1 py-2">
             <Label>Tingkat Prioritas</Label>
             <Controller
               control={form.control}
@@ -1895,13 +1914,13 @@ export default function CreateTicketModal({
                 <RadioGroup
                   value={field.value}
                   onValueChange={field.onChange}
-                  className="grid gap-3 sm:grid-cols-3"
+                  className="grid grid-cols-3 gap-2 sm:gap-3"
                   aria-label="Tingkat Prioritas"
                 >
                   <Label
                     htmlFor="priority-non-urgent"
                     className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm",
+                      "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
                       field.value === "NON_URGENT" &&
                         "border-green-600 text-green-700 dark:text-green-400",
                     )}
@@ -1909,24 +1928,29 @@ export default function CreateTicketModal({
                     <RadioGroupItem
                       id="priority-non-urgent"
                       value="NON_URGENT"
+                      className="!min-h-0"
                     />
                     Non-Urgent
                   </Label>
                   <Label
                     htmlFor="priority-urgent"
                     className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm",
+                      "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
                       field.value === "URGENT" &&
                         "border-amber-500 text-amber-700 dark:text-amber-400",
                     )}
                   >
-                    <RadioGroupItem id="priority-urgent" value="URGENT" />
+                    <RadioGroupItem
+                      id="priority-urgent"
+                      value="URGENT"
+                      className="!min-h-0"
+                    />
                     Urgent
                   </Label>
                   <Label
                     htmlFor="priority-emergency"
                     className={cn(
-                      "flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm",
+                      "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
                       field.value === "EMERGENCY" &&
                         "border-destructive text-destructive",
                     )}
@@ -1934,6 +1958,7 @@ export default function CreateTicketModal({
                     <RadioGroupItem
                       id="priority-emergency"
                       value="EMERGENCY"
+                      className="!min-h-0"
                     />
                     Emergency
                   </Label>
@@ -1943,7 +1968,7 @@ export default function CreateTicketModal({
           </div>
 
           {!usesItemDeliveryDates && !isAPHRequest && !isInternalFunding && (
-            <div className="space-y-2">
+            <div className="space-y-3 px-1 py-2">
               <Label>Tanggal Perlu Dibayarkan/Disediakan</Label>
               <Controller
                 control={form.control}
@@ -1986,6 +2011,7 @@ export default function CreateTicketModal({
             </div>
           )}
 
+          </fieldset>
         </form>
       </GlobalModal>
     </>

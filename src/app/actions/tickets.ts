@@ -426,14 +426,44 @@ function validHttpUrl(value: string): boolean {
   }
 }
 
+function isTicketNumberConflict(error: unknown): boolean {
+  return (
+    isUniqueConstraintError(error) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2034")
+  );
+}
+
+async function retryTicketNumberTransaction<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const maxAttempts = 30;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isTicketNumberConflict(error) || attempt === maxAttempts) {
+        throw error;
+      }
+      const delay = Math.min(750, 50 * 2 ** Math.min(attempt - 1, 4));
+      await new Promise((resolve) =>
+        setTimeout(resolve, delay + Math.floor(Math.random() * 100)),
+      );
+    }
+  }
+  throw new Error("Ticket number transaction did not complete.");
+}
+
 async function nextTicketNumber(
-  transaction: Prisma.TransactionClient,
+  database: Pick<Prisma.TransactionClient, "documentNumberSequence">,
 ): Promise<string> {
   const now = new Date();
   const month = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   const prefix = `TKT-${month}-`;
 
-  const sequence = await transaction.documentNumberSequence.upsert({
+  const sequence = await database.documentNumberSequence.upsert({
     where: { kind_year: { kind: prefix, year: 0 } },
     update: { value: { increment: 1 } },
     create: { kind: prefix, year: 0, value: 1 },
@@ -537,8 +567,9 @@ export async function createLogisticsPurchaseOrder(input: {
 
   let ticketNumber: string;
   try {
-    ticketNumber = await prisma.$transaction(async (transaction) => {
-      const generatedNumber = await nextTicketNumber(transaction);
+    ticketNumber = await retryTicketNumberTransaction(() =>
+      nextTicketNumber(prisma).then((generatedNumber) =>
+        prisma.$transaction(async (transaction) => {
       const ticketId = randomUUID();
       await transaction.ticket.create({
         data: {
@@ -575,9 +606,11 @@ export async function createLogisticsPurchaseOrder(input: {
         },
       });
       return generatedNumber;
-    });
+        }, { maxWait: 30000, timeout: 60000 }),
+      ),
+    );
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
+    if (isTicketNumberConflict(error)) {
       return actionFailure("Nomor tiket bentrok. Silakan coba kembali.");
     }
     console.error("Logistics purchase order creation failed:", error);
@@ -2284,8 +2317,9 @@ export async function createTicket(
     if (receiptUrls.some((url) => !isTicketRequestReceiptUrl(url))) {
       throw new Error("URL bukti reimbursement yang diunggah tidak valid.");
     }
-    await prisma.$transaction(async (transaction) => {
-      const ticketNumber = await nextTicketNumber(transaction);
+    await retryTicketNumberTransaction(() =>
+      nextTicketNumber(prisma).then((ticketNumber) =>
+        prisma.$transaction(async (transaction) => {
       await transaction.ticket.create({
         data: {
           id: randomUUID(),
@@ -2367,7 +2401,9 @@ export async function createTicket(
           database: transaction,
         });
       }
-    });
+        }, { maxWait: 30000, timeout: 60000 }),
+      ),
+    );
   } catch (error) {
     await Promise.all(
       receiptUrls.map(async (url) => {
@@ -2382,7 +2418,7 @@ export async function createTicket(
         }
       }),
     );
-    if (isUniqueConstraintError(error)) {
+    if (isTicketNumberConflict(error)) {
       return actionFailure("Nomor tiket bentrok. Silakan coba kembali.");
     }
     if (

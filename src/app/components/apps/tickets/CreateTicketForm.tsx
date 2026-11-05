@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   TicketCategoryHint,
   TicketPriority,
@@ -148,6 +148,7 @@ export default function CreateTicketForm({
       >
 
         <form onSubmit={submit} className="space-y-5">
+          <fieldset disabled={isSubmitting} className="contents">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="ticket-title" className="mb-2 block">
@@ -267,11 +268,12 @@ export default function CreateTicketForm({
               </Button>
             </div>
 
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="grid items-end gap-3 rounded-md border p-3 md:grid-cols-2 xl:grid-cols-4"
-              >
+            <div className="mb-3 space-y-4 rounded-md border p-4">
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(8rem,0.8fr)_minmax(9rem,0.9fr)_minmax(9rem,1fr)_3rem]"
+                >
                 {watchedType === TicketType.MATERIAL && (
                   <div>
                     <Label className="mb-2 block">Sumber Barang</Label>
@@ -389,14 +391,16 @@ export default function CreateTicketForm({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="text-red-500 hover:bg-red-500/10 hover:text-red-600"
                   aria-label={`Hapus item ${index + 1}`}
                   onClick={() => remove(index)}
                   disabled={fields.length <= 1}
                 >
                   <Trash2 aria-hidden="true" />
                 </Button>
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
 
             <p className="text-right font-semibold">
               Total estimasi:{" "}
@@ -431,10 +435,18 @@ export default function CreateTicketForm({
             >
               Batal
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Menyimpan..." : "Simpan draft"}
+            <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Simpan draft"
+              )}
             </Button>
           </div>
+          </fieldset>
         </form>
       </GlobalModal>
     </>

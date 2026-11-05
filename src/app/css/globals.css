@@ -1181,6 +1181,22 @@ main {
     line-height: 1.35;
   }
 
+  .body-wrapper {
+    font-size: 0.8125rem;
+  }
+
+  .body-wrapper h1 {
+    font-size: 1.25rem;
+  }
+
+  .body-wrapper h2 {
+    font-size: 1.125rem;
+  }
+
+  .body-wrapper h3 {
+    font-size: 1rem;
+  }
+
   .app-data-table {
     min-width: 42rem;
   }
