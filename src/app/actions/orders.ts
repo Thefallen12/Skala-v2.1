@@ -610,6 +610,62 @@ export async function updatePurchaseOrder(
   return { success: true, message: "Perubahan Purchase Order berhasil disimpan." };
 }
 
+export async function deletePurchaseOrder(
+  publicCode: string,
+): Promise<OrderActionResult> {
+  const session = await auth();
+  const canDeleteAnyStatus =
+    session?.user?.role === UserRole.DIRECTOR ||
+    session?.user?.role === UserRole.DEPUTY_DIRECTOR;
+  const canDeleteDraft = Boolean(
+    session?.user && canEditPurchaseOrders(session.user.role),
+  );
+  if (!session?.user || (!canDeleteAnyStatus && !canDeleteDraft)) {
+    return fail("Anda tidak memiliki akses untuk menghapus Purchase Order.");
+  }
+  if (!validPublicCode(publicCode)) {
+    return fail("Kode Purchase Order tidak valid.");
+  }
+
+  try {
+    const deleted = await prisma.$transaction(async (transaction) => {
+      const order = await transaction.purchaseOrder.findUnique({
+        where: { publicCode },
+        select: { id: true, status: true },
+      });
+      if (!order) return "not-found";
+      if (!canDeleteAnyStatus && order.status !== POStatus.DRAFT) {
+        return "not-draft";
+      }
+
+      const deleted = await transaction.purchaseOrder.deleteMany({
+        where: { id: order.id, status: order.status },
+      });
+      return deleted.count === 1 ? "deleted" : "changed";
+    });
+
+    if (deleted === "not-found") return fail("Purchase Order tidak ditemukan.");
+    if (deleted === "not-draft") {
+      return fail("Hanya Purchase Order berstatus Draft yang dapat dihapus.");
+    }
+    if (deleted === "changed") {
+      return fail("Status PO berubah. Muat ulang halaman sebelum mencoba lagi.");
+    }
+  } catch (error) {
+    console.error("Purchase Order deletion failed:", error);
+    return fail("Purchase Order gagal dihapus. Silakan coba kembali.");
+  }
+
+  revalidatePath(`/d/${publicCode}`);
+  revalidatePath("/apps/logistics");
+  revalidatePath("/apps/orders");
+  revalidatePath("/apps/documents");
+  revalidatePath("/apps/documents/issued");
+  revalidatePath("/apps/approvals");
+  revalidatePath("/apps/finance");
+  return { success: true, message: "Purchase Order berhasil dihapus." };
+}
+
 export async function reviewPurchaseOrder(
   publicCode: string,
 ): Promise<OrderActionResult> {
@@ -1080,9 +1136,18 @@ export async function markPurchaseOrderSentToVendor(
       },
     });
     if (updated.count !== 1) {
-      return fail(
-        "PO belum disetujui atau sudah tercatat dikirim ke vendor.",
-      );
+      const current = await prisma.purchaseOrder.findUnique({
+        where: { publicCode },
+        select: { status: true, vendorPoSentAt: true },
+      });
+      if (!current) return fail("PO tidak ditemukan.");
+      if (current.status !== POStatus.APPROVED) {
+        return fail("PO harus disetujui Direktur sebelum dikirim ke vendor.");
+      }
+      if (current.vendorPoSentAt) {
+        return fail("Pengiriman PO ke vendor sudah pernah dicatat.");
+      }
+      return fail("Status PO berubah. Muat ulang halaman sebelum mencoba lagi.");
     }
 
     revalidatePath("/apps/logistics");

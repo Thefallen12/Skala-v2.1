@@ -9,7 +9,6 @@ import {
   createEquipmentMaster,
 } from "@/app/actions/construction";
 import { submitPurchaseOrderForFinanceReview } from "@/app/actions/orders";
-import { createVendor, updateVendor } from "@/app/actions/vendors";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
 import DocumentSignoffQueue, {
   type DocumentSignoffTask,
@@ -20,10 +19,7 @@ import PurchaseOrderConfirmationQueue, {
 import PurchaseOrderInvoiceUpload from "@/app/components/apps/logistics/PurchaseOrderInvoiceUpload";
 import VehicleFleetPanel from "@/app/components/apps/logistics/VehicleFleetPanel";
 import VehicleOperationsPanel from "@/app/components/apps/logistics/VehicleOperationsPanel";
-import {
-  VendorBankAccountsEditor,
-  type EditableVendorBankAccount,
-} from "@/app/components/forms/VendorBankAccountsEditor";
+import { VendorFormDialog } from "@/app/components/forms/VendorFormDialog";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
 import type {
@@ -234,8 +230,6 @@ export default function LogisticsHub({
   const [equipmentMasterSheetOpen, setEquipmentMasterSheetOpen] = useState(false);
   const [vendorSheetOpen, setVendorSheetOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<LogisticsVendor | null>(null);
-  const [vendorAccounts, setVendorAccounts] = useState<EditableVendorBankAccount[]>([]);
-  const [vendorMessage, setVendorMessage] = useState("");
   const [purchaseOrderMessage, setPurchaseOrderMessage] = useState("");
   const [purchaseOrderMessageIsError, setPurchaseOrderMessageIsError] =
     useState(false);
@@ -315,44 +309,6 @@ export default function LogisticsHub({
       } catch (error) {
         console.error("Equipment master submission failed:", error);
         setEquipmentMessage("Master alat gagal disimpan. Silakan coba kembali.");
-      }
-    });
-  };
-
-  const submitVendor = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const input = {
-      name: String(formData.get("name") ?? ""),
-      category: String(formData.get("category") ?? ""),
-      address: String(formData.get("address") ?? ""),
-      phone: String(formData.get("phone") ?? ""),
-      email: String(formData.get("email") ?? ""),
-      bankAccounts: vendorAccounts.map(
-        ({ label, bankName, bankAccount, bankHolder, isPrimary }) => ({
-          label,
-          bankName,
-          bankAccount,
-          bankHolder,
-          isPrimary,
-        }),
-      ),
-    };
-    setVendorMessage("");
-    startTransition(async () => {
-      try {
-        const result = editingVendor
-          ? await updateVendor(editingVendor.id, input)
-          : await createVendor(input);
-        setVendorMessage(result.message);
-        if (result.success) {
-          setVendorSheetOpen(false);
-          setEditingVendor(null);
-          router.refresh();
-        }
-      } catch (error) {
-        console.error("Vendor save failed:", error);
-        setVendorMessage("Vendor gagal disimpan. Silakan coba kembali.");
       }
     });
   };
@@ -505,7 +461,19 @@ export default function LogisticsHub({
                               </span>
                             </>
                           )
-                            : "Draft"}
+                            : order.status === POStatus.PENDING_APPROVAL ? (
+                              <>
+                                <Clock3 className="size-4" aria-hidden="true" />
+                                <span className="sr-only">
+                                  Menunggu Persetujuan Direksi
+                                </span>
+                              </>
+                            )
+                              : order.status === POStatus.REJECTED
+                                ? "Ditolak"
+                                : order.status === POStatus.CANCELLED
+                                  ? "Dibatalkan"
+                                  : "Draft"}
                       </Badge>
                       {order.status === POStatus.DRAFT ? (
                         <>
@@ -558,7 +526,7 @@ export default function LogisticsHub({
                             </Button>
                           )}
                         </>
-                      ) : order.status === POStatus.PENDING_FINANCE_REVIEW ? (
+                      ) : order.status !== POStatus.APPROVED ? (
                         <Button
                           asChild
                           aria-label="Lihat PO"
@@ -583,7 +551,7 @@ export default function LogisticsHub({
                           includeTax={order.includeTax}
                           invoiceDate={invoiceDate}
                         />
-                      ) : (
+                      ) : order.status === POStatus.APPROVED ? (
                         <Badge
                           aria-label={
                             order.vendorPoSentAt
@@ -616,7 +584,7 @@ export default function LogisticsHub({
                                 </>
                               )}
                         </Badge>
-                      )}
+                      ) : null}
                       {order.status === POStatus.APPROVED && (
                         <Button
                           aria-label="Preview PO Terbit"
@@ -723,9 +691,7 @@ export default function LogisticsHub({
             <Button
               type="button"
               onClick={() => {
-                setVendorMessage("");
                 setEditingVendor(null);
-                setVendorAccounts([]);
                 setVendorSheetOpen(true);
               }}
             >
@@ -769,14 +735,7 @@ export default function LogisticsHub({
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setVendorMessage("");
                             setEditingVendor(vendor);
-                            setVendorAccounts(
-                              getVendorBankAccounts(vendor).map((account) => ({
-                                ...account,
-                                label: account.label ?? "",
-                              })),
-                            );
                             setVendorSheetOpen(true);
                           }}
                         >
@@ -909,78 +868,15 @@ export default function LogisticsHub({
         </div>
       </TabsContent>
 
-      <GlobalModal
+      <VendorFormDialog
         isOpen={vendorSheetOpen}
         onClose={() => {
           setVendorSheetOpen(false);
           setEditingVendor(null);
-          setVendorAccounts([]);
         }}
-        title={editingVendor ? "Edit Vendor" : "Tambah Vendor Baru"}
-        description="Simpan beberapa rekening dan tandai rekening utama. Rekening dapat dipilih saat membuat pembelian."
-        className="sm:max-w-2xl"
-      >
-          <form
-            key={editingVendor?.id ?? "new-vendor"}
-            className="mt-6 space-y-4"
-            onSubmit={submitVendor}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="vendor-name">Nama Vendor</Label>
-                <Input id="vendor-name" name="name" maxLength={180} required defaultValue={editingVendor?.name ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="vendor-category">Kategori</Label>
-                <Input id="vendor-category" name="category" maxLength={100} required defaultValue={editingVendor?.category ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="vendor-phone">Kontak / Telepon</Label>
-                <Input id="vendor-phone" name="phone" maxLength={60} defaultValue={editingVendor?.phone ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="vendor-email">Email</Label>
-                <Input id="vendor-email" name="email" type="email" maxLength={180} defaultValue={editingVendor?.email ?? ""} />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="vendor-address">Alamat</Label>
-                <Input id="vendor-address" name="address" maxLength={500} defaultValue={editingVendor?.address ?? ""} />
-              </div>
-              <VendorBankAccountsEditor
-                accounts={vendorAccounts}
-                onChange={setVendorAccounts}
-                disabled={isPending}
-                idPrefix="vendor"
-              />
-            </div>
-            {vendorMessage && (
-              <p className="text-sm text-muted-foreground" role="status">
-                {vendorMessage}
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => {
-                  setVendorSheetOpen(false);
-                  setEditingVendor(null);
-                  setVendorAccounts([]);
-                }}
-              >
-                Tutup
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending
-                  ? "Menyimpan..."
-                  : editingVendor
-                    ? "Simpan Perubahan"
-                    : "Simpan Vendor"}
-              </Button>
-            </div>
-          </form>
-      </GlobalModal>
+        vendor={editingVendor}
+        onSaved={() => router.refresh()}
+      />
 
       <GlobalModal
         isOpen={selection !== null}

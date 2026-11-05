@@ -2466,7 +2466,17 @@ export async function createTicket(
 
 export async function updateTicketDetails(
   ticketId: string,
-  input: { title: string; description: string; priority: TicketPriority },
+  input: {
+    title: string;
+    description: string;
+    priority: TicketPriority;
+    items?: Array<{
+      id: string;
+      itemName: string;
+      quantity: number;
+      unit: string;
+    }>;
+  },
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -2481,7 +2491,28 @@ export async function updateTicketDetails(
     input.title.trim().length > 160 ||
     typeof input.description !== "string" ||
     input.description.length > 5000 ||
-    !isTicketPriority(input.priority)
+    !isTicketPriority(input.priority) ||
+    (input.items !== undefined &&
+      (!Array.isArray(input.items) ||
+        input.items.length > 100 ||
+        input.items.some(
+          (item) =>
+            !item ||
+            typeof item.id !== "string" ||
+            item.id.length === 0 ||
+            item.id.length > 64 ||
+            typeof item.itemName !== "string" ||
+            item.itemName.trim().length < 1 ||
+            item.itemName.trim().length > 160 ||
+            typeof item.unit !== "string" ||
+            item.unit.trim().length < 1 ||
+            item.unit.trim().length > 32 ||
+            typeof item.quantity !== "number" ||
+            !Number.isFinite(item.quantity) ||
+            item.quantity <= 0 ||
+            item.quantity > 1_000_000_000,
+        ) ||
+        new Set(input.items.map((item) => item.id)).size !== input.items.length))
   ) {
     return actionFailure("Data tiket tidak valid.");
   }
@@ -2490,7 +2521,20 @@ export async function updateTicketDetails(
     const updated = await prisma.$transaction(async (transaction) => {
       const ticket = await transaction.ticket.findUnique({
         where: { id: ticketId },
-        select: { requesterId: true },
+        select: {
+          requesterId: true,
+          items: {
+            select: {
+              id: true,
+              itemName: true,
+              quantity: true,
+              unit: true,
+              estimatedCost: true,
+              poItemId: true,
+              doItemId: true,
+            },
+          },
+        },
       });
       if (!ticket) return "NOT_FOUND" as const;
       const isDirector = session.user.role === UserRole.DIRECTOR;
@@ -2509,6 +2553,37 @@ export async function updateTicketDetails(
         if (previousEdits > 0) return "EDIT_LIMIT_REACHED" as const;
       }
 
+      const currentItems = new Map(ticket.items.map((item) => [item.id, item]));
+      const submittedItems = input.items;
+      const keptIds = new Set(submittedItems?.map((item) => item.id) ?? []);
+      if (submittedItems !== undefined) {
+        if (ticket.items.length > 0 && submittedItems.length === 0) {
+          return "ITEMS_REQUIRED" as const;
+        }
+
+        for (const item of submittedItems) {
+          const current = currentItems.get(item.id);
+          if (!current) return "INVALID_ITEMS" as const;
+          if (
+            (current.poItemId || current.doItemId) &&
+            (item.itemName.trim() !== current.itemName ||
+              item.unit.trim() !== current.unit ||
+              item.quantity !== current.quantity)
+          ) {
+            return "ITEMS_LOCKED" as const;
+          }
+        }
+
+        if (
+          ticket.items.some(
+            (item) =>
+              (item.poItemId || item.doItemId) && !keptIds.has(item.id),
+          )
+        ) {
+          return "ITEMS_LOCKED" as const;
+        }
+      }
+
       const result = await transaction.ticket.updateMany({
         where: { id: ticketId },
         data: {
@@ -2519,12 +2594,74 @@ export async function updateTicketDetails(
       });
       if (result.count !== 1) return "LOCKED" as const;
 
+      if (submittedItems !== undefined) {
+        for (const item of submittedItems) {
+          const current = currentItems.get(item.id)!;
+          if (
+            current.poItemId ||
+            current.doItemId ||
+            (current.itemName === item.itemName.trim() &&
+              current.unit === item.unit.trim() &&
+              current.quantity === item.quantity)
+          ) {
+            continue;
+          }
+          const updatedItem = await transaction.ticketItem.updateMany({
+            where: {
+              id: item.id,
+              ticketId,
+              poItemId: null,
+              doItemId: null,
+            },
+            data: {
+              itemName: item.itemName.trim(),
+              quantity: item.quantity,
+              unit: item.unit.trim(),
+            },
+          });
+          if (updatedItem.count !== 1) throw new Error("TICKET_ITEMS_LOCKED");
+        }
+
+        const removedItems = ticket.items.filter(
+          (item) => !keptIds.has(item.id),
+        );
+        for (const item of removedItems) {
+          const deletedItem = await transaction.ticketItem.deleteMany({
+            where: {
+              id: item.id,
+              ticketId,
+              poItemId: null,
+              doItemId: null,
+            },
+          });
+          if (deletedItem.count !== 1) throw new Error("TICKET_ITEMS_LOCKED");
+        }
+
+        if (ticket.items.some((item) => item.estimatedCost !== null)) {
+          const totalAmount = submittedItems.reduce((total, item) => {
+            const estimatedCost = currentItems.get(item.id)?.estimatedCost;
+            if (estimatedCost === null || estimatedCost === undefined) {
+              return total;
+            }
+            return total.plus(
+              decimalFromScaledInteger(estimatedCost).times(
+                item.quantity.toString(),
+              ),
+            );
+          }, new Prisma.Decimal(0)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          await transaction.ticket.update({
+            where: { id: ticketId },
+            data: { totalAmount: scaledIntegerFromDecimal(totalAmount) },
+          });
+        }
+      }
+
       await transaction.ticketAuditLog.create({
         data: {
           ticketId,
           userId: session.user.id,
           action: isDirector ? "UPDATED" : "REQUESTER_EDITED",
-          notes: "Judul, deskripsi, atau prioritas tiket diperbarui.",
+          notes: "Informasi tiket dan rincian item diperbarui.",
         },
       });
       return "UPDATED" as const;
@@ -2542,8 +2679,24 @@ export async function updateTicketDetails(
     if (updated === "EDIT_LIMIT_REACHED") {
       return actionFailure("Pemohon hanya dapat mengedit tiket satu kali.");
     }
+    if (updated === "ITEMS_REQUIRED") {
+      return actionFailure("Tiket harus memiliki setidaknya satu item.");
+    }
+    if (updated === "INVALID_ITEMS") {
+      return actionFailure("Rincian item tiket tidak valid. Muat ulang halaman.");
+    }
+    if (updated === "ITEMS_LOCKED") {
+      return actionFailure(
+        "Item yang sudah terhubung ke PO atau Surat Jalan tidak dapat diubah atau dihapus.",
+      );
+    }
   } catch (error) {
     console.error("Ticket update failed:", error);
+    if (error instanceof Error && error.message === "TICKET_ITEMS_LOCKED") {
+      return actionFailure(
+        "Item sudah terhubung ke PO atau Surat Jalan. Muat ulang tiket sebelum mengedit.",
+      );
+    }
     return actionFailure("Tiket gagal diperbarui. Silakan coba kembali.");
   }
 
@@ -2567,49 +2720,21 @@ export async function deleteTicket(
     const deleted = await prisma.$transaction(async (transaction) => {
       const ticket = await transaction.ticket.findUnique({
         where: { id: ticketId },
-        select: {
-          status: true,
-          purchaseOrders: { select: { id: true }, take: 1 },
-          directStockPurchases: { select: { id: true }, take: 1 },
-          paymentTransactions: { select: { id: true }, take: 1 },
-          deliveryOrders: { select: { id: true }, take: 1 },
-          operationalDocuments: { select: { id: true }, take: 1 },
-          items: {
-            where: { OR: [{ poItemId: { not: null } }, { doItemId: { not: null } }] },
-            select: { id: true },
-            take: 1,
-          },
-        },
+        select: { id: true },
       });
       if (!ticket) return "NOT_FOUND" as const;
-      if (ticket.status !== TicketStatus.DRAFT) return "LOCKED" as const;
-      if (
-        ticket.purchaseOrders.length > 0 ||
-        ticket.directStockPurchases.length > 0 ||
-        ticket.paymentTransactions.length > 0 ||
-        ticket.deliveryOrders.length > 0 ||
-        ticket.operationalDocuments.length > 0 ||
-        ticket.items.length > 0
-      ) {
-        return "HAS_ACTIVITY" as const;
-      }
 
-      const result = await transaction.ticket.deleteMany({
-        where: { id: ticketId, status: TicketStatus.DRAFT },
+      await transaction.operationalDocument.deleteMany({
+        where: { ticketId },
       });
-      return result.count === 1 ? ("DELETED" as const) : ("LOCKED" as const);
+      const result = await transaction.ticket.deleteMany({
+        where: { id: ticketId },
+      });
+      return result.count === 1 ? ("DELETED" as const) : ("NOT_FOUND" as const);
     });
 
     if (deleted === "NOT_FOUND") {
       return actionFailure("Tiket tidak ditemukan.");
-    }
-    if (deleted === "LOCKED") {
-      return actionFailure("Tiket hanya dapat dihapus selama masih berstatus Draft.");
-    }
-    if (deleted === "HAS_ACTIVITY") {
-      return actionFailure(
-        "Tiket tidak dapat dihapus karena sudah memiliki dokumen atau transaksi terkait.",
-      );
     }
   } catch (error) {
     console.error("Ticket deletion failed:", error);

@@ -9,6 +9,7 @@ import { POPaymentMethod, type POStatus } from "@prisma/client";
 import {
   approvePurchaseOrder,
   createPurchaseOrder,
+  deletePurchaseOrder,
   reviewPurchaseOrder,
   submitPurchaseOrderForFinanceReview,
   updatePurchaseOrder,
@@ -21,6 +22,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { GlobalModal } from "@/components/ui/global-modal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -127,6 +138,7 @@ export default function POEditForm({
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(initialPreviewOpen);
   const [currentStatus, setCurrentStatus] = useState<POStatus>(status ?? "DRAFT");
   const [currentQr, setCurrentQr] = useState(qrDataUrl ?? null);
@@ -273,8 +285,35 @@ export default function POEditForm({
     }
   };
 
+  const handleDeletePurchaseOrder = async () => {
+    const canDelete =
+      (canEdit && currentStatus === "DRAFT") || canApprove;
+    if (!publicCode || !canDelete) return;
+    setIsSaving(true);
+    setMessage("");
+    try {
+      const result = await deletePurchaseOrder(publicCode);
+      setIsError(!result.success);
+      setMessage(result.message);
+      if (result.success) {
+        setIsDeleteDialogOpen(false);
+        router.replace(
+          canApprove ? "/apps/approvals" : "/apps/logistics?tab=documents",
+        );
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Purchase Order deletion failed:", error);
+      setIsError(true);
+      setMessage("Purchase Order gagal dihapus. Silakan coba kembali.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <form onSubmit={submit} className="order-editor-print-area space-y-6">
+    <>
+      <form onSubmit={submit} className="order-editor-print-area space-y-6">
       <Card className="space-y-5 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -606,6 +645,18 @@ export default function POEditForm({
               : "Buat Purchase Order"}
           </Button>
         )}
+        {publicCode &&
+          ((canEdit && currentStatus === "DRAFT") || canApprove) && (
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isSaving}
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 size-4" aria-hidden="true" />
+            {currentStatus === "DRAFT" ? "Hapus Draft" : "Hapus PO"}
+          </Button>
+        )}
         {canReview &&
           (currentStatus === "DRAFT" ||
             currentStatus === "PENDING_FINANCE_REVIEW") && (
@@ -684,6 +735,42 @@ export default function POEditForm({
           />
         </GlobalModal>
       )}
-    </form>
+      </form>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Hapus {currentStatus === "DRAFT" ? "draft " : ""}PO?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {poNumber ? `“${poNumber}”` : "Purchase Order"} beserta rincian
+              barang dan konfirmasi pesanannya akan dihapus permanen. Catatan
+              pembayaran atau invoice yang terkait dapat kehilangan hubungan
+              dengan PO ini. Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button" disabled={isSaving}>
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              disabled={isSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeletePurchaseOrder();
+              }}
+            >
+              {isSaving
+                ? "Menghapus..."
+                : `Ya, Hapus ${currentStatus === "DRAFT" ? "Draft" : "PO"}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

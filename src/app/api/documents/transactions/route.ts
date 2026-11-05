@@ -351,7 +351,17 @@ async function loadDocument(
         "Invoice harus disertai Surat Jalan (DO) dan salinan PO ini.",
       ],
       signatures: [
-        { heading: "Dibuat Oleh / Prepared By", name: order.createdBy?.name ?? undefined, role: order.createdBy?.role === UserRole.LOGISTICS ? "Koordinator Logistik / Logistics Coordinator" : "Logistik / Logistics" },
+        {
+          heading:
+            order.createdBy?.role === UserRole.LOGISTICS
+              ? "Diajukan Oleh / Submitted By"
+              : "Dibuat Oleh / Prepared By",
+          name: order.createdBy?.name ?? undefined,
+          role:
+            order.createdBy?.role === UserRole.LOGISTICS
+              ? "Koordinator Logistik / Logistics Coordinator"
+              : "Logistik / Logistics",
+        },
         {
           heading: "Persetujuan Keuangan / Finance Approval",
           name: order.reviewedBy?.name ?? undefined,

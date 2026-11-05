@@ -141,7 +141,7 @@ export function renderUniversalTransactionDocument(
       const approvalQrClass =
         document.kind === "PO" && index === 2 ? " signature-approval-qr" : "";
       const approvalStatus = signature.approvalStatus
-        ? `<span class="signature-approval"><span class="signature-approval-status ${signature.approvalStatus}">${signature.approvalStatus === "approved" ? "✓ TELAH DISETUJUI" : "MENUNGGU PERSETUJUAN"}</span>${
+        ? `<span class="signature-approval"><span class="signature-approval-status ${signature.approvalStatus}">${signature.approvalStatus === "approved" ? "✓ APPROVED" : "PENDING APPROVAL"}</span>${
             signature.approvalDate
               ? `<span class="signature-approval-date">${escapeHtml(signature.approvalDate)}</span>`
               : ""

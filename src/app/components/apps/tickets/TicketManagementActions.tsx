@@ -9,7 +9,7 @@ import {
   updateTicketDetails,
   type TicketActionResult,
 } from "@/app/actions/tickets";
-import { TicketPriority, TicketStatus, UserRole } from "@prisma/client";
+import { TicketPriority, UserRole } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,14 @@ const priorities: { value: TicketPriority; label: string }[] = [
   { value: TicketPriority.URGENT, label: "Mendesak" },
 ];
 
+type EditableTicketItem = {
+  id: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  isLinked: boolean;
+};
+
 export default function TicketManagementActions({
   ticket,
   role,
@@ -32,32 +40,58 @@ export default function TicketManagementActions({
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [title, setTitle] = useState(ticket.title);
   const [description, setDescription] = useState(ticket.description ?? "");
   const [priority, setPriority] = useState(ticket.priority);
+  const [items, setItems] = useState<EditableTicketItem[]>([]);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const isDirector = role === UserRole.DIRECTOR;
   const canEdit =
     isDirector || (ticket.canSubmit && ticket.canRequesterEdit);
-  const canDelete =
-    ticket.status === TicketStatus.DRAFT &&
-    (ticket.purchaseOrders?.length ?? 0) === 0 &&
-    (ticket.directStockPurchases?.length ?? 0) === 0 &&
-    (ticket.paymentTransactions?.length ?? 0) === 0 &&
-    (ticket.deliveryOrders?.length ?? 0) === 0 &&
-    (ticket.operationalDocuments?.length ?? 0) === 0 &&
-    ticket.items.every((item) => !item.poItemId && !item.doItemId);
 
   if (!canEdit && !isDirector) return null;
+
+  const getEditableItems = (): EditableTicketItem[] =>
+    ticket.items.map((item) => ({
+      id: item.id,
+      itemName: item.itemName,
+      quantity: item.quantity,
+      unit: item.unit,
+      isLinked: Boolean(item.poItemId || item.doItemId),
+    }));
 
   const openEditor = () => {
     setTitle(ticket.title);
     setDescription(ticket.description ?? "");
     setPriority(ticket.priority);
+    setItems(getEditableItems());
     setMessage("");
     setIsOpen(true);
   };
+
+  const updateItem = (
+    itemId: string,
+    changes: Partial<Pick<EditableTicketItem, "itemName" | "quantity" | "unit">>,
+  ) => {
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === itemId ? { ...item, ...changes } : item,
+      ),
+    );
+  };
+
+  const canSaveItems = items.every(
+    (item) =>
+      item.itemName.trim().length > 0 &&
+      item.itemName.trim().length <= 160 &&
+      item.unit.trim().length > 0 &&
+      item.unit.trim().length <= 32 &&
+      Number.isFinite(item.quantity) &&
+      item.quantity > 0 &&
+      item.quantity <= 1_000_000_000,
+  );
 
   const handleSave = () => {
     setMessage("");
@@ -67,6 +101,12 @@ export default function TicketManagementActions({
           title,
           description,
           priority,
+          items: items.map(({ id, itemName, quantity, unit }) => ({
+            id,
+            itemName,
+            quantity,
+            unit,
+          })),
         });
         setMessage(result.message);
         if (result.success) {
@@ -81,21 +121,21 @@ export default function TicketManagementActions({
   };
 
   const handleDelete = () => {
-    if (
-      !canDelete ||
-      !window.confirm(
-        `Hapus tiket ${ticket.ticketNumber}? Penghapusan hanya tersedia untuk tiket Draft yang belum diproses.`,
-      )
-    ) {
-      return;
-    }
-
+    if (isPending) return;
     setMessage("");
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (isPending) return;
     startTransition(async () => {
       try {
         const result = await deleteTicket(ticket.id);
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          setIsDeleteConfirmOpen(false);
+          router.refresh();
+        }
       } catch (error) {
         console.error("Ticket delete action failed:", error);
         setMessage("Tiket gagal dihapus. Silakan coba kembali.");
@@ -125,12 +165,8 @@ export default function TicketManagementActions({
           size="sm"
           variant="destructive"
           className="h-7 gap-1 px-2 text-xs"
-          disabled={!canDelete || isPending}
-          title={
-            canDelete
-              ? "Hapus tiket Draft"
-              : "Tiket hanya dapat dihapus selama masih berstatus Draft"
-          }
+          disabled={isPending}
+          title="Hapus tiket"
           onClick={handleDelete}
         >
           <Trash2 aria-hidden="true" className="size-3" />
@@ -146,7 +182,7 @@ export default function TicketManagementActions({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         title={`Edit tiket ${ticket.ticketNumber}`}
-        description="Ubah judul, deskripsi, atau prioritas tiket."
+        description="Perbarui informasi tiket dan barang langsung di formulir ini."
         footer={
           <>
             <Button
@@ -159,7 +195,13 @@ export default function TicketManagementActions({
             </Button>
             <Button
               type="button"
-              disabled={isPending || title.trim().length < 3}
+              disabled={
+                isPending ||
+                title.trim().length < 3 ||
+                title.trim().length > 160 ||
+                description.length > 5000 ||
+                !canSaveItems
+              }
               onClick={handleSave}
             >
               {isPending ? "Menyimpan..." : "Simpan perubahan"}
@@ -203,12 +245,156 @@ export default function TicketManagementActions({
               ))}
             </select>
           </div>
+          {items.length > 0 && (
+            <section className="space-y-3 border-t border-border pt-4">
+              <div>
+                <h3 className="text-sm font-semibold">Barang tiket</h3>
+                <p className="text-xs text-muted-foreground">
+                  Ubah nama, jumlah, atau satuan. Barang yang sudah masuk PO
+                  atau Surat Jalan tidak dapat diubah.
+                </p>
+              </div>
+              <div className="space-y-3">
+                {items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_auto] sm:items-end"
+                  >
+                    <div className="col-span-2 space-y-1.5 sm:col-span-1">
+                      <Label htmlFor={`ticket-item-name-${item.id}`}>
+                        Barang {index + 1}
+                      </Label>
+                      <Input
+                        id={`ticket-item-name-${item.id}`}
+                        value={item.itemName}
+                        maxLength={160}
+                        disabled={item.isLinked || isPending}
+                        onChange={(event) =>
+                          updateItem(item.id, {
+                            itemName: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ticket-item-quantity-${item.id}`}>
+                        Jumlah
+                      </Label>
+                      <Input
+                        id={`ticket-item-quantity-${item.id}`}
+                        type="number"
+                        min="0"
+                        max="1000000000"
+                        step="any"
+                        value={Number.isFinite(item.quantity) ? item.quantity : ""}
+                        disabled={item.isLinked || isPending}
+                        onChange={(event) =>
+                          updateItem(item.id, {
+                            quantity: event.target.valueAsNumber,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ticket-item-unit-${item.id}`}>
+                        Satuan
+                      </Label>
+                      <Input
+                        id={`ticket-item-unit-${item.id}`}
+                        value={item.unit}
+                        maxLength={32}
+                        disabled={item.isLinked || isPending}
+                        onChange={(event) =>
+                          updateItem(item.id, { unit: event.target.value })
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 self-end text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`Hapus barang ${item.itemName}`}
+                      title={
+                        item.isLinked
+                          ? "Barang yang sudah diproses tidak dapat dihapus"
+                          : items.length === 1
+                            ? "Tiket harus memiliki setidaknya satu barang"
+                            : "Hapus barang"
+                      }
+                      disabled={item.isLinked || items.length === 1 || isPending}
+                      onClick={() =>
+                        setItems((currentItems) =>
+                          currentItems.filter(
+                            (currentItem) => currentItem.id !== item.id,
+                          ),
+                        )
+                      }
+                    >
+                      <Trash2 aria-hidden="true" className="size-4" />
+                    </Button>
+                    {item.isLinked && (
+                      <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
+                        Sudah terhubung ke PO atau Surat Jalan dan tidak dapat
+                        diedit.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           {message && (
             <p className="text-sm text-muted-foreground" role="status">
               {message}
             </p>
           )}
         </div>
+      </GlobalModal>
+      <GlobalModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => {
+          if (!isPending) setIsDeleteConfirmOpen(false);
+        }}
+        title="Hapus tiket ini?"
+        description="Tindakan ini tidak dapat dibatalkan."
+        icon={<Trash2 aria-hidden="true" className="size-5 text-destructive" />}
+        className="sm:max-w-lg"
+        bodyClassName="space-y-3"
+        footerNote="Pastikan Anda memahami dampak penghapusan."
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setIsDeleteConfirmOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              onClick={confirmDelete}
+            >
+              <Trash2 aria-hidden="true" className="size-4" />
+              {isPending ? "Menghapus..." : "Hapus tiket"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed">
+          Tiket <span className="font-semibold">{ticket.ticketNumber}</span> dan
+          dokumen operasional terkait akan dihapus. PO, pembelian, transaksi
+          pembayaran, serta Surat Jalan akan tetap tersimpan, tetapi tidak lagi
+          terhubung ke tiket ini.
+        </p>
+        {message && (
+          <p className="text-sm text-destructive" role="alert">
+            {message}
+          </p>
+        )}
       </GlobalModal>
     </div>
   );
