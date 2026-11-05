@@ -1881,12 +1881,18 @@ export async function createTicket(
   const isFieldTeamInternalFundingRequest =
     requestCategory === TicketRequestCategory.REIMBURSEMENT ||
     requestCategory === TicketRequestCategory.KASBON;
+  const isMoverReimbursementRequest =
+    requestCategory === TicketRequestCategory.REIMBURSEMENT;
   if (
     isInternalFundingRequest &&
     session.user.role !== UserRole.DRAFTER &&
     !(
       session.user.role === UserRole.FIELD_TEAM &&
       isFieldTeamInternalFundingRequest
+    ) &&
+    !(
+      session.user.role === UserRole.MOVER &&
+      isMoverReimbursementRequest
     )
   ) {
     return actionFailure(
@@ -1915,6 +1921,15 @@ export async function createTicket(
   ) {
     return actionFailure(
       "Tim Lapangan hanya dapat membuat permintaan Operasional atau Material.",
+    );
+  }
+  if (
+    session.user.role === UserRole.MOVER &&
+    isInternalFundingRequest &&
+    !isMoverReimbursementRequest
+  ) {
+    return actionFailure(
+      "Pengangkut hanya dapat membuat pengajuan reimbursement.",
     );
   }
   const receiptFiles = input.receiptFiles ?? [];

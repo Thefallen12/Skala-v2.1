@@ -65,6 +65,10 @@ export async function getVisibleMenuKeysForRole(role: UserRole): Promise<string[
 
   const fallbackKeys = DEFAULT_MENU_ACCESS_BY_ROLE[role] ?? [];
   return APP_MENUS.filter((menu) => {
+    if (role === UserRole.MOVER && menu.key === "drafter") {
+      return false;
+    }
+
     if (isMenuAccessRequired(role, menu.key)) {
       return true;
     }

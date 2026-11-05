@@ -460,14 +460,21 @@ const getRequestTypeOptions = (
     });
   }
 
-  if (role === UserRole.DRAFTER || role === UserRole.FIELD_TEAM) {
+  if (
+    role === UserRole.DRAFTER ||
+    role === UserRole.FIELD_TEAM ||
+    role === UserRole.MOVER
+  ) {
     options.push(
       ...internalFundingCategories
         .filter(
           (category) =>
             role === UserRole.DRAFTER ||
-            category === TicketRequestCategory.REIMBURSEMENT ||
-            category === TicketRequestCategory.KASBON,
+            (role === UserRole.FIELD_TEAM &&
+              (category === TicketRequestCategory.REIMBURSEMENT ||
+                category === TicketRequestCategory.KASBON)) ||
+            (role === UserRole.MOVER &&
+              category === TicketRequestCategory.REIMBURSEMENT),
         )
         .map((category) => ({
           label: requestCategoryLabels[category],
