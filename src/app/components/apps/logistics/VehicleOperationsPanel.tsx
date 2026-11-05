@@ -169,7 +169,7 @@ export default function VehicleOperationsPanel({
                   <th className="p-3">No. Plat</th>
                   <th className="p-3">Jenis / Model</th>
                   <th className="p-3">Merk</th>
-                  <th className="p-3">Total KM</th>
+                  <th className="p-3">Kilometer Saat Ini</th>
                   <th className="p-3">Status</th>
                 </tr>
               </thead>
@@ -184,7 +184,7 @@ export default function VehicleOperationsPanel({
                     <td className="p-3">{vehicle.brand ?? "—"}</td>
                     <td className="p-3">
                       {vehicle.odometerInitialized
-                        ? `${Number(vehicle.currentKilometer).toLocaleString("id-ID")} km`
+                        ? `${new Intl.NumberFormat("id-ID").format(Number(vehicle.currentKilometer))} km`
                         : "KM belum diinisialisasi"}
                     </td>
                     <td className="p-3">

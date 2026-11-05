@@ -171,7 +171,7 @@ export default function VehicleFleetPanel({
                   <th className="p-3">Nomor Plat</th>
                       <th className="p-3">Jenis / Model</th>
                   <th className="p-3">Merk</th>
-                      <th className="p-3">Total KM</th>
+                      <th className="p-3">Kilometer Saat Ini</th>
                       <th className="p-3">Status Ketersediaan</th>
                       <th className="p-3 text-right">Aksi</th>
                 </tr>
@@ -191,7 +191,7 @@ export default function VehicleFleetPanel({
                     <td className="p-3">{vehicle.brand || "—"}</td>
                     <td className="p-3">
                       {vehicle.odometerInitialized
-                        ? `${Number(vehicle.currentKilometer).toLocaleString("id-ID")} km`
+                        ? `${new Intl.NumberFormat("id-ID").format(Number(vehicle.currentKilometer))} km`
                         : "Belum diatur"}
                     </td>
                     <td className="p-3">
