@@ -54,7 +54,7 @@ NEXTAUTH_URL=https://your-domain.example
 NEXT_PUBLIC_APP_URL=https://your-domain.example
 ```
 
-`MONGODB_URL`, `AUTH_SECRET`, `AUTH_TRUST_HOST`, `NEXTAUTH_URL`, and
+`MONGODB_URL` (or Hostinger's equivalent `MONGODB_URI`), `AUTH_SECRET`, `AUTH_TRUST_HOST`, `NEXTAUTH_URL`, and
 `NEXT_PUBLIC_APP_URL` are required for production. Configure
 `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` if
 users upload profile photos, receipts, or documents. `ADMIN_EMAIL`,
