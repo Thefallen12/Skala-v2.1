@@ -178,7 +178,8 @@ export default function TicketsApp({
   };
 
   return (
-    <div className="my-6 space-y-6">
+    <div className="tickets-dashboard my-6 space-y-6">
+      <h2 className="ticket-mobile-section-title">Ringkasan Tiket</h2>
       <TicketFilter
         tickets={tickets}
         activeFilter={filter}
@@ -186,8 +187,8 @@ export default function TicketsApp({
         actionRequiredCount={actionRequired.length}
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <CardBox className="overflow-hidden xl:col-span-2">
+      <div className="ticket-metrics-grid grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <CardBox className="ticket-trend-panel overflow-hidden xl:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
             <div>
               <h3 className="font-semibold">Tren Tiket & Transaksi</h3>
@@ -219,10 +220,11 @@ export default function TicketsApp({
             <TicketStatisticsChart
               months={monthlyStatistics.months}
               categoryLabel="Semua jenis permintaan"
+              compact
             />
           </div>
         </CardBox>
-        <CardBox className="h-full overflow-hidden">
+        <CardBox className="ticket-distribution-panel h-full overflow-hidden">
           <div className="border-b border-border px-5 py-4">
             <h3 className="font-semibold">Distribusi Jenis Permintaan</h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -230,7 +232,7 @@ export default function TicketsApp({
             </p>
           </div>
           <div className="p-4">
-            <TicketRequestDistributionChart tickets={tickets} />
+            <TicketRequestDistributionChart tickets={tickets} compact />
           </div>
         </CardBox>
       </div>
@@ -242,7 +244,7 @@ export default function TicketsApp({
         onFilter={selectTicketFilter}
       />
 
-      <CardBox className="overflow-hidden">
+      <CardBox className="ticket-directory-panel overflow-hidden">
         <div
           id="ticket-directory"
           className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4"

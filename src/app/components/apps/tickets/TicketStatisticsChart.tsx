@@ -7,10 +7,13 @@ import type { TicketStatisticsMonth } from "./ticket-statistics";
 export default function TicketStatisticsChart({
   months,
   categoryLabel,
+  compact = false,
 }: {
   months: TicketStatisticsMonth[];
   categoryLabel: string;
+  compact?: boolean;
 }) {
+  const chartHeight = compact ? 185 : 340;
   const values = months.map((month) =>
     Number((month.totalCents + BigInt(50)) / BigInt(100)),
   );
@@ -22,7 +25,7 @@ export default function TicketStatisticsChart({
       toolbar: { show: false },
       fontFamily: "inherit",
       foreColor: "#7C8FAC",
-      height: 340,
+      height: chartHeight,
       zoom: { enabled: false },
     },
     colors: ["var(--color-info)", "var(--color-primary)"],
@@ -34,12 +37,14 @@ export default function TicketStatisticsChart({
       categories: months.map((month) => month.label),
       axisBorder: { show: false },
       axisTicks: { show: false },
+      labels: { show: true },
     },
     yaxis: [
       {
         seriesName: "Nilai transaksi",
-        title: { text: "Nilai (Rp)" },
+        title: compact ? { text: undefined } : { text: "Nilai (Rp)" },
         labels: {
+          show: true,
           formatter: (value) =>
             new Intl.NumberFormat("id-ID", {
               notation: "compact",
@@ -52,11 +57,15 @@ export default function TicketStatisticsChart({
         opposite: true,
         min: 0,
         forceNiceScale: true,
-        title: { text: "Jumlah tiket" },
-        labels: { formatter: (value) => `${Math.round(value)}` },
+        title: compact ? { text: undefined } : { text: "Jumlah tiket" },
+        labels: {
+          show: true,
+          formatter: (value) => `${Math.round(value)}`,
+        },
       },
     ],
     tooltip: {
+      enabled: !compact,
       shared: true,
       intersect: false,
       theme: "dark",
@@ -74,7 +83,7 @@ export default function TicketStatisticsChart({
         },
       ],
     },
-    legend: { position: "top", horizontalAlign: "left" },
+    legend: { show: !compact, position: "top", horizontalAlign: "left" },
   };
 
   const series: ApexAxisChartSeries = [
@@ -83,17 +92,31 @@ export default function TicketStatisticsChart({
   ];
 
   return (
-    <div className="min-h-[340px] w-full">
+    <div className={`${compact ? "min-h-[185px]" : "min-h-[340px]"} w-full`}>
       {months.length > 0 ? (
-        <Chart
-          options={options}
-          series={series}
-          type="line"
-          height={340}
-          width="100%"
-        />
+        <>
+          {compact && (
+            <div className="mobile-chart-legend">
+              <span>
+                <i className="bg-info" aria-hidden="true" />
+                Nilai transaksi · Semua jenis permintaan
+              </span>
+              <span>
+                <i className="bg-primary" aria-hidden="true" />
+                Jumlah transaksi · Semua jenis permintaan
+              </span>
+            </div>
+          )}
+          <Chart
+            options={options}
+            series={series}
+            type="line"
+            height={chartHeight}
+            width="100%"
+          />
+        </>
       ) : (
-        <div className="flex h-[340px] items-center justify-center text-sm text-muted-foreground">
+        <div className={`flex ${compact ? "h-[185px]" : "h-[340px]"} items-center justify-center text-sm text-muted-foreground`}>
           Belum ada data transaksi untuk periode ini.
         </div>
       )}

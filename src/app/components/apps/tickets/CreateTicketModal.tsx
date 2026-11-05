@@ -868,7 +868,7 @@ export default function CreateTicketModal({
         onClose={() => setOpen(false)}
         title="Tambah tiket ERP"
         description="Isi proyek, jenis permintaan, data penerima atau rincian item, prioritas, dan tanggal kebutuhan."
-        className="max-w-4xl"
+        className="ticket-create-modal max-w-4xl"
         footer={
           <>
             <Button
@@ -907,13 +907,13 @@ export default function CreateTicketModal({
           </p>
         )}
 
-        <form id="ticket-form" onSubmit={submit} className="space-y-5">
+        <form id="ticket-form" onSubmit={submit} className="ticket-create-form space-y-5">
           <fieldset
             disabled={form.formState.isSubmitting}
             className="contents"
           >
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
+          <div className="ticket-create-top-fields grid gap-4 md:grid-cols-2">
+            <div className="ticket-project-field space-y-2">
               <Label htmlFor="ticket-project">Pilih Proyek</Label>
               <Controller
                 control={form.control}
@@ -955,7 +955,7 @@ export default function CreateTicketModal({
                 </p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="ticket-request-field space-y-2">
               <Label htmlFor="ticket-request-category">Jenis Permintaan</Label>
               <Controller
                 control={form.control}
@@ -1578,7 +1578,7 @@ export default function CreateTicketModal({
             ) : (
               <>
             {usesItemDeliveryDates && (
-              <div className="grid grid-cols-2 items-end gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm">
+              <div className="ticket-item-source-row grid grid-cols-2 items-end gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm">
                 <div className="space-y-2">
                   <Label className="hidden sm:flex" htmlFor="ticket-item-source">
                     Sumber Barang
@@ -1658,7 +1658,7 @@ export default function CreateTicketModal({
                 )}
               </div>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="ticket-items-heading flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold">Rincian Item</h3>
               </div>
@@ -1683,12 +1683,12 @@ export default function CreateTicketModal({
               </Button>
             </div>
 
-            <div className="space-y-4 rounded-md border p-4">
+            <div className="ticket-items-box space-y-4 rounded-md border p-4">
               {fields.map((field, index) => (
                 <div
                   key={field.id}
                   className={cn(
-                    "grid items-end gap-2 sm:gap-4",
+                    "ticket-item-row grid items-end gap-2 sm:gap-4",
                     usesItemDeliveryDates
                       ? "grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_2.5rem] sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]"
                       : "grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]",
@@ -1905,7 +1905,7 @@ export default function CreateTicketModal({
             )}
           </section>}
 
-          <div className="space-y-3 px-1 py-2">
+          <div className="ticket-priority-section space-y-3 px-1 py-2">
             <Label>Tingkat Prioritas</Label>
             <Controller
               control={form.control}
@@ -1968,7 +1968,7 @@ export default function CreateTicketModal({
           </div>
 
           {!usesItemDeliveryDates && !isAPHRequest && !isInternalFunding && (
-            <div className="space-y-3 px-1 py-2">
+            <div className="ticket-needed-date-section space-y-3 px-1 py-2">
               <Label>Tanggal Perlu Dibayarkan/Disediakan</Label>
               <Controller
                 control={form.control}

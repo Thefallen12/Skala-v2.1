@@ -5,6 +5,13 @@ import type { ApexOptions } from "apexcharts";
 import { TicketRequestCategory } from "@prisma/client";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import { categoryForTicket } from "./ticket-statistics";
+import { TicketStatus } from "@prisma/client";
+
+const statusLabels: Partial<Record<TicketStatus, string>> = {
+  PENDING_DIRECTOR: "Menunggu Persetujuan Direktur",
+  COMPLETED: "Selesai",
+  REJECTED: "Ditolak",
+};
 
 const categories = [
   {
@@ -56,8 +63,10 @@ const categories = [
 
 export default function TicketRequestDistributionChart({
   tickets,
+  compact = false,
 }: {
   tickets: TicketRow[];
+  compact?: boolean;
 }) {
   const counts = categories.map(
     (category) =>
@@ -67,6 +76,14 @@ export default function TicketRequestDistributionChart({
   const populatedCategories = categories
     .map((category, index) => ({ ...category, count: counts[index] }))
     .filter((category) => category.count > 0);
+  const statusCounts = Object.values(TicketStatus)
+    .map((status) => ({
+      status,
+      count: tickets.filter((ticket) => ticket.status === status).length,
+    }))
+    .filter((item) => item.count > 0)
+    .sort((left, right) => right.count - left.count);
+  const leadingStatus = statusCounts[0];
 
   const options: ApexOptions = {
     chart: {
@@ -113,7 +130,7 @@ export default function TicketRequestDistributionChart({
             options={options}
             series={counts}
             type="donut"
-            height={220}
+          height={compact ? 170 : 220}
             width="100%"
           />
           <ul className="mt-2 space-y-2">
@@ -136,6 +153,25 @@ export default function TicketRequestDistributionChart({
               </li>
             ))}
           </ul>
+          {compact && leadingStatus && (
+            <div className="mobile-chart-status" aria-label="Distribusi status tiket">
+              <div className="flex items-center justify-between gap-2">
+                <span>Distribusi Status</span>
+                <span>{leadingStatus.count}</span>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-muted">
+                <span
+                  className="block h-full rounded-full bg-warning"
+                  style={{
+                    width: `${(leadingStatus.count / tickets.length) * 100}%`,
+                  }}
+                />
+              </div>
+              <span className="mt-1 block truncate text-warning">
+                {statusLabels[leadingStatus.status] ?? leadingStatus.status} ({leadingStatus.count})
+              </span>
+            </div>
+          )}
         </>
       ) : (
         <div className="flex h-[220px] items-center justify-center text-center text-sm text-muted-foreground">

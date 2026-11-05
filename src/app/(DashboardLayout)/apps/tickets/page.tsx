@@ -353,22 +353,24 @@ const Tickets = async ({
 
   return (
     <>
-      <BreadcrumbComp
-        title="Tickets App"
-        items={BCrumb}
-        action={
-          <CreateTicketModal
-            projects={projects}
-            requesterRole={session.user.role}
-            movers={movers}
-            stockItems={stockItems.map((item) => ({
-              ...item,
-              unitPrice: decimalStringFromScaledInteger(item.unitPrice),
-              stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
-            }))}
-          />
-        }
-      />
+      <div className="tickets-page-brand">
+        <BreadcrumbComp
+          title="Tickets App"
+          items={BCrumb}
+          action={
+            <CreateTicketModal
+              projects={projects}
+              requesterRole={session.user.role}
+              movers={movers}
+              stockItems={stockItems.map((item) => ({
+                ...item,
+                unitPrice: decimalStringFromScaledInteger(item.unitPrice),
+                stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
+              }))}
+            />
+          }
+        />
+      </div>
       <TicketsApp
         tickets={ticketRows}
         projects={projects}

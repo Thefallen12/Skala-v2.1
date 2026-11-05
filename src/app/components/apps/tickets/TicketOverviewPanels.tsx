@@ -171,7 +171,7 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
     .filter(({ count }) => count > 0);
 
   return (
-    <CardBox className="h-full overflow-hidden">
+    <CardBox className="ticket-status-panel h-full overflow-hidden">
       <div className="border-b border-border px-5 py-4">
         <h3 className="font-semibold">Distribusi Status Tiket</h3>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -263,7 +263,7 @@ function RecentTicketActivity({
     .slice(0, 6);
 
   return (
-    <CardBox className="h-full overflow-hidden">
+    <CardBox className="ticket-activity-panel h-full overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
           <h3 className="font-semibold">Aktivitas Terbaru</h3>
@@ -393,7 +393,7 @@ export default function TicketOverviewPanels({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+    <div className="ticket-overview-grid grid grid-cols-1 gap-6 xl:grid-cols-3">
       <TicketStatusDistribution tickets={tickets} />
 
       <RecentTicketActivity
@@ -403,7 +403,7 @@ export default function TicketOverviewPanels({
       />
 
       <div className="grid gap-6">
-        <CardBox className="overflow-hidden">
+        <CardBox className="ticket-alert-panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
               <h3 className="font-semibold">Peringatan Tiket</h3>
@@ -471,7 +471,7 @@ export default function TicketOverviewPanels({
           </div>
         </CardBox>
 
-        <CardBox className="overflow-hidden">
+        <CardBox className="ticket-quick-panel overflow-hidden">
           <div className="border-b border-border px-5 py-4">
             <h3 className="font-semibold">Tindakan Cepat</h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -487,7 +487,8 @@ export default function TicketOverviewPanels({
             >
               <BellRing className="size-4 shrink-0 text-warning" aria-hidden="true" />
               <span className="min-w-0 whitespace-normal text-left">
-                Tiket menunggu tindakan
+                <span className="hidden sm:inline">Tiket menunggu tindakan</span>
+                <span className="sm:hidden">Menunggu</span>
               </span>
             </Button>
             <Button
@@ -498,7 +499,8 @@ export default function TicketOverviewPanels({
             >
               <FilePlus2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
               <span className="min-w-0 whitespace-normal text-left">
-                Draft tiket
+                <span className="hidden sm:inline">Draft tiket</span>
+                <span className="sm:hidden">Draft</span>
               </span>
             </Button>
             <Button
@@ -509,7 +511,8 @@ export default function TicketOverviewPanels({
             >
               <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden="true" />
               <span className="min-w-0 whitespace-normal text-left">
-                Tiket selesai
+                <span className="hidden sm:inline">Tiket selesai</span>
+                <span className="sm:hidden">Selesai</span>
               </span>
             </Button>
             <Button
@@ -523,7 +526,8 @@ export default function TicketOverviewPanels({
             >
               <ListFilter className="size-4 shrink-0" aria-hidden="true" />
               <span className="min-w-0 whitespace-normal text-left">
-                Semua tiket
+                <span className="hidden sm:inline">Semua tiket</span>
+                <span className="sm:hidden">Semua</span>
               </span>
             </Button>
             <Button
@@ -534,7 +538,8 @@ export default function TicketOverviewPanels({
             >
               <Download className="size-4 shrink-0 text-primary" aria-hidden="true" />
               <span className="min-w-0 whitespace-normal text-left">
-                Generate Report
+                <span className="hidden sm:inline">Generate Report</span>
+                <span className="sm:hidden">Report</span>
               </span>
             </Button>
           </div>
