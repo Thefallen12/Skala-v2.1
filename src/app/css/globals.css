@@ -1775,8 +1775,8 @@ main {
   .ticket-create-top-fields {
     gap: 0.65rem;
     grid-template-areas:
-      "request"
-      "project";
+      "project"
+      "request";
   }
 
   .ticket-create-top-fields > div {
