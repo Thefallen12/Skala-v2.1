@@ -184,7 +184,7 @@ export default function VehicleOperationsPanel({
                     <td className="p-3">{vehicle.brand ?? "—"}</td>
                     <td className="p-3">
                       {vehicle.odometerInitialized
-                        ? `${new Intl.NumberFormat("id-ID").format(Number(vehicle.currentKilometer))} km`
+                        ? `${vehicle.currentKilometer} km`
                         : "KM belum diinisialisasi"}
                     </td>
                     <td className="p-3">

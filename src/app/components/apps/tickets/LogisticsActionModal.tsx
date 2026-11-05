@@ -381,7 +381,7 @@ export default function LogisticsActionModal({
                         {vehicle.plateNumber} · {vehicle.vehicleType}
                         {vehicle.brand ? ` · ${vehicle.brand}` : ""}
                         {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
-                        {` · ${Number(vehicle.currentKilometer).toLocaleString("id-ID")} km`}
+                        {` · ${vehicle.currentKilometer} km`}
                       </option>
                     ))}
                 </select>

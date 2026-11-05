@@ -191,7 +191,7 @@ export default function VehicleFleetPanel({
                     <td className="p-3">{vehicle.brand || "—"}</td>
                     <td className="p-3">
                       {vehicle.odometerInitialized
-                        ? `${new Intl.NumberFormat("id-ID").format(Number(vehicle.currentKilometer))} km`
+                        ? `${vehicle.currentKilometer} km`
                         : "Belum diatur"}
                     </td>
                     <td className="p-3">
