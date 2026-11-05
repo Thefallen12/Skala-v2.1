@@ -46,27 +46,6 @@ before applying.
 The production database is MongoDB Atlas. Configure these variables in
 Hostinger before both the build and runtime process:
 
-```env
-MONGODB_URI=mongodb+srv://...
-AUTH_SECRET=<long-random-secret>
-AUTH_TRUST_HOST=true
-NEXTAUTH_URL=https://your-domain.example
-NEXT_PUBLIC_APP_URL=https://your-domain.example
-```
-
-`MONGODB_URI`, `AUTH_SECRET`, `AUTH_TRUST_HOST`, `NEXTAUTH_URL`, and
-`NEXT_PUBLIC_APP_URL` are required for production. Configure
-`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` if
-users upload profile photos, receipts, or documents. `ADMIN_EMAIL`,
-`ADMIN_PASSWORD`, and `ADMIN_NAME` are only needed when running the initial
-seed; do not leave the seed password in a long-lived production environment.
-
-Do not add `CLIENT_ID`, `CLIENT_SECRET`, `MYSQL_URL`, or `DATABASE_URL` unless a
-separate integration explicitly uses them. They are not required by the
-current NextAuth credentials login or MongoDB Prisma runtime. Migration-only
-`POSTGRES_SOURCE_URL` should be configured temporarily on a trusted machine,
-not as a normal Hostinger runtime variable.
-
 Use the repository root as the application directory, `npm ci` for dependency
 installation, `npm run build` for the build command, and `npm run start` for
 the startup command. Use Node.js 22 or newer and the port supplied by
