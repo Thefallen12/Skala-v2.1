@@ -1,14 +1,21 @@
 import { PrismaClient } from "@prisma/client";
 
 const connectionString = process.env.MONGODB_URI?.trim();
+const isProductionBuild =
+  process.env.NEXT_PHASE === "phase-production-build";
 
-if (!connectionString) {
+if (!isProductionBuild && !connectionString) {
   throw new Error(
     "MONGODB_URI is required. Configure the MongoDB Atlas connection string in the Hostinger environment.",
   );
 }
 
-if (!connectionString.startsWith("mongodb://") && !connectionString.startsWith("mongodb+srv://")) {
+if (
+  !isProductionBuild &&
+  connectionString &&
+  !connectionString.startsWith("mongodb://") &&
+  !connectionString.startsWith("mongodb+srv://")
+) {
   throw new Error(
     "MONGODB_URI must be a mongodb:// or mongodb+srv:// connection string.",
   );
