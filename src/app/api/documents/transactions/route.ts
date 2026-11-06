@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import {
   createBrandedQrDataUrl,
   getDocumentHeaderLogoDataUrl,
+  getLogisticsSignatureDataUrl,
 } from "@/lib/documents/qr-code";
 import {
   getRequestOrigin,
@@ -253,6 +254,10 @@ async function loadDocument(
       },
     });
     if (!order) return null;
+    const submittedByFachri =
+      order.createdBy?.role === UserRole.LOGISTICS &&
+      order.createdBy.name?.trim().toLocaleLowerCase("id-ID") ===
+        "fachri maulana hattami";
     const hasVendorValue = (value: string | null | undefined) =>
       Boolean(value?.trim());
     const vendorFallback =
@@ -364,6 +369,9 @@ async function loadDocument(
             order.createdBy?.role === UserRole.LOGISTICS
               ? "Koordinator Logistik / Logistics Coordinator"
               : "Logistik / Logistics",
+          signatureImageDataUrl: submittedByFachri
+            ? await getLogisticsSignatureDataUrl()
+            : undefined,
         },
         {
           heading: "Persetujuan Keuangan / Finance Approval",

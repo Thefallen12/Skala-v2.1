@@ -14,6 +14,13 @@ export async function getDocumentHeaderLogoDataUrl(): Promise<string> {
   return `data:image/png;base64,${logo.toString("base64")}`;
 }
 
+export async function getLogisticsSignatureDataUrl(): Promise<string> {
+  const signature = await readFile(
+    join(process.cwd(), "public", "signatures", "fachri-maulana-hattami.png"),
+  );
+  return `data:image/png;base64,${signature.toString("base64")}`;
+}
+
 export async function createBrandedQrDataUrl(
   value: string,
   width = 240,

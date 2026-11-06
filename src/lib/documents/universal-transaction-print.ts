@@ -30,6 +30,7 @@ export type UniversalDocumentData = {
     heading: string;
     name?: string;
     role: string;
+    signatureImageDataUrl?: string | null;
     approvalStatus?: "approved" | "pending";
     approvalDate?: string;
   }[];
@@ -147,11 +148,15 @@ export function renderUniversalTransactionDocument(
               : ""
           }</span>`
         : "";
+      const signatureImage = signature.signatureImageDataUrl
+        ? `<img class="signature-handwritten-image" src="${escapeHtml(signature.signatureImageDataUrl)}" alt="Tanda tangan ${escapeHtml(signature.name || "penandatangan")}" />`
+        : "";
       return `
-        <div class="signature${signatureQr ? " signature-with-qr" : ""}${approvalQrClass}${approvalStatus ? " signature-with-approval" : ""}">
+        <div class="signature${signatureQr ? " signature-with-qr" : ""}${approvalQrClass}${approvalStatus ? " signature-with-approval" : ""}${signatureImage ? " signature-with-image" : ""}">
           ${bilingualText(signature.heading, "signature-heading")}
           ${approvalStatus}
           ${signatureQr}
+          ${signatureImage}
           <span class="signature-name">${
             signature.name
               ? `<strong>${escapeHtml(signature.name)}</strong>`
@@ -223,6 +228,8 @@ export function renderUniversalTransactionDocument(
           .signature-with-approval .signature-approval { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
           .signature-with-approval .signature-name { margin-top: 0; }
           .signature-name { min-height: 42px; display: flex; align-items: end; justify-content: center; margin-top: auto; }
+          .signature-with-image .signature-handwritten-image { width: 140px; height: 48px; margin-top: auto; object-fit: contain; }
+          .signature-with-image .signature-name { min-height: 24px; margin-top: 0; }
           .signature-with-qr { min-height: 160px; }
           .signature-qr { display: flex; width: 100%; align-self: stretch; align-items: center; justify-content: center; margin: 4px 0 0; text-align: center; }
           .signature-qr img { display: block; width: 84px; height: 84px; margin-inline: auto; object-fit: contain; }
