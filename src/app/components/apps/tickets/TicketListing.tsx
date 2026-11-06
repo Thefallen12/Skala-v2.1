@@ -571,6 +571,7 @@ export default function TicketListing({
                 className="cursor-pointer"
                 onClick={() => openTicketSheet(ticket)}
                 onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     openTicketSheet(ticket);
