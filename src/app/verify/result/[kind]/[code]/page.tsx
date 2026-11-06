@@ -174,7 +174,7 @@ async function loadInvoice(code: string) {
   const isValid = Boolean(invoice.signedAt);
   return createDocument("invoice", code, {
     type: "INVOICE",
-    documentNumber: invoice.invoiceNumber,
+    documentNumber: invoice.invoiceNumber ?? "Tanpa Nomor",
     issueDate: formatDate(invoice.signedAt ?? invoice.createdAt),
     partner: invoice.vendorName,
     createdBy: invoice.signedBy?.name ?? "Keuangan",

@@ -41,6 +41,17 @@ transactions (a replica set). Optional unique values use partial unique indexes
 so multiple absent values remain valid in MongoDB. Back up both databases
 before applying.
 
+Vendor invoice numbers are optional. After deploying a schema change that
+makes `Invoice.invoiceNumber` optional, run the focused index migration once
+against the target MongoDB database:
+
+```powershell
+npm run db:migrate:optional-invoice-number
+```
+
+It preserves uniqueness for provided invoice numbers while allowing multiple
+invoice/bon records without a number.
+
 ## Hostinger Node.js deployment
 
 The production database is MongoDB Atlas. Configure these variables in

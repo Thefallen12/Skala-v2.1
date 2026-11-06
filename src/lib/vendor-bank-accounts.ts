@@ -13,6 +13,19 @@ export type VendorBankAccountOption = Omit<VendorBankAccountInput, "label"> & {
   label: string | null;
 };
 
+export function formatVendorBankAccount(details: {
+  bankName: string | null | undefined;
+  bankAccount: string | null | undefined;
+  bankHolder: string | null | undefined;
+}): string | null {
+  const parts = [
+    details.bankName?.trim(),
+    details.bankAccount?.trim(),
+    details.bankHolder?.trim() ? `a.n. ${details.bankHolder.trim()}` : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 type VendorWithBankAccounts = {
   bankName: string | null | undefined;
   bankAccount: string | null | undefined;

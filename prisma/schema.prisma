@@ -1579,7 +1579,7 @@ model DOItem {
 model Invoice {
   id               String         @id @default(cuid()) @map("_id")
   publicCode       String?        @unique
-  invoiceNumber    String         @unique
+  invoiceNumber    String?        @unique
   poId             String?
   po               PurchaseOrder? @relation(fields: [poId], references: [id], onDelete: SetNull)
   projectId        String?

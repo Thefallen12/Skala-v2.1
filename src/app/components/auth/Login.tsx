@@ -10,6 +10,7 @@ import { getSession, signIn } from 'next-auth/react'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import LoadingOverlay from '@/components/ui/loading-overlay'
 import { getRoleHomePath } from '@/lib/role-home'
 
 const loginSchema = z.object({
@@ -22,6 +23,7 @@ type LoginFormValues = z.infer<typeof loginSchema>
 export const Login = () => {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
   const router = useRouter()
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -30,6 +32,7 @@ export const Login = () => {
 
   const handleCredentialsSubmit = form.handleSubmit(async ({ identifier, password }) => {
     setError('')
+    setIsAuthenticating(true)
     try {
       const result = await signIn('credentials', {
         identifier: identifier.trim().toLowerCase(),
@@ -45,12 +48,14 @@ export const Login = () => {
             ? 'Server login tidak dapat terhubung ke database. Coba lagi nanti atau hubungi administrator.'
             : 'Email atau kata sandi tidak sesuai.',
         )
+        setIsAuthenticating(false)
         return
       }
 
       const session = await getSession()
       if (!session?.user?.role) {
         setError('Login berhasil, tetapi sesi belum dapat diverifikasi. Muat ulang halaman.')
+        setIsAuthenticating(false)
         return
       }
 
@@ -62,11 +67,13 @@ export const Login = () => {
         error instanceof Error ? error.message : 'Unknown error',
       )
       setError('Server login tidak merespons. Muat ulang halaman atau hubungi administrator.')
+      setIsAuthenticating(false)
     }
   })
 
   return (
     <main className='grid min-h-screen grid-cols-1 font-sans antialiased text-slate-800 lg:grid-cols-2'>
+      {isAuthenticating && <LoadingOverlay label='Memeriksa akun...' />}
       <section className='relative hidden min-h-screen flex-col justify-between overflow-hidden bg-[#102a4d] p-10 text-white lg:flex xl:p-12'>
         <div
           aria-hidden='true'

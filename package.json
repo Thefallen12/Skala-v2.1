@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "db:migrate:optional-invoice-number": "node scripts/migrate-optional-invoice-number-index.mjs",
     "db:migrate:postgres-to-mongo": "tsx prisma/migrate-postgres-to-mongodb.ts",
     "db:migrate:postgres-to-mongo:apply": "tsx prisma/migrate-postgres-to-mongodb.ts --apply",
     "predev": "npm run prisma:generate",

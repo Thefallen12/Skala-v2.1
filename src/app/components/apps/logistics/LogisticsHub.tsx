@@ -27,7 +27,7 @@ import type {
   TicketProjectOption,
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
-import { POStatus, UserRole } from "@prisma/client";
+import { POPaymentMethod, POStatus, UserRole } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Boxes,
   Check,
@@ -123,6 +128,11 @@ type HubPurchaseOrder = {
   publicCode: string;
   poNumber: string;
   vendorName: string;
+  paymentMethod: POPaymentMethod;
+  paymentTerms: string | null;
+  paymentBankName: string | null;
+  paymentAccountNumber: string | null;
+  paymentAccountName: string | null;
   status: string;
   createdAt: string;
   ticketId: string | null;
@@ -446,45 +456,9 @@ export default function LogisticsHub({
                           Dikirim {new Date(order.vendorPoSentAt).toLocaleString("id-ID")}
                         </p>
                       )}
-                      <Badge
-                        className="mt-2 h-6 shrink-0 whitespace-nowrap px-2 text-[0.6875rem]"
-                        variant={
-                          order.status === POStatus.APPROVED
-                            ? "lightSuccess"
-                            : "outline"
-                        }
-                      >
-                        {order.status === POStatus.APPROVED
-                          ? "Disetujui"
-                          : order.status === POStatus.PENDING_FINANCE_REVIEW ? (
-                            <>
-                              <Clock3 className="size-4" aria-hidden="true" />
-                              <span className="sr-only">
-                                Menunggu Keuangan
-                              </span>
-                            </>
-                          )
-                            : order.status === POStatus.PENDING_APPROVAL ? (
-                              <>
-                                <Clock3 className="size-4" aria-hidden="true" />
-                                <span className="sr-only">
-                                  Menunggu Persetujuan Direksi
-                                </span>
-                              </>
-                            )
-                              : order.status === POStatus.REJECTED
-                                ? "Ditolak"
-                                : order.status === POStatus.CANCELLED
-                                  ? "Dibatalkan"
-                                  : "Draft"}
-                      </Badge>
-                      {order.status === POStatus.APPROVED && !order.vendorPoSentAt && (
-                        <span className="mt-1 text-xs text-muted-foreground">
-                          Menunggu pengiriman
-                        </span>
-                      )}
                     </div>
-                    <div className="flex shrink-0 flex-nowrap items-start gap-1.5">
+                    <div className="flex shrink-0 flex-col items-center gap-2">
+                      <div className="flex flex-nowrap items-start gap-1.5">
                       {order.status === POStatus.DRAFT ? (
                         <>
                           <div className="flex w-12 flex-col items-center gap-1">
@@ -570,6 +544,11 @@ export default function LogisticsHub({
                           items={order.items}
                           includeTax={order.includeTax}
                           invoiceDate={invoiceDate}
+                          paymentMethod={order.paymentMethod}
+                          paymentTerms={order.paymentTerms}
+                          paymentBankName={order.paymentBankName}
+                          paymentAccountNumber={order.paymentAccountNumber}
+                          paymentAccountName={order.paymentAccountName}
                         />
                       ) : null}
                       {order.status === POStatus.APPROVED && (
@@ -596,6 +575,54 @@ export default function LogisticsHub({
                           </span>
                         </div>
                       )}
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        {order.status === POStatus.APPROVED ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                aria-label="Disetujui"
+                                className="flex size-10 items-center justify-center rounded-md border border-success text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                role="img"
+                                tabIndex={0}
+                              >
+                                <Check className="size-4" aria-hidden="true" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Disetujui</TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Badge
+                            className="h-6 shrink-0 whitespace-nowrap px-2 text-[0.6875rem]"
+                            variant="outline"
+                          >
+                            {order.status === POStatus.PENDING_FINANCE_REVIEW ? (
+                              <>
+                                <Clock3 className="size-4" aria-hidden="true" />
+                                <span className="sr-only">Menunggu Keuangan</span>
+                              </>
+                            )
+                              : order.status === POStatus.PENDING_APPROVAL ? (
+                                <>
+                                  <Clock3 className="size-4" aria-hidden="true" />
+                                  <span className="sr-only">
+                                    Menunggu Persetujuan Direksi
+                                  </span>
+                                </>
+                              )
+                                : order.status === POStatus.REJECTED
+                                  ? "Ditolak"
+                                  : order.status === POStatus.CANCELLED
+                                    ? "Dibatalkan"
+                                    : "Draft"}
+                          </Badge>
+                        )}
+                        {order.status === POStatus.APPROVED && !order.vendorPoSentAt && (
+                          <span className="text-center text-xs text-muted-foreground">
+                            Menunggu pengiriman
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </article>
                 );
@@ -886,7 +913,7 @@ export default function LogisticsHub({
               </p>
               <iframe
                 title={`Pratinjau dokumen ${selection.number}`}
-                src={`/api/documents/${selection.kind}?publicCode=${encodeURIComponent(selection.code)}&format=html`}
+                src={`/api/documents/transactions?kind=${selection.kind.toUpperCase()}&publicCode=${encodeURIComponent(selection.code)}&format=html`}
                 className="mt-4 h-[70vh] w-full rounded-lg border"
               />
               <div className="mt-3 flex justify-end">

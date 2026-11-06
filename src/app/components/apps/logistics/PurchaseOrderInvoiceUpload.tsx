@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, FileText, Send, Upload } from "lucide-react";
+import type { POPaymentMethod } from "@prisma/client";
 import {
   markPurchaseOrderSentToVendor,
   submitPurchaseOrderInvoice,
@@ -10,6 +11,7 @@ import {
 import InvoiceDetailsFields, {
   type InvoiceDraft,
 } from "@/app/components/apps/logistics/InvoiceDetailsFields";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -34,8 +36,6 @@ function createInvoiceDraft(
   return {
     invoiceNumber: "",
     periodOrDate: invoiceDate,
-    paymentMethod: "",
-    bankAccount: "",
     tax: 0,
     deduction: 0,
     items: items.map((item) => ({
@@ -57,6 +57,11 @@ export default function PurchaseOrderInvoiceUpload({
   items,
   includeTax,
   invoiceDate,
+  paymentMethod,
+  paymentTerms,
+  paymentBankName,
+  paymentAccountNumber,
+  paymentAccountName,
 }: {
   publicCode: string;
   invoiceUrl: string | null;
@@ -66,6 +71,11 @@ export default function PurchaseOrderInvoiceUpload({
   items: InvoiceItemSeed[];
   includeTax: boolean;
   invoiceDate: string;
+  paymentMethod: POPaymentMethod;
+  paymentTerms: string | null;
+  paymentBankName: string | null;
+  paymentAccountNumber: string | null;
+  paymentAccountName: string | null;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -295,6 +305,11 @@ export default function PurchaseOrderInvoiceUpload({
             idPrefix={`po-invoice-${publicCode}`}
             value={draft}
             onChange={setDraft}
+            paymentMethod={paymentMethod}
+            paymentTerms={paymentTerms}
+            bankName={paymentBankName}
+            bankAccount={paymentAccountNumber}
+            bankHolder={paymentAccountName}
           />
           <div className="space-y-2 rounded-md border p-3">
             <p className="text-sm font-medium">Dokumen Invoice / Bon</p>
@@ -308,9 +323,12 @@ export default function PurchaseOrderInvoiceUpload({
               }}
             />
             {invoiceFile && (
-              <p className="text-sm text-muted-foreground">
-                File lokal siap dikirim: {invoiceFile.name}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="min-w-0 break-all text-sm text-muted-foreground">
+                  File lokal siap dikirim: {invoiceFile.name}
+                </p>
+                <InvoiceFilePreview file={invoiceFile} />
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
               File baru diunggah saat tombol Simpan &amp; Kirim ditekan. PDF, JPG, PNG, atau WEBP; maksimal 5 MB.

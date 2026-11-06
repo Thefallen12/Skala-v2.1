@@ -85,6 +85,8 @@ export type TicketRow = {
     publicCode: string;
     poNumber: string;
     vendorName: string;
+    paymentMethod?: POPaymentMethod | null;
+    paymentTerms?: string | null;
     paymentBankName?: string | null;
     paymentAccountNumber?: string | null;
     paymentAccountName?: string | null;

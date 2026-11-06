@@ -11,7 +11,10 @@ import {
   createBrandedQrDataUrl,
   getDocumentHeaderLogoDataUrl,
 } from "@/lib/documents/qr-code";
-import { resolvePublicAppUrl } from "@/lib/documents/public-app-url";
+import {
+  getRequestOrigin,
+  resolvePublicAppUrl,
+} from "@/lib/documents/public-app-url";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import { renderPdf } from "@/lib/documents/render-pdf";
 import { isValidPublicCode } from "@/lib/documents/random-code";
@@ -672,7 +675,7 @@ async function loadDocument(
       kind,
       title: "INVOICE PEMBAYARAN",
       subtitle: invoice.subkonTermyn ? "UPAH TUKANG & LANSIR" : "TAGIHAN VENDOR",
-      number: invoice.invoiceNumber,
+      number: invoice.invoiceNumber ?? "Tanpa Nomor",
       date: invoice.periodOrDate ?? formatDate(invoice.createdAt),
       verificationPublicCode: invoice.signedAt ? invoice.publicCode : null,
       leftDetails: [
@@ -980,18 +983,18 @@ export async function GET(request: NextRequest) {
           verificationCode,
         )
       : null;
-    const publicAppUrl =
-      resolvePublicAppUrl(new URL(request.url).origin) ??
-      new URL(request.url).origin;
+    const publicAppUrl = resolvePublicAppUrl(
+      getRequestOrigin(request.headers),
+    );
     const [logoResult, qrResult, approvalQrResult] = await Promise.allSettled([
       getDocumentHeaderLogoDataUrl(),
-      verificationPath
+      verificationPath && publicAppUrl
         ? createBrandedQrDataUrl(
             new URL(verificationPath, publicAppUrl).toString(),
             260,
           )
         : Promise.resolve(null),
-      kind === "PO" && document.signatures[2]?.name
+      kind === "PO" && document.signatures[2]?.name && publicAppUrl
         ? createBrandedQrDataUrl(
             new URL(
               documentVerificationPath("po", publicCode),
@@ -999,7 +1002,7 @@ export async function GET(request: NextRequest) {
             ).toString(),
             240,
           )
-        : kind === "DO" && document.approvalPublicCode
+        : kind === "DO" && document.approvalPublicCode && publicAppUrl
         ? createBrandedQrDataUrl(
             new URL(
               documentVerificationPath("po", document.approvalPublicCode),

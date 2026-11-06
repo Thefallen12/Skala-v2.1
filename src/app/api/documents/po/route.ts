@@ -44,7 +44,12 @@ export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get("download") === "1") {
     destination.searchParams.set("download", "1");
   }
-  return NextResponse.redirect(destination, 307);
+  return new NextResponse(null, {
+    status: 307,
+    headers: {
+      Location: `${destination.pathname}${destination.search}`,
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {

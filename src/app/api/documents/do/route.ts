@@ -13,5 +13,10 @@ export async function GET(request: NextRequest) {
   const destination = new URL("/api/documents/transactions", request.url);
   destination.searchParams.set("kind", "DO");
   destination.searchParams.set("publicCode", publicCode);
-  return NextResponse.redirect(destination, 307);
+  return new NextResponse(null, {
+    status: 307,
+    headers: {
+      Location: `${destination.pathname}${destination.search}`,
+    },
+  });
 }

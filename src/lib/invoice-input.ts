@@ -9,7 +9,7 @@ export const invoiceItemInputSchema = z.object({
 });
 
 export const vendorInvoiceInputSchema = z.object({
-  invoiceNumber: z.string().trim().min(1).max(100),
+  invoiceNumber: z.string().trim().max(100).optional().or(z.literal("")),
   periodOrDate: z.string().trim().max(120).optional().or(z.literal("")),
   paymentMethod: z.string().trim().max(80).optional().or(z.literal("")),
   bankAccount: z.string().trim().max(180).optional().or(z.literal("")),

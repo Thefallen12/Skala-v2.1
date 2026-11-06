@@ -24,26 +24,34 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import InvoiceDetailsFields, {
   type InvoiceDraft,
 } from "@/app/components/apps/logistics/InvoiceDetailsFields";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 
 function createInvoiceDraft(
   items: NonNullable<
     NonNullable<TicketRow["purchaseOrders"]>[number]["items"]
   > = [],
+  includeTax = false,
 ): InvoiceDraft {
+  const invoiceItems = items.map((item) => ({
+    itemCode: item.itemCode ?? "",
+    description: item.itemName,
+    quantity: item.quantity,
+    unit: item.unit,
+    unitPrice: item.unitPrice,
+  }));
   return {
     invoiceNumber: "",
     periodOrDate: new Date().toLocaleDateString("id-ID"),
-    paymentMethod: "",
-    bankAccount: "",
-    tax: 0,
+    tax: includeTax
+      ? Math.round(
+          invoiceItems.reduce(
+            (sum, item) => sum + item.quantity * item.unitPrice,
+            0,
+          ) * 0.11,
+        )
+      : 0,
     deduction: 0,
-    items: items.map((item) => ({
-      itemCode: item.itemCode ?? "",
-      description: item.itemName,
-      quantity: item.quantity,
-      unit: item.unit,
-      unitPrice: item.unitPrice,
-    })),
+    items: invoiceItems,
   };
 }
 
@@ -102,7 +110,10 @@ export default function LogisticsActionModal({
   const invoiceDraft =
     invoiceDraftState?.orderCode === (latestPurchaseOrder?.publicCode ?? null)
       ? invoiceDraftState.draft
-      : createInvoiceDraft(latestPurchaseOrder?.items);
+      : createInvoiceDraft(
+          latestPurchaseOrder?.items,
+          latestPurchaseOrder?.includeTax,
+        );
   const invoiceFile =
     invoiceFileState.orderCode === (latestPurchaseOrder?.publicCode ?? null)
       ? invoiceFileState.file
@@ -126,9 +137,9 @@ export default function LogisticsActionModal({
       actionType === "BUY_STORE" &&
       purchaseOrderApproved &&
       !purchaseOrderPaid &&
-      (!invoiceDraft.invoiceNumber.trim() || !invoiceFile)
+      !invoiceFile
     ) {
-      setMessage("Isi nomor invoice dan unggah dokumen melalui Cloudinary.");
+      setMessage("Unggah dokumen invoice/bon melalui Cloudinary.");
       return;
     }
     if (
@@ -483,6 +494,15 @@ export default function LogisticsActionModal({
                       <InvoiceDetailsFields
                         idPrefix={`ticket-invoice-${ticket.id}`}
                         value={invoiceDraft}
+                        paymentMethod={latestPurchaseOrder.paymentMethod ?? null}
+                        paymentTerms={latestPurchaseOrder.paymentTerms ?? null}
+                        bankName={latestPurchaseOrder.paymentBankName ?? null}
+                        bankAccount={
+                          latestPurchaseOrder.paymentAccountNumber ?? null
+                        }
+                        bankHolder={
+                          latestPurchaseOrder.paymentAccountName ?? null
+                        }
                         onChange={(draft) =>
                           setInvoiceDraftState({
                             orderCode: latestPurchaseOrder?.publicCode ?? null,
@@ -502,9 +522,12 @@ export default function LogisticsActionModal({
                         }
                       />
                       {invoiceFile && (
-                        <p className="text-xs text-muted-foreground">
-                          File lokal siap dikirim: {invoiceFile.name}
-                        </p>
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 break-all text-xs text-muted-foreground">
+                            File lokal siap dikirim: {invoiceFile.name}
+                          </p>
+                          <InvoiceFilePreview file={invoiceFile} />
+                        </div>
                       )}
                     </>
                   )}
@@ -536,8 +559,7 @@ export default function LogisticsActionModal({
                   (actionType === "BUY_STORE" &&
                     purchaseOrderApproved &&
                     !purchaseOrderPaid &&
-                    (!invoiceDraft.invoiceNumber.trim() ||
-                      !invoiceFile))
+                    !invoiceFile)
                 }
               >
                 {isPending

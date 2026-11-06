@@ -70,6 +70,7 @@ import {
   vendorInvoiceInputSchema,
   type VendorInvoiceInput,
 } from "@/lib/invoice-input";
+import { formatVendorBankAccount } from "@/lib/vendor-bank-accounts";
 import { isPurchaseOrderInvoiceUrl } from "@/lib/purchase-order-invoices";
 import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-invoice-config";
 import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
@@ -1313,7 +1314,11 @@ export async function submitDirectStockPurchaseInvoice(
           id: purchase.id,
           isApprovedByDirector: true,
           status: DirectStockPurchaseStatus.PENDING_RECEIPT,
-          vendorInvoiceUrl: null,
+          OR: [
+            { vendorInvoiceUrl: null },
+            { vendorInvoiceUrl: { isSet: false } },
+            { vendorInvoiceUrl: "" },
+          ],
         },
         data: {
           vendorInvoiceUrl: documentUrl,
@@ -3148,6 +3153,11 @@ export async function processLogisticsMaterial(
               id: true,
               poNumber: true,
               vendorName: true,
+              paymentMethod: true,
+              paymentBankName: true,
+              paymentAccountNumber: true,
+              paymentAccountName: true,
+              includeTax: true,
               vendorPoSentAt: true,
               paidAt: true,
               paymentTransactions: {
@@ -3185,14 +3195,17 @@ export async function processLogisticsMaterial(
       if (!order.vendorPoSentAt) {
         throw new Error("Logistik harus mengirim PO ke vendor sebelum mengunggah invoice.");
       }
-      const items = parsedInvoice.data.items.map((item) => ({
-        ...item,
-        itemCode: item.itemCode?.trim() || null,
+      const items = order.items.map((item) => ({
+        itemCode: item.itemCode,
+        description: item.itemName,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
         totalPrice: item.quantity * item.unitPrice,
       }));
       const subTotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-      const tax = parsedInvoice.data.tax ?? 0;
-      const deduction = parsedInvoice.data.deduction ?? 0;
+      const tax = order.includeTax ? Math.round(subTotal * 0.11) : 0;
+      const deduction = 0;
       const grandTotal = subTotal + tax - deduction;
       if (!Number.isFinite(grandTotal) || grandTotal <= 0) {
         throw new Error("Total invoice harus lebih besar dari nol.");
@@ -3202,7 +3215,11 @@ export async function processLogisticsMaterial(
           id: ticketId,
           type: TicketType.MATERIAL,
           status: TicketStatus.PROCESSED_LOGISTIC,
-          purchaseReceiptUrl: null,
+          OR: [
+            { purchaseReceiptUrl: null },
+            { purchaseReceiptUrl: { isSet: false } },
+            { purchaseReceiptUrl: "" },
+          ],
         },
         data: {
           status: TicketStatus.WAITING_FINANCE_PAYMENT,
@@ -3216,13 +3233,20 @@ export async function processLogisticsMaterial(
       const invoice = await transaction.invoice.create({
         data: {
           publicCode: await generateAvailablePublicCode(transaction),
-          invoiceNumber: parsedInvoice.data.invoiceNumber,
+          invoiceNumber: parsedInvoice.data.invoiceNumber?.trim() || null,
           poId: order.id,
           projectId: ticket.projectId,
           vendorName: order.vendorName,
           periodOrDate: parsedInvoice.data.periodOrDate?.trim() || null,
-          paymentMethod: parsedInvoice.data.paymentMethod?.trim() || null,
-          bankAccount: parsedInvoice.data.bankAccount?.trim() || null,
+          paymentMethod: order.paymentMethod,
+          bankAccount:
+            order.paymentMethod === POPaymentMethod.TRANSFER
+              ? formatVendorBankAccount({
+                  bankName: order.paymentBankName,
+                  bankAccount: order.paymentAccountNumber,
+                  bankHolder: order.paymentAccountName,
+                })
+              : null,
           documentUrl: parsedInvoice.data.documentUrl,
           subTotal,
           tax,
@@ -3239,13 +3263,13 @@ export async function processLogisticsMaterial(
           ticketId,
           userId: session.user.id,
           action: "LOGISTICS_BUY_STORE",
-          notes: `Invoice ${parsedInvoice.data.invoiceNumber} PO ${order.poNumber} diteruskan ke Keuangan.`,
+          notes: `Invoice${parsedInvoice.data.invoiceNumber ? ` ${parsedInvoice.data.invoiceNumber}` : " tanpa nomor"} PO ${order.poNumber} diteruskan ke Keuangan.`,
         },
       });
       await sendNotification({
         roleTarget: UserRole.FINANCE,
         title: "Invoice PO Siap Dibayar",
-        message: `Invoice ${parsedInvoice.data.invoiceNumber} untuk PO #${order.poNumber} siap diperiksa dan diproses.`,
+        message: `Invoice${parsedInvoice.data.invoiceNumber ? ` ${parsedInvoice.data.invoiceNumber}` : " tanpa nomor"} untuk PO #${order.poNumber} siap diperiksa dan diproses.`,
         actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(ticketId)}`,
         type: NotificationType.APPROVAL,
         database: transaction,

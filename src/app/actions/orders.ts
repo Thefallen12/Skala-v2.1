@@ -65,6 +65,7 @@ import {
   vendorInvoiceInputSchema,
   type VendorInvoiceInput,
 } from "@/lib/invoice-input";
+import { formatVendorBankAccount } from "@/lib/vendor-bank-accounts";
 
 export type PurchaseOrderItemInput = {
   stockItemId?: string;
@@ -745,6 +746,10 @@ export async function submitPurchaseOrderForFinanceReview(
         select: {
           poNumber: true,
           vendorName: true,
+          paymentMethod: true,
+          paymentBankName: true,
+          paymentAccountNumber: true,
+          paymentAccountName: true,
           status: true,
           items: {
             select: { itemName: true, quantity: true, unit: true },
@@ -919,6 +924,17 @@ export async function submitPurchaseOrderInvoice(
     select: {
       status: true,
       ticketId: true,
+      includeTax: true,
+      items: {
+        orderBy: { id: "asc" },
+        select: {
+          itemCode: true,
+          itemName: true,
+          quantity: true,
+          unit: true,
+          unitPrice: true,
+        },
+      },
       vendorPoSentAt: true,
       vendorInvoiceUrl: true,
       invoices: { select: { id: true }, take: 1 },
@@ -984,8 +1000,23 @@ export async function submitPurchaseOrderInvoice(
           id: true,
           poNumber: true,
           vendorName: true,
+          paymentMethod: true,
+          paymentBankName: true,
+          paymentAccountNumber: true,
+          paymentAccountName: true,
           status: true,
           ticketId: true,
+          includeTax: true,
+          items: {
+            orderBy: { id: "asc" },
+            select: {
+              itemCode: true,
+              itemName: true,
+              quantity: true,
+              unit: true,
+              unitPrice: true,
+            },
+          },
           projectId: true,
           vendorPoSentAt: true,
           vendorInvoiceUrl: true,
@@ -1017,14 +1048,17 @@ export async function submitPurchaseOrderInvoice(
         throw new Error("Invoice/bon untuk PO ini sudah pernah dikirim.");
       }
 
-      const items = parsed.data.items.map((item) => ({
-        ...item,
-        itemCode: item.itemCode?.trim() || null,
+      const items = order.items.map((item) => ({
+        itemCode: item.itemCode,
+        description: item.itemName,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
         totalPrice: item.quantity * item.unitPrice,
       }));
       const subTotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-      const tax = parsed.data.tax ?? 0;
-      const deduction = parsed.data.deduction ?? 0;
+      const tax = order.includeTax ? Math.round(subTotal * 0.11) : 0;
+      const deduction = 0;
       const grandTotal = subTotal + tax - deduction;
       if (!Number.isFinite(grandTotal) || grandTotal <= 0) {
         throw new Error("Total invoice harus lebih besar dari nol.");
@@ -1034,7 +1068,11 @@ export async function submitPurchaseOrderInvoice(
         where: {
           id: order.id,
           status: POStatus.APPROVED,
-          vendorInvoiceUrl: null,
+          OR: [
+            { vendorInvoiceUrl: null },
+            { vendorInvoiceUrl: { isSet: false } },
+            { vendorInvoiceUrl: "" },
+          ],
         },
         data: {
           vendorInvoiceUrl: parsed.data.documentUrl,
@@ -1048,13 +1086,20 @@ export async function submitPurchaseOrderInvoice(
       const invoice = await transaction.invoice.create({
         data: {
           publicCode: await generateAvailablePublicCode(transaction),
-          invoiceNumber: parsed.data.invoiceNumber,
+          invoiceNumber: parsed.data.invoiceNumber?.trim() || null,
           poId: order.id,
           projectId: order.projectId ?? order.ticket?.projectId ?? null,
           vendorName: order.vendorName,
           periodOrDate: parsed.data.periodOrDate?.trim() || null,
-          paymentMethod: parsed.data.paymentMethod?.trim() || null,
-          bankAccount: parsed.data.bankAccount?.trim() || null,
+          paymentMethod: order.paymentMethod,
+          bankAccount:
+            order.paymentMethod === POPaymentMethod.TRANSFER
+              ? formatVendorBankAccount({
+                  bankName: order.paymentBankName,
+                  bankAccount: order.paymentAccountNumber,
+                  bankHolder: order.paymentAccountName,
+                })
+              : null,
           documentUrl: parsed.data.documentUrl,
           subTotal,
           tax,

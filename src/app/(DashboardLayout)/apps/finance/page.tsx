@@ -1021,7 +1021,7 @@ export default async function FinancePage({
           ...documentSignoffInvoices.map((document) => ({
             id: document.id,
             kind: "INVOICE" as const,
-            number: document.invoiceNumber,
+            number: document.invoiceNumber ?? "Tanpa Nomor",
             action:
               session.user.role === UserRole.FINANCE
                 ? ("sign" as const)
