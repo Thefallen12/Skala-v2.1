@@ -872,12 +872,33 @@ export default function TicketListing({
                       />
                     </div>
                   ))}
-                  {selectedTicket.recipientName && (
+                  {(selectedTicket.recipientName ||
+                    selectedTicket.bankName ||
+                    selectedTicket.accountNumber ||
+                    selectedTicket.transferReceiptUrl) && (
                     <div className="rounded-md border p-3 text-sm">
                       <h4 className="mb-2 font-semibold">Tujuan Pembayaran</h4>
-                      <p>Nama penerima: {selectedTicket.recipientName}</p>
-                      <p>Bank: {selectedTicket.bankName || "—"}</p>
-                      <p>Nomor rekening: {selectedTicket.accountNumber || "—"}</p>
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <p>Nama penerima: {selectedTicket.recipientName || "—"}</p>
+                          <p>Bank: {selectedTicket.bankName || "—"}</p>
+                          <p>Nomor rekening: {selectedTicket.accountNumber || "—"}</p>
+                        </div>
+                        {selectedTicket.transferReceiptUrl && (
+                          <ActionIconButton
+                            type="button"
+                            label="Lihat Bukti transfer"
+                            tooltip="Lihat Bukti transfer"
+                            icon={Eye}
+                            onClick={() =>
+                              setSelectedReceipt({
+                                label: "Bukti transfer",
+                                url: selectedTicket.transferReceiptUrl!,
+                              })
+                            }
+                          />
+                        )}
+                      </div>
                     </div>
                   )}
                   {(selectedTicket.paymentTransactions?.length ?? 0) > 0 && (
@@ -980,15 +1001,10 @@ export default function TicketListing({
                   {[
                     ["Bukti pembayaran", selectedTicket.paymentProofUrl],
                     ["Bukti pembelian", selectedTicket.purchaseReceiptUrl],
-                    ["Bukti transfer", selectedTicket.transferReceiptUrl],
                     ["Bukti pengiriman", selectedTicket.deliveryReceiptUrl],
                   ]
                     .filter((receipt): receipt is [string, string] =>
-                      Boolean(receipt[1]) &&
-                      !(
-                        receipt[0] === "Bukti transfer" &&
-                        receipt[1] === selectedTicket.paymentProofUrl
-                      ),
+                      Boolean(receipt[1]),
                     )
                     .map(([label, url]) => (
                       <ActionIconButton

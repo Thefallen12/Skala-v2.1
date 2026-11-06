@@ -894,23 +894,23 @@ export default function ProjectWorkstationMaster({
             <Table pagination={false} className="text-xs">
               <TableHeader>
                 <TableRow className="border-border bg-muted hover:bg-muted">
-                  <TableHead className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <TableHead className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     Kode & Nama Proyek
                   </TableHead>
-                  <TableHead className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <TableHead className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     Lokasi
                   </TableHead>
                   {canViewFinancials && (
                     <>
-                      <TableHead className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                         Pagu Budget
                       </TableHead>
-                      <TableHead className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      <TableHead className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                         Realisasi
                       </TableHead>
                     </>
                   )}
-                  <TableHead className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                  <TableHead className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                     Penunjukan PIC
                   </TableHead>
                   <TableHead className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -992,7 +992,7 @@ export default function ProjectWorkstationMaster({
                           >
                             <SelectTrigger
                               aria-label={`PIC proyek ${project.title}`}
-                              className="min-w-44 border-border bg-background text-foreground hover:border-primary"
+                              className="w-full min-w-44 border-border bg-background text-foreground hover:border-primary"
                             >
                               <SelectValue placeholder="Pilih PIC" />
                             </SelectTrigger>

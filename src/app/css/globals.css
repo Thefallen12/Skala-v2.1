@@ -1054,7 +1054,13 @@ main {
   }
 
   .app-data-table th {
-    @apply h-11 whitespace-nowrap px-3 text-left align-middle font-semibold sm:px-4;
+    @apply h-11 whitespace-nowrap px-3 text-center align-middle font-semibold sm:px-4;
+    text-align: center !important;
+  }
+
+  .app-data-table td [data-slot="select-trigger"] {
+    width: 100% !important;
+    min-width: 0 !important;
   }
 
   .app-data-table tbody tr {
