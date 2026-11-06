@@ -20,6 +20,7 @@ import {
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import { createTicket } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Calendar } from "@/components/ui/calendar";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -1893,16 +1894,14 @@ export default function CreateTicketModal({
                   </div>
 
                   {index > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 justify-self-end self-end text-red-500 hover:bg-red-500/10 hover:text-red-600 sm:h-10 sm:w-10"
-                      aria-label={`Hapus item ${index + 1}`}
+                    <ActionIconButton
+                      label={`Hapus item ${index + 1}`}
+                      tooltip={`Hapus item ${index + 1}`}
+                      icon={Trash2}
+                      className="justify-self-end self-end text-red-500 hover:bg-destructive hover:text-destructive-foreground"
                       onClick={() => remove(index)}
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </Button>
+                      variant="ghost"
+                    />
                   )}
                 </div>
               ))}

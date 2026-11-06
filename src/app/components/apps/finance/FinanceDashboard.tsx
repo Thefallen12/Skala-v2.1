@@ -9,10 +9,12 @@ import {
   ArrowUpRight,
   Clock3,
   ExternalLink,
+  Eye,
   ReceiptText,
   Wallet,
 } from "lucide-react";
 import type { FinanceAccountOption } from "@/app/components/apps/finance/IncomingFundModal";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { DataTableTemplate } from "@/components/ui/data-table-template";
 import {
@@ -547,21 +549,22 @@ export default function FinanceDashboard({
                     <TableCell className="whitespace-nowrap">
                       <span className="block">{transaction.paymentMethod}</span>
                       {transaction.proofUrl && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (transaction.proofUrl) {
-                              onPreviewProof(
-                                transaction.proofUrl,
-                                `Bukti transaksi ${transaction.sourceDesc}`,
-                              );
-                            }
-                          }}
-                          className="mt-1 inline-flex items-center gap-1 text-blue-300 hover:underline"
-                        >
-                          <ExternalLink className="size-3" aria-hidden="true" />
-                          Lihat bukti
-                        </button>
+                        <div className="mt-1">
+                          <ActionIconButton
+                            type="button"
+                            label={`Lihat bukti transaksi ${transaction.sourceDesc}`}
+                            tooltip="Lihat bukti"
+                            icon={Eye}
+                            onClick={() => {
+                              if (transaction.proofUrl) {
+                                onPreviewProof(
+                                  transaction.proofUrl,
+                                  `Bukti transaksi ${transaction.sourceDesc}`,
+                                );
+                              }
+                            }}
+                          />
+                        </div>
                       )}
                     </TableCell>
                     <TableCell className="max-w-[220px]">

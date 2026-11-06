@@ -8,8 +8,10 @@ import {
   UserRole,
 } from "@prisma/client";
 import { canManageUsers } from "@/lib/user-access";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -200,11 +202,16 @@ export default async function IssuedDocumentsPage() {
                       : "—"}
                   </TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" asChild>
-                      <Link href={`/d/${order.publicCode}`}>
-                        {order.status === POStatus.DRAFT ? "Buka Draft" : "Buka PO"}
-                      </Link>
-                    </Button>
+                    <ActionIconButton
+                      label={
+                        order.status === POStatus.DRAFT
+                          ? `Buka draft PO ${order.poNumber}`
+                          : `Buka PO ${order.poNumber}`
+                      }
+                      tooltip={order.status === POStatus.DRAFT ? "Buka Draft" : "Buka PO"}
+                      icon={Eye}
+                      href={`/d/${order.publicCode}`}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -285,9 +292,12 @@ export default async function IssuedDocumentsPage() {
                         : "—"}
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/d/${order.publicCode}`}>Buka DO</Link>
-                      </Button>
+                      <ActionIconButton
+                        label={`Buka DO ${order.doNumber}`}
+                        tooltip="Buka DO"
+                        icon={Eye}
+                        href={`/d/${order.publicCode}`}
+                      />
                     </TableCell>
                   </TableRow>
                 );

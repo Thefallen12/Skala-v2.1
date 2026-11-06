@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { ArrowLeft, ArrowRight, Plus, Trash2 } from "lucide-react";
 import {
   createTimesheetEntry,
@@ -364,17 +365,14 @@ export default function ProjectTimesheet({
                     <td className="whitespace-nowrap px-2 py-2 text-right font-semibold">{formatDuration(total)}</td>
                     <td className="px-1 py-1">
                       {ownedEntry && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-6"
-                          aria-label={`Hapus satu catatan jam kerja untuk ${row.project.name}`}
-                          title="Hapus satu catatan jam kerja"
+                        <ActionIconButton
+                          label={`Hapus satu catatan jam kerja untuk ${row.project.name}`}
+                          tooltip="Hapus satu catatan jam kerja"
+                          icon={Trash2}
+                          className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                           disabled={isPending}
                           onClick={() => onDeleteEntry(ownedEntry)}
-                        >
-                          <Trash2 className="size-3 text-destructive" />
-                        </Button>
+                        />
                       )}
                     </td>
                   </tr>

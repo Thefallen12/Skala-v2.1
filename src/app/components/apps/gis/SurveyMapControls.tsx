@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -331,26 +332,20 @@ export default function SurveyMapControls({
                         <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                           {title}
                         </span>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          aria-label={`Edit detail ${title}`}
+                        <ActionIconButton
+                          label={`Edit detail ${title}`}
+                          tooltip={`Edit detail ${title}`}
+                          icon={Pencil}
                           onClick={() => onEditFeatureMetadata(rawId)}
-                        >
-                          <Pencil className="size-3.5" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
                           variant="ghost"
-                          className="size-7"
-                          aria-label={`Edit posisi ${title}`}
+                        />
+                        <ActionIconButton
+                          label={`Edit posisi ${title}`}
+                          tooltip={`Edit posisi ${title}`}
+                          icon={MapPinned}
                           onClick={() => onEditFeaturePosition(rawId)}
-                        >
-                          <MapPinned className="size-3.5" aria-hidden="true" />
-                        </Button>
+                          variant="ghost"
+                        />
                       </li>
                     );
                   })}

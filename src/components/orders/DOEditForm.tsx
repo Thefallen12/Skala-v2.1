@@ -10,6 +10,7 @@ import type { VehicleSummary } from "@/app/actions/vehicles";
 import { createDeliveryOrder, updateDeliveryOrder } from "@/app/actions/orders";
 import type { DeliveryOrderItemInput } from "@/app/actions/orders";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -744,16 +745,15 @@ export default function DOEditForm({
                     />
                   </TableCell>
                   <TableCell>
-                    <Button
+                    <ActionIconButton
                       type="button"
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`Hapus item baris ${index + 1}`}
+                      label={`Hapus item baris ${index + 1}`}
+                      tooltip={`Hapus item baris ${index + 1}`}
+                      icon={Trash2}
+                      className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                       disabled={fields.length <= 1}
                       onClick={() => remove(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    />
                   </TableCell>
                 </TableRow>
               ))}

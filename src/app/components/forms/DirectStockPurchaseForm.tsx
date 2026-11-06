@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import {
   createDirectStockPurchase,
   saveLogisticsStockItem,
@@ -11,6 +12,7 @@ import CreateVendorInline, {
 } from "@/app/components/forms/CreateVendorInline";
 import { POPaymentMethod } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -536,10 +538,12 @@ export default function DirectStockPurchaseForm({
                     />
                   </TableCell>
                   <TableCell>
-                    <Button
+                    <ActionIconButton
                       type="button"
-                      variant="ghost"
-                      size="sm"
+                      label={`Hapus barang baris ${index + 1}`}
+                      tooltip={`Hapus barang baris ${index + 1}`}
+                      icon={Trash2}
+                      className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                       disabled={
                         isPending ||
                         Boolean(initialTicketId) ||
@@ -550,9 +554,7 @@ export default function DirectStockPurchaseForm({
                           current.filter((item) => item.key !== line.key),
                         )
                       }
-                    >
-                      Hapus
-                    </Button>
+                    />
                   </TableCell>
                 </TableRow>
               ))}

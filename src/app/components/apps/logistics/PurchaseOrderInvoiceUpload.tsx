@@ -12,14 +12,10 @@ import InvoiceDetailsFields, {
   type InvoiceDraft,
 } from "@/app/components/apps/logistics/InvoiceDetailsFields";
 import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 type InvoiceItemSeed = {
   itemCode: string | null;
@@ -142,29 +138,14 @@ export default function PurchaseOrderInvoiceUpload({
   if (!vendorPoSentAt) {
     return (
       <div className="flex min-w-0 flex-col items-center">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              aria-label={
-                isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
-              }
-              title={
-                isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
-              }
-              className="size-10 p-0"
-              onClick={markPoSent}
-              disabled={isPending}
-            >
-              <Send className="size-4 text-orange-500" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {isPending ? "Menyimpan..." : "Tandai PO Dikirim ke Vendor"}
-          </TooltipContent>
-        </Tooltip>
+        <ActionIconButton
+          label={isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"}
+          tooltip={isPending ? "Menyimpan..." : "Tandai PO Dikirim ke Vendor"}
+          icon={Send}
+          onClick={markPoSent}
+          disabled={isPending}
+          className="text-orange-500 hover:text-white"
+        />
         {message && (
           <p
             className={`max-w-full break-words text-center text-xs leading-4 ${isError ? "text-destructive" : "text-muted-foreground"}`}
@@ -181,47 +162,23 @@ export default function PurchaseOrderInvoiceUpload({
     return (
       <div className="flex items-start gap-1.5">
         <div className="flex w-10 flex-col items-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="size-10 p-0"
-                aria-label="Lihat invoice vendor"
-                title="Lihat invoice vendor"
-              >
-                <a href={invoiceUrl} target="_blank" rel="noreferrer">
-                  <ExternalLink className="size-4" aria-hidden="true" />
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Lihat invoice vendor</TooltipContent>
-          </Tooltip>
+          <ActionIconButton
+            label="Lihat invoice vendor"
+            icon={ExternalLink}
+            href={invoiceUrl}
+            target="_blank"
+            rel="noreferrer"
+          />
         </div>
         {invoiceId && (
           <div className="flex w-10 flex-col items-center">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="size-10 p-0"
-                  aria-label="Cetak invoice"
-                  title="Cetak invoice"
-                >
-                  <a
-                    href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(invoiceId)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <FileText className="size-4" aria-hidden="true" />
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Cetak invoice</TooltipContent>
-            </Tooltip>
+            <ActionIconButton
+              label="Cetak invoice"
+              icon={FileText}
+              href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(invoiceId)}`}
+              target="_blank"
+              rel="noreferrer"
+            />
           </div>
         )}
       </div>
@@ -239,20 +196,12 @@ export default function PurchaseOrderInvoiceUpload({
   return (
     <>
       <div className="flex min-w-0 flex-col items-center">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              size="sm"
-              aria-label="Catat Invoice Vendor"
-              className="size-10 p-0"
-              onClick={() => setIsOpen(true)}
-            >
-              <Upload className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Catat Invoice Vendor</TooltipContent>
-        </Tooltip>
+        <ActionIconButton
+          label="Catat Invoice Vendor"
+          tooltip="Catat Invoice Vendor"
+          icon={Upload}
+          onClick={() => setIsOpen(true)}
+        />
         {message && (
           <p
             className={`break-words text-center text-xs leading-4 ${isError ? "text-destructive" : "text-muted-foreground"}`}

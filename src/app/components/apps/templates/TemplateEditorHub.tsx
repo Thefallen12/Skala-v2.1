@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/documents";
 import DocumentWordEditor from "@/components/editor/DocumentWordEditor";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -226,17 +227,15 @@ export default function TemplateEditorHub({
                   })}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <ActionIconButton
+                    label={`Edit template ${template.name}`}
+                    tooltip={`Edit template ${template.name}`}
+                    icon={Pencil}
                     onClick={(event) => {
                       event.stopPropagation();
                       openTemplate(template.id);
                     }}
-                  >
-                    <Pencil className="mr-1.5 size-3.5" />
-                    Edit
-                  </Button>
+                  />
                 </TableCell>
               </TableRow>
             ))}

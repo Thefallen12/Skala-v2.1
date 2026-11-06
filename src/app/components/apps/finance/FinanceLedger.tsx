@@ -26,9 +26,11 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
+  Eye,
   Plus,
   Wallet,
 } from "lucide-react";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 
 export type FinanceCashflowRow = {
   id: string;
@@ -522,20 +524,18 @@ export default function FinanceLedger({
                         </td>
                         <td className="px-3 py-3">
                           {payment.proofUrl ? (
-                            <Button
+                            <ActionIconButton
                               type="button"
-                              size="sm"
-                              variant="link"
-                              className="h-auto p-0"
+                              label={`Lihat bukti transfer ${payment.sourceDesc}`}
+                              tooltip="Lihat Bukti"
+                              icon={Eye}
                               onClick={() =>
                                 onPreviewProof(
                                   payment.proofUrl!,
                                   `Bukti transfer ${payment.sourceDesc}`,
                                 )
                               }
-                            >
-                              Lihat Bukti
-                            </Button>
+                            />
                           ) : (
                             <span className="text-xs text-muted-foreground">
                               Bukti belum tersedia
@@ -635,20 +635,18 @@ export default function FinanceLedger({
                       </td>
                       <td className="px-3 py-3">
                         {cashflow.proofUrl ? (
-                          <Button
+                          <ActionIconButton
                             type="button"
-                            size="sm"
-                            variant="link"
-                            className="h-auto p-0"
+                            label={`Lihat bukti transaksi ${cashflow.sourceDesc}`}
+                            tooltip="Lihat Bukti"
+                            icon={Eye}
                             onClick={() =>
                               onPreviewProof(
                                 cashflow.proofUrl!,
                                 `Bukti transaksi ${cashflow.sourceDesc}`,
                               )
                             }
-                          >
-                            Lihat Bukti
-                          </Button>
+                          />
                         ) : (
                           <span className="text-xs text-muted-foreground">
                             Bukti belum tersedia

@@ -34,6 +34,7 @@ import type {
 } from "@/lib/drawing-types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const categoryLabels = [...DRAWING_CATEGORIES];
 
@@ -469,35 +475,35 @@ export default function DrawingWorkspace({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button
+                      <ActionIconButton
                         type="button"
-                        size="icon"
-                        variant="outline"
-                        className="size-8"
-                        aria-label={`Lihat ${drawing.drawingCode}`}
+                        label={`Lihat gambar ${drawing.drawingCode}`}
+                        tooltip={`Lihat gambar ${drawing.drawingCode}`}
+                        icon={Eye}
                         onClick={(event) => {
                           event.stopPropagation();
                           setSelectedId(drawing.id);
                         }}
-                      >
-                        <Eye className="size-4" aria-hidden="true" />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            className="size-8"
-                            aria-label={`Aksi ${drawing.drawingCode}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <MoreHorizontal
-                              className="size-4"
-                              aria-hidden="true"
-                            />
-                          </Button>
-                        </DropdownMenuTrigger>
+                      />
+                      <Tooltip>
+                        <DropdownMenu>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                className="size-10"
+                                aria-label={`Aksi ${drawing.drawingCode}`}
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <MoreHorizontal
+                                  className="size-4"
+                                  aria-hidden="true"
+                                />
+                              </Button>
+                            </DropdownMenuTrigger>
+                          </TooltipTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onSelect={() => setSelectedId(drawing.id)}
@@ -521,7 +527,9 @@ export default function DrawingWorkspace({
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                        </DropdownMenu>
+                        <TooltipContent>Aksi gambar {drawing.drawingCode}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </TableCell>
                 </TableRow>

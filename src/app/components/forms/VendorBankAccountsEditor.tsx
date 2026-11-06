@@ -2,6 +2,7 @@
 
 import { Plus, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { VendorBankAccountInput } from "@/lib/vendor-bank-accounts";
@@ -89,11 +90,10 @@ export function VendorBankAccountsEditor({
                   <Star aria-hidden="true" />
                   {account.isPrimary ? "Utama" : "Jadikan utama"}
                 </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Hapus rekening ${index + 1}`}
+                <ActionIconButton
+                  label={`Hapus rekening ${index + 1}`}
+                  tooltip={`Hapus rekening ${index + 1}`}
+                  icon={Trash2}
                   disabled={disabled}
                   onClick={() => {
                     const remaining = accounts.filter(
@@ -104,9 +104,8 @@ export function VendorBankAccountsEditor({
                     }
                     onChange(remaining);
                   }}
-                >
-                  <Trash2 aria-hidden="true" />
-                </Button>
+                  variant="ghost"
+                />
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">

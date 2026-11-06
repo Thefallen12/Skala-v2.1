@@ -10,6 +10,7 @@ import {
 import { useState, type FormEvent } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -414,20 +415,18 @@ export default function RequestFormModal({
                       <FileText className="size-4 shrink-0 text-orange-300" aria-hidden="true" />
                       <span className="truncate">{document.name}</span>
                     </span>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 shrink-0 text-slate-400 hover:text-red-300"
-                      aria-label={`Hapus ${document.name}`}
+                    <ActionIconButton
+                      label={`Hapus ${document.name}`}
+                      tooltip={`Hapus ${document.name}`}
+                      icon={Trash2}
+                      className="shrink-0 text-red-300 hover:bg-destructive hover:text-destructive-foreground"
                       onClick={() =>
                         setDocuments((current) =>
                           current.filter((entry) => entry !== document),
                         )
                       }
-                    >
-                      <Trash2 className="size-4" aria-hidden="true" />
-                    </Button>
+                      variant="ghost"
+                    />
                   </li>
                 ))}
               </ul>

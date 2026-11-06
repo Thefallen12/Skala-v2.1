@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/vehicle-fuel";
 import { createEquipmentLog } from "@/app/actions/construction";
 import { DOStatus, VehicleFuelSource } from "@prisma/client";
+import { ExternalLink } from "lucide-react";
 import {
   VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
   VEHICLE_FUEL_PRICE_PER_LITER,
@@ -22,6 +23,7 @@ import {
   withLocalPhotoPreview,
 } from "@/lib/photo-urls";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -766,15 +768,15 @@ export default function MoverWorkspace({
                   {order.receiptPhotoUrls.length > 0 && (
                     <div className="flex flex-wrap gap-3">
                       {order.receiptPhotoUrls.map((receiptUrl, index) => (
-                        <a
+                        <ActionIconButton
                           key={receiptUrl}
-                          className="text-sm font-medium text-primary underline"
+                          label={`Lihat foto bukti pengiriman ${index + 1} untuk DO ${order.doNumber}`}
+                          tooltip={`Lihat foto bukti ${index + 1}`}
+                          icon={ExternalLink}
                           href={photoDownloadHref(receiptUrl)}
                           target="_blank"
                           rel="noreferrer"
-                        >
-                          Lihat foto bukti {index + 1}
-                        </a>
+                        />
                       ))}
                     </div>
                   )}

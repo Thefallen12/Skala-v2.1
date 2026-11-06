@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Activity, ChartNoAxesCombined, SearchCheck } from "lucide-react";
 import CardBox from "@/app/components/shared/CardBox";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import TicketFilter from "@/app/components/apps/tickets/TicketFilter";
 import TicketListing from "@/app/components/apps/tickets/TicketListing";
 import TicketOverviewPanels from "@/app/components/apps/tickets/TicketOverviewPanels";
@@ -200,19 +201,13 @@ export default function TicketsApp({
               tickets={tickets}
               formattedTotal={formattedTotal}
               trigger={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  title="Lihat statistik nilai & transaksi"
-                  aria-label="Lihat statistik nilai & transaksi"
+                <ActionIconButton
+                  label="Lihat statistik nilai & transaksi"
+                  tooltip="Lihat statistik nilai & transaksi"
+                  icon={ChartNoAxesCombined}
                   className="shrink-0"
-                >
-                  <ChartNoAxesCombined
-                    className="size-5"
-                    aria-hidden="true"
-                  />
-                </Button>
+                  variant="ghost"
+                />
               }
             />
           </div>

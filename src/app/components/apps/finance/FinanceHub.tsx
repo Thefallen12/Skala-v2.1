@@ -44,6 +44,7 @@ import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPr
 import VehicleTripLogTable from "@/app/components/apps/logistics/VehicleTripLogTable";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -991,48 +992,30 @@ export default function FinanceHub({
       }
 
       return (
-        <button
+        <ActionIconButton
           type="button"
-          className="group flex items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`Lihat pratinjau ${label}`}
+          label={`Lihat pratinjau ${label}`}
+          tooltip={`Lihat foto ${label}`}
+          icon={Eye}
           onClick={(event) => {
             event.stopPropagation();
             setReceiptPreview({ label, url });
           }}
-        >
-          <Image
-            src={paymentReceiptHref(url)}
-            alt={label}
-            width={64}
-            height={64}
-            className="size-16 rounded-md border object-cover transition-transform group-hover:scale-105"
-            unoptimized
-            onError={() => {
-              setUnavailableProofUrls((current) =>
-                current.includes(url) ? current : [...current, url],
-              );
-            }}
-          />
-          <span className="text-sm font-medium text-primary underline-offset-4 group-hover:underline">
-            Lihat Foto
-          </span>
-        </button>
+        />
       );
     }
 
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <Button asChild size="sm" variant="outline">
-          <a
-            href={paymentReceiptHref(url)}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-            Lihat Bukti Transfer
-          </a>
-        </Button>
+        <ActionIconButton
+          label={`Lihat bukti transfer ${label}`}
+          tooltip="Lihat Bukti Transfer"
+          icon={ExternalLink}
+          href={paymentReceiptHref(url)}
+          target="_blank"
+          rel="noreferrer"
+          onLinkClick={(event) => event.stopPropagation()}
+        />
         {url.startsWith("/api/tickets/receipts/") && (
           <FinancePaymentProofReplacement
             paymentTransactionId={paymentTransactionId}
@@ -1258,19 +1241,19 @@ export default function FinanceHub({
                                     Lengkap · {expense.proofUrls.length} bukti
                                   </Badge>
                                   {expense.proofUrls.map((url, index) => (
-                                    <button
+                                    <ActionIconButton
                                       key={url}
                                       type="button"
-                                      className="text-xs text-primary underline"
+                                      label={`Lihat bukti ${typeLabel} ${index + 1} untuk ${expense.recipientName}`}
+                                      tooltip={`Lihat bukti ${index + 1}`}
+                                      icon={Eye}
                                       onClick={() =>
                                         setReceiptPreview({
                                           url,
                                           label: `Bukti ${typeLabel} · ${expense.recipientName} (${index + 1})`,
                                         })
                                       }
-                                    >
-                                      Lihat bukti {index + 1}
-                                    </button>
+                                    />
                                   ))}
                                 </div>
                               </td>
@@ -1350,15 +1333,16 @@ export default function FinanceHub({
                           <TableCell>{order.items.length}</TableCell>
                           <TableCell className="text-right">
                             {role === UserRole.FINANCE && !order.paidAt && (
-                              <Button
+                              <ActionIconButton
+                                label={`Tandai PO ${order.poNumber} diperiksa`}
+                                tooltip="Tandai Diperiksa"
+                                icon={FileCheck2}
                                 disabled={isPending}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   runReview(order.publicCode);
                                 }}
-                              >
-                                Tandai Diperiksa
-                              </Button>
+                              />
                             )}
                           </TableCell>
                         </TableRow>
@@ -1457,22 +1441,23 @@ export default function FinanceHub({
                           <TableCell className="text-right">
                             <div className="flex flex-wrap justify-end gap-2">
                               {row.paidAmount > 0 && (
-                                <Button
+                                <ActionIconButton
                                   type="button"
-                                  variant="outline"
+                                  label={`Lihat bukti pembayaran ${row.title}`}
+                                  tooltip="Lihat Bukti"
+                                  icon={Eye}
                                   disabled={isPending}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     openPaymentHistory(row);
                                   }}
-                                >
-                                  <Eye className="mr-2 size-4" aria-hidden="true" />
-                                  Lihat Bukti
-                                </Button>
+                                />
                               )}
                               {outstanding > 0 && (
-                                <Button
-                                  type="button"
+                                <ActionIconButton
+                                  label={`Catat pembayaran ${row.title}`}
+                                  tooltip={`Catat pembayaran ${row.title}`}
+                                  icon={Wallet}
                                   disabled={
                                     isPending || role !== UserRole.FINANCE
                                   }
@@ -1483,9 +1468,7 @@ export default function FinanceHub({
                                       id: row.id,
                                     });
                                   }}
-                                >
-                                  Bayar / Transfer
-                                </Button>
+                                />
                               )}
                             </div>
                           </TableCell>
@@ -1903,14 +1886,14 @@ export default function FinanceHub({
                         {terbilangRupiah(Number(request.requestedAmount))}
                       </p>
                       {request.transferProofUrl && (
-                        <a
-                          className="font-medium text-primary underline"
+                        <ActionIconButton
+                          label={`Lihat bukti transfer permintaan ${request.doNumber}`}
+                          tooltip="Lihat bukti transfer"
+                          icon={ExternalLink}
                           href={photoDownloadHref(request.transferProofUrl)}
                           target="_blank"
                           rel="noreferrer"
-                        >
-                          Lihat bukti transfer
-                        </a>
+                        />
                       )}
                     </div>
                   )}
@@ -1920,33 +1903,33 @@ export default function FinanceHub({
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2 text-sm">
-                    <a
-                      className="font-medium text-primary underline"
+                    <ActionIconButton
+                      label={`Lihat foto speedometer sebelum isi untuk DO ${request.doNumber}`}
+                      tooltip="Foto speedometer sebelum isi"
+                      icon={ExternalLink}
                       href={photoDownloadHref(request.beforeFillingPhotoUrl)}
                       target="_blank"
                       rel="noreferrer"
-                    >
-                      Foto speedometer sebelum isi
-                    </a>
+                    />
                     {request.afterFillingPhotoUrl && (
-                      <a
-                        className="font-medium text-primary underline"
+                      <ActionIconButton
+                        label={`Lihat foto speedometer setelah isi untuk DO ${request.doNumber}`}
+                        tooltip="Foto speedometer setelah isi"
+                        icon={ExternalLink}
                         href={photoDownloadHref(request.afterFillingPhotoUrl)}
                         target="_blank"
                         rel="noreferrer"
-                      >
-                        Foto speedometer setelah isi
-                      </a>
+                      />
                     )}
                     {request.receiptPhotoUrl && (
-                      <a
-                        className="font-medium text-primary underline"
+                      <ActionIconButton
+                        label={`Lihat bon BBM untuk DO ${request.doNumber}`}
+                        tooltip="Bon BBM"
+                        icon={ExternalLink}
                         href={photoDownloadHref(request.receiptPhotoUrl)}
                         target="_blank"
                         rel="noreferrer"
-                      >
-                        Bon BBM
-                      </a>
+                      />
                     )}
                   </div>
                   {request.status === "PENDING_FINANCE" && role === UserRole.FINANCE && (
@@ -2176,30 +2159,28 @@ export default function FinanceHub({
                   ? `PO ini sudah lunas pada ${new Date(activeStandaloneOrder.paidAt).toLocaleDateString("id-ID")}.`
                   : "PO ini sudah lunas."}
                 {activeStandaloneOrder.paymentReceiptUrl && (
-                  <a
+                  <ActionIconButton
+                    label={`Lihat bukti pelunasan PO ${activeStandaloneOrder.poNumber}`}
+                    tooltip="Lihat bukti pelunasan"
+                    icon={ExternalLink}
                     href={photoDownloadHref(
                       activeStandaloneOrder.paymentReceiptUrl,
                     )}
                     target="_blank"
                     rel="noreferrer"
-                    className="ml-2 underline"
-                  >
-                    Lihat bukti pelunasan
-                  </a>
+                  />
                 )}
               </div>
             )}
             {activeStandaloneOrder?.vendorInvoiceUrl && (
-              <Button asChild size="sm" variant="outline">
-                <a
-                  href={photoDownloadHref(activeStandaloneOrder.vendorInvoiceUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-                  Lihat invoice/bon dari Logistik
-                </a>
-              </Button>
+              <ActionIconButton
+                label={`Lihat invoice/bon PO ${activeStandaloneOrder.poNumber} dari Logistik`}
+                tooltip="Lihat invoice/bon dari Logistik"
+                icon={ExternalLink}
+                href={photoDownloadHref(activeStandaloneOrder.vendorInvoiceUrl)}
+                target="_blank"
+                rel="noreferrer"
+              />
             )}
             {activeStandaloneOrder && role === UserRole.FINANCE && !isPaymentSettled && (
               <form className="space-y-3" onSubmit={submitPayment}>
@@ -2360,16 +2341,14 @@ export default function FinanceHub({
                   <strong>{currency(remainingAmount)}</strong>
                 </p>
                 {activeDirectPurchase.vendorInvoiceUrl && (
-                  <Button asChild size="sm" variant="outline">
-                    <a
-                      href={photoDownloadHref(activeDirectPurchase.vendorInvoiceUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-                      Lihat Invoice / BON Faktur
-                    </a>
-                  </Button>
+                  <ActionIconButton
+                    label="Lihat invoice atau bon faktur pembelian langsung"
+                    tooltip="Lihat Invoice / BON Faktur"
+                    icon={ExternalLink}
+                    href={photoDownloadHref(activeDirectPurchase.vendorInvoiceUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                  />
                 )}
                 {role === UserRole.FINANCE &&
                   activeDirectPurchase.vendorInvoiceUrl &&
@@ -2517,14 +2496,14 @@ export default function FinanceHub({
                     Sisa tagihan: <strong>{currency(remainingAmount)}</strong>
                   </p>
                   {activeTicket.purchaseReceiptUrl && (
-                    <a
-                      className="font-medium text-primary underline"
+                    <ActionIconButton
+                      label={`Lihat invoice atau bon dari Logistik untuk tiket ${activeTicket.ticketNumber}`}
+                      tooltip="Lihat invoice/bon dari Logistik"
+                      icon={ExternalLink}
                       href={photoDownloadHref(activeTicket.purchaseReceiptUrl)}
                       target="_blank"
                       rel="noreferrer"
-                    >
-                      Lihat invoice/bon dari Logistik
-                    </a>
+                    />
                   )}
                 </div>
                 <DocumentPdfGenerator

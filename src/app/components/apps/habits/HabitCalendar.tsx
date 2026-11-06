@@ -25,6 +25,7 @@ import {
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -756,16 +757,13 @@ export default function HabitCalendar({
           <CardBox className="space-y-4 p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">Kalender</h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-8"
-                aria-label="Tambah agenda"
+              <ActionIconButton
+                label="Tambah agenda"
+                tooltip="Tambah agenda"
+                icon={Plus}
                 onClick={() => onAddSchedule(selectedDate)}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-              </Button>
+                variant="outline"
+              />
             </div>
             <div className="flex items-center justify-between gap-2">
               <Button

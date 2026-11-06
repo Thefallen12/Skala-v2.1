@@ -20,6 +20,7 @@ import {
   CircleDollarSign,
   Copy,
   Download,
+  ExternalLink,
   Eye,
   FileUp,
   MoreHorizontal,
@@ -34,6 +35,7 @@ import {
 } from "lucide-react";
 import CardBox from "@/app/components/shared/CardBox";
 import TicketListing from "@/app/components/apps/tickets/TicketListing";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
 import CreatePurchaseModal from "@/app/components/forms/CreatePurchaseModal";
@@ -67,6 +69,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -208,20 +215,18 @@ function DirectPurchaseInvoiceAction({
   const invoiceUrl = purchase.vendorInvoiceUrl;
   if (invoiceUrl) {
     return (
-      <Button
+      <ActionIconButton
         type="button"
-        variant="link"
-        size="sm"
-        className="h-auto p-0 text-xs"
+        label={`Lihat invoice/bon faktur pembelian ${purchase.purchaseNumber}`}
+        tooltip="Lihat Invoice/Bon"
+        icon={ExternalLink}
         onClick={() =>
           onPreview(
             invoiceUrl,
             `${purchase.purchaseNumber} · Invoice / BON Faktur`,
           )
         }
-      >
-        Lihat Invoice/Bon
-      </Button>
+      />
     );
   }
   if (!purchase.isApprovedByDirector) {
@@ -1324,17 +1329,21 @@ export default function LogisticsWorkspace({
                         </TableCell>
                         {canCreatePurchaseOrder && (
                           <TableCell>
+                            <Tooltip>
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    aria-label={`Aksi untuk ${item.name}`}
-                                  >
-                                    <MoreHorizontal aria-hidden="true" />
-                                  </Button>
-                                </DropdownMenuTrigger>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      className="size-10"
+                                      aria-label={`Aksi untuk ${item.name}`}
+                                    >
+                                      <MoreHorizontal aria-hidden="true" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
                                 <DropdownMenuContent align="end" className="w-44">
                                   <DropdownMenuItem
                                     onSelect={() => openStockEditor(item)}
@@ -1367,6 +1376,8 @@ export default function LogisticsWorkspace({
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
+                              <TooltipContent>Aksi barang {item.name}</TooltipContent>
+                            </Tooltip>
                           </TableCell>
                         )}
                       </TableRow>
@@ -1520,12 +1531,12 @@ export default function LogisticsWorkspace({
                         "—"
                       )}
                       {receiptPhotos.map((photo, index) => (
-                        <Button
+                        <ActionIconButton
                           key={photo}
                           type="button"
-                          variant="link"
-                          size="sm"
-                          className="mt-1 block h-auto p-0 text-xs"
+                          label={`Lihat foto penerimaan ${index + 1} pembelian ${purchase.purchaseNumber}`}
+                          tooltip={`Lihat foto penerimaan ${index + 1}`}
+                          icon={Eye}
                           onClick={() => {
                             setStockReceiptPreviewFailed(false);
                             setStockReceiptPreview({
@@ -1533,9 +1544,7 @@ export default function LogisticsWorkspace({
                               label: `${purchase.purchaseNumber} · Foto penerimaan ${index + 1}`,
                             });
                           }}
-                        >
-                          Lihat foto {index + 1}
-                        </Button>
+                        />
                       ))}
                     </TableCell>
                     {canCreatePurchaseOrder && (
@@ -1544,17 +1553,17 @@ export default function LogisticsWorkspace({
                           {purchase.status === "PENDING_RECEIPT" &&
                             purchase.isApprovedByDirector &&
                             purchase.hasFinanceProof && (
-                              <Button
+                              <ActionIconButton
                                 type="button"
-                                size="sm"
+                                label={`Terima barang pembelian ${purchase.purchaseNumber}`}
+                                tooltip="Terima Barang"
+                                icon={PackageOpen}
                                 onClick={() => {
                                   setReceivingPurchaseError("");
                                   clearReceivingPhotos();
                                   setReceivingPurchase(purchase);
                                 }}
-                              >
-                                Terima Barang
-                              </Button>
+                              />
                             )}
                         </div>
                       </TableCell>
@@ -1891,12 +1900,12 @@ export default function LogisticsWorkspace({
                             className="object-cover"
                             sizes="(max-width: 640px) 30vw, 140px"
                           />
-                          <Button
-                            type="button"
+                          <ActionIconButton
+                            label={`Hapus foto ${index + 1}`}
+                            tooltip={`Hapus foto ${index + 1}`}
+                            icon={X}
                             variant="destructive"
-                            size="icon"
-                            aria-label={`Hapus foto ${index + 1}`}
-                            className="absolute right-1 top-1 size-7"
+                            className="absolute right-1 top-1"
                             onClick={() => {
                               URL.revokeObjectURL(photo.previewUrl);
                               receivingPreviewUrls.current.delete(
@@ -1911,9 +1920,7 @@ export default function LogisticsWorkspace({
                               );
                             }}
                             disabled={receivingPurchaseSubmitting}
-                          >
-                            <X aria-hidden="true" />
-                          </Button>
+                          />
                         </div>
                       ))}
                     </div>

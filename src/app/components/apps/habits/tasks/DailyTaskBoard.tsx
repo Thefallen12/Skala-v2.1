@@ -27,6 +27,7 @@ import {
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -709,15 +710,15 @@ export default function DailyTaskBoard({
                   </select>
                 )}
                 {canEdit && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Hapus tugas ${task.title}`}
+                  <ActionIconButton
+                    label={`Hapus tugas ${task.title}`}
+                    tooltip={`Hapus tugas ${task.title}`}
+                    icon={Trash2}
                     disabled={isPending}
                     onClick={() => onDelete(task.id)}
-                  >
-                    <Trash2 className="size-4 text-destructive" aria-hidden="true" />
-                  </Button>
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    variant="ghost"
+                  />
                 )}
               </div>
             );

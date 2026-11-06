@@ -13,6 +13,7 @@ import type {
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -383,19 +384,18 @@ export default function OfficeExpenseModal({
                       <span className="min-w-0 truncate text-xs" title={proof.name}>
                         {proof.name}
                       </span>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        aria-label={`Hapus ${proof.name}`}
+                      <ActionIconButton
+                        label={`Hapus ${proof.name}`}
+                        tooltip={`Hapus ${proof.name}`}
+                        icon={Trash2}
                         onClick={() =>
                           setProofs((current) =>
                             current.filter((item) => item !== proof),
                           )
                         }
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
+                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        variant="ghost"
+                      />
                     </div>
                   </div>
                 ))}

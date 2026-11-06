@@ -18,6 +18,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -545,28 +546,20 @@ export default function SurveySidebar({
                       </span>
                       {id && (
                         <>
-                          <Button
+                          <ActionIconButton
                             type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-[10px]"
-                            aria-label={`Edit data ${title}`}
+                            label={`Edit data ${title}`}
+                            tooltip={`Edit data ${title}`}
+                            icon={Pencil}
                             onClick={() => onEditFeatureMetadata(id)}
-                          >
-                            <Pencil className="mr-1 size-3" aria-hidden="true" />
-                            Data
-                          </Button>
-                          <Button
+                          />
+                          <ActionIconButton
                             type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-[10px]"
-                            aria-label={`Edit posisi ${title}`}
+                            label={`Edit posisi ${title}`}
+                            tooltip={`Edit posisi ${title}`}
+                            icon={MapPin}
                             onClick={() => onEditFeaturePosition(id)}
-                          >
-                            <MapPin className="mr-1 size-3" aria-hidden="true" />
-                            Posisi
-                          </Button>
+                          />
                         </>
                       )}
                     </li>

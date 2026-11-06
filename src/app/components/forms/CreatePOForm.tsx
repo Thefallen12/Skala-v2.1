@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import {
   createPurchaseOrder,
   type OrderActionResult,
@@ -16,6 +17,7 @@ import CreateVendorInline, {
 } from "@/app/components/forms/CreateVendorInline";
 import { POPaymentMethod } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -713,10 +715,12 @@ export default function CreatePOForm({
                     </div>
                   </TableCell>
                   <TableCell className="overflow-hidden">
-                    <Button
+                    <ActionIconButton
                       type="button"
-                      variant="ghost"
-                      size="sm"
+                      label={`Hapus barang baris ${index + 1}`}
+                      tooltip={`Hapus barang baris ${index + 1}`}
+                      icon={Trash2}
+                      className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                       disabled={
                         isPending ||
                         items.length === 1 ||
@@ -727,9 +731,7 @@ export default function CreatePOForm({
                           current.filter((_, itemIndex) => itemIndex !== index),
                         )
                       }
-                    >
-                      Hapus
-                    </Button>
+                    />
                   </TableCell>
                 </TableRow>
               ))}

@@ -3,13 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { GlobalModal } from "@/components/ui/global-modal";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 type LocalPreview = {
   file: File;
@@ -49,32 +44,22 @@ export default function InvoiceFilePreview({ file }: { file: File | null }) {
   return (
     <>
       <div className="flex shrink-0 flex-col items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="size-10 p-0"
-              aria-label="Pratinjau invoice atau bon"
-              title="Pratinjau invoice atau bon"
-              onClick={() => {
-                if (previewRef.current) {
-                  URL.revokeObjectURL(previewRef.current.url);
-                }
-                const nextPreview = {
-                  file,
-                  url: URL.createObjectURL(file),
-                };
-                previewRef.current = nextPreview;
-                setPreview(nextPreview);
-              }}
-            >
-              <Eye className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Pratinjau invoice / bon</TooltipContent>
-        </Tooltip>
+        <ActionIconButton
+          label="Pratinjau invoice atau bon"
+          tooltip="Pratinjau invoice / bon"
+          icon={Eye}
+          onClick={() => {
+            if (previewRef.current) {
+              URL.revokeObjectURL(previewRef.current.url);
+            }
+            const nextPreview = {
+              file,
+              url: URL.createObjectURL(file),
+            };
+            previewRef.current = nextPreview;
+            setPreview(nextPreview);
+          }}
+        />
         <span className="text-center text-[10px] leading-3 text-muted-foreground">
           Preview
         </span>

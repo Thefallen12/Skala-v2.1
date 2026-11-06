@@ -5,7 +5,9 @@ import { DOStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import CardBox from "@/app/components/shared/CardBox";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
+import { Eye, Pencil } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -128,11 +130,20 @@ export default async function OrdersPage() {
                       <TableCell>{order.status.replaceAll("_", " ")}</TableCell>
                       <TableCell>{order.updatedAt.toLocaleDateString("id-ID")}</TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/d/${order.publicCode}`}>
-                            {canEditPO && order.status === "DRAFT" ? "Edit" : "Review"}
-                          </Link>
-                        </Button>
+                        <ActionIconButton
+                          label={
+                            canEditPO && order.status === "DRAFT"
+                              ? `Edit PO ${order.poNumber}`
+                              : `Review PO ${order.poNumber}`
+                          }
+                          tooltip={
+                            canEditPO && order.status === "DRAFT" ? "Edit PO" : "Review PO"
+                          }
+                          icon={
+                            canEditPO && order.status === "DRAFT" ? Pencil : Eye
+                          }
+                          href={`/d/${order.publicCode}`}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -173,9 +184,12 @@ export default async function OrdersPage() {
                       <TableCell>{doStatusLabels[order.status]}</TableCell>
                       <TableCell>{order.updatedAt.toLocaleDateString("id-ID")}</TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" asChild>
-                          <Link href={`/d/${order.publicCode}`}>Edit</Link>
-                        </Button>
+                        <ActionIconButton
+                          label={`Edit DO ${order.doNumber}`}
+                          tooltip="Edit DO"
+                          icon={Pencil}
+                          href={`/d/${order.publicCode}`}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}

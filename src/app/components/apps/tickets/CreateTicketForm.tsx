@@ -13,6 +13,7 @@ import {
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import { createTicket } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -387,17 +388,15 @@ export default function CreateTicketForm({
                       />
                     </div>
                   )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-red-500 hover:bg-red-500/10 hover:text-red-600"
-                  aria-label={`Hapus item ${index + 1}`}
+                <ActionIconButton
+                  label={`Hapus item ${index + 1}`}
+                  tooltip={`Hapus item ${index + 1}`}
+                  icon={Trash2}
+                  className="text-red-500 hover:bg-destructive hover:text-destructive-foreground"
                   onClick={() => remove(index)}
                   disabled={fields.length <= 1}
-                >
-                  <Trash2 aria-hidden="true" />
-                </Button>
+                  variant="ghost"
+                />
                 </div>
               ))}
             </div>

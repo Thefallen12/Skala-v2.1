@@ -3,7 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 import { POStatus } from "@prisma/client";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/tickets";
 import CreatePOForm from "@/app/components/forms/CreatePOForm";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -240,11 +241,13 @@ export default function LogisticsActionModal({
                   tidak dibuat dan stok tidak dikurangi kembali.
                 </p>
               </div>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link href={`/d/${existingDeliveryOrder.publicCode}`}>
-                  Lihat Surat Jalan
-                </Link>
-              </Button>
+              <ActionIconButton
+                type="button"
+                label={`Lihat Surat Jalan ${existingDeliveryOrder.doNumber}`}
+                tooltip="Lihat Surat Jalan"
+                icon={FileText}
+                href={`/d/${existingDeliveryOrder.publicCode}`}
+              />
             </section>
           ) : (
             <>
@@ -461,11 +464,13 @@ export default function LogisticsActionModal({
                           : "Menunggu Finance"}
                 </Badge>
               </div>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link href={`/d/${latestPurchaseOrder.publicCode}`}>
-                  Buka / cetak PO
-                </Link>
-              </Button>
+              <ActionIconButton
+                type="button"
+                label={`Buka / cetak PO ${latestPurchaseOrder.poNumber}`}
+                tooltip="Buka / cetak PO"
+                icon={FileText}
+                href={`/d/${latestPurchaseOrder.publicCode}`}
+              />
               {purchaseOrderPaid ? (
                 <p className="text-sm text-muted-foreground">
                   Pembayaran tercatat dan barang sudah masuk stok gudang.

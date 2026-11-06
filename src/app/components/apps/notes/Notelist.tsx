@@ -1,12 +1,11 @@
 "use client";
 
-import { Icon } from "@iconify/react";
 import React, { useState } from "react";
 import { NotesType } from "@/app/(DashboardLayout)/types/apps/notes";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle } from "@/components/ui/alert";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { Trash2 } from "lucide-react";
 
 interface NotelistProps {
   notes: NotesType[];
@@ -70,19 +69,13 @@ const Notelist: React.FC<NotelistProps> = ({ notes, loading, selectedNoteId, onS
                     <p className="text-xs text-muted-foreground">
                       {note.datef ? new Date(note.datef).toLocaleDateString() : "-"}
                     </p>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onDeleteNote(note.id)}
-                          aria-label="Delete note"
-                        >
-                          <Icon icon="tabler:trash" height={18} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Delete</TooltipContent>
-                    </Tooltip>
+                    <ActionIconButton
+                      label={`Hapus catatan ${note.title}`}
+                      tooltip={`Hapus catatan ${note.title}`}
+                      icon={Trash2}
+                      onClick={() => onDeleteNote(note.id)}
+                      variant="ghost"
+                    />
                   </div>
                 </div>
               </div>

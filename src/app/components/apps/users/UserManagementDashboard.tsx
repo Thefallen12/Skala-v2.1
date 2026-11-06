@@ -56,6 +56,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const UserManagementCharts = dynamic(() => import("./UserManagementCharts"), {
   ssr: false,
@@ -804,20 +809,22 @@ export default function UserManagementDashboard({
                     </Badge>
                   </TableCell>
                   <TableCell className="whitespace-normal p-0 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          aria-label={`Tindakan untuk ${user.name}`}
-                          disabled={isPending}
-                          className="h-7 w-7"
-                        >
-                          <MoreHorizontal className="size-4" aria-hidden="true" />
-                          <span className="sr-only">Tindakan</span>
-                        </Button>
-                      </DropdownMenuTrigger>
+                    <Tooltip>
+                      <DropdownMenu>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Tindakan untuk ${user.name}`}
+                              disabled={isPending}
+                              className="size-10"
+                            >
+                              <MoreHorizontal className="size-4" aria-hidden="true" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
                       <DropdownMenuContent align="end" className="w-40">
                         <DropdownMenuItem
                           onSelect={() => openEditAccount(user)}
@@ -834,7 +841,9 @@ export default function UserManagementDashboard({
                           Hapus
                         </DropdownMenuItem>
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                      </DropdownMenu>
+                      <TooltipContent>Tindakan akun {user.name}</TooltipContent>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}

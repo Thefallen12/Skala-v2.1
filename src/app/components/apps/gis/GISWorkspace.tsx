@@ -5,6 +5,7 @@ import { center } from "@turf/turf";
 import {
   ArrowUpRight,
   Download,
+  Eye,
   FileUp,
   MapPinned,
   MapPin,
@@ -55,6 +56,7 @@ import ProjectMapLoader, {
   type GlobalPolygonFeature,
 } from "./ProjectMapLoader";
 import SurveyDetailModal from "@/components/gis/SurveyDetailModal";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { useMaintenanceEnabled } from "@/components/maintenance/MaintenanceContext";
 import { UnderProductionState } from "@/components/ui/under-production-state";
 
@@ -754,8 +756,22 @@ export default function GISWorkspace({
                     <span className="font-semibold text-muted-foreground">Keterangan</span><span>:</span><span>{activeSurvey?.notes ?? "Belum ada keterangan."}</span>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-3">
-                    <Button type="button" size="sm" className="text-xs" onClick={() => changeView("details")}>Edit Data</Button>
-                    {reportSurveyId && <Button type="button" size="sm" variant="outline" className="text-xs" onClick={() => setReportPreviewOpen(true)}><FileText className="mr-1 size-3" /> Tampilkan PDF</Button>}
+                    <ActionIconButton
+                      type="button"
+                      label="Edit data survei"
+                      tooltip="Edit data survei"
+                      icon={Pencil}
+                      onClick={() => changeView("details")}
+                    />
+                    {reportSurveyId && (
+                      <ActionIconButton
+                        type="button"
+                        label="Tampilkan PDF laporan survei"
+                        tooltip="Tampilkan PDF"
+                        icon={FileText}
+                        onClick={() => setReportPreviewOpen(true)}
+                      />
+                    )}
                   </div>
                   <div className="mt-4 border-t border-border pt-3">
                     <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Legenda</p>
@@ -823,13 +839,21 @@ export default function GISWorkspace({
                       <td className="px-3 py-3 whitespace-nowrap">{new Date(survey.createdAt).toLocaleDateString("id-ID")}</td>
                       <td className="px-3 py-3">{survey.surveyorName}</td>
                       <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-bold ${running ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}><span className={`size-2 rounded-full ${running ? "bg-emerald-500" : "bg-amber-500"}`} />{running ? "Aktif" : "Pilih Adat"}</span></td>
-                      <td className="px-3 py-3"><Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => {
-                        if (isSurveyDetailsUnderMaintenance) {
-                          changeView("details");
-                          return;
-                        }
-                        setDetailSurveyId(survey.id);
-                      }}>Lihat Detail</Button></td>
+                      <td className="px-3 py-3">
+                        <ActionIconButton
+                          type="button"
+                          label={`Lihat detail survei ${project?.code ?? survey.projectCode ?? ""}`}
+                          tooltip="Lihat Detail"
+                          icon={Eye}
+                          onClick={() => {
+                            if (isSurveyDetailsUnderMaintenance) {
+                              changeView("details");
+                              return;
+                            }
+                            setDetailSurveyId(survey.id);
+                          }}
+                        />
+                      </td>
                     </tr>
                   );
                 })}

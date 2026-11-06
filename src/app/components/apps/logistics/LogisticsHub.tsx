@@ -28,6 +28,7 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import { POPaymentMethod, POStatus, UserRole } from "@prisma/client";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -462,65 +463,49 @@ export default function LogisticsHub({
                       {order.status === POStatus.DRAFT ? (
                         <>
                           <div className="flex w-10 flex-col items-center">
-                            <Button
-                              asChild
-                              aria-label={
+                            <ActionIconButton
+                              label={
                                 role === UserRole.LOGISTICS ||
                                 role === UserRole.ADMINISTRATIONS
                                   ? "Lanjutkan Draft"
                                   : "Lihat Draft"
                               }
-                              title={
+                              tooltip={
                                 role === UserRole.LOGISTICS ||
                                 role === UserRole.ADMINISTRATIONS
                                   ? "Lanjutkan Draft"
                                   : "Lihat Draft"
                               }
-                              className="size-10 p-0"
-                              size="sm"
-                              variant="outline"
-                            >
-                              <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
-                                <FilePenLine aria-hidden="true" />
-                              </Link>
-                            </Button>
+                              icon={FilePenLine}
+                              href={`/d/${encodeURIComponent(order.publicCode)}`}
+                            />
                           </div>
                           {(role === UserRole.LOGISTICS ||
                             role === UserRole.ADMINISTRATIONS) && (
                             <div className="flex w-10 flex-col items-center">
-                              <Button
-                                aria-label={
+                              <ActionIconButton
+                                label={
                                   isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
                                 }
-                                title={
+                                tooltip={
                                   isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
                                 }
-                                className="size-10 p-0"
-                                size="sm"
+                                icon={Send}
+                                onClick={() => submitDraftPurchaseOrder(order.publicCode)}
                                 disabled={isPending}
-                                onClick={() =>
-                                  submitDraftPurchaseOrder(order.publicCode)
-                                }
-                              >
-                                <Send className="text-orange-500" aria-hidden="true" />
-                              </Button>
+                                className="text-orange-500 hover:text-white"
+                              />
                             </div>
                           )}
                         </>
                       ) : order.status !== POStatus.APPROVED ? (
                         <div className="flex w-12 flex-col items-center">
-                          <Button
-                            asChild
-                            aria-label="Lihat PO"
-                            title="Lihat PO"
-                            className="size-10 p-0"
-                            size="sm"
-                            variant="outline"
-                          >
-                            <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
-                              <Eye aria-hidden="true" />
-                            </Link>
-                          </Button>
+                          <ActionIconButton
+                            label="Lihat PO"
+                            tooltip="Lihat PO"
+                            icon={Eye}
+                            href={`/d/${encodeURIComponent(order.publicCode)}`}
+                          />
                         </div>
                       ) : role === UserRole.LOGISTICS ? (
                         <PurchaseOrderInvoiceUpload
@@ -541,12 +526,10 @@ export default function LogisticsHub({
                       ) : null}
                       {order.status === POStatus.APPROVED && (
                         <div className="flex w-10 flex-col items-center">
-                          <Button
-                            aria-label="Preview PO Terbit"
-                            title="Preview PO Terbit"
-                            variant="outline"
-                            size="sm"
-                            className="size-10 p-0"
+                          <ActionIconButton
+                            label="Preview PO Terbit"
+                            tooltip="Preview PO Terbit"
+                            icon={Eye}
                             onClick={() =>
                               openDocumentPreview({
                                 kind: "po",
@@ -555,9 +538,7 @@ export default function LogisticsHub({
                                 executiveApproval: "PO disetujui oleh Direksi",
                               })
                             }
-                          >
-                            <Eye aria-hidden="true" />
-                          </Button>
+                          />
                         </div>
                       )}
                       </div>
@@ -648,12 +629,10 @@ export default function LogisticsHub({
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge variant="outline">{order.status}</Badge>
                       {order.executiveApproved ? (
-                        <Button
-                          aria-label="Preview Surat Jalan"
-                          title="Preview Surat Jalan"
-                          variant="outline"
-                          size="sm"
-                          className="h-10 w-10 px-0 sm:h-9 sm:w-auto sm:px-3"
+                        <ActionIconButton
+                          label="Preview Surat Jalan"
+                          tooltip="Preview Surat Jalan"
+                          icon={Eye}
                           onClick={() =>
                             openDocumentPreview({
                               kind: "do",
@@ -663,12 +642,7 @@ export default function LogisticsHub({
                                 "DO terhubung ke PO/tiket yang disetujui Direksi",
                             })
                           }
-                        >
-                          <Eye className="sm:mr-1.5" aria-hidden="true" />
-                          <span className="sr-only sm:not-sr-only">
-                            Preview Surat Jalan
-                          </span>
-                        </Button>
+                        />
                       ) : (
                         <Button variant="outline" size="sm" disabled>
                           Belum Ada Persetujuan Eksekutif
@@ -742,18 +716,16 @@ export default function LogisticsHub({
                       <TableCell>{primaryAccount?.bankAccount ?? "—"}</TableCell>
                       <TableCell>{vendor.phone ?? vendor.email ?? "—"}</TableCell>
                       <TableCell className="text-right">
-                        <Button
+                        <ActionIconButton
                           type="button"
-                          variant="outline"
-                          size="sm"
+                          label={`Edit vendor ${vendor.name}`}
+                          tooltip="Edit vendor"
+                          icon={Pencil}
                           onClick={() => {
                             setEditingVendor(vendor);
                             setVendorSheetOpen(true);
                           }}
-                        >
-                          <Pencil aria-hidden="true" />
-                          Edit
-                        </Button>
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -913,9 +885,12 @@ export default function LogisticsHub({
                 className="mt-4 h-[70vh] w-full rounded-lg border"
               />
               <div className="mt-3 flex justify-end">
-                <Button variant="outline" asChild>
-                  <Link href="/apps/documents/issued">Buka Dokumen Terbit</Link>
-                </Button>
+                <ActionIconButton
+                  label="Buka dokumen terbit"
+                  tooltip="Buka Dokumen Terbit"
+                  icon={FileText}
+                  href="/apps/documents/issued"
+                />
               </div>
             </>
           )}

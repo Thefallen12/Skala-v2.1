@@ -29,6 +29,7 @@ import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import type { FieldTeamOption } from "@/app/(DashboardLayout)/types/project";
 import type { ProjectDashboardRow } from "@/app/(DashboardLayout)/types/project";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -94,6 +95,7 @@ import {
   MapPin,
   MapPinned,
   Search,
+  Trash2,
   Upload,
   Pencil,
   Users,
@@ -1042,44 +1044,38 @@ export default function ProjectWorkstationMaster({
                       onKeyDown={(event) => event.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-1">
-                        <Button
+                        <ActionIconButton
                           type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Buka peta survei untuk ${project.title}`}
-                          title="Buka peta dan survei proyek"
-                          className="size-9 text-sky-600 hover:bg-sky-50 hover:text-sky-700 dark:text-sky-300 dark:hover:bg-sky-500/10"
+                          label={`Buka peta survei untuk ${project.title}`}
+                          tooltip="Buka peta dan survei proyek"
+                          icon={MapPinned}
+                          className="text-sky-600 hover:text-white dark:text-sky-300"
                           onClick={() => {
                             router.replace(
                               `/apps/projects?section=surveys&view=map&projectId=${encodeURIComponent(project.id)}`,
                               { scroll: false },
                             );
                           }}
-                        >
-                          <MapPinned className="size-4" aria-hidden="true" />
-                        </Button>
+                        />
                         {isProjectManager && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Edit ${project.title}`}
-                            className="size-9 border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-500/25 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:bg-sky-500 dark:hover:text-white"
+                          <ActionIconButton
+                            label={`Edit proyek ${project.title}`}
+                            tooltip={`Edit proyek ${project.title}`}
+                            icon={Pencil}
                             onClick={() => editProject(project)}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
+                          />
                         )}
                         {currentUserRole === UserRole.DIRECTOR && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
+                          <ActionIconButton
+                            label={`Hapus proyek ${project.title}`}
+                            tooltip={`Hapus proyek ${project.title}`}
+                            icon={Trash2}
+                            className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                             onClick={() => {
                               setPendingDeleteProjectId(project.id);
                               setConfirmArchiveOpen(true);
                             }}
-                          >
-                            Hapus
-                          </Button>
+                          />
                         )}
                       </div>
                     </TableCell>

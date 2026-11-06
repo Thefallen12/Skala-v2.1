@@ -12,7 +12,6 @@ import {
   Clock3,
   Eye,
   EyeOff,
-  Ellipsis,
   FolderKanban,
   Pencil,
   ShieldCheck,
@@ -33,6 +32,7 @@ import CardBox from "@/app/components/shared/CardBox";
 import PushNotificationSettings from "./PushNotificationSettings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -393,13 +393,12 @@ export default function UserProfile({ profile }: { profile: UserProfileData }) {
                       </p>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link
+                      <ActionIconButton
+                        label={`Buka proyek ${project.name}`}
+                        tooltip={`Buka proyek ${project.name}`}
+                        icon={FolderKanban}
                         href="/apps/habits?tab=calendar"
-                        aria-label={`Buka proyek ${project.name}`}
-                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <Ellipsis className="size-4" />
-                      </Link>
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

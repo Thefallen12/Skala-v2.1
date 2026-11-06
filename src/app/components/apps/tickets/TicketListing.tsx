@@ -6,7 +6,20 @@ import { id } from "date-fns/locale";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { Download, Eye, FileText, Printer } from "lucide-react";
+import {
+  Check,
+  CircleDollarSign,
+  ClipboardList,
+  Download,
+  ExternalLink,
+  Eye,
+  FileText,
+  PackageCheck,
+  PackageOpen,
+  Printer,
+  Send,
+  Truck,
+} from "lucide-react";
 import {
   checkTicketItemsStock,
   approveByDirector,
@@ -34,6 +47,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -615,13 +629,19 @@ export default function TicketListing({
                         FINANCE: "Selesaikan",
                         MOVER: "Konfirmasi Tiba",
                       };
+                      const icons = {
+                        LOGISTICS: PackageOpen,
+                        EXPEDITION_RECEIPT: PackageCheck,
+                        FINANCE: CircleDollarSign,
+                        MOVER: Truck,
+                      };
                       return (
-                        <Button
-                          size="sm"
+                        <ActionIconButton
+                          label={labels[workflow]}
+                          tooltip={labels[workflow]}
+                          icon={icons[workflow]}
                           onClick={() => setWorkflowTicket(ticket)}
-                        >
-                          {labels[workflow]}
-                        </Button>
+                        />
                       );
                     }
                     if (
@@ -633,32 +653,38 @@ export default function TicketListing({
                       )
                     ) {
                       return (
-                        <Button
-                          size="sm"
+                        <ActionIconButton
+                          label="Proses Item"
+                          tooltip="Proses Item"
+                          icon={ClipboardList}
                           onClick={() => openTicketSheet(ticket)}
-                        >
-                          Proses Item
-                        </Button>
+                        />
                       );
                     }
                     return visibleAction ? (
-                      <Button
-                        size="sm"
+                      <ActionIconButton
+                        label={
+                          isPending && busyId === ticket.id
+                            ? "Memproses..."
+                            : visibleAction.label
+                        }
+                        tooltip={
+                          isPending && busyId === ticket.id
+                            ? "Memproses..."
+                            : visibleAction.label
+                        }
+                        icon={visibleAction.label === "Setujui" ? Check : Send}
                         disabled={isPending && busyId === ticket.id}
                         onClick={() => runAction(ticket, visibleAction)}
-                      >
-                        {isPending && busyId === ticket.id
-                          ? "Memproses..."
-                          : visibleAction.label}
-                      </Button>
+                      />
                     ) : (
-                      <Button
+                      <ActionIconButton
+                        label="Detail"
+                        tooltip="Lihat detail tiket"
+                        icon={Eye}
                         variant="outline"
-                        size="sm"
                         onClick={() => openTicketSheet(ticket)}
-                      >
-                        Detail
-                      </Button>
+                      />
                     );
                     })()}
                     <TicketManagementActions ticket={ticket} role={role} />
@@ -837,11 +863,13 @@ export default function TicketListing({
                           DO {deliveryOrder.doNumber}
                         </p>
                       </div>
-                      <Button asChild type="button" variant="outline" size="sm">
-                        <Link href={`/d/${deliveryOrder.publicCode}`}>
-                          Buka / cetak DO
-                        </Link>
-                      </Button>
+                      <ActionIconButton
+                        type="button"
+                        label={`Buka / cetak DO ${deliveryOrder.doNumber}`}
+                        tooltip="Buka / cetak DO"
+                        icon={FileText}
+                        href={`/d/${deliveryOrder.publicCode}`}
+                      />
                     </div>
                   ))}
                   {selectedTicket.recipientName && (
@@ -903,16 +931,16 @@ export default function TicketListing({
                                 <td className="py-2 pr-3">{payment.transferDestination}</td>
                                 <td className="py-2">
                                   {payment.proofOfTransferUrl ? (
-                                    <a
+                                    <ActionIconButton
+                                      label={`Lihat bukti transfer pembayaran ${payment.reference}`}
+                                      tooltip="Lihat Bukti"
+                                      icon={ExternalLink}
                                       href={withLocalPhotoPreview(
                                         payment.proofOfTransferUrl,
                                       )}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="text-primary underline"
-                                    >
-                                      Lihat Bukti
-                                    </a>
+                                    />
                                   ) : (
                                     "—"
                                   )}
@@ -925,32 +953,29 @@ export default function TicketListing({
                     </div>
                   )}
                   {selectedTicket.attachmentUrl && (
-                    <a
+                    <ActionIconButton
+                      label="Buka lampiran atau quotation"
+                      tooltip="Buka lampiran / quotation"
+                      icon={ExternalLink}
                       href={selectedTicket.attachmentUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm text-primary underline"
-                    >
-                      Buka lampiran / quotation
-                    </a>
+                    />
                   )}
                   {selectedTicket.receiptUrls.map((url, index) => (
-                    <Button
+                    <ActionIconButton
                       key={url}
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mr-2"
+                      label={`Lihat bukti pengajuan ${index + 1}`}
+                      tooltip={`Lihat bukti pengajuan ${index + 1}`}
+                      icon={Eye}
                       onClick={() =>
                         setSelectedReceipt({
                           label: `Bukti pengajuan ${index + 1}`,
                           url,
                         })
                       }
-                    >
-                      <Eye aria-hidden="true" />
-                      Lihat bukti pengajuan {index + 1}
-                    </Button>
+                    />
                   ))}
                   {[
                     ["Bukti pembayaran", selectedTicket.paymentProofUrl],
@@ -966,17 +991,14 @@ export default function TicketListing({
                       ),
                     )
                     .map(([label, url]) => (
-                      <Button
+                      <ActionIconButton
                         key={url}
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mr-2"
+                        label={`Lihat ${label}`}
+                        tooltip={`Lihat ${label}`}
+                        icon={Eye}
                         onClick={() => setSelectedReceipt({ label, url })}
-                      >
-                        <Eye aria-hidden="true" />
-                        Lihat {label}
-                      </Button>
+                      />
                     ))}
                 </section>
 

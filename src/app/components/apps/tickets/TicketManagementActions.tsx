@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleAlert, CircleCheck, Pencil, Trash2 } from "lucide-react";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import {
   deleteTicket,
@@ -163,32 +164,25 @@ export default function TicketManagementActions({
   return (
     <div className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
       {canEdit && (
-        <Button
+        <ActionIconButton
           type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 gap-1 px-2 text-xs"
+          label="Edit tiket"
+          tooltip="Edit tiket"
+          icon={Pencil}
           disabled={isPending}
-          title="Edit tiket"
           onClick={openEditor}
-        >
-          <Pencil aria-hidden="true" className="size-3" />
-          Edit
-        </Button>
+        />
       )}
       {isDirector && (
-        <Button
+        <ActionIconButton
           type="button"
-          size="sm"
-          variant="destructive"
-          className="h-7 gap-1 px-2 text-xs"
+          label="Hapus tiket"
+          tooltip="Hapus tiket"
+          icon={Trash2}
+          className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
           disabled={isPending}
-          title="Hapus tiket"
           onClick={handleDelete}
-        >
-          <Trash2 aria-hidden="true" className="size-3" />
-          Hapus
-        </Button>
+        />
       )}
       {toast && (
         <div
@@ -339,19 +333,16 @@ export default function TicketManagementActions({
                         }
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-9 self-end text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      aria-label={`Hapus barang ${item.itemName}`}
-                      title={
+                    <ActionIconButton
+                      label={`Hapus barang ${item.itemName}`}
+                      tooltip={
                         item.isLinked
                           ? "Barang yang sudah diproses tidak dapat dihapus"
                           : items.length === 1
                             ? "Tiket harus memiliki setidaknya satu barang"
-                            : "Hapus barang"
+                            : `Hapus barang ${item.itemName}`
                       }
+                      icon={Trash2}
                       disabled={item.isLinked || items.length === 1 || isPending}
                       onClick={() =>
                         setItems((currentItems) =>
@@ -360,9 +351,9 @@ export default function TicketManagementActions({
                           ),
                         )
                       }
-                    >
-                      <Trash2 aria-hidden="true" className="size-4" />
-                    </Button>
+                      className="self-end text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      variant="ghost"
+                    />
                     {item.isLinked && (
                       <p className="col-span-2 text-xs text-muted-foreground sm:col-span-4">
                         Sudah terhubung ke PO atau Surat Jalan dan tidak dapat

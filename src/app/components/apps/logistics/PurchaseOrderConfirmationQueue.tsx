@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Printer, Send } from "lucide-react";
 import { markPurchaseOrderConfirmationSent } from "@/app/actions/orders";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
@@ -110,35 +111,30 @@ export default function PurchaseOrderConfirmationQueue({
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button
+                <ActionIconButton
                   type="button"
-                  size="sm"
-                  variant="outline"
+                  label={`Lihat atau cetak KO ${row.confirmationOrderNumber}`}
+                  tooltip="Lihat / Cetak KO"
+                  icon={Printer}
                   onClick={() => setSelected(row)}
-                >
-                  <Printer className="mr-2 size-4" aria-hidden="true" />
-                  Lihat / Cetak KO
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <a
-                    href={photoDownloadHref(row.proofOfTransferUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-                    Bukti Transfer
-                  </a>
-                </Button>
+                />
+                <ActionIconButton
+                  label={`Buka bukti transfer KO ${row.confirmationOrderNumber}`}
+                  tooltip="Bukti Transfer"
+                  icon={ExternalLink}
+                  href={photoDownloadHref(row.proofOfTransferUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                />
                 {!row.vendorSentAt && (
-                  <Button
+                  <ActionIconButton
                     type="button"
-                    size="sm"
+                    label={`Tandai KO ${row.confirmationOrderNumber} sudah dikirim`}
+                    tooltip="Tandai Dikirim"
+                    icon={Send}
                     onClick={() => markAsSent(row)}
                     disabled={isPending}
-                  >
-                    <Send className="mr-2 size-4" aria-hidden="true" />
-                    Tandai Dikirim
-                  </Button>
+                  />
                 )}
               </div>
             </article>

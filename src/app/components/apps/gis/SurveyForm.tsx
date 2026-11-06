@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { saveFieldSurvey } from "@/app/actions/field-surveys";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -580,19 +581,17 @@ export default function SurveyForm({
                     >
                       <div className="flex items-center justify-between gap-2 text-xs text-slate-300">
                         <span className="min-w-0 truncate">{photo.file.name}</span>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          aria-label={`Hapus ${photo.file.name}`}
+                        <ActionIconButton
+                          label={`Hapus ${photo.file.name}`}
+                          tooltip={`Hapus ${photo.file.name}`}
+                          icon={Trash2}
                           onClick={() =>
                             setDocumentationPhotos((photos) =>
                               photos.filter((_, photoIndex) => photoIndex !== index),
                             )
                           }
-                        >
-                          <Trash2 className="size-3" aria-hidden="true" />
-                        </Button>
+                          variant="ghost"
+                        />
                       </div>
                       <Input
                         value={photo.caption}

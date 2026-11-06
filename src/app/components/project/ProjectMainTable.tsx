@@ -33,6 +33,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -189,17 +194,21 @@ export default function ProjectMainTable({
     pageStartIndex + pageSize,
   );
   const renderProjectActions = (project: ProjectDashboardRow) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Aksi untuk ${project.title}`}
-        >
-          <MoreHorizontal aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
+    <Tooltip>
+      <DropdownMenu>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-10"
+              aria-label={`Aksi untuk ${project.title}`}
+            >
+              <MoreHorizontal aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
       <DropdownMenuContent align="end">
         {canUpdateProjectProgress && (
           <DropdownMenuItem onSelect={() => setProgressProject(project)}>
@@ -232,7 +241,9 @@ export default function ProjectMainTable({
           Lihat Realisasi Anggaran
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+      <TooltipContent>Aksi proyek {project.title}</TooltipContent>
+    </Tooltip>
   );
   const resetFilters = () => {
     setSearchQuery("");

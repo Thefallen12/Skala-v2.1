@@ -20,6 +20,7 @@ import { HabitFrequency } from "@prisma/client";
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -433,28 +434,16 @@ export default function HabitDashboard({
                     : "border-border bg-card"
                 }`}
               >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`${isCompleted ? "Batalkan" : "Tandai"} ${habit.title}`}
+                <ActionIconButton
+                  label={`${isCompleted ? "Batalkan" : "Tandai"} ${habit.title}`}
+                  tooltip={`${isCompleted ? "Batalkan" : "Tandai"} ${habit.title}`}
+                  icon={isCompleted ? CheckCircle2 : Circle}
                   aria-pressed={isCompleted}
                   disabled={isPending}
                   className="mt-0.5 shrink-0 sm:mt-0"
                   onClick={() => void handleToggleCompletion(habit)}
-                >
-                  {isCompleted ? (
-                    <CheckCircle2
-                      className="size-6 text-success"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Circle
-                      className="size-6 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                  )}
-                </Button>
+                  variant="ghost"
+                />
                 <div className="min-w-0 flex-1">
                   <p
                     className={`break-words font-medium ${
@@ -484,17 +473,15 @@ export default function HabitDashboard({
                     aria-hidden="true"
                   />
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Hapus kebiasaan ${habit.title}`}
+                <ActionIconButton
+                  label={`Hapus kebiasaan ${habit.title}`}
+                  tooltip={`Hapus kebiasaan ${habit.title}`}
+                  icon={Trash2}
                   disabled={isPending}
                   onClick={() => setDeleteTarget(habit)}
                   className="shrink-0 text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                </Button>
+                  variant="ghost"
+                />
               </div>
             );
           })}

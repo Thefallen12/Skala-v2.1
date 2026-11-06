@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import {
   FileSignature,
   FileText,
+  Pencil,
   Plus,
   Printer,
   Save,
@@ -32,6 +33,7 @@ import {
 } from "@prisma/client";
 import type { Template } from "@pdfme/common";
 import { Badge } from "@/components/ui/badge";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -864,13 +866,12 @@ export default function DocumentWorkspace({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
+                        <ActionIconButton
+                          label={`Edit template ${template.name}`}
+                          tooltip={`Edit template ${template.name}`}
+                          icon={Pencil}
                           onClick={() => openTemplateDialog(template)}
-                        >
-                          Edit
-                        </Button>
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1065,10 +1066,12 @@ function renderDocumentTable(
                   )}
                 </TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm" onClick={() => onSelect(document)}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Detail
-                  </Button>
+                  <ActionIconButton
+                    label={`Lihat detail dokumen ${document.documentNumber}`}
+                    tooltip={`Lihat detail dokumen ${document.documentNumber}`}
+                    icon={FileText}
+                    onClick={() => onSelect(document)}
+                  />
                 </TableCell>
               </TableRow>
             ))}

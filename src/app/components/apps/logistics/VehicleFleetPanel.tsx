@@ -12,6 +12,7 @@ import {
   type VehicleStatus,
   type VehicleSummary,
 } from "@/app/actions/vehicles";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { NativeDataTable } from "@/components/ui/native-data-table";
@@ -240,44 +241,36 @@ export default function VehicleFleetPanel({
                     <td className="p-3">
                       {canManage ? (
                         <div className="flex justify-end gap-2">
-                          <Button
+                          <ActionIconButton
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            label={`Edit kendaraan ${vehicle.plateNumber}`}
+                            tooltip={`Edit kendaraan ${vehicle.plateNumber}`}
+                            icon={Pencil}
                             disabled={isPending}
                             onClick={() => openEditDialog(vehicle)}
-                            aria-label={`Edit ${vehicle.plateNumber}`}
-                          >
-                            <Pencil className="size-4" />
-                            Edit
-                          </Button>
-                          <Button
+                          />
+                          <ActionIconButton
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            label={`Edit KM ${vehicle.plateNumber}`}
+                            tooltip={`Edit kilometer ${vehicle.plateNumber}`}
+                            icon={Gauge}
                             disabled={isPending}
                             onClick={() => openKilometerDialog(vehicle)}
-                            aria-label={`Edit KM ${vehicle.plateNumber}`}
-                          >
-                            <Gauge className="size-4" />
-                            Edit KM
-                          </Button>
-                          <Button
+                          />
+                          <ActionIconButton
                             type="button"
-                            variant="outline"
-                            size="sm"
+                            label={`Hapus kendaraan ${vehicle.plateNumber}`}
+                            tooltip={`Hapus kendaraan ${vehicle.plateNumber}`}
+                            icon={Trash2}
+                            className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                             disabled={
                               isPending ||
                               vehicle.status === "IN_USE" ||
                               vehicle.status === "RESERVED"
                             }
                             onClick={() => handleDelete(vehicle)}
-                            aria-label={`Hapus ${vehicle.plateNumber}`}
-                          >
-                            <Trash2 className="size-4" />
-                            Hapus
-                          </Button>
-                          </div>
+                          />
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
