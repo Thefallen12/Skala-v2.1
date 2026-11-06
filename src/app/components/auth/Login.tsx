@@ -19,6 +19,16 @@ const loginSchema = z.object({
 })
 
 type LoginFormValues = z.infer<typeof loginSchema>
+const LOGIN_TIMEOUT_MS = 30_000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), timeoutMs)
+  })
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
+}
 
 export const Login = () => {
   const [error, setError] = useState('')
@@ -34,39 +44,62 @@ export const Login = () => {
     setError('')
     setIsAuthenticating(true)
     try {
-      const result = await signIn('credentials', {
-        identifier: identifier.trim().toLowerCase(),
-        password,
-        redirect: false,
-        redirectTo: '/',
-      })
-      if (!result?.ok || result.error) {
-        const errorCode =
-          typeof result?.error === 'string' ? result.error : result?.code
+      const outcome = await withTimeout(
+        (async () => {
+          const result = await signIn('credentials', {
+            identifier: identifier.trim().toLowerCase(),
+            password,
+            redirect: false,
+            redirectTo: '/',
+          })
+          if (!result?.ok || result.error) {
+            return {
+              type: 'credentials-error' as const,
+              errorCode:
+                typeof result?.error === 'string' ? result.error : result?.code,
+            }
+          }
+
+          const session = await getSession()
+          if (!session?.user?.role) {
+            return { type: 'session-error' as const }
+          }
+
+          return { type: 'success' as const, role: session.user.role }
+        })(),
+        LOGIN_TIMEOUT_MS,
+      )
+
+      if (outcome.type === 'credentials-error') {
         setError(
-          errorCode === 'database-unavailable'
+          outcome.errorCode === 'database-unavailable'
             ? 'Server login tidak dapat terhubung ke database. Coba lagi nanti atau hubungi administrator.'
             : 'Email atau kata sandi tidak sesuai.',
         )
         setIsAuthenticating(false)
         return
       }
-
-      const session = await getSession()
-      if (!session?.user?.role) {
+      if (outcome.type === 'session-error') {
         setError('Login berhasil, tetapi sesi belum dapat diverifikasi. Muat ulang halaman.')
         setIsAuthenticating(false)
         return
       }
 
-      router.replace(getRoleHomePath(session.user.role))
+      router.replace(getRoleHomePath(outcome.role))
       router.refresh()
     } catch (error) {
-      console.error(
-        'Password sign-in request failed:',
-        error instanceof Error ? error.message : 'Unknown error',
+      const timedOut = error instanceof Error && error.message === 'LOGIN_TIMEOUT'
+      if (!timedOut) {
+        console.error(
+          'Password sign-in request failed:',
+          error instanceof Error ? error.message : 'Unknown error',
+        )
+      }
+      setError(
+        timedOut
+          ? 'Server login terlalu lama merespons. Muat ulang halaman atau coba lagi.'
+          : 'Server login tidak merespons. Muat ulang halaman atau hubungi administrator.',
       )
-      setError('Server login tidak merespons. Muat ulang halaman atau hubungi administrator.')
       setIsAuthenticating(false)
     }
   })
