@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Ticket } from "lucide-react";
+import { ArrowUpRight, Ticket, UserRound } from "lucide-react";
 import CardBox from "../shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { TicketPriority } from "@prisma/client";
@@ -43,10 +43,10 @@ export const RecentTransaction = ({
     <div className="mb-5 flex items-center justify-between gap-3 border-b border-border pb-4">
       <div>
         <h2 className="font-bold text-slate-900 dark:text-white">
-          Tiket Terbaru
+          Pengguna yang Mengajukan Request
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Permintaan terbaru yang tercatat
+          Pemohon dari request terbaru yang tercatat
         </p>
       </div>
       <Link
@@ -67,14 +67,14 @@ export const RecentTransaction = ({
           >
             <div className="flex min-w-0 items-start gap-3">
               <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-orange-500/10 text-orange-500">
-                <Ticket className="size-4" aria-hidden="true" />
+                <UserRound className="size-4" aria-hidden="true" />
               </span>
               <div className="min-w-0">
                 <span className="block truncate text-sm font-bold text-slate-900 group-hover:text-orange-600 dark:text-white dark:group-hover:text-orange-300">
-                  {ticket.title}
+                  {ticket.requesterName}
                 </span>
                 <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                  {ticket.requesterName} · {ticket.projectName}
+                  {ticket.title} · {ticket.projectName}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <Badge variant="gray" className="px-2 py-0.5 text-[10px]">

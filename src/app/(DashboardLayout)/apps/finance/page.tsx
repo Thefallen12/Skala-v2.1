@@ -156,8 +156,24 @@ export default async function FinancePage({
     prisma.purchaseOrder.findMany({
       where: {
         status: POStatus.APPROVED,
-        ticketId: null,
-        vendorInvoiceUrl: { not: null },
+        AND: [
+          {
+            OR: [{ ticketId: null }, { ticketId: { isSet: false } }],
+          },
+          {
+            OR: [
+              { vendorInvoiceUrl: { not: null } },
+              {
+                invoices: {
+                  some: {
+                    documentUrl: { not: null },
+                    status: { in: ["UNPAID", "PARTIAL"] },
+                  },
+                },
+              },
+            ],
+          },
+        ],
       },
       orderBy: { approvedAt: "asc" },
       select: {
@@ -185,6 +201,15 @@ export default async function FinancePage({
         paidAt: true,
         paymentReceiptUrl: true,
         vendorInvoiceUrl: true,
+        invoices: {
+          where: { status: { in: ["UNPAID", "PARTIAL"] } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            documentUrl: true,
+            grandTotal: true,
+          },
+        },
         items: {
           select: {
             itemName: true,
@@ -215,7 +240,6 @@ export default async function FinancePage({
         vendorInvoiceUrl: { not: null },
       },
       orderBy: { approvedAt: "asc" },
-      take: 100,
       select: {
         id: true,
         purchaseNumber: true,
@@ -1091,7 +1115,9 @@ export default async function FinancePage({
           createdAt: order.createdAt.toISOString(),
           paidAt: order.paidAt?.toISOString() ?? null,
           paymentReceiptUrl: order.paymentReceiptUrl,
-          vendorInvoiceUrl: order.vendorInvoiceUrl,
+          vendorInvoiceUrl:
+            order.vendorInvoiceUrl ?? order.invoices[0]?.documentUrl ?? null,
+          invoiceGrandTotal: order.invoices[0]?.grandTotal ?? null,
           paymentMethod: order.paymentMethod,
           paymentBankName:
             order.paymentBankName ??

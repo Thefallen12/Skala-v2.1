@@ -61,6 +61,8 @@ import {
   decimalFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
+import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
+import { receivePurchaseOrderStock } from "@/lib/logistics/receive-purchase-order-stock";
 import {
   vendorInvoiceInputSchema,
   type VendorInvoiceInput,
@@ -1208,6 +1210,119 @@ export async function markPurchaseOrderSentToVendor(
     console.error("Purchase order vendor dispatch failed:", error);
     return fail("Pengiriman PO ke vendor gagal dicatat. Silakan coba kembali.");
   }
+}
+
+export async function receiveStandalonePurchaseOrder(
+  publicCode: string,
+): Promise<OrderActionResult> {
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
+    return fail("Hanya Logistik yang dapat mengonfirmasi penerimaan barang PO.");
+  }
+  if (!isValidPublicCode(publicCode)) {
+    return fail("Kode Purchase Order tidak valid.");
+  }
+
+  try {
+    const outcome = await prisma.$transaction(async (transaction) => {
+      await acquireMongoTransactionLock(transaction, `po-receipt:${publicCode}`);
+      const order = await transaction.purchaseOrder.findUnique({
+        where: { publicCode },
+        select: {
+          id: true,
+          poNumber: true,
+          vendorName: true,
+          projectId: true,
+          status: true,
+          ticketId: true,
+          paidAt: true,
+          includeTax: true,
+          vendorInvoiceUrl: true,
+          items: {
+            select: {
+              stockItemId: true,
+              itemName: true,
+              quantity: true,
+              unit: true,
+              unitPrice: true,
+              totalPrice: true,
+            },
+          },
+          invoices: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { documentUrl: true, grandTotal: true },
+          },
+          stockPurchases: { select: { id: true }, take: 1 },
+        },
+      });
+
+      if (!order) return "not-found";
+      if (order.ticketId) return "ticket-linked";
+      if (order.status !== POStatus.APPROVED) return "not-approved";
+      if (!order.paidAt) return "not-paid";
+      if (!order.vendorInvoiceUrl && !order.invoices[0]?.documentUrl) {
+        return "missing-invoice";
+      }
+      if (order.stockPurchases.length > 0) return "already-received";
+      const invoiceTotal =
+        order.invoices[0]?.grandTotal ??
+        Math.round(
+          order.items.reduce((total, item) => total + item.totalPrice, 0) *
+            (order.includeTax ? 1.11 : 1) *
+            100,
+        ) / 100;
+      const paymentTotal = await transaction.paymentTransaction.aggregate({
+        where: { poId: order.id, status: PaymentStatus.PAID },
+        _sum: { amount: true },
+      });
+      if (
+        !Number.isFinite(invoiceTotal) ||
+        invoiceTotal <= 0 ||
+        (paymentTotal._sum.amount ?? 0) + 0.005 < invoiceTotal
+      ) {
+        return "not-paid";
+      }
+
+      await receivePurchaseOrderStock(transaction, {
+        purchaseOrderId: order.id,
+        poNumber: order.poNumber,
+        vendorName: order.vendorName,
+        projectId: order.projectId,
+        receivedById: session.user.id,
+        notes: `Penerimaan PO ${order.poNumber} dikonfirmasi oleh Logistik.`,
+        items: order.items,
+      });
+      return "received";
+    });
+
+    if (outcome !== "received") {
+      const messages: Record<string, string> = {
+        "not-found": "Purchase Order tidak ditemukan.",
+        "ticket-linked": "PO ini terkait tiket dan tidak dapat diterima melalui alur PO mandiri.",
+        "not-approved": "PO harus disetujui sebelum barang dapat diterima.",
+        "not-paid": "PO harus lunas sebelum barang dapat diterima.",
+        "missing-invoice": "Invoice/bon PO tidak ditemukan.",
+        "already-received": "Penerimaan PO ini sudah pernah dicatat.",
+      };
+      return fail(messages[outcome] ?? "Status PO tidak valid untuk penerimaan.");
+    }
+  } catch (error) {
+    console.error("Standalone purchase order receipt failed:", error);
+    return fail(
+      error instanceof Error
+        ? error.message
+        : "Penerimaan PO gagal dicatat. Silakan coba kembali.",
+    );
+  }
+
+  revalidatePath("/apps/logistics");
+  revalidatePath("/apps/finance");
+  revalidatePath("/apps/logistics/stock");
+  return {
+    success: true,
+    message: "Penerimaan PO berhasil dicatat dan stok telah diperbarui.",
+  };
 }
 
 export async function markPurchaseOrderConfirmationSent(

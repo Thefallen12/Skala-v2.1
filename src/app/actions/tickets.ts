@@ -4858,6 +4858,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
               tax: true,
               deduction: true,
               grandTotal: true,
+              documentUrl: true,
               items: {
                 orderBy: { id: "asc" },
                 select: {
@@ -4891,7 +4892,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
       if (order.status !== POStatus.APPROVED) {
         throw new Error("PO belum disetujui Direktur.");
       }
-      if (!order.vendorInvoiceUrl) {
+      if (!order.vendorInvoiceUrl && !order.invoices[0]?.documentUrl) {
         throw new Error("Logistik harus mengunggah invoice/bon sebelum pembayaran PO.");
       }
       await acquireMongoTransactionLock(transaction, `po-payment:${order.id}`);
@@ -4988,14 +4989,6 @@ export async function processFinanceStandalonePurchaseOrderPayment(
             transferDestination: transferDestination.trim(),
           },
         });
-        await receivePurchaseOrderStock(transaction, {
-          purchaseOrderId: order.id,
-          poNumber: order.poNumber,
-          vendorName: order.vendorName,
-          receivedById: session.user.id,
-          notes: `Penerimaan restock PO ${order.poNumber} ke gudang.`,
-          items: order.items,
-        });
       }
 
       await sendNotification({
@@ -5010,9 +5003,9 @@ export async function processFinanceStandalonePurchaseOrderPayment(
       if (isFullyPaid) {
         await sendNotification({
           roleTarget: UserRole.LOGISTICS,
-          title: "Restock PO Diterima",
-          message: `PO #${order.poNumber} telah lunas dan material sudah masuk stok gudang.`,
-          actionUrl: "/apps/logistics?tab=stock",
+          title: "PO Lunas, Menunggu Penerimaan",
+          message: `Pembayaran PO #${order.poNumber} telah lunas. Catat penerimaan barang setelah dikirim vendor.`,
+          actionUrl: "/apps/logistics?tab=documents",
           type: NotificationType.SUCCESS,
           database: transaction,
         });
@@ -5052,8 +5045,8 @@ export async function processFinanceStandalonePurchaseOrderPayment(
     success: true,
     message:
       paymentType === PaymentType.FULL_PAYMENT
-        ? "Pelunasan PO berhasil; material masuk ke stok gudang."
-        : "Pembayaran sebagian PO berhasil dicatat; stok menunggu pelunasan.",
+        ? "Pelunasan PO berhasil; menunggu pengiriman vendor dan konfirmasi penerimaan Logistik."
+        : "Pembayaran sebagian PO berhasil dicatat; PO menunggu pelunasan.",
   };
 }
 

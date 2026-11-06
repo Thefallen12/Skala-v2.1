@@ -10,6 +10,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import CardBox from "../shared/CardBox";
 import { Badge } from "@/components/ui/badge";
+import { ProjectProgressChart } from "./ProjectProgressChart";
 
 const projectStatusClasses: Record<string, string> = {
   Selesai:
@@ -33,24 +34,22 @@ type DashboardProject = {
   statusLabel: string;
   progress: number;
   budget: string;
-  fieldPic: { name: string } | null;
+  fieldPic: { id: string; name: string } | null;
 };
 
 export const ProductPerformance = ({
   projects,
-  averageProgress,
 }: {
   projects: DashboardProject[];
-  averageProgress: number;
 }) => (
   <CardBox className="dashboard-enter w-full min-w-0 overflow-hidden border-indigo-200 bg-gradient-to-br from-white to-indigo-50/80 p-4 shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-slate-700/80 dark:from-[#1e293b] dark:to-[#1e1b4b]/40 sm:p-6">
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
       <div>
         <h2 className="font-bold text-slate-900 dark:text-white">
-          Proyek Terbaru
+          Progres Pekerjaan
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Rata-rata progres proyek terbaru: {averageProgress}%
+          Memantau {projects.length} proyek terbaru
         </p>
       </div>
       <Link
@@ -60,6 +59,23 @@ export const ProductPerformance = ({
         Semua proyek
       </Link>
     </div>
+    <section className="mb-5 border-b border-border pb-5">
+      <div className="mb-1">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+          Persentase progres berdasarkan PIC
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Rata-rata progres proyek yang ditangani setiap PIC
+        </p>
+      </div>
+      <ProjectProgressChart
+        projects={projects.map((project) => ({
+          picId: project.fieldPic?.id ?? null,
+          picName: project.fieldPic?.name ?? null,
+          progress: project.progress,
+        }))}
+      />
+    </section>
     <div className="space-y-3 sm:hidden">
       {projects.length ? (
         projects.map((project) => (
@@ -101,22 +117,19 @@ export const ProductPerformance = ({
       )}
     </div>
     <div className="hidden overflow-x-auto sm:block">
-      <Table className="table-fixed">
+      <Table className="table-fixed" pageSize={10}>
         <TableHeader>
           <TableRow>
             <TableHead className="hidden w-[22%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
               Kode
             </TableHead>
-            <TableHead className="w-[36%] text-xs font-semibold uppercase tracking-wide xl:w-[21%]">
+            <TableHead className="w-[36%] text-xs font-semibold uppercase tracking-wide xl:w-[29%]">
               Proyek
             </TableHead>
-            <TableHead className="hidden w-[16%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
-              PIC
-            </TableHead>
-            <TableHead className="w-[25%] text-xs font-semibold uppercase tracking-wide xl:w-[17%]">
+            <TableHead className="w-[25%] text-xs font-semibold uppercase tracking-wide xl:w-[20%]">
               Status
             </TableHead>
-            <TableHead className="w-[39%] text-xs font-semibold uppercase tracking-wide xl:w-[14%]">
+            <TableHead className="w-[39%] text-xs font-semibold uppercase tracking-wide xl:w-[19%]">
               Progres
             </TableHead>
             <TableHead className="hidden w-[10%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
@@ -139,9 +152,6 @@ export const ProductPerformance = ({
                   <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                     {project.name}
                   </p>
-                </TableCell>
-                <TableCell className="hidden truncate text-sm text-muted-foreground xl:table-cell">
-                  {project.fieldPic?.name ?? "Belum ditentukan"}
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -175,7 +185,7 @@ export const ProductPerformance = ({
           ) : (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={5}
                 className="py-8 text-center text-sm text-muted-foreground"
               >
                 Belum ada proyek.

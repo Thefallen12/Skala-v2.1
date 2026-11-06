@@ -517,10 +517,16 @@ export default async function LogisticsPage({
         paymentAccountName: true,
         status: true,
         createdAt: true,
+        paidAt: true,
         ticketId: true,
         vendorInvoiceUrl: true,
         vendorPoSentAt: true,
         includeTax: true,
+        stockPurchases: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true },
+        },
         items: {
           orderBy: { id: "asc" },
           select: {
@@ -913,10 +919,12 @@ export default async function LogisticsPage({
           vendorName: order.vendorName,
           status: order.status,
           createdAt: order.createdAt.toISOString(),
+          paidAt: order.paidAt?.toISOString() ?? null,
           ticketId: order.ticketId,
           vendorInvoiceUrl:
             order.vendorInvoiceUrl ?? order.invoices[0]?.documentUrl ?? null,
           invoiceId: order.invoices[0]?.id ?? null,
+          receivedAt: order.stockPurchases[0]?.createdAt.toISOString() ?? null,
           vendorPoSentAt: order.vendorPoSentAt?.toISOString() ?? null,
           includeTax: order.includeTax,
           paymentMethod: order.paymentMethod,

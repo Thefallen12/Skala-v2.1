@@ -118,6 +118,7 @@ type FinanceOrder = {
   paidAt?: string | null;
   paymentReceiptUrl?: string | null;
   vendorInvoiceUrl: string | null;
+  invoiceGrandTotal?: number | null;
   paymentMethod: "CASH" | "TRANSFER";
   paymentBankName: string | null;
   paymentAccountNumber: string | null;
@@ -488,11 +489,11 @@ export default function FinanceHub({
     : activeDirectPurchase
       ? Number(activeDirectPurchase.totalAmount)
       : Math.round(
-          (previewOrder?.items ?? []).reduce(
-            (sum, item) => sum + item.totalPrice,
-            0,
-          ) *
-            (previewOrder?.includeTax ? 1.11 : 1) *
+          (previewOrder?.invoiceGrandTotal ??
+            (previewOrder?.items ?? []).reduce(
+              (sum, item) => sum + item.totalPrice,
+              0,
+            ) * (previewOrder?.includeTax ? 1.11 : 1)) *
             100,
         ) / 100;
   const paidAmount = paymentHistory.reduce(
@@ -539,6 +540,7 @@ export default function FinanceHub({
       reference: order.poNumber,
       title: `Pembelian PO · ${order.vendorName}`,
       grandTotal:
+        order.invoiceGrandTotal ??
         Math.round(
           order.items.reduce((total, item) => total + item.totalPrice, 0) *
             (order.includeTax ? 1.11 : 1) *

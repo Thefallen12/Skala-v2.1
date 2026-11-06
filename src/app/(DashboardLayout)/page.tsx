@@ -117,7 +117,7 @@ export default async function DashboardPage() {
     }),
     prisma.project.findMany({
       orderBy: { updatedAt: "desc" },
-      take: 6,
+      take: 10,
       select: {
         id: true,
         code: true,
@@ -126,7 +126,7 @@ export default async function DashboardPage() {
         priority: true,
         progress: true,
         budget: true,
-        fieldPic: { select: { name: true } },
+        fieldPic: { select: { id: true, name: true } },
       },
     }),
     prisma.ticket.count({
@@ -300,13 +300,6 @@ export default async function DashboardPage() {
     },
   ] as const;
 
-  const totalProjectProgress =
-    recentProjects.length > 0
-      ? Math.round(
-          recentProjects.reduce((sum, project) => sum + project.progress, 0) /
-            recentProjects.length,
-        )
-      : 0;
   const completedProjects =
     (projectCounts.get(ProjectStatus.DONE) ?? 0) +
     (projectCounts.get(ProjectStatus.COMPLETED) ?? 0);
@@ -385,8 +378,7 @@ export default async function DashboardPage() {
                 ? rupiah.format(decimalNumberFromScaledInteger(project.budget))
                 : "—",
             }))}
-            averageProgress={totalProjectProgress}
-          />
+            />
         </div>
       </div>
       <Footer />

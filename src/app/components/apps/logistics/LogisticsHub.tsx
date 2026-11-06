@@ -49,6 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { NativeDataTable } from "@/components/ui/native-data-table";
+import PurchaseOrderReceiptAction from "@/app/components/apps/logistics/PurchaseOrderReceiptAction";
 import {
   Tabs,
   TabsContent,
@@ -136,6 +137,8 @@ type HubPurchaseOrder = {
   paymentAccountName: string | null;
   status: string;
   createdAt: string;
+  paidAt: string | null;
+  receivedAt: string | null;
   ticketId: string | null;
   vendorInvoiceUrl: string | null;
   invoiceId: string | null;
@@ -452,6 +455,25 @@ export default function LogisticsHub({
                       <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString("id-ID")}
                       </p>
+                      {!order.ticketId && order.paidAt && (
+                        <div className="mt-2 space-y-1">
+                          <Badge variant={order.receivedAt ? "success" : "warning"}>
+                            {order.receivedAt
+                              ? "Barang diterima"
+                              : "Menunggu pengiriman vendor"}
+                          </Badge>
+                          {order.receivedAt ? (
+                            <p className="text-xs text-muted-foreground">
+                              Diterima{" "}
+                              {new Date(order.receivedAt).toLocaleString("id-ID")}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              PO lunas; konfirmasikan setelah barang tiba.
+                            </p>
+                          )}
+                        </div>
+                      )}
                       {order.vendorPoSentAt && (
                         <p className="mt-1 text-xs text-muted-foreground">
                           Dikirim {new Date(order.vendorPoSentAt).toLocaleString("id-ID")}
@@ -508,21 +530,30 @@ export default function LogisticsHub({
                           />
                         </div>
                       ) : role === UserRole.LOGISTICS ? (
-                        <PurchaseOrderInvoiceUpload
-                          publicCode={order.publicCode}
-                          invoiceUrl={order.vendorInvoiceUrl}
-                          invoiceId={order.invoiceId}
-                          vendorPoSentAt={order.vendorPoSentAt}
-                          ticketLinked={Boolean(order.ticketId)}
-                          items={order.items}
-                          includeTax={order.includeTax}
-                          invoiceDate={invoiceDate}
-                          paymentMethod={order.paymentMethod}
-                          paymentTerms={order.paymentTerms}
-                          paymentBankName={order.paymentBankName}
-                          paymentAccountNumber={order.paymentAccountNumber}
-                          paymentAccountName={order.paymentAccountName}
-                        />
+                        <>
+                          <PurchaseOrderInvoiceUpload
+                            publicCode={order.publicCode}
+                            invoiceUrl={order.vendorInvoiceUrl}
+                            invoiceId={order.invoiceId}
+                            vendorPoSentAt={order.vendorPoSentAt}
+                            ticketLinked={Boolean(order.ticketId)}
+                            items={order.items}
+                            includeTax={order.includeTax}
+                            invoiceDate={invoiceDate}
+                            paymentMethod={order.paymentMethod}
+                            paymentTerms={order.paymentTerms}
+                            paymentBankName={order.paymentBankName}
+                            paymentAccountNumber={order.paymentAccountNumber}
+                            paymentAccountName={order.paymentAccountName}
+                          />
+                          {!order.ticketId &&
+                            order.paidAt &&
+                            !order.receivedAt && (
+                              <PurchaseOrderReceiptAction
+                                publicCode={order.publicCode}
+                              />
+                            )}
+                        </>
                       ) : null}
                       {order.status === POStatus.APPROVED && (
                         <div className="flex w-10 flex-col items-center">
