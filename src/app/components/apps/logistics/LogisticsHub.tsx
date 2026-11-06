@@ -61,7 +61,7 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Boxes,
-  Check,
+  CheckCircle2,
   Clock3,
   Eye,
   FilePenLine,
@@ -457,11 +457,11 @@ export default function LogisticsHub({
                         </p>
                       )}
                     </div>
-                    <div className="flex shrink-0 flex-col items-center gap-2">
+                    <div className="flex shrink-0 flex-row items-start gap-2">
                       <div className="flex flex-nowrap items-start gap-1.5">
                       {order.status === POStatus.DRAFT ? (
                         <>
-                          <div className="flex w-12 flex-col items-center gap-1">
+                          <div className="flex w-10 flex-col items-center">
                             <Button
                               asChild
                               aria-label={
@@ -484,16 +484,10 @@ export default function LogisticsHub({
                                 <FilePenLine aria-hidden="true" />
                               </Link>
                             </Button>
-                            <span className="text-center text-[10px] leading-3 text-muted-foreground">
-                              {role === UserRole.LOGISTICS ||
-                              role === UserRole.ADMINISTRATIONS
-                                ? "Edit"
-                                : "Lihat"}
-                            </span>
                           </div>
                           {(role === UserRole.LOGISTICS ||
                             role === UserRole.ADMINISTRATIONS) && (
-                            <div className="flex w-12 flex-col items-center gap-1">
+                            <div className="flex w-10 flex-col items-center">
                               <Button
                                 aria-label={
                                   isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
@@ -508,16 +502,13 @@ export default function LogisticsHub({
                                   submitDraftPurchaseOrder(order.publicCode)
                                 }
                               >
-                                <Send aria-hidden="true" />
+                                <Send className="text-orange-500" aria-hidden="true" />
                               </Button>
-                              <span className="text-center text-[10px] leading-3 text-muted-foreground">
-                                Ajukan
-                              </span>
                             </div>
                           )}
                         </>
                       ) : order.status !== POStatus.APPROVED ? (
-                        <div className="flex w-12 flex-col items-center gap-1">
+                        <div className="flex w-12 flex-col items-center">
                           <Button
                             asChild
                             aria-label="Lihat PO"
@@ -530,9 +521,6 @@ export default function LogisticsHub({
                               <Eye aria-hidden="true" />
                             </Link>
                           </Button>
-                          <span className="text-center text-[10px] leading-3 text-muted-foreground">
-                            Lihat
-                          </span>
                         </div>
                       ) : role === UserRole.LOGISTICS ? (
                         <PurchaseOrderInvoiceUpload
@@ -552,7 +540,7 @@ export default function LogisticsHub({
                         />
                       ) : null}
                       {order.status === POStatus.APPROVED && (
-                        <div className="flex w-12 flex-col items-center gap-1">
+                        <div className="flex w-10 flex-col items-center">
                           <Button
                             aria-label="Preview PO Terbit"
                             title="Preview PO Terbit"
@@ -570,14 +558,11 @@ export default function LogisticsHub({
                           >
                             <Eye aria-hidden="true" />
                           </Button>
-                          <span className="text-center text-[10px] leading-3 text-muted-foreground">
-                            Lihat
-                          </span>
                         </div>
                       )}
                       </div>
-                      <div className="flex flex-col items-center gap-1">
-                        {order.status === POStatus.APPROVED ? (
+                      <div className="flex flex-row items-start gap-1.5">
+                        {order.status === POStatus.APPROVED && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span
@@ -586,12 +571,13 @@ export default function LogisticsHub({
                                 role="img"
                                 tabIndex={0}
                               >
-                                <Check className="size-4" aria-hidden="true" />
+                                <CheckCircle2 className="size-5" aria-hidden="true" />
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>Disetujui</TooltipContent>
                           </Tooltip>
-                        ) : (
+                        )}
+                        {order.status !== POStatus.APPROVED && (
                           <Badge
                             className="h-6 shrink-0 whitespace-nowrap px-2 text-[0.6875rem]"
                             variant="outline"
@@ -618,9 +604,19 @@ export default function LogisticsHub({
                           </Badge>
                         )}
                         {order.status === POStatus.APPROVED && !order.vendorPoSentAt && (
-                          <span className="text-center text-xs text-muted-foreground">
-                            Menunggu pengiriman
-                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                aria-label="Menunggu pengiriman"
+                                className="flex size-10 items-center justify-center rounded-md border border-amber-500 text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                role="img"
+                                tabIndex={0}
+                              >
+                                <Clock3 className="size-5" aria-hidden="true" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Menunggu pengiriman</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </div>

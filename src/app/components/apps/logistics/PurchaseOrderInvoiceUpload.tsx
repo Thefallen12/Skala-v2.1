@@ -141,7 +141,7 @@ export default function PurchaseOrderInvoiceUpload({
 
   if (!vendorPoSentAt) {
     return (
-      <div className="flex min-w-0 flex-col items-center gap-1">
+      <div className="flex min-w-0 flex-col items-center">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -158,16 +158,13 @@ export default function PurchaseOrderInvoiceUpload({
               onClick={markPoSent}
               disabled={isPending}
             >
-              <Send className="size-4" aria-hidden="true" />
+              <Send className="size-4 text-orange-500" aria-hidden="true" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
             {isPending ? "Menyimpan..." : "Tandai PO Dikirim ke Vendor"}
           </TooltipContent>
         </Tooltip>
-        <span className="text-center text-[10px] leading-3 text-muted-foreground">
-          {isPending ? "Menyimpan" : "Kirim"}
-        </span>
         {message && (
           <p
             className={`max-w-full break-words text-center text-xs leading-4 ${isError ? "text-destructive" : "text-muted-foreground"}`}
@@ -183,7 +180,7 @@ export default function PurchaseOrderInvoiceUpload({
   if (invoiceUrl) {
     return (
       <div className="flex items-start gap-1.5">
-        <div className="flex w-12 flex-col items-center gap-1">
+        <div className="flex w-10 flex-col items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -201,12 +198,9 @@ export default function PurchaseOrderInvoiceUpload({
             </TooltipTrigger>
             <TooltipContent>Lihat invoice vendor</TooltipContent>
           </Tooltip>
-          <span className="text-center text-[10px] leading-3 text-muted-foreground">
-            Invoice
-          </span>
         </div>
         {invoiceId && (
-          <div className="flex w-12 flex-col items-center gap-1">
+          <div className="flex w-10 flex-col items-center">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -228,9 +222,6 @@ export default function PurchaseOrderInvoiceUpload({
               </TooltipTrigger>
               <TooltipContent>Cetak invoice</TooltipContent>
             </Tooltip>
-            <span className="text-center text-[10px] leading-3 text-muted-foreground">
-              Cetak
-            </span>
           </div>
         )}
       </div>
@@ -247,7 +238,7 @@ export default function PurchaseOrderInvoiceUpload({
 
   return (
     <>
-      <div className="flex min-w-0 flex-col items-center gap-1">
+      <div className="flex min-w-0 flex-col items-center">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -262,9 +253,6 @@ export default function PurchaseOrderInvoiceUpload({
           </TooltipTrigger>
           <TooltipContent>Catat Invoice Vendor</TooltipContent>
         </Tooltip>
-        <span className="text-center text-[10px] leading-3 text-muted-foreground">
-          Invoice
-        </span>
         {message && (
           <p
             className={`break-words text-center text-xs leading-4 ${isError ? "text-destructive" : "text-muted-foreground"}`}
