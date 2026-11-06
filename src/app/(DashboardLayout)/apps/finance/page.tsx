@@ -96,6 +96,7 @@ export default async function FinancePage({
     dashboardIncomingFlows,
     dashboardPaidFlows,
     dashboardOfficeExpenses,
+    officeExpenseUsage,
   ] = await Promise.all([
     prisma.purchaseOrder.findMany({
       where: {
@@ -330,7 +331,9 @@ export default async function FinancePage({
         accountNumber: true,
         requester: {
           select: {
+            id: true,
             name: true,
+            role: true,
             bankName: true,
             bankAccountName: true,
             bankAccountNumber: true,
@@ -777,7 +780,100 @@ export default async function FinancePage({
       where: { createdAt: { gte: cashflowDashboardStart, lte: currentDate } },
       select: { createdAt: true, amount: true },
     }),
+    session.user.role === UserRole.FINANCE ||
+    session.user.role === UserRole.ADMINISTRATIONS
+      ? prisma.officeExpense.findMany({
+          where: { expenseType: { in: ["SALARY", "ADVANCE"] } },
+          select: {
+            recipientId: true,
+            expenseType: true,
+            amount: true,
+            recipient: { select: { name: true, role: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const fundUsageByUser = new Map<
+    string,
+    {
+      userId: string;
+      name: string;
+      role: UserRole;
+      totalAmount: number;
+      categories: Map<string, { amount: number; count: number }>;
+    }
+  >();
+  const addFundUsage = (
+    userId: string,
+    name: string,
+    role: UserRole,
+    category: string,
+    amount: number,
+  ) => {
+    const userUsage = fundUsageByUser.get(userId) ?? {
+      userId,
+      name,
+      role,
+      totalAmount: 0,
+      categories: new Map<string, { amount: number; count: number }>(),
+    };
+    const categoryUsage = userUsage.categories.get(category) ?? {
+      amount: 0,
+      count: 0,
+    };
+    categoryUsage.amount += amount;
+    categoryUsage.count += 1;
+    userUsage.categories.set(category, categoryUsage);
+    userUsage.totalAmount += amount;
+    fundUsageByUser.set(userId, userUsage);
+  };
+
+  for (const ticket of tickets) {
+    if (
+      ticket.requestCategory !== TicketRequestCategory.OPS &&
+      ticket.requestCategory !== TicketRequestCategory.REIMBURSEMENT
+    ) {
+      continue;
+    }
+    const paidPayments = new Map(
+      [
+        ...ticket.paymentTransactions,
+        ...ticket.purchaseOrders.flatMap((order) => order.paymentTransactions),
+      ].map((payment) => [payment.id, payment]),
+    );
+    for (const payment of paidPayments.values()) {
+      addFundUsage(
+        ticket.requester.id,
+        ticket.requester.name,
+        ticket.requester.role,
+        ticket.requestCategory,
+        payment.amount,
+      );
+    }
+  }
+  for (const expense of officeExpenseUsage) {
+    addFundUsage(
+      expense.recipientId,
+      expense.recipient.name,
+      expense.recipient.role,
+      expense.expenseType,
+      expense.amount,
+    );
+  }
+  const fundUsageSummary = Array.from(fundUsageByUser.values())
+    .map((user) => ({
+      ...user,
+      categories: Array.from(user.categories, ([type, values]) => ({
+        type,
+        ...values,
+      })),
+    }))
+    .sort(
+      (a, b) =>
+        b.totalAmount - a.totalAmount ||
+        a.name.localeCompare(b.name, "id"),
+    );
 
   const monthlyFlowMap = new Map<
     string,
@@ -1028,6 +1124,7 @@ export default async function FinancePage({
           recipientRole: expense.recipient.role,
         }))}
         officeExpenseRecipients={officeExpenseRecipients}
+        fundUsageSummary={fundUsageSummary}
         dashboardTransactions={dashboardTransactions}
         expenseCategories={expenseCategories}
         cashflows={cashflows.map((cashflow) => ({

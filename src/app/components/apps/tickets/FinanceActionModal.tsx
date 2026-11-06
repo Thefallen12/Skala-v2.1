@@ -70,6 +70,16 @@ export default function FinanceActionModal({
   const [accounts, setAccounts] = useState<FinanceAccountOption[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const purchaseOrder = ticket.purchaseOrders?.[0];
+  const amountPaid = ticket.paymentTransactions?.reduce(
+    (sum, payment) => sum + payment.amount,
+    0,
+  ) ?? 0;
+  const isFirstPayment = (ticket.paymentTransactions?.length ?? 0) === 0;
+  const currentPaymentType =
+    !isFirstPayment && paymentType === PaymentType.DOWN_PAYMENT
+      ? PaymentType.FULL_PAYMENT
+      : paymentType;
 
   useEffect(() => {
     if (!open) return;
@@ -112,9 +122,9 @@ export default function FinanceActionModal({
           file,
           transferDestination,
           financeAccountId,
-          paymentType,
+          paymentType: currentPaymentType,
           amount:
-            paymentType === PaymentType.FULL_PAYMENT
+            currentPaymentType === PaymentType.FULL_PAYMENT
               ? undefined
               : parseRupiahInput(paymentAmount),
         });
@@ -132,11 +142,6 @@ export default function FinanceActionModal({
       }
     });
   };
-  const purchaseOrder = ticket.purchaseOrders?.[0];
-  const amountPaid = ticket.paymentTransactions?.reduce(
-    (sum, payment) => sum + payment.amount,
-    0,
-  ) ?? 0;
   const remainingAmount = Math.max(
     0,
     Number(ticket.totalAmount ?? 0) - amountPaid,
@@ -264,33 +269,35 @@ export default function FinanceActionModal({
               <input
                 type="radio"
                 name="paymentType"
-                checked={paymentType === PaymentType.FULL_PAYMENT}
+                checked={currentPaymentType === PaymentType.FULL_PAYMENT}
                 onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
               />
               Bayar Lunas (Full Payment)
             </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="paymentType"
-                checked={paymentType === PaymentType.DOWN_PAYMENT}
-                onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
-              />
-              Bayar Uang Muka (DP) / Sebagian
-            </label>
+            {isFirstPayment && (
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="paymentType"
+                  checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
+                  onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
+                />
+                Bayar Uang Muka (DP) / Sebagian
+              </label>
+            )}
             <label className="block space-y-2 font-medium">
               Nominal Pembayaran (Rp)
               <RupiahAmountInput
                 id="finance-action-payment-amount"
                 value={
-                  paymentType === PaymentType.FULL_PAYMENT
+                  currentPaymentType === PaymentType.FULL_PAYMENT
                     ? formatRupiahNumber(remainingAmount)
                     : paymentAmount
                 }
                 onChange={setPaymentAmount}
                 required
                 disabled={
-                  isPending || paymentType === PaymentType.FULL_PAYMENT
+                  isPending || currentPaymentType === PaymentType.FULL_PAYMENT
                 }
               />
             </label>
@@ -325,13 +332,13 @@ export default function FinanceActionModal({
                 isPending ||
                 accountsLoading ||
                 accounts.length === 0 ||
-                (paymentType !== PaymentType.FULL_PAYMENT &&
+                (currentPaymentType !== PaymentType.FULL_PAYMENT &&
                   parseRupiahInput(paymentAmount) <= 0)
               }
             >
               {isPending
                 ? "Menyimpan..."
-                : paymentType === PaymentType.FULL_PAYMENT
+                : currentPaymentType === PaymentType.FULL_PAYMENT
                   ? "Selesaikan Pembayaran"
                   : "Catat Pembayaran DP"}
             </Button>

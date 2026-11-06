@@ -31,6 +31,7 @@ export type PaymentModalTarget = {
   title: string;
   grandTotal: number;
   paidAmount: number;
+  isFirstPayment?: boolean;
   transferDestination: string;
   isInternalFunding?: boolean;
   requesterName?: string;
@@ -115,6 +116,12 @@ export default function PaymentModal({
           ? "Pilih buku kas/bank sumber pembayaran."
           : "Pilih bukti transfer terlebih dahulu.",
       );
+      setIsMessageError(true);
+      return;
+    }
+    if (!target.isFirstPayment && paymentType === PaymentType.DOWN_PAYMENT) {
+      setPaymentType(PaymentType.FULL_PAYMENT);
+      setMessage("DP hanya dapat digunakan pada pembayaran pertama.");
       setIsMessageError(true);
       return;
     }
@@ -346,9 +353,11 @@ export default function PaymentModal({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={PaymentType.DOWN_PAYMENT}>
-                          Down Payment
-                        </SelectItem>
+                        {target.isFirstPayment && (
+                          <SelectItem value={PaymentType.DOWN_PAYMENT}>
+                            Down Payment
+                          </SelectItem>
+                        )}
                         <SelectItem value={PaymentType.PROGRESS_PAYMENT}>
                           Progress Payment (Termin)
                         </SelectItem>

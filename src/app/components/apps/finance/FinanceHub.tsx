@@ -226,6 +226,14 @@ type FinanceOfficeExpense = {
   account: { accountName: string };
 };
 
+type FinanceFundUsageSummary = {
+  userId: string;
+  name: string;
+  role: UserRole;
+  totalAmount: number;
+  categories: { type: string; amount: number; count: number }[];
+};
+
 type RetentionContract = {
   id: string;
   contractNumber: string;
@@ -334,6 +342,7 @@ export default function FinanceHub({
   dashboardMonths,
   financeAccounts,
   officeExpenses,
+  fundUsageSummary,
   officeExpenseRecipients,
   cashflows,
   historicalPayments,
@@ -359,6 +368,7 @@ export default function FinanceHub({
   dashboardMonths: FinanceDashboardMonth[];
   financeAccounts: FinanceAccountOption[];
   officeExpenses: FinanceOfficeExpense[];
+  fundUsageSummary: FinanceFundUsageSummary[];
   officeExpenseRecipients: { id: string; name: string; role: UserRole }[];
   cashflows: FinanceCashflowRow[];
   historicalPayments: FinanceHistoricalPayment[];
@@ -500,6 +510,11 @@ export default function FinanceHub({
     (sum, payment) => sum + payment.amount,
     0,
   );
+  const isFirstPayment = paymentHistory.length === 0;
+  const currentPaymentType =
+    !isFirstPayment && paymentType === PaymentType.DOWN_PAYMENT
+      ? PaymentType.FULL_PAYMENT
+      : paymentType;
   const remainingAmount = Math.max(
     0,
     Math.round((paymentTotal - paidAmount) * 100) / 100,
@@ -523,6 +538,7 @@ export default function FinanceHub({
         (total, payment) => total + payment.amount,
         0,
       ),
+      isFirstPayment: ticket.paymentTransactions.length === 0,
       transferDestination:
         ticket.transferDestination ??
         (ticket.vendorBankName && ticket.vendorAccountNumber
@@ -550,6 +566,7 @@ export default function FinanceHub({
         (total, payment) => total + payment.amount,
         0,
       ),
+      isFirstPayment: (order.paymentTransactions ?? []).length === 0,
       transferDestination:
         order.paymentBankName && order.paymentAccountNumber
           ? `Ditransfer ke: ${order.paymentBankName}, ${order.paymentAccountNumber}, a.n. ${order.paymentAccountName ?? order.vendorName}`
@@ -565,6 +582,7 @@ export default function FinanceHub({
         (total, payment) => total + payment.amount,
         0,
       ),
+      isFirstPayment: purchase.paymentTransactions.length === 0,
       transferDestination:
         purchase.paymentBankName && purchase.paymentAccountNumber
           ? `Ditransfer ke: ${purchase.paymentBankName}, ${purchase.paymentAccountNumber}, a.n. ${purchase.paymentAccountName ?? purchase.vendorName}`
@@ -817,7 +835,7 @@ export default function FinanceHub({
       return;
     }
     const amount =
-      paymentType === PaymentType.FULL_PAYMENT
+      currentPaymentType === PaymentType.FULL_PAYMENT
         ? undefined
         : parseRupiahInput(paymentAmount);
     setMessage("");
@@ -839,7 +857,7 @@ export default function FinanceHub({
           file: receiptUrl,
           transferDestination,
           financeAccountId,
-          paymentType,
+          paymentType: currentPaymentType,
           amount,
         });
         setMessage(result.message);
@@ -1182,12 +1200,83 @@ export default function FinanceHub({
                   Catat Pengeluaran Internal
                 </Button>
               </CardHeader>
-              <CardContent>
-                {officeExpenses.length === 0 ? (
-                  <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    Belum ada pengeluaran kantor atau operasional yang dicatat.
-                  </p>
-                ) : (
+              <CardContent className="space-y-6">
+                <section className="space-y-3">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold">
+                      Rekap Penggunaan Dana per Pengguna
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Pembayaran OPS dan reimbursement, serta gaji dan
+                      kasbon/ambilan. Request gudang dan material tidak
+                      termasuk.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Reimbursement dihitung dari tiket yang dibayar; catatan
+                      reimbursement di Pengeluaran Kantor tidak dihitung ulang.
+                    </p>
+                  </div>
+                  {fundUsageSummary.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      Belum ada pembayaran OPS, reimbursement, gaji, atau
+                      kasbon/ambilan yang tercatat.
+                    </p>
+                  ) : (
+                    <NativeDataTable itemLabel="rekap penggunaan dana">
+                      <table className="app-data-table w-full min-w-[620px] text-left text-sm">
+                        <thead>
+                          <tr className="border-b text-muted-foreground">
+                            <th className="py-2 pr-3">Pengguna / Jenis Request</th>
+                            <th className="py-2 text-right">
+                              Total Dibayarkan
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fundUsageSummary.map((user) => (
+                            <tr key={user.userId} className="border-b last:border-0">
+                              <td className="py-3 pr-3">
+                                <p className="font-medium">{user.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {user.role.replaceAll("_", " ")}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {user.categories.map((category) => (
+                                    <span
+                                      key={category.type}
+                                      className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs"
+                                    >
+                                      {category.type === "OPS"
+                                        ? "OPS"
+                                        : expenseTypeLabels[category.type] ??
+                                          category.type}
+                                      {" · "}
+                                      {category.count} transaksi ·{" "}
+                                      {currency(category.amount)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-3 text-right font-semibold tabular-nums">
+                                {currency(user.totalAmount)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </NativeDataTable>
+                  )}
+                </section>
+
+                <section className="space-y-3 border-t pt-6">
+                  <h3 className="font-semibold">
+                    Riwayat Pengeluaran Kantor &amp; Operasional
+                  </h3>
+                  {officeExpenses.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      Belum ada pengeluaran kantor atau operasional yang dicatat.
+                    </p>
+                  ) : (
                   <NativeDataTable itemLabel="pengeluaran">
                     <table className="app-data-table w-full min-w-[850px] text-left text-sm">
                       <thead>
@@ -1265,7 +1354,8 @@ export default function FinanceHub({
                       </tbody>
                     </table>
                   </NativeDataTable>
-                )}
+                  )}
+                </section>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2200,25 +2290,27 @@ export default function FinanceHub({
                       <input
                         type="radio"
                         name="paymentType"
-                        checked={paymentType === PaymentType.FULL_PAYMENT}
+                        checked={currentPaymentType === PaymentType.FULL_PAYMENT}
                         onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
                       />
                       Bayar Lunas (Full Payment)
                     </label>
+                    {isFirstPayment && (
+                      <label className="flex items-center gap-2 font-normal">
+                        <input
+                          type="radio"
+                          name="paymentType"
+                          checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
+                          onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
+                        />
+                        Bayar Uang Muka (DP) / Sebagian
+                      </label>
+                    )}
                     <label className="flex items-center gap-2 font-normal">
                       <input
                         type="radio"
                         name="paymentType"
-                        checked={paymentType === PaymentType.DOWN_PAYMENT}
-                        onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
-                      />
-                      Bayar Uang Muka (DP) / Sebagian
-                    </label>
-                    <label className="flex items-center gap-2 font-normal">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        checked={paymentType === PaymentType.PROGRESS_PAYMENT}
+                        checked={currentPaymentType === PaymentType.PROGRESS_PAYMENT}
                         onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
                       />
                       Pembayaran Termin
@@ -2230,7 +2322,7 @@ export default function FinanceHub({
                       <RupiahAmountInput
                         id="standalone-payment-amount"
                         value={
-                          paymentType === PaymentType.FULL_PAYMENT
+                          currentPaymentType === PaymentType.FULL_PAYMENT
                             ? formatRupiahNumber(remainingAmount)
                             : paymentAmount
                         }
@@ -2238,7 +2330,7 @@ export default function FinanceHub({
                         required
                         disabled={
                           isPending ||
-                          paymentType === PaymentType.FULL_PAYMENT
+                          currentPaymentType === PaymentType.FULL_PAYMENT
                         }
                       />
                     </div>
@@ -2282,15 +2374,15 @@ export default function FinanceHub({
                     !receiptUrl ||
                     financeAccounts.length === 0 ||
                     isPending ||
-                    (paymentType !== PaymentType.FULL_PAYMENT &&
+                    (currentPaymentType !== PaymentType.FULL_PAYMENT &&
                       parseRupiahInput(paymentAmount) <= 0)
                   }
                 >
                   {isPending
                     ? "Memproses..."
-                    : paymentType === PaymentType.FULL_PAYMENT
+                    : currentPaymentType === PaymentType.FULL_PAYMENT
                       ? "Bayar & Terima ke Gudang"
-                        : paymentType === PaymentType.DOWN_PAYMENT
+                        : currentPaymentType === PaymentType.DOWN_PAYMENT
                           ? "Catat Pembayaran DP"
                           : "Catat Pembayaran Termin"}
                 </Button>
@@ -2362,25 +2454,27 @@ export default function FinanceHub({
                         <input
                           type="radio"
                           name="direct-purchase-payment-type"
-                          checked={paymentType === PaymentType.FULL_PAYMENT}
+                          checked={currentPaymentType === PaymentType.FULL_PAYMENT}
                           onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
                         />
                         Bayar Lunas
                       </label>
+                      {activeDirectPurchase.paymentTransactions.length === 0 && (
+                        <label className="flex items-center gap-2 font-normal">
+                          <input
+                            type="radio"
+                            name="direct-purchase-payment-type"
+                            checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
+                            onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
+                          />
+                          Uang Muka (DP)
+                        </label>
+                      )}
                       <label className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="direct-purchase-payment-type"
-                          checked={paymentType === PaymentType.DOWN_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
-                        />
-                        Uang Muka (DP)
-                      </label>
-                      <label className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="direct-purchase-payment-type"
-                          checked={paymentType === PaymentType.PROGRESS_PAYMENT}
+                          checked={currentPaymentType === PaymentType.PROGRESS_PAYMENT}
                           onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
                         />
                         Pembayaran Termin
@@ -2392,7 +2486,7 @@ export default function FinanceHub({
                         <RupiahAmountInput
                           id="direct-purchase-payment-amount"
                           value={
-                            paymentType === PaymentType.FULL_PAYMENT
+                            currentPaymentType === PaymentType.FULL_PAYMENT
                               ? formatRupiahNumber(remainingAmount)
                               : paymentAmount
                           }
@@ -2400,7 +2494,7 @@ export default function FinanceHub({
                           required
                           disabled={
                             isPending ||
-                            paymentType === PaymentType.FULL_PAYMENT
+                            currentPaymentType === PaymentType.FULL_PAYMENT
                           }
                         />
                       </div>
@@ -2444,15 +2538,15 @@ export default function FinanceHub({
                         !receiptUrl ||
                         financeAccounts.length === 0 ||
                         isPending ||
-                        (paymentType !== PaymentType.FULL_PAYMENT &&
+                        (currentPaymentType !== PaymentType.FULL_PAYMENT &&
                           parseRupiahInput(paymentAmount) <= 0)
                       }
                     >
                       {isPending
                         ? "Memproses..."
-                        : paymentType === PaymentType.FULL_PAYMENT
+                        : currentPaymentType === PaymentType.FULL_PAYMENT
                           ? "Selesaikan Pembayaran"
-                          : paymentType === PaymentType.DOWN_PAYMENT
+                          : currentPaymentType === PaymentType.DOWN_PAYMENT
                             ? "Catat Uang Muka"
                             : "Catat Pembayaran Termin"}
                     </Button>
@@ -2523,25 +2617,27 @@ export default function FinanceHub({
                         <input
                           type="radio"
                           name="paymentType"
-                          checked={paymentType === PaymentType.FULL_PAYMENT}
+                          checked={currentPaymentType === PaymentType.FULL_PAYMENT}
                           onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
                         />
                         Bayar Lunas (Full Payment)
                       </label>
+                      {activeTicket.paymentTransactions.length === 0 && (
+                        <label className="flex items-center gap-2 font-normal">
+                          <input
+                            type="radio"
+                            name="paymentType"
+                            checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
+                            onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
+                          />
+                          Bayar Uang Muka (DP) / Sebagian
+                        </label>
+                      )}
                       <label className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="paymentType"
-                          checked={paymentType === PaymentType.DOWN_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
-                        />
-                        Bayar Uang Muka (DP) / Sebagian
-                      </label>
-                      <label className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="paymentType"
-                          checked={paymentType === PaymentType.PROGRESS_PAYMENT}
+                          checked={currentPaymentType === PaymentType.PROGRESS_PAYMENT}
                           onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
                         />
                         Pembayaran Termin
@@ -2553,7 +2649,7 @@ export default function FinanceHub({
                         <RupiahAmountInput
                           id="ticket-payment-amount"
                           value={
-                            paymentType === PaymentType.FULL_PAYMENT
+                            currentPaymentType === PaymentType.FULL_PAYMENT
                               ? formatRupiahNumber(remainingAmount)
                               : paymentAmount
                           }
@@ -2561,7 +2657,7 @@ export default function FinanceHub({
                           required
                           disabled={
                             isPending ||
-                            paymentType === PaymentType.FULL_PAYMENT
+                            currentPaymentType === PaymentType.FULL_PAYMENT
                           }
                         />
                       </div>
@@ -2630,15 +2726,15 @@ export default function FinanceHub({
                         !receiptUrl ||
                         financeAccounts.length === 0 ||
                         isPending ||
-                        (paymentType !== PaymentType.FULL_PAYMENT &&
+                        (currentPaymentType !== PaymentType.FULL_PAYMENT &&
                           parseRupiahInput(paymentAmount) <= 0)
                       }
                     >
                       {isPending
                         ? "Memproses..."
-                        : paymentType === PaymentType.FULL_PAYMENT
+                        : currentPaymentType === PaymentType.FULL_PAYMENT
                           ? "Selesaikan Pembayaran"
-                          : paymentType === PaymentType.DOWN_PAYMENT
+                          : currentPaymentType === PaymentType.DOWN_PAYMENT
                             ? "Catat Pembayaran DP"
                             : "Catat Pembayaran Termin"}
                     </Button>
@@ -2712,7 +2808,7 @@ export default function FinanceHub({
       <PaymentModal
         key={
           selectedPaymentRow
-            ? `${selectedPaymentRow.kind}:${selectedPaymentRow.id}:${selectedPaymentRow.grandTotal}:${selectedPaymentRow.paidAmount}`
+            ? `${selectedPaymentRow.kind}:${selectedPaymentRow.id}:${selectedPaymentRow.grandTotal}:${selectedPaymentRow.paidAmount}:${selectedPaymentRow.isFirstPayment}`
             : "closed"
         }
         open={paymentModalSelection !== null}

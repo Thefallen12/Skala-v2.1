@@ -4569,13 +4569,23 @@ export async function processFinancePayment(
         isInternalFundingRequest && paymentMethod === POPaymentMethod.CASH
           ? "Tunai"
           : transferDestination.trim();
+      const paymentWhere = {
+        status: PaymentStatus.PAID,
+        ...(order ? { poId: order.id } : { ticketId }),
+      };
       const previousPayments = await transaction.paymentTransaction.aggregate({
-        where: {
-          status: PaymentStatus.PAID,
-          ...(order ? { poId: order.id } : { ticketId }),
-        },
+        where: paymentWhere,
         _sum: { amount: true },
       });
+      if (
+        paymentType === PaymentType.DOWN_PAYMENT &&
+        (await transaction.paymentTransaction.findFirst({
+          where: paymentWhere,
+          select: { id: true },
+        }))
+      ) {
+        throw new Error("DP hanya dapat digunakan pada pembayaran pertama.");
+      }
       const allocation = allocatePaymentAmount(
         invoiceTotal,
         previousPayments._sum.amount ?? 0,
@@ -4909,6 +4919,15 @@ export async function processFinanceStandalonePurchaseOrderPayment(
         where: { poId: order.id, status: PaymentStatus.PAID },
         _sum: { amount: true },
       });
+      if (
+        paymentType === PaymentType.DOWN_PAYMENT &&
+        (await transaction.paymentTransaction.findFirst({
+          where: { poId: order.id, status: PaymentStatus.PAID },
+          select: { id: true },
+        }))
+      ) {
+        throw new Error("DP hanya dapat digunakan pada pembayaran pertama.");
+      }
       const allocation = allocatePaymentAmount(
         total,
         paymentHistory._sum.amount ?? 0,
@@ -5030,7 +5049,8 @@ export async function processFinanceStandalonePurchaseOrderPayment(
           error.message.startsWith("Buku bank/kas sumber") ||
           error.message.startsWith("Barang ") ||
           error.message.startsWith("PO tidak memiliki rincian") ||
-          error.message.startsWith("Status pembayaran PO"))
+          error.message.startsWith("Status pembayaran PO") ||
+          error.message.startsWith("DP hanya"))
         ? error.message
         : "Pembayaran PO gagal diproses. Muat ulang halaman dan coba kembali.",
     );
@@ -5132,6 +5152,18 @@ export async function processFinanceDirectStockPurchasePayment(
         },
         _sum: { amount: true },
       });
+      if (
+        paymentType === PaymentType.DOWN_PAYMENT &&
+        (await transaction.paymentTransaction.findFirst({
+          where: {
+            directStockPurchaseId: purchase.id,
+            status: PaymentStatus.PAID,
+          },
+          select: { id: true },
+        }))
+      ) {
+        throw new Error("DP hanya dapat digunakan pada pembayaran pertama.");
+      }
       const total = decimalFromScaledInteger(purchase.totalAmount).toNumber();
       const allocation = allocatePaymentAmount(
         total,
@@ -5224,6 +5256,7 @@ export async function processFinanceDirectStockPurchasePayment(
           error.message.startsWith("Buku bank/kas sumber") ||
           error.message.startsWith("Total tagihan") ||
           error.message.startsWith("Tagihan sudah lunas.") ||
+          error.message.startsWith("DP hanya") ||
           error.message.startsWith("Nominal pembayaran"))
         ? error.message
         : "Pembayaran pembelian langsung gagal diproses. Coba kembali.",
