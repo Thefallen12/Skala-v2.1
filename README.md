@@ -92,7 +92,7 @@ npx web-push generate-vapid-keys
 ```
 
 Keep the generated private key secret. Set these variables in the local `.env`
-and in Hostinger's environment before building and running the app:
+and in Hostinger's runtime environment:
 
 ```env
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=generated-public-key
@@ -100,6 +100,14 @@ VAPID_PRIVATE_KEY=generated-private-key
 VAPID_SUBJECT=mailto:admin@your-domain.example
 ```
 
-The public key is embedded in the browser bundle at build time, so rebuild and
-redeploy after changing it. Never commit `.env` or paste private keys into
-source control.
+The browser fetches the public key from `/api/push/vapid-public-key` at runtime,
+so changing it does not require baking it into the browser bundle. Configure all
+three variables on the running Hostinger application and restart it. Keep the
+same VAPID key pair for subscriptions already saved in MongoDB; if you rotate
+the keys, users must enable notifications again on each device. Never commit
+`.env` or paste private keys into source control.
+
+On iPhone and iPad, Web Push is supported on iOS/iPadOS 16.4 and later for a
+web app added to the Home Screen. In Safari, use **Share > Add to Home Screen**,
+open the app from its new Home Screen icon, sign in, and enable notifications
+under **Profil > Notifikasi**. Allow notifications when iOS prompts.

@@ -8,7 +8,27 @@ import {
 } from "@/app/actions/push-subscriptions";
 import { Button } from "@/components/ui/button";
 
-type PushState = "checking" | "unsupported" | "disabled" | "enabled";
+type PushState =
+  | "checking"
+  | "unsupported"
+  | "install-required"
+  | "blocked"
+  | "disabled"
+  | "enabled";
+
+function isIosDevice() {
+  return (
+    /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isInstalledWebApp() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
 
 function applicationServerKeyToBytes(key: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (key.length % 4)) % 4);
@@ -22,13 +42,21 @@ function applicationServerKeyToBytes(key: string): Uint8Array<ArrayBuffer> {
 }
 
 export default function PushNotificationSettings() {
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const [state, setState] = useState<PushState>("checking");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     let active = true;
+    if (isIosDevice() && !isInstalledWebApp()) {
+      Promise.resolve().then(() => {
+        if (active) setState("install-required");
+      });
+      return () => {
+        active = false;
+      };
+    }
+
     if (
       !("Notification" in window) ||
       !("serviceWorker" in navigator) ||
@@ -36,6 +64,15 @@ export default function PushNotificationSettings() {
     ) {
       Promise.resolve().then(() => {
         if (active) setState("unsupported");
+      });
+      return () => {
+        active = false;
+      };
+    }
+
+    if (Notification.permission === "denied") {
+      Promise.resolve().then(() => {
+        if (active) setState("blocked");
       });
       return () => {
         active = false;
@@ -65,10 +102,6 @@ export default function PushNotificationSettings() {
     setBusy(true);
     setMessage("");
     try {
-      if (!publicKey) {
-        setMessage("VAPID public key belum dikonfigurasi untuk aplikasi ini.");
-        return;
-      }
       if (!window.isSecureContext) {
         setMessage("Notifikasi browser memerlukan HTTPS.");
         return;
@@ -79,6 +112,24 @@ export default function PushNotificationSettings() {
           permission === "denied"
             ? "Izin notifikasi diblokir di browser. Ubah izin situs lalu coba lagi."
             : "Izin notifikasi belum diberikan.",
+        );
+        return;
+      }
+
+      const keyResponse = await fetch("/api/push/vapid-public-key", {
+        cache: "no-store",
+      });
+      const keyData: unknown = await keyResponse.json();
+      const publicKey =
+        typeof keyData === "object" &&
+        keyData !== null &&
+        "publicKey" in keyData &&
+        typeof keyData.publicKey === "string"
+          ? keyData.publicKey
+          : null;
+      if (!keyResponse.ok || !publicKey) {
+        setMessage(
+          "Konfigurasi VAPID server belum lengkap atau tidak valid. Hubungi administrator hosting.",
         );
         return;
       }
@@ -151,6 +202,17 @@ export default function PushNotificationSettings() {
         <span className="text-xs text-muted-foreground">
           Browser ini tidak mendukung Web Push.
         </span>
+      ) : state === "install-required" ? (
+        <p className="max-w-sm text-xs text-muted-foreground" role="status">
+          Notifikasi iPhone memerlukan iOS 16.4 atau lebih baru. Buka situs ini
+          di Safari, pilih Bagikan &gt; Tambah ke Layar Utama, lalu buka aplikasi
+          dari ikon tersebut untuk mengaktifkan notifikasi.
+        </p>
+      ) : state === "blocked" ? (
+        <p className="max-w-xs text-xs text-muted-foreground" role="status">
+          Izin notifikasi diblokir. Ubah izin situs menjadi Izinkan melalui
+          pengaturan browser, lalu muat ulang halaman ini.
+        </p>
       ) : state === "enabled" ? (
         <Button
           type="button"

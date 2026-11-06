@@ -80,6 +80,13 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (
+    self.location.hostname === 'localhost' ||
+    self.location.hostname === '127.0.0.1'
+  ) {
+    return;
+  }
+
   const request = event.request;
   if (request.method !== 'GET') return;
 

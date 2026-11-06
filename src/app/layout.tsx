@@ -31,6 +31,7 @@ export default function RootLayout({
           type="image/svg+xml"
         />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="theme-color" content="#102A4D" />
       </head>
       <body className={`${dmSans.className}`}>

@@ -4091,6 +4091,9 @@ async function createWarehouseDeliveryOrder(
         return {
           ...existingOrder,
           message: `DO ${existingOrder.doNumber} sudah ada. Tiket dilanjutkan menggunakan DO tersebut tanpa membuat dokumen atau mengurangi stok lagi.`,
+          pushRecipientId: null,
+          pushTicketNumber: "",
+          pushTicketTitle: "",
         };
       }
       if (ticket.status !== TicketStatus.PROCESSED_LOGISTIC) {
@@ -4106,6 +4109,11 @@ async function createWarehouseDeliveryOrder(
             select: { id: true, name: true },
           })
         : ticket.moverAssignee;
+      const isNewMoverAssignment =
+        !hasPaidPurchaseOrder &&
+        Boolean(
+          selectedMover && ticket.moverAssignee?.id !== selectedMover.id,
+        );
       if (moverAssigneeId && !selectedMover) {
         throw new Error("Mover tidak ditemukan atau sudah tidak aktif.");
       }
@@ -4302,8 +4310,23 @@ async function createWarehouseDeliveryOrder(
         message: hasPaidPurchaseOrder
           ? `DO ${deliveryOrder.doNumber} diterbitkan untuk pengiriman ekspedisi. Stok dicadangkan.`
           : `DO ${deliveryOrder.doNumber} diterbitkan. Stok dicadangkan dan tiket diteruskan ke ${selectedMover!.name}.`,
+        pushRecipientId: isNewMoverAssignment ? selectedMover?.id ?? null : null,
+        pushTicketNumber: ticket.ticketNumber,
+        pushTicketTitle: ticket.title,
       };
     });
+
+    if (result.pushRecipientId) {
+      try {
+        await sendPushNotification(result.pushRecipientId, {
+          title: "Tiket baru ditugaskan kepada Anda",
+          body: `${result.pushTicketNumber} · ${result.pushTicketTitle}`,
+          url: "/apps/tickets",
+        });
+      } catch (error) {
+        console.error("New ticket assignment push notification failed:", error);
+      }
+    }
 
     revalidatePath("/apps/tickets");
     revalidatePath("/apps/logistics");

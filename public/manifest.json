@@ -1,20 +1,26 @@
 {
-  "name": "Tailwind Admin Dashboard",
-  "short_name": "TailwindAdmin",
+  "id": "/",
+  "name": "Skala Prioritas Engineering",
+  "short_name": "Skala Prioritas",
+  "description": "Sistem operasional konstruksi dan logistik Skala Prioritas.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#5d87ff",
+  "background_color": "#102A4D",
+  "theme_color": "#102A4D",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
