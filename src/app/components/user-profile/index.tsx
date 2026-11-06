@@ -30,6 +30,7 @@ import {
   type ProfileActionResult,
 } from "@/app/actions/profile";
 import CardBox from "@/app/components/shared/CardBox";
+import PushNotificationSettings from "./PushNotificationSettings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -752,8 +753,10 @@ export default function UserProfile({ profile }: { profile: UserProfileData }) {
           <CardBox className="p-5">
             <h2 className="text-sm font-semibold">Notifikasi dan pengingat</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pengingat tugas dan agenda dapat dilihat melalui modul Jadwal &amp; Rapat.
+              Aktifkan notifikasi browser untuk menerima tiket yang ditugaskan
+              kepada Anda, termasuk saat aplikasi tidak sedang terbuka.
             </p>
+            <PushNotificationSettings />
             <Link
               href="/apps/habits?tab=calendar"
               className="mt-4 inline-flex items-center text-xs font-medium text-primary hover:underline"

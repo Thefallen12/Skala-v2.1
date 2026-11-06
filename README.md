@@ -63,3 +63,32 @@ commit `.env`, disclose secret values in logs, or put real values in
 Hostinger local disk is not a durable shared file store. Keep uploads in
 Cloudinary or attach persistent storage before relying on `.private-data` across
 restarts.
+
+## Browser push notifications
+
+The app sends Web Push notifications to a Mover when a new ticket is created
+with that Mover assigned. Each browser/device stores its own subscription in
+the MongoDB `User` document's `pushSubscriptions` array. Users can enable or
+disable notifications from **Profil > Notifikasi**. Push requires HTTPS and a
+browser that supports the Push API.
+
+Install the sender and type definitions, then generate a VAPID key pair:
+
+```powershell
+npm install web-push
+npm install -D @types/web-push
+npx web-push generate-vapid-keys
+```
+
+Keep the generated private key secret. Set these variables in the local `.env`
+and in Hostinger's environment before building and running the app:
+
+```env
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=generated-public-key
+VAPID_PRIVATE_KEY=generated-private-key
+VAPID_SUBJECT=mailto:admin@your-domain.example
+```
+
+The public key is embedded in the browser bundle at build time, so rebuild and
+redeploy after changing it. Never commit `.env` or paste private keys into
+source control.

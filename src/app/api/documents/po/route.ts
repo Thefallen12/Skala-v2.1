@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
   const destination = new URL("/api/documents/transactions", request.url);
   destination.searchParams.set("kind", "PO");
   destination.searchParams.set("publicCode", publicCode);
+  if (request.nextUrl.searchParams.get("format") === "html") {
+    destination.searchParams.set("format", "html");
+  }
   if (request.nextUrl.searchParams.get("download") === "1") {
     destination.searchParams.set("download", "1");
   }

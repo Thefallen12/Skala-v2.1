@@ -1128,7 +1128,10 @@ export async function markPurchaseOrderSentToVendor(
       where: {
         publicCode,
         status: POStatus.APPROVED,
-        vendorPoSentAt: null,
+        OR: [
+          { vendorPoSentAt: null },
+          { vendorPoSentAt: { isSet: false } },
+        ],
       },
       data: {
         vendorPoSentAt: new Date(),

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
+import { CircleAlert, CircleCheck, Pencil, Trash2 } from "lucide-react";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import {
   deleteTicket,
@@ -31,6 +31,11 @@ type EditableTicketItem = {
   isLinked: boolean;
 };
 
+type TicketToast = {
+  message: string;
+  success: boolean;
+};
+
 export default function TicketManagementActions({
   ticket,
   role,
@@ -45,11 +50,17 @@ export default function TicketManagementActions({
   const [description, setDescription] = useState(ticket.description ?? "");
   const [priority, setPriority] = useState(ticket.priority);
   const [items, setItems] = useState<EditableTicketItem[]>([]);
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<TicketToast | null>(null);
   const [isPending, startTransition] = useTransition();
   const isDirector = role === UserRole.DIRECTOR;
   const canEdit =
     isDirector || (ticket.canSubmit && ticket.canRequesterEdit);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   if (!canEdit && !isDirector) return null;
 
@@ -67,7 +78,7 @@ export default function TicketManagementActions({
     setDescription(ticket.description ?? "");
     setPriority(ticket.priority);
     setItems(getEditableItems());
-    setMessage("");
+    setToast(null);
     setIsOpen(true);
   };
 
@@ -94,7 +105,7 @@ export default function TicketManagementActions({
   );
 
   const handleSave = () => {
-    setMessage("");
+    setToast(null);
     startTransition(async () => {
       try {
         const result: TicketActionResult = await updateTicketDetails(ticket.id, {
@@ -108,21 +119,24 @@ export default function TicketManagementActions({
             unit,
           })),
         });
-        setMessage(result.message);
+        setToast({ message: result.message, success: result.success });
         if (result.success) {
           setIsOpen(false);
           router.refresh();
         }
       } catch (error) {
         console.error("Ticket edit action failed:", error);
-        setMessage("Tiket gagal diperbarui. Silakan coba kembali.");
+        setToast({
+          message: "Tiket gagal diperbarui. Silakan coba kembali.",
+          success: false,
+        });
       }
     });
   };
 
   const handleDelete = () => {
     if (isPending) return;
-    setMessage("");
+    setToast(null);
     setIsDeleteConfirmOpen(true);
   };
 
@@ -131,14 +145,17 @@ export default function TicketManagementActions({
     startTransition(async () => {
       try {
         const result = await deleteTicket(ticket.id);
-        setMessage(result.message);
+        setToast({ message: result.message, success: result.success });
         if (result.success) {
           setIsDeleteConfirmOpen(false);
           router.refresh();
         }
       } catch (error) {
         console.error("Ticket delete action failed:", error);
-        setMessage("Tiket gagal dihapus. Silakan coba kembali.");
+        setToast({
+          message: "Tiket gagal dihapus. Silakan coba kembali.",
+          success: false,
+        });
       }
     });
   };
@@ -173,10 +190,23 @@ export default function TicketManagementActions({
           Hapus
         </Button>
       )}
-      {message && !isOpen && (
-        <p className="max-w-36 truncate text-[11px] text-destructive" role="alert">
-          {message}
-        </p>
+      {toast && (
+        <div
+          className={`fixed bottom-5 right-5 z-[100] flex max-w-[min(24rem,calc(100vw-2.5rem))] items-center gap-3 rounded-xl border px-4 py-3 text-sm shadow-xl ${
+            toast.success
+              ? "border-emerald-500/30 bg-emerald-950 text-emerald-50"
+              : "border-red-500/30 bg-red-950 text-red-50"
+          }`}
+          role={toast.success ? "status" : "alert"}
+          aria-live={toast.success ? "polite" : "assertive"}
+        >
+          {toast.success ? (
+            <CircleCheck className="size-5 shrink-0 text-emerald-300" aria-hidden="true" />
+          ) : (
+            <CircleAlert className="size-5 shrink-0 text-red-300" aria-hidden="true" />
+          )}
+          <span>{toast.message}</span>
+        </div>
       )}
       <GlobalModal
         isOpen={isOpen}
@@ -344,11 +374,6 @@ export default function TicketManagementActions({
               </div>
             </section>
           )}
-          {message && (
-            <p className="text-sm text-muted-foreground" role="status">
-              {message}
-            </p>
-          )}
         </div>
       </GlobalModal>
       <GlobalModal
@@ -390,11 +415,6 @@ export default function TicketManagementActions({
           pembayaran, serta Surat Jalan akan tetap tersimpan, tetapi tidak lagi
           terhubung ke tiket ini.
         </p>
-        {message && (
-          <p className="text-sm text-destructive" role="alert">
-            {message}
-          </p>
-        )}
       </GlobalModal>
     </div>
   );

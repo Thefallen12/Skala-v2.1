@@ -429,9 +429,9 @@ export default function LogisticsHub({
                 return (
                   <article
                     key={order.publicCode}
-                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-2 rounded-lg border px-3 py-2"
+                    className="flex min-w-0 items-start justify-between gap-3 rounded-lg border p-3"
                   >
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 flex-1 flex-col items-start">
                       <p
                         className="break-words text-sm font-semibold text-primary"
                         title={`${order.poNumber} · ${order.vendorName}`}
@@ -441,10 +441,13 @@ export default function LogisticsHub({
                       <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString("id-ID")}
                       </p>
-                    </div>
-                    <div className="flex shrink-0 items-center justify-end gap-1.5">
+                      {order.vendorPoSentAt && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Dikirim {new Date(order.vendorPoSentAt).toLocaleString("id-ID")}
+                        </p>
+                      )}
                       <Badge
-                        className="h-8 shrink-0 whitespace-nowrap px-2.5 text-[0.6875rem]"
+                        className="mt-2 h-6 shrink-0 whitespace-nowrap px-2 text-[0.6875rem]"
                         variant={
                           order.status === POStatus.APPROVED
                             ? "lightSuccess"
@@ -475,71 +478,88 @@ export default function LogisticsHub({
                                   ? "Dibatalkan"
                                   : "Draft"}
                       </Badge>
+                      {order.status === POStatus.APPROVED && !order.vendorPoSentAt && (
+                        <span className="mt-1 text-xs text-muted-foreground">
+                          Menunggu pengiriman
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 flex-nowrap items-start gap-1.5">
                       {order.status === POStatus.DRAFT ? (
                         <>
+                          <div className="flex w-12 flex-col items-center gap-1">
+                            <Button
+                              asChild
+                              aria-label={
+                                role === UserRole.LOGISTICS ||
+                                role === UserRole.ADMINISTRATIONS
+                                  ? "Lanjutkan Draft"
+                                  : "Lihat Draft"
+                              }
+                              title={
+                                role === UserRole.LOGISTICS ||
+                                role === UserRole.ADMINISTRATIONS
+                                  ? "Lanjutkan Draft"
+                                  : "Lihat Draft"
+                              }
+                              className="size-10 p-0"
+                              size="sm"
+                              variant="outline"
+                            >
+                              <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                                <FilePenLine aria-hidden="true" />
+                              </Link>
+                            </Button>
+                            <span className="text-center text-[10px] leading-3 text-muted-foreground">
+                              {role === UserRole.LOGISTICS ||
+                              role === UserRole.ADMINISTRATIONS
+                                ? "Edit"
+                                : "Lihat"}
+                            </span>
+                          </div>
+                          {(role === UserRole.LOGISTICS ||
+                            role === UserRole.ADMINISTRATIONS) && (
+                            <div className="flex w-12 flex-col items-center gap-1">
+                              <Button
+                                aria-label={
+                                  isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
+                                }
+                                title={
+                                  isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
+                                }
+                                className="size-10 p-0"
+                                size="sm"
+                                disabled={isPending}
+                                onClick={() =>
+                                  submitDraftPurchaseOrder(order.publicCode)
+                                }
+                              >
+                                <Send aria-hidden="true" />
+                              </Button>
+                              <span className="text-center text-[10px] leading-3 text-muted-foreground">
+                                Ajukan
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      ) : order.status !== POStatus.APPROVED ? (
+                        <div className="flex w-12 flex-col items-center gap-1">
                           <Button
                             asChild
-                            aria-label={
-                              role === UserRole.LOGISTICS ||
-                              role === UserRole.ADMINISTRATIONS
-                                ? "Lanjutkan Draft"
-                                : "Lihat Draft"
-                            }
-                            title={
-                              role === UserRole.LOGISTICS ||
-                              role === UserRole.ADMINISTRATIONS
-                                ? "Lanjutkan Draft"
-                                : "Lihat Draft"
-                            }
-                            className="h-10 w-10 px-0 py-0 text-xs"
+                            aria-label="Lihat PO"
+                            title="Lihat PO"
+                            className="size-10 p-0"
                             size="sm"
                             variant="outline"
                           >
                             <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
-                              <FilePenLine aria-hidden="true" />
-                              {role === UserRole.LOGISTICS ||
-                              role === UserRole.ADMINISTRATIONS
-                                ? <span className="sr-only">Lanjutkan Draft</span>
-                                : <span className="sr-only">Lihat Draft</span>}
+                              <Eye aria-hidden="true" />
                             </Link>
                           </Button>
-                          {(role === UserRole.LOGISTICS ||
-                            role === UserRole.ADMINISTRATIONS) && (
-                            <Button
-                              aria-label={
-                                isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
-                              }
-                              title={
-                                isPending ? "Mengajukan PO..." : "Ajukan ke Keuangan"
-                              }
-                              className="h-10 w-10 px-0 py-0 text-xs"
-                              size="sm"
-                              disabled={isPending}
-                              onClick={() =>
-                                submitDraftPurchaseOrder(order.publicCode)
-                              }
-                            >
-                              <Send aria-hidden="true" />
-                              <span className="sr-only">
-                                {isPending ? "Mengajukan..." : "Ajukan ke Keuangan"}
-                              </span>
-                            </Button>
-                          )}
-                        </>
-                      ) : order.status !== POStatus.APPROVED ? (
-                        <Button
-                          asChild
-                          aria-label="Lihat PO"
-                          title="Lihat PO"
-                          className="h-10 w-10 px-0 py-0 text-xs"
-                          size="sm"
-                          variant="outline"
-                        >
-                          <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
-                            <Eye aria-hidden="true" />
-                            <span className="sr-only">Lihat PO</span>
-                          </Link>
-                        </Button>
+                          <span className="text-center text-[10px] leading-3 text-muted-foreground">
+                            Lihat
+                          </span>
+                        </div>
                       ) : role === UserRole.LOGISTICS ? (
                         <PurchaseOrderInvoiceUpload
                           publicCode={order.publicCode}
@@ -551,61 +571,30 @@ export default function LogisticsHub({
                           includeTax={order.includeTax}
                           invoiceDate={invoiceDate}
                         />
-                      ) : order.status === POStatus.APPROVED ? (
-                        <Badge
-                          aria-label={
-                            order.vendorPoSentAt
-                              ? "PO dikirim ke vendor"
-                              : "Menunggu pengiriman PO"
-                          }
-                          title={
-                            order.vendorPoSentAt
-                              ? "PO dikirim ke vendor"
-                              : "Menunggu pengiriman PO"
-                          }
-                          className="h-8 whitespace-nowrap px-2.5 text-[0.6875rem]"
-                          variant={order.vendorPoSentAt ? "lightSuccess" : "outline"}
-                        >
-                          {order.vendorPoSentAt
-                            ? (
-                                <>
-                                  <Check className="size-4" aria-hidden="true" />
-                                  <span className="sr-only">
-                                    PO dikirim ke vendor
-                                  </span>
-                                </>
-                              )
-                            : (
-                                <>
-                                  <Clock3 className="size-4" aria-hidden="true" />
-                                  <span className="sr-only">
-                                    Menunggu pengiriman PO
-                                  </span>
-                                </>
-                              )}
-                        </Badge>
                       ) : null}
                       {order.status === POStatus.APPROVED && (
-                        <Button
-                          aria-label="Preview PO Terbit"
-                          title="Preview PO Terbit"
-                          variant="outline"
-                          size="sm"
-                          className="h-10 w-10 max-w-full px-0 py-0 text-xs"
-                          onClick={() =>
-                            openDocumentPreview({
-                              kind: "po",
-                              code: order.publicCode,
-                              number: order.poNumber,
-                              executiveApproval: "PO disetujui oleh Direksi",
-                            })
-                          }
-                        >
-                          <Eye aria-hidden="true" />
-                          <span className="sr-only">
-                            Preview PO Terbit
+                        <div className="flex w-12 flex-col items-center gap-1">
+                          <Button
+                            aria-label="Preview PO Terbit"
+                            title="Preview PO Terbit"
+                            variant="outline"
+                            size="sm"
+                            className="size-10 p-0"
+                            onClick={() =>
+                              openDocumentPreview({
+                                kind: "po",
+                                code: order.publicCode,
+                                number: order.poNumber,
+                                executiveApproval: "PO disetujui oleh Direksi",
+                              })
+                            }
+                          >
+                            <Eye aria-hidden="true" />
+                          </Button>
+                          <span className="text-center text-[10px] leading-3 text-muted-foreground">
+                            Lihat
                           </span>
-                        </Button>
+                        </div>
                       )}
                     </div>
                   </article>
@@ -897,7 +886,7 @@ export default function LogisticsHub({
               </p>
               <iframe
                 title={`Pratinjau dokumen ${selection.number}`}
-                src={`/api/documents/${selection.kind}?publicCode=${encodeURIComponent(selection.code)}`}
+                src={`/api/documents/${selection.kind}?publicCode=${encodeURIComponent(selection.code)}&format=html`}
                 className="mt-4 h-[70vh] w-full rounded-lg border"
               />
               <div className="mt-3 flex justify-end">

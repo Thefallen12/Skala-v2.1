@@ -39,6 +39,7 @@ import {
   syncTicketStatus,
 } from "@/lib/ticket-utils";
 import { sendNotification } from "@/lib/notifications";
+import { sendPushNotification } from "@/lib/push-notifications";
 import { receivePurchaseOrderStock } from "@/lib/logistics/receive-purchase-order-stock";
 import {
   DirectStockPurchasePhotoValidationError,
@@ -2313,6 +2314,7 @@ export async function createTicket(
     }
   }
 
+  let ticketNumber = "";
   const receiptUrls: string[] = [];
   try {
     for (const file of receiptFiles) {
@@ -2341,8 +2343,9 @@ export async function createTicket(
       throw new Error("URL bukti reimbursement yang diunggah tidak valid.");
     }
     await retryTicketNumberTransaction(() =>
-      nextTicketNumber(prisma).then((ticketNumber) =>
-        prisma.$transaction(async (transaction) => {
+      nextTicketNumber(prisma).then((generatedTicketNumber) => {
+        ticketNumber = generatedTicketNumber;
+        return prisma.$transaction(async (transaction) => {
       await transaction.ticket.create({
         data: {
           id: randomUUID(),
@@ -2424,8 +2427,8 @@ export async function createTicket(
           database: transaction,
         });
       }
-        }, { maxWait: 30000, timeout: 60000 }),
-      ),
+        }, { maxWait: 30000, timeout: 60000 });
+      }),
     );
   } catch (error) {
     await Promise.all(
@@ -2454,6 +2457,18 @@ export async function createTicket(
     return actionFailure("Tiket gagal dibuat. Silakan coba kembali.");
   }
 
+  if (moverAssignee) {
+    try {
+      await sendPushNotification(moverAssignee.id, {
+        title: "Tiket baru ditugaskan kepada Anda",
+        body: `${ticketNumber} · ${input.title.trim()}`,
+        url: "/apps/tickets",
+      });
+    } catch (error) {
+      console.error("New ticket push notification failed:", error);
+    }
+  }
+
   revalidatePath("/apps/tickets");
   revalidatePath("/apps/project");
   return {
@@ -2478,6 +2493,22 @@ export async function updateTicketDetails(
     }>;
   },
 ): Promise<TicketActionResult> {
+  const unlinkedTicketItemFilter: Prisma.TicketItemWhereInput = {
+    AND: [
+      {
+        OR: [
+          { poItemId: null },
+          { poItemId: { isSet: false } },
+        ],
+      },
+      {
+        OR: [
+          { doItemId: null },
+          { doItemId: { isSet: false } },
+        ],
+      },
+    ],
+  };
   const session = await auth();
   if (!session?.user?.id) {
     return actionFailure("Anda tidak memiliki izin untuk mengedit tiket.");
@@ -2610,8 +2641,7 @@ export async function updateTicketDetails(
             where: {
               id: item.id,
               ticketId,
-              poItemId: null,
-              doItemId: null,
+              ...unlinkedTicketItemFilter,
             },
             data: {
               itemName: item.itemName.trim(),
@@ -2630,8 +2660,7 @@ export async function updateTicketDetails(
             where: {
               id: item.id,
               ticketId,
-              poItemId: null,
-              doItemId: null,
+              ...unlinkedTicketItemFilter,
             },
           });
           if (deletedItem.count !== 1) throw new Error("TICKET_ITEMS_LOCKED");

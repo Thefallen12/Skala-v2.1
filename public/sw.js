@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skala-prioritas-static-v3';
+const CACHE_NAME = 'skala-prioritas-static-v4';
 const PUBLIC_ASSET_PATTERN = /\.(?:avif|css|eot|gif|ico|jpe?g|js|mjs|png|svg|ttf|webp|woff2?)$/i;
 
 self.addEventListener('install', (event) => {
@@ -22,6 +22,60 @@ self.addEventListener('activate', (event) => {
       ),
       self.clients.claim(),
     ]),
+  );
+});
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data?.text() ?? '' };
+  }
+
+  const title =
+    typeof data.title === 'string' && data.title
+      ? data.title
+      : 'Notifikasi Skala Prioritas';
+  const url =
+    typeof data.url === 'string' &&
+    data.url.startsWith('/') &&
+    !data.url.startsWith('//')
+      ? data.url
+      : '/apps/tickets';
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof data.body === 'string' ? data.body : '',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      data: { url },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const path =
+    typeof event.notification.data?.url === 'string' &&
+    event.notification.data.url.startsWith('/') &&
+    !event.notification.data.url.startsWith('//')
+      ? event.notification.data.url
+      : '/apps/tickets';
+  const targetUrl = new URL(path, self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(
+      (windowClients) => {
+        const appWindow = windowClients.find(
+          (client) => new URL(client.url).origin === self.location.origin,
+        );
+        if (appWindow) {
+          return appWindow.navigate(targetUrl).then(() => appWindow.focus());
+        }
+        return self.clients.openWindow(targetUrl);
+      },
+    ),
   );
 });
 

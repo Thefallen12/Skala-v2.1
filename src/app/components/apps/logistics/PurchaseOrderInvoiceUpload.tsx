@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Send, Upload } from "lucide-react";
+import { ExternalLink, FileText, Send, Upload } from "lucide-react";
 import {
   markPurchaseOrderSentToVendor,
   submitPurchaseOrderInvoice,
@@ -13,6 +13,11 @@ import InvoiceDetailsFields, {
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type InvoiceItemSeed = {
   itemCode: string | null;
@@ -126,29 +131,36 @@ export default function PurchaseOrderInvoiceUpload({
 
   if (!vendorPoSentAt) {
     return (
-      <div className="min-w-0 max-w-full space-y-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          aria-label={
-            isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
-          }
-          title={
-            isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
-          }
-          className="h-10 w-10 max-w-full px-0 py-0 text-xs"
-          onClick={markPoSent}
-          disabled={isPending}
-        >
-          <Send className="size-4" aria-hidden="true" />
-          <span className="sr-only">
+      <div className="flex min-w-0 flex-col items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              aria-label={
+                isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
+              }
+              title={
+                isPending ? "Menyimpan status pengiriman PO..." : "Tandai PO Dikirim ke Vendor"
+              }
+              className="size-10 p-0"
+              onClick={markPoSent}
+              disabled={isPending}
+            >
+              <Send className="size-4" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
             {isPending ? "Menyimpan..." : "Tandai PO Dikirim ke Vendor"}
-          </span>
-        </Button>
+          </TooltipContent>
+        </Tooltip>
+        <span className="text-center text-[10px] leading-3 text-muted-foreground">
+          {isPending ? "Menyimpan" : "Kirim"}
+        </span>
         {message && (
           <p
-            className={`max-w-full break-words text-sm leading-5 ${isError ? "text-destructive" : "text-muted-foreground"}`}
+            className={`max-w-full break-words text-center text-xs leading-4 ${isError ? "text-destructive" : "text-muted-foreground"}`}
             role={isError ? "alert" : "status"}
           >
             {message}
@@ -160,36 +172,64 @@ export default function PurchaseOrderInvoiceUpload({
 
   if (invoiceUrl) {
     return (
-      <div className="space-y-1">
-        <p className="text-xs text-muted-foreground">
-          PO ditandai dikirim {new Date(vendorPoSentAt).toLocaleString("id-ID")}.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm" variant="link" className="h-auto p-0">
-            <a href={invoiceUrl} target="_blank" rel="noreferrer">
-              <ExternalLink className="mr-1 size-3" aria-hidden="true" />
-              Lihat invoice/bon
-            </a>
-          </Button>
-          {invoiceId && (
-            <Button asChild size="sm" variant="link" className="h-auto p-0">
-              <a
-                href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(invoiceId)}`}
-                target="_blank"
-                rel="noreferrer"
+      <div className="flex items-start gap-1.5">
+        <div className="flex w-12 flex-col items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="size-10 p-0"
+                aria-label="Lihat invoice vendor"
+                title="Lihat invoice vendor"
               >
-                Cetak Invoice
-              </a>
-            </Button>
-          )}
+                <a href={invoiceUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="size-4" aria-hidden="true" />
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Lihat invoice vendor</TooltipContent>
+          </Tooltip>
+          <span className="text-center text-[10px] leading-3 text-muted-foreground">
+            Invoice
+          </span>
         </div>
+        {invoiceId && (
+          <div className="flex w-12 flex-col items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="size-10 p-0"
+                  aria-label="Cetak invoice"
+                  title="Cetak invoice"
+                >
+                  <a
+                    href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(invoiceId)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <FileText className="size-4" aria-hidden="true" />
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Cetak invoice</TooltipContent>
+            </Tooltip>
+            <span className="text-center text-[10px] leading-3 text-muted-foreground">
+              Cetak
+            </span>
+          </div>
+        )}
       </div>
     );
   }
 
   if (ticketLinked) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="min-w-0 break-words text-sm text-muted-foreground">
         PO dikirim. Invoice/bon dan rincian tagihan dicatat melalui detail tiket.
       </p>
     );
@@ -197,24 +237,27 @@ export default function PurchaseOrderInvoiceUpload({
 
   return (
     <>
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">
-          PO ditandai dikirim {new Date(vendorPoSentAt).toLocaleString("id-ID")}.
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          aria-label="Catat Invoice Vendor"
-          title="Catat Invoice Vendor"
-          className="h-10 w-10 px-0 sm:h-9 sm:w-auto sm:px-3"
-          onClick={() => setIsOpen(true)}
-        >
-          <Upload className="sm:mr-1.5 size-4" aria-hidden="true" />
-          <span className="sr-only sm:not-sr-only">Catat Invoice Vendor</span>
-        </Button>
+      <div className="flex min-w-0 flex-col items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="sm"
+              aria-label="Catat Invoice Vendor"
+              className="size-10 p-0"
+              onClick={() => setIsOpen(true)}
+            >
+              <Upload className="size-4" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Catat Invoice Vendor</TooltipContent>
+        </Tooltip>
+        <span className="text-center text-[10px] leading-3 text-muted-foreground">
+          Invoice
+        </span>
         {message && (
           <p
-            className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+            className={`break-words text-center text-xs leading-4 ${isError ? "text-destructive" : "text-muted-foreground"}`}
             role={isError ? "alert" : "status"}
           >
             {message}
