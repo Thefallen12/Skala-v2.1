@@ -35,6 +35,7 @@ const categoryOptions = [
     label: "Belanja Kebutuhan Tim Lapangan",
   },
   { value: TicketRequestCategory.APH, label: "APH" },
+  { value: TicketRequestCategory.SHIPPING_COST, label: "Biaya Pengiriman" },
 ] as const;
 
 type CategoryFilter = (typeof categoryOptions)[number]["value"];

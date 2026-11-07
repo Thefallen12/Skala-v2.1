@@ -117,6 +117,7 @@ enum TicketRequestCategory {
   REIMBURSEMENT
   KASBON
   OPERATING_EXPENSE
+  SHIPPING_COST
 }
 
 enum TicketFieldCategory {
@@ -1255,7 +1256,10 @@ model Ticket {
   paymentProofUrl           String?
   requestCategory           TicketRequestCategory?
   fieldCategory             TicketFieldCategory?
-  requestPaymentMethod      POPaymentMethod?
+  shippingDetails            Json?
+  relatedPoIds                String[]                @default([])
+  relatedTicketIds            String[]                @default([])
+  requestPaymentMethod       POPaymentMethod?
   requestPaymentDescription String?
   recipientName             String?
   bankName                  String?

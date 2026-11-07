@@ -123,6 +123,9 @@ export type CreateTicketInput = {
   requestPaymentMethod?: POPaymentMethod;
   transferDestination?: string;
   requestPaymentDescription?: string;
+  originCity?: string;
+  destinationCity?: string;
+  relatedDocumentNumbers?: string;
   requestedAmount?: number;
   receiptFiles?: File[];
   items: TicketItemInput[];
@@ -167,6 +170,21 @@ export type TicketActionResult = {
   };
 };
 
+export type ShippingDocumentOptions = {
+  purchaseOrders: Array<{
+    id: string;
+    poNumber: string;
+    vendorName: string;
+    status: POStatus;
+  }>;
+  tickets: Array<{
+    id: string;
+    ticketNumber: string;
+    title: string;
+    status: TicketStatus;
+  }>;
+};
+
 const actionFailure = (message: string): TicketActionResult => ({
   success: false,
   message,
@@ -193,6 +211,7 @@ function evaluateWarehouseStock(
   ticketItems: { id: string; itemName: string; quantity: number; unit: string }[],
   stockItems: {
     id: string;
+    sku: string;
     name: string;
     unit: string;
     stockQuantity: bigint;
@@ -201,6 +220,7 @@ function evaluateWarehouseStock(
 ): {
   available: true;
   reservations: Map<string, WarehouseReservation>;
+  itemCodesByTicketItemId: Map<string, string>;
 } | {
   available: false;
   fallbackRequired: boolean;
@@ -209,6 +229,7 @@ function evaluateWarehouseStock(
   const normalize = (value: string) =>
     value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
   const reservations = new Map<string, WarehouseReservation>();
+  const itemCodesByTicketItemId = new Map<string, string>();
 
   for (const ticketItem of ticketItems) {
     const matches = stockItems.filter(
@@ -232,6 +253,7 @@ function evaluateWarehouseStock(
     }
 
     const stockItem = matches[0];
+    itemCodesByTicketItemId.set(ticketItem.id, stockItem.sku);
     const current = reservations.get(stockItem.id);
     reservations.set(stockItem.id, {
       stockItemId: stockItem.id,
@@ -258,7 +280,7 @@ function evaluateWarehouseStock(
     }
   }
 
-  return { available: true, reservations };
+  return { available: true, reservations, itemCodesByTicketItemId };
 }
 
 function evaluateWarehouseItemAvailability(
@@ -1876,6 +1898,8 @@ export async function createTicket(
     requestCategory === TicketRequestCategory.WAREHOUSE;
   const isFieldRequest =
     requestCategory === TicketRequestCategory.FIELD;
+  const isShippingCostRequest =
+    requestCategory === TicketRequestCategory.SHIPPING_COST;
   const isOfficeRequest =
     requestCategory === TicketRequestCategory.OFFICE;
   const isAPHRequest = requestCategory === TicketRequestCategory.APH;
@@ -1884,6 +1908,15 @@ export async function createTicket(
     TicketRequestCategory.KASBON,
     TicketRequestCategory.OPERATING_EXPENSE,
   ].some((category) => category === requestCategory);
+  if (
+    isShippingCostRequest &&
+    session.user.role !== UserRole.LOGISTICS &&
+    session.user.role !== UserRole.DIRECTOR
+  ) {
+    return actionFailure(
+      "Permintaan biaya pengiriman hanya dapat dibuat oleh Logistik atau Direktur.",
+    );
+  }
   const isFieldTeamInternalFundingRequest =
     requestCategory === TicketRequestCategory.REIMBURSEMENT ||
     requestCategory === TicketRequestCategory.KASBON;
@@ -1923,10 +1956,11 @@ export async function createTicket(
   if (
     session.user.role === UserRole.FIELD_TEAM &&
     (isFieldRequest ||
+      requestCategory === TicketRequestCategory.MATERIAL ||
       (isInternalFundingRequest && !isFieldTeamInternalFundingRequest))
   ) {
     return actionFailure(
-      "Tim Lapangan hanya dapat membuat permintaan Operasional atau Material.",
+      "Tim Lapangan hanya dapat mengajukan material dari Gudang, Operasional, Reimbursement, atau Kasbon.",
     );
   }
   if (
@@ -1987,7 +2021,8 @@ export async function createTicket(
     requiresRecipientPayment ||
     isOperationalFunding ||
     isAPHRequest ||
-    isInternalFundingRequest;
+    isInternalFundingRequest ||
+    isShippingCostRequest;
   let operationalRecipient: {
     name: string;
     bankName: string;
@@ -2033,6 +2068,36 @@ export async function createTicket(
     input.type !== expectedType
   ) {
     return actionFailure("Kategori permintaan tidak sesuai dengan jenis tiket.");
+  }
+  if (isShippingCostRequest) {
+    if (
+      typeof input.originCity !== "string" ||
+      input.originCity.trim().length < 1 ||
+      input.originCity.trim().length > 120 ||
+      typeof input.destinationCity !== "string" ||
+      input.destinationCity.trim().length < 1 ||
+      input.destinationCity.trim().length > 120 ||
+      (input.relatedDocumentNumbers !== undefined &&
+        (typeof input.relatedDocumentNumbers !== "string" ||
+          input.relatedDocumentNumbers.length > 2000)) ||
+      typeof input.requestedAmount !== "number" ||
+      !Number.isSafeInteger(input.requestedAmount) ||
+      input.requestedAmount <= 0 ||
+      input.requestedAmount > Number.MAX_SAFE_INTEGER ||
+      input.items.length > 0
+    ) {
+      return actionFailure(
+        "Rute, nominal, atau dokumen terkait biaya pengiriman tidak valid.",
+      );
+    }
+  } else if (
+    input.originCity !== undefined ||
+    input.destinationCity !== undefined ||
+    input.relatedDocumentNumbers !== undefined
+  ) {
+    return actionFailure(
+      "Detail rute hanya dapat digunakan pada permintaan biaya pengiriman.",
+    );
   }
   if (
     input.moverAssigneeId !== undefined &&
@@ -2138,6 +2203,17 @@ export async function createTicket(
         "Pengajuan reimbursement/kasbon tidak menggunakan rincian barang.",
       );
     }
+  } else if (isShippingCostRequest) {
+    if (
+      typeof input.requestedAmount !== "number" ||
+      !Number.isSafeInteger(input.requestedAmount) ||
+      input.requestedAmount <= 0 ||
+      input.requestedAmount > Number.MAX_SAFE_INTEGER
+    ) {
+      return actionFailure(
+        "Nominal biaya pengiriman harus berupa angka lebih besar dari 0.",
+      );
+    }
   } else if (input.items.length < 1) {
     return actionFailure("Tambahkan setidaknya satu rincian item.");
   }
@@ -2165,6 +2241,88 @@ export async function createTicket(
       !validHttpUrl(input.attachmentUrl))
   ) {
     return actionFailure("Lampiran harus berupa URL HTTP atau HTTPS yang valid.");
+  }
+
+  let relatedPoIds: string[] = [];
+  let relatedTicketIds: string[] = [];
+  if (isShippingCostRequest) {
+    const relatedDocumentNumbers = [
+      ...new Set(
+        (input.relatedDocumentNumbers ?? "")
+          .split(",")
+          .map((number) => number.trim())
+          .filter(Boolean)
+          .map((number) => number.toLocaleUpperCase("id-ID")),
+      ),
+    ];
+    if (
+      relatedDocumentNumbers.length > 20 ||
+      relatedDocumentNumbers.some((number) => number.length > 120)
+    ) {
+      return actionFailure(
+        "Maksimal 20 nomor PO atau tiket dapat dikaitkan; tiap nomor maksimal 120 karakter.",
+      );
+    }
+    if (relatedDocumentNumbers.length > 0) {
+      const [purchaseOrders, tickets] = await Promise.all([
+        prisma.purchaseOrder.findMany({
+          where: {
+            OR: relatedDocumentNumbers.map((number) => ({
+              poNumber: { equals: number, mode: "insensitive" as const },
+            })),
+          },
+          select: { id: true, poNumber: true },
+        }),
+        prisma.ticket.findMany({
+          where: {
+            OR: relatedDocumentNumbers.map((number) => ({
+              ticketNumber: { equals: number, mode: "insensitive" as const },
+            })),
+          },
+          select: { id: true, ticketNumber: true, type: true },
+        }),
+      ]);
+      const purchaseOrdersByNumber = new Map(
+        purchaseOrders.map((purchaseOrder) => [
+          purchaseOrder.poNumber.toLocaleLowerCase("id-ID"),
+          purchaseOrder,
+        ]),
+      );
+      const ticketsByNumber = new Map(
+        tickets.map((ticket) => [
+          ticket.ticketNumber.toLocaleLowerCase("id-ID"),
+          ticket,
+        ]),
+      );
+      const unresolvedNumbers: string[] = [];
+      for (const number of relatedDocumentNumbers) {
+        const key = number.toLocaleLowerCase("id-ID");
+        const purchaseOrder = purchaseOrdersByNumber.get(key);
+        const ticket = ticketsByNumber.get(key);
+        if (purchaseOrder && ticket) {
+          return actionFailure(
+            `Nomor "${number}" cocok dengan PO dan tiket sekaligus. Gunakan nomor dokumen yang tidak ambigu.`,
+          );
+        }
+        if (ticket && ticket.type !== TicketType.MATERIAL) {
+          return actionFailure(
+            `Tiket "${number}" bukan permintaan belanja material yang dapat dikaitkan.`,
+          );
+        }
+        if (purchaseOrder) {
+          relatedPoIds.push(purchaseOrder.id);
+        } else if (ticket) {
+          relatedTicketIds.push(ticket.id);
+        } else {
+          unresolvedNumbers.push(number);
+        }
+      }
+      if (unresolvedNumbers.length > 0) {
+        return actionFailure(
+          `Dokumen terkait tidak ditemukan: ${unresolvedNumbers.join(", ")}.`,
+        );
+      }
+    }
   }
 
   const supportsItemSource =
@@ -2207,6 +2365,8 @@ export async function createTicket(
       !item ||
       (supportsItemSource &&
         !Object.values(TicketCategoryHint).includes(categoryHint)) ||
+      (isWarehouseRequest &&
+        categoryHint !== TicketCategoryHint.WAREHOUSE) ||
       (categoryHint === TicketCategoryHint.WAREHOUSE &&
         isWarehouseRequest &&
         !stockItem) ||
@@ -2359,6 +2519,16 @@ export async function createTicket(
           description: input.description?.trim() || null,
           type: input.type,
           requestCategory,
+          ...(isShippingCostRequest
+            ? {
+                shippingDetails: {
+                  originCity: input.originCity!.trim(),
+                  destinationCity: input.destinationCity!.trim(),
+                },
+                relatedPoIds,
+                relatedTicketIds,
+              }
+            : {}),
           fieldCategory: input.fieldCategory ?? null,
           requestPaymentMethod: isAPHRequest
             ? input.requestPaymentMethod
@@ -2481,6 +2651,52 @@ export async function createTicket(
     message: isInternalFundingRequest
       ? "Pengajuan berhasil dikirim ke Direktur untuk persetujuan."
       : "Draft tiket berhasil dibuat.",
+  };
+}
+
+export async function getShippingDocumentOptions(): Promise<
+  | { success: true; options: ShippingDocumentOptions }
+  | { success: false; message: string }
+> {
+  const session = await auth();
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.LOGISTICS &&
+      session.user.role !== UserRole.DIRECTOR)
+  ) {
+    return {
+      success: false,
+      message: "Pilihan PO dan tiket hanya tersedia untuk Logistik atau Direktur.",
+    };
+  }
+
+  const [purchaseOrders, tickets] = await Promise.all([
+    prisma.purchaseOrder.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        poNumber: true,
+        vendorName: true,
+        status: true,
+      },
+    }),
+    prisma.ticket.findMany({
+      where: { type: TicketType.MATERIAL },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        ticketNumber: true,
+        title: true,
+        status: true,
+      },
+    }),
+  ]);
+
+  return {
+    success: true,
+    options: { purchaseOrders, tickets },
   };
 }
 
@@ -4175,6 +4391,7 @@ async function createWarehouseDeliveryOrder(
       const stockItems = await transaction.stockItem.findMany({
         select: {
           id: true,
+          sku: true,
           name: true,
           unit: true,
           stockQuantity: true,
@@ -4233,7 +4450,10 @@ async function createWarehouseDeliveryOrder(
           data: {
             id: randomUUID(),
             doId: deliveryOrder.id,
-            itemCode: item.poItem?.itemCode ?? null,
+            itemCode:
+              item.poItem?.itemCode ??
+              stockEvaluation.itemCodesByTicketItemId.get(item.id) ??
+              null,
             itemName: item.itemName,
             qtyOrdered: item.quantity,
             qtyDelivered: item.quantity,

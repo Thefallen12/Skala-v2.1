@@ -18,12 +18,17 @@ import {
   POPaymentMethod,
 } from "@prisma/client";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
-import { createTicket } from "@/app/actions/tickets";
+import {
+  createTicket,
+  getShippingDocumentOptions,
+} from "@/app/actions/tickets";
+import type { ShippingDocumentOptions } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Calendar } from "@/components/ui/calendar";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -67,6 +72,7 @@ const requestCategoryLabels: Record<TicketRequestCategory, string> = {
   REIMBURSEMENT: "Reimbursement",
   KASBON: "Kasbon / Ambilan",
   OPERATING_EXPENSE: "Biaya Operasional",
+  SHIPPING_COST: "Biaya Pengiriman",
 };
 
 const internalFundingCategories = [
@@ -115,6 +121,9 @@ const ticketFormSchema = z
     requestPaymentMethod: z.enum(Object.values(POPaymentMethod)).optional(),
     transferDestination: z.string().optional(),
     requestPaymentDescription: z.string().optional(),
+    originCity: z.string(),
+    destinationCity: z.string(),
+    relatedDocumentNumbers: z.string(),
     receiptFiles: z.array(z.instanceof(File)).max(5),
     operationalRequestType: z.enum(["GENERAL", "SURVEY"]),
     operationalAmount: z
@@ -153,6 +162,8 @@ const ticketFormSchema = z
       values.requestCategory === TicketRequestCategory.FIELD;
     const isAPHRequest = values.requestCategory === TicketRequestCategory.APH;
     const isInternalFunding = isInternalFundingCategory(values.requestCategory);
+    const isShippingCostRequest =
+      values.requestCategory === TicketRequestCategory.SHIPPING_COST;
     if (projectLinkedRequest && !values.projectId) {
       context.addIssue({
         code: "custom",
@@ -163,6 +174,19 @@ const ticketFormSchema = z
     const usesItemDeliveryDates =
       values.requestCategory === TicketRequestCategory.MATERIAL ||
       values.requestCategory === TicketRequestCategory.WAREHOUSE;
+    const usesStockCatalog =
+      usesItemDeliveryDates &&
+      values.itemSource === TicketCategoryHint.WAREHOUSE;
+    if (
+      values.requestCategory === TicketRequestCategory.WAREHOUSE &&
+      values.itemSource !== TicketCategoryHint.WAREHOUSE
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["itemSource"],
+        message: "Permintaan material dari gudang hanya menggunakan stok gudang.",
+      });
+    }
     if (
       !usesItemDeliveryDates &&
       !isAPHRequest &&
@@ -198,9 +222,7 @@ const ticketFormSchema = z
         });
       }
       values.items.forEach((item, index) => {
-        if (
-          !item.stockItemId
-        ) {
+        if (usesStockCatalog && !item.stockItemId) {
           context.addIssue({
             code: "custom",
             path: ["items", index, "stockItemId"],
@@ -288,6 +310,46 @@ const ticketFormSchema = z
         });
       }
     }
+    if (isShippingCostRequest) {
+      if (!values.originCity.trim() || values.originCity.trim().length > 120) {
+        context.addIssue({
+          code: "custom",
+          path: ["originCity"],
+          message: "Kota asal wajib diisi (maksimal 120 karakter).",
+        });
+      }
+      if (
+        !values.destinationCity.trim() ||
+        values.destinationCity.trim().length > 120
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["destinationCity"],
+          message: "Kota tujuan wajib diisi (maksimal 120 karakter).",
+        });
+      }
+      if (values.requestedAmount === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["requestedAmount"],
+          message: "Nominal biaya pengiriman harus lebih besar dari 0.",
+        });
+      }
+      if (values.relatedDocumentNumbers.trim().length > 2000) {
+        context.addIssue({
+          code: "custom",
+          path: ["relatedDocumentNumbers"],
+          message: "Daftar dokumen terkait terlalu panjang.",
+        });
+      }
+      if (values.items.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["items"],
+          message: "Permintaan biaya pengiriman tidak menggunakan rincian barang.",
+        });
+      }
+    }
     const requiresRecipientPayment =
       values.requestCategory === TicketRequestCategory.FIELD &&
       values.fieldCategory !== undefined;
@@ -348,7 +410,7 @@ const ticketFormSchema = z
           });
         }
       }
-    } else if (isAPHRequest || isInternalFunding) {
+    } else if (isAPHRequest || isInternalFunding || isShippingCostRequest) {
       if (values.items.length > 0) {
         context.addIssue({
           code: "custom",
@@ -366,7 +428,7 @@ const ticketFormSchema = z
       }
       values.items.forEach((item, index) => {
         if (
-          !usesItemDeliveryDates &&
+          !usesStockCatalog &&
           (!item.itemName?.trim() || item.itemName.trim().length > 160)
         ) {
           context.addIssue({
@@ -376,7 +438,7 @@ const ticketFormSchema = z
           });
         }
         if (
-          !usesItemDeliveryDates &&
+          !usesStockCatalog &&
           (!item.unit?.trim() || item.unit.trim().length > 32)
         ) {
           context.addIssue({
@@ -432,14 +494,15 @@ const getRequestTypeOptions = (
 
   if (selectedProjectId) {
     options.push(
-      {
-        label: "Permintaan Material",
-        value: TicketRequestCategory.MATERIAL,
-      },
-      {
-        label: requestCategoryLabels[TicketRequestCategory.WAREHOUSE],
-        value: TicketRequestCategory.WAREHOUSE,
-      },
+      role === UserRole.FIELD_TEAM
+        ? {
+            label: requestCategoryLabels[TicketRequestCategory.WAREHOUSE],
+            value: TicketRequestCategory.WAREHOUSE,
+          }
+        : {
+            label: "Permintaan Material",
+            value: TicketRequestCategory.MATERIAL,
+          },
     );
   }
 
@@ -451,6 +514,13 @@ const getRequestTypeOptions = (
     options.push({
       label: "Belanja Kantor",
       value: TicketRequestCategory.OFFICE,
+    });
+  }
+
+  if (role === UserRole.LOGISTICS || role === UserRole.DIRECTOR) {
+    options.push({
+      label: "Biaya Pengiriman (Ekspedisi/Mover)",
+      value: TicketRequestCategory.SHIPPING_COST,
     });
   }
 
@@ -519,6 +589,15 @@ export default function CreateTicketModal({
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [receiptUploadError, setReceiptUploadError] = useState("");
   const [stockPickerIndex, setStockPickerIndex] = useState<number | null>(null);
+  const [shippingDocumentOptions, setShippingDocumentOptions] = useState<
+    ShippingDocumentOptions | null
+  >(null);
+  const [shippingDocumentsLoaded, setShippingDocumentsLoaded] =
+    useState(false);
+  const [shippingDocumentsAttempt, setShippingDocumentsAttempt] = useState(0);
+  const [shippingDocumentsError, setShippingDocumentsError] = useState("");
+  const [selectedShippingDocumentKeys, setSelectedShippingDocumentKeys] =
+    useState<string[]>([]);
   const router = useRouter();
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
@@ -550,6 +629,9 @@ export default function CreateTicketModal({
       requestPaymentMethod: POPaymentMethod.CASH,
       transferDestination: "",
       requestPaymentDescription: "",
+      originCity: "",
+      destinationCity: "",
+      relatedDocumentNumbers: "",
       receiptFiles: [],
       operationalRequestType: "GENERAL",
       operationalAmount: undefined,
@@ -658,11 +740,99 @@ export default function CreateTicketModal({
     requestCategory === TicketRequestCategory.OPS;
   const isAPHRequest = requestCategory === TicketRequestCategory.APH;
   const isInternalFunding = isInternalFundingCategory(requestCategory);
+  const isShippingCostRequest =
+    requestCategory === TicketRequestCategory.SHIPPING_COST;
+  const shippingDocumentsLoading =
+    open &&
+    isShippingCostRequest &&
+    !shippingDocumentsLoaded &&
+    !shippingDocumentsError;
+  useEffect(() => {
+    if (!open || !isShippingCostRequest) return;
+
+    let active = true;
+    void getShippingDocumentOptions()
+      .then((result) => {
+        if (!active) return;
+        if (!result.success) {
+          setShippingDocumentsError(result.message);
+          setShippingDocumentsLoaded(true);
+          return;
+        }
+        setShippingDocumentOptions(result.options);
+        setShippingDocumentsError("");
+        setShippingDocumentsLoaded(true);
+      })
+      .catch((loadError: unknown) => {
+        console.error("Shipping document options failed to load:", loadError);
+        if (active) {
+          setShippingDocumentsError(
+            "PO dan tiket tidak dapat dimuat. Muat ulang daftar dokumen untuk mencoba lagi.",
+          );
+          setShippingDocumentsLoaded(true);
+        }
+      })
+
+    return () => {
+      active = false;
+    };
+  }, [open, isShippingCostRequest, shippingDocumentsAttempt]);
+
+  const updateSelectedShippingDocuments = (nextKeys: string[]) => {
+    setSelectedShippingDocumentKeys(nextKeys);
+    const selectedNumbers = nextKeys.flatMap((key) => {
+      const [kind, id] = key.split(":", 2);
+      if (kind === "PO") {
+        const order = shippingDocumentOptions?.purchaseOrders.find(
+          (option) => option.id === id,
+        );
+        return order ? [order.poNumber] : [];
+      }
+      const ticket = shippingDocumentOptions?.tickets.find(
+        (option) => option.id === id,
+      );
+      return ticket ? [ticket.ticketNumber] : [];
+    });
+    form.setValue("relatedDocumentNumbers", selectedNumbers.join(", "), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  const toggleShippingDocument = (key: string, checked: boolean) => {
+    const nextKeys = checked
+      ? [...selectedShippingDocumentKeys, key]
+      : selectedShippingDocumentKeys.filter((selected) => selected !== key);
+    updateSelectedShippingDocuments(nextKeys);
+  };
+  const shippingDocumentGroups = [
+    {
+      key: "PO",
+      title: "Purchase Order (PO)",
+      options: (shippingDocumentOptions?.purchaseOrders ?? []).map(
+        (option) => ({
+          id: option.id,
+          number: option.poNumber,
+          detail: option.vendorName,
+        }),
+      ),
+    },
+    {
+      key: "TICKET",
+      title: "Tiket Permintaan Material",
+      options: (shippingDocumentOptions?.tickets ?? []).map((option) => ({
+        id: option.id,
+        number: option.ticketNumber,
+        detail: option.title,
+      })),
+    },
+  ] as const;
   const requiresFundingRequest =
     requiresRecipientPayment ||
     isOperationalFunding ||
     isAPHRequest ||
-    isInternalFunding;
+    isInternalFunding ||
+    isShippingCostRequest;
   const operationalRequestedAmount =
     operationalRequestType === "SURVEY"
       ? (watchedSurveyConsumptionAmount ?? 0) + (watchedSurveyFuelAmount ?? 0)
@@ -675,6 +845,8 @@ export default function CreateTicketModal({
   const usesItemDeliveryDates =
     requestCategory === TicketRequestCategory.MATERIAL ||
     requestCategory === TicketRequestCategory.WAREHOUSE;
+  const usesStockCatalog =
+    usesItemDeliveryDates && itemSource === TicketCategoryHint.WAREHOUSE;
   const submit = form.handleSubmit(async (values) => {
     setError("");
     if (
@@ -706,6 +878,8 @@ export default function CreateTicketModal({
         ? "Permintaan APH"
       : isInternalFunding
         ? `${categoryLabel}: ${values.requestPaymentDescription?.trim()}`.slice(0, 160)
+      : isShippingCostRequest
+        ? `${categoryLabel}: ${values.originCity.trim()} ke ${values.destinationCity.trim()}`.slice(0, 160)
       : requiresRecipientPayment
       ? `${subCategoryLabel}: ${values.recipientName?.trim()}`.slice(0, 160)
       : `${categoryLabel}: ${firstItemName}`.slice(0, 160);
@@ -730,6 +904,19 @@ export default function CreateTicketModal({
         : null,
       isInternalFunding
         ? `Keterangan: ${values.requestPaymentDescription?.trim()}`
+        : null,
+      isShippingCostRequest
+        ? `Rute pengiriman: ${values.originCity.trim()} ke ${values.destinationCity.trim()}`
+        : null,
+      isShippingCostRequest
+        ? `Nominal biaya pengiriman: ${formatCurrency(values.requestedAmount ?? 0)}`
+        : null,
+      isShippingCostRequest && values.relatedDocumentNumbers.trim()
+        ? `Dokumen terkait: ${values.relatedDocumentNumbers
+            .split(",")
+            .map((number) => number.trim())
+            .filter(Boolean)
+            .join(", ")}`
         : null,
       isOperationalFunding
         ? `Keperluan: ${operationalRequestLabel}`
@@ -786,6 +973,13 @@ export default function CreateTicketModal({
         requestPaymentDescription: isAPHRequest
           ? values.requestPaymentDescription
           : undefined,
+        originCity: isShippingCostRequest ? values.originCity : undefined,
+        destinationCity: isShippingCostRequest
+          ? values.destinationCity
+          : undefined,
+        relatedDocumentNumbers: isShippingCostRequest
+          ? values.relatedDocumentNumbers
+          : undefined,
         priority,
         projectId: values.projectId || undefined,
         moverAssigneeId: undefined,
@@ -800,7 +994,7 @@ export default function CreateTicketModal({
           ? values.requestedAmount
           : isOperationalFunding
             ? operationalAmount
-            : isAPHRequest || isInternalFunding
+            : isAPHRequest || isInternalFunding || isShippingCostRequest
               ? values.requestedAmount
               : undefined,
         receiptFiles: isInternalFunding ? values.receiptFiles : [],
@@ -828,6 +1022,7 @@ export default function CreateTicketModal({
       setOpen(false);
       form.reset();
       setReceiptFiles([]);
+      setSelectedShippingDocumentKeys([]);
       setReceiptUploadError("");
       setRequestedAmountEdit(null);
       router.refresh();
@@ -987,6 +1182,10 @@ export default function CreateTicketModal({
                           shouldValidate: true,
                         });
                       }
+                      if (value !== TicketRequestCategory.SHIPPING_COST) {
+                        setSelectedShippingDocumentKeys([]);
+                        form.setValue("relatedDocumentNumbers", "");
+                      }
                       if (value !== "FIELD") {
                         form.setValue("fieldCategory", undefined);
                         form.clearErrors("fieldCategory");
@@ -1011,7 +1210,10 @@ export default function CreateTicketModal({
                           { shouldValidate: true },
                         );
                       }
-                      if (value === TicketRequestCategory.APH) {
+                      if (
+                        value === TicketRequestCategory.APH ||
+                        value === TicketRequestCategory.SHIPPING_COST
+                      ) {
                         form.setValue(
                           "items",
                           [],
@@ -1025,7 +1227,8 @@ export default function CreateTicketModal({
                         form.setValue("items", [], { shouldValidate: true });
                       } else if (
                         requestCategory === TicketRequestCategory.APH ||
-                        isInternalFundingCategory(requestCategory)
+                        isInternalFundingCategory(requestCategory) ||
+                        requestCategory === TicketRequestCategory.SHIPPING_COST
                       ) {
                         form.setValue(
                           "itemSource",
@@ -1071,6 +1274,169 @@ export default function CreateTicketModal({
                 </p>
               )}
             </div>
+
+            {isShippingCostRequest && (
+              <section className="space-y-4 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4 md:col-span-2">
+                <div>
+                  <h3 className="font-semibold">Detail Biaya Pengiriman</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Isi rute dan nominal biaya ekspedisi atau mover. Dokumen
+                    terkait dapat dikosongkan.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-shipping-origin">Dari Kota (Asal)</Label>
+                    <Input
+                      id="ticket-shipping-origin"
+                      maxLength={120}
+                      placeholder="Contoh: Medan"
+                      aria-invalid={!!form.formState.errors.originCity}
+                      {...form.register("originCity")}
+                    />
+                    {form.formState.errors.originCity && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {form.formState.errors.originCity.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-shipping-destination">
+                      Ke Kota (Tujuan)
+                    </Label>
+                    <Input
+                      id="ticket-shipping-destination"
+                      maxLength={120}
+                      placeholder="Contoh: Takengon"
+                      aria-invalid={!!form.formState.errors.destinationCity}
+                      {...form.register("destinationCity")}
+                    />
+                    {form.formState.errors.destinationCity && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {form.formState.errors.destinationCity.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-shipping-amount">
+                      Nominal Biaya (Rp)
+                    </Label>
+                    <RupiahAmountInput
+                      id="ticket-shipping-amount"
+                      value={
+                        watchedRequestedAmount === undefined
+                          ? ""
+                          : formatRupiahNumber(watchedRequestedAmount)
+                      }
+                      onChange={(value) => {
+                        const amount = parseRupiahInput(value);
+                        form.setValue(
+                          "requestedAmount",
+                          amount > 0 ? amount : undefined,
+                          { shouldDirty: true, shouldValidate: true },
+                        );
+                      }}
+                      required
+                    />
+                    {form.formState.errors.requestedAmount && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {form.formState.errors.requestedAmount.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>
+                      Pilih PO / Tiket Belanja Terkait (Opsional)
+                    </Label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {shippingDocumentGroups.map((group) => (
+                        <fieldset
+                          key={group.key}
+                          className="min-w-0 space-y-2 rounded-md border p-3"
+                          disabled={shippingDocumentsLoading}
+                        >
+                          <legend className="px-1 text-sm font-medium">
+                            {group.title}
+                          </legend>
+                          <div className="max-h-40 space-y-1 overflow-y-auto">
+                            {group.options.length === 0 ? (
+                              <p className="py-2 text-xs text-muted-foreground">
+                                Belum ada {group.key === "PO" ? "PO" : "tiket"}.
+                              </p>
+                            ) : (
+                              group.options.map((option) => {
+                                const key = `${group.key}:${option.id}`;
+                                return (
+                                  <label
+                                    key={key}
+                                    htmlFor={`shipping-document-${key}`}
+                                    className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
+                                  >
+                                    <Checkbox
+                                      id={`shipping-document-${key}`}
+                                      checked={selectedShippingDocumentKeys.includes(
+                                        key,
+                                      )}
+                                      onCheckedChange={(checked) =>
+                                        toggleShippingDocument(
+                                          key,
+                                          checked === true,
+                                        )
+                                      }
+                                    />
+                                    <span className="min-w-0 text-xs">
+                                      <span className="block font-medium">
+                                        {option.number}
+                                      </span>
+                                      <span className="block truncate text-muted-foreground">
+                                        {option.detail}
+                                      </span>
+                                    </span>
+                                  </label>
+                                );
+                              })
+                            )}
+                          </div>
+                        </fieldset>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Pilih satu atau beberapa PO maupun tiket belanja
+                      material.
+                    </p>
+                    {shippingDocumentsLoading && (
+                      <p className="text-xs text-muted-foreground" role="status">
+                        Memuat daftar PO dan tiket...
+                      </p>
+                    )}
+                    {shippingDocumentsError && (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm text-destructive" role="alert">
+                          {shippingDocumentsError}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setShippingDocumentsError("");
+                            setShippingDocumentsLoaded(false);
+                            setShippingDocumentsAttempt((attempt) => attempt + 1);
+                          }}
+                        >
+                          Muat ulang
+                        </Button>
+                      </div>
+                    )}
+                    {form.formState.errors.relatedDocumentNumbers && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {form.formState.errors.relatedDocumentNumbers.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
 
             {isInternalFunding && (
               <section className="space-y-4 rounded-lg border border-orange-500/30 bg-orange-500/5 p-4 md:col-span-2">
@@ -1362,7 +1728,7 @@ export default function CreateTicketModal({
             </section>
           )}
 
-          {!isAPHRequest && !isInternalFunding && <section className="space-y-3">
+          {!isAPHRequest && !isInternalFunding && !isShippingCostRequest && <section className="space-y-3">
             {requiresRecipientPayment ? (
               <div className="mb-3 space-y-4 rounded-md border p-4">
                 <div>
@@ -1593,54 +1959,63 @@ export default function CreateTicketModal({
             ) : (
               <>
             {usesItemDeliveryDates && (
-              <div className="ticket-item-source-row grid grid-cols-2 items-end gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm">
-                <div className="space-y-2">
-                  <Label className="hidden sm:flex" htmlFor="ticket-item-source">
-                    Sumber Barang
-                  </Label>
-                  <Controller
-                    control={form.control}
-                    name="itemSource"
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={(value: TicketCategoryHint) => {
-                          field.onChange(value);
-                          replace(
-                            (form.getValues("items") ?? []).map((item) => ({
-                              ...item,
-                              stockItemId: "",
-                              itemName: "",
-                              unit: "",
-                              estimatedCost: undefined,
-                              categoryHint: value,
-                              expectedDeliveryDate: "",
-                            })),
-                          );
-                          if (value !== TicketCategoryHint.WAREHOUSE) {
-                            form.setValue("itemsExpectedDeliveryDate", "");
-                          }
-                          form.clearErrors([
-                            "items",
-                            "itemsExpectedDeliveryDate",
-                          ]);
-                        }}
-                      >
-                        <SelectTrigger id="ticket-item-source" className="h-9 w-full text-xs sm:h-10 sm:text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={TicketCategoryHint.WAREHOUSE}>
-                            Gudang (Stok)
-                          </SelectItem>
-                          <SelectItem value={TicketCategoryHint.PURCHASE}>
-                            Pembelian Baru
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
+              <div
+                className={cn(
+                  "ticket-item-source-row grid items-end gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
+                  requestCategory === TicketRequestCategory.WAREHOUSE
+                    ? "grid-cols-1"
+                    : "grid-cols-2",
+                )}
+              >
+                {requestCategory !== TicketRequestCategory.WAREHOUSE && (
+                  <div className="space-y-2">
+                    <Label className="hidden sm:flex" htmlFor="ticket-item-source">
+                      Sumber Barang
+                    </Label>
+                    <Controller
+                      control={form.control}
+                      name="itemSource"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={(value: TicketCategoryHint) => {
+                            field.onChange(value);
+                            replace(
+                              (form.getValues("items") ?? []).map((item) => ({
+                                ...item,
+                                stockItemId: "",
+                                itemName: "",
+                                unit: "",
+                                estimatedCost: undefined,
+                                categoryHint: value,
+                                expectedDeliveryDate: "",
+                              })),
+                            );
+                            if (value !== TicketCategoryHint.WAREHOUSE) {
+                              form.setValue("itemsExpectedDeliveryDate", "");
+                            }
+                            form.clearErrors([
+                              "items",
+                              "itemsExpectedDeliveryDate",
+                            ]);
+                          }}
+                        >
+                          <SelectTrigger id="ticket-item-source" className="h-9 w-full text-xs sm:h-10 sm:text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={TicketCategoryHint.WAREHOUSE}>
+                              Gudang (Stok)
+                            </SelectItem>
+                            <SelectItem value={TicketCategoryHint.PURCHASE}>
+                              Pembelian Baru
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                )}
                 {itemSource === TicketCategoryHint.WAREHOUSE && (
                   <div className="space-y-2">
                     <Label className="hidden sm:flex" htmlFor="ticket-items-delivery-date">
@@ -1709,7 +2084,7 @@ export default function CreateTicketModal({
                       : "grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]",
                   )}
                 >
-                  {usesItemDeliveryDates ? (
+                  {usesStockCatalog ? (
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm" htmlFor={`ticket-stock-item-${index}`}>Barang</Label>
                       <Controller
@@ -1865,7 +2240,7 @@ export default function CreateTicketModal({
 
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm" htmlFor={`ticket-unit-${index}`}>Satuan</Label>
-                    {usesItemDeliveryDates ? (
+                    {usesStockCatalog ? (
                       <Controller
                         control={form.control}
                         name={`items.${index}.unit`}

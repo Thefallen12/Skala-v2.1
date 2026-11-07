@@ -59,6 +59,11 @@ const categories = [
     label: "Biaya Operasional",
     color: "var(--color-success)",
   },
+  {
+    value: TicketRequestCategory.SHIPPING_COST,
+    label: "Biaya Pengiriman",
+    color: "var(--color-info)",
+  },
 ] as const;
 
 export default function TicketRequestDistributionChart({

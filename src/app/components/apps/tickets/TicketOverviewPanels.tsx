@@ -131,6 +131,12 @@ const requestCategories = [
     color: "bg-warning",
     textColor: "text-warning",
   },
+  {
+    value: TicketRequestCategory.SHIPPING_COST,
+    label: "Biaya Pengiriman",
+    color: "bg-info",
+    textColor: "text-info",
+  },
 ] as const;
 
 const requestCategoryLabels: Record<TicketRequestCategory, string> = {
@@ -143,6 +149,7 @@ const requestCategoryLabels: Record<TicketRequestCategory, string> = {
   REIMBURSEMENT: "Reimbursement",
   KASBON: "Kasbon / Ambilan",
   OPERATING_EXPENSE: "Biaya Operasional",
+  SHIPPING_COST: "Biaya Pengiriman",
 };
 
 const fieldCategoryLabels: Record<TicketFieldCategory, string> = {

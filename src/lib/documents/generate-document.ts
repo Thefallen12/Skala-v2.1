@@ -6,6 +6,7 @@ import { readDocumentTemplateImage } from "@/lib/document-template-images";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
 
 export type DocumentLineItem = {
+  itemCode?: string | null;
   description: string;
   quantity: number;
   unit?: string;
@@ -15,6 +16,7 @@ export type DocumentLineItem = {
 };
 
 type DocumentLineItemField =
+  | "item_code"
   | "item_description"
   | "item_qty"
   | "item_unit"
@@ -74,6 +76,7 @@ function renderLineItems(
       (item) =>
         isDeliveryOrder
           ? `<tr>
+              <td>${escapeHtml(item.itemCode ?? "")}</td>
               <td>${escapeHtml(item.description)}</td>
               <td class="number">${escapeHtml(String(item.quantity))}</td>
               <td>${escapeHtml(item.unit ?? "")}</td>
@@ -96,7 +99,7 @@ function renderItemsTable(
   isDeliveryOrder: boolean,
 ): string {
   const headers = isDeliveryOrder
-    ? "<th>MATERIAL</th><th>JUMLAH</th><th>SATUAN</th>"
+    ? "<th>KODE BARANG / ITEM CODE</th><th>MATERIAL</th><th>JUMLAH</th><th>SATUAN</th>"
     : '<th>DESCRIPTION</th><th class="number">QTY</th><th class="money">UNIT PRICE</th><th class="money">AMOUNT</th>';
   const classes = isDeliveryOrder ? "items do-items" : "items po-items";
   return `<table class="${classes}"><thead><tr>${headers}</tr></thead><tbody>${renderLineItems(items, isDeliveryOrder)}</tbody></table>`;
@@ -112,7 +115,9 @@ function renderLineItemField(
   return items
     .map((item) => {
       const value =
-        field === "item_description"
+        field === "item_code"
+          ? item.itemCode ?? ""
+          : field === "item_description"
           ? item.description
           : field === "item_qty"
             ? item.quantity
@@ -126,7 +131,7 @@ function renderLineItemField(
 
 function ensureItemsTableHeaders(html: string, isDeliveryOrder: boolean): string {
   const headers = isDeliveryOrder
-    ? ["MATERIAL", "JUMLAH", "SATUAN", "KETERANGAN"]
+    ? ["KODE BARANG / ITEM CODE", "MATERIAL", "JUMLAH", "SATUAN", "KETERANGAN"]
     : ["DESCRIPTION", "QTY", "UNIT PRICE", "AMOUNT"];
   return html.replace(
     /<table\b(?=[^>]*\bclass=["'][^"']*\b(?:items|po-items|do-items)\b[^"']*["'])[^>]*>[\s\S]*?<\/table>/gi,
@@ -288,6 +293,7 @@ export async function generateDocument(
             : "";
         }
         if (
+          key === "item_code" ||
           key === "item_description" ||
           key === "item_qty" ||
           key === "item_unit" ||

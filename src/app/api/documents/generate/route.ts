@@ -232,17 +232,47 @@ export async function POST(request: NextRequest) {
           items: {
             orderBy: { id: "asc" },
             select: {
+              itemCode: true,
               itemName: true,
               qtyOrdered: true,
               qtyDelivered: true,
               unit: true,
               remarks: true,
+              ticketItems: {
+                select: {
+                  poItem: {
+                    select: {
+                      itemCode: true,
+                      stockItem: { select: { sku: true } },
+                    },
+                  },
+                },
+              },
             },
           },
         },
       });
       if (!deliveryOrder) {
         return responseError("Delivery Order tidak ditemukan.", 404);
+      }
+
+      const stockItems = await prisma.stockItem.findMany({
+        where: {
+          OR: deliveryOrder.items.map((item) => ({
+            name: item.itemName,
+            unit: item.unit,
+          })),
+        },
+        select: { sku: true, name: true, unit: true },
+      });
+      const normalizeStockItem = (value: string) =>
+        value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+      const stockSkusByItem = new Map<string, string[]>();
+      for (const stockItem of stockItems) {
+        const key = `${normalizeStockItem(stockItem.name)}|${normalizeStockItem(stockItem.unit)}`;
+        const skus = stockSkusByItem.get(key) ?? [];
+        skus.push(stockItem.sku);
+        stockSkusByItem.set(key, skus);
       }
 
       relatedRecordId = deliveryOrder.id;
@@ -281,6 +311,22 @@ export async function POST(request: NextRequest) {
           .join(" · "),
         items: deliveryOrder.items.map(
           (item): DocumentLineItem => ({
+            itemCode:
+              item.itemCode ||
+              item.ticketItems
+                .map(
+                  (ticketItem) =>
+                    ticketItem.poItem?.stockItem?.sku ??
+                    ticketItem.poItem?.itemCode,
+                )
+                .find((code) => Boolean(code)) ||
+              (() => {
+                const skus = stockSkusByItem.get(
+                  `${normalizeStockItem(item.itemName)}|${normalizeStockItem(item.unit)}`,
+                );
+                return skus?.length === 1 ? skus[0] : null;
+              })() ||
+              null,
             description: item.itemName,
             quantity: item.qtyDelivered || item.qtyOrdered,
             unit: item.unit,
