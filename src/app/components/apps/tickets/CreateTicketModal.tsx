@@ -534,6 +534,7 @@ const getRequestTypeOptions = (
   if (
     role === UserRole.DRAFTER ||
     role === UserRole.FIELD_TEAM ||
+    role === UserRole.KOORDINATOR ||
     role === UserRole.MOVER
   ) {
     options.push(
@@ -541,7 +542,8 @@ const getRequestTypeOptions = (
         .filter(
           (category) =>
             role === UserRole.DRAFTER ||
-            (role === UserRole.FIELD_TEAM &&
+            ((role === UserRole.FIELD_TEAM ||
+              role === UserRole.KOORDINATOR) &&
               (category === TicketRequestCategory.REIMBURSEMENT ||
                 category === TicketRequestCategory.KASBON)) ||
             (role === UserRole.MOVER &&

@@ -1990,7 +1990,8 @@ export async function createTicket(
     isInternalFundingRequest &&
     session.user.role !== UserRole.DRAFTER &&
     !(
-      session.user.role === UserRole.FIELD_TEAM &&
+      (session.user.role === UserRole.FIELD_TEAM ||
+        session.user.role === UserRole.KOORDINATOR) &&
       isFieldTeamInternalFundingRequest
     ) &&
     !(
@@ -1999,7 +2000,7 @@ export async function createTicket(
     )
   ) {
     return actionFailure(
-      "Pengajuan reimbursement dan kasbon hanya dapat dibuat oleh Drafter atau Tim Lapangan.",
+      "Pengajuan reimbursement dan kasbon hanya dapat dibuat oleh Drafter, Tim Lapangan, atau Koordinator Lapangan.",
     );
   }
   if (
