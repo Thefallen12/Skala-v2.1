@@ -1391,6 +1391,7 @@ model PaymentTransaction {
   processedById           String?
   processedBy             User?                @relation("PaymentTransactionProcessor", fields: [processedById], references: [id], onDelete: SetNull)
   proofOfTransferUrl      String?
+  additionalProofUrls     String[]             @default([])
   paidAt                  DateTime?
   confirmationOrderNumber String?              @unique
   vendorSentAt            DateTime?

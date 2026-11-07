@@ -77,6 +77,37 @@ import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
 import { isTicketRequestReceiptUrl } from "@/lib/ticket-request-receipts";
 import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-config";
 
+const MAX_FINANCE_PAYMENT_PROOFS = 5;
+const MAX_FINANCE_PAYMENT_PROOF_SIZE = 5 * 1024 * 1024;
+const FINANCE_PAYMENT_PROOF_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+type FinancePaymentProofInput = File | File[] | string;
+
+function isValidFinancePaymentProofInput(
+  proof: FinancePaymentProofInput,
+): boolean {
+  if (typeof proof === "string") {
+    return isFinancePaymentProofUrl(proof);
+  }
+  const files = Array.isArray(proof) ? proof : [proof];
+  return (
+    files.length > 0 &&
+    files.length <= MAX_FINANCE_PAYMENT_PROOFS &&
+    files.every(
+      (file) =>
+        file instanceof File &&
+        file.size > 0 &&
+        file.size <= MAX_FINANCE_PAYMENT_PROOF_SIZE &&
+        FINANCE_PAYMENT_PROOF_TYPES.has(file.type),
+    )
+  );
+}
+
 async function storeFinancePaymentProof(proof: File | string): Promise<string> {
   if (typeof proof === "string") {
     if (!isFinancePaymentProofUrl(proof)) {
@@ -95,6 +126,39 @@ async function storeFinancePaymentProof(proof: File | string): Promise<string> {
     throw new Error("Cloudinary mengembalikan URL foto bukti yang tidak valid.");
   }
   return uploaded.secureUrl;
+}
+
+async function storeFinancePaymentProofs(
+  proof: FinancePaymentProofInput,
+): Promise<string[]> {
+  if (!isValidFinancePaymentProofInput(proof)) {
+    throw new Error(
+      "Pilih 1-5 bukti pembayaran PDF/JPG/PNG/WEBP, maksimal 5 MB per file.",
+    );
+  }
+  const proofs = Array.isArray(proof) ? proof : [proof];
+  const storedUrls: string[] = [];
+  try {
+    for (const file of proofs) {
+      storedUrls.push(await storeFinancePaymentProof(file));
+    }
+    return storedUrls;
+  } catch (error) {
+    await removeFinancePaymentProofs(storedUrls);
+    throw error;
+  }
+}
+
+async function removeFinancePaymentProofs(urls: string[]): Promise<void> {
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        await removeTicketReceipt(url);
+      } catch (error) {
+        console.error("Failed to remove an unreferenced payment proof:", error);
+      }
+    }),
+  );
 }
 
 type TicketItemInput = {
@@ -4579,7 +4643,7 @@ async function createWarehouseDeliveryOrder(
 
 export async function processFinancePayment(
   ticketId: string,
-  proof: File | string,
+  proof: FinancePaymentProofInput,
   transferDestination: string,
   financeAccountId: string,
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
@@ -4605,8 +4669,7 @@ export async function processFinancePayment(
     );
   }
   if (
-    (!(proof instanceof File) &&
-      (typeof proof !== "string" || !isFinancePaymentProofUrl(proof))) ||
+    !isValidFinancePaymentProofInput(proof) ||
     !Object.values(PaymentType).includes(paymentType)
   ) {
     return actionFailure("Jenis pembayaran atau bukti transfer tidak valid.");
@@ -4619,9 +4682,11 @@ export async function processFinancePayment(
     return actionFailure("Nominal pembayaran sebagian harus lebih besar dari nol.");
   }
 
+  let receiptUrls: string[];
   let receiptUrl: string;
   try {
-    receiptUrl = await storeFinancePaymentProof(proof);
+    receiptUrls = await storeFinancePaymentProofs(proof);
+    receiptUrl = receiptUrls[0];
   } catch (error) {
     return actionFailure(
       error instanceof Error ? error.message : "File bukti gagal diproses.",
@@ -4828,6 +4893,7 @@ export async function processFinancePayment(
           status: PaymentStatus.PAID,
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
+          additionalProofUrls: receiptUrls.slice(1),
           paidAt: now,
         },
         select: { id: true },
@@ -4990,11 +5056,7 @@ export async function processFinancePayment(
       }
     });
   } catch (error) {
-    try {
-      await removeTicketReceipt(receiptUrl);
-    } catch (cleanupError) {
-      console.error("Failed to remove an unreferenced payment receipt:", cleanupError);
-    }
+    await removeFinancePaymentProofs(receiptUrls);
     console.error("Finance ticket payment failed:", error);
     return actionFailure(
       error instanceof Error
@@ -5019,7 +5081,7 @@ export async function processFinancePayment(
 
 export async function processFinanceStandalonePurchaseOrderPayment(
   publicCode: string,
-  proof: File | string,
+  proof: FinancePaymentProofInput,
   transferDestination: string,
   financeAccountId: string,
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
@@ -5040,10 +5102,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
       "Keterangan tujuan transfer dan buku bank/kas sumber wajib dipilih.",
     );
   }
-  if (
-    !(proof instanceof File) &&
-    (typeof proof !== "string" || !isFinancePaymentProofUrl(proof))
-  ) {
+  if (!isValidFinancePaymentProofInput(proof)) {
     return actionFailure("Bukti pembayaran wajib diunggah.");
   }
   if (!Object.values(PaymentType).includes(paymentType)) {
@@ -5057,9 +5116,11 @@ export async function processFinanceStandalonePurchaseOrderPayment(
     return actionFailure("Nominal pembayaran sebagian harus lebih besar dari nol.");
   }
 
+  let receiptUrls: string[];
   let receiptUrl: string;
   try {
-    receiptUrl = await storeFinancePaymentProof(proof);
+    receiptUrls = await storeFinancePaymentProofs(proof);
+    receiptUrl = receiptUrls[0];
   } catch (error) {
     return actionFailure(
       error instanceof Error ? error.message : "File bukti gagal diproses.",
@@ -5170,6 +5231,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
           status: PaymentStatus.PAID,
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
+          additionalProofUrls: receiptUrls.slice(1),
           paidAt: now,
         },
         select: { id: true },
@@ -5251,11 +5313,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
       }
     });
   } catch (error) {
-    try {
-      await removeTicketReceipt(receiptUrl);
-    } catch (cleanupError) {
-      console.error("Failed to remove an unreferenced PO receipt:", cleanupError);
-    }
+    await removeFinancePaymentProofs(receiptUrls);
     console.error("Standalone Purchase Order payment failed:", error);
     return actionFailure(
       error instanceof Error &&
@@ -5292,7 +5350,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
 
 export async function processFinanceDirectStockPurchasePayment(
   purchaseId: string,
-  proof: File | string,
+  proof: FinancePaymentProofInput,
   transferDestination: string,
   financeAccountId: string,
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
@@ -5316,8 +5374,7 @@ export async function processFinanceDirectStockPurchasePayment(
     );
   }
   if (
-    (!(proof instanceof File) &&
-      (typeof proof !== "string" || !isFinancePaymentProofUrl(proof))) ||
+    !isValidFinancePaymentProofInput(proof) ||
     !Object.values(PaymentType).includes(paymentType)
   ) {
     return actionFailure("Jenis pembayaran atau bukti transfer tidak valid.");
@@ -5329,9 +5386,11 @@ export async function processFinanceDirectStockPurchasePayment(
     return actionFailure("Nominal pembayaran sebagian harus lebih besar dari nol.");
   }
 
+  let receiptUrls: string[];
   let receiptUrl: string;
   try {
-    receiptUrl = await storeFinancePaymentProof(proof);
+    receiptUrls = await storeFinancePaymentProofs(proof);
+    receiptUrl = receiptUrls[0];
   } catch (error) {
     return actionFailure(
       error instanceof Error ? error.message : "File bukti gagal diproses.",
@@ -5402,6 +5461,7 @@ export async function processFinanceDirectStockPurchasePayment(
           status: PaymentStatus.PAID,
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
+          additionalProofUrls: receiptUrls.slice(1),
           paidAt: now,
         },
         select: { id: true },
@@ -5455,14 +5515,7 @@ export async function processFinanceDirectStockPurchasePayment(
       }
     });
   } catch (error) {
-    try {
-      await removeTicketReceipt(receiptUrl);
-    } catch (cleanupError) {
-      console.error(
-        "Failed to remove an unreferenced direct purchase receipt:",
-        cleanupError,
-      );
-    }
+    await removeFinancePaymentProofs(receiptUrls);
     console.error("Direct stock purchase payment failed:", error);
     return actionFailure(
       error instanceof Error &&
@@ -5503,6 +5556,7 @@ export type PaymentRecordTarget =
 
 export async function submitPaymentRecord(input: {
   target: PaymentRecordTarget;
+  files?: File[];
   file?: File;
   proofOfTransferUrl?: string;
   transferDestination: string;
@@ -5516,13 +5570,25 @@ export async function submitPaymentRecord(input: {
     !input.target ||
     typeof input.target !== "object" ||
     typeof input.target.id !== "string" ||
-    !input.target.id.trim() ||
-    (input.file instanceof File && input.file.size === 0) ||
-    (input.file !== undefined && !(input.file instanceof File)) ||
+    !input.target.id.trim()
+  ) {
+    return actionFailure("Data pembayaran atau bukti transfer tidak valid.");
+  }
+  const proofSourceCount = [
+    input.files !== undefined,
+    input.file !== undefined,
+    input.proofOfTransferUrl !== undefined,
+  ].filter(Boolean).length;
+  if (
+    proofSourceCount !== 1 ||
+    (input.files !== undefined &&
+      (!Array.isArray(input.files) ||
+        !isValidFinancePaymentProofInput(input.files))) ||
+    (input.file !== undefined &&
+      (!(input.file instanceof File) ||
+        !isValidFinancePaymentProofInput(input.file))) ||
     (input.proofOfTransferUrl !== undefined &&
-      (typeof input.proofOfTransferUrl !== "string" ||
-        !isFinancePaymentProofUrl(input.proofOfTransferUrl))) ||
-    (Boolean(input.file) === Boolean(input.proofOfTransferUrl)) ||
+      !isValidFinancePaymentProofInput(input.proofOfTransferUrl)) ||
     !isBoundedText(input.transferDestination, 300) ||
     !isBoundedText(input.financeAccountId, 100) ||
     !Object.values(PaymentType).includes(input.paymentType) ||
@@ -5531,7 +5597,7 @@ export async function submitPaymentRecord(input: {
   ) {
     return actionFailure("Data pembayaran atau bukti transfer tidak valid.");
   }
-  const proof = input.proofOfTransferUrl ?? input.file;
+  const proof = input.files ?? input.proofOfTransferUrl ?? input.file;
   if (!proof) {
     return actionFailure("Bukti pembayaran wajib diunggah.");
   }

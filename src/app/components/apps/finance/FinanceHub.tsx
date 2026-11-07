@@ -142,6 +142,7 @@ type PaymentTransaction = {
   transferDestination: string;
   status: string;
   proofOfTransferUrl: string | null;
+  additionalProofUrls: string[];
   paidAt: string | null;
 };
 
@@ -197,6 +198,7 @@ type FinanceHistoryTransaction = {
   amount: number;
   transferDestination: string;
   proofOfTransferUrl: string | null;
+  additionalProofUrls: string[];
   paidAt: string | null;
 };
 
@@ -461,7 +463,7 @@ export default function FinanceHub({
     return null;
   });
   const [message, setMessage] = useState("");
-  const [receiptUrl, setReceiptUrl] = useState<File | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState<File[]>([]);
   const [paymentType, setPaymentType] = useState<PaymentType>(
     PaymentType.FULL_PAYMENT,
   );
@@ -818,7 +820,7 @@ export default function FinanceHub({
     event.preventDefault();
     if (
       (!activeTicket && !activeStandaloneOrder && !activeDirectPurchase) ||
-      !receiptUrl
+      receiptUrl.length === 0
     ) {
       setMessage("Pilih PO/tiket dan unggah bukti pembayaran terlebih dahulu.");
       return;
@@ -854,7 +856,7 @@ export default function FinanceHub({
         if (!target) return;
         const result: TicketActionResult = await submitPaymentRecord({
           target,
-          file: receiptUrl,
+          files: receiptUrl,
           transferDestination,
           financeAccountId,
           paymentType: currentPaymentType,
@@ -862,7 +864,7 @@ export default function FinanceHub({
         });
         setMessage(result.message);
         if (result.success) {
-          setReceiptUrl(null);
+          setReceiptUrl([]);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
           router.refresh();
@@ -980,7 +982,7 @@ export default function FinanceHub({
     });
   };
 
-  const renderPaymentProof = (
+  const renderSinglePaymentProof = (
     paymentTransactionId: string,
     url: string | null,
     label: string,
@@ -1043,6 +1045,33 @@ export default function FinanceHub({
             onSaved={() => router.refresh()}
           />
         )}
+      </div>
+    );
+  };
+
+  const renderPaymentProof = (
+    paymentTransactionId: string,
+    url: string | null,
+    additionalUrls: string[],
+    label: string,
+  ) => {
+    const urls = [url, ...additionalUrls].filter(
+      (proofUrl): proofUrl is string => Boolean(proofUrl),
+    );
+    if (urls.length === 0) {
+      return <span className="text-muted-foreground">Tidak ada bukti</span>;
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {urls.map((proofUrl, index) => (
+          <div key={`${proofUrl}-${index}`}>
+            {renderSinglePaymentProof(
+              paymentTransactionId,
+              proofUrl,
+              urls.length > 1 ? `${label} ${index + 1}` : label,
+            )}
+          </div>
+        ))}
       </div>
     );
   };
@@ -1674,6 +1703,7 @@ export default function FinanceHub({
                           {renderPaymentProof(
                             payment.id,
                             payment.proofOfTransferUrl,
+                            payment.additionalProofUrls ?? [],
                             `Bukti transfer ${payment.reference}`,
                           )}
                         </TableCell>
@@ -2183,7 +2213,7 @@ export default function FinanceHub({
         isOpen={selection !== null}
         onClose={() => {
           setSelection(null);
-          setReceiptUrl(null);
+          setReceiptUrl([]);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
           setMessage("");
@@ -2207,7 +2237,7 @@ export default function FinanceHub({
             type="button"
             onClick={() => {
               setSelection(null);
-              setReceiptUrl(null);
+              setReceiptUrl([]);
               setPaymentAmount("");
               setPaymentType(PaymentType.FULL_PAYMENT);
               setMessage("");
@@ -2232,7 +2262,7 @@ export default function FinanceHub({
                   minimalToolbar
                   onClose={() => {
                     setSelection(null);
-                    setReceiptUrl(null);
+                    setReceiptUrl([]);
                     setPaymentAmount("");
                     setPaymentType(PaymentType.FULL_PAYMENT);
                     setMessage("");
@@ -2365,13 +2395,14 @@ export default function FinanceHub({
                   <FinancePaymentProofUpload
                     value={receiptUrl}
                     onChange={setReceiptUrl}
+                    multiple
                     disabled={isPending}
                   />
                 </div>
                 <Button
                   type="submit"
                   disabled={
-                    !receiptUrl ||
+                    receiptUrl.length === 0 ||
                     financeAccounts.length === 0 ||
                     isPending ||
                     (currentPaymentType !== PaymentType.FULL_PAYMENT &&
@@ -2529,13 +2560,14 @@ export default function FinanceHub({
                       <FinancePaymentProofUpload
                         value={receiptUrl}
                         onChange={setReceiptUrl}
+                        multiple
                         disabled={isPending}
                       />
                     </div>
                     <Button
                       type="submit"
                       disabled={
-                        !receiptUrl ||
+                        receiptUrl.length === 0 ||
                         financeAccounts.length === 0 ||
                         isPending ||
                         (currentPaymentType !== PaymentType.FULL_PAYMENT &&
@@ -2717,13 +2749,14 @@ export default function FinanceHub({
                       <FinancePaymentProofUpload
                         value={receiptUrl}
                         onChange={setReceiptUrl}
+                        multiple
                         disabled={isPending}
                       />
                     </div>
                     <Button
                       type="submit"
                       disabled={
-                        !receiptUrl ||
+                        receiptUrl.length === 0 ||
                         financeAccounts.length === 0 ||
                         isPending ||
                         (currentPaymentType !== PaymentType.FULL_PAYMENT &&
@@ -2777,6 +2810,7 @@ export default function FinanceHub({
                             {renderPaymentProof(
                               payment.id,
                               payment.proofOfTransferUrl,
+                              payment.additionalProofUrls ?? [],
                               `Bukti transfer ${payment.transferDestination}`,
                             )}
                           </td>
