@@ -1077,6 +1077,118 @@ main {
 
 }
 
+/* Float shared form labels over their fields without changing non-text controls. */
+:is(div, fieldset):has(
+    > [data-slot="label"] + :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      ),
+    > [data-slot="label"] + div :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      )
+  ) {
+  position: relative;
+}
+
+:is(div, fieldset):has(
+    > [data-slot="label"] + :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      ),
+    > [data-slot="label"] + div :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      )
+  ) > [data-slot="label"] {
+  position: absolute;
+  z-index: 1;
+  top: -0.4rem;
+  left: 0.6rem;
+  max-width: calc(100% - 1.2rem);
+  padding: 0 0.25rem;
+  background: var(--card);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+[data-slot="label"]:has(
+    > [data-slot="label-text"] ~ :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      ),
+    > [data-slot="label-text"] ~ div :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      )
+  ) {
+  position: relative;
+  display: block;
+  min-width: 0;
+  padding-top: 0.35rem;
+}
+
+[data-slot="label"]:has(
+    > [data-slot="label-text"] ~ :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      ),
+    > [data-slot="label-text"] ~ div :is(
+        input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+        textarea,
+        select,
+        [data-slot="select-trigger"],
+        button[aria-haspopup="dialog"]
+      )
+  ) > [data-slot="label-text"] {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0.6rem;
+  max-width: calc(100% - 1.2rem);
+  padding: 0 0.25rem;
+  background: var(--card);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+input[type="date"] {
+  position: relative;
+  padding-right: 2.75rem;
+  font-size: 0.8125rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.75rem;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
 @media (max-width: 639px) {
   html,
   body {
@@ -1369,7 +1481,7 @@ main {
 
   .ticket-metrics-grid {
     width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.6rem;
     align-items: start;
   }
@@ -1467,8 +1579,8 @@ main {
 
   .ticket-distribution-panel ul {
     margin-top: 0;
-    max-height: 4.25rem;
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
   }
 
   .ticket-distribution-panel li {

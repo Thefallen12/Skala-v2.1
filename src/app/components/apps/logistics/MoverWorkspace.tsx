@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -512,14 +513,14 @@ export default function MoverWorkspace({
                     <p className="text-sm font-medium sm:col-span-2">
                       Dana sudah diserahkan. Isi BBM lalu kirim foto speedometer setelah pengisian.
                     </p>
-                    <label className="grid gap-1 text-sm">
+                    <FormLabel className="grid gap-1 text-sm">
                       Speedometer setelah isi (wajib)
                       <Input name="afterFillingPhoto" type="file" accept="image/jpeg,image/png,image/webp" required disabled={isPending} />
-                    </label>
-                    <label className="grid gap-1 text-sm">
+                    </FormLabel>
+                    <FormLabel className="grid gap-1 text-sm">
                       Bon / struk BBM (jika ada)
                       <Input name="receiptPhoto" type="file" accept="image/jpeg,image/png,image/webp" disabled={isPending} />
-                    </label>
+                    </FormLabel>
                     <p className="text-xs text-muted-foreground sm:col-span-2">
                       Foto JPG, PNG, atau WEBP maksimal 5 MB per file.
                     </p>
@@ -559,7 +560,7 @@ export default function MoverWorkspace({
                         {VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER} km/L, dan sumber BBM.
                       </p>
                     </div>
-                    <label className="grid gap-1 text-sm">
+                    <FormLabel className="grid gap-1 text-sm">
                       Sumber pembelian BBM
                       <select
                         name="source"
@@ -579,7 +580,7 @@ export default function MoverWorkspace({
                         <option value={VehicleFuelSource.SPBU}>SPBU · Rp10.000/L</option>
                         <option value={VehicleFuelSource.RETAIL}>Eceran · Rp14.000/L</option>
                       </select>
-                    </label>
+                    </FormLabel>
                     <div className="rounded-md bg-muted/50 p-3 text-sm sm:col-span-2">
                       Jarak dihitung:{" "}
                       <strong>{eligibleDistanceKm.toLocaleString("id-ID")} km</strong>
@@ -590,7 +591,7 @@ export default function MoverWorkspace({
                       {" · "}Harga acuan:{" "}
                       <strong>Rp{fuelUnitPrice.toLocaleString("id-ID")}/L</strong>
                     </div>
-                    <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                    <FormLabel className="flex items-start gap-2 text-sm sm:col-span-2">
                       <input
                         name="includeExceptionAllowance"
                         type="checkbox"
@@ -604,9 +605,9 @@ export default function MoverWorkspace({
                         disabled={isPending}
                       />
                       Ada kondisi khusus (macet/kondisi jalan); tambahkan toleransi 10 km
-                    </label>
+                    </FormLabel>
                     {includeExceptionAllowance && (
-                      <label className="grid gap-1 text-sm sm:col-span-2">
+                      <FormLabel className="grid gap-1 text-sm sm:col-span-2">
                         Alasan kondisi khusus (wajib)
                         <Input
                           name="exceptionReason"
@@ -615,9 +616,9 @@ export default function MoverWorkspace({
                           disabled={isPending}
                           placeholder="Jelaskan kondisi jalan atau kemacetan"
                         />
-                      </label>
+                      </FormLabel>
                     )}
-                    <label className="grid gap-1 text-sm">
+                    <FormLabel className="grid gap-1 text-sm">
                       Foto speedometer sebelum pengisian (wajib)
                       <Input
                         name="beforeFillingPhoto"
@@ -626,8 +627,8 @@ export default function MoverWorkspace({
                         required
                         disabled={isPending}
                       />
-                    </label>
-                    <label className="grid gap-1 text-sm">
+                    </FormLabel>
+                    <FormLabel className="grid gap-1 text-sm">
                       Foto speedometer setelah pengisian (wajib)
                       <Input
                         name="afterFillingPhoto"
@@ -636,8 +637,8 @@ export default function MoverWorkspace({
                         required
                         disabled={isPending}
                       />
-                    </label>
-                    <label className="grid gap-1 text-sm sm:col-span-2">
+                    </FormLabel>
+                    <FormLabel className="grid gap-1 text-sm sm:col-span-2">
                       Foto bon / struk BBM (jika ada)
                       <Input
                         name="receiptPhoto"
@@ -648,7 +649,7 @@ export default function MoverWorkspace({
                       <span className="text-xs text-muted-foreground">
                         Foto JPG, PNG, atau WEBP maksimal 5 MB per file.
                       </span>
-                    </label>
+                    </FormLabel>
                     {latestFuelRequest?.status === "REJECTED" && (
                       <p className="text-sm text-destructive sm:col-span-2">
                         Request sebelumnya ditolak. Periksa catatan Keuangan sebelum mengajukan reimbursement ulang.
@@ -676,7 +677,7 @@ export default function MoverWorkspace({
                     className="flex flex-wrap items-end gap-3 rounded-md border p-3"
                     onSubmit={(event) => startDelivery(event, order.publicCode)}
                   >
-                    <label className="grid gap-1 text-sm">
+                    <FormLabel className="grid gap-1 text-sm">
                       KM berangkat
                       <Input
                         name="kilometerStart"
@@ -686,7 +687,7 @@ export default function MoverWorkspace({
                         required
                         defaultValue={order.vehicleCurrentKilometer ?? ""}
                       />
-                    </label>
+                    </FormLabel>
                     <Button type="submit" disabled={isPending}>
                       {isPending && pendingCode === order.publicCode ? "Memulai..." : "Mulai Pengiriman"}
                     </Button>
@@ -700,7 +701,7 @@ export default function MoverWorkspace({
                         submitDeliveryProof(event, order.publicCode)
                       }
                     >
-                      <label className="grid gap-1 text-sm">
+                      <FormLabel className="grid gap-1 text-sm">
                         Tambah foto bukti (bisa pilih beberapa)
                         <Input
                           name="deliveryProofs"
@@ -712,8 +713,8 @@ export default function MoverWorkspace({
                         <span className="text-xs text-muted-foreground">
                           Maksimal 5 foto per kiriman, 5 MB per foto.
                         </span>
-                      </label>
-                      <label className="grid gap-1 text-sm">
+                      </FormLabel>
+                      <FormLabel className="grid gap-1 text-sm">
                         KM berangkat
                         <Input
                           name="kilometerStart"
@@ -728,8 +729,8 @@ export default function MoverWorkspace({
                             ""
                           }
                         />
-                      </label>
-                      <label className="grid gap-1 text-sm">
+                      </FormLabel>
+                      <FormLabel className="grid gap-1 text-sm">
                         ODO saat kembali ke gudang
                         <Input
                           name="kilometerEnd"
@@ -738,7 +739,7 @@ export default function MoverWorkspace({
                           step="0.001"
                           required
                         />
-                      </label>
+                      </FormLabel>
                       <p className="basis-full text-xs text-muted-foreground">
                         Simpan bukti serah-terima saat di lokasi, lalu selesaikan DO setelah kendaraan kembali ke gudang. Sistem memakai selisih ODO untuk menghitung jarak dan estimasi BBM.
                       </p>
@@ -800,7 +801,7 @@ export default function MoverWorkspace({
             </CardHeader>
             <CardContent>
               <form className="space-y-3" onSubmit={submitEquipmentLog}>
-                <label className="grid gap-1 text-sm">
+                <FormLabel className="grid gap-1 text-sm">
                   Proyek
                   <select
                     className="h-10 rounded-md border bg-background px-3"
@@ -815,8 +816,8 @@ export default function MoverWorkspace({
                       </option>
                     ))}
                   </select>
-                </label>
-                <label className="grid gap-1 text-sm">
+                </FormLabel>
+                <FormLabel className="grid gap-1 text-sm">
                   Alat terdaftar (opsional)
                   <select
                     className="h-10 rounded-md border bg-background px-3"
@@ -830,16 +831,16 @@ export default function MoverWorkspace({
                       </option>
                     ))}
                   </select>
-                </label>
-                <label className="grid gap-1 text-sm">
+                </FormLabel>
+                <FormLabel className="grid gap-1 text-sm">
                   Nama alat
                   <Input name="equipmentName" maxLength={120} required />
-                </label>
-                <label className="grid gap-1 text-sm">
+                </FormLabel>
+                <FormLabel className="grid gap-1 text-sm">
                   Operator
                   <Input name="operatorName" maxLength={120} defaultValue={userName} />
-                </label>
-                <label className="grid gap-1 text-sm">
+                </FormLabel>
+                <FormLabel className="grid gap-1 text-sm">
                   Tanggal
                   <Input
                     name="date"
@@ -847,17 +848,17 @@ export default function MoverWorkspace({
                     required
                     defaultValue={today}
                   />
-                </label>
+                </FormLabel>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1 text-sm">
+                  <FormLabel className="grid gap-1 text-sm">
                     HM awal
                     <Input name="hmStart" type="number" min="0" step="0.01" required />
-                  </label>
-                  <label className="grid gap-1 text-sm">
+                  </FormLabel>
+                  <FormLabel className="grid gap-1 text-sm">
                     HM akhir
                     <Input name="hmEnd" type="number" min="0" step="0.01" required />
-                  </label>
-                  <label className="grid gap-1 text-sm">
+                  </FormLabel>
+                  <FormLabel className="grid gap-1 text-sm">
                     Jam efektif
                     <Input
                       name="effectiveHours"
@@ -867,20 +868,20 @@ export default function MoverWorkspace({
                       step="0.01"
                       required
                     />
-                  </label>
-                  <label className="grid gap-1 text-sm">
+                  </FormLabel>
+                  <FormLabel className="grid gap-1 text-sm">
                     BBM (liter)
                     <Input name="fuelLiter" type="number" min="0" step="0.01" required />
-                  </label>
+                  </FormLabel>
                 </div>
-                <label className="grid gap-1 text-sm">
+                <FormLabel className="grid gap-1 text-sm">
                   Catatan
                   <textarea
                     className="min-h-20 rounded-md border bg-background p-3"
                     name="notes"
                     maxLength={2000}
                   />
-                </label>
+                </FormLabel>
                 <Button type="submit" disabled={isPending || projects.length === 0}>
                   {isPending ? "Menyimpan..." : "Simpan Log"}
                 </Button>

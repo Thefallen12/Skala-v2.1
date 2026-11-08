@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import {
   DialogFooter,
 } from "@/components/ui/dialog";
@@ -817,7 +817,7 @@ export default function DailyTaskBoard({
               <legend className="text-sm font-medium">Anggota tugas</legend>
               <div className="grid max-h-28 gap-2 overflow-y-auto rounded-md border border-input p-3 sm:grid-cols-2">
                 {members.map((member) => (
-                  <label key={member.id} className="flex items-center gap-2 text-xs">
+                  <FormLabel key={member.id} className="flex items-center gap-2 text-xs">
                     <input
                       type="checkbox"
                       name="memberIds"
@@ -826,7 +826,7 @@ export default function DailyTaskBoard({
                       className="size-3.5 accent-primary"
                     />
                     <span className="truncate">{member.name}</span>
-                  </label>
+                  </FormLabel>
                 ))}
               </div>
             </fieldset>
@@ -834,7 +834,7 @@ export default function DailyTaskBoard({
               <legend className="text-sm font-medium">Warna bar tugas</legend>
               <div className="flex flex-wrap gap-2">
                 {habitTaskColors.map((color, index) => (
-                  <label
+                  <FormLabel
                     key={color.value}
                     title={color.label}
                     className="cursor-pointer"
@@ -850,7 +850,7 @@ export default function DailyTaskBoard({
                     <span
                       className={`block size-7 rounded-full ring-offset-2 peer-checked:ring-2 peer-checked:ring-primary ${color.className}`}
                     />
-                  </label>
+                  </FormLabel>
                 ))}
               </div>
             </fieldset>

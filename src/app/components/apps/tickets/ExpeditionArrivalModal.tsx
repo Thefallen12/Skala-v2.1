@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import { receiveExpeditionDeliveryOrder } from "@/app/actions/orders";
@@ -61,7 +62,7 @@ export default function ExpeditionArrivalModal({
       description={`Tiket ${ticketNumber} · DO ${doNumber}. Unggah foto saat material tiba di gudang. Status DO dan tiket akan diselesaikan bersama.`}
     >
         <form className="space-y-4" onSubmit={submit}>
-          <label className="block space-y-2 text-sm font-medium">
+          <FormLabel className="block space-y-2 text-sm font-medium">
             Foto bukti material tiba
             <Input
               type="file"
@@ -70,7 +71,7 @@ export default function ExpeditionArrivalModal({
               disabled={isPending}
               onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
             />
-          </label>
+          </FormLabel>
           <p className="text-xs text-muted-foreground">
             Format JPG, PNG, atau WEBP; maksimal 5 MB.
           </p>

@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import { processMoverDelivery } from "@/app/actions/tickets";
@@ -54,7 +55,7 @@ export default function MoverActionModal({
       description="Unggah bukti serah terima barang di lapangan. File PDF, JPG, PNG, atau WEBP maksimal 5 MB."
     >
         <form className="space-y-4" onSubmit={submit}>
-          <label className="block space-y-2 text-sm font-medium">
+          <FormLabel className="block space-y-2 text-sm font-medium">
             Upload Foto Barang Tiba / Bukti DO
             <Input
               type="file"
@@ -63,7 +64,7 @@ export default function MoverActionModal({
               disabled={isPending}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-          </label>
+          </FormLabel>
           {message && (
             <p className="text-sm text-muted-foreground" role="status">
               {message}

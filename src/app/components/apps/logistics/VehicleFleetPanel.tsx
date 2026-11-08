@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -304,7 +305,7 @@ export default function VehicleFleetPanel({
         className="sm:max-w-xl"
       >
           <form id="vehicle-form" className="mt-6 space-y-4" onSubmit={submitVehicle}>
-            <label className="grid gap-1.5 text-sm font-medium">
+            <FormLabel className="grid gap-1.5 text-sm font-medium">
               Nomor plat
               <Input
                 name="plateNumber"
@@ -313,8 +314,8 @@ export default function VehicleFleetPanel({
                 placeholder="BL 1234 AB"
                 defaultValue={editingVehicle?.plateNumber ?? ""}
               />
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">
+            </FormLabel>
+            <FormLabel className="grid gap-1.5 text-sm font-medium">
               Jenis kendaraan
               <Input
                 name="vehicleType"
@@ -323,8 +324,8 @@ export default function VehicleFleetPanel({
                 placeholder="Pick-up, Truk Engkel, Dump Truck"
                 defaultValue={editingVehicle?.vehicleType ?? ""}
               />
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">
+            </FormLabel>
+            <FormLabel className="grid gap-1.5 text-sm font-medium">
               Merk
               <Input
                 name="brand"
@@ -332,8 +333,8 @@ export default function VehicleFleetPanel({
                 placeholder="Toyota, Mitsubishi"
                 defaultValue={editingVehicle?.brand ?? ""}
               />
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">
+            </FormLabel>
+            <FormLabel className="grid gap-1.5 text-sm font-medium">
               Model
               <Input
                 name="modelName"
@@ -341,9 +342,9 @@ export default function VehicleFleetPanel({
                 placeholder="Hilux 2.4"
                 defaultValue={editingVehicle?.modelName ?? ""}
               />
-            </label>
+            </FormLabel>
             {(!editingVehicle || !editingVehicle.odometerInitialized) && (
-              <label className="grid gap-1.5 text-sm font-medium">
+              <FormLabel className="grid gap-1.5 text-sm font-medium">
                 {editingVehicle ? "Inisialisasi KM awal" : "KM awal"}
                 <Input
                   name="initialKilometer"
@@ -353,10 +354,10 @@ export default function VehicleFleetPanel({
                   required
                   defaultValue={editingVehicle?.currentKilometer ?? "0"}
                 />
-              </label>
+              </FormLabel>
             )}
             {editingVehicle && (
-              <label className="grid gap-1.5 text-sm font-medium">
+              <FormLabel className="grid gap-1.5 text-sm font-medium">
                 Status
                 <select
                   className="h-10 rounded-md border bg-background px-3 font-normal"
@@ -369,7 +370,7 @@ export default function VehicleFleetPanel({
                     </option>
                   ))}
                 </select>
-              </label>
+              </FormLabel>
             )}
             <div className="flex justify-end gap-2">
               <Button
@@ -404,7 +405,7 @@ export default function VehicleFleetPanel({
           className="mt-6 space-y-4"
           onSubmit={submitKilometer}
         >
-          <label className="grid gap-1.5 text-sm font-medium">
+          <FormLabel className="grid gap-1.5 text-sm font-medium">
             Kilometer saat ini
             <Input
               name="kilometer"
@@ -419,7 +420,7 @@ export default function VehicleFleetPanel({
             <span className="text-xs font-normal text-muted-foreground">
               Gunakan titik untuk nilai desimal, contoh: 18790.4 km.
             </span>
-          </label>
+          </FormLabel>
           <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
             Nilai ini menjadi acuan KM untuk pencatatan perjalanan berikutnya.
             Kendaraan yang terikat DO aktif tidak dapat diubah.

@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -87,7 +88,7 @@ export default function CreatePurchaseModal({
           }
           className="grid gap-3 sm:grid-cols-2"
         >
-          <label
+          <FormLabel
             htmlFor="purchase-type-po"
             className="flex cursor-pointer items-start gap-3 rounded-lg border p-4"
           >
@@ -100,8 +101,8 @@ export default function CreatePurchaseModal({
                 Lanjutkan ke form pembuatan draft Purchase Order.
               </span>
             </span>
-          </label>
-          <label
+          </FormLabel>
+          <FormLabel
             htmlFor="purchase-type-direct"
             className="flex cursor-pointer items-start gap-3 rounded-lg border p-4"
           >
@@ -114,7 +115,7 @@ export default function CreatePurchaseModal({
                 Isi barang dan harga untuk diajukan kepada Direktur.
               </span>
             </span>
-          </label>
+          </FormLabel>
         </RadioGroup>
         {purchaseType === "PURCHASE_ORDER" ? (
           <CreatePOForm

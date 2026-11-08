@@ -60,7 +60,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { GlobalModal } from "@/components/ui/global-modal";
 import {
   DropdownMenu,
@@ -238,7 +238,7 @@ function DirectPurchaseInvoiceAction({
 
   return (
     <div className="space-y-2">
-      <label className="block space-y-1">
+      <FormLabel className="block space-y-1">
         <span className="text-xs font-medium">Foto Invoice / BON Faktur</span>
         <Input
           ref={invoicePhotoInput}
@@ -253,7 +253,7 @@ function DirectPurchaseInvoiceAction({
           disabled={isPending}
           aria-label="Pilih foto Invoice atau BON Faktur"
         />
-      </label>
+      </FormLabel>
       <Button
         type="button"
         size="sm"

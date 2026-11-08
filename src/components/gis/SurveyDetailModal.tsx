@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -649,9 +650,9 @@ export default function SurveyDetailModal({
             ) : null}
 
             <div className="space-y-2">
-              <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+              <FormLabel className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                 Nama Foto
-              </label>
+              </FormLabel>
               <input
                 autoFocus
                 value={photoNameDraft}

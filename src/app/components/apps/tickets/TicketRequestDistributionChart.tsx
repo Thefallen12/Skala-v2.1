@@ -61,7 +61,7 @@ const categories = [
   },
   {
     value: TicketRequestCategory.SHIPPING_COST,
-    label: "Biaya Pengiriman",
+    label: "Pengiriman Barang PO",
     color: "var(--color-info)",
   },
 ] as const;

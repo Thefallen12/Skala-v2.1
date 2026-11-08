@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import type { Editor } from "@tiptap/react";
 import { CellSelection } from "@tiptap/pm/tables";
@@ -129,7 +130,7 @@ export default function TableMenuPopover({
           Warna sel dan kolom
         </p>
         <div className="space-y-2 rounded-md border p-2">
-          <label className="flex items-center justify-between gap-2 text-sm">
+          <FormLabel className="flex items-center justify-between gap-2 text-sm">
             Warna isi
             <input
               type="color"
@@ -138,7 +139,7 @@ export default function TableMenuPopover({
               value={backgroundColor}
               onChange={(event) => setBackgroundColor(event.target.value)}
             />
-          </label>
+          </FormLabel>
           <div className="grid grid-cols-2 gap-1">
             <Button
               type="button"
@@ -163,7 +164,7 @@ export default function TableMenuPopover({
           </div>
         </div>
         <div className="space-y-2 rounded-md border p-2">
-          <label className="flex items-center justify-between gap-2 text-sm">
+          <FormLabel className="flex items-center justify-between gap-2 text-sm">
             Warna garis
             <input
               type="color"
@@ -172,7 +173,7 @@ export default function TableMenuPopover({
               value={borderColor}
               onChange={(event) => setBorderColor(event.target.value)}
             />
-          </label>
+          </FormLabel>
           <div className="grid grid-cols-2 gap-1">
             <Button
               type="button"
@@ -205,7 +206,7 @@ export default function TableMenuPopover({
         <p className="px-2 py-1 text-xs font-semibold text-muted-foreground">
           Baris dan kolom
         </p>
-        <label className="flex items-center gap-2 px-2 py-1 text-sm">
+        <FormLabel className="flex items-center gap-2 px-2 py-1 text-sm">
           Tinggi baris (px)
           <Input
             aria-label="Tinggi baris tabel dalam piksel"
@@ -237,7 +238,7 @@ export default function TableMenuPopover({
               if (event.key === "Enter") event.currentTarget.blur();
             }}
           />
-        </label>
+        </FormLabel>
         <Button
           type="button"
           variant="ghost"

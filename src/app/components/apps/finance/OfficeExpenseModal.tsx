@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { FileText, ReceiptText, Trash2, Wallet } from "lucide-react";
@@ -268,14 +268,14 @@ export default function OfficeExpenseModal({
                 ["TRANSFER", "Transfer"],
                 ["CASH", "Cash"],
               ].map(([value, label]) => (
-                <label key={value} className="flex items-center gap-2 text-sm">
+                <FormLabel key={value} className="flex items-center gap-2 text-sm">
                   <input
                     type="radio"
                     value={value}
                     {...form.register("paymentMethod")}
                   />
                   {label}
-                </label>
+                </FormLabel>
               ))}
             </div>
           </div>

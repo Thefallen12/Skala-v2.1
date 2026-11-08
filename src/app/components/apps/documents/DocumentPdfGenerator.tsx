@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState } from "react";
 import { Download } from "lucide-react";
@@ -79,7 +80,7 @@ export default function DocumentPdfGenerator({
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
       <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-60 flex-1 space-y-1.5 text-sm">
+        <FormLabel className="min-w-60 flex-1 space-y-1.5 text-sm">
           <span className="font-medium">Template PDF</span>
           <select
             value={selectedTemplateId}
@@ -96,7 +97,7 @@ export default function DocumentPdfGenerator({
               </option>
             ))}
           </select>
-        </label>
+        </FormLabel>
         <Button
           type="button"
           onClick={downloadPdf}

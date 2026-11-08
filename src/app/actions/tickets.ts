@@ -187,8 +187,6 @@ export type CreateTicketInput = {
   requestPaymentMethod?: POPaymentMethod;
   transferDestination?: string;
   requestPaymentDescription?: string;
-  originCity?: string;
-  destinationCity?: string;
   relatedDocumentNumbers?: string;
   requestedAmount?: number;
   receiptFiles?: File[];
@@ -240,12 +238,6 @@ export type ShippingDocumentOptions = {
     poNumber: string;
     vendorName: string;
     status: POStatus;
-  }>;
-  tickets: Array<{
-    id: string;
-    ticketNumber: string;
-    title: string;
-    status: TicketStatus;
   }>;
 };
 
@@ -2086,8 +2078,7 @@ export async function createTicket(
     requiresRecipientPayment ||
     isOperationalFunding ||
     isAPHRequest ||
-    isInternalFundingRequest ||
-    isShippingCostRequest;
+    isInternalFundingRequest;
   let operationalRecipient: {
     name: string;
     bankName: string;
@@ -2136,32 +2127,18 @@ export async function createTicket(
   }
   if (isShippingCostRequest) {
     if (
-      typeof input.originCity !== "string" ||
-      input.originCity.trim().length < 1 ||
-      input.originCity.trim().length > 120 ||
-      typeof input.destinationCity !== "string" ||
-      input.destinationCity.trim().length < 1 ||
-      input.destinationCity.trim().length > 120 ||
-      (input.relatedDocumentNumbers !== undefined &&
-        (typeof input.relatedDocumentNumbers !== "string" ||
-          input.relatedDocumentNumbers.length > 2000)) ||
-      typeof input.requestedAmount !== "number" ||
-      !Number.isSafeInteger(input.requestedAmount) ||
-      input.requestedAmount <= 0 ||
-      input.requestedAmount > Number.MAX_SAFE_INTEGER ||
+      typeof input.relatedDocumentNumbers !== "string" ||
+      !input.relatedDocumentNumbers.trim() ||
+      input.relatedDocumentNumbers.length > 2000 ||
       input.items.length > 0
     ) {
       return actionFailure(
-        "Rute, nominal, atau dokumen terkait biaya pengiriman tidak valid.",
+        "Pilih minimal satu PO barang yang valid untuk tiket pengiriman.",
       );
     }
-  } else if (
-    input.originCity !== undefined ||
-    input.destinationCity !== undefined ||
-    input.relatedDocumentNumbers !== undefined
-  ) {
+  } else if (input.relatedDocumentNumbers !== undefined) {
     return actionFailure(
-      "Detail rute hanya dapat digunakan pada permintaan biaya pengiriman.",
+      "PO terkait hanya dapat digunakan pada tiket pengiriman barang.",
     );
   }
   if (
@@ -2269,14 +2246,9 @@ export async function createTicket(
       );
     }
   } else if (isShippingCostRequest) {
-    if (
-      typeof input.requestedAmount !== "number" ||
-      !Number.isSafeInteger(input.requestedAmount) ||
-      input.requestedAmount <= 0 ||
-      input.requestedAmount > Number.MAX_SAFE_INTEGER
-    ) {
+    if (input.items.length > 0) {
       return actionFailure(
-        "Nominal biaya pengiriman harus berupa angka lebih besar dari 0.",
+        "Tiket pengiriman barang menggunakan rincian PO, bukan rincian item manual.",
       );
     }
   } else if (input.items.length < 1) {
@@ -2309,7 +2281,6 @@ export async function createTicket(
   }
 
   let relatedPoIds: string[] = [];
-  let relatedTicketIds: string[] = [];
   if (isShippingCostRequest) {
     const relatedDocumentNumbers = [
       ...new Set(
@@ -2325,68 +2296,38 @@ export async function createTicket(
       relatedDocumentNumbers.some((number) => number.length > 120)
     ) {
       return actionFailure(
-        "Maksimal 20 nomor PO atau tiket dapat dikaitkan; tiap nomor maksimal 120 karakter.",
+        "Maksimal 20 PO dapat dipilih; tiap nomor PO maksimal 120 karakter.",
       );
     }
-    if (relatedDocumentNumbers.length > 0) {
-      const [purchaseOrders, tickets] = await Promise.all([
-        prisma.purchaseOrder.findMany({
-          where: {
-            OR: relatedDocumentNumbers.map((number) => ({
-              poNumber: { equals: number, mode: "insensitive" as const },
-            })),
-          },
-          select: { id: true, poNumber: true },
-        }),
-        prisma.ticket.findMany({
-          where: {
-            OR: relatedDocumentNumbers.map((number) => ({
-              ticketNumber: { equals: number, mode: "insensitive" as const },
-            })),
-          },
-          select: { id: true, ticketNumber: true, type: true },
-        }),
-      ]);
-      const purchaseOrdersByNumber = new Map(
-        purchaseOrders.map((purchaseOrder) => [
-          purchaseOrder.poNumber.toLocaleLowerCase("id-ID"),
-          purchaseOrder,
-        ]),
+    const purchaseOrders = await prisma.purchaseOrder.findMany({
+      where: {
+        OR: relatedDocumentNumbers.map((number) => ({
+          poNumber: { equals: number, mode: "insensitive" as const },
+        })),
+      },
+      select: { id: true, poNumber: true },
+    });
+    const purchaseOrdersByNumber = new Map(
+      purchaseOrders.map((purchaseOrder) => [
+        purchaseOrder.poNumber.toLocaleLowerCase("id-ID"),
+        purchaseOrder,
+      ]),
+    );
+    const unresolvedNumbers: string[] = [];
+    for (const number of relatedDocumentNumbers) {
+      const purchaseOrder = purchaseOrdersByNumber.get(
+        number.toLocaleLowerCase("id-ID"),
       );
-      const ticketsByNumber = new Map(
-        tickets.map((ticket) => [
-          ticket.ticketNumber.toLocaleLowerCase("id-ID"),
-          ticket,
-        ]),
+      if (purchaseOrder) {
+        relatedPoIds.push(purchaseOrder.id);
+      } else {
+        unresolvedNumbers.push(number);
+      }
+    }
+    if (unresolvedNumbers.length > 0) {
+      return actionFailure(
+        `PO tidak ditemukan: ${unresolvedNumbers.join(", ")}.`,
       );
-      const unresolvedNumbers: string[] = [];
-      for (const number of relatedDocumentNumbers) {
-        const key = number.toLocaleLowerCase("id-ID");
-        const purchaseOrder = purchaseOrdersByNumber.get(key);
-        const ticket = ticketsByNumber.get(key);
-        if (purchaseOrder && ticket) {
-          return actionFailure(
-            `Nomor "${number}" cocok dengan PO dan tiket sekaligus. Gunakan nomor dokumen yang tidak ambigu.`,
-          );
-        }
-        if (ticket && ticket.type !== TicketType.MATERIAL) {
-          return actionFailure(
-            `Tiket "${number}" bukan permintaan belanja material yang dapat dikaitkan.`,
-          );
-        }
-        if (purchaseOrder) {
-          relatedPoIds.push(purchaseOrder.id);
-        } else if (ticket) {
-          relatedTicketIds.push(ticket.id);
-        } else {
-          unresolvedNumbers.push(number);
-        }
-      }
-      if (unresolvedNumbers.length > 0) {
-        return actionFailure(
-          `Dokumen terkait tidak ditemukan: ${unresolvedNumbers.join(", ")}.`,
-        );
-      }
     }
   }
 
@@ -2586,12 +2527,7 @@ export async function createTicket(
           requestCategory,
           ...(isShippingCostRequest
             ? {
-                shippingDetails: {
-                  originCity: input.originCity!.trim(),
-                  destinationCity: input.destinationCity!.trim(),
-                },
                 relatedPoIds,
-                relatedTicketIds,
               }
             : {}),
           fieldCategory: input.fieldCategory ?? null,
@@ -2731,37 +2667,24 @@ export async function getShippingDocumentOptions(): Promise<
   ) {
     return {
       success: false,
-      message: "Pilihan PO dan tiket hanya tersedia untuk Logistik atau Direktur.",
+      message: "Pilihan PO hanya tersedia untuk Logistik atau Direktur.",
     };
   }
 
-  const [purchaseOrders, tickets] = await Promise.all([
-    prisma.purchaseOrder.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        poNumber: true,
-        vendorName: true,
-        status: true,
-      },
-    }),
-    prisma.ticket.findMany({
-      where: { type: TicketType.MATERIAL },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        ticketNumber: true,
-        title: true,
-        status: true,
-      },
-    }),
-  ]);
+  const purchaseOrders = await prisma.purchaseOrder.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    select: {
+      id: true,
+      poNumber: true,
+      vendorName: true,
+      status: true,
+    },
+  });
 
   return {
     success: true,
-    options: { purchaseOrders, tickets },
+    options: { purchaseOrders },
   };
 }
 

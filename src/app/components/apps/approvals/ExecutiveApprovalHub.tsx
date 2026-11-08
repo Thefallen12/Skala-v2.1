@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import Image from "next/image";
 import { useState, useTransition } from "react";
@@ -848,7 +849,7 @@ export default function ExecutiveApprovalHub({
                   </div>
                   {ticketDecision && (
                     <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-                      <label className="block space-y-1 text-sm font-medium">
+                      <FormLabel className="block space-y-1 text-sm font-medium">
                         {ticketDecision === "REJECT"
                           ? "Alasan penolakan"
                           : "Catatan revisi"}
@@ -865,7 +866,7 @@ export default function ExecutiveApprovalHub({
                           }
                           className="min-h-20 font-normal"
                         />
-                      </label>
+                      </FormLabel>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
@@ -981,7 +982,7 @@ export default function ExecutiveApprovalHub({
                   {currency(selectedWage.proposedTotalWage)}
                 </dd>
               </dl>
-              <label className="block space-y-1 text-sm">
+              <FormLabel className="block space-y-1 text-sm">
                 Nilai upah disetujui (Rp)
                 <input
                   className="h-10 w-full rounded-md border bg-background px-3"
@@ -992,8 +993,8 @@ export default function ExecutiveApprovalHub({
                   value={wageAmount}
                   onChange={(event) => setWageAmount(event.target.value)}
                 />
-              </label>
-              <label className="block space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="block space-y-1 text-sm">
                 Catatan audit persetujuan / koreksi
                 <textarea
                   className="min-h-20 w-full rounded-md border bg-background p-3"
@@ -1003,7 +1004,7 @@ export default function ExecutiveApprovalHub({
                   onChange={(event) => setWageReason(event.target.value)}
                   placeholder="Tuliskan alasan persetujuan atau koreksi nilai."
                 />
-              </label>
+              </FormLabel>
               {isExecutive(role) && (
                 <Button type="submit" className="w-full" disabled={isPending}>
                   {isPending ? "Memproses..." : "Setujui Upah"}

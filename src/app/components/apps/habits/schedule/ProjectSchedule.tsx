@@ -43,7 +43,7 @@ import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
   DialogFooter,
@@ -745,7 +745,7 @@ export default function ProjectSchedule({
               </div>
               <div className="grid max-h-28 gap-2 overflow-y-auto rounded-md border border-input p-3 sm:grid-cols-2">
                 {members.map((member) => (
-                  <label key={member.id} className="flex min-w-0 items-center gap-2 text-xs">
+                  <FormLabel key={member.id} className="flex min-w-0 items-center gap-2 text-xs">
                     <input
                       type="checkbox"
                       name="participantIds"
@@ -755,7 +755,7 @@ export default function ProjectSchedule({
                     <span className="truncate" title={member.email}>
                       {member.name}
                     </span>
-                  </label>
+                  </FormLabel>
                 ))}
               </div>
               <p className="text-[10px] text-muted-foreground">

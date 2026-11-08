@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -520,7 +520,7 @@ export default function GISWorkspace({
               className="h-8 gap-1.5 px-2.5 text-[10px] sm:h-7"
               asChild
             >
-              <label className="cursor-pointer">
+              <FormLabel className="cursor-pointer">
                 <FileUp className="size-4" aria-hidden="true" />
                 <span>Upload SHP/GeoJSON</span>
                 <Input
@@ -532,7 +532,7 @@ export default function GISWorkspace({
                     event.target.value = "";
                   }}
                 />
-              </label>
+              </FormLabel>
             </Button>
             <Button
               type="button"

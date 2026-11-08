@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import InvoiceDetailsFields, {
   type InvoiceDraft,
@@ -261,21 +261,21 @@ export default function LogisticsActionModal({
             }}
             className="gap-3"
           >
-            <label className="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm">
+            <FormLabel className="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm">
               <RadioGroupItem value="READY_WAREHOUSE" />
               <span>
                 {purchaseOrderPaid
                   ? "DO Ekspedisi / Mover eksternal"
                   : "Stok Tersedia di Gudang (Kirim via Mover)"}
               </span>
-            </label>
+            </FormLabel>
             {!purchaseOrderPaid && (
-              <label className="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm">
+              <FormLabel className="flex cursor-pointer items-center gap-3 rounded-md border p-3 text-sm">
                 <RadioGroupItem value="BUY_STORE" />
                 <span>
                   Stok kurang — buat PO, lalu kirim invoice ke Keuangan
                 </span>
-              </label>
+              </FormLabel>
             )}
           </RadioGroup>
           {actionType === "READY_WAREHOUSE" && (

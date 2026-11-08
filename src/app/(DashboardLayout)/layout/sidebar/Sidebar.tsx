@@ -246,6 +246,16 @@ const SidebarLayout = ({
               )}
             </div>
           ))}
+          <div className="mt-4 border-t border-border/70 py-4">
+            <a
+              href="/downloads/skala-prioritas.apk"
+              download="skala-prioritas.apk"
+              className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              <Icon icon="tabler:download" height={18} width={18} aria-hidden="true" />
+              Download APK
+            </a>
+          </div>
         </div>
       </SimpleBar>
     </AMSidebar>

@@ -28,7 +28,7 @@ import {
 } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import {
   Compass,
   Check,
@@ -883,7 +883,7 @@ export default function ProjectMap({
             ))}
           </div>
         </details>
-        <label className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card/95 px-3 text-xs font-medium text-card-foreground shadow-lg backdrop-blur">
+        <FormLabel className="flex h-9 items-center gap-2 rounded-lg border border-border bg-card/95 px-3 text-xs font-medium text-card-foreground shadow-lg backdrop-blur">
           <MapIcon className="size-4 text-muted-foreground" aria-hidden="true" />
           <span className="hidden sm:inline">Basemap</span>
           <select
@@ -910,7 +910,7 @@ export default function ProjectMap({
             <option value="google-satellite">Google Satellite (API Key)</option>
             <option value="streets">OpenStreetMap</option>
           </select>
-        </label>
+        </FormLabel>
         <div
           aria-label="Arah utara"
           title="Utara"

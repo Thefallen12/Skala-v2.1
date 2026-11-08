@@ -85,6 +85,8 @@ import {
   Camera,
   ClipboardList,
   Download,
+  FileDown,
+  FileSpreadsheet,
   HardHat,
   ImageIcon,
   Plus,
@@ -100,8 +102,43 @@ import {
   Pencil,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
+
+const workPointFieldClass =
+  "flex w-full min-w-0 flex-col items-start gap-1.5 text-left";
+
+function ProjectViewTab({
+  value,
+  label,
+  icon: Icon,
+}: {
+  value: string;
+  label: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <TabsTrigger
+          value={value}
+          aria-label={label}
+          className="h-10 w-10 min-w-10 shrink-0 rounded-md border border-primary/75 bg-transparent p-0 text-primary hover:bg-primary hover:text-primary-foreground aria-selected:border-primary aria-selected:bg-primary aria-selected:text-primary-foreground aria-selected:shadow-sm aria-selected:ring-2 aria-selected:ring-primary/40 aria-selected:ring-offset-2 aria-selected:ring-offset-background sm:h-auto sm:w-auto sm:min-w-0 sm:shrink sm:rounded-sm sm:border-0 sm:bg-transparent sm:px-3 sm:py-1.5 sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground sm:aria-selected:bg-primary sm:aria-selected:text-primary-foreground sm:aria-selected:ring-0 sm:aria-selected:ring-offset-0"
+        >
+          <Icon className="size-4" aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only">{label}</span>
+        </TabsTrigger>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 function calculateWorkPointTotal(volumeValue: string, unitPriceValue: string) {
   if (!volumeValue || !unitPriceValue) return "";
@@ -775,7 +812,7 @@ export default function ProjectWorkstationMaster({
 
       {activeSection === "projects" && (
       <Card className="border-border bg-card text-card-foreground shadow-md">
-        <CardHeader className="flex flex-col gap-4 pb-4 xl:flex-row xl:items-center xl:justify-between">
+        <CardHeader className="flex flex-col gap-4 pb-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-lg text-foreground">Daftar Proyek</CardTitle>
@@ -784,61 +821,50 @@ export default function ProjectWorkstationMaster({
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {isProjectManager && (
               <>
-                <Button
-                  size="sm"
+                <ActionIconButton
+                  type="button"
+                  label="Tambah Proyek Baru"
+                  tooltip="Tambah Proyek Baru"
+                  icon={Plus}
                   onClick={() => setNewProjectOpen(true)}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <Plus className="mr-2 size-4" />
-                  Tambah Proyek Baru
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
+                  className="size-11"
+                />
+                <ActionIconButton
+                  type="button"
+                  label="Import CSV"
+                  tooltip="Import CSV"
+                  icon={Upload}
                   onClick={() => setImportOpen(true)}
-                  className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                >
-                  <Upload className="mr-2 size-4" />
-                  Import CSV
-                </Button>
+                  className="size-11"
+                />
               </>
             )}
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <a href={getExportHref("csv")}>
-                <Download className="mr-2 size-4" />
-                Export (CSV)
-              </a>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <a href={getExportHref("xlsx")}>
-                Export Excel
-                <Download className="ml-2 size-4" />
-              </a>
-            </Button>
+            <ActionIconButton
+              label="Export proyek ke CSV"
+              tooltip="Export CSV"
+              icon={Download}
+              href={getExportHref("csv")}
+              className="size-11"
+            />
+            <ActionIconButton
+              label="Export proyek ke Excel"
+              tooltip="Export Excel"
+              icon={FileSpreadsheet}
+              href={getExportHref("xlsx")}
+              className="size-11"
+            />
             {isProjectManager && (
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              >
-                <a href="/api/projects/template-csv" download>
-                  Download Template CSV
-                </a>
-              </Button>
+              <ActionIconButton
+                label="Download Template CSV"
+                tooltip="Download Template CSV"
+                icon={FileDown}
+                href="/api/projects/template-csv"
+                download
+                className="size-11"
+              />
             )}
           </div>
         </CardHeader>
@@ -1210,35 +1236,41 @@ export default function ProjectWorkstationMaster({
                 defaultValue={canViewFinancials ? "pagu" : "titik"}
                 className="space-y-4"
               >
-                <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted p-2">
+                <TabsList className="grid h-auto w-full grid-cols-6 justify-items-center gap-1 rounded-lg border border-border bg-muted p-2 sm:flex sm:flex-wrap sm:justify-start">
                   {canViewFinancials && (
-                    <TabsTrigger value="pagu" className="gap-2">
-                      <ClipboardList className="size-4" />
-                      Pagu & Realisasi
-                    </TabsTrigger>
+                    <ProjectViewTab
+                      value="pagu"
+                      label="Pagu & Realisasi"
+                      icon={ClipboardList}
+                    />
                   )}
-                  <TabsTrigger value="titik" className="gap-2">
-                    <HardHat className="size-4" />
-                    Titik & Upah
-                  </TabsTrigger>
-                  <TabsTrigger value="harian" className="gap-2">
-                    <Camera className="size-4" />
-                    Laporan Harian
-                  </TabsTrigger>
+                  <ProjectViewTab
+                    value="titik"
+                    label="Titik & Upah"
+                    icon={HardHat}
+                  />
+                  <ProjectViewTab
+                    value="harian"
+                    label="Laporan Harian"
+                    icon={Camera}
+                  />
                   {!isFieldTeam && (
                     <>
-                      <TabsTrigger value="gambar" className="gap-2">
-                        <ImageIcon className="size-4" />
-                        Gambar Kerja
-                      </TabsTrigger>
-                      <TabsTrigger value="kurva" className="gap-2">
-                        <ChartSpline className="size-4" />
-                        Kurva S
-                      </TabsTrigger>
-                      <TabsTrigger value="timeline" className="gap-2">
-                        <CalendarDays className="size-4" />
-                        Timeline Pekerjaan & Gaji
-                      </TabsTrigger>
+                      <ProjectViewTab
+                        value="gambar"
+                        label="Gambar Kerja"
+                        icon={ImageIcon}
+                      />
+                      <ProjectViewTab
+                        value="kurva"
+                        label="Kurva S"
+                        icon={ChartSpline}
+                      />
+                      <ProjectViewTab
+                        value="timeline"
+                        label="Timeline Pekerjaan & Gaji"
+                        icon={CalendarDays}
+                      />
                     </>
                   )}
                 </TabsList>
@@ -1378,12 +1410,12 @@ export default function ProjectWorkstationMaster({
                           </p>
                         </CardHeader>
                         <CardContent>
-                          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitWorkPoint}>
-                            <Label>Nama titik / tugas<Input name="title" required maxLength={180} /></Label>
-                            <Label>Koordinat<Input name="location" maxLength={240} /></Label>
-                            <Label>Tanggal mulai rencana<Input name="plannedStartDate" type="date" /></Label>
-                            <Label>Tanggal target selesai<Input name="targetDate" type="date" /></Label>
-                            <Label>Volume pekerjaan<Input name="proposedVolume" type="number" min="0.001" step="0.001" required onChange={(event) => {
+                          <form className="grid w-full grid-cols-1 items-start gap-3 sm:grid-cols-2" onSubmit={submitWorkPoint}>
+                            <Label className={workPointFieldClass}>Nama titik / tugas<Input className="w-full" name="title" required maxLength={180} /></Label>
+                            <Label className={workPointFieldClass}>Koordinat<Input className="w-full" name="location" maxLength={240} /></Label>
+                            <Label className={workPointFieldClass}>Tanggal mulai rencana<Input className="w-full" name="plannedStartDate" type="date" /></Label>
+                            <Label className={workPointFieldClass}>Tanggal target selesai<Input className="w-full" name="targetDate" type="date" /></Label>
+                            <Label className={workPointFieldClass}>Volume pekerjaan<Input className="w-full" name="proposedVolume" type="number" min="0.001" step="0.001" required onChange={(event) => {
                               const form = event.currentTarget.form;
                               if (!form) return;
                               const formData = new FormData(form);
@@ -1392,8 +1424,8 @@ export default function ProjectWorkstationMaster({
                                 String(formData.get("proposedUnitPrice") ?? ""),
                               ));
                             }} /></Label>
-                            <Label>Satuan volume<Input name="proposedUnit" maxLength={40} placeholder="m, m², m³, unit" required /></Label>
-                            <Label>
+                            <Label className={workPointFieldClass}>Satuan volume<Input className="w-full" name="proposedUnit" maxLength={40} placeholder="m, m², m³, unit" required /></Label>
+                            <Label className={workPointFieldClass}>
                               Harga satuan
                               <RupiahInput
                                 name="proposedUnitPrice"
@@ -1409,7 +1441,7 @@ export default function ProjectWorkstationMaster({
                                 }}
                               />
                             </Label>
-                            <Label>
+                            <Label className={workPointFieldClass}>
                               Total upah
                               <RupiahInput
                                 name="proposedTotalWage"

@@ -17,7 +17,7 @@ import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
 import { Wallet } from "lucide-react";
@@ -307,7 +307,7 @@ export default function IncomingFundModal({
                     ["CASH", "Tunai"],
                     ["DEPOSIT", "Setor Tunai"],
                   ].map(([value, label]) => (
-                    <label
+                    <FormLabel
                       key={value}
                       className="flex items-center gap-2 text-sm"
                     >
@@ -317,7 +317,7 @@ export default function IncomingFundModal({
                         {...form.register("paymentMethod")}
                       />
                       {label}
-                    </label>
+                    </FormLabel>
                   ))}
                 </div>
               </div>

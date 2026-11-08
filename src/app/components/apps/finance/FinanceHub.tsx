@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/table";
 import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import {
   GlobalModal,
 } from "@/components/ui/global-modal";
@@ -1814,7 +1814,7 @@ export default function FinanceHub({
                         accounts={financeAccounts}
                         disabled={isPending}
                       />
-                      <label className="space-y-1 text-sm">
+                      <FormLabel className="space-y-1 text-sm">
                         Bukti pembayaran (PDF/JPG/PNG/WEBP, maks. 5 MB)
                         <Input
                           type="file"
@@ -1830,7 +1830,7 @@ export default function FinanceHub({
                             }
                           }}
                         />
-                      </label>
+                      </FormLabel>
                       <Button
                         disabled={
                           !termynReceipts[termyn.id] ||
@@ -1874,7 +1874,7 @@ export default function FinanceHub({
                         accounts={financeAccounts}
                         disabled={isPending}
                       />
-                      <label className="space-y-1 text-sm">
+                      <FormLabel className="space-y-1 text-sm">
                         Bukti transfer retensi
                         <Input
                           type="file"
@@ -1890,7 +1890,7 @@ export default function FinanceHub({
                             }
                           }}
                         />
-                      </label>
+                      </FormLabel>
                       <Button
                         disabled={
                           !retentionReceipts[contract.id] ||
@@ -2067,7 +2067,7 @@ export default function FinanceHub({
                         disabled={isPending}
                         required={false}
                       />
-                      <label className="grid gap-1 text-sm">
+                      <FormLabel className="grid gap-1 text-sm">
                         Metode penyaluran dana
                         <select
                           name="disbursementMethod"
@@ -2090,8 +2090,8 @@ export default function FinanceHub({
                           <option value={POPaymentMethod.CASH}>Tunai / Cash</option>
                           <option value={POPaymentMethod.TRANSFER}>Transfer</option>
                         </select>
-                      </label>
-                      <label className="grid gap-1 text-sm">
+                      </FormLabel>
+                      <FormLabel className="grid gap-1 text-sm">
                         {fuelDisbursementMethods[request.id] === POPaymentMethod.TRANSFER
                           ? "Tujuan transfer (bank, no. rekening, nama penerima)"
                           : "Nama penerima dana tunai"}
@@ -2114,10 +2114,10 @@ export default function FinanceHub({
                           }
                           disabled={isPending}
                         />
-                      </label>
+                      </FormLabel>
                       {fuelDisbursementMethods[request.id] ===
                         POPaymentMethod.TRANSFER && (
-                        <label className="grid gap-1 text-sm md:col-span-2">
+                        <FormLabel className="grid gap-1 text-sm md:col-span-2">
                           Bukti transfer (wajib)
                           <Input
                             name="transferProof"
@@ -2129,16 +2129,16 @@ export default function FinanceHub({
                           <span className="text-xs text-muted-foreground">
                             PDF/JPG/PNG/WEBP, maksimal 5 MB.
                           </span>
-                        </label>
+                        </FormLabel>
                       )}
-                      <label className="grid gap-1 text-sm md:col-span-2">
+                      <FormLabel className="grid gap-1 text-sm md:col-span-2">
                         Catatan Keuangan (opsional)
                         <Input
                           name="financeNote"
                           maxLength={1000}
                           disabled={isPending}
                         />
-                      </label>
+                      </FormLabel>
                       <div className="flex flex-wrap gap-2 md:col-span-2">
                         <Button
                           type="submit"
@@ -2169,7 +2169,7 @@ export default function FinanceHub({
                           submitFuelReconciliation(event, request.id)
                         }
                       >
-                        <label className="grid gap-1 text-sm">
+                        <FormLabel className="grid gap-1 text-sm">
                           Catatan rekonsiliasi (opsional)
                           <Input
                             name="reconciliationNote"
@@ -2177,7 +2177,7 @@ export default function FinanceHub({
                             disabled={isPending}
                             placeholder="Contoh: ODO dan bukti pengisian sudah sesuai"
                           />
-                        </label>
+                        </FormLabel>
                         <Button
                           type="submit"
                           className="self-end"
@@ -2316,7 +2316,7 @@ export default function FinanceHub({
                   </p>
                   <div className="space-y-2 pt-1">
                     <Label>Jenis pembayaran</Label>
-                    <label className="flex items-center gap-2 font-normal">
+                    <FormLabel className="flex items-center gap-2 font-normal">
                       <input
                         type="radio"
                         name="paymentType"
@@ -2324,9 +2324,9 @@ export default function FinanceHub({
                         onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
                       />
                       Bayar Lunas (Full Payment)
-                    </label>
+                    </FormLabel>
                     {isFirstPayment && (
-                      <label className="flex items-center gap-2 font-normal">
+                      <FormLabel className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="paymentType"
@@ -2334,9 +2334,9 @@ export default function FinanceHub({
                           onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
                         />
                         Bayar Uang Muka (DP) / Sebagian
-                      </label>
+                      </FormLabel>
                     )}
-                    <label className="flex items-center gap-2 font-normal">
+                    <FormLabel className="flex items-center gap-2 font-normal">
                       <input
                         type="radio"
                         name="paymentType"
@@ -2344,7 +2344,7 @@ export default function FinanceHub({
                         onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
                       />
                       Pembayaran Termin
-                    </label>
+                    </FormLabel>
                     <div className="space-y-2">
                       <Label htmlFor="standalone-payment-amount">
                         Nominal Pembayaran (Rp)
@@ -2481,7 +2481,7 @@ export default function FinanceHub({
                   <form className="space-y-3 border-t pt-3" onSubmit={submitPayment}>
                     <section className="space-y-2 text-sm">
                       <Label>Jenis pembayaran</Label>
-                      <label className="flex items-center gap-2 font-normal">
+                      <FormLabel className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="direct-purchase-payment-type"
@@ -2489,9 +2489,9 @@ export default function FinanceHub({
                           onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
                         />
                         Bayar Lunas
-                      </label>
+                      </FormLabel>
                       {activeDirectPurchase.paymentTransactions.length === 0 && (
-                        <label className="flex items-center gap-2 font-normal">
+                        <FormLabel className="flex items-center gap-2 font-normal">
                           <input
                             type="radio"
                             name="direct-purchase-payment-type"
@@ -2499,9 +2499,9 @@ export default function FinanceHub({
                             onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
                           />
                           Uang Muka (DP)
-                        </label>
+                        </FormLabel>
                       )}
-                      <label className="flex items-center gap-2 font-normal">
+                      <FormLabel className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="direct-purchase-payment-type"
@@ -2509,7 +2509,7 @@ export default function FinanceHub({
                           onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
                         />
                         Pembayaran Termin
-                      </label>
+                      </FormLabel>
                       <div className="space-y-2">
                         <Label htmlFor="direct-purchase-payment-amount">
                           Nominal Pembayaran (Rp)
@@ -2645,7 +2645,7 @@ export default function FinanceHub({
                   <form className="space-y-3" onSubmit={submitPayment}>
                     <section className="space-y-2 rounded-lg border p-3 text-sm">
                       <Label>Jenis pembayaran</Label>
-                      <label className="flex items-center gap-2 font-normal">
+                      <FormLabel className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="paymentType"
@@ -2653,9 +2653,9 @@ export default function FinanceHub({
                           onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
                         />
                         Bayar Lunas (Full Payment)
-                      </label>
+                      </FormLabel>
                       {activeTicket.paymentTransactions.length === 0 && (
-                        <label className="flex items-center gap-2 font-normal">
+                        <FormLabel className="flex items-center gap-2 font-normal">
                           <input
                             type="radio"
                             name="paymentType"
@@ -2663,9 +2663,9 @@ export default function FinanceHub({
                             onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
                           />
                           Bayar Uang Muka (DP) / Sebagian
-                        </label>
+                        </FormLabel>
                       )}
-                      <label className="flex items-center gap-2 font-normal">
+                      <FormLabel className="flex items-center gap-2 font-normal">
                         <input
                           type="radio"
                           name="paymentType"
@@ -2673,7 +2673,7 @@ export default function FinanceHub({
                           onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
                         />
                         Pembayaran Termin
-                      </label>
+                      </FormLabel>
                       <div className="space-y-2">
                         <Label htmlFor="ticket-payment-amount">
                           Nominal Pembayaran (Rp)

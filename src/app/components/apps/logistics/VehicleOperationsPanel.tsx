@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -219,26 +220,26 @@ export default function VehicleOperationsPanel({
         className="sm:max-w-xl"
       >
           <form id="vehicle-master-form" className="mt-6 space-y-3" onSubmit={submitVehicle}>
-            <label className="grid gap-1 text-sm">
+            <FormLabel className="grid gap-1 text-sm">
               Nomor plat
               <Input name="plateNumber" required maxLength={20} placeholder="BL 1234 AB" />
-            </label>
-            <label className="grid gap-1 text-sm">
+            </FormLabel>
+            <FormLabel className="grid gap-1 text-sm">
               Jenis kendaraan
               <Input name="vehicleType" required maxLength={80} placeholder="Pick-up, Truk Engkel" />
-            </label>
-            <label className="grid gap-1 text-sm">
+            </FormLabel>
+            <FormLabel className="grid gap-1 text-sm">
               Merk
               <Input name="brand" maxLength={80} />
-            </label>
-            <label className="grid gap-1 text-sm">
+            </FormLabel>
+            <FormLabel className="grid gap-1 text-sm">
               Model
               <Input name="modelName" maxLength={80} />
-            </label>
-            <label className="grid gap-1 text-sm">
+            </FormLabel>
+            <FormLabel className="grid gap-1 text-sm">
               KM awal
               <Input name="initialKilometer" type="number" min="0" step="0.001" required defaultValue="0" />
-            </label>
+            </FormLabel>
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -265,7 +266,7 @@ export default function VehicleOperationsPanel({
         className="sm:max-w-xl"
       >
           <form id="vehicle-trip-form" className="mt-6 space-y-3" onSubmit={submitTripLog}>
-            <label className="grid gap-1 text-sm">
+            <FormLabel className="grid gap-1 text-sm">
               Kendaraan
               <select
                 name="vehicleId"
@@ -281,8 +282,8 @@ export default function VehicleOperationsPanel({
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="grid gap-1 text-sm">
+            </FormLabel>
+            <FormLabel className="grid gap-1 text-sm">
               Tujuan proyek
               <select name="projectId" required className="h-10 rounded-md border bg-background px-3">
                 <option value="">Pilih proyek</option>
@@ -292,8 +293,8 @@ export default function VehicleOperationsPanel({
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="grid gap-1 text-sm">
+            </FormLabel>
+            <FormLabel className="grid gap-1 text-sm">
               No. DO (opsional; hanya DO selesai tanpa log)
               <select name="deliveryOrderId" className="h-10 rounded-md border bg-background px-3">
                 <option value="">Tidak terkait DO</option>
@@ -301,9 +302,9 @@ export default function VehicleOperationsPanel({
                   <option key={order.id} value={order.id}>{order.doNumber}</option>
                 ))}
               </select>
-            </label>
+            </FormLabel>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-1 text-sm">
+              <FormLabel className="grid gap-1 text-sm">
                 KM awal
                 <Input
                   name="kilometerStart"
@@ -314,11 +315,11 @@ export default function VehicleOperationsPanel({
                   defaultValue={selectedVehicle?.currentKilometer ?? ""}
                   key={selectedVehicle?.id ?? "no-vehicle"}
                 />
-              </label>
-              <label className="grid gap-1 text-sm">
+              </FormLabel>
+              <FormLabel className="grid gap-1 text-sm">
                 KM akhir
                 <Input name="kilometerEnd" type="number" min="0" step="0.001" required />
-              </label>
+              </FormLabel>
             </div>
             <div className="flex justify-end gap-2">
               <Button

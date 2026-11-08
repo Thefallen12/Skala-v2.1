@@ -1,4 +1,5 @@
 'use client'
+import { FormLabel } from "@/components/ui/label"
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
@@ -198,12 +199,12 @@ export const Login = () => {
               name='identifier'
               render={({ field }) => (
                 <div className='space-y-2'>
-                  <label
+                  <FormLabel
                     htmlFor='identifier'
                     className='text-xs font-bold uppercase tracking-wider text-slate-700 dark:!text-slate-700'
                   >
                     Email
-                  </label>
+                  </FormLabel>
                   <div className='relative'>
                     <Mail
                       aria-hidden='true'
@@ -243,12 +244,12 @@ export const Login = () => {
               render={({ field }) => (
                 <div className='space-y-2'>
                   <div className='flex items-center justify-between gap-3'>
-                    <label
+                    <FormLabel
                       htmlFor='password'
                       className='text-xs font-bold uppercase tracking-wider text-slate-700 dark:!text-slate-700'
                     >
                       Kata Sandi
-                    </label>
+                    </FormLabel>
                     <span className='text-right text-xs text-slate-500'>
                       Lupa kata sandi? Hubungi administrator.
                     </span>

@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition } from "react";
 import { format } from "date-fns";
@@ -550,6 +551,9 @@ export default function TicketListing({
         </p>
       )}
 
+      <p className="mb-2 text-xs text-muted-foreground sm:hidden">
+        Geser tabel ke samping untuk melihat semua kolom.
+      </p>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -1288,7 +1292,7 @@ export default function TicketListing({
           </div>
           {readyStockItems.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1.5 text-sm">
+              <FormLabel className="space-y-1.5 text-sm">
                 <span className="font-medium">Mover untuk pengiriman</span>
                 <select
                   value={selectedMoverId}
@@ -1309,8 +1313,8 @@ export default function TicketListing({
                     Belum ada Mover aktif yang dapat ditugaskan.
                   </span>
                 )}
-              </label>
-              <label className="space-y-1.5 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1.5 text-sm">
                 <span className="font-medium">Kendaraan (ditetapkan Logistik)</span>
                 <select
                   value={selectedVehicleId}
@@ -1333,7 +1337,7 @@ export default function TicketListing({
                     Tidak ada kendaraan tersedia dengan KM awal yang sudah disiapkan.
                   </span>
                 )}
-              </label>
+              </FormLabel>
             </div>
           )}
           {fulfillmentMessage && (
@@ -1400,7 +1404,7 @@ export default function TicketListing({
             }
             className="grid gap-3 sm:grid-cols-2"
           >
-            <label
+            <FormLabel
               htmlFor="ticket-procurement-po"
               className="flex cursor-pointer items-start gap-3 rounded-lg border p-4"
             >
@@ -1414,8 +1418,8 @@ export default function TicketListing({
                   Pengadaan melalui PO vendor dan alur persetujuan.
                 </span>
               </span>
-            </label>
-            <label
+            </FormLabel>
+            <FormLabel
               htmlFor="ticket-procurement-direct"
               className="flex cursor-pointer items-start gap-3 rounded-lg border p-4"
             >
@@ -1431,7 +1435,7 @@ export default function TicketListing({
                   Catat pembelian barang yang dibutuhkan tanpa membuat PO.
                 </span>
               </span>
-            </label>
+            </FormLabel>
           </RadioGroup>
           {selectedTicket && selectedTicketItems.length > 0 &&
           purchaseMode === "PURCHASE_ORDER" ? (

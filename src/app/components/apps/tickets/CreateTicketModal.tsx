@@ -29,7 +29,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
@@ -72,7 +72,7 @@ const requestCategoryLabels: Record<TicketRequestCategory, string> = {
   REIMBURSEMENT: "Reimbursement",
   KASBON: "Kasbon / Ambilan",
   OPERATING_EXPENSE: "Biaya Operasional",
-  SHIPPING_COST: "Biaya Pengiriman",
+  SHIPPING_COST: "Pengiriman Barang PO",
 };
 
 const internalFundingCategories = [
@@ -121,8 +121,6 @@ const ticketFormSchema = z
     requestPaymentMethod: z.enum(Object.values(POPaymentMethod)).optional(),
     transferDestination: z.string().optional(),
     requestPaymentDescription: z.string().optional(),
-    originCity: z.string(),
-    destinationCity: z.string(),
     relatedDocumentNumbers: z.string(),
     receiptFiles: z.array(z.instanceof(File)).max(5),
     operationalRequestType: z.enum(["GENERAL", "SURVEY"]),
@@ -311,42 +309,25 @@ const ticketFormSchema = z
       }
     }
     if (isShippingCostRequest) {
-      if (!values.originCity.trim() || values.originCity.trim().length > 120) {
-        context.addIssue({
-          code: "custom",
-          path: ["originCity"],
-          message: "Kota asal wajib diisi (maksimal 120 karakter).",
-        });
-      }
-      if (
-        !values.destinationCity.trim() ||
-        values.destinationCity.trim().length > 120
-      ) {
-        context.addIssue({
-          code: "custom",
-          path: ["destinationCity"],
-          message: "Kota tujuan wajib diisi (maksimal 120 karakter).",
-        });
-      }
-      if (values.requestedAmount === undefined) {
-        context.addIssue({
-          code: "custom",
-          path: ["requestedAmount"],
-          message: "Nominal biaya pengiriman harus lebih besar dari 0.",
-        });
-      }
-      if (values.relatedDocumentNumbers.trim().length > 2000) {
+      if (!values.relatedDocumentNumbers.trim()) {
         context.addIssue({
           code: "custom",
           path: ["relatedDocumentNumbers"],
-          message: "Daftar dokumen terkait terlalu panjang.",
+          message: "Pilih setidaknya satu PO barang.",
+        });
+      } else if (values.relatedDocumentNumbers.length > 2000) {
+        context.addIssue({
+          code: "custom",
+          path: ["relatedDocumentNumbers"],
+          message: "Daftar PO terlalu panjang.",
         });
       }
       if (values.items.length > 0) {
         context.addIssue({
           code: "custom",
           path: ["items"],
-          message: "Permintaan biaya pengiriman tidak menggunakan rincian barang.",
+          message:
+            "Tiket pengiriman barang menggunakan rincian PO, bukan rincian item manual.",
         });
       }
     }
@@ -410,12 +391,12 @@ const ticketFormSchema = z
           });
         }
       }
-    } else if (isAPHRequest || isInternalFunding || isShippingCostRequest) {
+    } else if (isAPHRequest || isInternalFunding) {
       if (values.items.length > 0) {
         context.addIssue({
           code: "custom",
           path: ["items"],
-          message: "Permintaan dana APH tidak menggunakan rincian item.",
+          message: "Pengajuan ini tidak menggunakan rincian item.",
         });
       }
     } else {
@@ -519,7 +500,7 @@ const getRequestTypeOptions = (
 
   if (role === UserRole.LOGISTICS || role === UserRole.DIRECTOR) {
     options.push({
-      label: "Biaya Pengiriman (Ekspedisi/Mover)",
+      label: requestCategoryLabels[TicketRequestCategory.SHIPPING_COST],
       value: TicketRequestCategory.SHIPPING_COST,
     });
   }
@@ -631,8 +612,6 @@ export default function CreateTicketModal({
       requestPaymentMethod: POPaymentMethod.CASH,
       transferDestination: "",
       requestPaymentDescription: "",
-      originCity: "",
-      destinationCity: "",
       relatedDocumentNumbers: "",
       receiptFiles: [],
       operationalRequestType: "GENERAL",
@@ -769,7 +748,7 @@ export default function CreateTicketModal({
         console.error("Shipping document options failed to load:", loadError);
         if (active) {
           setShippingDocumentsError(
-            "PO dan tiket tidak dapat dimuat. Muat ulang daftar dokumen untuk mencoba lagi.",
+            "Daftar PO tidak dapat dimuat. Muat ulang untuk mencoba lagi.",
           );
           setShippingDocumentsLoaded(true);
         }
@@ -783,17 +762,11 @@ export default function CreateTicketModal({
   const updateSelectedShippingDocuments = (nextKeys: string[]) => {
     setSelectedShippingDocumentKeys(nextKeys);
     const selectedNumbers = nextKeys.flatMap((key) => {
-      const [kind, id] = key.split(":", 2);
-      if (kind === "PO") {
-        const order = shippingDocumentOptions?.purchaseOrders.find(
-          (option) => option.id === id,
-        );
-        return order ? [order.poNumber] : [];
-      }
-      const ticket = shippingDocumentOptions?.tickets.find(
+      const [, id] = key.split(":", 2);
+      const order = shippingDocumentOptions?.purchaseOrders.find(
         (option) => option.id === id,
       );
-      return ticket ? [ticket.ticketNumber] : [];
+      return order ? [order.poNumber] : [];
     });
     form.setValue("relatedDocumentNumbers", selectedNumbers.join(", "), {
       shouldDirty: true,
@@ -810,7 +783,7 @@ export default function CreateTicketModal({
   const shippingDocumentGroups = [
     {
       key: "PO",
-      title: "Purchase Order (PO)",
+      title: "PO Barang",
       options: (shippingDocumentOptions?.purchaseOrders ?? []).map(
         (option) => ({
           id: option.id,
@@ -818,15 +791,6 @@ export default function CreateTicketModal({
           detail: option.vendorName,
         }),
       ),
-    },
-    {
-      key: "TICKET",
-      title: "Tiket Permintaan Material",
-      options: (shippingDocumentOptions?.tickets ?? []).map((option) => ({
-        id: option.id,
-        number: option.ticketNumber,
-        detail: option.title,
-      })),
     },
   ] as const;
   const requiresFundingRequest =
@@ -881,7 +845,7 @@ export default function CreateTicketModal({
       : isInternalFunding
         ? `${categoryLabel}: ${values.requestPaymentDescription?.trim()}`.slice(0, 160)
       : isShippingCostRequest
-        ? `${categoryLabel}: ${values.originCity.trim()} ke ${values.destinationCity.trim()}`.slice(0, 160)
+        ? `${categoryLabel}: ${values.relatedDocumentNumbers.trim()}`.slice(0, 160)
       : requiresRecipientPayment
       ? `${subCategoryLabel}: ${values.recipientName?.trim()}`.slice(0, 160)
       : `${categoryLabel}: ${firstItemName}`.slice(0, 160);
@@ -907,14 +871,8 @@ export default function CreateTicketModal({
       isInternalFunding
         ? `Keterangan: ${values.requestPaymentDescription?.trim()}`
         : null,
-      isShippingCostRequest
-        ? `Rute pengiriman: ${values.originCity.trim()} ke ${values.destinationCity.trim()}`
-        : null,
-      isShippingCostRequest
-        ? `Nominal biaya pengiriman: ${formatCurrency(values.requestedAmount ?? 0)}`
-        : null,
       isShippingCostRequest && values.relatedDocumentNumbers.trim()
-        ? `Dokumen terkait: ${values.relatedDocumentNumbers
+        ? `PO barang: ${values.relatedDocumentNumbers
             .split(",")
             .map((number) => number.trim())
             .filter(Boolean)
@@ -975,10 +933,6 @@ export default function CreateTicketModal({
         requestPaymentDescription: isAPHRequest
           ? values.requestPaymentDescription
           : undefined,
-        originCity: isShippingCostRequest ? values.originCity : undefined,
-        destinationCity: isShippingCostRequest
-          ? values.destinationCity
-          : undefined,
         relatedDocumentNumbers: isShippingCostRequest
           ? values.relatedDocumentNumbers
           : undefined,
@@ -996,7 +950,7 @@ export default function CreateTicketModal({
           ? values.requestedAmount
           : isOperationalFunding
             ? operationalAmount
-            : isAPHRequest || isInternalFunding || isShippingCostRequest
+            : isAPHRequest || isInternalFunding
               ? values.requestedAmount
               : undefined,
         receiptFiles: isInternalFunding ? values.receiptFiles : [],
@@ -1280,162 +1234,112 @@ export default function CreateTicketModal({
             {isShippingCostRequest && (
               <section className="space-y-4 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4 md:col-span-2">
                 <div>
-                  <h3 className="font-semibold">Detail Biaya Pengiriman</h3>
+                  <h3 className="font-semibold">Barang yang Akan Dikirim</h3>
                   <p className="text-sm text-muted-foreground">
-                    Isi rute dan nominal biaya ekspedisi atau mover. Dokumen
-                    terkait dapat dikosongkan.
+                    Pilih PO yang berisi barang pengiriman. Nominal biaya dan
+                    data ekspedisi tidak diperlukan.
                   </p>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-shipping-origin">Dari Kota (Asal)</Label>
-                    <Input
-                      id="ticket-shipping-origin"
-                      maxLength={120}
-                      placeholder="Contoh: Medan"
-                      aria-invalid={!!form.formState.errors.originCity}
-                      {...form.register("originCity")}
-                    />
-                    {form.formState.errors.originCity && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.originCity.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-shipping-destination">
-                      Ke Kota (Tujuan)
-                    </Label>
-                    <Input
-                      id="ticket-shipping-destination"
-                      maxLength={120}
-                      placeholder="Contoh: Takengon"
-                      aria-invalid={!!form.formState.errors.destinationCity}
-                      {...form.register("destinationCity")}
-                    />
-                    {form.formState.errors.destinationCity && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.destinationCity.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-shipping-amount">
-                      Nominal Biaya (Rp)
-                    </Label>
-                    <RupiahAmountInput
-                      id="ticket-shipping-amount"
-                      value={
-                        watchedRequestedAmount === undefined
-                          ? ""
-                          : formatRupiahNumber(watchedRequestedAmount)
-                      }
-                      onChange={(value) => {
-                        const amount = parseRupiahInput(value);
-                        form.setValue(
-                          "requestedAmount",
-                          amount > 0 ? amount : undefined,
-                          { shouldDirty: true, shouldValidate: true },
-                        );
-                      }}
-                      required
-                    />
-                    {form.formState.errors.requestedAmount && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.requestedAmount.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>
-                      Pilih PO / Tiket Belanja Terkait (Opsional)
-                    </Label>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {shippingDocumentGroups.map((group) => (
-                        <fieldset
-                          key={group.key}
-                          className="min-w-0 space-y-2 rounded-md border p-3"
-                          disabled={shippingDocumentsLoading}
-                        >
-                          <legend className="px-1 text-sm font-medium">
-                            {group.title}
-                          </legend>
-                          <div className="max-h-40 space-y-1 overflow-y-auto">
-                            {group.options.length === 0 ? (
-                              <p className="py-2 text-xs text-muted-foreground">
-                                Belum ada {group.key === "PO" ? "PO" : "tiket"}.
-                              </p>
-                            ) : (
-                              group.options.map((option) => {
-                                const key = `${group.key}:${option.id}`;
-                                return (
-                                  <label
-                                    key={key}
-                                    htmlFor={`shipping-document-${key}`}
-                                    className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
-                                  >
-                                    <Checkbox
-                                      id={`shipping-document-${key}`}
-                                      checked={selectedShippingDocumentKeys.includes(
+                <div className="space-y-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {shippingDocumentGroups.map((group) => (
+                      <fieldset
+                        key={group.key}
+                        className="min-w-0 space-y-2 rounded-md border p-3"
+                        disabled={shippingDocumentsLoading}
+                        aria-invalid={
+                          !!form.formState.errors.relatedDocumentNumbers
+                        }
+                        aria-describedby={
+                          form.formState.errors.relatedDocumentNumbers
+                            ? "ticket-related-po-error"
+                            : undefined
+                        }
+                      >
+                        <legend className="px-1 text-sm font-medium">
+                          Pilih PO Barang{" "}
+                          <span className="text-destructive" aria-hidden="true">
+                            *
+                          </span>
+                        </legend>
+                        <div className="max-h-40 space-y-1 overflow-y-auto">
+                          {group.options.length === 0 ? (
+                            <p className="py-2 text-xs text-muted-foreground">
+                              Belum ada PO.
+                            </p>
+                          ) : (
+                            group.options.map((option) => {
+                              const key = `${group.key}:${option.id}`;
+                              return (
+                                <FormLabel
+                                  key={key}
+                                  htmlFor={`shipping-document-${key}`}
+                                  className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
+                                >
+                                  <Checkbox
+                                    id={`shipping-document-${key}`}
+                                    checked={selectedShippingDocumentKeys.includes(
+                                      key,
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      toggleShippingDocument(
                                         key,
-                                      )}
-                                      onCheckedChange={(checked) =>
-                                        toggleShippingDocument(
-                                          key,
-                                          checked === true,
-                                        )
-                                      }
-                                    />
-                                    <span className="min-w-0 text-xs">
-                                      <span className="block font-medium">
-                                        {option.number}
-                                      </span>
-                                      <span className="block truncate text-muted-foreground">
-                                        {option.detail}
-                                      </span>
+                                        checked === true,
+                                      )
+                                    }
+                                  />
+                                  <span className="min-w-0 text-xs">
+                                    <span className="block font-medium">
+                                      {option.number}
                                     </span>
-                                  </label>
-                                );
-                              })
-                            )}
-                          </div>
-                        </fieldset>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Pilih satu atau beberapa PO maupun tiket belanja
-                      material.
-                    </p>
-                    {shippingDocumentsLoading && (
-                      <p className="text-xs text-muted-foreground" role="status">
-                        Memuat daftar PO dan tiket...
-                      </p>
-                    )}
-                    {shippingDocumentsError && (
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm text-destructive" role="alert">
-                          {shippingDocumentsError}
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setShippingDocumentsError("");
-                            setShippingDocumentsLoaded(false);
-                            setShippingDocumentsAttempt((attempt) => attempt + 1);
-                          }}
-                        >
-                          Muat ulang
-                        </Button>
-                      </div>
-                    )}
-                    {form.formState.errors.relatedDocumentNumbers && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.relatedDocumentNumbers.message}
-                      </p>
-                    )}
+                                    <span className="block truncate text-muted-foreground">
+                                      {option.detail}
+                                    </span>
+                                  </span>
+                                </FormLabel>
+                              );
+                            })
+                          )}
+                        </div>
+                      </fieldset>
+                    ))}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Pilih satu atau beberapa PO yang memuat barang.
+                  </p>
+                  {shippingDocumentsLoading && (
+                    <p className="text-xs text-muted-foreground" role="status">
+                      Memuat daftar PO...
+                    </p>
+                  )}
+                  {shippingDocumentsError && (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm text-destructive" role="alert">
+                        {shippingDocumentsError}
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShippingDocumentsError("");
+                          setShippingDocumentsLoaded(false);
+                          setShippingDocumentsAttempt((attempt) => attempt + 1);
+                        }}
+                      >
+                        Muat ulang
+                      </Button>
+                    </div>
+                  )}
+                  {form.formState.errors.relatedDocumentNumbers && (
+                    <p
+                      id="ticket-related-po-error"
+                      className="text-sm text-destructive"
+                      role="alert"
+                    >
+                      {form.formState.errors.relatedDocumentNumbers.message}
+                    </p>
+                  )}
                 </div>
               </section>
             )}

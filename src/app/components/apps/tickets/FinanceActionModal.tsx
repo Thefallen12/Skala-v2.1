@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import {
   PaymentType,
   POPaymentMethod,
@@ -218,7 +218,7 @@ export default function FinanceActionModal({
               {ticket.accountNumber || "Tidak dicantumkan"}
             </p>
           </section>
-          <label className="block space-y-2 text-sm font-medium">
+          <FormLabel className="block space-y-2 text-sm font-medium">
             {isCashPayment ? "Keterangan pembayaran tunai" : "Tujuan transfer"}
             <Input
               key={ticket.id}
@@ -233,7 +233,7 @@ export default function FinanceActionModal({
               required
               disabled={isPending}
             />
-          </label>
+          </FormLabel>
           <div className="space-y-2">
             <Label htmlFor="ticket-finance-account">
               Dibayar Dari (Buku Bank/Kas)
@@ -265,7 +265,7 @@ export default function FinanceActionModal({
           </div>
           <fieldset className="space-y-2 rounded-md border p-3 text-sm">
             <legend className="px-1 font-medium">Skema pembayaran</legend>
-            <label className="flex items-center gap-2">
+            <FormLabel className="flex items-center gap-2">
               <input
                 type="radio"
                 name="paymentType"
@@ -273,9 +273,9 @@ export default function FinanceActionModal({
                 onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
               />
               Bayar Lunas (Full Payment)
-            </label>
+            </FormLabel>
             {isFirstPayment && (
-              <label className="flex items-center gap-2">
+              <FormLabel className="flex items-center gap-2">
                 <input
                   type="radio"
                   name="paymentType"
@@ -283,9 +283,9 @@ export default function FinanceActionModal({
                   onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
                 />
                 Bayar Uang Muka (DP) / Sebagian
-              </label>
+              </FormLabel>
             )}
-            <label className="block space-y-2 font-medium">
+            <FormLabel className="block space-y-2 font-medium">
               Nominal Pembayaran (Rp)
               <RupiahAmountInput
                 id="finance-action-payment-amount"
@@ -300,9 +300,9 @@ export default function FinanceActionModal({
                   isPending || currentPaymentType === PaymentType.FULL_PAYMENT
                 }
               />
-            </label>
+            </FormLabel>
           </fieldset>
-          <label className="block space-y-2 text-sm font-medium">
+          <FormLabel className="block space-y-2 text-sm font-medium">
             {isCashPayment
               ? "Upload Bukti Penyerahan Dana"
               : "Upload Bukti Transfer / Pengiriman Dana"}
@@ -313,7 +313,7 @@ export default function FinanceActionModal({
               disabled={isPending}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-          </label>
+          </FormLabel>
           {message && (
             <p className="text-sm text-muted-foreground" role="status">
               {message}

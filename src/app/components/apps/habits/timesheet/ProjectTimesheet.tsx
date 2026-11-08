@@ -15,7 +15,7 @@ import {
 import CardBox from "@/app/components/shared/CardBox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { TablePaginationControls } from "@/components/ui/table";
@@ -220,7 +220,7 @@ export default function ProjectTimesheet({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[10px]">
-            <label className="flex items-center gap-1.5">
+            <FormLabel className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Member</span>
               <select
                 aria-label="Filter anggota"
@@ -242,8 +242,8 @@ export default function ProjectTimesheet({
                   <option key={member.id} value={member.id}>{member.name}</option>
                 ))}
               </select>
-            </label>
-            <label className="flex items-center gap-1.5">
+            </FormLabel>
+            <FormLabel className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Team</span>
               <select
                 aria-label="Filter tim"
@@ -265,8 +265,8 @@ export default function ProjectTimesheet({
                   <option key={role} value={role}>{role.replaceAll("_", " ")}</option>
                 ))}
               </select>
-            </label>
-            <label className="flex items-center gap-1.5">
+            </FormLabel>
+            <FormLabel className="flex items-center gap-1.5">
               <span className="text-muted-foreground">Time Frame</span>
               <select
                 aria-label="Rentang waktu"
@@ -278,8 +278,8 @@ export default function ProjectTimesheet({
                 <option value="14">14 days</option>
                 <option value="30">30 days</option>
               </select>
-            </label>
-            <label className="flex items-center gap-1.5">
+            </FormLabel>
+            <FormLabel className="flex items-center gap-1.5">
               <span className="text-muted-foreground">More filters</span>
               <select
                 aria-label="Filter proyek"
@@ -301,7 +301,7 @@ export default function ProjectTimesheet({
                   <option key={project.id} value={project.id}>{project.code}</option>
                 ))}
               </select>
-            </label>
+            </FormLabel>
             <Button size="sm" className="h-8 px-2.5 text-[10px]" onClick={() => setIsDialogOpen(true)} disabled={!projects.length}>
               <Plus className="mr-1 size-3.5" /> Catat jam
             </Button>

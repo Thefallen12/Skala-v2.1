@@ -128,10 +128,9 @@ public class MainActivity extends BridgeActivity {
 
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
-        settings.setSupportZoom(false);
-        settings.setBuiltInZoomControls(false);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(true);
         settings.setDisplayZoomControls(false);
-        settings.setTextZoom(100);
 
         // Inject script untuk memastikan lebar 100% dan menghilangkan area kosong / sidebar di mobile
         webView.setWebViewClient(new WebViewClient() {
@@ -158,7 +157,7 @@ public class MainActivity extends BridgeActivity {
             "    meta.name = 'viewport';" +
             "    document.head.appendChild(meta);" +
             "  }" +
-            "  meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
+            "  meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';" +
             "})();";
         view.evaluateJavascript(js, null);
     }

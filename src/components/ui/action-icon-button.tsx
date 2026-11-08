@@ -17,6 +17,7 @@ type ActionIconButtonProps = {
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
   onLinkClick?: React.MouseEventHandler<HTMLAnchorElement>;
   href?: string;
+  download?: boolean | string;
   target?: React.HTMLAttributeAnchorTarget;
   rel?: string;
   disabled?: boolean;
@@ -33,6 +34,7 @@ export function ActionIconButton({
   onClick,
   onLinkClick,
   href,
+  download,
   target,
   rel,
   disabled,
@@ -56,6 +58,7 @@ export function ActionIconButton({
     >
       <Link
         href={href}
+        download={download}
         target={target}
         rel={rel}
         aria-label={label}

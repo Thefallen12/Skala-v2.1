@@ -32,7 +32,7 @@ import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormLabel, Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -935,7 +935,7 @@ export default function LogisticsHub({
         className="sm:max-w-xl"
       >
           <form className="mt-6 space-y-4" onSubmit={submitEquipmentLog}>
-            <label className="block space-y-1 text-sm">
+            <FormLabel className="block space-y-1 text-sm">
               Proyek
               <select className="h-10 w-full rounded-md border bg-background px-3" name="projectId" required>
                 <option value="">Pilih proyek</option>
@@ -945,8 +945,8 @@ export default function LogisticsHub({
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="block space-y-1 text-sm">
+            </FormLabel>
+            <FormLabel className="block space-y-1 text-sm">
               Master alat (opsional)
               <select className="h-10 w-full rounded-md border bg-background px-3" name="equipmentMasterId" defaultValue="">
                 <option value="">Catat tanpa master</option>
@@ -956,41 +956,41 @@ export default function LogisticsHub({
                   </option>
                 ))}
               </select>
-            </label>
+            </FormLabel>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm">
+              <FormLabel className="space-y-1 text-sm">
                 Nama alat
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="equipmentName" maxLength={120} required />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 Operator
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="operatorName" maxLength={120} />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 Tanggal
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="date" type="date" required defaultValue={today} />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 HM awal
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="hmStart" type="number" min="0" step="0.01" required />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 HM akhir
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="hmEnd" type="number" min="0" step="0.01" required />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 Jam efektif
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="effectiveHours" type="number" min="0" max="24" step="0.01" required />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 BBM (liter)
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="fuelLiter" type="number" min="0" step="0.01" required />
-              </label>
+              </FormLabel>
             </div>
-            <label className="block space-y-1 text-sm">
+            <FormLabel className="block space-y-1 text-sm">
               Catatan
               <textarea className="min-h-20 w-full rounded-md border bg-background p-3" name="notes" maxLength={2000} />
-            </label>
+            </FormLabel>
             {equipmentMessage && <p className="text-sm" role="status">{equipmentMessage}</p>}
             <Button type="submit" disabled={isPending || projects.length === 0}>
               {isPending ? "Menyimpan..." : "Simpan Log"}
@@ -1006,27 +1006,27 @@ export default function LogisticsHub({
         className="sm:max-w-lg"
       >
           <form className="mt-6 space-y-4" onSubmit={submitEquipmentMaster}>
-            <label className="block space-y-1 text-sm">
+            <FormLabel className="block space-y-1 text-sm">
               Nama alat
               <input className="h-10 w-full rounded-md border bg-background px-3" name="name" maxLength={160} required />
-            </label>
+            </FormLabel>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm">
+              <FormLabel className="space-y-1 text-sm">
                 Merek
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="brand" maxLength={120} />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 No. plat / seri
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="licensePlate" maxLength={80} />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 Tarif operasional per jam
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="hourlyRate" type="number" min="0" step="0.01" required defaultValue="0" />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 HM saat registrasi
                 <input className="h-10 w-full rounded-md border bg-background px-3" name="currentHM" type="number" min="0" step="0.01" required defaultValue="0" />
-              </label>
+              </FormLabel>
             </div>
             {equipmentMessage && <p className="text-sm" role="status">{equipmentMessage}</p>}
             <Button type="submit" disabled={isPending}>

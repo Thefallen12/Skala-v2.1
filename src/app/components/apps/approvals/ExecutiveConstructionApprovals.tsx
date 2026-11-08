@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import {
@@ -255,10 +256,10 @@ export default function ExecutiveConstructionApprovals({
               <option value="FHO">BAST-2 / FHO</option>
             </select>
             <Input name="date" type="date" required />
-            <label className="space-y-1 text-sm">
+            <FormLabel className="space-y-1 text-sm">
               Akhir masa pemeliharaan (PHO)
               <Input name="maintenanceEndsAt" type="date" />
-            </label>
+            </FormLabel>
             <Input name="notes" maxLength={4000} placeholder="Catatan serah terima" />
             <Button type="submit" disabled={isPending} className="sm:col-span-2">
               Buat Draf BAST

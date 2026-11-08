@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useState, type ChangeEvent } from "react";
 import type { Editor } from "@tiptap/react";
@@ -325,7 +326,7 @@ export default function WordToolbar({
         <ToolbarButton label="Strikethrough" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
           <Strikethrough />
         </ToolbarButton>
-        <label className="flex h-8 items-center gap-1 rounded-md border px-2 text-xs" title="Warna teks">
+        <FormLabel className="flex h-8 items-center gap-1 rounded-md border px-2 text-xs" title="Warna teks">
           <span>Warna</span>
           <input
             type="color"
@@ -334,7 +335,7 @@ export default function WordToolbar({
             value={color}
             onChange={(event) => editor.chain().focus().setColor(event.target.value).run()}
           />
-        </label>
+        </FormLabel>
         <Select
           defaultValue="11pt"
           onValueChange={(value) => editor.chain().focus().setFontSize(value).run()}
@@ -473,7 +474,7 @@ export default function WordToolbar({
             </div>
             <div className="grid grid-cols-2 gap-3">
               {(["top", "right", "bottom", "left"] as const).map((side) => (
-                <label key={side} className="space-y-1 text-sm">
+                <FormLabel key={side} className="space-y-1 text-sm">
                   {side === "top" ? "Atas" : side === "right" ? "Kanan" : side === "bottom" ? "Bawah" : "Kiri"}
                   <Input
                     type="number"
@@ -491,7 +492,7 @@ export default function WordToolbar({
                     }}
                     aria-label={`Margin ${side}`}
                   />
-                </label>
+                </FormLabel>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">Nilai dalam milimeter (5–50 mm).</p>
@@ -550,7 +551,7 @@ export default function WordToolbar({
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <label className="space-y-1 text-sm">
+              <FormLabel className="space-y-1 text-sm">
                 Lebar gambar (px)
                 <Input
                   type="number"
@@ -559,8 +560,8 @@ export default function WordToolbar({
                   value={imageWidth}
                   onChange={(event) => setImageWidth(event.target.value)}
                 />
-              </label>
-              <label className="space-y-1 text-sm">
+              </FormLabel>
+              <FormLabel className="space-y-1 text-sm">
                 Posisi gambar
                 <Select value={imageAlignment} onValueChange={setImageAlignment}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -570,7 +571,7 @@ export default function WordToolbar({
                     <SelectItem value="right">Kanan</SelectItem>
                   </SelectContent>
                 </Select>
-              </label>
+              </FormLabel>
             </div>
             {isImageSelected && (
               <div className="space-y-2 rounded-md border p-3">

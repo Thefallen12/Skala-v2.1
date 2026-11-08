@@ -5,8 +5,19 @@ import * as LabelPrimitive from "@radix-ui/react-label"
 
 import { cn } from "@/lib/utils"
 
+function renderLabelChildren(children: React.ReactNode) {
+  return React.Children.map(children, (child) =>
+    typeof child === "string" && child.trim() ? (
+      <span data-slot="label-text">{child}</span>
+    ) : (
+      child
+    )
+  )
+}
+
 function Label({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof LabelPrimitive.Root>) {
   return (
@@ -17,8 +28,21 @@ function Label({
         className
       )}
       {...props}
-    />
+    >
+      {renderLabelChildren(children)}
+    </LabelPrimitive.Root>
   )
 }
 
-export { Label }
+function FormLabel({
+  children,
+  ...props
+}: React.ComponentProps<"label">) {
+  return (
+    <label {...props} data-slot="label">
+      {renderLabelChildren(children)}
+    </label>
+  )
+}
+
+export { FormLabel, Label }

@@ -1,4 +1,5 @@
 "use client";
+import { FormLabel } from "@/components/ui/label"
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -35,7 +36,10 @@ const categoryOptions = [
     label: "Belanja Kebutuhan Tim Lapangan",
   },
   { value: TicketRequestCategory.APH, label: "APH" },
-  { value: TicketRequestCategory.SHIPPING_COST, label: "Biaya Pengiriman" },
+  {
+    value: TicketRequestCategory.SHIPPING_COST,
+    label: "Pengiriman Barang PO",
+  },
 ] as const;
 
 type CategoryFilter = (typeof categoryOptions)[number]["value"];
@@ -109,9 +113,9 @@ export default function TicketStatisticsModal({
               </div>
             </div>
             <div className="w-full sm:w-44">
-              <label className="mb-1.5 block text-sm font-medium">
+              <FormLabel className="mb-1.5 block text-sm font-medium">
                 Periode
-              </label>
+              </FormLabel>
               <Select value={period} onValueChange={setPeriod}>
                 <SelectTrigger aria-label="Periode statistik">
                   <SelectValue />
@@ -124,9 +128,9 @@ export default function TicketStatisticsModal({
               </Select>
             </div>
             <div className="w-full sm:w-64">
-              <label className="mb-1.5 block text-sm font-medium">
+              <FormLabel className="mb-1.5 block text-sm font-medium">
                 Jenis permintaan
-              </label>
+              </FormLabel>
               <Select
                 value={category}
                 onValueChange={(value) => {
