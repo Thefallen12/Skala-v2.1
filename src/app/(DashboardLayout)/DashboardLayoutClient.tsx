@@ -94,31 +94,43 @@ export default function DashboardLayoutClient({
           <div
             role='status'
             aria-live='polite'
-            className='fixed right-4 top-20 z-[60] w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-border bg-background p-4 text-foreground shadow-lg'
+            className='fixed left-3 right-3 top-4 z-[9999] rounded-xl border border-border bg-card p-4 text-card-foreground shadow-2xl backdrop-blur-md sm:left-auto sm:right-4 sm:top-20 sm:w-96'
           >
-            <p className='font-semibold'>{incomingNotification.title}</p>
-            <p className='mt-1 text-sm text-muted-foreground'>
-              {incomingNotification.message}
-            </p>
-            <div className='mt-3 flex justify-end gap-2'>
+            <div className='flex items-start justify-between gap-2'>
+              <p className='font-semibold text-sm leading-tight text-foreground'>
+                {incomingNotification.title}
+              </p>
               <button
                 type='button'
-                className='text-sm text-muted-foreground hover:text-foreground'
+                className='-mr-1 -mt-1 rounded p-1 text-muted-foreground hover:text-foreground'
+                onClick={() => setIncomingNotification(null)}
+                aria-label='Tutup'
+              >
+                ✕
+              </button>
+            </div>
+            <p className='mt-1 text-xs text-muted-foreground leading-relaxed line-clamp-3'>
+              {incomingNotification.message}
+            </p>
+            <div className='mt-3 flex items-center justify-end gap-2 border-t border-border/50 pt-2'>
+              <button
+                type='button'
+                className='px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground'
                 onClick={() => setIncomingNotification(null)}
               >
-                Tutup
+                Abaikan
               </button>
               {incomingNotification.actionUrl && (
                 <button
                   type='button'
-                  className='text-sm font-medium text-primary hover:underline'
+                  className='rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90'
                   onClick={() => {
                     const actionUrl = incomingNotification.actionUrl
                     if (actionUrl) router.push(actionUrl)
                     setIncomingNotification(null)
                   }}
                 >
-                  Buka
+                  Buka Dokumen
                 </button>
               )}
             </div>

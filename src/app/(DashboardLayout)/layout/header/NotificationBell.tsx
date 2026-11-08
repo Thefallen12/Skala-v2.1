@@ -82,22 +82,22 @@ export default function NotificationBell({
             )}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1rem))] p-0">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <h2 className="font-semibold">Notifikasi</h2>
-            <Badge variant="secondary">{unreadCount} belum dibaca</Badge>
+        <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1.5rem))] p-0 rounded-xl shadow-xl">
+          <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/40">
+            <h2 className="font-semibold text-sm">Notifikasi</h2>
+            <Badge variant="secondary" className="text-xs">{unreadCount} baru</Badge>
           </div>
           {loadFailed && (
-            <p className="px-4 py-2 text-sm text-destructive" role="alert">
-              Notifikasi gagal dimuat.
+            <p className="px-4 py-2 text-xs text-destructive" role="alert">
+              Gagal memuat notifikasi.
             </p>
           )}
           {message && (
-            <p className="px-4 py-2 text-sm text-destructive" role="alert">
+            <p className="px-4 py-2 text-xs text-destructive" role="alert">
               {message}
             </p>
           )}
-          <SimpleBar className="max-h-[min(24rem,60vh)]">
+          <SimpleBar className="max-h-[min(26rem,65vh)]">
             {items.map((item) => (
                 <DropdownMenuItem
                   key={item.id}
@@ -105,19 +105,19 @@ export default function NotificationBell({
                     event.preventDefault();
                     void openNotification(item.id, item.actionUrl);
                   }}
-                  className="items-start whitespace-normal border-b px-4 py-3"
+                  className="items-start gap-2 whitespace-normal border-b px-4 py-3 cursor-pointer transition hover:bg-muted/60 active:bg-muted"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm ${item.isRead ? "font-medium" : "font-bold"}`}>
+                    <p className={`text-sm leading-snug ${item.isRead ? "font-normal text-muted-foreground" : "font-semibold text-foreground"}`}>
                       {item.title}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{item.message}</p>
-                    <time className="mt-1 block text-[10px] text-muted-foreground">
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.message}</p>
+                    <time className="mt-1 block text-[10px] text-muted-foreground/80">
                       {formatTime(item.createdAt)}
                     </time>
                   </div>
                   {!item.isRead && (
-                    <span className="mt-1 size-2 shrink-0 rounded-full bg-red-600" />
+                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
                   )}
                 </DropdownMenuItem>
             ))}

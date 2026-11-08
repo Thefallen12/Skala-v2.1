@@ -48,6 +48,17 @@ public class MainActivity extends BridgeActivity {
         "  padding-right: 12px !important;" +
         "  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important;" +
         "}" +
+        "/* Floating Toast Notification di mobile / Android */" +
+        "div[role=\"status\"][aria-live=\"polite\"].fixed {" +
+        "  top: max(env(safe-area-inset-top, 0px), 16px) !important;" +
+        "  left: 12px !important;" +
+        "  right: 12px !important;" +
+        "  width: calc(100vw - 24px) !important;" +
+        "  max-width: none !important;" +
+        "  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3) !important;" +
+        "  border-radius: 12px !important;" +
+        "  z-index: 99999 !important;" +
+        "}" +
         "@media (max-width: 1280px) {" +
         "  .page-wrapper { margin-left: 0 !important; }" +
         "  .body-wrapper { margin-left: 0 !important; }" +
@@ -85,7 +96,17 @@ public class MainActivity extends BridgeActivity {
             window.setAttributes(layoutParams);
         }
 
+        requestNotificationPermission();
         configureWebView();
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
     }
 
     private void configureWebView() {
