@@ -48,6 +48,17 @@ public class MainActivity extends BridgeActivity {
         "  padding-right: 12px !important;" +
         "  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important;" +
         "}" +
+        "/* Mobile User: optimalkan seluruh button & kontrol sentuh di Android */" +
+        "button, [role=\"button\"], input[type=\"button\"], input[type=\"submit\"], .btn {" +
+        "  min-height: 44px !important;" +
+        "  touch-action: manipulation !important;" +
+        "  -webkit-tap-highlight-color: transparent !important;" +
+        "  user-select: none !important;" +
+        "}" +
+        "button:active, [role=\"button\"]:active {" +
+        "  transform: scale(0.97) !important;" +
+        "  transition: transform 0.08s ease !important;" +
+        "}" +
         "/* Floating Toast Notification di mobile / Android */" +
         "div[role=\"status\"][aria-live=\"polite\"].fixed {" +
         "  top: max(env(safe-area-inset-top, 0px), 16px) !important;" +

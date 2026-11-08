@@ -74,3 +74,23 @@ select {
 select:focus{
   outline: none;
 }
+
+/* Mobile Touch Optimization for all Buttons & Interactive Elements */
+@media (hover: none) and (pointer: coarse), (max-width: 768px) {
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  .btn {
+    min-height: 44px !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.08s ease-in-out;
+  }
+}
