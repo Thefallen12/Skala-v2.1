@@ -19,3 +19,10 @@
     }
 }
 
+/* Android WebView / mobile: pastikan tidak ada margin sidebar */
+@media screen and (max-width:1280px), (hover: none) {
+    .page-wrapper {
+        margin-left: 0 !important;
+    }
+}
+
