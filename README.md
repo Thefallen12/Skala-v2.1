@@ -11,16 +11,17 @@ Enable the Map Tiles API and billing for its Google Cloud project, then restrict
 the key to the application's HTTP referrers and the Map Tiles API. Restart the
 Next.js development server after changing the environment.
 
-The dashboard's current-location village lookup uses the Google Maps
-Geocoding API. Configure a separate server-side key in `.env`:
+The dashboard's current-location village lookup uses the AMap Web Service
+reverse-geocoding API. Create a key with the **Web Service** platform type and
+configure it in `.env`:
 
 ```env
-GOOGLE_MAPS_GEOCODING_API_KEY=your-server-side-geocoding-key
+AMAP_WEB_SERVICE_KEY=your-amap-web-service-key
 ```
 
-Enable the Geocoding API and billing in Google Cloud, and restrict this key to
-the Geocoding API. Keep this key server-side; do not use the `NEXT_PUBLIC_`
-browser key for geocoding requests.
+The location API converts the device's GPS coordinates to AMap coordinates
+before looking up the village. Keep this key server-side; do not use a
+`NEXT_PUBLIC_` browser key for location requests.
 
 Google Earth Engine is a separate service for displaying computed imagery and
 requires an Earth Engine-enabled Cloud project and OAuth/IAM authorization. It
