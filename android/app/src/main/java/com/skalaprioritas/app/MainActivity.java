@@ -7,31 +7,62 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
-import androidx.core.view.ViewCompat;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
+    private static final String APP_INJECTED_CSS =
+        ":root {" +
+        "  --app-safe-top: env(safe-area-inset-top, 24px);" +
+        "  --app-safe-bottom: env(safe-area-inset-bottom, 16px);" +
+        "}" +
+        "html, body {" +
+        "  width: 100% !important;" +
+        "  max-width: 100vw !important;" +
+        "  overflow-x: hidden !important;" +
+        "  -webkit-text-size-adjust: 100% !important;" +
+        "}" +
+        ".page-wrapper {" +
+        "  margin-left: 0 !important;" +
+        "  width: 100% !important;" +
+        "  max-width: 100vw !important;" +
+        "  min-width: 0 !important;" +
+        "}" +
+        ".body-wrapper {" +
+        "  margin-left: 0 !important;" +
+        "  width: 100% !important;" +
+        "  max-width: 100vw !important;" +
+        "  min-width: 0 !important;" +
+        "}" +
+        ".body-wrapper > header {" +
+        "  padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;" +
+        "}" +
+        ".container {" +
+        "  width: 100% !important;" +
+        "  max-width: 100vw !important;" +
+        "  padding-left: 12px !important;" +
+        "  padding-right: 12px !important;" +
+        "  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important;" +
+        "}" +
+        "@media (max-width: 1280px) {" +
+        "  .page-wrapper { margin-left: 0 !important; }" +
+        "  .body-wrapper { margin-left: 0 !important; }" +
+        "}";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Splash screen harus dipanggil SEBELUM super.onCreate()
-        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
-
+        SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);
 
-        // Edge-to-edge: biarkan konten mengisi seluruh layar (di bawah status bar & nav bar)
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
-
         Window window = getWindow();
-
-        // Transparan status bar & navigation bar
         window.setStatusBarColor(Color.TRANSPARENT);
         window.setNavigationBarColor(Color.TRANSPARENT);
 
-        // Ikon status bar terang (teks putih di atas background gelap)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.getInsetsController().setSystemBarsAppearance(
                 0,
@@ -47,12 +78,56 @@ public class MainActivity extends BridgeActivity {
             );
         }
 
-        // Aktifkan cutout / notch mode agar konten masuk area layar penuh
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             WindowManager.LayoutParams layoutParams = window.getAttributes();
             layoutParams.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             window.setAttributes(layoutParams);
         }
+
+        configureWebView();
+    }
+
+    private void configureWebView() {
+        if (bridge == null || bridge.getWebView() == null) return;
+
+        WebView webView = bridge.getWebView();
+        WebSettings settings = webView.getSettings();
+
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        settings.setTextZoom(100);
+
+        // Inject script untuk memastikan lebar 100% dan menghilangkan area kosong / sidebar di mobile
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                injectMobileCss(view);
+            }
+        });
+    }
+
+    private void injectMobileCss(WebView view) {
+        String js = "(function() {" +
+            "  var existing = document.getElementById('skala-mobile-injected-css');" +
+            "  if (!existing) {" +
+            "    var style = document.createElement('style');" +
+            "    style.id = 'skala-mobile-injected-css';" +
+            "    style.innerHTML = `" + APP_INJECTED_CSS + "`;" +
+            "    document.head.appendChild(style);" +
+            "  }" +
+            "  var meta = document.querySelector('meta[name=\"viewport\"]');" +
+            "  if (!meta) {" +
+            "    meta = document.createElement('meta');" +
+            "    meta.name = 'viewport';" +
+            "    document.head.appendChild(meta);" +
+            "  }" +
+            "  meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';" +
+            "})();";
+        view.evaluateJavascript(js, null);
     }
 }
