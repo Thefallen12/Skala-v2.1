@@ -72,7 +72,7 @@ const Header = ({
   return (
     <>
       <header
-        className={`sticky top-0 z-20 border-b border-border bg-background/75 text-foreground backdrop-blur-xl ${
+        className={`fixed inset-x-0 top-0 z-20 border-b border-border bg-background/75 text-foreground backdrop-blur-xl md:sticky md:inset-x-auto ${
           isSticky ? "shadow-md" : "shadow-sm"
         }`}
       >

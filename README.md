@@ -11,6 +11,17 @@ Enable the Map Tiles API and billing for its Google Cloud project, then restrict
 the key to the application's HTTP referrers and the Map Tiles API. Restart the
 Next.js development server after changing the environment.
 
+The dashboard's current-location village lookup uses the Google Maps
+Geocoding API. Configure a separate server-side key in `.env`:
+
+```env
+GOOGLE_MAPS_GEOCODING_API_KEY=your-server-side-geocoding-key
+```
+
+Enable the Geocoding API and billing in Google Cloud, and restrict this key to
+the Geocoding API. Keep this key server-side; do not use the `NEXT_PUBLIC_`
+browser key for geocoding requests.
+
 Google Earth Engine is a separate service for displaying computed imagery and
 requires an Earth Engine-enabled Cloud project and OAuth/IAM authorization. It
 is not a public basemap endpoint; Google Earth Pro imagery must not be loaded

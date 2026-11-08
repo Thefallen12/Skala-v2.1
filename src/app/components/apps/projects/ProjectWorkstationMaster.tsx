@@ -51,6 +51,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -85,6 +91,7 @@ import {
   Camera,
   ClipboardList,
   Download,
+  Ellipsis,
   FileDown,
   FileSpreadsheet,
   HardHat,
@@ -812,16 +819,68 @@ export default function ProjectWorkstationMaster({
 
       {activeSection === "projects" && (
       <Card className="border-border bg-card text-card-foreground shadow-md">
-        <CardHeader className="flex flex-col gap-4 pb-4 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-lg text-foreground">Daftar Proyek</CardTitle>
-              <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                {filteredProjects.length} dari {projects.length} proyek
-              </span>
-            </div>
+        <CardHeader className="flex-row items-start justify-between gap-2 pb-4 md:items-center">
+          <div className="min-w-0 flex-1 md:flex md:items-center md:gap-2">
+            <CardTitle className="text-lg text-foreground">Daftar Proyek</CardTitle>
+            <span className="mt-1 inline-flex rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground md:mt-0">
+              {filteredProjects.length} dari {projects.length} proyek
+            </span>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex shrink-0 items-center gap-2 md:hidden">
+            {isProjectManager && (
+              <ActionIconButton
+                type="button"
+                label="Tambah Proyek Baru"
+                tooltip="Tambah Proyek Baru"
+                icon={Plus}
+                onClick={() => setNewProjectOpen(true)}
+                className="size-11"
+              />
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label="Aksi proyek lainnya"
+                  title="Aksi proyek lainnya"
+                  className="size-11 border border-primary/75 bg-transparent text-primary hover:bg-primary hover:text-primary-foreground"
+                >
+                  <Ellipsis className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isProjectManager && (
+                  <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                    <Upload aria-hidden="true" />
+                    Import CSV
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem asChild>
+                  <Link href={getExportHref("csv")}>
+                    <Download aria-hidden="true" />
+                    Export CSV
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={getExportHref("xlsx")}>
+                    <FileSpreadsheet aria-hidden="true" />
+                    Export Excel
+                  </Link>
+                </DropdownMenuItem>
+                {isProjectManager && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/api/projects/template-csv" download>
+                      <FileDown aria-hidden="true" />
+                      Download Template CSV
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <div className="hidden flex-wrap items-center justify-end gap-2 md:flex">
             {isProjectManager && (
               <>
                 <ActionIconButton

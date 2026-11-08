@@ -118,40 +118,33 @@ const DashboardCardLink = ({
 
 const TopCards = ({ cards }: { cards: readonly DashboardCard[] }) => {
   return (
-    <>
-      <div className="grid min-w-0 grid-cols-2 gap-3 sm:hidden">
-        {cards.map((card, index) => (
-          <DashboardCardLink key={card.title} card={card} index={index} />
-        ))}
-      </div>
-      <Swiper
-        slidesPerView={1.15}
-        spaceBetween={12}
-        loop={cards.length > 5}
-        freeMode
-        grabCursor
-        speed={5000}
-        autoplay={{
-          delay: 1,
-          disableOnInteraction: false,
-          pauseOnMouseEnter: false,
-        }}
-        modules={[Autoplay, FreeMode]}
-        breakpoints={{
-          480: { slidesPerView: 2, spaceBetween: 12 },
-          768: { slidesPerView: 3, spaceBetween: 16 },
-          1024: { slidesPerView: 4, spaceBetween: 16 },
-          1200: { slidesPerView: 5, spaceBetween: 16 },
-        }}
-        className="mySwiper hidden w-full min-w-0 sm:block"
-      >
-        {cards.map((card, index) => (
-          <SwiperSlide key={card.title} className="h-auto">
-            <DashboardCardLink card={card} index={index} />
-          </SwiperSlide>
-        ))}
-      </Swiper>
-    </>
+    <Swiper
+      slidesPerView={1.15}
+      spaceBetween={12}
+      loop={cards.length > 5}
+      freeMode
+      grabCursor
+      speed={5000}
+      autoplay={{
+        delay: 1,
+        disableOnInteraction: false,
+        pauseOnMouseEnter: false,
+      }}
+      modules={[Autoplay, FreeMode]}
+      breakpoints={{
+        480: { slidesPerView: 2, spaceBetween: 12 },
+        768: { slidesPerView: 3, spaceBetween: 16 },
+        1024: { slidesPerView: 4, spaceBetween: 16 },
+        1200: { slidesPerView: 5, spaceBetween: 16 },
+      }}
+      className="mySwiper w-full min-w-0"
+    >
+      {cards.map((card, index) => (
+        <SwiperSlide key={card.title} className="h-auto">
+          <DashboardCardLink card={card} index={index} />
+        </SwiperSlide>
+      ))}
+    </Swiper>
   );
 };
 

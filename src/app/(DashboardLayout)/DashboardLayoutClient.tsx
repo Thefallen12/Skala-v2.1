@@ -150,7 +150,7 @@ export default function DashboardLayoutClient({
               sidebarCounts={sidebarCounts}
             />
           </div>
-          <div className='body-wrapper min-w-0 flex-1'>
+          <div className='body-wrapper min-w-0 flex-1 pt-16 md:pt-0'>
             <Header
               canManageUsers={canManageUsers}
               canAccessLogistics={canAccessLogistics}
