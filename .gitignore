@@ -45,6 +45,9 @@ next-env.d.ts
 # Prisma query engine binaries are platform-specific generated artifacts.
 /src/generated/prisma/query_engine-*.node
 
+# IDE config
+.idea/
+
 # Android build outputs
 *.apk
 /android/app/build
