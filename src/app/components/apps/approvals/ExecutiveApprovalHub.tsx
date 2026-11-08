@@ -33,20 +33,12 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   BASTType,
   POPaymentMethod,
   TicketType,
   UserRole,
 } from "@prisma/client";
-import { FileText, Wallet, HardHat } from "lucide-react";
+import { FileText, Wallet, HardHat, ChevronRight } from "lucide-react";
 
 type ApprovalPurchaseOrder = {
   publicCode: string;
@@ -196,7 +188,8 @@ function isExecutive(role: UserRole) {
   return role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR;
 }
 
-function QueueTable({
+// ─── Mobile-friendly card list pengganti tabel ───────────────────────────────
+function QueueCardList({
   rows,
   emptyText,
   onSelect,
@@ -205,49 +198,38 @@ function QueueTable({
   emptyText: string;
   onSelect: (id: string) => void;
 }) {
+  if (rows.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        {emptyText}
+      </p>
+    );
+  }
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Item Persetujuan</TableHead>
-            <TableHead>Rincian</TableHead>
-            <TableHead className="text-right">Nominal</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow
-              key={row.id}
-              tabIndex={0}
-              role="button"
-              className="cursor-pointer"
-              onClick={() => onSelect(row.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(row.id);
-                }
-              }}
-            >
-              <TableCell className="font-medium">{row.title}</TableCell>
-              <TableCell className="text-muted-foreground">{row.detail}</TableCell>
-              <TableCell className="text-right font-medium">{row.amount}</TableCell>
-            </TableRow>
-          ))}
-          {rows.length === 0 && (
-            <TableRow>
-              <TableCell
-                colSpan={3}
-                className="py-10 text-center text-muted-foreground"
-              >
-                {emptyText}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <ul className="divide-y divide-border">
+      {rows.map((row) => (
+        <li key={row.id}>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 px-1 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+            onClick={() => onSelect(row.id)}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold leading-snug">
+                {row.title}
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                {row.detail}
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {row.amount}
+              </p>
+            </div>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -549,39 +531,44 @@ export default function ExecutiveApprovalHub({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <ErpHubBrand
         title="Executive Approval Hub"
         description="Satu pusat kendali untuk persetujuan PO, dana pembelian, tiket, upah, termin, dan dokumen proyek."
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted p-2">
-          <TabsTrigger value="po" className="gap-2">
-            <FileText className="size-4" />
-            Persetujuan PO <Badge variant="secondary">{purchaseOrders.length}</Badge>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        {/* Tab bar — ikon saja di mobile, label muncul di md+ */}
+        <TabsList className="grid w-full grid-cols-3 rounded-xl border border-border bg-muted p-1">
+          <TabsTrigger value="po" className="flex flex-col items-center gap-0.5 rounded-lg py-2 text-xs sm:flex-row sm:gap-2 sm:text-sm">
+            <FileText className="size-4 shrink-0" />
+            <span className="hidden sm:inline">Persetujuan PO</span>
+            <span className="sm:hidden">PO</span>
+            <Badge variant="secondary" className="ml-auto sm:ml-0">{purchaseOrders.length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="direct-purchase" className="gap-2">
-            <Wallet className="size-4" />
-            Dana Beli Langsung & Tiket
-            <Badge variant="secondary">
+          <TabsTrigger value="direct-purchase" className="flex flex-col items-center gap-0.5 rounded-lg py-2 text-xs sm:flex-row sm:gap-2 sm:text-sm">
+            <Wallet className="size-4 shrink-0" />
+            <span className="hidden sm:inline">Dana &amp; Tiket</span>
+            <span className="sm:hidden">Dana</span>
+            <Badge variant="secondary" className="ml-auto sm:ml-0">
               {directPurchases.length + tickets.length}
             </Badge>
           </TabsTrigger>
-          <TabsTrigger value="wages" className="gap-2">
-            <HardHat className="size-4" />
-            Usulan Upah & Subkon
-            <Badge variant="secondary">{wageRows.length}</Badge>
+          <TabsTrigger value="wages" className="flex flex-col items-center gap-0.5 rounded-lg py-2 text-xs sm:flex-row sm:gap-2 sm:text-sm">
+            <HardHat className="size-4 shrink-0" />
+            <span className="hidden sm:inline">Upah &amp; Subkon</span>
+            <span className="sm:hidden">Upah</span>
+            <Badge variant="secondary" className="ml-auto sm:ml-0">{wageRows.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="po">
           <Card>
-            <CardHeader>
-              <CardTitle>PO yang Sudah Diperiksa Keuangan</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">PO yang Sudah Diperiksa Keuangan</CardTitle>
             </CardHeader>
-            <CardContent>
-              <QueueTable
+            <CardContent className="px-3 pb-2 sm:px-6">
+              <QueueCardList
                 rows={poRows}
                 emptyText="Tidak ada PO yang menunggu tanda tangan."
                 onSelect={selectRow("po")}
@@ -592,11 +579,11 @@ export default function ExecutiveApprovalHub({
 
         <TabsContent value="direct-purchase">
           <Card>
-            <CardHeader>
-              <CardTitle>Persetujuan Dana Pembelian dan Tiket</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Persetujuan Dana Pembelian dan Tiket</CardTitle>
             </CardHeader>
-            <CardContent>
-              <QueueTable
+            <CardContent className="px-3 pb-2 sm:px-6">
+              <QueueCardList
                 rows={directPurchaseRows}
                 emptyText="Tidak ada pembelian langsung atau tiket yang menunggu persetujuan."
                 onSelect={chooseFinancialRow}
@@ -607,11 +594,11 @@ export default function ExecutiveApprovalHub({
 
         <TabsContent value="wages">
           <Card>
-            <CardHeader>
-              <CardTitle>Persetujuan Upah, Termin, dan Dokumen Proyek</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Persetujuan Upah, Termin, dan Dokumen Proyek</CardTitle>
             </CardHeader>
-            <CardContent>
-              <QueueTable
+            <CardContent className="px-3 pb-2 sm:px-6">
+              <QueueCardList
                 rows={wageRows}
                 emptyText="Tidak ada usulan upah atau subkon yang menunggu persetujuan."
                 onSelect={chooseWageRow}
@@ -621,61 +608,60 @@ export default function ExecutiveApprovalHub({
         </TabsContent>
       </Tabs>
 
+      {/* Riwayat — scroll horizontal di mobile */}
       <Card>
-        <CardHeader>
-          <CardTitle>Laporan Riwayat Persetujuan</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Riwayat terbaru persetujuan dokumen, pembelian, tiket, upah, termin, dan proyek.
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Riwayat Persetujuan</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Terbaru: persetujuan dokumen, pembelian, tiket, upah, termin, dan proyek.
           </p>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Jenis</TableHead>
-                  <TableHead>Dokumen / Referensi</TableHead>
-                  <TableHead>Keputusan</TableHead>
-                  <TableHead>Oleh / Waktu</TableHead>
-                  <TableHead>Catatan</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {approvalHistory.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="whitespace-nowrap">{entry.category}</TableCell>
-                    <TableCell className="min-w-56 font-medium">{entry.reference}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {approvalHistoryLabels[entry.action] ?? entry.action}
-                    </TableCell>
-                    <TableCell className="min-w-40 text-xs">
-                      <p>{entry.actorName}</p>
-                      <p className="text-muted-foreground">
+        <CardContent className="p-0">
+          {approvalHistory.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Belum ada riwayat persetujuan.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {approvalHistory.map((entry) => (
+                <li key={entry.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{entry.reference}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {entry.category} · {entry.actorName}
+                      </p>
+                      {entry.notes && (
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                          {entry.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                        entry.action === "APPROVED" || entry.action === "APPROVED_BY_DIR"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : entry.action === "REJECTED_BY_DIR"
+                            ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      }`}>
+                        {approvalHistoryLabels[entry.action] ?? entry.action}
+                      </span>
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {new Intl.DateTimeFormat("id-ID", {
-                          dateStyle: "medium",
-                          timeStyle: "short",
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
                           timeZone: "Asia/Jakarta",
                         }).format(new Date(entry.createdAt))}
                       </p>
-                    </TableCell>
-                    <TableCell className="min-w-48 max-w-md whitespace-pre-wrap text-xs text-muted-foreground">
-                      {entry.notes || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {approvalHistory.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="py-8 text-center text-sm text-muted-foreground"
-                    >
-                      Belum ada riwayat persetujuan.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
@@ -688,10 +674,11 @@ export default function ExecutiveApprovalHub({
           {message}
         </p>
       )}
+
       {signedPo && (
         <Card>
-          <CardHeader>
-            <CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
               PO {qrTitle || signedPo.order.poNumber} telah disetujui
             </CardTitle>
           </CardHeader>
@@ -722,6 +709,7 @@ export default function ExecutiveApprovalHub({
         </Card>
       )}
 
+      {/* Modal detail — full screen di mobile */}
       <GlobalModal
         isOpen={selection !== null}
         onClose={() => {
@@ -754,406 +742,407 @@ export default function ExecutiveApprovalHub({
           </Button>
         }
       >
-
-          <div className="mt-6 space-y-4">
-            {selectedPo && (
-              <>
-                <p className="text-sm">
-                  Vendor: <strong>{selectedPo.vendorName}</strong> ·{" "}
-                  {selectedPo.projectSiteName}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Pemeriksa Keuangan: {selectedPo.financeReviewerName ?? "—"} ·{" "}
-                  {selectedPo.financeReviewedAt ?? "Belum diperiksa"}
-                </p>
-                <UniversalDocumentPreview
-                  title={`Purchase Order ${selectedPo.poNumber}`}
-                  documentNumber={selectedPo.poNumber}
-                  src={`/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(selectedPo.publicCode)}`}
-                />
-                {isExecutive(role) && (
-                  <Button
-                    disabled={isPending}
-                    onClick={() => {
-                      setQrTitle(selectedPo.poNumber);
-                      runApproval(() =>
-                        approvePurchaseOrder(selectedPo.publicCode),
-                      );
-                    }}
-                  >
-                    {isPending ? "Memproses..." : "Approve & Sign QR"}
-                  </Button>
-                )}
-              </>
-            )}
-
-            {selectedTicket && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <p className="font-semibold">{selectedTicket.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  Pemohon {selectedTicket.requesterName} ·{" "}
-                  {selectedTicket.projectName ?? "Gudang umum"} ·{" "}
-                  {dateLabel(selectedTicket.createdAt)}
-                </p>
-                {selectedTicket.type !== TicketType.MATERIAL && (
-                  <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm">
-                    <dt>Penerima dana</dt>
-                    <dd className="text-right">{selectedTicket.recipientName ?? "—"}</dd>
-                    <dt>Bank tujuan</dt>
-                    <dd className="text-right">{selectedTicket.bankName ?? "—"}</dd>
-                    <dt>Nomor rekening</dt>
-                    <dd className="text-right">{selectedTicket.accountNumber ?? "—"}</dd>
-                  </dl>
-                )}
-                <ul className="divide-y">
-                  {selectedTicket.items.map((item, index) => (
-                    <li className="py-2 text-sm" key={`${item.itemName}-${index}`}>
-                      {item.itemName} · {item.quantity} {item.unit}
-                    </li>
-                  ))}
-                </ul>
-                <p className="font-semibold">{currency(selectedTicket.totalAmount)}</p>
-                {isExecutive(role) && (
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        disabled={isPending}
-                        onClick={() =>
-                          runApproval(() =>
-                            approveByDirector(
-                              selectedTicket.id,
-                              selectedTicket.type,
-                            ),
-                          )
-                        }
-                      >
-                        {isPending
-                          ? "Memproses..."
-                          : selectedTicket.type === TicketType.MATERIAL
-                            ? "Setujui & Teruskan ke Logistik"
-                            : "Setujui Pencairan Dana"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        disabled={isPending}
-                        onClick={() => {
-                          setMessage("");
-                          setTicketDecision("REJECT");
-                          setTicketDecisionReason("");
-                        }}
-                      >
-                        Tolak
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={isPending}
-                        onClick={() => {
-                          setMessage("");
-                          setTicketDecision("REVISION");
-                          setTicketDecisionReason("");
-                        }}
-                      >
-                        Minta Revisi
-                      </Button>
-                    </div>
-                    {ticketDecision && (
-                      <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-                        <label className="block space-y-1 text-sm font-medium">
-                          {ticketDecision === "REJECT"
-                            ? "Alasan penolakan"
-                            : "Catatan revisi"}
-                          <Textarea
-                            value={ticketDecisionReason}
-                            maxLength={2000}
-                            onChange={(event) =>
-                              setTicketDecisionReason(event.target.value)
-                            }
-                            placeholder={
-                              ticketDecision === "REJECT"
-                                ? "Tuliskan alasan penolakan."
-                                : "Jelaskan bagian yang harus diperbaiki."
-                            }
-                            className="min-h-20 font-normal"
-                          />
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={
-                              ticketDecision === "REJECT"
-                                ? "destructive"
-                                : "default"
-                            }
-                            disabled={
-                              isPending ||
-                              ticketDecisionReason.trim().length < 3
-                            }
-                            onClick={runTicketDecision}
-                          >
-                            {isPending
-                              ? "Memproses..."
-                              : ticketDecision === "REJECT"
-                                ? "Konfirmasi Tolak"
-                                : "Kirim Revisi"}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={isPending}
-                            onClick={() => {
-                              setTicketDecision(null);
-                              setTicketDecisionReason("");
-                            }}
-                          >
-                            Batal
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+        <div className="mt-4 space-y-4">
+          {selectedPo && (
+            <>
+              <div className="rounded-lg bg-muted/50 p-3 text-sm space-y-1">
+                <p><span className="text-muted-foreground">Vendor:</span> <strong>{selectedPo.vendorName}</strong></p>
+                <p><span className="text-muted-foreground">Proyek:</span> {selectedPo.projectSiteName}</p>
+                <p><span className="text-muted-foreground">Pemeriksa Keuangan:</span> {selectedPo.financeReviewerName ?? "—"}</p>
               </div>
-            )}
-
-            {selectedDirectPurchase && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <p className="font-semibold">{selectedDirectPurchase.vendorName}</p>
-                <p className="text-sm text-muted-foreground">
-                  Pemohon {selectedDirectPurchase.createdByName} ·{" "}
-                  {dateLabel(selectedDirectPurchase.createdAt)}
-                </p>
-                <ul className="divide-y">
-                  {selectedDirectPurchase.items.map((item, index) => (
-                    <li className="py-2 text-sm" key={`${item.itemName}-${index}`}>
-                      {item.itemName} · {item.quantity} {item.unit}
-                    </li>
-                  ))}
-                </ul>
-                <p className="font-semibold">
-                  {currency(selectedDirectPurchase.totalAmount)}
-                </p>
-                {isExecutive(role) && (
-                  <Button
-                    disabled={isPending}
-                    onClick={() =>
-                      runApproval(() =>
-                        approveDirectStockPurchaseByDirector(
-                          selectedDirectPurchase.id,
-                        ),
-                      )
-                    }
-                  >
-                    {isPending ? "Memproses..." : "Setujui Pengajuan Pembelian"}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {selectedWage && (
-              <form
-                className="space-y-3 rounded-lg border p-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  runApproval(() =>
-                    approveProjectWorkPointWage(
-                      selectedWage.id,
-                      wageAmount,
-                      wageReason,
-                    ),
-                  );
-                }}
-              >
-                <p className="font-semibold">
-                  {selectedWage.projectName} · {selectedWage.title}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedWage.location ?? "Lokasi belum dicatat"} · Pengusul:{" "}
-                  {selectedWage.proposedByName}
-                </p>
-                <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm">
-                  <dt>Volume pekerjaan</dt>
-                  <dd className="text-right">
-                    {selectedWage.proposedVolume && selectedWage.proposedUnit
-                      ? `${selectedWage.proposedVolume} ${selectedWage.proposedUnit}`
-                      : "Tidak dicatat pada usulan lama"}
-                  </dd>
-                  <dt>Harga satuan</dt>
-                  <dd className="text-right">
-                    {selectedWage.proposedUnitPrice
-                      ? currency(selectedWage.proposedUnitPrice)
-                      : "Tidak dicatat pada usulan lama"}
-                  </dd>
-                  <dt className="font-semibold">Total usulan</dt>
-                  <dd className="text-right font-semibold">
-                    {currency(selectedWage.proposedTotalWage)}
-                  </dd>
-                </dl>
-                <label className="block space-y-1 text-sm">
-                  Nilai upah disetujui (Rp)
-                  <input
-                    className="h-10 w-full rounded-md border bg-background px-3"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    value={wageAmount}
-                    onChange={(event) => setWageAmount(event.target.value)}
-                  />
-                </label>
-                <label className="block space-y-1 text-sm">
-                  Catatan audit persetujuan / koreksi
-                  <textarea
-                    className="min-h-20 w-full rounded-md border bg-background p-3"
-                    maxLength={2000}
-                    required
-                    value={wageReason}
-                    onChange={(event) => setWageReason(event.target.value)}
-                    placeholder="Tuliskan alasan persetujuan atau koreksi nilai."
-                  />
-                </label>
-                {isExecutive(role) && (
-                  <Button type="submit" disabled={isPending}>
-                    {isPending ? "Memproses..." : "Setujui Upah"}
-                  </Button>
-                )}
-              </form>
-            )}
-
-            {selectedTermyn && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <p className="font-semibold">
-                  {selectedTermyn.subkonName} · {selectedTermyn.projectName}
-                </p>
-                <p className="text-sm">
-                  SPK {selectedTermyn.contractNumber} · Klaim progres{" "}
-                  {selectedTermyn.claimedPercent}% · Pengusul{" "}
-                  {selectedTermyn.createdByName}
-                </p>
-                <dl className="grid grid-cols-2 gap-2 text-sm">
-                  <dt>Nilai bruto</dt>
-                  <dd className="text-right">{currency(selectedTermyn.grossAmount)}</dd>
-                  <dt>Retensi</dt>
-                  <dd className="text-right">{currency(selectedTermyn.retentionAmount)}</dd>
-                  <dt className="font-semibold">Nilai dibayar</dt>
-                  <dd className="text-right font-semibold">
-                    {currency(selectedTermyn.netAmount)}
-                  </dd>
-                </dl>
-                {isExecutive(role) && (
-                  <Button
-                    disabled={isPending}
-                    onClick={() =>
-                      runApproval(() => approveSubkonTermyn(selectedTermyn.id))
-                    }
-                  >
-                    {isPending ? "Memproses..." : "Setujui Upah/Termyn"}
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {selectedContract && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <p className="font-semibold">{selectedContract.subkonName}</p>
-                <p className="text-sm">{selectedContract.projectName}</p>
-                <p className="whitespace-pre-wrap text-sm">
-                  {selectedContract.workScope}
-                </p>
-                <p className="font-semibold">{currency(selectedContract.contractValue)}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    disabled={
-                      isPending ||
-                      selectedContract.createdById === currentUserId
-                    }
-                    onClick={() =>
-                      runApproval(() =>
-                        approveSubkonContract(selectedContract.publicCode, "ACTIVE"),
-                      )
-                    }
-                  >
-                    Setujui SPK
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    disabled={isPending}
-                    onClick={() =>
-                      runApproval(() =>
-                        approveSubkonContract(selectedContract.publicCode, "REJECTED"),
-                      )
-                    }
-                  >
-                    Tolak
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {selectedAddendum && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <p className="font-semibold">{selectedAddendum.projectName}</p>
-                <p>{selectedAddendum.reason}</p>
-                <p className="text-sm">
-                  Perubahan pagu {currency(selectedAddendum.budgetChange)} ·
-                  Perpanjangan {selectedAddendum.timeExtension} hari
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    disabled={isPending}
-                    onClick={() =>
-                      runApproval(() =>
-                        approveProjectAddendum(selectedAddendum.id, "APPROVED"),
-                      )
-                    }
-                  >
-                    Setujui CCO
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    disabled={isPending}
-                    onClick={() =>
-                      runApproval(() =>
-                        approveProjectAddendum(selectedAddendum.id, "REJECTED"),
-                      )
-                    }
-                  >
-                    Tolak
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {selectedBast && (
-              <div className="space-y-3 rounded-lg border p-4">
-                <p className="font-semibold">
-                  BAST {selectedBast.type} · {selectedBast.projectName}
-                </p>
-                <p className="text-sm">Tanggal: {dateLabel(selectedBast.date)}</p>
-                {selectedBast.maintenanceEndsAt && (
-                  <p className="text-sm">
-                    Akhir pemeliharaan: {dateLabel(selectedBast.maintenanceEndsAt)}
-                  </p>
-                )}
-                {selectedBast.notes && (
-                  <p className="whitespace-pre-wrap text-sm">{selectedBast.notes}</p>
-                )}
+              <UniversalDocumentPreview
+                title={`Purchase Order ${selectedPo.poNumber}`}
+                documentNumber={selectedPo.poNumber}
+                src={`/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(selectedPo.publicCode)}`}
+              />
+              {isExecutive(role) && (
                 <Button
+                  className="w-full"
+                  disabled={isPending}
+                  onClick={() => {
+                    setQrTitle(selectedPo.poNumber);
+                    runApproval(() =>
+                      approvePurchaseOrder(selectedPo.publicCode),
+                    );
+                  }}
+                >
+                  {isPending ? "Memproses..." : "Approve & Sign QR"}
+                </Button>
+              )}
+            </>
+          )}
+
+          {selectedTicket && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="font-semibold">{selectedTicket.title}</p>
+              <p className="text-sm text-muted-foreground">
+                Pemohon {selectedTicket.requesterName} ·{" "}
+                {selectedTicket.projectName ?? "Gudang umum"} ·{" "}
+                {dateLabel(selectedTicket.createdAt)}
+              </p>
+              {selectedTicket.type !== TicketType.MATERIAL && (
+                <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm">
+                  <dt>Penerima dana</dt>
+                  <dd className="text-right">{selectedTicket.recipientName ?? "—"}</dd>
+                  <dt>Bank tujuan</dt>
+                  <dd className="text-right">{selectedTicket.bankName ?? "—"}</dd>
+                  <dt>Nomor rekening</dt>
+                  <dd className="text-right">{selectedTicket.accountNumber ?? "—"}</dd>
+                </dl>
+              )}
+              <ul className="divide-y">
+                {selectedTicket.items.map((item, index) => (
+                  <li className="py-2 text-sm" key={`${item.itemName}-${index}`}>
+                    {item.itemName} · {item.quantity} {item.unit}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-base font-semibold">{currency(selectedTicket.totalAmount)}</p>
+              {isExecutive(role) && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      className="flex-1"
+                      disabled={isPending}
+                      onClick={() =>
+                        runApproval(() =>
+                          approveByDirector(
+                            selectedTicket.id,
+                            selectedTicket.type,
+                          ),
+                        )
+                      }
+                    >
+                      {isPending
+                        ? "Memproses..."
+                        : selectedTicket.type === TicketType.MATERIAL
+                          ? "Setujui & Teruskan ke Logistik"
+                          : "Setujui Pencairan Dana"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      disabled={isPending}
+                      onClick={() => {
+                        setMessage("");
+                        setTicketDecision("REJECT");
+                        setTicketDecisionReason("");
+                      }}
+                    >
+                      Tolak
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() => {
+                        setMessage("");
+                        setTicketDecision("REVISION");
+                        setTicketDecisionReason("");
+                      }}
+                    >
+                      Minta Revisi
+                    </Button>
+                  </div>
+                  {ticketDecision && (
+                    <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                      <label className="block space-y-1 text-sm font-medium">
+                        {ticketDecision === "REJECT"
+                          ? "Alasan penolakan"
+                          : "Catatan revisi"}
+                        <Textarea
+                          value={ticketDecisionReason}
+                          maxLength={2000}
+                          onChange={(event) =>
+                            setTicketDecisionReason(event.target.value)
+                          }
+                          placeholder={
+                            ticketDecision === "REJECT"
+                              ? "Tuliskan alasan penolakan."
+                              : "Jelaskan bagian yang harus diperbaiki."
+                          }
+                          className="min-h-20 font-normal"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={
+                            ticketDecision === "REJECT"
+                              ? "destructive"
+                              : "default"
+                          }
+                          disabled={
+                            isPending ||
+                            ticketDecisionReason.trim().length < 3
+                          }
+                          onClick={runTicketDecision}
+                        >
+                          {isPending
+                            ? "Memproses..."
+                            : ticketDecision === "REJECT"
+                              ? "Konfirmasi Tolak"
+                              : "Kirim Revisi"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={isPending}
+                          onClick={() => {
+                            setTicketDecision(null);
+                            setTicketDecisionReason("");
+                          }}
+                        >
+                          Batal
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedDirectPurchase && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="font-semibold">{selectedDirectPurchase.vendorName}</p>
+              <p className="text-sm text-muted-foreground">
+                Pemohon {selectedDirectPurchase.createdByName} ·{" "}
+                {dateLabel(selectedDirectPurchase.createdAt)}
+              </p>
+              <ul className="divide-y">
+                {selectedDirectPurchase.items.map((item, index) => (
+                  <li className="py-2 text-sm" key={`${item.itemName}-${index}`}>
+                    {item.itemName} · {item.quantity} {item.unit}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-base font-semibold">
+                {currency(selectedDirectPurchase.totalAmount)}
+              </p>
+              {isExecutive(role) && (
+                <Button
+                  className="w-full"
                   disabled={isPending}
                   onClick={() =>
-                    runApproval(() => approveBAST(selectedBast.id))
+                    runApproval(() =>
+                      approveDirectStockPurchaseByDirector(
+                        selectedDirectPurchase.id,
+                      ),
+                    )
                   }
                 >
-                  Setujui BAST
+                  {isPending ? "Memproses..." : "Setujui Pengajuan Pembelian"}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {selectedWage && (
+            <form
+              className="space-y-3 rounded-lg border p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                runApproval(() =>
+                  approveProjectWorkPointWage(
+                    selectedWage.id,
+                    wageAmount,
+                    wageReason,
+                  ),
+                );
+              }}
+            >
+              <p className="font-semibold">
+                {selectedWage.projectName} · {selectedWage.title}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {selectedWage.location ?? "Lokasi belum dicatat"} · Pengusul:{" "}
+                {selectedWage.proposedByName}
+              </p>
+              <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm">
+                <dt>Volume pekerjaan</dt>
+                <dd className="text-right">
+                  {selectedWage.proposedVolume && selectedWage.proposedUnit
+                    ? `${selectedWage.proposedVolume} ${selectedWage.proposedUnit}`
+                    : "Tidak dicatat pada usulan lama"}
+                </dd>
+                <dt>Harga satuan</dt>
+                <dd className="text-right">
+                  {selectedWage.proposedUnitPrice
+                    ? currency(selectedWage.proposedUnitPrice)
+                    : "Tidak dicatat pada usulan lama"}
+                </dd>
+                <dt className="font-semibold">Total usulan</dt>
+                <dd className="text-right font-semibold">
+                  {currency(selectedWage.proposedTotalWage)}
+                </dd>
+              </dl>
+              <label className="block space-y-1 text-sm">
+                Nilai upah disetujui (Rp)
+                <input
+                  className="h-10 w-full rounded-md border bg-background px-3"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  value={wageAmount}
+                  onChange={(event) => setWageAmount(event.target.value)}
+                />
+              </label>
+              <label className="block space-y-1 text-sm">
+                Catatan audit persetujuan / koreksi
+                <textarea
+                  className="min-h-20 w-full rounded-md border bg-background p-3"
+                  maxLength={2000}
+                  required
+                  value={wageReason}
+                  onChange={(event) => setWageReason(event.target.value)}
+                  placeholder="Tuliskan alasan persetujuan atau koreksi nilai."
+                />
+              </label>
+              {isExecutive(role) && (
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending ? "Memproses..." : "Setujui Upah"}
+                </Button>
+              )}
+            </form>
+          )}
+
+          {selectedTermyn && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="font-semibold">
+                {selectedTermyn.subkonName} · {selectedTermyn.projectName}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                SPK {selectedTermyn.contractNumber} · Klaim progres{" "}
+                {selectedTermyn.claimedPercent}% · Pengusul{" "}
+                {selectedTermyn.createdByName}
+              </p>
+              <dl className="grid grid-cols-2 gap-2 rounded-md bg-muted/50 p-3 text-sm">
+                <dt>Nilai bruto</dt>
+                <dd className="text-right">{currency(selectedTermyn.grossAmount)}</dd>
+                <dt>Retensi</dt>
+                <dd className="text-right">{currency(selectedTermyn.retentionAmount)}</dd>
+                <dt className="font-semibold">Nilai dibayar</dt>
+                <dd className="text-right font-semibold">
+                  {currency(selectedTermyn.netAmount)}
+                </dd>
+              </dl>
+              {isExecutive(role) && (
+                <Button
+                  className="w-full"
+                  disabled={isPending}
+                  onClick={() =>
+                    runApproval(() => approveSubkonTermyn(selectedTermyn.id))
+                  }
+                >
+                  {isPending ? "Memproses..." : "Setujui Upah/Termyn"}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {selectedContract && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="font-semibold">{selectedContract.subkonName}</p>
+              <p className="text-sm text-muted-foreground">{selectedContract.projectName}</p>
+              <p className="whitespace-pre-wrap text-sm">{selectedContract.workScope}</p>
+              <p className="text-base font-semibold">{currency(selectedContract.contractValue)}</p>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={
+                    isPending ||
+                    selectedContract.createdById === currentUserId
+                  }
+                  onClick={() =>
+                    runApproval(() =>
+                      approveSubkonContract(selectedContract.publicCode, "ACTIVE"),
+                    )
+                  }
+                >
+                  Setujui SPK
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={isPending}
+                  onClick={() =>
+                    runApproval(() =>
+                      approveSubkonContract(selectedContract.publicCode, "REJECTED"),
+                    )
+                  }
+                >
+                  Tolak
                 </Button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {selectedAddendum && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="font-semibold">{selectedAddendum.projectName}</p>
+              <p className="text-sm">{selectedAddendum.reason}</p>
+              <p className="text-sm text-muted-foreground">
+                Perubahan pagu {currency(selectedAddendum.budgetChange)} ·
+                Perpanjangan {selectedAddendum.timeExtension} hari
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  disabled={isPending}
+                  onClick={() =>
+                    runApproval(() =>
+                      approveProjectAddendum(selectedAddendum.id, "APPROVED"),
+                    )
+                  }
+                >
+                  Setujui CCO
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={isPending}
+                  onClick={() =>
+                    runApproval(() =>
+                      approveProjectAddendum(selectedAddendum.id, "REJECTED"),
+                    )
+                  }
+                >
+                  Tolak
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {selectedBast && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <p className="font-semibold">
+                BAST {selectedBast.type} · {selectedBast.projectName}
+              </p>
+              <p className="text-sm text-muted-foreground">Tanggal: {dateLabel(selectedBast.date)}</p>
+              {selectedBast.maintenanceEndsAt && (
+                <p className="text-sm text-muted-foreground">
+                  Akhir pemeliharaan: {dateLabel(selectedBast.maintenanceEndsAt)}
+                </p>
+              )}
+              {selectedBast.notes && (
+                <p className="whitespace-pre-wrap text-sm">{selectedBast.notes}</p>
+              )}
+              <Button
+                className="w-full"
+                disabled={isPending}
+                onClick={() =>
+                  runApproval(() => approveBAST(selectedBast.id))
+                }
+              >
+                Setujui BAST
+              </Button>
+            </div>
+          )}
+        </div>
       </GlobalModal>
     </div>
   );
