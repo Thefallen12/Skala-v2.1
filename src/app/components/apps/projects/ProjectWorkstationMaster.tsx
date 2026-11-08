@@ -29,6 +29,8 @@ import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import type { FieldTeamOption } from "@/app/(DashboardLayout)/types/project";
 import type { ProjectDashboardRow } from "@/app/(DashboardLayout)/types/project";
+import { ProjectProgressChart as ProjectProgressByPicChart } from "@/app/components/dashboard/ProjectProgressChart";
+import CurrentLocation from "@/app/components/dashboard/CurrentLocation";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -230,6 +232,8 @@ export type ProjectWorkstationMasterData = {
     weather: string | null;
     workersCount: number;
     progress: number | null;
+    workPointId: string | null;
+    dailyVolume: number | null;
     workSummary: string | null;
     notes: string | null;
     photoUrls: string[];
@@ -241,6 +245,9 @@ export type ProjectWorkstationMasterData = {
     plannedStartDate: string | null;
     targetDate: string | null;
     progress: number;
+    proposedVolume: string | null;
+    proposedUnit: string | null;
+    completedVolume: number | null;
     proposedTotalWage: string;
     approvedTotalWage: string | null;
     wageAuditLogs: {
@@ -312,6 +319,9 @@ const currency = (amount: number | string) =>
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(Number(amount));
+
+const formatVolume = (amount: number) =>
+  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 3 }).format(amount);
 
 const PROJECTS_PER_PAGE = 5;
 
@@ -493,6 +503,8 @@ export default function ProjectWorkstationMaster({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [selectedReportWorkPointId, setSelectedReportWorkPointId] =
+    useState("");
   const sectionParam = searchParams.get("section");
   const viewParam = searchParams.get("view");
   const projectParam = searchParams.get("projectId");
@@ -528,6 +540,23 @@ export default function ProjectWorkstationMaster({
     currentUserRole === UserRole.KOORDINATOR;
   const activeProject =
     projects.find((project) => project.id === activeProjectId) ?? null;
+  const reportWorkPointId =
+    activeProject?.workPoints.some(
+      (point) => point.id === selectedReportWorkPointId,
+    )
+      ? selectedReportWorkPointId
+      : activeProject?.workPoints[0]?.id ?? "";
+  const reportWorkPoint = activeProject?.workPoints.find(
+    (point) => point.id === reportWorkPointId,
+  );
+  const reportTargetVolume = Number(reportWorkPoint?.proposedVolume ?? 0);
+  const reportCompletedVolume =
+    reportWorkPoint?.completedVolume ??
+    (reportTargetVolume * (reportWorkPoint?.progress ?? 0)) / 100;
+  const reportRemainingVolume = Math.max(
+    0,
+    reportTargetVolume - reportCompletedVolume,
+  );
   const pendingDeleteProject =
     projects.find((project) => project.id === pendingDeleteProjectId) ?? null;
   const filteredBlueprints = activeProject?.blueprints.filter(
@@ -757,28 +786,27 @@ export default function ProjectWorkstationMaster({
               <h1 className="mt-1 text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                 Project Workstation
               </h1>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              <p className="mt-1 hidden max-w-2xl text-sm text-muted-foreground sm:block">
                 Satu pusat kendali untuk data proyek, anggaran, pelaksanaan, dan dokumen.
               </p>
             </div>
           </div>
-          <div className="shrink-0 space-y-2 sm:text-right">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="w-full min-w-0 space-y-2 sm:w-auto sm:shrink-0 sm:text-right">
+            <p className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground sm:block">
               Adapt, Improvise and Finish
             </p>
-            <p className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-1.5 text-xs font-medium text-foreground">
-              <MapPin className="size-3.5 text-secondary" aria-hidden="true" />
-              Takengon, Aceh
-            </p>
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300">
-                <BriefcaseBusiness className="size-3.5" aria-hidden="true" />
-                {activeProjectCount} Proyek Aktif
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300">
-                <Users className="size-3.5" aria-hidden="true" />
-                {assignedPicCount} PIC Terlibat
-              </span>
+            <div className="grid w-full grid-cols-[minmax(0,1.3fr)_repeat(2,minmax(0,1fr))] items-stretch gap-1.5 sm:flex sm:flex-col sm:items-end sm:gap-2">
+              <CurrentLocation variant="badge" />
+              <div className="contents sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
+                <span className="inline-flex h-full min-h-14 flex-col items-center justify-center gap-0.5 rounded-full border border-sky-200 bg-sky-50 px-1.5 py-1 text-center text-[9px] font-medium leading-tight text-sky-700 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300 sm:h-auto sm:min-h-0 sm:flex-row sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-left sm:text-[11px] sm:leading-normal">
+                  <BriefcaseBusiness className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span>{activeProjectCount} Proyek Aktif</span>
+                </span>
+                <span className="inline-flex h-full min-h-14 flex-col items-center justify-center gap-0.5 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-1 text-center text-[9px] font-medium leading-tight text-violet-700 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300 sm:h-auto sm:min-h-0 sm:flex-row sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-left sm:text-[11px] sm:leading-normal">
+                  <Users className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span>{assignedPicCount} PIC Terlibat</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -816,6 +844,28 @@ export default function ProjectWorkstationMaster({
           Peta & Survei Lapangan
         </Button>
       </nav>
+
+      {activeSection === "projects" && (
+        <Card className="border-border bg-card text-card-foreground shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-foreground">
+              Persentase progres berdasarkan PIC
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Rata-rata progres proyek yang ditangani setiap PIC
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ProjectProgressByPicChart
+              projects={projects.map((project) => ({
+                picId: project.fieldPicId,
+                picName: project.fieldPicName,
+                progress: project.progress,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {activeSection === "projects" && (
       <Card className="border-border bg-card text-card-foreground shadow-md">
@@ -1015,11 +1065,17 @@ export default function ProjectWorkstationMaster({
                     onClick={() => {
                       setNotice("");
                       setActiveProjectId(project.id);
+                      setSelectedReportWorkPointId(
+                        project.workPoints[0]?.id ?? "",
+                      );
                     }}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         setActiveProjectId(project.id);
+                        setSelectedReportWorkPointId(
+                          project.workPoints[0]?.id ?? "",
+                        );
                       }
                     }}
                   >
@@ -1257,6 +1313,7 @@ export default function ProjectWorkstationMaster({
         isOpen={activeProject !== null}
         onClose={() => {
           setActiveProjectId(null);
+          setSelectedReportWorkPointId("");
           setNotice("");
         }}
         title={activeProject?.title ?? "Detail Proyek"}
@@ -1665,21 +1722,66 @@ export default function ProjectWorkstationMaster({
                             </Select>
                           </Label>
                           <Label>Jumlah pekerja hadir<Input name="workersCount" type="number" min="0" max="100000" defaultValue="0" required /></Label>
-                          <Label>
-                            Progres kumulatif (%)
-                            <Input
-                              name="progress"
-                              type="number"
-                              min={activeProject.progress}
-                              max="100"
-                              step="0.1"
-                              defaultValue={activeProject.progress}
-                              required
-                            />
-                            <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                              Isi progres keseluruhan terbaru. Nilai tidak dapat lebih rendah dari progres proyek saat ini ({activeProject.progress}%).
-                            </span>
-                          </Label>
+                          {activeProject.workPoints.length > 0 ? (
+                            <>
+                              <Label>
+                                Item pekerjaan
+                                <Select
+                                  name="workPointId"
+                                  value={reportWorkPointId}
+                                  onValueChange={setSelectedReportWorkPointId}
+                                >
+                                  <SelectTrigger className="mt-2 w-full">
+                                    <SelectValue placeholder="Pilih item pekerjaan" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {activeProject.workPoints.map((point) => (
+                                      <SelectItem key={point.id} value={point.id}>
+                                        {point.title}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </Label>
+                              <Label>
+                                {`Volume selesai hari ini (${reportWorkPoint?.proposedUnit ?? "unit"})`}
+                                <Input
+                                  name="dailyVolume"
+                                  type="number"
+                                  min="0.001"
+                                  max={reportRemainingVolume}
+                                  step="0.001"
+                                  required
+                                  disabled={
+                                    !reportWorkPoint ||
+                                    reportTargetVolume <= 0 ||
+                                    reportRemainingVolume <= 0
+                                  }
+                                />
+                                <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                                  {reportWorkPoint && reportTargetVolume > 0
+                                    ? `Terkumpul ${formatVolume(reportCompletedVolume)} dari ${formatVolume(reportTargetVolume)} ${reportWorkPoint.proposedUnit ?? "unit"}; sisa ${formatVolume(reportRemainingVolume)}. Progres dihitung otomatis.`
+                                    : "Item pekerjaan ini belum memiliki target volume yang valid."}
+                                </span>
+                              </Label>
+                            </>
+                          ) : (
+                            <Label>
+                              Progres kumulatif (%)
+                              <Input
+                                name="progress"
+                                type="number"
+                                min={activeProject.progress}
+                                max="100"
+                                step="0.1"
+                                defaultValue={activeProject.progress}
+                                required
+                              />
+                              <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                                Isi progres keseluruhan terbaru. Nilai tidak dapat lebih rendah dari progres proyek saat ini ({activeProject.progress}%).
+                              </span>
+                            </Label>
+                          )}
                           <Label className="sm:col-span-2">
                             Uraian pekerjaan harian
                             <Textarea name="workSummary" maxLength={2000} required />
@@ -1687,7 +1789,15 @@ export default function ProjectWorkstationMaster({
                           <Label className="sm:col-span-2">Foto progres (maks. 5 foto, 5 MB/foto)
                             <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
                           </Label>
-                          <Button type="submit" disabled={isPending} className="sm:col-span-2">
+                          <Button
+                            type="submit"
+                            disabled={
+                              isPending ||
+                              (activeProject.workPoints.length > 0 &&
+                                (!reportWorkPoint || reportTargetVolume <= 0))
+                            }
+                            className="sm:col-span-2"
+                          >
                             {isPending ? "Menyimpan..." : "Simpan Laporan"}
                           </Button>
                         </form>
@@ -1709,6 +1819,23 @@ export default function ProjectWorkstationMaster({
                             <Badge variant="outline">{report.progress === null ? "—" : `${report.progress}%`}</Badge>
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground">{report.workersCount} pekerja · {report.photoUrls.length} foto</p>
+                          {report.dailyVolume !== null &&
+                            report.workPointId &&
+                            (() => {
+                              const point = activeProject.workPoints.find(
+                                (workPoint) =>
+                                  workPoint.id === report.workPointId,
+                              );
+                              if (!point) return null;
+                              const target = Number(point.proposedVolume ?? 0);
+                              const total =
+                                (target * (report.progress ?? 0)) / 100;
+                              return (
+                                <p className="mt-1 text-sm">
+                                  {point.title}: {formatVolume(report.dailyVolume)} {point.proposedUnit ?? "unit"} hari ini · total {formatVolume(total)}/{formatVolume(target)} {point.proposedUnit ?? "unit"}
+                                </p>
+                              );
+                            })()}
                           {report.workSummary && <p className="mt-2 text-sm">{report.workSummary}</p>}
                           {report.photoUrls.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">

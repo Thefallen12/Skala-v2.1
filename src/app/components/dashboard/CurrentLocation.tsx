@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MapPin } from "lucide-react";
 
 type LocationState =
   | { status: "loading" }
@@ -25,7 +26,11 @@ const toDms = (value: number, positive: string, negative: string) => {
   return `${degrees}°${String(minutes).padStart(2, "0")}′${String(seconds).padStart(4, "0")}″${direction}`;
 };
 
-const CurrentLocation = () => {
+const CurrentLocation = ({
+  variant = "default",
+}: {
+  variant?: "default" | "badge";
+}) => {
   const [location, setLocation] = useState<LocationState>({
     status: "loading",
   });
@@ -120,11 +125,37 @@ const CurrentLocation = () => {
     location.status === "ready"
       ? `${toDms(location.latitude, "N", "S")} ${toDms(location.longitude, "E", "W")}`
       : null;
+  const coordinateParts = coordinates?.split(" ") ?? [];
+
+  const accessibleLabel = `Lokasi terkini: ${placeName}${coordinates ? `, ${coordinates}` : ""}`;
+
+  if (variant === "badge") {
+    return (
+      <div
+        className="inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-border bg-muted px-2 py-1 text-left text-xs font-medium text-foreground sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
+        aria-label={accessibleLabel}
+        aria-live="polite"
+      >
+        <MapPin className="size-3.5 shrink-0 text-secondary" aria-hidden="true" />
+        <div className="grid min-w-0 flex-1">
+          <span className="line-clamp-2 max-w-full text-[10px] leading-tight sm:line-clamp-none sm:max-w-[13rem] sm:truncate sm:text-xs" title={placeName}>
+            {placeName}
+          </span>
+          {coordinateParts.length === 2 && (
+            <span className="flex flex-col text-[8px] font-medium leading-tight text-muted-foreground sm:flex-row sm:gap-1 sm:text-[10px] sm:leading-normal">
+              <span className="whitespace-nowrap">{coordinateParts[0]}</span>
+              <span className="whitespace-nowrap">{coordinateParts[1]}</span>
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       className="mt-1 flex min-w-0 flex-col items-end leading-tight"
-      aria-label={`Lokasi terkini: ${placeName}${coordinates ? `, ${coordinates}` : ""}`}
+      aria-label={accessibleLabel}
       aria-live="polite"
     >
       <span className="max-w-full truncate text-[9px] font-semibold text-slate-500 dark:text-slate-400 sm:text-xs">

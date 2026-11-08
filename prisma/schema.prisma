@@ -752,10 +752,13 @@ model DailyReport {
   id             String                 @id @default(cuid()) @map("_id")
   projectId      String
   project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workPointId    String?
+  workPoint      ProjectWorkPoint?      @relation(fields: [workPointId], references: [id], onDelete: SetNull)
   reportDate     DateTime
   weather        String?
   workersCount   Int                    @default(0)
   progress       Float?
+  dailyVolume    Float?
   equipment      Json?
   workSummary    String?
   notes          String?
@@ -799,6 +802,8 @@ model ProjectWorkPoint {
   wageApprovedById  String?
   wageApprovedBy    User?                      @relation("WorkPointWageApprover", fields: [wageApprovedById], references: [id], onDelete: SetNull)
   progress          Float                      @default(0)
+  completedVolume   Float?
+  dailyReports      DailyReport[]
   progressReports   ProjectWorkPointProgress[]
   wageAuditLogs     WageAuditLog[]
   createdAt         DateTime                   @default(now())
@@ -1116,7 +1121,7 @@ model SubkonContract {
   subkonName               String
   workScope                String
   contractValue            BigInt
-  retentionPct             BigInt          @default(5000)
+  retentionPct             BigInt         @default(5000)
   status                   SPKStatus      @default(DRAFT)
   createdById              String
   createdBy                User           @relation("SubkonContractCreator", fields: [createdById], references: [id], onDelete: Restrict)
@@ -1256,10 +1261,10 @@ model Ticket {
   paymentProofUrl           String?
   requestCategory           TicketRequestCategory?
   fieldCategory             TicketFieldCategory?
-  shippingDetails            Json?
-  relatedPoIds                String[]                @default([])
-  relatedTicketIds            String[]                @default([])
-  requestPaymentMethod       POPaymentMethod?
+  shippingDetails           Json?
+  relatedPoIds              String[]                @default([])
+  relatedTicketIds          String[]                @default([])
+  requestPaymentMethod      POPaymentMethod?
   requestPaymentDescription String?
   recipientName             String?
   bankName                  String?
@@ -1474,7 +1479,7 @@ model Vehicle {
   vehicleType         String
   brand               String?
   modelName           String?
-  currentKilometer    BigInt                @default(0)
+  currentKilometer    BigInt               @default(0)
   odometerInitialized Boolean              @default(false)
   status              String               @default("AVAILABLE")
   deliveryOrders      DeliveryOrder[]      @relation("DeliveryOrderVehicle")

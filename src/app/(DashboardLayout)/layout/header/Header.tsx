@@ -27,6 +27,7 @@ const Header = ({
   userName,
   userRole,
   notifications,
+  androidDownloadUrl,
   sidebarCounts,
   notificationFeed,
   notificationLoadFailed,
@@ -44,6 +45,7 @@ const Header = ({
   userName: string;
   userRole: UserRole;
   notifications: DashboardNotification[];
+  androidDownloadUrl: string | null;
   sidebarCounts: SidebarCounts;
   notificationFeed: NotificationFeed | null;
   notificationLoadFailed: boolean;
@@ -209,6 +211,7 @@ const Header = ({
             isMover={isMover}
             allowedMenuKeys={allowedMenuKeys}
             sidebarCounts={sidebarCounts}
+            androidDownloadUrl={androidDownloadUrl}
             onClose={() => setIsOpen(false)}
           />
         </SheetContent>

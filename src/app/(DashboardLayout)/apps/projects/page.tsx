@@ -84,6 +84,8 @@ export default async function ProjectsWorkstationPage({
           weather: true,
           workersCount: true,
           progress: true,
+          workPointId: true,
+          dailyVolume: true,
           workSummary: true,
           notes: true,
           progressPhotos: {
@@ -101,6 +103,9 @@ export default async function ProjectsWorkstationPage({
           plannedStartDate: true,
           targetDate: true,
           progress: true,
+          proposedVolume: true,
+          proposedUnit: true,
+          completedVolume: true,
           proposedTotalWage: true,
           approvedTotalWage: true,
           wageAuditLogs: {
@@ -336,6 +341,8 @@ export default async function ProjectsWorkstationPage({
       weather: report.weather,
       workersCount: report.workersCount,
       progress: report.progress,
+      workPointId: report.workPointId,
+      dailyVolume: report.dailyVolume,
       workSummary: report.workSummary,
       notes: report.notes,
       photoUrls: report.progressPhotos.map((photo) => photo.fileUrl ?? photo.url),
@@ -347,6 +354,12 @@ export default async function ProjectsWorkstationPage({
       plannedStartDate: point.plannedStartDate?.toISOString().slice(0, 10) ?? null,
       targetDate: point.targetDate?.toISOString().slice(0, 10) ?? null,
       progress: point.progress,
+      proposedVolume:
+        point.proposedVolume !== null
+          ? decimalStringFromScaledInteger(point.proposedVolume)
+          : null,
+      proposedUnit: point.proposedUnit,
+      completedVolume: point.completedVolume,
       proposedTotalWage: decimalStringFromScaledInteger(
         point.proposedTotalWage,
       ),
@@ -361,13 +374,29 @@ export default async function ProjectsWorkstationPage({
         createdAt: log.createdAt.toISOString(),
         changedByName: log.changedBy.name,
       })),
-      progressReports: point.progressReports.map((report) => ({
-        id: report.id,
-        reportDate: report.reportDate.toISOString().slice(0, 10),
-        progress: report.progress,
-        workSummary: report.workSummary,
-        photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
-      })),
+      progressReports: [
+        ...point.progressReports.map((report) => ({
+          id: report.id,
+          reportDate: report.reportDate.toISOString().slice(0, 10),
+          progress: report.progress,
+          workSummary: report.workSummary,
+          photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
+        })),
+        ...project.dailyReports
+          .filter(
+            (report) =>
+              report.workPointId === point.id && report.progress !== null,
+          )
+          .map((report) => ({
+            id: report.id,
+            reportDate: report.reportDate.toISOString().slice(0, 10),
+            progress: report.progress!,
+            workSummary: report.workSummary,
+            photoUrls: report.progressPhotos.map(
+              (photo) => photo.fileUrl ?? photo.url,
+            ),
+          })),
+      ],
     })),
     blueprints: isFieldRole ? [] : project.blueprints.map((blueprint) => ({
       id: blueprint.id,

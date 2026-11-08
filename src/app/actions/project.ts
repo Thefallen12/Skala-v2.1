@@ -23,6 +23,7 @@ import { removeBlueprintFile } from "@/lib/blueprint-files";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import {
   decimalFromScaledInteger,
+  decimalNumberFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
 
@@ -1075,13 +1076,49 @@ export async function editApprovedProjectWorkPointWage(
   }
 }
 
-const projectProgressSchema = z.object({
-  reportDate: z.iso.date(),
-  progress: z.coerce.number().finite().min(0).max(100),
-  workSummary: z.string().trim().min(1).max(2000),
-  weather: z.enum(["Cerah", "Hujan Gerimis", "Hujan Lebat", "Mendung"]),
-  workersCount: z.coerce.number().int().min(0).max(100000),
-});
+const projectProgressSchema = z
+  .object({
+    reportDate: z.iso.date(),
+    progress: z.preprocess(
+      (value) => (value === "" || value === null ? undefined : value),
+      z.coerce.number().finite().min(0).max(100).optional(),
+    ),
+    workPointId: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() ? value.trim() : undefined,
+      z.string().max(100).optional(),
+    ),
+    dailyVolume: z.preprocess(
+      (value) => (value === "" || value === null ? undefined : value),
+      z.coerce.number().finite().positive().optional(),
+    ),
+    workSummary: z.string().trim().min(1).max(2000),
+    weather: z.enum(["Cerah", "Hujan Gerimis", "Hujan Lebat", "Mendung"]),
+    workersCount: z.coerce.number().int().min(0).max(100000),
+  })
+  .superRefine((value, context) => {
+    if (value.workPointId && value.dailyVolume === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["dailyVolume"],
+        message: "Volume yang selesai hari ini wajib diisi.",
+      });
+    }
+    if (!value.workPointId && value.progress === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["progress"],
+        message: "Pilih item pekerjaan atau isi progres kumulatif proyek.",
+      });
+    }
+    if (!value.workPointId && value.dailyVolume !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["workPointId"],
+        message: "Pilih item pekerjaan untuk mencatat volume harian.",
+      });
+    }
+  });
 
 const progressUpdateRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
@@ -1129,6 +1166,8 @@ export async function addProjectProgress(
   const parsed = projectProgressSchema.safeParse({
     reportDate: input.get("reportDate"),
     progress: input.get("progress"),
+    workPointId: input.get("workPointId"),
+    dailyVolume: input.get("dailyVolume"),
     workSummary: input.get("workSummary"),
     weather: input.get("weather"),
     workersCount: input.get("workersCount"),
@@ -1178,7 +1217,11 @@ export async function addProjectProgress(
     ) {
       return { success: false, message: "Hanya PIC proyek yang dapat mengirim laporan harian." };
     }
-    if (values.progress < project.progress) {
+    if (
+      !values.workPointId &&
+      values.progress !== undefined &&
+      values.progress < project.progress
+    ) {
       return {
         success: false,
         message: "Progres kumulatif tidak boleh lebih rendah dari progres proyek saat ini.",
@@ -1190,13 +1233,6 @@ export async function addProjectProgress(
     }
 
     await prisma.$transaction(async (transaction) => {
-      const updatedProject = await transaction.project.updateMany({
-        where: { id: projectId, progress: { lte: values.progress } },
-        data: { progress: values.progress },
-      });
-      if (updatedProject.count !== 1) {
-        throw new Error("PROGRESS_CANNOT_DECREASE");
-      }
       const existingReport = await transaction.dailyReport.findUnique({
         where: {
           projectId_reportDate: {
@@ -1206,11 +1242,88 @@ export async function addProjectProgress(
         },
         select: {
           id: true,
+          workPointId: true,
+          dailyVolume: true,
           _count: { select: { progressPhotos: true } },
         },
       });
       if ((existingReport?._count.progressPhotos ?? 0) + photos.length > 5) {
         throw new Error("Laporan pada tanggal ini sudah memiliki 5 foto.");
+      }
+
+      let reportProgress = values.progress ?? project.progress;
+      let dailyVolume: number | null = null;
+      let workPointId: string | null = null;
+      if (values.workPointId) {
+        const workPoint = await transaction.projectWorkPoint.findFirst({
+          where: { id: values.workPointId, projectId },
+          select: {
+            id: true,
+            progress: true,
+            completedVolume: true,
+            proposedVolume: true,
+          },
+        });
+        if (!workPoint) {
+          throw new Error("ITEM_PEKERJAAN_TIDAK_DITEMUKAN");
+        }
+        if (
+          existingReport?.workPointId &&
+          existingReport.workPointId !== workPoint.id
+        ) {
+          throw new Error("LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN");
+        }
+        if (!workPoint.proposedVolume) {
+          throw new Error("TARGET_VOLUME_TIDAK_VALID");
+        }
+        if (values.dailyVolume === undefined) {
+          throw new Error("VOLUME_HARIAN_TIDAK_VALID");
+        }
+        const targetVolume = decimalNumberFromScaledInteger(
+          workPoint.proposedVolume,
+        );
+        const alreadyCompleted =
+          workPoint.completedVolume ??
+          (targetVolume * workPoint.progress) / 100;
+        const previousSameDayVolume =
+          existingReport?.workPointId === workPoint.id
+            ? existingReport.dailyVolume ?? 0
+            : 0;
+        const completedBeforeToday = Math.max(
+          0,
+          alreadyCompleted - previousSameDayVolume,
+        );
+        const nextCompleted =
+          completedBeforeToday + values.dailyVolume;
+        if (nextCompleted > targetVolume + 0.000001) {
+          throw new Error("VOLUME_MELEBIHI_TARGET");
+        }
+        dailyVolume = values.dailyVolume;
+        workPointId = workPoint.id;
+        reportProgress =
+          Math.round((Math.min(nextCompleted, targetVolume) / targetVolume) * 1000) /
+          10;
+        await transaction.projectWorkPoint.update({
+          where: { id: workPoint.id },
+          data: {
+            completedVolume: Math.min(nextCompleted, targetVolume),
+            progress: reportProgress,
+          },
+        });
+      } else {
+        if (existingReport?.workPointId) {
+          throw new Error("LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN");
+        }
+        if (values.progress === undefined) {
+          throw new Error("PROGRES_KUMULATIF_TIDAK_VALID");
+        }
+        const updatedProject = await transaction.project.updateMany({
+          where: { id: projectId, progress: { lte: values.progress } },
+          data: { progress: values.progress },
+        });
+        if (updatedProject.count !== 1) {
+          throw new Error("PROGRESS_CANNOT_DECREASE");
+        }
       }
 
       const report = await transaction.dailyReport.upsert({
@@ -1223,13 +1336,17 @@ export async function addProjectProgress(
         create: {
           projectId,
           reportDate,
-          progress: values.progress,
+          workPointId,
+          dailyVolume,
+          progress: reportProgress,
           workSummary: values.workSummary || null,
           weather: values.weather,
           workersCount: values.workersCount,
         },
         update: {
-          progress: values.progress,
+          workPointId,
+          dailyVolume,
+          progress: reportProgress,
           workSummary: values.workSummary || null,
           weather: values.weather,
           workersCount: values.workersCount,
@@ -1269,6 +1386,49 @@ export async function addProjectProgress(
       error.message === "Laporan pada tanggal ini sudah memiliki 5 foto."
     ) {
       return { success: false, message: error.message };
+    }
+    if (error instanceof Error && error.message === "VOLUME_MELEBIHI_TARGET") {
+      return {
+        success: false,
+        message: "Volume hari ini melebihi sisa target pekerjaan.",
+      };
+    }
+    if (
+      error instanceof Error &&
+      error.message === "LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN"
+    ) {
+      return {
+        success: false,
+        message:
+          "Laporan pada tanggal ini sudah terkait item pekerjaan lain. Gunakan item yang sama atau ubah tanggal laporan.",
+      };
+    }
+    if (
+      error instanceof Error &&
+      error.message === "ITEM_PEKERJAAN_TIDAK_DITEMUKAN"
+    ) {
+      return { success: false, message: "Item pekerjaan tidak ditemukan di proyek ini." };
+    }
+    if (error instanceof Error && error.message === "TARGET_VOLUME_TIDAK_VALID") {
+      return {
+        success: false,
+        message: "Item pekerjaan belum memiliki target volume dan satuan yang valid.",
+      };
+    }
+    if (error instanceof Error && error.message === "VOLUME_HARIAN_TIDAK_VALID") {
+      return {
+        success: false,
+        message: "Volume yang selesai hari ini wajib diisi.",
+      };
+    }
+    if (
+      error instanceof Error &&
+      error.message === "PROGRES_KUMULATIF_TIDAK_VALID"
+    ) {
+      return {
+        success: false,
+        message: "Progres kumulatif proyek wajib diisi.",
+      };
     }
     if (error instanceof Error && error.message === "PROGRESS_CANNOT_DECREASE") {
       return {

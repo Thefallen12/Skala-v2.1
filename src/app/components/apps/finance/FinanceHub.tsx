@@ -78,6 +78,11 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   photoDownloadHref,
   withLocalPhotoPreview,
 } from "@/lib/photo-urls";
@@ -1132,61 +1137,143 @@ export default function FinanceHub({
         onValueChange={setActiveTab}
         className="space-y-5"
       >
-        <TabsList className="grid h-auto w-full grid-cols-1 gap-2 rounded-xl border border-border/70 bg-muted/40 p-2 min-[480px]:grid-cols-2 xl:grid-cols-6">
-          <TabsTrigger
-            value="check"
-            className="h-auto min-h-11 min-w-0 justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left leading-snug data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm"
-          >
-            <FileCheck2 className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1">1. Perlu Diperiksa (PO & Tiket)</span>
-            <Badge variant="secondary">{purchaseOrders.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger
-            value="payment"
-            className="h-auto min-h-11 min-w-0 justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left leading-snug data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm"
-          >
-            <ReceiptText className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1">2. Antrean Pembayaran</span>
-            <Badge variant="secondary">{pendingPaymentCount}</Badge>
-          </TabsTrigger>
-          <TabsTrigger
-            value="history"
-            className="h-auto min-h-11 min-w-0 justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left leading-snug data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm"
-          >
-            <History className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1">3. Riwayat & Bukti Transfer</span>
-            <Badge variant="secondary">{paymentHistoryRows.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger
-            value="ledger"
-            className="h-auto min-h-11 min-w-0 justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left leading-snug data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm"
-          >
-            <Wallet className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1">4. Buku Kas &amp; Arus Dana</span>
-            <Badge variant="secondary">{cashflows.length}</Badge>
-          </TabsTrigger>
+        <TabsList
+          className={`grid h-auto w-full ${canManageOfficeExpenses ? "grid-cols-6" : "grid-cols-5"} gap-1 rounded-xl border border-border/70 bg-muted/40 p-1.5 min-[480px]:grid-cols-2 min-[480px]:gap-2 min-[480px]:p-2 xl:grid-cols-6`}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TabsTrigger
+                value="check"
+                aria-label={`Perlu Diperiksa (PO & Tiket), ${purchaseOrders.length}`}
+                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+              >
+                <FileCheck2 className="size-4 shrink-0" aria-hidden="true" />
+                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
+                  1. Perlu Diperiksa (PO & Tiket)
+                </span>
+                <Badge
+                  variant="secondary"
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                >
+                  {purchaseOrders.length}
+                </Badge>
+              </TabsTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Perlu Diperiksa (PO & Tiket)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TabsTrigger
+                value="payment"
+                aria-label={`Antrean Pembayaran, ${pendingPaymentCount}`}
+                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+              >
+                <ReceiptText className="size-4 shrink-0" aria-hidden="true" />
+                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
+                  2. Antrean Pembayaran
+                </span>
+                <Badge
+                  variant="secondary"
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                >
+                  {pendingPaymentCount}
+                </Badge>
+              </TabsTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Antrean Pembayaran</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TabsTrigger
+                value="history"
+                aria-label={`Riwayat & Bukti Transfer, ${paymentHistoryRows.length}`}
+                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+              >
+                <History className="size-4 shrink-0" aria-hidden="true" />
+                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
+                  3. Riwayat & Bukti Transfer
+                </span>
+                <Badge
+                  variant="secondary"
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                >
+                  {paymentHistoryRows.length}
+                </Badge>
+              </TabsTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Riwayat & Bukti Transfer</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TabsTrigger
+                value="ledger"
+                aria-label={`Buku Kas & Arus Dana, ${cashflows.length}`}
+                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+              >
+                <Wallet className="size-4 shrink-0" aria-hidden="true" />
+                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
+                  4. Buku Kas &amp; Arus Dana
+                </span>
+                <Badge
+                  variant="secondary"
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                >
+                  {cashflows.length}
+                </Badge>
+              </TabsTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Buku Kas & Arus Dana</TooltipContent>
+          </Tooltip>
           {canManageOfficeExpenses && (
-            <TabsTrigger
-              value="office-expense"
-              className="h-auto min-h-11 min-w-0 justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left leading-snug data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm"
-            >
-              <ReceiptText className="size-4 shrink-0" />
-              <span className="min-w-0 flex-1">
-                5. Pengeluaran Kantor &amp; Tim
-              </span>
-              <Badge variant="secondary">{officeExpenses.length}</Badge>
-            </TabsTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger
+                  value="office-expense"
+                  aria-label={`Pengeluaran Kantor & Tim, ${officeExpenses.length}`}
+                  className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+                >
+                  <ReceiptText className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
+                    5. Pengeluaran Kantor &amp; Tim
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                  >
+                    {officeExpenses.length}
+                  </Badge>
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Pengeluaran Kantor & Tim</TooltipContent>
+            </Tooltip>
           )}
-          <TabsTrigger
-            value="operations"
-            className="h-auto min-h-11 min-w-0 justify-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left leading-snug data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm"
-          >
-            <Fuel className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1">Operasional Lainnya</span>
-            <Badge variant="secondary">
-              {termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length}
-            </Badge>
-          </TabsTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <TabsTrigger
+                value="operations"
+                aria-label={`Operasional Lainnya, ${termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length}`}
+                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+              >
+                <Fuel className="size-4 shrink-0" aria-hidden="true" />
+                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
+                  Operasional Lainnya
+                </span>
+                <Badge
+                  variant="secondary"
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                >
+                  {termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length}
+                </Badge>
+              </TabsTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Operasional Lainnya</TooltipContent>
+          </Tooltip>
         </TabsList>
 
         <div id="finance-ledger-tab">

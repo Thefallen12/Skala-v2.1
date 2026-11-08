@@ -27,6 +27,7 @@ export default function DashboardLayoutClient({
   userName,
   userRole,
   notifications,
+  androidDownloadUrl,
 }: Readonly<{
   children: React.ReactNode
   canManageUsers: boolean
@@ -42,6 +43,7 @@ export default function DashboardLayoutClient({
   userName: string
   userRole: UserRole
   notifications: DashboardNotification[]
+  androidDownloadUrl: string | null
 }>) {
   const router = useRouter()
   const pathname = usePathname()
@@ -148,6 +150,7 @@ export default function DashboardLayoutClient({
               isMover={isMover}
               allowedMenuKeys={allowedMenuKeys}
               sidebarCounts={sidebarCounts}
+              androidDownloadUrl={androidDownloadUrl}
             />
           </div>
           <div className='body-wrapper min-w-0 flex-1 pt-16 md:pt-0'>
@@ -164,6 +167,7 @@ export default function DashboardLayoutClient({
               userName={userName}
               userRole={userRole}
               notifications={notifications}
+              androidDownloadUrl={androidDownloadUrl}
               sidebarCounts={sidebarCounts}
               notificationFeed={data ?? null}
               notificationLoadFailed={Boolean(error)}

@@ -194,6 +194,7 @@ export default async function Layout({
       userName={session.user.name ?? "Pengguna"}
       userRole={session.user.role}
       notifications={notifications}
+      androidDownloadUrl={process.env.LINK_DOWNLOAD_ANDROID?.trim() || null}
     >
       {children}
     </DashboardLayoutClient>
