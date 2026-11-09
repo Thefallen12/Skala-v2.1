@@ -122,6 +122,7 @@ const ticketFormSchema = z
     transferDestination: z.string().optional(),
     requestPaymentDescription: z.string().optional(),
     relatedDocumentNumbers: z.string(),
+    deliveryReceiptFile: z.instanceof(File).nullable(),
     receiptFiles: z.array(z.instanceof(File)).max(5),
     operationalRequestType: z.enum(["GENERAL", "SURVEY"]),
     operationalAmount: z
@@ -322,6 +323,20 @@ const ticketFormSchema = z
           message: "Daftar PO terlalu panjang.",
         });
       }
+      if (values.requestedAmount === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["requestedAmount"],
+          message: "Biaya pengiriman harus lebih besar dari 0.",
+        });
+      }
+      if (!values.deliveryReceiptFile) {
+        context.addIssue({
+          code: "custom",
+          path: ["deliveryReceiptFile"],
+          message: "Unggah resi pengiriman sebelum menyimpan tiket.",
+        });
+      }
       if (values.items.length > 0) {
         context.addIssue({
           code: "custom",
@@ -485,6 +500,16 @@ const getRequestTypeOptions = (
             value: TicketRequestCategory.MATERIAL,
           },
     );
+    if (
+      role === UserRole.DIRECTOR ||
+      role === UserRole.KOORDINATOR ||
+      role === UserRole.FIELD_TEAM
+    ) {
+      options.push({
+        label: requestCategoryLabels[TicketRequestCategory.FIELD],
+        value: TicketRequestCategory.FIELD,
+      });
+    }
   }
 
   if (
@@ -613,6 +638,7 @@ export default function CreateTicketModal({
       transferDestination: "",
       requestPaymentDescription: "",
       relatedDocumentNumbers: "",
+      deliveryReceiptFile: null,
       receiptFiles: [],
       operationalRequestType: "GENERAL",
       operationalAmount: undefined,
@@ -649,6 +675,10 @@ export default function CreateTicketModal({
   const watchedRequestedAmount = useWatch({
     control: form.control,
     name: "requestedAmount",
+  });
+  const watchedDeliveryReceiptFile = useWatch({
+    control: form.control,
+    name: "deliveryReceiptFile",
   });
   const operationalRequestType = useWatch({
     control: form.control,
@@ -789,6 +819,7 @@ export default function CreateTicketModal({
           id: option.id,
           number: option.poNumber,
           detail: option.vendorName,
+          deliveryOrders: option.deliveryOrders,
         }),
       ),
     },
@@ -878,6 +909,9 @@ export default function CreateTicketModal({
             .filter(Boolean)
             .join(", ")}`
         : null,
+      isShippingCostRequest
+        ? `Biaya pengiriman: ${formatCurrency(values.requestedAmount ?? 0)}`
+        : null,
       isOperationalFunding
         ? `Keperluan: ${operationalRequestLabel}`
         : null,
@@ -936,6 +970,9 @@ export default function CreateTicketModal({
         relatedDocumentNumbers: isShippingCostRequest
           ? values.relatedDocumentNumbers
           : undefined,
+        deliveryReceiptFile: isShippingCostRequest
+          ? values.deliveryReceiptFile ?? undefined
+          : undefined,
         priority,
         projectId: values.projectId || undefined,
         moverAssigneeId: undefined,
@@ -950,7 +987,7 @@ export default function CreateTicketModal({
           ? values.requestedAmount
           : isOperationalFunding
             ? operationalAmount
-            : isAPHRequest || isInternalFunding
+            : isAPHRequest || isInternalFunding || isShippingCostRequest
               ? values.requestedAmount
               : undefined,
         receiptFiles: isInternalFunding ? values.receiptFiles : [],
@@ -1141,6 +1178,10 @@ export default function CreateTicketModal({
                       if (value !== TicketRequestCategory.SHIPPING_COST) {
                         setSelectedShippingDocumentKeys([]);
                         form.setValue("relatedDocumentNumbers", "");
+                        form.setValue("deliveryReceiptFile", null, {
+                          shouldValidate: false,
+                        });
+                        form.clearErrors("deliveryReceiptFile");
                       }
                       if (value !== "FIELD") {
                         form.setValue("fieldCategory", undefined);
@@ -1236,8 +1277,8 @@ export default function CreateTicketModal({
                 <div>
                   <h3 className="font-semibold">Barang yang Akan Dikirim</h3>
                   <p className="text-sm text-muted-foreground">
-                    Pilih PO yang berisi barang pengiriman. Nominal biaya dan
-                    data ekspedisi tidak diperlukan.
+                    Pilih PO yang berisi barang pengiriman dan masukkan biaya
+                    pengirimannya.
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -1271,38 +1312,158 @@ export default function CreateTicketModal({
                             group.options.map((option) => {
                               const key = `${group.key}:${option.id}`;
                               return (
-                                <FormLabel
-                                  key={key}
-                                  htmlFor={`shipping-document-${key}`}
-                                  className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
-                                >
-                                  <Checkbox
-                                    id={`shipping-document-${key}`}
-                                    checked={selectedShippingDocumentKeys.includes(
-                                      key,
-                                    )}
-                                    onCheckedChange={(checked) =>
-                                      toggleShippingDocument(
+                                <div key={key} className="space-y-1">
+                                  <FormLabel
+                                    htmlFor={`shipping-document-${key}`}
+                                    className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
+                                  >
+                                    <Checkbox
+                                      id={`shipping-document-${key}`}
+                                      checked={selectedShippingDocumentKeys.includes(
                                         key,
-                                        checked === true,
-                                      )
-                                    }
-                                  />
-                                  <span className="min-w-0 text-xs">
-                                    <span className="block font-medium">
-                                      {option.number}
+                                      )}
+                                      onCheckedChange={(checked) =>
+                                        toggleShippingDocument(
+                                          key,
+                                          checked === true,
+                                        )
+                                      }
+                                    />
+                                    <span className="min-w-0 text-xs">
+                                      <span className="block font-medium">
+                                        {option.number}
+                                      </span>
+                                      <span className="block truncate text-muted-foreground">
+                                        {option.detail}
+                                      </span>
                                     </span>
-                                    <span className="block truncate text-muted-foreground">
-                                      {option.detail}
-                                    </span>
-                                  </span>
-                                </FormLabel>
+                                  </FormLabel>
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 pl-8 text-xs">
+                                    {option.deliveryOrders.length > 0 ? (
+                                      option.deliveryOrders.map((order) => (
+                                        <a
+                                          key={order.publicCode}
+                                          href={`/d/${order.publicCode}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-primary underline underline-offset-4 hover:text-primary/80"
+                                        >
+                                          Lihat DO {order.doNumber}
+                                        </a>
+                                      ))
+                                    ) : (
+                                      <span className="text-muted-foreground">
+                                        DO belum diterbitkan
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               );
                             })
                           )}
                         </div>
                       </fieldset>
                     ))}
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-shipping-cost">
+                        Biaya Pengiriman
+                      </Label>
+                      <RupiahAmountInput
+                        id="ticket-shipping-cost"
+                        value={
+                          watchedRequestedAmount === undefined
+                            ? ""
+                            : formatRupiahNumber(watchedRequestedAmount)
+                        }
+                        onChange={(value) => {
+                          const amount = parseRupiahInput(value);
+                          form.setValue(
+                            "requestedAmount",
+                            amount > 0 ? amount : undefined,
+                            { shouldDirty: true, shouldValidate: true },
+                          );
+                        }}
+                        required
+                      />
+                      {form.formState.errors.requestedAmount && (
+                        <p className="text-sm text-destructive" role="alert">
+                          {form.formState.errors.requestedAmount.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-shipping-receipt">
+                      Resi Pengiriman (wajib)
+                    </Label>
+                    <Input
+                      id="ticket-shipping-receipt"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0] ?? null;
+                        if (!file) return;
+                        const extension =
+                          file.name.split(".").pop()?.toLowerCase() ?? "";
+                        if (
+                          file.size < 1 ||
+                          file.size > 10 * 1024 * 1024 ||
+                          !["pdf", "jpg", "jpeg", "png", "webp"].includes(
+                            extension,
+                          )
+                        ) {
+                          form.setValue("deliveryReceiptFile", null, {
+                            shouldDirty: true,
+                            shouldValidate: false,
+                          });
+                          form.setError("deliveryReceiptFile", {
+                            type: "validate",
+                            message:
+                              "Pilih resi PDF, JPG, PNG, atau WEBP maksimal 10 MB.",
+                          });
+                        } else {
+                          form.setValue("deliveryReceiptFile", file, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.clearErrors("deliveryReceiptFile");
+                        }
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Resi disimpan bersama tiket saat Anda menekan Simpan draft.
+                    </p>
+                    {watchedDeliveryReceiptFile && (
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span
+                          className="min-w-0 truncate text-muted-foreground"
+                          role="status"
+                        >
+                          {watchedDeliveryReceiptFile.name}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="link"
+                          className="h-auto p-0 text-destructive"
+                          onClick={() => {
+                            form.setValue("deliveryReceiptFile", null, {
+                              shouldDirty: true,
+                              shouldValidate: true,
+                            });
+                            form.clearErrors("deliveryReceiptFile");
+                          }}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    )}
+                    {form.formState.errors.deliveryReceiptFile && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {form.formState.errors.deliveryReceiptFile.message}
+                      </p>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Pilih satu atau beberapa PO yang memuat barang.
@@ -1511,11 +1672,16 @@ export default function CreateTicketModal({
                         <SelectItem value="none">
                           Pilih kebutuhan lapangan
                         </SelectItem>
-                        {fieldCategories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {fieldCategoryLabels[category]}
-                          </SelectItem>
-                        ))}
+                        {fieldCategories
+                          .filter(
+                            (category) =>
+                              category === TicketFieldCategory.LABOR,
+                          )
+                          .map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {fieldCategoryLabels[category]}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   )}

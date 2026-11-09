@@ -190,6 +190,7 @@ export type CreateTicketInput = {
   transferDestination?: string;
   requestPaymentDescription?: string;
   relatedDocumentNumbers?: string;
+  deliveryReceiptFile?: File;
   requestedAmount?: number;
   receiptFiles?: File[];
   items: TicketItemInput[];
@@ -240,6 +241,10 @@ export type ShippingDocumentOptions = {
     poNumber: string;
     vendorName: string;
     status: POStatus;
+    deliveryOrders: Array<{
+      doNumber: string;
+      publicCode: string;
+    }>;
   }>;
 };
 
@@ -2007,19 +2012,25 @@ export async function createTicket(
       "Permintaan belanja kantor hanya dapat dibuat oleh Admin, Drafter, atau Keuangan.",
     );
   }
-  if (isFieldRequest && session.user.role !== UserRole.FIELD_TEAM) {
+  const canRequestLabor =
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.KOORDINATOR ||
+    session.user.role === UserRole.FIELD_TEAM;
+  if (
+    isFieldRequest &&
+    (!canRequestLabor || input.fieldCategory !== TicketFieldCategory.LABOR)
+  ) {
     return actionFailure(
-      "Kebutuhan lapangan hanya dapat diajukan oleh Tim Lapangan.",
+      "Upah Tukang hanya dapat diajukan oleh Direktur, Koordinator Lapangan, atau Tim Lapangan.",
     );
   }
   if (
     session.user.role === UserRole.FIELD_TEAM &&
-    (isFieldRequest ||
-      requestCategory === TicketRequestCategory.MATERIAL ||
+    (requestCategory === TicketRequestCategory.MATERIAL ||
       (isInternalFundingRequest && !isFieldTeamInternalFundingRequest))
   ) {
     return actionFailure(
-      "Tim Lapangan hanya dapat mengajukan material dari Gudang, Operasional, Reimbursement, atau Kasbon.",
+      "Tim Lapangan hanya dapat mengajukan material dari Gudang, Upah Tukang, Operasional, Reimbursement, atau Kasbon.",
     );
   }
   if (
@@ -2056,6 +2067,21 @@ export async function createTicket(
       "Bukti struk/nota tidak valid; reimbursement wajib menyertakan minimal satu bukti.",
     );
   }
+  const deliveryReceiptFile = input.deliveryReceiptFile;
+  if (
+    (isShippingCostRequest &&
+      (!(deliveryReceiptFile instanceof File) ||
+        deliveryReceiptFile.size < 1 ||
+        deliveryReceiptFile.size > 10 * 1024 * 1024 ||
+        !["pdf", "jpg", "jpeg", "png", "webp"].includes(
+          deliveryReceiptFile.name.split(".").at(-1)?.toLowerCase() ?? "",
+        ))) ||
+    (!isShippingCostRequest && deliveryReceiptFile !== undefined)
+  ) {
+    return actionFailure(
+      "Tiket pengiriman wajib menyertakan resi PDF, JPG, PNG, atau WEBP maksimal 10 MB.",
+    );
+  }
   if (
     isAPHRequest &&
     session.user.role !== UserRole.DIRECTOR &&
@@ -2080,7 +2106,8 @@ export async function createTicket(
     requiresRecipientPayment ||
     isOperationalFunding ||
     isAPHRequest ||
-    isInternalFundingRequest;
+    isInternalFundingRequest ||
+    isShippingCostRequest;
   let operationalRecipient: {
     name: string;
     bankName: string;
@@ -2248,6 +2275,16 @@ export async function createTicket(
       );
     }
   } else if (isShippingCostRequest) {
+    if (
+      typeof input.requestedAmount !== "number" ||
+      !Number.isSafeInteger(input.requestedAmount) ||
+      input.requestedAmount <= 0 ||
+      input.requestedAmount > Number.MAX_SAFE_INTEGER
+    ) {
+      return actionFailure(
+        "Biaya pengiriman harus berupa angka lebih besar dari 0.",
+      );
+    }
     if (input.items.length > 0) {
       return actionFailure(
         "Tiket pengiriman barang menggunakan rincian PO, bukan rincian item manual.",
@@ -2489,6 +2526,7 @@ export async function createTicket(
 
   let ticketNumber = "";
   const receiptUrls: string[] = [];
+  let deliveryReceiptUrl: string | null = null;
   try {
     for (const file of receiptFiles) {
       if (file.type === "application/pdf") {
@@ -2510,6 +2548,42 @@ export async function createTicket(
             )
           ).secureUrl,
         );
+      }
+    }
+    if (deliveryReceiptFile) {
+      const extension =
+        deliveryReceiptFile.name.split(".").at(-1)?.toLowerCase() ?? "";
+      if (extension === "pdf") {
+        deliveryReceiptUrl = await uploadCloudinaryRawFile(
+          deliveryReceiptFile,
+          REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
+          ["pdf"],
+          10 * 1024 * 1024,
+        );
+      } else {
+        const mimeTypeByExtension: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          webp: "image/webp",
+        };
+        const normalizedFile =
+          deliveryReceiptFile.type === mimeTypeByExtension[extension]
+            ? deliveryReceiptFile
+            : new File([deliveryReceiptFile], deliveryReceiptFile.name, {
+                type: mimeTypeByExtension[extension],
+                lastModified: deliveryReceiptFile.lastModified,
+              });
+        deliveryReceiptUrl = (
+          await uploadCloudinaryPhoto(
+            normalizedFile,
+            REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
+            10 * 1024 * 1024,
+          )
+        ).secureUrl;
+      }
+      if (!isTicketRequestReceiptUrl(deliveryReceiptUrl)) {
+        throw new Error("URL resi pengiriman yang diunggah tidak valid.");
       }
     }
     if (receiptUrls.some((url) => !isTicketRequestReceiptUrl(url))) {
@@ -2552,6 +2626,7 @@ export async function createTicket(
             ? input.requestedAmount!
             : null,
           receiptUrls: isInternalFundingRequest ? receiptUrls : [],
+          deliveryReceiptUrl,
           paymentProofUrl: null,
           attachmentUrl: input.attachmentUrl?.trim() || null,
           recipientName: requiresRecipientPayment
@@ -2610,7 +2685,10 @@ export async function createTicket(
     );
   } catch (error) {
     await Promise.all(
-      receiptUrls.map(async (url) => {
+      [
+        ...receiptUrls,
+        ...(deliveryReceiptUrl ? [deliveryReceiptUrl] : []),
+      ].map(async (url) => {
         try {
           if (url.includes("/raw/upload/")) {
             await removeCloudinaryRawFile(url);
@@ -2681,6 +2759,13 @@ export async function getShippingDocumentOptions(): Promise<
       poNumber: true,
       vendorName: true,
       status: true,
+      deliveryOrders: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          doNumber: true,
+          publicCode: true,
+        },
+      },
     },
   });
 
