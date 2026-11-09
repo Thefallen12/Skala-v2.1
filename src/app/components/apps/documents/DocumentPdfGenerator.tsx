@@ -77,6 +77,8 @@ export default function DocumentPdfGenerator({
     }
   };
 
+  if (compatibleTemplates.length === 0) return null;
+
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
       <div className="flex flex-wrap items-end gap-3">

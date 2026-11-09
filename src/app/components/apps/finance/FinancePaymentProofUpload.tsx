@@ -4,15 +4,10 @@ import { useId, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_FILES = 5;
-const ACCEPTED_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 type SingleFileProps = {
   value: File | null;
@@ -63,7 +58,7 @@ export default function FinancePaymentProofUpload(
       <Input
         ref={inputRef}
         type="file"
-        accept="application/pdf,image/jpeg,image/png,image/webp"
+        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
         multiple={multiple}
         disabled={disabled}
         required={!multiple && selectedFiles.length === 0}
@@ -74,10 +69,11 @@ export default function FinancePaymentProofUpload(
           if (newFiles.length === 0) return;
 
           let invalidType = false;
-          const validFiles = newFiles.filter((file) => {
-            if (ACCEPTED_TYPES.has(file.type)) return true;
+          const validFiles = newFiles.flatMap((file) => {
+            const normalizedFile = normalizeFinancePaymentProofFile(file);
+            if (normalizedFile) return [normalizedFile];
             invalidType = true;
-            return false;
+            return [];
           });
           const invalidSize = validFiles.some(
             (file) => file.size < 1 || file.size > MAX_FILE_SIZE,

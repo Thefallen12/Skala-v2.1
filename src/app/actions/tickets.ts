@@ -65,6 +65,10 @@ import {
   saveTicketReceipt,
 } from "@/lib/ticket-receipts";
 import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
+import {
+  getFinancePaymentProofMimeType,
+  normalizeFinancePaymentProofFile,
+} from "@/lib/finance-payment-proof-file";
 import { FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER } from "@/lib/finance-payment-proof-config";
 import {
   vendorInvoiceInputSchema,
@@ -79,12 +83,6 @@ import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-confi
 
 const MAX_FINANCE_PAYMENT_PROOFS = 5;
 const MAX_FINANCE_PAYMENT_PROOF_SIZE = 5 * 1024 * 1024;
-const FINANCE_PAYMENT_PROOF_TYPES = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 type FinancePaymentProofInput = File | File[] | string;
 
@@ -103,7 +101,7 @@ function isValidFinancePaymentProofInput(
         file instanceof File &&
         file.size > 0 &&
         file.size <= MAX_FINANCE_PAYMENT_PROOF_SIZE &&
-        FINANCE_PAYMENT_PROOF_TYPES.has(file.type),
+        getFinancePaymentProofMimeType(file) !== null,
     )
   );
 }
@@ -115,11 +113,15 @@ async function storeFinancePaymentProof(proof: File | string): Promise<string> {
     }
     return proof;
   }
-  if (proof.type === "application/pdf") {
-    return saveTicketReceipt(proof);
+  const normalizedProof = normalizeFinancePaymentProofFile(proof);
+  if (!normalizedProof) {
+    throw new Error("Format bukti pembayaran harus PDF, JPG, PNG, atau WEBP.");
+  }
+  if (normalizedProof.type === "application/pdf") {
+    return saveTicketReceipt(normalizedProof);
   }
   const uploaded = await uploadCloudinaryPhoto(
-    proof,
+    normalizedProof,
     FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER,
   );
   if (!isFinancePaymentProofUrl(uploaded.secureUrl)) {
