@@ -406,7 +406,7 @@ const ticketFormSchema = z
           });
         }
       }
-    } else if (isAPHRequest || isInternalFunding) {
+    } else if (isAPHRequest || isInternalFunding || isShippingCostRequest) {
       if (values.items.length > 0) {
         context.addIssue({
           code: "custom",
