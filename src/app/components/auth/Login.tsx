@@ -196,14 +196,14 @@ export const Login = () => {
                   <div className='space-y-1.5'>
                     <FormLabel
                       htmlFor='identifier'
-                      className='text-xs font-semibold text-slate-700'
+                      className='text-xs font-semibold text-slate-800'
                     >
                       Email Pengguna
                     </FormLabel>
                     <div className='relative'>
                       <Mail
                         aria-hidden='true'
-                        className='pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400'
+                        className='pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-500'
                       />
                       <Input
                         id='identifier'
@@ -211,7 +211,7 @@ export const Login = () => {
                         autoComplete='email'
                         placeholder='nama@skalaprioritas.com'
                         disabled={form.formState.isSubmitting || isAuthenticating}
-                        className='h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 text-sm focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-orange-500/20'
+                        className='h-11 rounded-xl border border-slate-300 bg-white pl-10 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:text-slate-900 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400'
                         {...field}
                       />
                     </div>
@@ -232,7 +232,7 @@ export const Login = () => {
                     <div className='flex items-center justify-between'>
                       <FormLabel
                         htmlFor='password'
-                        className='text-xs font-semibold text-slate-700'
+                        className='text-xs font-semibold text-slate-800'
                       >
                         Kata Sandi
                       </FormLabel>
@@ -240,7 +240,7 @@ export const Login = () => {
                     <div className='relative'>
                       <LockKeyhole
                         aria-hidden='true'
-                        className='pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400'
+                        className='pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-500'
                       />
                       <Input
                         id='password'
@@ -248,13 +248,13 @@ export const Login = () => {
                         autoComplete='current-password'
                         placeholder='Masukkan kata sandi'
                         disabled={form.formState.isSubmitting || isAuthenticating}
-                        className='h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 pr-10 text-sm focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-orange-500/20'
+                        className='h-11 rounded-xl border border-slate-300 bg-white pl-10 pr-10 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:text-slate-900 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400'
                         {...field}
                       />
                       <button
                         type='button'
                         aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                        className='absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400 hover:text-slate-600 focus:outline-none'
+                        className='absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500 hover:text-slate-700 focus:outline-none'
                         onClick={() => setShowPassword((v) => !v)}
                       >
                         {showPassword ? <EyeOff className='size-4' /> : <Eye className='size-4' />}
