@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import React, { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -941,24 +941,24 @@ export default function ProjectDetailView({
 
               {/* RAB & Progres Grouped Table (Image 1 & 2) */}
               <div className="overflow-x-auto rounded-xl border border-border/80">
-                <table className="w-full text-left text-xs">
+                <table className="w-full min-w-[850px] text-left text-xs">
                   <thead className="bg-muted/40 font-semibold text-muted-foreground">
                     <tr className="border-b border-border">
-                      <th className="px-3.5 py-3">Uraian pekerjaan</th>
+                      <th className="px-4 py-3">Uraian pekerjaan</th>
                       <th className="w-24 px-3.5 py-3">Volume</th>
                       <th className="w-32 px-3.5 py-3">Harga satuan</th>
-                      <th className="w-32 px-3.5 py-3">Jumlah</th>
+                      <th className="w-36 px-3.5 py-3">Jumlah</th>
                       <th className="w-20 px-3.5 py-3">Bobot</th>
-                      <th className="w-24 px-3.5 py-3">Terpasang</th>
-                      <th className="w-36 px-3.5 py-3">Progres</th>
+                      <th className="w-28 px-3.5 py-3">Terpasang</th>
+                      <th className="w-40 px-3.5 py-3">Progres</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/60">
                     {rabGroups.map((group, groupIdx) => (
-                      <tbody key={groupIdx} className="divide-y divide-border/60 border-t border-border">
+                      <React.Fragment key={groupIdx}>
                         {/* Section Header */}
                         <tr className="bg-muted/30 font-bold text-foreground">
-                          <td colSpan={7} className="px-3.5 py-2.5">
+                          <td colSpan={7} className="px-4 py-2.5 font-bold text-foreground">
                             {group.sectionName}
                           </td>
                         </tr>
@@ -966,7 +966,7 @@ export default function ProjectDetailView({
                         {/* Items in section */}
                         {group.items.map((it) => (
                           <tr key={it.id} className="hover:bg-muted/10">
-                            <td className="px-3.5 py-2.5">
+                            <td className="px-4 py-3">
                               <p className="font-semibold text-foreground">
                                 {it.code ? it.code + " " : ""}
                                 {it.title}
@@ -982,16 +982,16 @@ export default function ProjectDetailView({
                                 Isi analisa material
                               </button>
                             </td>
-                            <td className="px-3.5 py-2.5 text-muted-foreground">{it.volumeText}</td>
-                            <td className="px-3.5 py-2.5 font-mono">{currency(it.unitPrice)}</td>
-                            <td className="px-3.5 py-2.5 font-mono font-semibold text-foreground">
+                            <td className="px-3.5 py-3 whitespace-nowrap text-muted-foreground">{it.volumeText}</td>
+                            <td className="px-3.5 py-3 whitespace-nowrap font-mono">{currency(it.unitPrice)}</td>
+                            <td className="px-3.5 py-3 whitespace-nowrap font-mono font-semibold text-foreground">
                               {currency(it.totalPrice)}
                             </td>
-                            <td className="px-3.5 py-2.5 font-mono">{it.bobot.toFixed(2)}%</td>
-                            <td className="px-3.5 py-2.5 text-muted-foreground">{it.terpasangText}</td>
-                            <td className="px-3.5 py-2.5">
+                            <td className="px-3.5 py-3 whitespace-nowrap font-mono">{it.bobot.toFixed(2)}%</td>
+                            <td className="px-3.5 py-3 whitespace-nowrap text-muted-foreground">{it.terpasangText}</td>
+                            <td className="px-3.5 py-3">
                               <div className="flex items-center gap-2">
-                                <Progress value={it.progress} className="h-2 flex-1" />
+                                <Progress value={it.progress} className="h-2 flex-1 min-w-16" />
                                 <span className="w-8 text-right font-mono text-[11px] text-muted-foreground">
                                   {it.progress}%
                                 </span>
@@ -999,23 +999,23 @@ export default function ProjectDetailView({
                             </td>
                           </tr>
                         ))}
-                      </tbody>
+                      </React.Fragment>
                     ))}
 
                     {/* Summary row */}
                     <tr className="border-t-2 border-border bg-muted/50 font-bold text-foreground">
-                      <td colSpan={3} className="px-3.5 py-3">
+                      <td colSpan={3} className="px-4 py-3 font-bold text-foreground">
                         Total RAB
                       </td>
-                      <td className="px-3.5 py-3 font-mono font-extrabold text-foreground">
+                      <td className="px-3.5 py-3 font-mono font-extrabold text-foreground whitespace-nowrap">
                         {currency(totalRabNumber)}
                       </td>
-                      <td className="px-3.5 py-3 font-mono">100%</td>
+                      <td className="px-3.5 py-3 font-mono whitespace-nowrap">100%</td>
                       <td className="px-3.5 py-3"></td>
                       <td className="px-3.5 py-3">
                         <div className="flex items-center gap-2">
-                          <Progress value={project.progress} className="h-2 flex-1" />
-                          <span className="w-8 text-right font-mono text-[11px]">
+                          <Progress value={project.progress} className="h-2 flex-1 min-w-16" />
+                          <span className="w-8 text-right font-mono text-[11px] font-bold">
                             {project.progress}%
                           </span>
                         </div>
