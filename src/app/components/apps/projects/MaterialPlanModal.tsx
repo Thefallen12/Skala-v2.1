@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { HelpCircle, Plus, Trash2, X } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { HelpCircle, Plus, Trash2, X, Search, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -44,6 +44,266 @@ const COMMON_MATERIALS = [
   { name: "Lampu LED Downlight 12W", unit: "pcs" },
   { name: "Bata Ringan / Hebel", unit: "m3" },
 ];
+
+function SearchableMaterialInput({
+  value,
+  unit,
+  stockItems = [],
+  commonMaterials = [],
+  placeholder = "Pilih atau ketik nama material",
+  onChange,
+}: {
+  value: string;
+  unit?: string;
+  stockItems?: StockItemOption[];
+  commonMaterials?: Array<{ name: string; unit: string }>;
+  placeholder?: string;
+  onChange: (materialName: string, unit?: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const [highlightIndex, setHighlightIndex] = useState<number>(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Sync internal query when value updates from outside
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  // Click outside to close
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Deduplicated Catalog
+  const catalog = useMemo(() => {
+    const list: Array<{ id: string; name: string; sku?: string; unit: string; category?: string }> = [];
+    const seen = new Set<string>();
+
+    for (const item of stockItems) {
+      const key = item.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push({
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          unit: item.unit,
+          category: item.category,
+        });
+      }
+    }
+
+    for (const item of commonMaterials) {
+      const key = item.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push({
+          id: `common_${item.name}`,
+          name: item.name,
+          unit: item.unit,
+        });
+      }
+    }
+
+    return list;
+  }, [stockItems, commonMaterials]);
+
+  // Filter items matching typed query
+  const filtered = useMemo(() => {
+    const q = (query || "").trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        (item.sku && item.sku.toLowerCase().includes(q)) ||
+        (item.category && item.category.toLowerCase().includes(q))
+    );
+  }, [catalog, query]);
+
+  const exactMatch = useMemo(() => {
+    const q = (query || "").trim().toLowerCase();
+    return catalog.some((item) => item.name.toLowerCase() === q);
+  }, [catalog, query]);
+
+  const handleSelect = (item: { name: string; unit: string }) => {
+    onChange(item.name, item.unit);
+    setQuery(item.name);
+    setIsOpen(false);
+    setHighlightIndex(-1);
+  };
+
+  const handleSelectCustom = () => {
+    if (query.trim()) {
+      onChange(query.trim(), unit || "pcs");
+      setIsOpen(false);
+      setHighlightIndex(-1);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        return;
+      }
+      setHighlightIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (isOpen) {
+        if (highlightIndex >= 0 && filtered[highlightIndex]) {
+          handleSelect(filtered[highlightIndex]);
+        } else if (filtered.length > 0) {
+          handleSelect(filtered[0]);
+        } else if (query.trim()) {
+          handleSelectCustom();
+        }
+      }
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative flex items-center">
+        <Search className="pointer-events-none absolute left-3 size-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          value={query}
+          onFocus={() => {
+            setIsOpen(true);
+            setHighlightIndex(-1);
+          }}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuery(val);
+            onChange(val);
+            setIsOpen(true);
+            setHighlightIndex(-1);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-16 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs transition"
+        />
+        <div className="absolute right-2 flex items-center gap-1">
+          {query && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                onChange("", unit);
+                setIsOpen(true);
+              }}
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Hapus teks"
+            >
+              <X className="size-3" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen((prev) => !prev)}
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            tabIndex={-1}
+            title="Buka daftar material"
+          >
+            <ChevronDown
+              className={`size-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Dropdown Menu Anchored Below Input */}
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1.5 w-full min-w-[320px] max-w-[480px] z-50 rounded-xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100">
+          <div className="flex items-center justify-between border-b border-border/70 bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+            <span className="font-medium">
+              {query ? `Hasil (${filtered.length})` : `Pilih material (${catalog.length})`}
+            </span>
+            <span className="text-[10px] text-muted-foreground">Ketik untuk mencari</span>
+          </div>
+
+          <div ref={listRef} className="max-h-64 overflow-y-auto divide-y divide-border/40 p-1">
+            {/* Custom Option if query not exact match */}
+            {query.trim() && !exactMatch && (
+              <button
+                type="button"
+                onClick={handleSelectCustom}
+                className="flex items-center justify-between w-full px-3 py-2 text-left text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition font-semibold"
+              >
+                <span className="truncate">
+                  + Gunakan &quot;<strong>{query.trim()}</strong>&quot;
+                </span>
+                <span className="text-[10px] font-mono opacity-80 whitespace-nowrap ml-2">
+                  (Material Kustom)
+                </span>
+              </button>
+            )}
+
+            {filtered.map((item, idx) => {
+              const isSelected = item.name.toLowerCase() === value.trim().toLowerCase();
+              const isHighlighted = idx === highlightIndex;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelect(item)}
+                  className={`flex items-center justify-between w-full px-3 py-2 text-left text-xs rounded-lg transition group ${
+                    isSelected
+                      ? "bg-accent text-accent-foreground font-bold"
+                      : isHighlighted
+                      ? "bg-muted text-foreground"
+                      : "hover:bg-muted/70 text-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    {isSelected && <Check className="size-3 text-primary shrink-0" />}
+                    <span className="truncate font-medium group-hover:text-primary transition">
+                      {item.name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 text-[11px] font-mono text-muted-foreground">
+                    {item.sku && <span>{item.sku}</span>}
+                    {item.sku && <span>·</span>}
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold text-foreground">
+                      {item.unit}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {filtered.length === 0 && !query.trim() && (
+              <div className="py-6 text-center text-xs text-muted-foreground">
+                Belum ada data material dalam stok.
+              </div>
+            )}
+            {filtered.length === 0 && query.trim() && exactMatch && (
+              <div className="py-6 text-center text-xs text-muted-foreground">
+                Tidak ada material lain yang cocok.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MaterialPlanModal({
   open,
@@ -177,30 +437,28 @@ export default function MaterialPlanModal({
         )}
 
         {/* Dynamic Rows */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[380px] pb-32">
           {materials.map((row, index) => (
-            <div key={index} className="flex flex-wrap items-center gap-2.5">
-              {/* Material Dropdown / Input */}
+            <div key={index} className="relative flex flex-wrap items-center gap-2.5" style={{ zIndex: materials.length - index }}>
+              {/* Material Dropdown / Searchable Input */}
               <div className="min-w-56 flex-1">
-                <input
-                  list={`materials-list-${index}`}
+                <SearchableMaterialInput
                   value={row.materialName}
-                  onChange={(e) => handleRowChange(index, "materialName", e.target.value)}
+                  unit={row.unit}
+                  stockItems={stockItems}
+                  commonMaterials={COMMON_MATERIALS}
                   placeholder="Pilih atau ketik nama material"
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                  onChange={(materialName, unit) => {
+                    setMaterials((prev) =>
+                      prev.map((r, i) => {
+                        if (i !== index) return r;
+                        const updated = { ...r, materialName };
+                        if (unit) updated.unit = unit;
+                        return updated;
+                      })
+                    );
+                  }}
                 />
-                <datalist id={`materials-list-${index}`}>
-                  {stockItems.map((item) => (
-                    <option key={item.id} value={item.name}>
-                      {item.sku} · {item.unit}
-                    </option>
-                  ))}
-                  {COMMON_MATERIALS.map((item) => (
-                    <option key={item.name} value={item.name}>
-                      {item.unit}
-                    </option>
-                  ))}
-                </datalist>
               </div>
 
               {/* Quantity & Unit */}
@@ -214,13 +472,13 @@ export default function MaterialPlanModal({
                     handleRowChange(index, "quantity", parseFloat(e.target.value) || 0)
                   }
                   placeholder="Jumlah"
-                  className="h-9 text-right text-xs"
+                  className="h-10 text-right text-xs rounded-xl"
                 />
                 <Input
                   value={row.unit}
                   onChange={(e) => handleRowChange(index, "unit", e.target.value)}
                   placeholder="Satuan"
-                  className="h-9 w-14 text-center text-xs"
+                  className="h-10 w-16 text-center text-xs rounded-xl font-medium"
                 />
               </div>
 
@@ -229,7 +487,7 @@ export default function MaterialPlanModal({
                 <select
                   value={row.scope}
                   onChange={(e) => handleRowChange(index, "scope", e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
                 >
                   <option value="ALL">Seluruh proyek</option>
                   {rabItems.map((item) => (
@@ -245,7 +503,7 @@ export default function MaterialPlanModal({
               <button
                 type="button"
                 onClick={() => handleRemoveRow(index)}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
                 title="Hapus baris"
               >
                 <Trash2 className="size-4" />
@@ -258,7 +516,7 @@ export default function MaterialPlanModal({
             variant="outline"
             size="sm"
             onClick={handleAddRow}
-            className="mt-2 gap-1.5 text-xs font-semibold"
+            className="mt-2 gap-1.5 text-xs font-semibold rounded-lg"
           >
             <Plus className="size-3.5" />
             <span>Tambah material</span>
@@ -266,14 +524,14 @@ export default function MaterialPlanModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/10 p-5">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/10 p-4">
+          <Button type="button" variant="outline" onClick={onClose} className="h-9 px-4 text-xs rounded-lg">
             Batal
           </Button>
           <Button
             type="button"
             onClick={handleSave}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-9 px-5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
           >
             Simpan rencana
           </Button>
