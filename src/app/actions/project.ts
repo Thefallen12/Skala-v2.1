@@ -1602,3 +1602,256 @@ export async function getProjectFinancialBreakdown(
     return failure("Realisasi anggaran gagal dimuat. Silakan coba kembali.");
   }
 }
+
+
+export type RabItemInput = {
+  id?: string;
+  section: string;
+  code: string;
+  title: string;
+  volume: number;
+  unit: string;
+  unitPrice: number;
+  rapPrice?: number;
+  startDate?: string;
+  endDate?: string;
+};
+
+export async function saveProjectRab(
+  projectId: string,
+  input: {
+    items: RabItemInput[];
+    replaceExisting?: boolean;
+  },
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengubah RAB." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, isDeleted: true, fieldPicId: true },
+  });
+  if (!project || project.isDeleted) {
+    return { success: false, message: "Proyek tidak ditemukan." };
+  }
+
+  try {
+    const totalRab = input.items.reduce(
+      (sum, item) => sum + item.volume * item.unitPrice,
+      0,
+    );
+    const totalRap = input.items.reduce(
+      (sum, item) => sum + item.volume * (item.rapPrice ?? item.unitPrice * 0.8),
+      0,
+    );
+
+    const startDates = input.items
+      .map((it) => it.startDate)
+      .filter((d) => Boolean(d))
+      .sort();
+    const endDates = input.items
+      .map((it) => it.endDate)
+      .filter((d) => Boolean(d))
+      .sort();
+
+    await prisma.$transaction(async (tx) => {
+      if (input.replaceExisting) {
+        await tx.projectWorkPoint.deleteMany({
+          where: {
+            projectId,
+            progressReports: { none: {} },
+          },
+        });
+      }
+
+      for (const item of input.items) {
+        const fullTitle = item.code ? (item.code + " " + item.title).trim() : item.title.trim();
+        const proposedTotalWage = BigInt(Math.round(item.volume * item.unitPrice * 100));
+        const proposedVolume = BigInt(Math.round(item.volume * 100));
+        const proposedUnitPrice = BigInt(Math.round(item.unitPrice * 100));
+
+        if (item.id) {
+          const existing = await tx.projectWorkPoint.findUnique({
+            where: { id: item.id },
+            select: { id: true },
+          });
+          if (existing) {
+            await tx.projectWorkPoint.update({
+              where: { id: item.id },
+              data: {
+                title: fullTitle,
+                location: item.section || "Umum",
+                proposedVolume,
+                proposedUnit: item.unit || "paket",
+                proposedUnitPrice,
+                proposedTotalWage,
+                approvedTotalWage: proposedTotalWage,
+                plannedStartDate: item.startDate ? new Date(item.startDate) : null,
+                targetDate: item.endDate ? new Date(item.endDate) : null,
+              },
+            });
+            continue;
+          }
+        }
+
+        await tx.projectWorkPoint.create({
+          data: {
+            projectId,
+            title: fullTitle,
+            location: item.section || "Umum",
+            proposedVolume,
+            proposedUnit: item.unit || "paket",
+            proposedUnitPrice,
+            proposedTotalWage,
+            approvedTotalWage: proposedTotalWage,
+            plannedStartDate: item.startDate ? new Date(item.startDate) : null,
+            targetDate: item.endDate ? new Date(item.endDate) : null,
+            proposedById: session.user.id,
+            wageApprovedById: session.user.id,
+            wageApprovedAt: new Date(),
+            progress: 0,
+            completedVolume: 0,
+          },
+        });
+      }
+
+      const firstStartDate = startDates[0];
+      const lastEndDate = endDates[endDates.length - 1];
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          pagu: BigInt(Math.round(totalRab * 100)),
+          budget: BigInt(Math.round(totalRap * 100)),
+          ...(firstStartDate ? { startDate: new Date(firstStartDate) } : {}),
+          ...(lastEndDate ? { endDate: new Date(lastEndDate) } : {}),
+        },
+      });
+    });
+
+    revalidatePath("/apps/projects/" + projectId);
+    revalidatePath("/apps/projects");
+    return {
+      success: true,
+      message: "RAB proyek berhasil disimpan. Total RAB: Rp " + totalRab.toLocaleString("id-ID"),
+    };
+  } catch (error) {
+    console.error("Save project RAB failed:", error);
+    return { success: false, message: "Gagal menyimpan RAB proyek." };
+  }
+}
+
+export async function recordProjectOpname(
+  projectId: string,
+  input: {
+    reportDate: string;
+    isAdditional: boolean;
+    items: Array<{
+      workPointId: string;
+      volume: number;
+    }>;
+  },
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mencatat progres opname." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    const reportDate = new Date(input.reportDate);
+
+    await prisma.$transaction(async (tx) => {
+      const workPoints = await tx.projectWorkPoint.findMany({
+        where: { projectId },
+        select: {
+          id: true,
+          title: true,
+          proposedVolume: true,
+          proposedUnit: true,
+          completedVolume: true,
+          proposedTotalWage: true,
+          progress: true,
+        },
+      });
+
+      const wpMap = new Map(workPoints.map((wp) => [wp.id, wp]));
+
+      for (const opnameItem of input.items) {
+        const wp = wpMap.get(opnameItem.workPointId);
+        if (!wp) continue;
+
+        const targetVol = wp.proposedVolume ? Number(wp.proposedVolume) / 100 : 1;
+        const currentCompleted = wp.completedVolume ?? 0;
+        const newCompleted = input.isAdditional
+          ? currentCompleted + opnameItem.volume
+          : opnameItem.volume;
+
+        const progressPercent =
+          targetVol > 0
+            ? Math.min(100, Math.round((newCompleted / targetVol) * 1000) / 10)
+            : 100;
+
+        await tx.projectWorkPoint.update({
+          where: { id: wp.id },
+          data: {
+            completedVolume: Math.max(0, newCompleted),
+            progress: progressPercent,
+          },
+        });
+
+        await tx.projectWorkPointProgress.create({
+          data: {
+            workPointId: wp.id,
+            reportDate,
+            progress: progressPercent,
+            workSummary: "Opname terpasang: " + newCompleted + " " + (wp.proposedUnit || ""),
+          },
+        });
+      }
+
+      const updatedPoints = await tx.projectWorkPoint.findMany({
+        where: { projectId },
+        select: { progress: true, proposedTotalWage: true },
+      });
+
+      const totalWage = updatedPoints.reduce(
+        (acc, p) => acc + Number(p.proposedTotalWage),
+        0,
+      );
+
+      let overallProgress = 0;
+      if (totalWage > 0) {
+        overallProgress =
+          updatedPoints.reduce(
+            (acc, p) => acc + p.progress * (Number(p.proposedTotalWage) / totalWage),
+            0,
+          );
+      } else if (updatedPoints.length > 0) {
+        overallProgress =
+          updatedPoints.reduce((acc, p) => acc + p.progress, 0) /
+          updatedPoints.length;
+      }
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          progress: Math.round(overallProgress * 10) / 10,
+        },
+      });
+    });
+
+    revalidatePath("/apps/projects/" + projectId);
+    revalidatePath("/apps/projects");
+    return { success: true, message: "Progres opname berhasil disimpan." };
+  } catch (error) {
+    console.error("Record project opname failed:", error);
+    return { success: false, message: "Gagal mencatat progres opname." };
+  }
+}

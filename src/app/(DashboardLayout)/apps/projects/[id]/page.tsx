@@ -101,6 +101,17 @@ export default async function ProjectDetailPage({
     },
   });
 
+  const stockItems = await prisma.stockItem.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      sku: true,
+      name: true,
+      unit: true,
+      category: true,
+    },
+  });
+
   const realizationMap = await getPaidProjectTicketRealization([project.id]);
   const realization = realizationMap.get(project.id);
 
@@ -253,6 +264,7 @@ export default async function ProjectDetailPage({
     <ProjectDetailView
       project={formattedProject}
       fieldTeamUsers={fieldTeamUsers}
+      stockItems={stockItems}
       currentUserRole={session.user.role}
     />
   );
