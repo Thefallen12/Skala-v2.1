@@ -66,7 +66,13 @@ export const Login = () => {
 
       if (outcome.type === 'credentials-error') {
         setIsAuthenticating(false)
-        setError('Email atau kata sandi tidak sesuai. Silakan periksa kembali (default sistem: password123).')
+        if (outcome.errorCode === 'database-unavailable') {
+          setError('Koneksi ke database sedang terganggu. Silakan coba kembali dalam beberapa saat.')
+        } else if (outcome.errorCode && outcome.errorCode !== 'CredentialsSignin') {
+          setError(`Kendala autentikasi server (${outcome.errorCode}). Silakan refresh halaman atau coba kembali.`)
+        } else {
+          setError('Email atau kata sandi tidak sesuai. Silakan periksa kembali (default sistem: password123).')
+        }
         return
       }
 

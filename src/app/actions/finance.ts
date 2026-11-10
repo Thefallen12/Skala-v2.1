@@ -21,6 +21,7 @@ export type OfficeExpenseInput = {
   accountId: string;
   paymentMethod: (typeof paymentMethods)[number];
   proofFiles: File[];
+  transactionDate?: string;
 };
 
 export type OfficeExpenseActionResult = {
@@ -31,7 +32,27 @@ export type OfficeExpenseActionResult = {
 class OfficeExpenseError extends Error {}
 
 function isFinanceOperator(role: UserRole): boolean {
-  return role === UserRole.FINANCE || role === UserRole.ADMINISTRATIONS;
+  return (
+    role === UserRole.FINANCE ||
+    role === UserRole.ADMINISTRATIONS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR
+  );
+}
+
+function parseTransactionDate(dateStr?: string): Date {
+  if (!dateStr || typeof dateStr !== "string") {
+    return new Date();
+  }
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return new Date();
+  }
+  const [, year, month, day] = match;
+  const parsed = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0),
+  );
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
 function isBoundedText(value: unknown, maximum: number): value is string {
@@ -112,6 +133,8 @@ export async function recordOfficeExpense(
       throw new OfficeExpenseError("URL bukti transaksi tidak valid.");
     }
 
+    const effectiveDate = parseTransactionDate(input.transactionDate);
+
     await prisma.$transaction(async (transaction) => {
       const recipient = await transaction.user.findFirst({
         where: { id: input.recipientId, isActive: true },
@@ -149,6 +172,7 @@ export async function recordOfficeExpense(
           proofUrl: uploadedProofUrls[0],
           accountId: input.accountId,
           recordedBy: session.user.id,
+          createdAt: effectiveDate,
         },
         select: { id: true },
       });
@@ -164,6 +188,7 @@ export async function recordOfficeExpense(
           proofUrls: uploadedProofUrls,
           recordedBy: session.user.id,
           cashflowId: cashflow.id,
+          createdAt: effectiveDate,
         },
       });
     });

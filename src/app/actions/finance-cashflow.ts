@@ -77,7 +77,12 @@ const fail = (message: string): FinanceActionResult => ({
 });
 
 function isFinanceOperator(role: UserRole): boolean {
-  return role === UserRole.FINANCE || role === UserRole.ADMINISTRATIONS;
+  return (
+    role === UserRole.FINANCE ||
+    role === UserRole.ADMINISTRATIONS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR
+  );
 }
 
 function validAmount(amount: number): boolean {
