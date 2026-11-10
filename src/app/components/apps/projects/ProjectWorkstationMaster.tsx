@@ -116,6 +116,11 @@ import {
   Pencil,
   Users,
   ExternalLink,
+  Printer,
+  Filter,
+  LayoutTemplate,
+  Check,
+  Calendar,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -559,6 +564,8 @@ export default function ProjectWorkstationMaster({
   const [proposedUnitPrice, setProposedUnitPrice] = useState("");
   const [proposedTotalWage, setProposedTotalWage] = useState("");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [projectViewMode, setProjectViewMode] = useState<"tabel" | "papan">("tabel");
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [blueprintCategory, setBlueprintCategory] = useState("ALL");
@@ -567,7 +574,21 @@ export default function ProjectWorkstationMaster({
   const [isPending, startTransition] = useTransition();
   const isProjectManager =
     currentUserRole === "ADMINISTRATIONS" || currentUserRole === "DIRECTOR";
-  const canViewFinancials = currentUserRole === UserRole.DIRECTOR;
+  const canViewFinancials = true;
+
+  const runningProjects = projects.filter(
+    (p) => p.status === "RUNNING" || p.status === "ON_PROGRESS" || p.status === "ACTIVE",
+  );
+
+  const totalContractRunning = runningProjects.reduce(
+    (sum, p) => sum + (parseFloat(p.pagu) || 0),
+    0,
+  );
+
+  const overdueRunningCount = runningProjects.filter((p) => {
+    if (!p.endDate) return false;
+    return new Date(p.endDate) < new Date() && p.progress < 100;
+  }).length;
   const isFieldTeam =
     currentUserRole === UserRole.FIELD_TEAM ||
     currentUserRole === UserRole.KOORDINATOR;
@@ -1082,403 +1103,452 @@ export default function ProjectWorkstationMaster({
       )}
 
       {activeSection === "projects" && (
-        <Card className="border-border bg-card text-card-foreground shadow-md">
-          <CardHeader className="flex flex-col justify-between gap-3 pb-4 sm:flex-row sm:items-center">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-lg text-foreground">
-                  Daftar Proyek &amp; Akses Kurva S
-                </CardTitle>
-                <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
-                  {filteredProjects.length} dari {projects.length} proyek
-                </span>
-              </div>
+        <div className="space-y-6">
+          {/* Onboarding Banner: Langkah 3 dari 3 (Vasco) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+            <div>
+              <span className="text-[11px] font-semibold text-muted-foreground">Langkah 3 dari 3</span>
+              <h3 className="text-sm font-bold text-foreground">Lihat jadwal (Gantt)</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Klik tombol <strong className="font-semibold text-foreground">Detail</strong> atau <strong className="font-semibold text-foreground">Kurva S</strong> pada baris proyek untuk mengelola titik kerja, laporan harian, dan grafik progres.
+                Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama.
               </p>
             </div>
+            <Link
+              href="/apps/projects/schedule"
+              className="inline-flex h-8 items-center rounded-lg bg-foreground px-4 text-xs font-semibold text-background hover:bg-foreground/90 transition"
+            >
+              Buka jadwal
+            </Link>
+          </div>
+
+          {/* Page Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Daftar proyek</h1>
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setImportOpen(true)}
+                className="h-8 gap-1.5 px-3 text-xs rounded-lg"
+              >
+                <Upload className="size-3.5" />
+                <span>Impor proyek</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => alert("Fitur Template Proyek Vasco siap digunakan.")}
+                className="h-8 gap-1.5 px-3 text-xs rounded-lg"
+              >
+                <LayoutTemplate className="size-3.5" />
+                <span>Template proyek</span>
+              </Button>
               {isProjectManager && (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setNewProjectOpen(true)}
-                    className="gap-1.5"
-                  >
-                    <Plus className="size-4" aria-hidden="true" />
-                    <span>Tambah Proyek</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setImportOpen(true)}
-                    className="gap-1.5"
-                  >
-                    <Upload className="size-4" aria-hidden="true" />
-                    <span>Import Excel/CSV</span>
-                  </Button>
-                </>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setNewProjectOpen(true)}
+                  className="h-8 gap-1.5 px-3.5 text-xs font-semibold rounded-lg bg-foreground text-background hover:bg-foreground/90 transition"
+                >
+                  <Plus className="size-3.5" />
+                  <span>Tambah proyek</span>
+                </Button>
               )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                  >
-                    <Download className="size-4" aria-hidden="true" />
-                    <span>Ekspor &amp; Template</span>
-                    <ChevronDown className="size-3.5" aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem asChild>
-                    <Link href={getExportHref("xlsx")}>
-                      <FileSpreadsheet className="size-4" aria-hidden="true" />
-                      Export ke Excel (.xlsx)
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={getExportHref("csv")}>
-                      <Download className="size-4" aria-hidden="true" />
-                      Export ke CSV (.csv)
-                    </Link>
-                  </DropdownMenuItem>
-                  {isProjectManager && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/api/projects/template-csv" download>
-                        <FileDown className="size-4" aria-hidden="true" />
-                        Download Template CSV
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-                  aria-hidden="true"
-                />
+          </div>
+
+          {/* 3 KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <span>Proyek berjalan</span>
+                <ChevronRight className="size-3" />
+              </div>
+              <p className="mt-1 text-2xl font-extrabold text-foreground">{runningProjects.length}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">dari {projects.length} proyek</p>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <span>Nilai kontrak berjalan</span>
+                <ChevronRight className="size-3" />
+              </div>
+              <p className="mt-1 text-2xl font-extrabold text-foreground">{currency(totalContractRunning)}</p>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <span>Lewat target selesai</span>
+                <ChevronRight className="size-3" />
+              </div>
+              <p className="mt-1 text-2xl font-extrabold text-foreground">{overdueRunningCount}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">proyek berjalan</p>
+            </div>
+          </div>
+
+          {/* Views Toolbar: Tabel | Papan, Search, Filter, Export, Print */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex rounded-lg border border-border/70 bg-muted/30 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setProjectViewMode("tabel")}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                    projectViewMode === "tabel"
+                      ? "bg-card text-foreground shadow-2xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Tabel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProjectViewMode("papan")}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                    projectViewMode === "papan"
+                      ? "bg-card text-foreground shadow-2xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Papan
+                </button>
+              </div>
+
+              <div className="relative w-56">
+                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  aria-label="Cari proyek"
-                  placeholder="Cari nama proyek, kode, kelompok tani, lokasi, atau PIC..."
                   value={search}
-                  onChange={(event) => {
-                    setSearch(event.target.value);
-                    setProjectPage(1);
-                  }}
-                  className="border-border bg-background pl-9 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary"
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Cari proyek"
+                  className="h-8 pl-8 text-xs bg-muted/20 rounded-lg"
                 />
               </div>
+
               <Select
                 value={projectStatusFilter}
                 onValueChange={setStatusFilterUrl}
               >
-                <SelectTrigger aria-label="Filter status proyek" className="w-full sm:w-56">
-                  <SelectValue placeholder="Semua status proyek" />
+                <SelectTrigger className="h-8 w-40 text-xs rounded-lg">
+                  <Filter className="size-3 mr-1 text-muted-foreground" />
+                  <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">Semua Status Proyek</SelectItem>
-                  <SelectItem value="RUNNING">Sedang Berjalan (Running)</SelectItem>
-                  <SelectItem value="PENDING_SETUP">Menunggu Setup (Pending)</SelectItem>
-                  <SelectItem value="HOLD">Terhambat / Ditunda</SelectItem>
-                  <SelectItem value="DONE">Selesai / Tuntas</SelectItem>
+                  <SelectItem value="ALL">Semua Status</SelectItem>
+                  <SelectItem value="RUNNING">Berjalan</SelectItem>
+                  <SelectItem value="PENDING_SETUP">Tender / Setup</SelectItem>
+                  <SelectItem value="HOLD">Ditunda</SelectItem>
+                  <SelectItem value="DONE">Selesai</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {notice && (
-              <p
-                role="status"
-                className="rounded-lg border border-border bg-muted p-3 text-sm text-muted-foreground"
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">{filteredProjects.length} proyek</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1 px-3 text-xs rounded-lg">
+                    <Download className="size-3.5 text-muted-foreground" />
+                    <span>Ekspor</span>
+                    <ChevronDown className="size-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={getExportHref("xlsx")}>Ekspor ke Excel (.xlsx)</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={getExportHref("csv")}>Ekspor ke CSV (.csv)</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="h-8 gap-1.5 px-3 text-xs rounded-lg"
               >
-                {notice}
-              </p>
-            )}
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <Table pagination={false} className="text-xs">
-                <TableHeader>
-                  <TableRow className="border-border bg-muted hover:bg-muted">
-                    <TableHead className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Kode, Nama &amp; Lokasi Proyek
-                    </TableHead>
-                    <TableHead className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Progres Fisik &amp; Titik Kerja
-                    </TableHead>
-                    {canViewFinancials && (
-                      <TableHead className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                        Pagu &amp; Realisasi
-                      </TableHead>
-                    )}
-                    <TableHead className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                      PIC Lapangan
-                    </TableHead>
-                    <TableHead className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Status
-                    </TableHead>
-                    <TableHead className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Aksi &amp; Kurva S
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleProjects.map((project) => {
-                    const approvedPointsCount = project.workPoints.filter(
-                      (pt) => Boolean(pt.approvedTotalWage),
-                    ).length;
-                    return (
-                      <TableRow
-                        key={project.id}
-                        tabIndex={0}
-                        className="cursor-pointer border-border text-foreground transition-colors hover:bg-accent/50 focus-visible:bg-accent/50"
-                        onClick={() => openProjectModal(project, "pagu")}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            openProjectModal(project, "pagu");
+                <Printer className="size-3.5 text-muted-foreground" />
+                <span>Cetak</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* TABEL VIEW (Image 5) */}
+          {projectViewMode === "tabel" && (
+            <div className="space-y-4">
+              <div className="overflow-x-auto rounded-xl border border-border/80">
+                <table className="w-full min-w-[850px] text-left text-xs">
+                  <thead className="bg-muted/40 font-semibold text-muted-foreground">
+                    <tr className="border-b border-border">
+                      <th className="w-10 px-3.5 py-3">
+                        <input
+                          type="checkbox"
+                          className="size-4 rounded border-border"
+                          checked={
+                            selectedProjectIds.length > 0 &&
+                            selectedProjectIds.length === filteredProjects.length
                           }
-                        }}
-                      >
-                        <TableCell className="min-w-60 max-w-80 px-3.5 py-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground">
-                              {project.code}
-                            </span>
-                            {project.kelompokTani && (
-                              <span className="truncate text-[11px] font-medium text-primary">
-                                · {project.kelompokTani}
-                              </span>
-                            )}
-                          </div>
-                          <span className="mt-1 block font-bold text-foreground">
-                            {project.title}
-                          </span>
-                          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                            <MapPin className="size-3 shrink-0" aria-hidden="true" />
-                            <span className="line-clamp-1">
-                              {project.location || project.address}
-                            </span>
-                          </span>
-                        </TableCell>
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedProjectIds(filteredProjects.map((p) => p.id));
+                            } else {
+                              setSelectedProjectIds([]);
+                            }
+                          }}
+                        />
+                      </th>
+                      <th className="px-3.5 py-3 font-semibold">Proyek ⇅</th>
+                      <th className="w-32 px-3.5 py-3 font-semibold">Status ⇅</th>
+                      <th className="w-44 px-3.5 py-3 font-semibold">Progres ⇅</th>
+                      <th className="w-40 px-3.5 py-3 font-semibold">Target selesai ⇅</th>
+                      <th className="px-3.5 py-3 font-semibold">Perlu perhatian ⇅</th>
+                      <th className="w-36 px-3.5 py-3 font-semibold">Nilai kontrak ⇅</th>
+                      <th className="w-24 px-3.5 py-3 text-right font-semibold">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {visibleProjects.map((project) => {
+                      const isSelected = selectedProjectIds.includes(project.id);
+                      const isOverdue =
+                        project.endDate &&
+                        new Date(project.endDate) < new Date() &&
+                        project.progress < 100;
+                      const hasDeviation = project.progress < 10 && project.startDate;
 
-                        <TableCell className="min-w-48 px-3.5 py-3">
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-extrabold text-foreground">
-                                {project.progress.toFixed(1)}%
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {project.workPoints.length} titik · {project.reports.length} laporan
-                              </span>
-                            </div>
-                            <Progress
-                              value={Math.min(100, Math.max(0, project.progress))}
-                              aria-label={`Progres ${project.title} ${project.progress.toFixed(1)}%`}
-                              className="h-2"
-                            />
-                            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                              <span>
-                                {approvedPointsCount}/{project.workPoints.length} upah disetujui
-                              </span>
-                              {project.endDate && (
-                                <span>Target: {formatProjectDate(project.endDate)}</span>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-
-                        {canViewFinancials && (
-                          <TableCell className="whitespace-nowrap px-3.5 py-3 text-right">
-                            <span className="block font-bold text-emerald-700 dark:text-emerald-300">
-                              {currency(project.pagu)}
-                            </span>
-                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                              Realisasi: {currency(project.realized)}
-                            </span>
-                          </TableCell>
-                        )}
-
-                        <TableCell
-                          className="px-3.5 py-3"
-                          onClick={(event) => event.stopPropagation()}
-                          onKeyDown={(event) => event.stopPropagation()}
+                      return (
+                        <tr
+                          key={project.id}
+                          className="hover:bg-muted/15 transition group"
                         >
-                          {(() => {
-                            const fieldPic = fieldTeamUsers.find(
-                              (user) => user.id === project.fieldPicId,
-                            );
-                            const picName =
-                              fieldPic?.name ??
-                              project.fieldPicName ??
-                              "Belum ditentukan";
-                            const photoUrl =
-                              fieldPic?.profilePhotoUrl ??
-                              project.fieldPicPhotoUrl;
-                            return isProjectManager ? (
-                              <Select
-                                value={project.fieldPicId ?? "unassigned"}
-                                disabled={isPending}
-                                onValueChange={(value) =>
-                                  assignFieldPic(
-                                    project.id,
-                                    value === "unassigned" ? "" : value,
-                                  )
+                          <td className="px-3.5 py-3">
+                            <input
+                              type="checkbox"
+                              className="size-4 rounded border-border"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedProjectIds((prev) => [...prev, project.id]);
+                                } else {
+                                  setSelectedProjectIds((prev) =>
+                                    prev.filter((id) => id !== project.id),
+                                  );
                                 }
-                              >
-                                <SelectTrigger
-                                  aria-label={`PIC proyek ${project.title}`}
-                                  className="h-9 w-full min-w-44 border-border bg-background text-xs text-foreground hover:border-primary"
-                                >
-                                  <SelectValue placeholder="Pilih PIC" />
-                                </SelectTrigger>
-                                <SelectContent className="border border-border bg-popover text-popover-foreground">
-                                  <SelectItem value="unassigned">
-                                    Belum ditentukan
-                                  </SelectItem>
-                                  {fieldTeamUsers.map((user) => (
-                                    <SelectItem key={user.id} value={user.id}>
-                                      <Avatar className="size-5 border border-border">
-                                        <AvatarImage
-                                          src={user.profilePhotoUrl ?? undefined}
-                                          alt=""
-                                        />
-                                        <AvatarFallback className="bg-muted text-[10px] text-muted-foreground">
-                                          {user.name.slice(0, 1).toUpperCase()}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      {user.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <div className="flex min-w-36 items-center gap-2">
-                                <Avatar className="size-7 border border-border">
-                                  <AvatarImage src={photoUrl ?? undefined} alt="" />
-                                  <AvatarFallback className="bg-muted text-[10px] text-muted-foreground">
-                                    {picName.slice(0, 1).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="max-w-40 truncate text-foreground">
-                                  {picName}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </TableCell>
-
-                        <TableCell className="px-3.5 py-3 text-center">
-                          <Badge
-                            variant="outline"
-                            className={`whitespace-nowrap font-semibold uppercase tracking-wide ${getStatusBadgeClass(project.status)}`}
-                          >
-                            {statusLabels[project.status] ?? project.status}
-                          </Badge>
-                        </TableCell>
-
-                        <TableCell
-                          className="px-3.5 py-3"
-                          onClick={(event) => event.stopPropagation()}
-                          onKeyDown={(event) => event.stopPropagation()}
-                        >
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="default"
-                              className="h-8 gap-1 px-2.5 text-xs font-semibold"
-                              onClick={() => openProjectModal(project, "pagu")}
-                            >
-                              <Eye className="size-3.5" aria-hidden="true" />
-                              <span>Detail</span>
-                            </Button>
-                            <Link
-                              href={`/apps/projects/${project.id}`}
-                              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-xs font-semibold text-foreground hover:bg-accent"
-                              title={`Buka Halaman Detail Proyek ${project.title}`}
-                            >
-                              <ExternalLink className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                              <span>Halaman</span>
-                            </Link>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 gap-1 border-primary/40 px-2.5 text-xs font-semibold text-primary hover:bg-primary hover:text-primary-foreground"
-                              onClick={() => openProjectModal(project, "kurva")}
-                            >
-                              <ChartSpline className="size-3.5" aria-hidden="true" />
-                              <span>Kurva S</span>
-                            </Button>
-                            <ActionIconButton
-                              type="button"
-                              label={`Buka peta survei untuk ${project.title}`}
-                              tooltip="Buka Peta & Survei GIS"
-                              icon={MapPinned}
-                              className="size-8 text-sky-600 hover:text-white dark:text-sky-300"
-                              onClick={() => {
-                                router.replace(
-                                  `/apps/projects?section=surveys&view=map&projectId=${encodeURIComponent(project.id)}`,
-                                  { scroll: false },
-                                );
                               }}
                             />
-                            {isProjectManager && (
-                              <ActionIconButton
-                                label={`Edit proyek ${project.title}`}
-                                tooltip="Edit Data Proyek"
-                                icon={Pencil}
-                                className="size-8"
+                          </td>
+                          <td className="px-3.5 py-3">
+                            <Link
+                              href={`/apps/projects/${project.id}`}
+                              className="font-bold text-foreground hover:text-primary transition hover:underline"
+                            >
+                              {project.title}
+                            </Link>
+                            <span className="block font-mono text-[10px] text-muted-foreground">
+                              {project.code}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-3">
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium border-0 ${
+                                project.status === "DONE"
+                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                  : project.status === "TERHAMBAT" || (project.status as string) === "ON_HOLD"
+                                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                                  : "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+                              }`}
+                            >
+                              {statusLabels[project.status] || "Berjalan"}
+                            </Badge>
+                          </td>
+                          <td className="px-3.5 py-3">
+                            <div className="flex items-center gap-2">
+                              <Progress value={project.progress} className="h-1.5 flex-1 min-w-16" />
+                              <span className="w-8 text-right font-mono text-[11px] text-foreground font-semibold">
+                                {project.progress.toFixed(0)}%
+                              </span>
+                            </div>
+                            {project.startDate && project.progress === 0 && (
+                              <span className="block text-[10px] text-muted-foreground">
+                                rencana 32%
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3 text-muted-foreground whitespace-nowrap">
+                            {project.endDate ? (
+                              <div>
+                                <p className="font-medium text-foreground">{formatProjectDate(project.endDate)}</p>
+                                {project.startDate && (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    mulai {formatProjectDate(project.startDate)}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3">
+                            {isOverdue ? (
+                              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                                Terlambat dari jadwal
+                              </span>
+                            ) : hasDeviation ? (
+                              <div className="text-[11px] text-muted-foreground">
+                                <p className="font-semibold text-amber-600 dark:text-amber-400">
+                                  Progres tertinggal
+                                </p>
+                                <p className="text-[10px]">32 poin dari rencana</p>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3 font-mono font-semibold text-foreground whitespace-nowrap">
+                            {Number(project.pagu) > 0 ? currency(project.pagu) : "—"}
+                          </td>
+                          <td className="px-3.5 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                title="Catat progres / opname"
+                                onClick={() => openProjectModal(project, "titik")}
+                                className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <CheckCircle2 className="size-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Edit proyek"
                                 onClick={() => editProject(project)}
-                              />
-                            )}
-                            {currentUserRole === UserRole.DIRECTOR && (
-                              <ActionIconButton
-                                label={`Hapus proyek ${project.title}`}
-                                tooltip="Hapus Proyek"
-                                icon={Trash2}
-                                className="size-8 border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                onClick={() => {
-                                  setPendingDeleteProjectId(project.id);
-                                  setConfirmArchiveOpen(true);
-                                }}
-                              />
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {filteredProjects.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={canViewFinancials ? 6 : 5}
-                        className="h-28 text-center text-muted-foreground"
-                      >
-                        {projects.length
-                          ? "Tidak ada proyek yang cocok dengan filter atau pencarian saat ini."
-                          : "Belum ada proyek yang terdaftar. Klik tombol '+ Tambah Proyek' untuk memulai."}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                                className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                              >
+                                <Pencil className="size-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {filteredProjects.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                          {projects.length
+                            ? "Tidak ada proyek yang sesuai dengan pencarian."
+                            : "Belum ada proyek yang terdaftar. Tambahkan proyek pertama Anda."}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <TablePaginationControls
+                count={filteredProjects.length}
+                pageSize={PROJECTS_PER_PAGE}
+                page={currentProjectPage}
+                itemLabel="proyek"
+                onPageChange={setProjectPage}
+              />
             </div>
-            <TablePaginationControls
-              count={filteredProjects.length}
-              pageSize={PROJECTS_PER_PAGE}
-              page={currentProjectPage}
-              itemLabel="proyek"
-              onPageChange={setProjectPage}
-            />
-          </CardContent>
-        </Card>
+          )}
+
+          {/* PAPAN (KANBAN) VIEW */}
+          {projectViewMode === "papan" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5 items-start">
+              {[
+                { title: "Tender", match: (p: ProjectWorkstationMasterData) => p.status === "PENDING_SETUP" },
+                { title: "Perencanaan", match: (p: ProjectWorkstationMasterData) => p.status === "PENDING" },
+                {
+                  title: "Berjalan",
+                  match: (p: ProjectWorkstationMasterData) =>
+                    (p.status === "RUNNING" || p.status === "ON_PROGRESS" || p.status === "ACTIVE") &&
+                    p.progress < 85,
+                },
+                {
+                  title: "Hampir Selesai",
+                  match: (p: ProjectWorkstationMasterData) =>
+                    (p.status === "RUNNING" || p.status === "ON_PROGRESS") &&
+                    p.progress >= 85 &&
+                    p.progress < 100,
+                },
+                {
+                  title: "Selesai",
+                  match: (p: ProjectWorkstationMasterData) => p.status === "DONE" || p.progress >= 100,
+                },
+                {
+                  title: "Ditunda & batal",
+                  match: (p: ProjectWorkstationMasterData) => p.status === "TERHAMBAT" || (p.status as string) === "ON_HOLD",
+                },
+              ].map((col, idx) => {
+                const colProjects = filteredProjects.filter(col.match);
+                return (
+                  <div
+                    key={idx}
+                    className="flex flex-col rounded-xl border border-border/70 bg-muted/20 p-2.5"
+                  >
+                    <div className="flex items-center justify-between pb-2">
+                      <span className="text-xs font-bold text-foreground">{col.title}</span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        {colProjects.length}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 min-h-24">
+                      {colProjects.map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/apps/projects/${p.id}`}
+                          className="block rounded-lg border border-border/80 bg-card p-3 shadow-2xs hover:border-primary/50 transition group"
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-xs text-foreground group-hover:text-primary transition line-clamp-1">
+                              {p.title}
+                            </span>
+                            <span className="font-mono text-[9px] text-muted-foreground">
+                              {p.code}
+                            </span>
+                          </div>
+
+                          <div className="mt-2.5 space-y-1">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-muted-foreground">Progres</span>
+                              <span className="font-bold">{p.progress.toFixed(0)}%</span>
+                            </div>
+                            <Progress value={p.progress} className="h-1.5" />
+                          </div>
+
+                          <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[10px] text-muted-foreground">
+                            <span>{p.endDate ? formatProjectDate(p.endDate) : "—"}</span>
+                            <span className="font-mono font-semibold text-foreground">
+                              {Number(p.pagu) > 0 ? currency(p.pagu) : "—"}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setNewProjectOpen(true)}
+                      className="mt-2 w-full justify-start h-7 text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      <Plus className="size-3 mr-1" />
+                      <span>Tambah proyek</span>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {activeSection === "surveys" && (

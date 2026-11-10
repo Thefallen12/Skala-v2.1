@@ -48,6 +48,8 @@ export interface ScheduleTaskItem {
   progress: number;
   hasConstraint?: boolean;
   needsCheck?: boolean;
+  projectId?: string;
+  projectName?: string;
 }
 
 export interface ScheduleMilestoneItem {
@@ -78,6 +80,7 @@ export default function ProjectScheduleGantt({
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showOnboardingBanner, setShowOnboardingBanner] = useState(true);
 
   // Modals state
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -394,6 +397,28 @@ export default function ProjectScheduleGantt({
 
   return (
     <div className="space-y-4 pb-12">
+      {/* Onboarding Step 3 Banner (matching screenshot) */}
+      {showOnboardingBanner && (
+        <div className="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-[11px] font-semibold text-muted-foreground block">
+              Langkah 3 dari 3
+            </span>
+            <h3 className="text-sm font-bold text-foreground">Lihat jadwal (Gantt)</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => setShowOnboardingBanner(false)}
+            className="h-8 px-4 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium shrink-0 rounded-lg"
+          >
+            Selesai
+          </Button>
+        </div>
+      )}
+
       {/* Top Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -476,6 +501,7 @@ export default function ProjectScheduleGantt({
                 onChange={(e) => handleProjectChange(e.target.value)}
                 className="h-9 w-full rounded-lg border border-border bg-background px-3 pr-8 text-xs font-medium text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
               >
+                <option value="all">Semua proyek</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.title || p.name}
@@ -487,36 +513,43 @@ export default function ProjectScheduleGantt({
           </div>
 
           {/* Quick stats on the right */}
-          <div className="flex items-center gap-6 self-start md:self-center">
-            <div>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
-                Task
-              </span>
-              <span className="text-lg font-bold text-foreground">{tasks.length}</span>
+          {selectedProject.id === "all" ? (
+            <div className="text-right text-xs font-medium text-muted-foreground self-start md:self-center">
+              <span className="font-bold text-base text-foreground">{projects.length}</span> proyek ·{" "}
+              <span className="font-bold text-base text-foreground">{tasks.length}</span> task
             </div>
-
-            <div>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
-                Rentang
-              </span>
-              <span className="text-lg font-bold text-foreground">{totalWeeks} mgg</span>
-            </div>
-
-            <div className="w-32">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Jadwal selesai
+          ) : (
+            <div className="flex items-center gap-6 self-start md:self-center">
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+                  Task
                 </span>
-                <span className="font-semibold text-foreground">{scheduleCompletion}%</span>
+                <span className="text-lg font-bold text-foreground">{tasks.length}</span>
               </div>
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full bg-foreground transition-all duration-300"
-                  style={{ width: `${scheduleCompletion}%` }}
-                />
+
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+                  Rentang
+                </span>
+                <span className="text-lg font-bold text-foreground">{totalWeeks} mgg</span>
+              </div>
+
+              <div className="w-32">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Jadwal selesai
+                  </span>
+                  <span className="font-semibold text-foreground">{scheduleCompletion}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-foreground transition-all duration-300"
+                    style={{ width: `${scheduleCompletion}%` }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* View Switcher: Gantt | Papan */}
@@ -879,109 +912,175 @@ export default function ProjectScheduleGantt({
             <div className="p-4 overflow-x-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-[680px]">
                 {/* Belum mulai */}
-                <div className="rounded-xl border border-border bg-muted/10 p-3">
-                  <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
-                    <span className="flex items-center gap-1.5">
-                      <Clock className="size-3.5 text-muted-foreground" />
-                      <span>Belum mulai</span>
-                    </span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
-                      {counts.notStarted}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {tasks
-                      .filter((t) => (t.progress || 0) === 0)
-                      .map((t) => (
-                        <div
-                          key={t.id}
-                          onClick={() => handleOpenEditTask(t)}
-                          className="rounded-lg border border-border bg-card p-2.5 shadow-xs cursor-pointer hover:border-primary transition-colors"
-                        >
-                          <div className="text-xs font-medium text-foreground">{t.title}</div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {t.location}
+                <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="size-3.5 text-muted-foreground" />
+                        <span>Belum mulai</span>
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
+                        {counts.notStarted}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {tasks
+                        .filter((t) => (t.progress || 0) === 0)
+                        .map((t) => (
+                          <div
+                            key={t.id}
+                            onClick={() => handleOpenEditTask(t)}
+                            className="rounded-xl border border-border/80 bg-card p-3 shadow-xs cursor-pointer hover:border-primary transition-all space-y-1.5"
+                          >
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                              <span className="size-2 rounded-full bg-blue-600 shrink-0" />
+                              <span className="truncate">{t.projectName || selectedProject.title}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-medium">
+                              {t.location}
+                            </div>
+                            <div className="text-xs font-semibold text-foreground">
+                              {t.title}
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-0.5">
+                              <Calendar className="size-3" />
+                              <span>
+                                {t.plannedStartDate?.split("T")[0] || "—"} -{" "}
+                                {t.targetDate?.split("T")[0] || "—"}
+                              </span>
+                            </div>
                           </div>
-                          <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
-                            <span>0%</span>
-                            <span className="font-medium text-foreground">TODO</span>
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddTask}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Tambah task</span>
+                  </button>
                 </div>
 
                 {/* Berjalan */}
-                <div className="rounded-xl border border-border bg-muted/10 p-3">
-                  <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
-                    <span className="flex items-center gap-1.5">
-                      <AlertCircle className="size-3.5 text-amber-500" />
-                      <span>Berjalan</span>
-                    </span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
-                      {counts.inProgress}
-                    </span>
+                <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
+                      <span className="flex items-center gap-1.5">
+                        <AlertCircle className="size-3.5 text-amber-500" />
+                        <span>Berjalan</span>
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
+                        {counts.inProgress}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {tasks
+                        .filter((t) => (t.progress || 0) > 0 && (t.progress || 0) < 100)
+                        .map((t) => (
+                          <div
+                            key={t.id}
+                            onClick={() => handleOpenEditTask(t)}
+                            className="rounded-xl border border-border/80 bg-card p-3 shadow-xs cursor-pointer hover:border-primary transition-all space-y-1.5"
+                          >
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                              <span className="size-2 rounded-full bg-blue-600 shrink-0" />
+                              <span className="truncate">{t.projectName || selectedProject.title}</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-medium">
+                              {t.location}
+                            </div>
+                            <div className="text-xs font-semibold text-foreground">
+                              {t.title}
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="size-3" />
+                                <span>
+                                  {t.plannedStartDate?.split("T")[0] || "—"} -{" "}
+                                  {t.targetDate?.split("T")[0] || "—"}
+                                </span>
+                              </span>
+                              <span className="font-bold text-amber-600 dark:text-amber-400">
+                                {t.progress}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full bg-amber-500"
+                                style={{ width: `${t.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {tasks
-                      .filter((t) => (t.progress || 0) > 0 && (t.progress || 0) < 100)
-                      .map((t) => (
-                        <div
-                          key={t.id}
-                          onClick={() => handleOpenEditTask(t)}
-                          className="rounded-lg border border-border bg-card p-2.5 shadow-xs cursor-pointer hover:border-primary transition-colors"
-                        >
-                          <div className="text-xs font-medium text-foreground">{t.title}</div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {t.location}
-                          </div>
-                          <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full bg-amber-500"
-                              style={{ width: `${t.progress}%` }}
-                            />
-                          </div>
-                          <div className="mt-1 text-right text-[10px] font-semibold text-foreground">
-                            {t.progress}%
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddTask}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Tambah task</span>
+                  </button>
                 </div>
 
                 {/* Selesai */}
-                <div className="rounded-xl border border-border bg-muted/10 p-3">
-                  <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
-                    <span className="flex items-center gap-1.5">
-                      <CheckCircle2 className="size-3.5 text-emerald-500" />
-                      <span>Selesai</span>
-                    </span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
-                      {counts.done}
-                    </span>
+                <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="size-3.5 text-emerald-500" />
+                        <span>Selesai</span>
+                      </span>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
+                        {counts.done}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {tasks
+                        .filter((t) => (t.progress || 0) >= 100)
+                        .map((t) => (
+                          <div
+                            key={t.id}
+                            onClick={() => handleOpenEditTask(t)}
+                            className="rounded-xl border border-border/80 bg-card p-3 shadow-xs cursor-pointer hover:border-primary transition-all space-y-1.5"
+                          >
+                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                              <span className="size-2 rounded-full bg-blue-600 shrink-0" />
+                              <span className="truncate">{t.projectName || selectedProject.title}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-1.5 py-0.2 text-[10px] font-semibold">
+                                Selesai
+                              </span>
+                              <span className="text-[11px] text-muted-foreground font-medium">
+                                {t.location}
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-foreground line-through opacity-80">
+                              {t.title}
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-0.5">
+                              <Calendar className="size-3" />
+                              <span>
+                                {t.plannedStartDate?.split("T")[0] || "—"} -{" "}
+                                {t.targetDate?.split("T")[0] || "—"}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {tasks
-                      .filter((t) => (t.progress || 0) >= 100)
-                      .map((t) => (
-                        <div
-                          key={t.id}
-                          onClick={() => handleOpenEditTask(t)}
-                          className="rounded-lg border border-border bg-card p-2.5 shadow-xs cursor-pointer hover:border-primary transition-colors"
-                        >
-                          <div className="text-xs font-medium text-foreground line-through opacity-80">
-                            {t.title}
-                          </div>
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {t.location}
-                          </div>
-                          <div className="mt-2 flex items-center justify-between text-[10px] text-emerald-600 font-semibold">
-                            <span>100%</span>
-                            <span>Selesai</span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddTask}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Tambah task</span>
+                  </button>
                 </div>
               </div>
             </div>

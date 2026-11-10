@@ -1989,6 +1989,129 @@ export async function saveProjectMilestone(
   }
 }
 
+export async function uploadProjectDocument(
+  projectId: string,
+  input: {
+    title: string;
+    category: string;
+    fileUrl?: string;
+    notes?: string;
+  },
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengunggah dokumen." };
+  }
+  if (!projectId || !input.title.trim()) {
+    return { success: false, message: "Data dokumen tidak lengkap." };
+  }
+
+  try {
+    const drawingCode = `DOC-${Date.now().toString().slice(-6)}`;
+    await prisma.drawingDocument.create({
+      data: {
+        projectId,
+        title: input.title.trim(),
+        category: input.category || "Kontrak",
+        fileUrl: input.fileUrl || "/documents/sample.pdf",
+        uploadedById: session.user.id,
+        drawingCode,
+      },
+    });
+
+    revalidatePath(`/apps/projects/${projectId}`);
+    return { success: true, message: "Dokumen berhasil disimpan." };
+  } catch (error) {
+    console.error("Upload project document error:", error);
+    return { success: false, message: "Gagal menyimpan dokumen." };
+  }
+}
+
+export async function updateProjectCoreTeam(
+  projectId: string,
+  fieldPicId: string,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengubah tim proyek." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        fieldPicId: fieldPicId || null,
+      },
+    });
+
+    revalidatePath(`/apps/projects/${projectId}`);
+    return { success: true, message: "Tim inti proyek berhasil diperbarui." };
+  } catch (error) {
+    console.error("Update core team error:", error);
+    return { success: false, message: "Gagal memperbarui tim proyek." };
+  }
+}
+
+export async function applyRabAsContract(
+  projectId: string,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk terlebih dahulu." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    const points = await prisma.projectWorkPoint.findMany({
+      where: { projectId },
+      select: { proposedTotalWage: true },
+    });
+    const totalWage = points.reduce((sum, p) => sum + p.proposedTotalWage, BigInt(0));
+
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { pagu: totalWage },
+    });
+
+    revalidatePath(`/apps/projects/${projectId}`);
+    return { success: true, message: "Total RAB berhasil dipakai sebagai nilai kontrak." };
+  } catch (error) {
+    console.error("Apply RAB as contract error:", error);
+    return { success: false, message: "Gagal memperbarui nilai kontrak." };
+  }
+}
+
+export async function applyRapAsBudget(
+  projectId: string,
+  rapAmount: number,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk terlebih dahulu." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { budget: BigInt(Math.round(rapAmount * 100)) },
+    });
+
+    revalidatePath(`/apps/projects/${projectId}`);
+    return { success: true, message: "Nilai RAP berhasil dipakai sebagai RAP/Budget proyek." };
+  } catch (error) {
+    console.error("Apply RAP as budget error:", error);
+    return { success: false, message: "Gagal menyimpan RAP sebagai budget." };
+  }
+}
+
 export async function deleteProjectMilestone(
   milestoneId: string,
 ): Promise<ProjectMutationResult> {

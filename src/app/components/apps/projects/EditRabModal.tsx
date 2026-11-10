@@ -10,6 +10,7 @@ import {
   X,
   Sparkles,
   ClipboardPaste,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,7 +92,21 @@ export default function EditRabModal({
   onSuccess,
 }: EditRabModalProps) {
   const [items, setItems] = useState<EditableRabItem[]>(() =>
-    initialItems.length > 0 ? initialItems : SAMPLE_RENOVATION_ITEMS,
+    initialItems.length > 0
+      ? initialItems
+      : [
+          {
+            section: "",
+            code: "",
+            title: "",
+            volume: "" as unknown as number,
+            unit: "",
+            unitPrice: "" as unknown as number,
+            rapPrice: "" as unknown as number,
+            startDate: "",
+            endDate: "",
+          },
+        ],
   );
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [showPasteModal, setShowPasteModal] = useState(false);
@@ -101,6 +116,8 @@ export default function EditRabModal({
   const [isPending, startTransition] = useTransition();
 
   if (!open) return null;
+
+  const isNewRab = initialItems.length === 0;
 
   const totalRab = items.reduce(
     (sum, item) => sum + (Number(item.volume) || 0) * (Number(item.unitPrice) || 0),
@@ -114,21 +131,37 @@ export default function EditRabModal({
   const profitPercent = totalRab > 0 ? ((profit / totalRab) * 100).toFixed(1) : "0.0";
 
   const handleAddItem = () => {
-    const nextCode = `P.${items.length + 1}`;
     setItems((prev) => [
       ...prev,
       {
-        section: prev[prev.length - 1]?.section || "A. Pekerjaan",
-        code: nextCode,
+        section: prev[prev.length - 1]?.section || "",
+        code: "",
         title: "",
-        volume: 1,
-        unit: "m2",
-        unitPrice: 0,
-        rapPrice: 0,
+        volume: "" as unknown as number,
+        unit: "",
+        unitPrice: "" as unknown as number,
+        rapPrice: "" as unknown as number,
         startDate: "",
         endDate: "",
       },
     ]);
+  };
+
+  const handleAutoSchedule = () => {
+    const today = new Date();
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        const dStart = new Date(today);
+        dStart.setDate(dStart.getDate() + idx * 7);
+        const dEnd = new Date(dStart);
+        dEnd.setDate(dEnd.getDate() + 7);
+        return {
+          ...it,
+          startDate: dStart.toISOString().split("T")[0],
+          endDate: dEnd.toISOString().split("T")[0],
+        };
+      })
+    );
   };
 
   const handleRemoveItem = (index: number) => {
@@ -215,7 +248,9 @@ export default function EditRabModal({
         {/* Header */}
         <div className="flex items-start justify-between border-b border-border p-5">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold text-foreground">Ubah RAB</h2>
+            <h2 className="text-xl font-bold text-foreground">
+              {isNewRab ? "Isi RAB" : "Ubah RAB"}
+            </h2>
             <p className="text-xs text-muted-foreground">
               Satu baris per item pekerjaan. Bagian mengelompokkan item (mis. &quot;II. Pekerjaan Dinding&quot;). Tanggal rencana dipakai untuk Kurva S.
             </p>
@@ -268,6 +303,16 @@ export default function EditRabModal({
               type="button"
               variant="outline"
               size="sm"
+              onClick={() => setShowPasteModal(true)}
+              className="h-8 gap-1.5 text-xs"
+            >
+              <FileUp className="size-3.5 text-muted-foreground" />
+              <span>Impor file</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={handleAddItem}
               className="h-8 gap-1.5 text-xs font-semibold"
             >
@@ -276,14 +321,14 @@ export default function EditRabModal({
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => setItems(SAMPLE_RENOVATION_ITEMS)}
-              className="h-8 gap-1.5 text-xs text-sky-600 hover:text-sky-700 dark:text-sky-400"
-              title="Isi contoh RAB renovasi rumah seperti di desain"
+              onClick={handleAutoSchedule}
+              className="h-8 gap-1.5 text-xs"
+              title="Isi jadwal otomatis per minggu"
             >
-              <Sparkles className="size-3.5" />
-              <span>Contoh RAB Renovasi</span>
+              <Calendar className="size-3.5 text-muted-foreground" />
+              <span>Isi jadwal otomatis</span>
             </Button>
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
@@ -353,10 +398,11 @@ export default function EditRabModal({
                         type="number"
                         min="0"
                         step="any"
-                        value={item.volume}
+                        value={item.volume ? item.volume : ""}
                         onChange={(e) =>
                           handleChangeItem(index, "volume", parseFloat(e.target.value) || 0)
                         }
+                        placeholder="Volume"
                         className="h-8 text-right text-xs"
                       />
                     </td>
@@ -364,7 +410,7 @@ export default function EditRabModal({
                       <Input
                         value={item.unit}
                         onChange={(e) => handleChangeItem(index, "unit", e.target.value)}
-                        placeholder="m2 / paket"
+                        placeholder="Satuan"
                         className="h-8 text-xs"
                       />
                     </td>
@@ -372,11 +418,11 @@ export default function EditRabModal({
                       <Input
                         type="number"
                         min="0"
-                        value={item.unitPrice}
+                        value={item.unitPrice ? item.unitPrice : ""}
                         onChange={(e) =>
                           handleChangeItem(index, "unitPrice", parseFloat(e.target.value) || 0)
                         }
-                        placeholder="Rp 0"
+                        placeholder="Harga satuan"
                         className="h-8 text-right text-xs"
                       />
                     </td>
@@ -384,11 +430,11 @@ export default function EditRabModal({
                       <Input
                         type="number"
                         min="0"
-                        value={item.rapPrice}
+                        value={item.rapPrice ? item.rapPrice : ""}
                         onChange={(e) =>
                           handleChangeItem(index, "rapPrice", parseFloat(e.target.value) || 0)
                         }
-                        placeholder="Rp 0"
+                        placeholder="Harga RAP"
                         className="h-8 text-right text-xs"
                       />
                     </td>

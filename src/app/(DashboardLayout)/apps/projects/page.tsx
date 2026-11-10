@@ -68,12 +68,12 @@ export default async function ProjectsWorkstationPage({
       location: true,
       status: true,
       progress: true,
-      pagu: isDirector,
+      pagu: true,
       landArea: true,
       priority: true,
       vendor: true,
       clientName: true,
-      budget: isDirector,
+      budget: true,
       startDate: true,
       endDate: true,
       fieldPicId: true,
@@ -319,10 +319,8 @@ export default async function ProjectsWorkstationPage({
     fieldPicPhotoUrl: project.fieldPic?.profilePhotoUrl ?? null,
     status: project.status,
     progress: project.progress,
-    pagu: isDirector
-      ? project.pagu
-        ? decimalStringFromScaledInteger(project.pagu)
-        : "0"
+    pagu: project.pagu
+      ? decimalStringFromScaledInteger(project.pagu)
       : "0",
     landArea:
       project.landArea !== null
@@ -332,7 +330,7 @@ export default async function ProjectsWorkstationPage({
     vendor: project.vendor,
     clientName: project.clientName,
     budget:
-      isDirector && project.budget !== null
+      project.budget !== null
         ? decimalStringFromScaledInteger(project.budget)
         : null,
     startDate: project.startDate?.toISOString().slice(0, 10) ?? null,

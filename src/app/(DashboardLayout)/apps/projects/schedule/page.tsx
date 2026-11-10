@@ -55,13 +55,24 @@ export default async function ProjectSchedulePage({
     progress: p.progress,
   }));
 
-  const selectedProject =
-    projects.find((p) => p.id === requestedProjectId || p.code === requestedProjectId) ||
-    projects[0];
+  const isAllProjects = requestedProjectId === "all";
 
-  // Fetch work points (tasks) for selected project
+  const selectedProject: ScheduleProjectOption = isAllProjects
+    ? {
+        id: "all",
+        code: "ALL",
+        title: "Semua proyek",
+        name: "Semua proyek",
+        startDate: "2026-10-27T00:00:00.000Z",
+        endDate: "2026-12-26T00:00:00.000Z",
+        progress: 0,
+      }
+    : projects.find((p) => p.id === requestedProjectId || p.code === requestedProjectId) ||
+      projects[0];
+
+  // Fetch work points (tasks) from DB
   const rawWorkPoints = await prisma.projectWorkPoint.findMany({
-    where: { projectId: selectedProject.id },
+    where: isAllProjects ? {} : { projectId: selectedProject.id },
     orderBy: [{ location: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
@@ -70,10 +81,11 @@ export default async function ProjectSchedulePage({
       plannedStartDate: true,
       targetDate: true,
       progress: true,
+      projectId: true,
+      project: { select: { title: true, code: true } },
     },
   });
 
-  // If no work points yet, supply the default showcase tasks from the reference
   let tasks: ScheduleTaskItem[] = rawWorkPoints.map((wp) => ({
     id: wp.id,
     title: wp.title,
@@ -81,6 +93,8 @@ export default async function ProjectSchedulePage({
     plannedStartDate: wp.plannedStartDate ? wp.plannedStartDate.toISOString() : null,
     targetDate: wp.targetDate ? wp.targetDate.toISOString() : null,
     progress: wp.progress,
+    projectId: wp.projectId,
+    projectName: wp.project?.title || "Proyek",
   }));
 
   if (tasks.length === 0) {
@@ -92,6 +106,8 @@ export default async function ProjectSchedulePage({
         plannedStartDate: "2026-10-27T00:00:00Z",
         targetDate: "2026-11-02T00:00:00Z",
         progress: 100,
+        projectId: selectedProject.id,
+        projectName: selectedProject.title,
       },
       {
         id: "demo_2",
@@ -100,6 +116,8 @@ export default async function ProjectSchedulePage({
         plannedStartDate: "2026-11-03T00:00:00Z",
         targetDate: "2026-11-20T00:00:00Z",
         progress: 40,
+        projectId: selectedProject.id,
+        projectName: selectedProject.title,
       },
       {
         id: "demo_3",
@@ -108,6 +126,8 @@ export default async function ProjectSchedulePage({
         plannedStartDate: "2026-11-18T00:00:00Z",
         targetDate: "2026-12-05T00:00:00Z",
         progress: 0,
+        projectId: selectedProject.id,
+        projectName: selectedProject.title,
       },
       {
         id: "demo_4",
@@ -116,16 +136,20 @@ export default async function ProjectSchedulePage({
         plannedStartDate: "2026-11-30T00:00:00Z",
         targetDate: "2026-12-20T00:00:00Z",
         progress: 0,
+        projectId: selectedProject.id,
+        projectName: selectedProject.title,
       },
     ];
   }
 
-  // Fetch milestones
+  // Fetch milestones from DB
   const rawMilestones = await prisma.calendarEvent.findMany({
-    where: {
-      projectId: selectedProject.id,
-      type: "DEADLINE",
-    },
+    where: isAllProjects
+      ? { type: "DEADLINE" }
+      : {
+          projectId: selectedProject.id,
+          type: "DEADLINE",
+        },
     orderBy: { startsAt: "asc" },
     select: {
       id: true,
