@@ -59,6 +59,7 @@ import { deleteProject, duplicateProject } from "@/app/actions/project";
 import EditRabModal, { type EditableRabItem } from "./EditRabModal";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
 import MaterialPlanModal, { type MaterialPlanRow, type StockItemOption } from "./MaterialPlanModal";
+import AnalisaMaterialModal from "./AnalisaMaterialModal";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -154,6 +155,12 @@ export default function ProjectDetailView({
   const [isEditRabModalOpen, setIsEditRabModalOpen] = useState(false);
   const [isOpnameModalOpen, setIsOpnameModalOpen] = useState(false);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+  const [isAnalisaModalOpen, setIsAnalisaModalOpen] = useState(false);
+  const [selectedAnalisaItem, setSelectedAnalisaItem] = useState<{
+    title: string;
+    volume: number;
+    unit: string;
+  } | null>(null);
   const [selectedWorkPointForMaterial, setSelectedWorkPointForMaterial] = useState<string | undefined>();
   const [materialPlanList, setMaterialPlanList] = useState<MaterialPlanRow[]>([]);
 
@@ -757,16 +764,13 @@ export default function ProjectDetailView({
                 <span>Laporan harian</span>
               </Button>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveTab("rab")}
-                className="h-8 gap-1.5 text-xs"
+              <Link
+                href={`/apps/projects/schedule?projectId=${project.id}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
               >
                 <CalendarDays className="size-3.5 text-muted-foreground" />
                 <span>Jadwal proyek</span>
-              </Button>
+              </Link>
 
               <Link
                 href="/apps/invoice"
@@ -974,8 +978,15 @@ export default function ProjectDetailView({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setSelectedWorkPointForMaterial(it.id);
-                                  setIsMaterialModalOpen(true);
+                                  const parts = (it.volumeText || "100 M2").trim().split(" ");
+                                  const volNum = parseFloat(parts[0]) || 100;
+                                  const unitStr = parts.slice(1).join(" ") || "M2";
+                                  setSelectedAnalisaItem({
+                                    title: (it.code ? it.code + " " : "") + it.title,
+                                    volume: volNum,
+                                    unit: unitStr,
+                                  });
+                                  setIsAnalisaModalOpen(true);
                                 }}
                                 className="mt-0.5 text-[11px] font-medium text-sky-600 hover:underline dark:text-sky-400"
                               >
@@ -1525,6 +1536,15 @@ export default function ProjectDetailView({
         initialMaterials={materialPlanList}
         preselectedWorkPointId={selectedWorkPointForMaterial}
         onSave={(newMaterials) => setMaterialPlanList(newMaterials)}
+      />
+
+      {/* Modal: Analisa Material Per Item (Vasco Image) */}
+      <AnalisaMaterialModal
+        isOpen={isAnalisaModalOpen}
+        onClose={() => setIsAnalisaModalOpen(false)}
+        itemTitle={selectedAnalisaItem?.title || ""}
+        itemVolume={selectedAnalisaItem?.volume || 100}
+        itemUnit={selectedAnalisaItem?.unit || "M2"}
       />
     </div>
   );

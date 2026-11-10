@@ -1855,3 +1855,157 @@ export async function recordProjectOpname(
     return { success: false, message: "Gagal mencatat progres opname." };
   }
 }
+
+export async function saveProjectScheduleTask(
+  projectId: string,
+  input: {
+    id?: string;
+    title: string;
+    location: string;
+    plannedStartDate?: string;
+    targetDate?: string;
+    progress?: number;
+    kendala?: boolean;
+    perluDicek?: boolean;
+    notes?: string;
+  },
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengelola jadwal task." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    const startDate = input.plannedStartDate ? new Date(input.plannedStartDate) : null;
+    const endDate = input.targetDate ? new Date(input.targetDate) : null;
+    const progressVal = typeof input.progress === "number" ? Math.max(0, Math.min(100, input.progress)) : 0;
+
+    if (input.id) {
+      await prisma.projectWorkPoint.update({
+        where: { id: input.id },
+        data: {
+          title: input.title,
+          location: input.location,
+          plannedStartDate: startDate,
+          targetDate: endDate,
+          progress: progressVal,
+        },
+      });
+    } else {
+      await prisma.projectWorkPoint.create({
+        data: {
+          projectId,
+          title: input.title,
+          location: input.location || "A. Persiapan",
+          plannedStartDate: startDate,
+          targetDate: endDate,
+          progress: progressVal,
+          proposedVolume: BigInt(100),
+          proposedUnit: "paket",
+          proposedUnitPrice: BigInt(0),
+          proposedTotalWage: BigInt(0),
+          proposedById: session.user.id,
+        },
+      });
+    }
+
+    revalidatePath("/apps/projects/schedule");
+    revalidatePath(`/apps/projects/${projectId}`);
+    return { success: true, message: "Task jadwal berhasil disimpan." };
+  } catch (error) {
+    console.error("Save schedule task error:", error);
+    return { success: false, message: "Gagal menyimpan task jadwal." };
+  }
+}
+
+export async function deleteProjectScheduleTask(
+  workPointId: string,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk menghapus task." };
+  }
+
+  try {
+    const wp = await prisma.projectWorkPoint.findUnique({
+      where: { id: workPointId },
+      select: { id: true, projectId: true },
+    });
+    if (!wp) {
+      return { success: false, message: "Task tidak ditemukan." };
+    }
+
+    await prisma.projectWorkPoint.delete({
+      where: { id: workPointId },
+    });
+
+    revalidatePath("/apps/projects/schedule");
+    revalidatePath(`/apps/projects/${wp.projectId}`);
+    return { success: true, message: "Task berhasil dihapus." };
+  } catch (error) {
+    console.error("Delete schedule task error:", error);
+    return { success: false, message: "Gagal menghapus task." };
+  }
+}
+
+export async function saveProjectMilestone(
+  projectId: string,
+  title: string,
+  dateStr: string,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk menambah milestone." };
+  }
+  if (!projectId || !title.trim() || !dateStr) {
+    return { success: false, message: "Data milestone tidak lengkap." };
+  }
+
+  try {
+    const id = `ms_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const startsAt = new Date(dateStr);
+
+    await prisma.calendarEvent.create({
+      data: {
+        id,
+        title: title.trim(),
+        description: "MILESTONE",
+        type: "DEADLINE",
+        startsAt,
+        projectId,
+        createdById: session.user.id,
+        updatedAt: new Date(),
+      },
+    });
+
+    revalidatePath("/apps/projects/schedule");
+    return { success: true, message: "Milestone berhasil ditambahkan." };
+  } catch (error) {
+    console.error("Save milestone error:", error);
+    return { success: false, message: "Gagal menyimpan milestone." };
+  }
+}
+
+export async function deleteProjectMilestone(
+  milestoneId: string,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk menghapus milestone." };
+  }
+
+  try {
+    await prisma.calendarEvent.delete({
+      where: { id: milestoneId },
+    });
+
+    revalidatePath("/apps/projects/schedule");
+    return { success: true, message: "Milestone berhasil dihapus." };
+  } catch (error) {
+    console.error("Delete milestone error:", error);
+    return { success: false, message: "Gagal menghapus milestone." };
+  }
+}

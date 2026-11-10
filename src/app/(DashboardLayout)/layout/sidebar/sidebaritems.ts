@@ -69,6 +69,14 @@ const SidebarContent: MenuItem[] = [
         requiresProjects: true,
       },
       {
+        name: 'Jadwal Proyek (Gantt)',
+        subtitle: 'Timeline, Fase & Milestone',
+        icon: 'solar:calendar-date-bold-duotone',
+        url: '/apps/projects/schedule',
+        menuKey: 'master_proyek',
+        requiresProjects: true,
+      },
+      {
         name: 'Peta Survei Lapangan',
         subtitle: 'WebGIS & Titik Koordinat',
         icon: 'solar:map-point-wave-bold-duotone',
