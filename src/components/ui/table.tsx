@@ -41,7 +41,7 @@ export function getTableRows(children: React.ReactNode): React.ReactNode[] {
 function Table({
   className,
   pagination = true,
-  pageSize = 5,
+  pageSize = 10,
   itemLabel = "baris",
   children,
   ...props
@@ -50,7 +50,7 @@ function Table({
   const [rowCount, setRowCount] = React.useState(0);
   const safePageSize = Number.isFinite(pageSize)
     ? Math.max(1, Math.floor(pageSize))
-    : 5;
+    : 10;
   const paginationState = React.useMemo(
     () => ({
       enabled: pagination,
@@ -175,7 +175,7 @@ function TableBody({
   }, [pagination, rowCount]);
   const pageCount = Math.max(
     1,
-    Math.ceil(rowCount / (pagination?.pageSize ?? 5)),
+    Math.ceil(rowCount / (pagination?.pageSize ?? 10)),
   );
   const currentPage = Math.min(pagination?.page ?? 1, pageCount);
   const visibleRows =

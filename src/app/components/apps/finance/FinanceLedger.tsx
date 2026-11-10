@@ -603,7 +603,7 @@ export default function FinanceLedger({
 
         {/* Tabel Desktop */}
         <div className="hidden overflow-x-auto md:block">
-          <Table>
+          <Table pageSize={10}>
             <TableHeader>
               <TableRow>
                 <TableHead>Tanggal</TableHead>

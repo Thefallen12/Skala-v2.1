@@ -15,7 +15,7 @@ type NativeTableElement = React.ReactElement<{
 export function NativeDataTable({
   children,
   itemLabel = "baris",
-  pageSize = 5,
+  pageSize = 10,
 }: {
   children: NativeTableElement;
   itemLabel?: string;
@@ -37,7 +37,7 @@ export function NativeDataTable({
     getTableRows(body.props.children),
   );
   const safePageSize =
-    Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 5;
+    Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 10;
   const pageCount = Math.max(1, Math.ceil(rows.length / safePageSize));
   const currentPage = Math.min(page, pageCount);
   const firstIndex = (currentPage - 1) * safePageSize;

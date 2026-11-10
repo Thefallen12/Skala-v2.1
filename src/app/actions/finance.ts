@@ -13,6 +13,133 @@ import {
 const expenseTypes = ["SALARY", "ADVANCE", "REIMBURSEMENT"] as const;
 const paymentMethods = ["CASH", "TRANSFER"] as const;
 
+export type UpdateOfficeExpenseInput = {
+  id: string;
+  transactionDate?: string;
+  amount?: number;
+  newProofFiles?: File[];
+  keepProofUrls?: string[];
+  description?: string;
+};
+
+export async function updateOfficeExpense(
+  input: UpdateOfficeExpenseInput,
+): Promise<OfficeExpenseActionResult> {
+  const session = await auth();
+  if (!session?.user || !isFinanceOperator(session.user.role)) {
+    return {
+      success: false,
+      message: "Hanya Keuangan atau Direktur yang dapat mengubah data pengeluaran.",
+    };
+  }
+  if (!input || typeof input.id !== "string" || !input.id.trim()) {
+    return { success: false, message: "ID pengeluaran tidak valid." };
+  }
+
+  const existing = await prisma.officeExpense.findUnique({
+    where: { id: input.id },
+    include: { account: true, cashflow: true },
+  });
+  if (!existing) {
+    return { success: false, message: "Data pengeluaran tidak ditemukan." };
+  }
+
+  const newAmount =
+    input.amount !== undefined && Number.isFinite(input.amount) && input.amount > 0
+      ? input.amount
+      : existing.amount;
+
+  const diff = newAmount - existing.amount;
+  if (diff > 0 && existing.account.balance < diff) {
+    return {
+      success: false,
+      message: `Saldo akun tidak mencukupi untuk penambahan nominal (Kurang Rp ${Math.round(diff).toLocaleString("id-ID")}).`,
+    };
+  }
+
+  const uploadedProofUrls: string[] = [];
+  try {
+    if (Array.isArray(input.newProofFiles) && input.newProofFiles.length > 0) {
+      for (const file of input.newProofFiles) {
+        if (
+          file instanceof File &&
+          file.size > 0 &&
+          file.size <= 5 * 1024 * 1024 &&
+          ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)
+        ) {
+          uploadedProofUrls.push(await uploadCashflowProof(file));
+        }
+      }
+    }
+
+    const keepUrls = input.keepProofUrls
+      ? input.keepProofUrls.filter((url) => existing.proofUrls.includes(url))
+      : existing.proofUrls;
+
+    const finalProofUrls = [...keepUrls, ...uploadedProofUrls];
+    if (finalProofUrls.length === 0) {
+      return {
+        success: false,
+        message: "Minimal harus ada satu bukti foto/struk transaksi.",
+      };
+    }
+
+    const effectiveDate = input.transactionDate
+      ? parseTransactionDate(input.transactionDate)
+      : existing.createdAt;
+
+    await prisma.$transaction(async (tx) => {
+      if (diff !== 0) {
+        await tx.financeAccount.update({
+          where: { id: existing.accountId },
+          data: { balance: { decrement: diff } },
+        });
+      }
+
+      await tx.cashflow.update({
+        where: { id: existing.cashflowId },
+        data: {
+          amount: newAmount,
+          createdAt: effectiveDate,
+          proofUrl: finalProofUrls[0],
+          ...(input.description?.trim()
+            ? { sourceDesc: `[${existing.expenseType}] ${input.description.trim()}` }
+            : {}),
+        },
+      });
+
+      await tx.officeExpense.update({
+        where: { id: existing.id },
+        data: {
+          amount: newAmount,
+          createdAt: effectiveDate,
+          proofUrls: finalProofUrls,
+          ...(input.description?.trim()
+            ? { description: input.description.trim() }
+            : {}),
+        },
+      });
+    });
+
+    revalidatePath("/apps/finance");
+    return {
+      success: true,
+      message: "Data pengeluaran berhasil diperbarui (Tanggal, Nominal, dan Bukti Foto).",
+    };
+  } catch (error) {
+    await Promise.all(
+      uploadedProofUrls.map(async (url) => {
+        await removeUploadedCashflowProof(url);
+      }),
+    );
+    console.error("Updating office expense failed:", error);
+    return {
+      success: false,
+      message: "Gagal memperbarui pengeluaran. Silakan coba kembali.",
+    };
+  }
+}
+
 export type OfficeExpenseInput = {
   expenseType: (typeof expenseTypes)[number];
   description: string;

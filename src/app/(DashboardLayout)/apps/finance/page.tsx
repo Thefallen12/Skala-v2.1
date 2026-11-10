@@ -1209,7 +1209,9 @@ export default async function FinancePage({
         }))}
         officeExpenseRecipients={
           session.user.role === UserRole.FINANCE ||
-          session.user.role === UserRole.ADMINISTRATIONS
+          session.user.role === UserRole.ADMINISTRATIONS ||
+          session.user.role === UserRole.DIRECTOR ||
+          session.user.role === UserRole.DEPUTY_DIRECTOR
             ? officeExpenseRecipients
             : []
         }

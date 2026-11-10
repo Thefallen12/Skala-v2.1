@@ -29,6 +29,7 @@ import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
 import FinancePaymentProofReplacement from "@/app/components/apps/finance/FinancePaymentProofReplacement";
 import OfficeExpenseModal from "@/app/components/apps/finance/OfficeExpenseModal";
+import EditOfficeExpenseModal from "@/app/components/apps/finance/EditOfficeExpenseModal";
 import FinanceLedger, {
   type FinanceCashflowRow,
   type FinanceHistoricalPayment,
@@ -106,6 +107,7 @@ import {
   Fuel,
   History,
   Plus,
+  Pencil,
   ReceiptText,
   Search,
   Wallet,
@@ -322,7 +324,7 @@ function FinanceAccountField({
   );
 }
 
-const PAYMENT_HISTORY_PAGE_SIZE = 5;
+const PAYMENT_HISTORY_PAGE_SIZE = 10;
 
 const paymentReceiptHref = withLocalPhotoPreview;
 
@@ -418,8 +420,12 @@ export default function FinanceHub({
     null,
   );
   const [officeExpenseOpen, setOfficeExpenseOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<FinanceOfficeExpense | null>(null);
   const canManageOfficeExpenses =
-    role === UserRole.FINANCE || role === UserRole.ADMINISTRATIONS;
+    role === UserRole.FINANCE ||
+    role === UserRole.ADMINISTRATIONS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR;
   useEffect(() => {
     const targetId =
       activeTab === "ledger"
@@ -1452,7 +1458,7 @@ export default function FinanceHub({
                       Belum ada pengeluaran kantor atau operasional yang dicatat.
                     </p>
                   ) : (
-                  <NativeDataTable itemLabel="pengeluaran">
+                  <NativeDataTable itemLabel="pengeluaran" pageSize={10}>
                     <table className="app-data-table w-full min-w-[850px] text-left text-sm">
                       <thead>
                         <tr className="border-b text-muted-foreground">
@@ -1461,7 +1467,8 @@ export default function FinanceHub({
                           <th className="py-2 pr-3">Tipe</th>
                           <th className="py-2 pr-3 text-right">Nominal</th>
                           <th className="py-2 pr-3">Sumber Akun</th>
-                          <th className="py-2">Status Bukti</th>
+                          <th className="py-2 pr-3">Status Bukti</th>
+                          <th className="py-2 text-right">Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1501,7 +1508,7 @@ export default function FinanceHub({
                                     : "Transfer"}
                                 </p>
                               </td>
-                              <td className="py-2">
+                              <td className="py-2 pr-3">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <Badge variant="success">
                                     Lengkap · {expense.proofUrls.length} bukti
@@ -1525,6 +1532,20 @@ export default function FinanceHub({
                                     </Button>
                                   ))}
                                 </div>
+                              </td>
+                              <td className="py-2 text-right whitespace-nowrap">
+                                {canManageOfficeExpenses && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 gap-1.5 px-2.5 text-xs border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/30"
+                                    onClick={() => setEditingExpense(expense)}
+                                  >
+                                    <Pencil className="size-3.5" aria-hidden="true" />
+                                    Edit
+                                  </Button>
+                                )}
                               </td>
                             </tr>
                           );
@@ -3322,6 +3343,14 @@ export default function FinanceHub({
           onClose={() => setOfficeExpenseOpen(false)}
           accounts={financeAccounts}
           recipients={officeExpenseRecipients}
+        />
+      )}
+      {canManageOfficeExpenses && (
+        <EditOfficeExpenseModal
+          open={Boolean(editingExpense)}
+          onClose={() => setEditingExpense(null)}
+          expense={editingExpense}
+          onReceiptPreview={setReceiptPreview}
         />
       )}
     </div>
