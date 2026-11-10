@@ -70,10 +70,21 @@ export function getTicketPageVisibilityWhere(
           { status: TicketStatus.IN_TRANSIT },
           {
             status: TicketStatus.WAITING_FINANCE_PAYMENT,
-            type: TicketType.MATERIAL,
-            purchaseReceiptUrl: { not: null },
+            OR: [
+              {
+                type: TicketType.MATERIAL,
+                purchaseReceiptUrl: { not: null },
+              },
+              { requestCategory: TicketRequestCategory.SHIPPING_COST },
+            ],
           },
-          { status: TicketStatus.COMPLETED, type: TicketType.MATERIAL },
+          {
+            status: TicketStatus.COMPLETED,
+            OR: [
+              { type: TicketType.MATERIAL },
+              { requestCategory: TicketRequestCategory.SHIPPING_COST },
+            ],
+          },
           requesterTickets,
         ],
       };

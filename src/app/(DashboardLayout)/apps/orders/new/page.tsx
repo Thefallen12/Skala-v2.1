@@ -5,6 +5,7 @@ import DOEditForm from "@/components/orders/DOEditForm";
 import POEditForm from "@/components/orders/POEditForm";
 import {
   DOStatus,
+  TicketRequestCategory,
   TicketStatus,
   TicketType,
   UserRole,
@@ -55,7 +56,10 @@ export default async function NewOrderPage({
     ? await Promise.all([
         prisma.ticket.findMany({
           where: {
-            type: TicketType.MATERIAL,
+            OR: [
+              { type: TicketType.MATERIAL },
+              { requestCategory: TicketRequestCategory.SHIPPING_COST },
+            ],
             status: {
               in: [
                 TicketStatus.PROCESSED_LOGISTIC,
@@ -71,6 +75,8 @@ export default async function NewOrderPage({
             id: true,
             ticketNumber: true,
             title: true,
+            requestCategory: true,
+            relatedPoIds: true,
             requester: { select: { name: true } },
             moverAssignee: { select: { name: true } },
             project: {
@@ -109,6 +115,32 @@ export default async function NewOrderPage({
       ])
     : [[], []];
 
+  const allRelatedPoIds = [
+    ...new Set(
+      ticketOptions.flatMap((ticket) =>
+        ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+          ? ticket.relatedPoIds || []
+          : [],
+      ),
+    ),
+  ];
+  const relatedPurchaseOrders =
+    allRelatedPoIds.length > 0
+      ? await prisma.purchaseOrder.findMany({
+          where: { id: { in: allRelatedPoIds } },
+          select: {
+            id: true,
+            poNumber: true,
+            vendorName: true,
+            items: {
+              select: { itemName: true, quantity: true, unit: true },
+              orderBy: { id: "asc" },
+            },
+          },
+        })
+      : [];
+  const poMap = new Map(relatedPurchaseOrders.map((po) => [po.id, po]));
+
   return (
     <div className="space-y-4">
       <BreadcrumbComp
@@ -134,24 +166,49 @@ export default async function NewOrderPage({
               session.user.role === UserRole.LOGISTICS
             }
             ticketId={ticketId}
-            ticketOptions={ticketOptions.map((ticket) => ({
-              id: ticket.id,
-              ticketNumber: ticket.ticketNumber,
-              title: ticket.title,
-              projectName: projectSiteName(
-                ticket.project?.kelompokTani,
-                ticket.project?.location,
-              ),
-              projectLocation: ticket.project?.location ?? "",
-              vendorName: ticket.project?.vendor ?? "",
-              requesterName: ticket.requester.name,
-              moverName: ticket.moverAssignee?.name ?? "",
-              items: ticket.items.map((item) => ({
-                itemName: item.itemName,
-                quantity: item.quantity,
-                unit: item.unit,
-              })),
-            }))}
+            ticketOptions={ticketOptions.map((ticket) => {
+              const poItems =
+                ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+                  ? (ticket.relatedPoIds || []).flatMap((poId) =>
+                      (poMap.get(poId)?.items ?? []).map((item) => ({
+                        itemName: item.itemName,
+                        quantity: item.quantity,
+                        unit: item.unit,
+                      })),
+                    )
+                  : [];
+              const effectiveItems =
+                ticket.items.length > 0
+                  ? ticket.items.map((item) => ({
+                      itemName: item.itemName,
+                      quantity: item.quantity,
+                      unit: item.unit,
+                    }))
+                  : poItems;
+              const poVendors =
+                ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+                  ? (ticket.relatedPoIds || [])
+                      .map((poId) => poMap.get(poId)?.vendorName)
+                      .filter(Boolean)
+                      .join(", ")
+                  : "";
+              return {
+                id: ticket.id,
+                ticketNumber: ticket.ticketNumber,
+                title: ticket.title,
+                projectName:
+                  projectSiteName(
+                    ticket.project?.kelompokTani,
+                    ticket.project?.location,
+                  ) ||
+                  (poVendors ? `Vendor: ${poVendors}` : ticket.title),
+                projectLocation: ticket.project?.location ?? "",
+                vendorName: ticket.project?.vendor ?? poVendors,
+                requesterName: ticket.requester.name,
+                moverName: ticket.moverAssignee?.name ?? "",
+                items: effectiveItems,
+              };
+            })}
           />
         ) : (
           <POEditForm createdAt={new Date().toLocaleDateString("id-ID")} />

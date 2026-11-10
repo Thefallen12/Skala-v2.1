@@ -247,7 +247,14 @@ function actionFor(
 function workflowFor(
   role: TicketPageRole,
   ticket: TicketRow,
-): "LOGISTICS" | "EXPEDITION_RECEIPT" | "FINANCE" | "MOVER" | null {
+): "LOGISTICS" | "LOGISTICS_DO" | "EXPEDITION_RECEIPT" | "FINANCE" | "MOVER" | null {
+  if (
+    role === UserRole.LOGISTICS &&
+    ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
+    ticket.status === TicketStatus.PROCESSED_LOGISTIC
+  ) {
+    return "LOGISTICS_DO";
+  }
   if (
     role === UserRole.LOGISTICS &&
     ticket.type === TicketType.MATERIAL &&
@@ -761,12 +768,14 @@ export default function TicketListing({
                             LOGISTICS: ticket.deliveryOrders?.length
                               ? "Lanjutkan DO"
                               : "Proses Logistik",
+                            LOGISTICS_DO: "Terbitkan DO",
                             EXPEDITION_RECEIPT: "Terima Barang",
                             FINANCE: "Bayar / Selesaikan",
                             MOVER: "Konfirmasi Tiba",
                           };
                           const icons = {
                             LOGISTICS: PackageOpen,
+                            LOGISTICS_DO: Truck,
                             EXPEDITION_RECEIPT: PackageCheck,
                             FINANCE: CircleDollarSign,
                             MOVER: Truck,
@@ -777,7 +786,13 @@ export default function TicketListing({
                               type="button"
                               size="sm"
                               className="h-8 gap-1.5 px-2.5 text-xs font-semibold"
-                              onClick={() => setWorkflowTicket(ticket)}
+                              onClick={() => {
+                                if (workflow === "LOGISTICS_DO") {
+                                  router.push(`/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticket.id)}`);
+                                  return;
+                                }
+                                setWorkflowTicket(ticket);
+                              }}
                             >
                               <WorkflowIcon className="size-3.5" />
                               {labels[workflow]}
@@ -928,6 +943,7 @@ export default function TicketListing({
                   if (workflow) {
                     const labels = {
                       LOGISTICS: "Lanjutkan Proses Logistik (DO)",
+                      LOGISTICS_DO: "Terbitkan Surat Jalan (DO)",
                       EXPEDITION_RECEIPT: "Terima Barang & Selesaikan",
                       FINANCE: "Proses Pembayaran Finance",
                       MOVER: "Konfirmasi Barang Tiba",
@@ -938,6 +954,13 @@ export default function TicketListing({
                         onClick={() => {
                           setSelectedTicket(null);
                           setItemSelection(null);
+                          if (workflow === "LOGISTICS_DO") {
+                            const tid = selectedTicket.id;
+                            setSelectedTicket(null);
+                            setItemSelection(null);
+                            router.push(`/apps/orders/new?type=do&ticketId=${encodeURIComponent(tid)}`);
+                            return;
+                          }
                           setWorkflowTicket(selectedTicket);
                         }}
                       >

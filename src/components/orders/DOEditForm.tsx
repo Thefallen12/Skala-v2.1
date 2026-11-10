@@ -325,7 +325,7 @@ export default function DOEditForm({
                     <SelectContent>
                       {ticketOptions.map((ticket) => (
                         <SelectItem key={ticket.id} value={ticket.id}>
-                          {ticket.ticketNumber} — {ticket.projectName}
+                          {ticket.ticketNumber} — {ticket.projectName || ticket.title}
                         </SelectItem>
                       ))}
                     </SelectContent>

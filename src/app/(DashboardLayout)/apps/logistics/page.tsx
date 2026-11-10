@@ -328,13 +328,22 @@ export default async function LogisticsPage({
     );
   }
 
-  let where: Prisma.TicketWhereInput = { type: TicketType.MATERIAL };
+  let where: Prisma.TicketWhereInput = {
+    OR: [
+      { type: TicketType.MATERIAL },
+      { requestCategory: TicketRequestCategory.SHIPPING_COST },
+    ],
+  };
   if (session.user.role === UserRole.LOGISTICS) {
     where = {
-      type: TicketType.MATERIAL,
       OR: [
         {
+          type: TicketType.MATERIAL,
           status: TicketStatus.DRAFT,
+          requesterId: session.user.id,
+        },
+        {
+          requestCategory: TicketRequestCategory.SHIPPING_COST,
           requesterId: session.user.id,
         },
         {
@@ -349,7 +358,10 @@ export default async function LogisticsPage({
         },
         {
           status: TicketStatus.WAITING_FINANCE_PAYMENT,
-          purchaseReceiptUrl: { not: null },
+          OR: [
+            { purchaseReceiptUrl: { not: null } },
+            { requestCategory: TicketRequestCategory.SHIPPING_COST },
+          ],
         },
       ],
     };

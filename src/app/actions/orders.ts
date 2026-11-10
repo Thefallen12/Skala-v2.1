@@ -13,6 +13,7 @@ import {
   POStatus,
   StockMovementType,
   TicketCategoryHint,
+  TicketRequestCategory,
   TicketStatus,
   TicketType,
   UserRole,
@@ -1467,6 +1468,8 @@ export async function createDeliveryOrder(
             select: {
               id: true,
               type: true,
+              requestCategory: true,
+              relatedPoIds: true,
               status: true,
               isApprovedByDirector: true,
               projectId: true,
@@ -1486,8 +1489,13 @@ export async function createDeliveryOrder(
             },
           })
         : null;
-      if (input.ticketId && (!ticket || ticket.type !== TicketType.MATERIAL)) {
-        throw new Error("Tiket material yang dirujuk tidak ditemukan.");
+      if (
+        input.ticketId &&
+        (!ticket ||
+          (ticket.type !== TicketType.MATERIAL &&
+            ticket.requestCategory !== TicketRequestCategory.SHIPPING_COST))
+      ) {
+        throw new Error("Tiket referensi yang dirujuk tidak ditemukan.");
       }
       if (ticket && !ticket.isApprovedByDirector) {
         throw new Error(
@@ -1542,6 +1550,7 @@ export async function createDeliveryOrder(
       }
       if (
         ticket &&
+        ticket.requestCategory !== TicketRequestCategory.SHIPPING_COST &&
         (ticket.items.length !== input.items.length ||
           ticket.items.some((ticketItem, index) => {
             const orderItem = input.items[index];
@@ -1748,11 +1757,34 @@ export async function createDeliveryOrder(
           },
         });
       }
+      if (ticket) {
+        const nextTicketStatus =
+          deliveryMethod === DODeliveryMethod.EXPEDITION
+            ? TicketStatus.IN_TRANSIT
+            : TicketStatus.ASSIGNED_TO_MOVER;
+        await transaction.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            status: nextTicketStatus,
+            updatedAt: new Date(),
+          },
+        });
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: ticket.id,
+            userId: session.user.id,
+            action: "LOGISTICS_DO_CREATED",
+            notes: `Delivery Order ${doNumber} berhasil diterbitkan oleh Logistik untuk pengiriman barang.`,
+          },
+        });
+      }
       return { code, doNumber, alreadyExists: false };
     });
     revalidatePath(`/d/${created.code}`);
     revalidatePath("/apps/orders");
     revalidatePath("/apps/logistics");
+    revalidatePath("/apps/tickets");
     revalidatePath("/apps/documents/issued");
     revalidatePath("/apps/logistics/stock");
     return {

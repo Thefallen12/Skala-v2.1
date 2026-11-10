@@ -2634,9 +2634,12 @@ export async function createTicket(
             ? input.transferDestination?.trim() || null
             : null,
           priority: input.priority,
-          status: isInternalFundingRequest
-            ? TicketStatus.PENDING_DIRECTOR
-            : TicketStatus.DRAFT,
+          status:
+            isInternalFundingRequest || isShippingCostRequest
+              ? session.user.role === UserRole.DIRECTOR
+                ? TicketStatus.WAITING_FINANCE_PAYMENT
+                : TicketStatus.PENDING_DIRECTOR
+              : TicketStatus.DRAFT,
           totalAmount:
             totalAmount === null ? null : scaledIntegerFromDecimal(totalAmount),
           requestedAmount: requiresRequestedAmount
@@ -2746,9 +2749,12 @@ export async function createTicket(
   revalidatePath("/apps/project");
   return {
     success: true,
-    message: isInternalFundingRequest
-      ? "Pengajuan berhasil dikirim ke Direktur untuk persetujuan."
-      : "Draft tiket berhasil dibuat.",
+    message:
+      isInternalFundingRequest || isShippingCostRequest
+        ? session.user.role === UserRole.DIRECTOR
+          ? "Pengajuan pengiriman berhasil dibuat dan siap diproses Keuangan."
+          : "Pengajuan berhasil dikirim ke Direktur untuk persetujuan."
+        : "Draft tiket berhasil dibuat.",
   };
 }
 
@@ -5026,11 +5032,14 @@ export async function processFinancePayment(
         });
       }
 
+      const isShippingCostRequest =
+        ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
+
       if (isFullyPaid) {
         await transaction.ticket.update({
           where: { id: ticketId },
           data: {
-            ...(order
+            ...(order || isShippingCostRequest
               ? ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
                 ticket.status === TicketStatus.PROCESSED_FINANCE
                 ? { status: TicketStatus.PROCESSED_LOGISTIC }
@@ -5065,9 +5074,21 @@ export async function processFinancePayment(
           action: isFullyPaid
             ? "FINANCE_PAYMENT_COMPLETED"
             : "FINANCE_PAYMENT_PARTIAL",
-          notes: `${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "Pembayaran termin" : "Pelunasan"} sebesar Rp${amount.toLocaleString("id-ID")}; sisa tagihan Rp${newRemaining.toLocaleString("id-ID")}.`,
+          notes: isShippingCostRequest && isFullyPaid
+            ? `Pelunasan biaya pengiriman sebesar Rp${amount.toLocaleString("id-ID")} berhasil dibayar; diteruskan ke Logistik untuk menerbitkan Surat Jalan (DO).`
+            : `${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "Pembayaran termin" : "Pelunasan"} sebesar Rp${amount.toLocaleString("id-ID")}; sisa tagihan Rp${newRemaining.toLocaleString("id-ID")}.`,
         },
       });
+      if (isShippingCostRequest && isFullyPaid) {
+        await sendNotification({
+          roleTarget: UserRole.LOGISTICS,
+          title: "Biaya Pengiriman Dibayar - Siap Terbitkan DO",
+          message: `${ticket.ticketNumber} · ${ticket.title} telah dibayar Keuangan. Silakan terbitkan Surat Jalan (DO) untuk pengiriman barang.`,
+          actionUrl: `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticketId)}`,
+          type: NotificationType.SUCCESS,
+          database: transaction,
+        });
+      }
       if (order && confirmationOrderNumber) {
         await sendNotification({
           roleTarget: UserRole.LOGISTICS,

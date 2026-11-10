@@ -330,6 +330,7 @@ export default async function FinancePage({
         purchaseReceiptUrl: true,
         receiptUrls: true,
         requestCategory: true,
+        relatedPoIds: true,
         requestPaymentMethod: true,
         requestPaymentDescription: true,
         transferDestination: true,
@@ -1189,6 +1190,33 @@ export default async function FinancePage({
     console.error("Failed to generate Finance report QR code:", error);
   }
 
+  const allRelatedPoIdsForTickets = [
+    ...new Set(
+      tickets.flatMap((ticket) =>
+        ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+          ? ticket.relatedPoIds || []
+          : [],
+      ),
+    ),
+  ];
+  const relatedPosForTickets =
+    allRelatedPoIdsForTickets.length > 0
+      ? await prisma.purchaseOrder.findMany({
+          where: { id: { in: allRelatedPoIdsForTickets } },
+          select: {
+            id: true,
+            poNumber: true,
+            vendorName: true,
+            paymentBankName: true,
+            paymentAccountNumber: true,
+            paymentAccountName: true,
+          },
+        })
+      : [];
+  const financePoMap = new Map(
+    relatedPosForTickets.map((po) => [po.id, po]),
+  );
+
   return (
     <>
       <FinanceHub
@@ -1355,76 +1383,95 @@ export default async function FinancePage({
             paidAt: payment.paidAt?.toISOString() ?? null,
           })),
         }))}
-        tickets={tickets.map((ticket) => ({
-          id: ticket.id,
-          ticketNumber: ticket.ticketNumber,
-          title: ticket.title,
-          totalAmount:
-            (ticket.purchaseOrders[0]
-              ? Math.round(
-                  ticket.purchaseOrders[0].items.reduce(
-                    (sum, item) => sum + item.totalPrice,
-                    0,
-                  ) *
-                    (ticket.purchaseOrders[0].includeTax ? 1.11 : 1) *
-                    100,
-                ) / 100
-              : null)?.toString() ??
-            ticket.requestedAmount?.toString() ??
-            (ticket.totalAmount !== null
-              ? decimalStringFromScaledInteger(ticket.totalAmount)
-              : null) ??
-            null,
-          purchaseReceiptUrl: ticket.purchaseReceiptUrl,
-          requestCategory: ticket.requestCategory,
-          receiptUrls: ticket.receiptUrls,
-          requesterName: ticket.requester.name,
-          requestPaymentMethod: ticket.requestPaymentMethod,
-          requestPaymentDescription: ticket.requestPaymentDescription,
-          recipientName:
-            ticket.recipientName ??
-            ticket.requester.bankAccountName ??
-            ticket.requester.name,
-          bankName: ticket.bankName ?? ticket.requester.bankName,
-          accountNumber:
-            ticket.accountNumber ?? ticket.requester.bankAccountNumber,
-          transferDestination:
-            ticket.requestCategory === TicketRequestCategory.APH
-              ? ticket.transferDestination
-              : ticket.purchaseOrders[0]?.paymentBankName &&
-            ticket.purchaseOrders[0]?.paymentAccountNumber
-              ? `Ditransfer ke: ${ticket.purchaseOrders[0].paymentBankName} & ${ticket.purchaseOrders[0].paymentAccountNumber}`
+        tickets={tickets.map((ticket) => {
+          const firstRelatedPo =
+            ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
+            ticket.relatedPoIds?.length
+              ? financePoMap.get(ticket.relatedPoIds[0])
+              : undefined;
+          return {
+            id: ticket.id,
+            ticketNumber: ticket.ticketNumber,
+            title: ticket.title,
+            totalAmount:
+              (ticket.purchaseOrders[0]
+                ? Math.round(
+                    ticket.purchaseOrders[0].items.reduce(
+                      (sum, item) => sum + item.totalPrice,
+                      0,
+                    ) *
+                      (ticket.purchaseOrders[0].includeTax ? 1.11 : 1) *
+                      100,
+                  ) / 100
+                : null)?.toString() ??
+              ticket.requestedAmount?.toString() ??
+              (ticket.totalAmount !== null
+                ? decimalStringFromScaledInteger(ticket.totalAmount)
+                : null) ??
+              null,
+            purchaseReceiptUrl: ticket.purchaseReceiptUrl,
+            requestCategory: ticket.requestCategory,
+            receiptUrls: ticket.receiptUrls,
+            requesterName: ticket.requester.name,
+            requestPaymentMethod: ticket.requestPaymentMethod,
+            requestPaymentDescription: ticket.requestPaymentDescription,
+            recipientName:
+              ticket.recipientName ??
+              firstRelatedPo?.paymentAccountName ??
+              ticket.requester.bankAccountName ??
+              ticket.requester.name,
+            bankName:
+              ticket.bankName ??
+              firstRelatedPo?.paymentBankName ??
+              ticket.requester.bankName,
+            accountNumber:
+              ticket.accountNumber ??
+              firstRelatedPo?.paymentAccountNumber ??
+              ticket.requester.bankAccountNumber,
+            transferDestination:
+              ticket.requestCategory === TicketRequestCategory.APH
+                ? ticket.transferDestination
+                : ticket.purchaseOrders[0]?.paymentBankName &&
+              ticket.purchaseOrders[0]?.paymentAccountNumber
+                ? `Ditransfer ke: ${ticket.purchaseOrders[0].paymentBankName} & ${ticket.purchaseOrders[0].paymentAccountNumber}`
+                : firstRelatedPo?.paymentBankName &&
+                  firstRelatedPo?.paymentAccountNumber
+                  ? `Ditransfer ke: ${firstRelatedPo.paymentBankName} & ${firstRelatedPo.paymentAccountNumber}`
+                  : ticket.transferDestination ?? null,
+            vendorBankName:
+              ticket.purchaseOrders[0]?.paymentBankName ??
+              firstRelatedPo?.paymentBankName ??
+              ticket.bankName ??
+              ticket.requester.bankName,
+            vendorAccountNumber:
+              ticket.purchaseOrders[0]?.paymentAccountNumber ??
+              firstRelatedPo?.paymentAccountNumber ??
+              ticket.accountNumber ??
+              ticket.requester.bankAccountNumber,
+            vendorAccountName:
+              ticket.purchaseOrders[0]?.paymentAccountName ??
+              firstRelatedPo?.paymentAccountName ??
+              ticket.recipientName ??
+              ticket.requester.bankAccountName ??
+              ticket.requester.name,
+            projectName: ticket.project
+              ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
               : null,
-          vendorBankName:
-            ticket.purchaseOrders[0]?.paymentBankName ??
-            ticket.bankName ??
-            ticket.requester.bankName,
-          vendorAccountNumber:
-            ticket.purchaseOrders[0]?.paymentAccountNumber ??
-            ticket.accountNumber ??
-            ticket.requester.bankAccountNumber,
-          vendorAccountName:
-            ticket.purchaseOrders[0]?.paymentAccountName ??
-            ticket.recipientName ??
-            ticket.requester.bankAccountName ??
-            ticket.requester.name,
-          projectName: ticket.project
-            ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
-            : null,
-          paymentTransactions: Array.from(
-            new Map(
-              [
-                ...ticket.paymentTransactions,
-                ...ticket.purchaseOrders.flatMap(
-                  (order) => order.paymentTransactions,
-                ),
-              ].map((payment) => [payment.id, payment]),
-            ).values(),
-          ).map((payment) => ({
-            ...payment,
-            paidAt: payment.paidAt?.toISOString() ?? null,
-          })),
-        }))}
+            paymentTransactions: Array.from(
+              new Map(
+                [
+                  ...ticket.paymentTransactions,
+                  ...ticket.purchaseOrders.flatMap(
+                    (order) => order.paymentTransactions,
+                  ),
+                ].map((payment) => [payment.id, payment]),
+              ).values(),
+            ).map((payment) => ({
+              ...payment,
+              paidAt: payment.paidAt?.toISOString() ?? null,
+            })),
+          };
+        })}
         termyns={termyns.map((termyn) => ({
           id: termyn.id,
           contractNumber: termyn.subkonContract.contractNumber,
