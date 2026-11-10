@@ -66,12 +66,12 @@ export const Login = () => {
 
       if (outcome.type === 'credentials-error') {
         setIsAuthenticating(false)
-        setError('Email atau kata sandi tidak sesuai. Silakan periksa kembali.')
+        setError('Email atau kata sandi tidak sesuai. Silakan periksa kembali (default sistem: password123).')
         return
       }
 
-      router.push('/')
-      router.refresh()
+      // Hard navigation to ensure all server session cookies and fresh layout load cleanly
+      window.location.href = '/'
     } catch (err) {
       console.error('Sign-in exception:', err)
       setIsAuthenticating(false)
@@ -209,7 +209,7 @@ export const Login = () => {
                         id='identifier'
                         type='email'
                         autoComplete='email'
-                        placeholder='nama@skalaprioritas.com'
+                        placeholder='nama@skalaprioritas.com atau email Anda'
                         disabled={form.formState.isSubmitting || isAuthenticating}
                         className='h-11 rounded-xl border border-slate-300 bg-white pl-10 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:text-slate-900 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400'
                         {...field}
@@ -236,6 +236,9 @@ export const Login = () => {
                       >
                         Kata Sandi
                       </FormLabel>
+                      <span className='text-[11px] text-slate-400'>
+                        Default: password123
+                      </span>
                     </div>
                     <div className='relative'>
                       <LockKeyhole
