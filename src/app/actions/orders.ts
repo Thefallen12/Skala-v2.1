@@ -2699,12 +2699,22 @@ export async function submitMoverDeliveryProofs(
       }
 
       if (receiptUrls.length > 0) {
-        await transaction.deliveryOrderProof.createMany({
-          data: receiptUrls.map((url) => ({
-            deliveryOrderId: order.id,
-            url,
-          })),
+        const uniqueUrls = Array.from(new Set(receiptUrls));
+        const existingRecords = await transaction.deliveryOrderProof.findMany({
+          where: { url: { in: uniqueUrls } },
+          select: { url: true },
         });
+        const existingUrlSet = new Set(existingRecords.map((r) => r.url));
+        const urlsToInsert = uniqueUrls.filter((url) => !existingUrlSet.has(url));
+
+        if (urlsToInsert.length > 0) {
+          await transaction.deliveryOrderProof.createMany({
+            data: urlsToInsert.map((url) => ({
+              deliveryOrderId: order.id,
+              url,
+            })),
+          });
+        }
       }
 
       const primaryReceiptUrl =

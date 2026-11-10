@@ -269,7 +269,13 @@ export default function MoverWorkspace({
     const kmStart = Number(formData.get("kilometerStart"));
     const kmEnd = Number(formData.get("kilometerEnd"));
 
-    if (files.length === 0 && !completeDelivery) {
+    const existingCount = deliveryOrders.find((o) => o.publicCode === publicCode)?.receiptPhotoUrls.length ?? 0;
+    if (completeDelivery && files.length === 0 && existingCount === 0) {
+      setMessage("Unggah minimal satu foto bukti sebelum menyelesaikan DO.");
+      setIsError(true);
+      return;
+    }
+    if (!completeDelivery && files.length === 0) {
       setMessage("Pilih minimal satu foto bukti serah-terima untuk disimpan.");
       setIsError(true);
       return;

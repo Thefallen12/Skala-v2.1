@@ -78,7 +78,7 @@ export async function uploadCloudinaryRawFile(
     const relativeDir = path.posix.join("uploads", safeFolder);
     const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
     await mkdir(absDir, { recursive: true });
-    await writeFile(path.join(absDir, fileName), bytes);
+    await writeFile(path.join(/*turbopackIgnore: true*/ absDir, fileName), bytes);
     return `/${relativeDir}/${fileName}`;
   }
 
