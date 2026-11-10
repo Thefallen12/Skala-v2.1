@@ -13,9 +13,11 @@ import {
   CalendarDays,
   Camera,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   Coins,
+  Columns,
   Copy,
   Download,
   ExternalLink,
@@ -56,7 +58,12 @@ import { GlobalModal } from "@/components/ui/global-modal";
 import ProjectFormModal from "@/app/components/project/ProjectFormModal";
 import type { ProjectWorkstationMasterData } from "./ProjectWorkstationMaster";
 import type { FieldTeamOption } from "@/app/(DashboardLayout)/types/project";
-import { deleteProject, duplicateProject } from "@/app/actions/project";
+import {
+  deleteProject,
+  duplicateProject,
+  updateProjectKanbanStatus,
+  saveProjectScheduleTask,
+} from "@/app/actions/project";
 import EditRabModal, { type EditableRabItem } from "./EditRabModal";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
 import MaterialPlanModal, { type MaterialPlanRow, type StockItemOption } from "./MaterialPlanModal";
@@ -137,6 +144,28 @@ const DEFAULT_SAMPLE_ITEMS: EditableRabItem[] = [
   },
 ];
 
+const KANBAN_STAGES: Array<{
+  key: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda";
+  label: string;
+  badgeClass: string;
+}> = [
+  { key: "tender", label: "Tender", badgeClass: "bg-slate-500/10 text-slate-700 border-slate-300 dark:text-slate-300" },
+  { key: "perencanaan", label: "Perencanaan", badgeClass: "bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-300" },
+  { key: "berjalan", label: "Berjalan", badgeClass: "bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-300" },
+  { key: "hampir_selesai", label: "Hampir Selesai", badgeClass: "bg-purple-500/10 text-purple-700 border-purple-300 dark:text-purple-300" },
+  { key: "selesai", label: "Selesai", badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-300" },
+  { key: "ditunda", label: "Ditunda & batal", badgeClass: "bg-rose-500/10 text-rose-700 border-rose-300 dark:text-rose-300" },
+];
+
+function getKanbanKeyFromProject(status: ProjectStatus, progress: number): "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda" {
+  if (status === ProjectStatus.PENDING_SETUP) return "tender";
+  if (status === ProjectStatus.PENDING || status === ProjectStatus.PLANNED) return "perencanaan";
+  if (status === ProjectStatus.DONE || status === ProjectStatus.COMPLETED || progress >= 100) return "selesai";
+  if (status === ProjectStatus.TERHAMBAT || status === ProjectStatus.ON_HOLD) return "ditunda";
+  if (progress >= 85 && progress < 100) return "hampir_selesai";
+  return "berjalan";
+}
+
 export default function ProjectDetailView({
   project,
   fieldTeamUsers = [],
@@ -181,6 +210,69 @@ export default function ProjectDetailView({
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
   const [isCoreTeamModalOpen, setIsCoreTeamModalOpen] = useState(false);
   const [materialPlanList, setMaterialPlanList] = useState<MaterialPlanRow[]>([]);
+
+  // Papan & Status Kanban integration
+  const [currentKanbanKey, setCurrentKanbanKey] = useState<"tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda">(() =>
+    getKanbanKeyFromProject(project.status, project.progress)
+  );
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [scheduleViewMode, setScheduleViewMode] = useState<"papan" | "gantt">("papan");
+  const [taskDragOverColumn, setTaskDragOverColumn] = useState<string | null>(null);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [localWorkPoints, setLocalWorkPoints] = useState(project.workPoints);
+
+  React.useEffect(() => {
+    setLocalWorkPoints(project.workPoints);
+  }, [project.workPoints]);
+
+  React.useEffect(() => {
+    setCurrentKanbanKey(getKanbanKeyFromProject(project.status, project.progress));
+  }, [project.status, project.progress]);
+
+  const handleStageChange = async (newKey: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda") => {
+    setCurrentKanbanKey(newKey);
+    setIsUpdatingStatus(true);
+    try {
+      const res = await updateProjectKanbanStatus(project.id, newKey);
+      if (res.success) {
+        router.refresh();
+      } else {
+        alert(res.message || "Gagal mengubah tahap proyek.");
+      }
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleTaskDrop = async (targetCol: "belum_mulai" | "berjalan" | "selesai") => {
+    if (!draggedTaskId) return;
+    const task = localWorkPoints.find((wp) => wp.id === draggedTaskId);
+    if (!task) return;
+
+    let nextProgress = 0;
+    if (targetCol === "belum_mulai") nextProgress = 0;
+    else if (targetCol === "berjalan") nextProgress = 50;
+    else if (targetCol === "selesai") nextProgress = 100;
+
+    // Optimistic update
+    setLocalWorkPoints((prev) =>
+      prev.map((wp) => (wp.id === draggedTaskId ? { ...wp, progress: nextProgress } : wp))
+    );
+    setDraggedTaskId(null);
+    setTaskDragOverColumn(null);
+
+    const res = await saveProjectScheduleTask(project.id, {
+      id: task.id,
+      title: task.title,
+      location: task.location || "Umum",
+      progress: nextProgress,
+      plannedStartDate: task.plannedStartDate ? new Date(task.plannedStartDate).toISOString() : undefined,
+      targetDate: task.targetDate ? new Date(task.targetDate).toISOString() : undefined,
+    });
+    if (res.success) {
+      router.refresh();
+    }
+  };
 
   const handleApplyRabAsContract = () => {
     startTransition(async () => {
@@ -512,15 +604,15 @@ export default function ProjectDetailView({
         <div className="relative flex flex-col items-start justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:items-center">
           <div className="space-y-0.5">
             <span className="text-[11px] font-semibold text-muted-foreground">
-              {project.workPoints.length === 0 ? "Langkah 2 dari 3" : "Langkah 1 dari 3"}
+              {project.workPoints.length === 0 ? "Langkah 2 dari 3" : "Langkah 3 dari 3"}
             </span>
             <p className="text-sm font-bold text-foreground">
-              {project.workPoints.length === 0 ? "Isi RAB" : "Buat proyek pertama"}
+              {project.workPoints.length === 0 ? "Isi RAB" : "Lihat jadwal (Gantt)"}
             </p>
             <p className="text-xs text-muted-foreground">
               {project.workPoints.length === 0
                 ? "Tempel tabel RAB dari Excel atau isi itemnya. Progres dan biaya dihitung dari RAB."
-                : "Isi nama proyek dan kliennya; nilai kontrak bisa nanti."}
+                : "Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -530,11 +622,11 @@ export default function ProjectDetailView({
               onClick={() =>
                 project.workPoints.length === 0
                   ? setIsEditRabModalOpen(true)
-                  : setIsEditModalOpen(true)
+                  : setActiveTab("papan")
               }
               className="h-8 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
             >
-              {project.workPoints.length === 0 ? "Isi RAB" : "Buat proyek"}
+              {project.workPoints.length === 0 ? "Isi RAB" : "Buka jadwal"}
             </Button>
             <button
               type="button"
@@ -550,17 +642,26 @@ export default function ProjectDetailView({
       {/* 3. Header: Badges & Action Buttons */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
-          {/* Status Badges Row */}
+          {/* Status Badges Row with Interactive Kanban Stage Selector */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge variant="outline" className="font-semibold">
-              {project.status === ProjectStatus.COMPLETED
-                ? "Selesai"
-                : project.status === ProjectStatus.ACTIVE || project.status === ProjectStatus.RUNNING || project.status === ProjectStatus.ON_PROGRESS
-                  ? "Berjalan"
-                  : project.status === ProjectStatus.PENDING_SETUP
-                    ? "Persiapan"
-                    : "Berjalan"}
-            </Badge>
+            <div className="relative inline-flex items-center">
+              <select
+                value={currentKanbanKey}
+                disabled={isUpdatingStatus}
+                onChange={(e) => handleStageChange(e.target.value as any)}
+                className={`rounded-md border px-2.5 py-1 text-xs font-bold transition cursor-pointer appearance-none pr-6 shadow-2xs ${
+                  KANBAN_STAGES.find((s) => s.key === currentKanbanKey)?.badgeClass || "bg-card text-foreground"
+                }`}
+                title="Pilih tahap proyek (Tersinkron langsung dengan Papan Proyek)"
+              >
+                {KANBAN_STAGES.map((st) => (
+                  <option key={st.key} value={st.key} className="bg-popover text-foreground">
+                    Tahap: {st.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-1.5 size-3.5 text-muted-foreground" />
+            </div>
 
             <Badge
               variant="outline"
@@ -720,6 +821,9 @@ export default function ProjectDetailView({
           <TabsTrigger value="ringkasan" className="rounded-lg px-4 py-2 text-xs font-semibold">
             Ringkasan
           </TabsTrigger>
+          <TabsTrigger value="papan" className="rounded-lg px-4 py-2 text-xs font-semibold">
+            Papan &amp; Jadwal
+          </TabsTrigger>
           <TabsTrigger value="rab" className="rounded-lg px-4 py-2 text-xs font-semibold">
             RAB &amp; biaya
           </TabsTrigger>
@@ -802,21 +906,27 @@ export default function ProjectDetailView({
                 <span>Laporan harian</span>
               </Button>
 
-              <Link
-                href={`/apps/projects/schedule?projectId=${project.id}`}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("papan")}
+                className="h-8 gap-1.5 text-xs font-semibold"
               >
                 <CalendarDays className="size-3.5 text-muted-foreground" />
-                <span>Jadwal proyek</span>
-              </Link>
+                <span>Papan &amp; Jadwal</span>
+              </Button>
 
-              <Link
-                href="/apps/invoice"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("tagihan")}
+                className="h-8 gap-1.5 text-xs font-semibold"
               >
                 <FileText className="size-3.5 text-muted-foreground" />
                 <span>Quotation &amp; Invoice</span>
-              </Link>
+              </Button>
 
               <Link
                 href="/apps/logistics?tab=warehouse"
@@ -1552,6 +1662,260 @@ export default function ProjectDetailView({
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ===================== TAB 7: PAPAN & JADWAL (KANBAN DETAIL) ===================== */}
+        <TabsContent value="papan" className="space-y-6">
+          <Card className="border-border/80 shadow-2xs">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
+              <div>
+                <CardTitle className="text-base font-bold text-foreground">
+                  Papan &amp; Jadwal Pekerjaan
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Geser kartu task untuk mengubah status pekerjaan secara instan.
+                </CardDescription>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Switcher: Papan | Gantt */}
+                <div className="flex rounded-lg border border-border/70 bg-muted/30 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleViewMode("papan")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                      scheduleViewMode === "papan"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Papan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleViewMode("gantt")}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                      scheduleViewMode === "gantt"
+                        ? "bg-card text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Gantt
+                  </button>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditRabModalOpen(true)}
+                  className="h-8 gap-1.5 text-xs font-semibold rounded-lg"
+                >
+                  <Plus className="size-3.5" />
+                  <span>Tambah task</span>
+                </Button>
+
+                <Link
+                  href={`/apps/projects/schedule?projectId=${project.id}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted transition"
+                >
+                  <ExternalLink className="size-3.5 text-muted-foreground" />
+                  <span>Halaman Jadwal Penuh</span>
+                </Link>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-6">
+              {localWorkPoints.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Belum ada task pekerjaan. Isi RAB atau tambah task untuk mulai mengelola jadwal pekerjaan.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsEditRabModalOpen(true)}
+                    className="mt-3 h-8 gap-1.5 text-xs bg-foreground text-background font-semibold"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Isi RAB / Tambah task</span>
+                  </Button>
+                </div>
+              ) : scheduleViewMode === "papan" ? (
+                /* 3-Column Task Kanban Board */
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                  {(
+                    [
+                      {
+                        key: "belum_mulai" as const,
+                        title: "Belum mulai",
+                        match: (p: any) => (p.progress ?? 0) === 0,
+                        headerClass: "text-slate-600 dark:text-slate-400",
+                        badgeClass: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                      },
+                      {
+                        key: "berjalan" as const,
+                        title: "Berjalan",
+                        match: (p: any) => (p.progress ?? 0) > 0 && (p.progress ?? 0) < 100,
+                        headerClass: "text-blue-600 dark:text-blue-400",
+                        badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+                      },
+                      {
+                        key: "selesai" as const,
+                        title: "Selesai",
+                        match: (p: any) => (p.progress ?? 0) >= 100,
+                        headerClass: "text-emerald-600 dark:text-emerald-400",
+                        badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+                      },
+                    ]
+                  ).map((col) => {
+                    const colTasks = localWorkPoints.filter(col.match);
+                    const isOver = taskDragOverColumn === col.key;
+
+                    return (
+                      <div
+                        key={col.key}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setTaskDragOverColumn(col.key);
+                        }}
+                        onDragLeave={() => setTaskDragOverColumn(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleTaskDrop(col.key);
+                        }}
+                        className={`flex flex-col rounded-xl border p-3 min-h-[360px] transition-all duration-150 ${
+                          isOver
+                            ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
+                            : "border-border/70 bg-muted/20"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between pb-3 border-b border-border/50 mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-bold ${col.headerClass}`}>
+                              {col.title}
+                            </span>
+                          </div>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${col.badgeClass}`}>
+                            {colTasks.length}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2.5 flex-1">
+                          {colTasks.map((t) => {
+                            const isDragging = draggedTaskId === t.id;
+                            const titleParts = t.title.split(" ");
+                            const maybeCode = titleParts[0]?.includes(".") ? titleParts[0] : "";
+                            const cleanTitle = maybeCode ? titleParts.slice(1).join(" ") : t.title;
+
+                            return (
+                              <div
+                                key={t.id}
+                                draggable
+                                onDragStart={() => setDraggedTaskId(t.id)}
+                                onDragEnd={() => {
+                                  setDraggedTaskId(null);
+                                  setTaskDragOverColumn(null);
+                                }}
+                                className={`rounded-lg border bg-card p-3 shadow-2xs transition group select-none cursor-grab active:cursor-grabbing ${
+                                  isDragging
+                                    ? "opacity-30 border-dashed border-primary scale-95"
+                                    : "border-border/80 hover:border-primary/50 hover:shadow-xs"
+                                }`}
+                              >
+                                {t.location && (
+                                  <span className="inline-block rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground mb-1.5 line-clamp-1">
+                                    {t.location}
+                                  </span>
+                                )}
+
+                                <p className="text-xs font-bold text-foreground line-clamp-2">
+                                  {maybeCode ? maybeCode + " " : ""}
+                                  {cleanTitle}
+                                </p>
+
+                                <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                                  <span>
+                                    {t.proposedVolume
+                                      ? `${Number(t.proposedVolume)} ${t.proposedUnit || "paket"}`
+                                      : t.proposedUnit || "1 paket"}
+                                  </span>
+                                  {t.targetDate && (
+                                    <span className="flex items-center gap-1 text-[10px]">
+                                      <Calendar className="size-3" />
+                                      {formatDateIndo(t.targetDate)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-2 space-y-1 pt-1 border-t border-border/40">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="text-muted-foreground">Progres</span>
+                                    <span className="font-bold">{t.progress ?? 0}%</span>
+                                  </div>
+                                  <Progress value={t.progress ?? 0} className="h-1.5" />
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {colTasks.length === 0 && (
+                            <div
+                              className={`flex h-24 items-center justify-center rounded-lg border border-dashed text-center text-xs transition-colors ${
+                                isOver
+                                  ? "border-primary bg-primary/10 text-primary font-semibold"
+                                  : "border-border/50 text-muted-foreground/60"
+                              }`}
+                            >
+                              <span>{isOver ? "Lepas task di sini" : "Belum ada task"}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Gantt View Breakdown */
+                <div className="overflow-x-auto rounded-xl border border-border/80">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/40 font-semibold text-muted-foreground">
+                        <th className="py-3 px-4 text-left w-2/5">Uraian Task</th>
+                        <th className="py-3 px-3 text-left w-1/5">Fase / Bagian</th>
+                        <th className="py-3 px-3 text-center w-24">Target Selesai</th>
+                        <th className="py-3 px-3 text-right w-24">Progres</th>
+                        <th className="py-3 px-4 text-left w-1/4">Timeline</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {localWorkPoints.map((t) => (
+                        <tr key={t.id} className="hover:bg-muted/10 transition">
+                          <td className="py-3 px-4 font-semibold text-foreground">
+                            {t.title}
+                          </td>
+                          <td className="py-3 px-3 text-muted-foreground">
+                            {t.location || "Umum"}
+                          </td>
+                          <td className="py-3 px-3 text-center text-muted-foreground whitespace-nowrap">
+                            {t.targetDate ? formatDateIndo(t.targetDate) : "—"}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold">
+                            {t.progress ?? 0}%
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="w-full">
+                              <Progress value={t.progress ?? 0} className="h-2" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>

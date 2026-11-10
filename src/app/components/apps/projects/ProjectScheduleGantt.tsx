@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   ChevronDown,
+  ChevronRight,
   Trash2,
   CheckCircle2,
   Clock,
@@ -481,6 +482,26 @@ export default function ProjectScheduleGantt({
           </Button>
         </div>
       )}
+
+      {/* Breadcrumb Navigation */}
+      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Link href="/apps/projects" className="transition hover:text-foreground">
+          Proyek
+        </Link>
+        {selectedProject.id !== "all" && (
+          <>
+            <ChevronRight className="size-3.5" />
+            <Link
+              href={`/apps/projects/${selectedProject.id}`}
+              className="transition hover:text-foreground line-clamp-1 max-w-[200px]"
+            >
+              {selectedProject.title}
+            </Link>
+          </>
+        )}
+        <ChevronRight className="size-3.5" />
+        <span className="font-semibold text-foreground">Jadwal proyek</span>
+      </nav>
 
       {/* Top Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
