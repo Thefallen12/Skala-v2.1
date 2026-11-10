@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { Readable } from "stream";
 
 export interface ParsedRabItem {
   section: string;
@@ -24,6 +25,7 @@ export interface ParsedLaborRate {
   unit: string;
   rate: number;
   daysTotal?: number;
+  total?: number;
 }
 
 export interface ParsedDrtRabResult {
@@ -90,18 +92,62 @@ function getCellValueText(cell: ExcelJS.Cell | undefined): string {
   return String(val).trim();
 }
 
+function createEmptyMetadata() {
+  return {
+    code: `PRJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+    title: "",
+    poktanName: "",
+    desa: "",
+    kecamatan: "",
+    kabupaten: "",
+    provinsi: "",
+    address: "",
+    activityName: "",
+    satuanKerja: "",
+    year: String(new Date().getFullYear()),
+    landAreaHa: 0,
+    totalBudget: 0,
+  };
+}
+
 /**
- * Parses an Excel Workbook containing official DRT / Poktan RAB documents
+ * Parses an Excel or CSV file containing official DRT / Poktan RAB documents
  */
-export async function parseDrtRabWorkbook(buffer: ArrayBuffer | Buffer): Promise<ParsedDrtRabResult> {
+export async function parseDrtRabWorkbook(bufferInput: ArrayBuffer | Buffer): Promise<ParsedDrtRabResult> {
+  const buf = Buffer.isBuffer(bufferInput) ? bufferInput : Buffer.from(bufferInput);
   const workbook = new ExcelJS.Workbook();
-  // @ts-expect-error - ExcelJS load handles Buffer and ArrayBuffer
-  await workbook.xlsx.load(buffer);
+
+  // Check if buffer is a PKZip file (Excel .xlsx)
+  const isZip = buf.length >= 4 &&
+    buf[0] === 0x50 && buf[1] === 0x4B &&
+    buf[2] === 0x03 && buf[3] === 0x04;
+
+  try {
+    if (isZip) {
+      // @ts-expect-error - ExcelJS load handles Buffer
+      await workbook.xlsx.load(buf);
+    } else {
+      // Plain text CSV stream
+      const text = buf.toString("utf-8");
+      const stream = Readable.from([text]);
+      await workbook.csv.read(stream);
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Gagal membaca file: format file tidak dikenali atau korup (${err?.message || "format error"}).`,
+      metadata: createEmptyMetadata(),
+      workItems: [],
+      materials: [],
+      laborRates: [],
+      divisions: [],
+    };
+  }
 
   if (!workbook.worksheets || workbook.worksheets.length === 0) {
     return {
       success: false,
-      message: "File Excel kosong atau tidak memiliki lembar kerja (worksheet).",
+      message: "File kosong atau tidak memiliki lembar kerja (worksheet).",
       metadata: createEmptyMetadata(),
       workItems: [],
       materials: [],
@@ -114,341 +160,254 @@ export async function parseDrtRabWorkbook(buffer: ArrayBuffer | Buffer): Promise
   const workItems: ParsedRabItem[] = [];
   const materialsMap = new Map<string, ParsedMaterialItem>();
   const laborMap = new Map<string, ParsedLaborRate>();
-  const divisions: Array<{ no: string; title: string; totalPrice: number; weightPercent: number }> = [];
+  const divisionsMap = new Map<string, { no: string; title: string; totalPrice: number; weightPercent: number }>();
 
   // 1. Scan all sheets for project metadata (Poktan, Desa, Kecamatan, Luas, Total)
   for (const sheet of workbook.worksheets) {
     sheet.eachRow((row) => {
-      const rowTexts: string[] = [];
-      row.eachCell((cell) => {
-        rowTexts.push(getCellValueText(cell));
-      });
-      const fullRowText = rowTexts.join(" ");
+      const rowValues = (row.values as any[]) || [];
+      const fullRowText = rowValues.map((v) => (v !== null && v !== undefined ? String(v) : "")).join(" ");
 
-      // Detect Poktan Name
-      if (/Nama\s*Poktan|Poktan\s*:/i.test(fullRowText) && !metadata.poktanName) {
-        const match = fullRowText.match(/(?:Nama\s*Poktan|Poktan)\s*[:=]?\s*(?:Poktan\s*)?([A-Za-z0-9\s]+?)(?:\s*(?:Desa|Kecamatan|Kabupaten|Luas|$))/i);
-        if (match && match[1]) {
-          metadata.poktanName = match[1].trim();
+      // Detect Satuan Kerja & Luas
+      if (/Satuan\s*Kerja/i.test(fullRowText)) {
+        for (let i = 1; i <= 20; i++) {
+          const num = parseNumberId(row.getCell(i).value);
+          if (num > 0 && num < 1000 && !metadata.landAreaHa) {
+            metadata.landAreaHa = num;
+          }
+          const text = getCellValueText(row.getCell(i));
+          if (/Direktorat|Dinas/i.test(text) && !metadata.satuanKerja) {
+            metadata.satuanKerja = text;
+          }
         }
       }
 
-      // Detect Desa
-      if (/Desa|Gampong/i.test(fullRowText) && !metadata.desa) {
-        const match = fullRowText.match(/(?:Desa\/Gampong|Desa|Gampong)\s*[:=]?\s*([A-Za-z0-9\s]+?)(?:\s*(?:Kecamatan|Kabupaten|$))/i);
-        if (match && match[1]) metadata.desa = match[1].trim();
-      }
-
-      // Detect Kecamatan
-      if (/Kecamatan/i.test(fullRowText) && !metadata.kecamatan) {
-        const match = fullRowText.match(/Kecamatan\s*[:=]?\s*([A-Za-z0-9\s]+?)(?:\s*(?:Kabupaten|Kab|$))/i);
-        if (match && match[1]) metadata.kecamatan = match[1].trim();
-      }
-
-      // Detect Kabupaten
-      if (/Kabupaten/i.test(fullRowText) && !metadata.kabupaten) {
-        const match = fullRowText.match(/Kabupaten\s*[:=]?\s*([A-Za-z0-9\s]+?)(?:\s*(?:Provinsi|Tahun|$))/i);
-        if (match && match[1]) metadata.kabupaten = match[1].trim();
-      }
-
-      // Detect Luas Hektar
-      if (/Luas|Luasan/i.test(fullRowText) && metadata.landAreaHa === 0) {
-        const match = fullRowText.match(/(?:Luas\s*Hektar\s*Total|Luas|Luasan)\s*[:=]?\s*([0-9.,]+)\s*Ha/i);
+      // Detect Luas from other cells
+      if (/Luas|Luasan/i.test(fullRowText) && !metadata.landAreaHa) {
+        const match = fullRowText.match(/(\d+[.,]\d+)\s*(?:Ha|Hektar)/i);
         if (match && match[1]) {
           metadata.landAreaHa = parseNumberId(match[1]);
         }
       }
 
-      // Detect Tahun
-      if (/Tahun\s*Anggaran/i.test(fullRowText) && metadata.year === "2026") {
-        const match = fullRowText.match(/Tahun\s*Anggaran\s*[:=]?\s*(\d{4})/i);
-        if (match && match[1]) metadata.year = match[1];
-      }
-
       // Detect Kegiatan
       if (/Kegiatan/i.test(fullRowText) && !metadata.activityName) {
-        const match = fullRowText.match(/Kegiatan\s*[:=]?\s*([A-Za-z0-9\/\s()-]+?)(?:\s*(?:Nama|Lokasi|Tahun|$))/i);
-        if (match && match[1]) metadata.activityName = match[1].trim();
+        for (let i = 1; i <= 15; i++) {
+          const val = getCellValueText(row.getCell(i));
+          if (/DRT|SID|Rehabilitasi|Pembangunan/i.test(val)) {
+            metadata.activityName = val;
+            break;
+          }
+        }
+      }
+
+      // Detect Nama Poktan
+      if (/Nama\s*Poktan|Poktan/i.test(fullRowText) && !metadata.poktanName) {
+        for (let i = 1; i <= 15; i++) {
+          const val = getCellValueText(row.getCell(i));
+          if (/Bintang|Kejora|Poktan|Maju|Tani/i.test(val) && !/Nama\s*Poktan/i.test(val)) {
+            metadata.poktanName = val.startsWith("Poktan ") ? val : `Poktan ${val}`;
+            break;
+          }
+        }
+      }
+
+      // Detect Lokasi
+      if (/Lokasi/i.test(fullRowText) && !metadata.address) {
+        for (let i = 1; i <= 15; i++) {
+          const val = getCellValueText(row.getCell(i));
+          if (/Desa|Kecamatan|Kabupaten/i.test(val)) {
+            metadata.address = val;
+            const matchDesa = val.match(/Desa\s+([A-Za-z\s]+?)\s+Kecamatan/i);
+            if (matchDesa) metadata.desa = matchDesa[1].trim();
+            const matchKec = val.match(/Kecamatan\s+([A-Za-z\s]+?)\s+Kabupaten/i);
+            if (matchKec) metadata.kecamatan = matchKec[1].trim();
+            const matchKab = val.match(/Kabupaten\s+([A-Za-z\s]+)/i);
+            if (matchKab) metadata.kabupaten = matchKab[1].trim();
+            break;
+          }
+        }
+      }
+
+      // Detect Tahun
+      if (/Tahun\s*Anggaran/i.test(fullRowText)) {
+        const matchYear = fullRowText.match(/20\d{2}/);
+        if (matchYear) metadata.year = matchYear[0];
+      }
+
+      // Detect Total Budget / Pagu
+      if (/JUMLAH\s*I\+|Total\s*RAB|PAGU/i.test(fullRowText)) {
+        for (let i = 1; i <= 20; i++) {
+          const num = parseNumberId(row.getCell(i).value);
+          if (num > 1000000) {
+            metadata.totalBudget = Math.max(metadata.totalBudget, num);
+          }
+        }
       }
     });
   }
 
-  // 2. Identify the RAB / Rincian / Rekap sheet
-  let rincianSheet: ExcelJS.Worksheet | null = null;
-  let rekapSheet: ExcelJS.Worksheet | null = null;
-  let upahBahanSheet: ExcelJS.Worksheet | null = null;
-
+  // 2. Identify target sheet containing RAB line items
+  let targetDetailSheet = workbook.worksheets[0];
   for (const sheet of workbook.worksheets) {
     const name = sheet.name.toLowerCase();
     if (name.includes("rincian") || name.includes("rab") || name.includes("detail")) {
-      rincianSheet = sheet;
-    } else if (name.includes("rekap")) {
-      rekapSheet = sheet;
-    } else if (name.includes("upah") || name.includes("bahan") || name.includes("hsp") || name.includes("harga")) {
-      upahBahanSheet = sheet;
+      targetDetailSheet = sheet;
+      break;
     }
   }
 
-  // If no specifically named sheet, use worksheets[0]
-  if (!rincianSheet && !rekapSheet) {
-    rincianSheet = workbook.worksheets[0];
-  }
+  // 3. Parse Detailed Line Items, Divisions, Materials, and Labor Rates
+  let currentDivNo = "";
+  let currentDivTitle = "";
+  let currentItemNo = "";
+  let currentItemTitle = "";
 
-  // 3. Parse Rincian RAB (Detailed Line Items)
-  const targetDetailSheet = rincianSheet || rekapSheet;
-  if (targetDetailSheet) {
-    let currentSection = "I. Pekerjaan Utama";
-    let currentJobCode = "";
-    let inBahanSubgroup = false;
-    let inUpahSubgroup = false;
+  targetDetailSheet.eachRow((row) => {
+    const cell2 = getCellValueText(row.getCell(2));
+    const cell3 = getCellValueText(row.getCell(3));
+    const cell4 = getCellValueText(row.getCell(4));
 
-    targetDetailSheet.eachRow((row) => {
-      const colA = getCellValueText(row.getCell(1));
-      const colB = getCellValueText(row.getCell(2));
-      const colC = getCellValueText(row.getCell(3));
-      const colD = getCellValueText(row.getCell(4));
-      const colE = getCellValueText(row.getCell(5));
-      const colF = getCellValueText(row.getCell(6));
-      const colG = getCellValueText(row.getCell(7));
+    // Check Roman Division Header (e.g. Col 2 is "I", "II", "III", "IV" and Col 3 is "PEKERJAAN ...")
+    const isRomanDiv = /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)$/i.test(cell2) && cell3.length > 2;
+    if (isRomanDiv) {
+      currentDivNo = cell2.toUpperCase();
+      currentDivTitle = cell3;
+      currentItemNo = "";
+      currentItemTitle = "";
 
-      // Combine first two columns to inspect title
-      const label = (colB || colA).trim();
-      if (!label) return;
+      const divTotal = parseNumberId(row.getCell(10).value) || parseNumberId(row.getCell(7).value);
+      divisionsMap.set(currentDivNo, {
+        no: currentDivNo,
+        title: currentDivTitle,
+        totalPrice: divTotal,
+        weightPercent: 0,
+      });
+      return;
+    }
 
-      // Check if this is a Roman numeral Section header (e.g. "I", "II", "III", "IV" or "I. PEKERJAAN ...")
-      const isRomanSection =
-        /^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.?\s+[A-Z\s0-9()]+$/i.test(label) ||
-        (/^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)$/i.test(colA) && colB.length > 2);
+    // Check Sub-item:
+    // Format A: Col 3 is number (1, 2, 3...) and Col 4 is title (e.g. Div I-III)
+    // Format B: Col 2 is number (1, 2, 3...) and Col 3 is title (e.g. Div IV Pekerjaan Lain-lain)
+    let subItemNo = "";
+    let subItemTitle = "";
+    let itemTotal = 0;
+    let itemVol = 0;
+    let itemUnit = "";
+    let itemPrice = 0;
 
-      if (isRomanSection) {
-        currentSection = colA ? `${colA}. ${colB}`.replace(/\.+/, ".").trim() : label;
-        currentJobCode = "";
-        inBahanSubgroup = false;
-        inUpahSubgroup = false;
-        return;
-      }
+    if (/^\d+$/.test(cell3) && cell4.length > 1) {
+      subItemNo = cell3;
+      subItemTitle = cell4;
+      itemTotal = parseNumberId(row.getCell(10).value);
+      itemVol = parseNumberId(row.getCell(7).value);
+      itemUnit = getCellValueText(row.getCell(8)) || "paket";
+      itemPrice = parseNumberId(row.getCell(9).value);
+    } else if (/^\d+$/.test(cell2) && cell3.length > 1 && !/^[a-z]$/i.test(cell2)) {
+      subItemNo = cell2;
+      subItemTitle = cell3;
+      itemVol = parseNumberId(row.getCell(7).value) || 1;
+      itemUnit = getCellValueText(row.getCell(8)) || "Ls";
+      itemPrice = parseNumberId(row.getCell(9).value);
+      itemTotal = parseNumberId(row.getCell(10).value) || (itemVol * itemPrice);
+    }
 
-      // Check sub-group markers (I BIAYA UPAH / II BIAYA BAHAN)
-      if (/BIAYA\s*UPAH/i.test(label)) {
-        inUpahSubgroup = true;
-        inBahanSubgroup = false;
-        return;
-      }
-      if (/BIAYA\s*BAHAN/i.test(label)) {
-        inBahanSubgroup = true;
-        inUpahSubgroup = false;
-        return;
-      }
+    if (subItemNo && subItemTitle) {
+      currentItemNo = subItemNo;
+      currentItemTitle = subItemTitle;
 
-      // Check Subtotal or Total row
-      if (/Subtotal|Jumlah\s*Total|Total\s*RAB|JUMLAH\s*I\+/i.test(label) || /Total\s*RAB/i.test(colA)) {
-        const totalVal = parseNumberId(colF || colE || colD || colC);
-        if (totalVal > 0 && (/Total\s*RAB/i.test(label) || /JUMLAH/i.test(label))) {
-          metadata.totalBudget = totalVal;
-        }
-        return;
-      }
-
-      // Check if row is a Main Sub-item (starts with number 1, 2, 3...)
-      const isSubItem = /^\d+$/.test(colA.trim()) && colB.trim().length > 1;
-
-      if (isSubItem) {
-        currentJobCode = `${currentSection.split(".")[0] || "I"}.${colA.trim()}`;
-        inBahanSubgroup = false;
-        inUpahSubgroup = false;
-
-        const vol = parseNumberId(colC);
-        const sat = (colD || "paket").trim();
-        const harga = parseNumberId(colE);
-        const total = parseNumberId(colF) || (vol > 0 && harga > 0 ? vol * harga : parseNumberId(colD));
+      // Only import active/funded items (totalPrice > 0 or volume > 0)
+      if (itemTotal > 0 || (itemVol > 0 && itemPrice > 0)) {
+        const finalTotal = itemTotal > 0 ? itemTotal : (itemVol * itemPrice);
+        const finalVol = itemVol > 0 ? itemVol : 1;
+        const finalPrice = itemPrice > 0 ? itemPrice : (finalTotal / finalVol);
 
         workItems.push({
-          section: currentSection,
-          code: currentJobCode,
-          title: colB.trim(),
-          volume: vol > 0 ? vol : 1,
-          unit: sat || "paket",
-          unitPrice: harga > 0 ? harga : (vol > 0 ? Math.round(total / vol) : total),
-          totalPrice: total > 0 ? total : harga,
-          rapPrice: 0, // Explicitly omitted/0 per user instruction
+          section: currentDivNo ? `${currentDivNo}. ${currentDivTitle}` : "Pekerjaan",
+          code: currentDivNo ? `${currentDivNo}.${subItemNo}` : `ITM-${subItemNo}`,
+          title: subItemTitle,
+          volume: finalVol,
+          unit: itemUnit || "paket",
+          unitPrice: Math.round(finalPrice),
+          totalPrice: Math.round(finalTotal),
+          rapPrice: 0, // Explicit requirement: "kecuali harga RAP"
         });
-        return;
       }
+      return;
+    }
 
-      // Check if row is a breakdown item under Bahan or Upah (e.g. "a. Semen 40 kg" or "b. Pasir")
-      const isLetterSubitem = /^[a-z]\.?$/i.test(colA.trim()) || /^[a-z]\.\s+[A-Za-z]/i.test(label);
-      if (isLetterSubitem) {
-        const itemTitle = (colB || label.replace(/^[a-z]\.?\s*/i, "")).trim();
-        const vol = parseNumberId(colC || colD);
-        const sat = (colD && isNaN(Number(colD)) ? colD : colE && isNaN(Number(colE)) ? colE : "unit").trim();
-        const harga = parseNumberId(colE || colF);
-        const total = parseNumberId(colF || colG) || vol * harga;
+    // Check Breakdown line (Labor / Material / Alat)
+    // Col 3 is "a", "b", "c", Col 4 is material/labor name
+    if (/^[a-z]$/i.test(cell3) && cell4.length > 1) {
+      const vol = parseNumberId(row.getCell(7).value);
+      const unit = getCellValueText(row.getCell(8)) || "";
+      const unitPrice = parseNumberId(row.getCell(9).value);
+      const total = parseNumberId(row.getCell(10).value);
 
-        if (inBahanSubgroup || /Semen|Pasir|Batu|Kayu|Paku|Besi|Pipa|Kerikil|Minyak/i.test(itemTitle)) {
-          const existing = materialsMap.get(itemTitle.toLowerCase());
+      if (total > 0 || vol > 0) {
+        const isLabor = /OH|OJ|Mandor|Pekerja|Tukang/i.test(unit) || /Mandor|Pekerja|Tukang/i.test(cell4);
+        if (isLabor) {
+          const key = `${cell4}_${unit}`.toLowerCase();
+          const existing = laborMap.get(key);
+          if (existing) {
+            existing.daysTotal = (existing.daysTotal || 0) + vol;
+            existing.total = (existing.total || 0) + total;
+          } else {
+            laborMap.set(key, {
+              role: cell4,
+              unit: unit || "OH",
+              rate: unitPrice,
+              daysTotal: vol,
+              total,
+            });
+          }
+        } else {
+          const key = `${cell4}_${unit}`.toLowerCase();
+          const existing = materialsMap.get(key);
           if (existing) {
             existing.quantity += vol;
             existing.totalPrice = (existing.totalPrice || 0) + total;
           } else {
-            materialsMap.set(itemTitle.toLowerCase(), {
-              name: itemTitle,
+            materialsMap.set(key, {
+              name: cell4,
               quantity: vol,
-              unit: sat,
-              unitPrice: harga,
+              unit: unit || "unit",
+              unitPrice,
               totalPrice: total,
             });
           }
-        } else if (inUpahSubgroup || /Pekerja|Tukang|Mandor|Operator/i.test(itemTitle)) {
-          const roleKey = itemTitle.toLowerCase();
-          const existing = laborMap.get(roleKey);
-          if (existing) {
-            existing.daysTotal = (existing.daysTotal || 0) + vol;
-          } else {
-            laborMap.set(roleKey, {
-              role: itemTitle,
-              unit: sat || "OH",
-              rate: harga,
-              daysTotal: vol,
-            });
-          }
         }
       }
-    });
-  }
-
-  // 4. Parse Rekapitulasi Sheet if available
-  if (rekapSheet) {
-    rekapSheet.eachRow((row) => {
-      const c1 = getCellValueText(row.getCell(1));
-      const c2 = getCellValueText(row.getCell(2));
-      const c3 = getCellValueText(row.getCell(3));
-      const c4 = getCellValueText(row.getCell(4));
-
-      if (/^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.?$/i.test(c1.trim()) && c2) {
-        const price = parseNumberId(c3);
-        const weight = parseNumberId(c4);
-        divisions.push({
-          no: c1.trim(),
-          title: c2.trim(),
-          totalPrice: price,
-          weightPercent: weight,
-        });
-      } else if (/JUMLAH|TOTAL/i.test(c2) || /JUMLAH/i.test(c1)) {
-        const sumVal = parseNumberId(c3 || c4);
-        if (sumVal > 0) metadata.totalBudget = sumVal;
-      }
-    });
-  }
-
-  // 5. Parse Daftar Upah, Bahan dan Peralatan sheet if available
-  if (upahBahanSheet) {
-    let mode: "UPAH" | "BAHAN" | "LAIN" = "UPAH";
-    upahBahanSheet.eachRow((row) => {
-      const no = getCellValueText(row.getCell(1));
-      const uraian = getCellValueText(row.getCell(2));
-      const sat = getCellValueText(row.getCell(3));
-      const harga = parseNumberId(getCellValueText(row.getCell(4)));
-
-      if (/DAFTAR TENAGA KERJA/i.test(uraian) || no === "A") {
-        mode = "UPAH";
-        return;
-      }
-      if (/DAFTAR BAHAN\/MATERIAL/i.test(uraian) || no === "B") {
-        mode = "BAHAN";
-        return;
-      }
-      if (/LAIN-LAIN/i.test(uraian) || no === "C") {
-        mode = "LAIN";
-        return;
-      }
-
-      if (uraian && harga > 0) {
-        if (mode === "BAHAN") {
-          if (!materialsMap.has(uraian.toLowerCase())) {
-            materialsMap.set(uraian.toLowerCase(), {
-              name: uraian,
-              quantity: 0,
-              unit: sat,
-              unitPrice: harga,
-            });
-          }
-        } else if (mode === "UPAH") {
-          if (!laborMap.has(uraian.toLowerCase())) {
-            laborMap.set(uraian.toLowerCase(), {
-              role: uraian,
-              unit: sat,
-              rate: harga,
-            });
-          }
-        }
-      }
-    });
-  }
-
-  // Fallback: If workItems is empty but divisions exist, create workItems from divisions
-  if (workItems.length === 0 && divisions.length > 0) {
-    for (const d of divisions) {
-      workItems.push({
-        section: `${d.no}. ${d.title}`,
-        code: `${d.no}.1`,
-        title: d.title,
-        volume: 1,
-        unit: "paket",
-        unitPrice: d.totalPrice,
-        totalPrice: d.totalPrice,
-        rapPrice: 0,
-      });
     }
+  });
+
+  // Calculate sum of active workItems if metadata.totalBudget wasn't parsed
+  const sumWorkItems = workItems.reduce((acc, it) => acc + it.totalPrice, 0);
+  if (metadata.totalBudget === 0 && sumWorkItems > 0) {
+    metadata.totalBudget = sumWorkItems;
   }
 
-  // Derive calculated total budget if not explicitly set
-  if (metadata.totalBudget === 0) {
-    metadata.totalBudget = workItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  }
+  // Calculate division weights
+  const divisions = Array.from(divisionsMap.values()).map((div) => ({
+    ...div,
+    weightPercent: metadata.totalBudget > 0 ? (div.totalPrice / metadata.totalBudget) * 100 : 0,
+  }));
 
-  // Assemble full address and project title
-  const locationParts = [metadata.desa, metadata.kecamatan, metadata.kabupaten, metadata.provinsi].filter(Boolean);
-  metadata.address = locationParts.join(", ") || "Aceh Tengah";
-
+  // Build clean title if not present
   if (!metadata.title) {
-    if (metadata.poktanName) {
-      metadata.title = `Pembangunan DRT ${metadata.poktanName} (${metadata.address || "Aceh Tengah"})`;
-    } else {
-      metadata.title = `Pembangunan DRT Irigasi Pertanian (${metadata.year})`;
-    }
-  }
-
-  if (!metadata.code) {
-    metadata.code = `PRJ-${metadata.year}-${Math.floor(100 + Math.random() * 900)}`;
+    const loc = metadata.desa || metadata.kecamatan || metadata.address || "Aceh";
+    metadata.title = `Pembangunan ${metadata.activityName || "DRT"} ${metadata.poktanName || "Poktan"} (${loc})`;
   }
 
   return {
-    success: workItems.length > 0,
+    success: workItems.length > 0 || metadata.totalBudget > 0,
     message: workItems.length > 0
-      ? `Berhasil membaca ${workItems.length} item pekerjaan RAB dan ${materialsMap.size} material.`
-      : "Tidak ditemukan baris item pekerjaan dalam file Excel. Pastikan format tabel memiliki kolom Uraian, Volume, Satuan, dan Harga.",
+      ? `Berhasil membaca ${workItems.length} item pekerjaan RAB!`
+      : "Tidak ditemukan item pekerjaan dengan anggaran valid di lembar kerja.",
     metadata,
     workItems,
     materials: Array.from(materialsMap.values()),
     laborRates: Array.from(laborMap.values()),
     divisions,
-  };
-}
-
-function createEmptyMetadata() {
-  return {
-    code: "",
-    title: "",
-    poktanName: "",
-    desa: "",
-    kecamatan: "",
-    kabupaten: "",
-    provinsi: "",
-    address: "",
-    activityName: "",
-    satuanKerja: "",
-    year: "2026",
-    landAreaHa: 0,
-    totalBudget: 0,
   };
 }
