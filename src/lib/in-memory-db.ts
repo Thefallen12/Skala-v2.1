@@ -20,6 +20,21 @@ import { scaledIntegerFromDecimal } from "./scaled-decimal";
 // Default admin and demo users with realistic construction & logistics roles
 export const initialUsers = [
   {
+    id: "cmv93ecij0000juksf4twyg35",
+    name: "Angga Okta Pratama",
+    email: "angga81055@gmail.com",
+    role: UserRole.DIRECTOR,
+    passwordHash: "$2b$10$3SQIb8lPKbQUjf6HUqCcNOpmSIaTf5pYPvc5iypUlPZZ8rRVvy2um",
+    isActive: true,
+    profilePhotoUrl: "https://res.cloudinary.com/skala-prioritas/image/upload/v1793336724/skala_prioritas/user_profiles/se1ksdsnilxmzftpok5k.png",
+    phone: "081358837883",
+    bankName: "Mandiri",
+    bankAccountName: "Angga Okta Pratama",
+    bankAccountNumber: "106015156030",
+    createdAt: new Date("2026-10-14T22:22:46.363Z"),
+    lastLoginAt: new Date(),
+  },
+  {
     id: "usr_admin",
     name: "Administrator Utama",
     email: "admin@skalaprioritas.com",

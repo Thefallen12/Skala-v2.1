@@ -211,6 +211,7 @@ export const Login = () => {
                         autoComplete='email'
                         placeholder='nama@skalaprioritas.com atau email Anda'
                         disabled={form.formState.isSubmitting || isAuthenticating}
+                        style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
                         className='h-11 rounded-xl border border-slate-300 bg-white pl-10 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:text-slate-900 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400'
                         {...field}
                       />
@@ -251,6 +252,7 @@ export const Login = () => {
                         autoComplete='current-password'
                         placeholder='Masukkan kata sandi'
                         disabled={form.formState.isSubmitting || isAuthenticating}
+                        style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
                         className='h-11 rounded-xl border border-slate-300 bg-white pl-10 pr-10 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus-visible:border-[#F26522] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:text-slate-900 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400'
                         {...field}
                       />
