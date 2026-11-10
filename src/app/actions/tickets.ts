@@ -5040,10 +5040,7 @@ export async function processFinancePayment(
           where: { id: ticketId },
           data: {
             ...(order || isShippingCostRequest
-              ? ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
-                ticket.status === TicketStatus.PROCESSED_FINANCE
-                ? { status: TicketStatus.PROCESSED_LOGISTIC }
-                : {}
+              ? { status: TicketStatus.PROCESSED_LOGISTIC }
               : { status: TicketStatus.COMPLETED }),
             transferReceiptUrl: receiptUrl,
             transferDestination: effectiveTransferDestination,

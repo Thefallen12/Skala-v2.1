@@ -648,6 +648,80 @@ export async function deleteProject(
   }
 }
 
+export async function duplicateProject(
+  projectId: string,
+): Promise<ProjectMutationResult & { newProjectId?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk menduplikasi proyek." };
+  }
+  if (!projectManagerRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan menduplikasi proyek." };
+  }
+  try {
+    const source = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      include: {
+        workPoints: true,
+      },
+    });
+    if (!source) {
+      return { success: false, message: "Proyek tidak ditemukan." };
+    }
+    const year = new Date().getFullYear();
+    const count = await prisma.project.count();
+    const nextCode = `PRJ-${year}-${String(count + 1).padStart(3, "0")}`;
+    const duplicated = await prisma.project.create({
+      data: {
+        code: nextCode,
+        name: `${source.name} (Salinan)`,
+        title: `${source.title} (Salinan)`,
+        kelompokTani: source.kelompokTani,
+        address: source.address,
+        jenisPekerjaan: source.jenisPekerjaan,
+        location: source.location,
+        status: ProjectStatus.PENDING_SETUP,
+        progress: 0,
+        pagu: source.pagu,
+        budget: source.budget,
+        priority: source.priority,
+        vendor: source.vendor,
+        clientName: source.clientName,
+        fieldPicId: source.fieldPicId,
+        startDate: source.startDate,
+        endDate: source.endDate,
+        workPoints: {
+          create: source.workPoints.map((pt) => ({
+            title: pt.title,
+            location: pt.location,
+            plannedStartDate: pt.plannedStartDate,
+            targetDate: pt.targetDate,
+            proposedVolume: pt.proposedVolume,
+            proposedUnit: pt.proposedUnit,
+            proposedUnitPrice: pt.proposedUnitPrice,
+            proposedTotalWage: pt.proposedTotalWage,
+            proposedById: session.user.id,
+            progress: 0,
+          })),
+        },
+      },
+      select: { id: true, code: true },
+    });
+    revalidatePath("/apps/projects");
+    return {
+      success: true,
+      message: `Proyek berhasil diduplikasi menjadi ${duplicated.code}.`,
+      newProjectId: duplicated.id,
+    };
+  } catch (error) {
+    console.error("Duplicate project failed:", error);
+    return {
+      success: false,
+      message: "Gagal menduplikasi proyek. Silakan coba kembali.",
+    };
+  }
+}
+
 const workPointInputSchema = z
   .object({
     title: z.string().trim().min(1, "Nama tugas/titik wajib diisi.").max(180),

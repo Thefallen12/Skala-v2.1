@@ -115,6 +115,7 @@ import {
   Upload,
   Pencil,
   Users,
+  ExternalLink,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -1397,6 +1398,14 @@ export default function ProjectWorkstationMaster({
                               <Eye className="size-3.5" aria-hidden="true" />
                               <span>Detail</span>
                             </Button>
+                            <Link
+                              href={`/apps/projects/${project.id}`}
+                              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-xs font-semibold text-foreground hover:bg-accent"
+                              title={`Buka Halaman Detail Proyek ${project.title}`}
+                            >
+                              <ExternalLink className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                              <span>Halaman</span>
+                            </Link>
                             <Button
                               type="button"
                               size="sm"
@@ -1568,6 +1577,13 @@ export default function ProjectWorkstationMaster({
                   <MapPinned className="size-4 text-sky-500" aria-hidden="true" />
                   <span>Buka Peta &amp; Survei</span>
                 </Button>
+                <Link
+                  href={`/apps/projects/${activeProject.id}`}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                  <span>Buka Halaman Detail</span>
+                </Link>
                 {isProjectManager && (
                   <Button
                     type="button"
