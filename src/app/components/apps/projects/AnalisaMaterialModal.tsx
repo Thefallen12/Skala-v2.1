@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Trash2, Plus, HelpCircle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,14 +25,36 @@ interface AnalisaMaterialModalProps {
 }
 
 const DEFAULT_MATERIALS = [
-  { name: "Cat tembok 25 kg (contoh)", unit: "pail" },
-  { name: "Semen Portland 50 kg", unit: "sak" },
+  { name: "Batu Belah/Batu Kali/Batu Gunung", unit: "m3" },
   { name: "Pasir Pasang", unit: "m3" },
-  { name: "Batu Split 2/3", unit: "m3" },
-  { name: "Keramik 60x60 Polish", unit: "dus" },
+  { name: "Pasir Beton", unit: "m3" },
+  { name: "Semen 40 kg", unit: "Zak" },
+  { name: "Semen Portland 50 kg", unit: "sak" },
+  { name: "Kerikil / Batu Split 2/3", unit: "m3" },
+  { name: "Besi Beton Polos", unit: "kg" },
   { name: "Besi Beton Ulir 13mm", unit: "btg" },
+  { name: "Kawat Ikat", unit: "kg" },
+  { name: "Papan Kayu Kelas III", unit: "m3" },
+  { name: "Kayu Kelas III", unit: "m3" },
+  { name: "Multipleks 12 mm", unit: "Lembar" },
+  { name: "Paku Kayu", unit: "kg" },
+  { name: "Minyak Bekisting", unit: "Liter" },
+  { name: "Pipa Besi 12\"", unit: "m" },
   { name: "Pipa PVC AW 3/4 inch", unit: "btg" },
-  { name: "Kabel NYM 2x1.5mm", unit: "roll" },
+  { name: "Bar Screen (Saringan Sedimen)", unit: "Unit" },
+  { name: "Helm Safety", unit: "Unit" },
+  { name: "Sepatu safety boot", unit: "Unit" },
+  { name: "Kotak P3K", unit: "set" },
+  { name: "Prasasti", unit: "bh" },
+  { name: "Pekerja", unit: "OH" },
+  { name: "Tukang Batu", unit: "OH" },
+  { name: "Tukang Kayu", unit: "OH" },
+  { name: "Tukang Besi", unit: "OH" },
+  { name: "Kepala Tukang", unit: "OH" },
+  { name: "Mandor", unit: "OH" },
+  { name: "Molen", unit: "Hari" },
+  { name: "Keramik 60x60 Polish", unit: "dus" },
+  { name: "Cat tembok 25 kg", unit: "pail" },
 ];
 
 export default function AnalisaMaterialModal({
@@ -50,13 +72,31 @@ export default function AnalisaMaterialModal({
     return [
       {
         id: "1",
-        materialName: availableMaterials[0]?.name || "Cat tembok 25 kg (contoh)",
-        unit: availableMaterials[0]?.unit || "pail",
-        coefficient: 1.75,
-        wastePercent: 2,
+        materialName: availableMaterials[0]?.name || "Pekerja",
+        unit: availableMaterials[0]?.unit || "OH",
+        coefficient: 1,
+        wastePercent: 0,
       },
     ];
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialMaterials && initialMaterials.length > 0) {
+        setMaterials(initialMaterials);
+      } else {
+        setMaterials([
+          {
+            id: "1",
+            materialName: availableMaterials[0]?.name || "Pekerja",
+            unit: availableMaterials[0]?.unit || "OH",
+            coefficient: 1,
+            wastePercent: 0,
+          },
+        ]);
+      }
+    }
+  }, [initialMaterials, itemTitle, isOpen, availableMaterials]);
 
   const [templateName, setTemplateName] = useState("");
   const [savedTemplate, setSavedTemplate] = useState(false);

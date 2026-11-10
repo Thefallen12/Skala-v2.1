@@ -108,6 +108,7 @@ export default async function ProjectsWorkstationPage({
           progress: true,
           proposedVolume: true,
           proposedUnit: true,
+          proposedUnitPrice: true,
           completedVolume: true,
           proposedTotalWage: true,
           approvedTotalWage: true,
@@ -360,6 +361,10 @@ export default async function ProjectsWorkstationPage({
           ? decimalStringFromScaledInteger(point.proposedVolume)
           : null,
       proposedUnit: point.proposedUnit,
+      proposedUnitPrice:
+        point.proposedUnitPrice !== null
+          ? decimalStringFromScaledInteger(point.proposedUnitPrice)
+          : null,
       completedVolume: point.completedVolume,
       proposedTotalWage: decimalStringFromScaledInteger(
         point.proposedTotalWage,

@@ -1671,9 +1671,14 @@ export async function saveProjectRab(
 
       for (const item of input.items) {
         const fullTitle = item.code ? (item.code + " " + item.title).trim() : item.title.trim();
-        const proposedTotalWage = BigInt(Math.round(item.volume * item.unitPrice * 100));
-        const proposedVolume = BigInt(Math.round(item.volume * 100));
-        const proposedUnitPrice = BigInt(Math.round(item.unitPrice * 100));
+        const itemVol = item.volume > 0 ? item.volume : 1;
+        const total = (item as any).totalPrice && (item as any).totalPrice > 0
+          ? (item as any).totalPrice
+          : itemVol * item.unitPrice;
+        const proposedTotalWage = scaledIntegerFromDecimal(total);
+        const proposedVolume = scaledIntegerFromDecimal(itemVol);
+        const unitPriceVal = item.unitPrice > 0 ? item.unitPrice : Math.round(total / itemVol);
+        const proposedUnitPrice = scaledIntegerFromDecimal(unitPriceVal);
 
         if (item.id) {
           const existing = await tx.projectWorkPoint.findUnique({
@@ -2176,7 +2181,10 @@ export async function importDrtRabProject(input: {
             ? { kelompokTani: parsed.metadata.poktanName }
             : {}),
           ...(parsed.metadata.landAreaHa > 0
-            ? { landArea: BigInt(Math.round(parsed.metadata.landAreaHa * 100)) }
+            ? { landArea: scaledIntegerFromDecimal(parsed.metadata.landAreaHa) }
+            : {}),
+          ...(parsed.metadata.totalBudget > 0
+            ? { pagu: scaledIntegerFromDecimal(parsed.metadata.totalBudget) }
             : {}),
         },
       });
@@ -2218,8 +2226,8 @@ export async function importDrtRabProject(input: {
           address: parsed.metadata.address || "Aceh Tengah",
           location: parsed.metadata.address || "Aceh Tengah",
           jenisPekerjaan: parsed.metadata.activityName || "DRT/SID Rehabilitasi Lahan Sawah",
-          landArea: parsed.metadata.landAreaHa > 0 ? BigInt(Math.round(parsed.metadata.landAreaHa * 100)) : null,
-          pagu: BigInt(Math.round(parsed.metadata.totalBudget * 100)),
+          landArea: parsed.metadata.landAreaHa > 0 ? scaledIntegerFromDecimal(parsed.metadata.landAreaHa) : null,
+          pagu: scaledIntegerFromDecimal(parsed.metadata.totalBudget),
           budget: null, // "kecuali harga RAP"
           priority: ProjectPriority.MEDIUM,
           status: ProjectStatus.RUNNING,

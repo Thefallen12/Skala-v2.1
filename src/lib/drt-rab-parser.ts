@@ -1,6 +1,16 @@
 import ExcelJS from "exceljs";
 import { Readable } from "stream";
 
+export interface MaterialAnalysisItem {
+  id: string;
+  materialName: string;
+  unit: string;
+  coefficient: number;
+  wastePercent: number; // susut %
+  unitPrice?: number;
+  totalPrice?: number;
+}
+
 export interface ParsedRabItem {
   section: string;
   code: string;
@@ -10,6 +20,7 @@ export interface ParsedRabItem {
   unitPrice: number;
   totalPrice: number;
   rapPrice: number; // Set to 0 or estimated; user explicitly asked: "kecuali harga RAP"
+  analysisItems?: MaterialAnalysisItem[];
 }
 
 export interface ParsedMaterialItem {
@@ -63,6 +74,14 @@ export interface ParsedDrtRabResult {
 export function parseNumberId(val: unknown): number {
   if (typeof val === "number") return isNaN(val) ? 0 : val;
   if (!val) return 0;
+  if (typeof val === "object" && val !== null) {
+    if ("result" in val && val.result !== undefined && val.result !== null) {
+      return parseNumberId(val.result);
+    }
+    if ("text" in val && typeof (val as any).text === "string") {
+      return parseNumberId((val as any).text);
+    }
+  }
   const str = String(val).trim();
   if (!str) return 0;
 
@@ -262,6 +281,7 @@ export async function parseDrtRabWorkbook(bufferInput: ArrayBuffer | Buffer): Pr
   let currentDivTitle = "";
   let currentItemNo = "";
   let currentItemTitle = "";
+  let currentWorkItem: ParsedRabItem | null = null;
 
   targetDetailSheet.eachRow((row) => {
     const cell2 = getCellValueText(row.getCell(2));
@@ -275,6 +295,7 @@ export async function parseDrtRabWorkbook(bufferInput: ArrayBuffer | Buffer): Pr
       currentDivTitle = cell3;
       currentItemNo = "";
       currentItemTitle = "";
+      currentWorkItem = null;
 
       const divTotal = parseNumberId(row.getCell(10).value) || parseNumberId(row.getCell(7).value);
       divisionsMap.set(currentDivNo, {
@@ -319,19 +340,38 @@ export async function parseDrtRabWorkbook(bufferInput: ArrayBuffer | Buffer): Pr
       // Only import active/funded items (totalPrice > 0 or volume > 0)
       if (itemTotal > 0 || (itemVol > 0 && itemPrice > 0)) {
         const finalTotal = itemTotal > 0 ? itemTotal : (itemVol * itemPrice);
-        const finalVol = itemVol > 0 ? itemVol : 1;
-        const finalPrice = itemPrice > 0 ? itemPrice : (finalTotal / finalVol);
+        let finalVol = itemVol > 0 ? itemVol : 1;
+        let finalUnit = itemUnit || "paket";
 
-        workItems.push({
+        // If volume was 1 or missing, detect explicit volume from title or division title
+        // e.g. "PEKERJAAN GALIAN SEDIMEN (131 METER)" -> 131 m
+        if (finalVol === 1) {
+          const titleVolMatch = (subItemTitle + " " + currentDivTitle).match(/\((\d+(?:[.,]\d+)?)\s*(METER|M3|M2|M|UNIT|BH|LS|HA|ZAK|KG|TITIK)\)/i);
+          if (titleVolMatch && titleVolMatch[1]) {
+            finalVol = parseNumberId(titleVolMatch[1]);
+            const rawUnit = titleVolMatch[2].toLowerCase();
+            finalUnit = rawUnit === "meter" ? "m" : rawUnit;
+          } else if (itemPrice > 0 && finalTotal > itemPrice) {
+            finalVol = Math.round(finalTotal / itemPrice);
+          }
+        }
+
+        const finalPrice = itemPrice > 0 ? itemPrice : (finalVol > 0 ? Math.round(finalTotal / finalVol) : finalTotal);
+
+        const newWorkItem: ParsedRabItem = {
           section: currentDivNo ? `${currentDivNo}. ${currentDivTitle}` : "Pekerjaan",
           code: currentDivNo ? `${currentDivNo}.${subItemNo}` : `ITM-${subItemNo}`,
           title: subItemTitle,
           volume: finalVol,
-          unit: itemUnit || "paket",
+          unit: finalUnit,
           unitPrice: Math.round(finalPrice),
           totalPrice: Math.round(finalTotal),
           rapPrice: 0, // Explicit requirement: "kecuali harga RAP"
-        });
+          analysisItems: [],
+        };
+
+        workItems.push(newWorkItem);
+        currentWorkItem = newWorkItem;
       }
       return;
     }
@@ -345,6 +385,23 @@ export async function parseDrtRabWorkbook(bufferInput: ArrayBuffer | Buffer): Pr
       const total = parseNumberId(row.getCell(10).value);
 
       if (total > 0 || vol > 0) {
+        // Attach to current work item analysis
+        if (currentWorkItem) {
+          const itemVol = currentWorkItem.volume > 0 ? currentWorkItem.volume : 1;
+          const volVal = vol > 0 ? vol : (total > 0 && unitPrice > 0 ? total / unitPrice : 1);
+          const coeff = parseFloat((volVal / itemVol).toFixed(4));
+          currentWorkItem.analysisItems = currentWorkItem.analysisItems || [];
+          currentWorkItem.analysisItems.push({
+            id: `mat_${currentWorkItem.code}_${currentWorkItem.analysisItems.length + 1}`,
+            materialName: cell4,
+            unit: unit || "unit",
+            coefficient: coeff > 0 ? coeff : 1,
+            wastePercent: 0,
+            unitPrice: unitPrice > 0 ? unitPrice : undefined,
+            totalPrice: total > 0 ? total : undefined,
+          });
+        }
+
         const isLabor = /OH|OJ|Mandor|Pekerja|Tukang/i.test(unit) || /Mandor|Pekerja|Tukang/i.test(cell4);
         if (isLabor) {
           const key = `${cell4}_${unit}`.toLowerCase();
@@ -410,4 +467,334 @@ export async function parseDrtRabWorkbook(bufferInput: ArrayBuffer | Buffer): Pr
     laborRates: Array.from(laborMap.values()),
     divisions,
   };
+}
+
+/**
+ * Standard Indonesian DRT & SNI analysis template generator.
+ * Accurately auto-populates labor and material breakdown according to work item title.
+ */
+export function getStandardAnalysisForWorkItem(
+  title: string,
+  volume: number = 1,
+  unit: string = "m"
+): MaterialAnalysisItem[] {
+  const t = title.toLowerCase();
+
+  // 1. Galian Tanah / Sedimen
+  if (t.includes("galian") || t.includes("sedimen") || t.includes("lumpur")) {
+    return [
+      {
+        id: "mat_gal_1",
+        materialName: "Pekerja",
+        unit: "OH",
+        coefficient: 0.3893, // 51 OH / 131 m
+        wastePercent: 0,
+      },
+      {
+        id: "mat_gal_2",
+        materialName: "Mandor",
+        unit: "OH",
+        coefficient: 0.0229, // 3 OH / 131 m
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 2. Pasangan Batu (Campuran 1:4)
+  if (t.includes("pasangan batu") || t.includes("pas. batu") || t.includes("batu kali") || t.includes("batu belah")) {
+    return [
+      {
+        id: "mat_batu_1",
+        materialName: "Batu Belah/Batu Kali/Batu Gunung",
+        unit: "m3",
+        coefficient: 1.0,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_batu_2",
+        materialName: "Pasir Pasang",
+        unit: "m3",
+        coefficient: 0.4038,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_batu_3",
+        materialName: "Semen 40 kg",
+        unit: "Zak",
+        coefficient: 4.2043,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_batu_4",
+        materialName: "Pekerja",
+        unit: "OH",
+        coefficient: 1.247,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_batu_5",
+        materialName: "Tukang Batu",
+        unit: "OH",
+        coefficient: 0.4157,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_batu_6",
+        materialName: "Mandor",
+        unit: "OH",
+        coefficient: 0.1306,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 3. Plesteran (1:3 or 1:4 tebal 15mm)
+  if (t.includes("plesteran") || t.includes("acian")) {
+    return [
+      {
+        id: "mat_ples_1",
+        materialName: "Semen 40 kg",
+        unit: "Zak",
+        coefficient: 0.267,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_ples_2",
+        materialName: "Pasir Pasang",
+        unit: "m3",
+        coefficient: 0.024,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_ples_3",
+        materialName: "Pekerja",
+        unit: "OH",
+        coefficient: 0.107,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_ples_4",
+        materialName: "Tukang Batu",
+        unit: "OH",
+        coefficient: 0.053,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_ples_5",
+        materialName: "Mandor",
+        unit: "OH",
+        coefficient: 0.011,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 4. Beton / Rabat / Pondasi
+  if (t.includes("beton") || t.includes("rabat") || t.includes("cor")) {
+    return [
+      {
+        id: "mat_beton_1",
+        materialName: "Semen 40 Kg",
+        unit: "Zak",
+        coefficient: 8.15,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_beton_2",
+        materialName: "Pasir beton",
+        unit: "m3",
+        coefficient: 0.54,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_beton_3",
+        materialName: "Kerikil",
+        unit: "m3",
+        coefficient: 0.76,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_beton_4",
+        materialName: "Molen",
+        unit: "Hari",
+        coefficient: 0.1,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_beton_5",
+        materialName: "Pekerja",
+        unit: "OH",
+        coefficient: 1.65,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_beton_6",
+        materialName: "Tukang Batu",
+        unit: "OH",
+        coefficient: 0.275,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_beton_7",
+        materialName: "Mandor",
+        unit: "OH",
+        coefficient: 0.083,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 5. Bekisting
+  if (t.includes("bekisiting") || t.includes("bekisting") || t.includes("cetakan")) {
+    return [
+      {
+        id: "mat_bek_1",
+        materialName: "Multipleks 12 mm",
+        unit: "Lembar",
+        coefficient: 0.35,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_bek_2",
+        materialName: "Kayu Kelas III",
+        unit: "m3",
+        coefficient: 0.04,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_bek_3",
+        materialName: "Paku Kayu",
+        unit: "kg",
+        coefficient: 0.4,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_bek_4",
+        materialName: "Minyak Bekisting",
+        unit: "Liter",
+        coefficient: 0.2,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_bek_5",
+        materialName: "Pekerja",
+        unit: "OH",
+        coefficient: 0.52,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_bek_6",
+        materialName: "Tukang Kayu",
+        unit: "OH",
+        coefficient: 0.26,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_bek_7",
+        materialName: "Mandor",
+        unit: "OH",
+        coefficient: 0.026,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 6. Pembesian / Besi Beton
+  if (t.includes("pembesian") || t.includes("besi") || t.includes("tulangan")) {
+    return [
+      {
+        id: "mat_besi_1",
+        materialName: "Besi Beton Polos",
+        unit: "kg",
+        coefficient: 1.05,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_besi_2",
+        materialName: "Kawat Ikat",
+        unit: "kg",
+        coefficient: 0.015,
+        wastePercent: 2,
+      },
+      {
+        id: "mat_besi_3",
+        materialName: "Pekerja",
+        unit: "OH",
+        coefficient: 0.007,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_besi_4",
+        materialName: "Tukang Besi",
+        unit: "OH",
+        coefficient: 0.007,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_besi_5",
+        materialName: "Mandor",
+        unit: "OH",
+        coefficient: 0.0004,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 7. Pengadaan Pipa & Perlengkapan
+  if (t.includes("pipa") || t.includes("screen") || t.includes("saringan")) {
+    return [
+      {
+        id: "mat_pipa_1",
+        materialName: "Pipa Besi 12\"",
+        unit: "m",
+        coefficient: 1.0,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_pipa_2",
+        materialName: "Bar Screen (Saringan Sedimen)",
+        unit: "Unit",
+        coefficient: 0.083,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // 8. Perlengkapan K3 / APD
+  if (t.includes("k3") || t.includes("helm") || t.includes("sepatu") || t.includes("safety")) {
+    return [
+      {
+        id: "mat_k3_1",
+        materialName: "Helm Safety",
+        unit: "Unit",
+        coefficient: 1.0,
+        wastePercent: 0,
+      },
+      {
+        id: "mat_k3_2",
+        materialName: "Sepatu safety boot",
+        unit: "Unit",
+        coefficient: 1.0,
+        wastePercent: 0,
+      },
+    ];
+  }
+
+  // Default fallback for any general item
+  return [
+    {
+      id: "mat_gen_1",
+      materialName: "Pekerja",
+      unit: "OH",
+      coefficient: 1.0,
+      wastePercent: 0,
+    },
+    {
+      id: "mat_gen_2",
+      materialName: "Mandor",
+      unit: "OH",
+      coefficient: 0.1,
+      wastePercent: 0,
+    },
+  ];
 }

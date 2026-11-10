@@ -169,6 +169,10 @@ export default async function ProjectDetailPage({
           ? decimalStringFromScaledInteger(point.proposedVolume)
           : null,
       proposedUnit: point.proposedUnit,
+      proposedUnitPrice:
+        point.proposedUnitPrice !== null
+          ? decimalStringFromScaledInteger(point.proposedUnitPrice)
+          : null,
       completedVolume: point.completedVolume,
       proposedTotalWage: decimalStringFromScaledInteger(
         point.proposedTotalWage,

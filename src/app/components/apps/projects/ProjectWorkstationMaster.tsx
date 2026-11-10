@@ -255,6 +255,7 @@ export type ProjectWorkstationMasterData = {
     progress: number;
     proposedVolume: string | null;
     proposedUnit: string | null;
+    proposedUnitPrice?: string | null;
     completedVolume: number | null;
     proposedTotalWage: string;
     approvedTotalWage: string | null;

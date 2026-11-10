@@ -60,7 +60,8 @@ import { deleteProject, duplicateProject } from "@/app/actions/project";
 import EditRabModal, { type EditableRabItem } from "./EditRabModal";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
 import MaterialPlanModal, { type MaterialPlanRow, type StockItemOption } from "./MaterialPlanModal";
-import AnalisaMaterialModal from "./AnalisaMaterialModal";
+import AnalisaMaterialModal, { type MaterialAnalysisItem } from "./AnalisaMaterialModal";
+import { getStandardAnalysisForWorkItem } from "@/lib/drt-rab-parser";
 import UploadDocumentModal from "./UploadDocumentModal";
 import CoreTeamModal from "./CoreTeamModal";
 import { applyRabAsContract, applyRapAsBudget } from "@/app/actions/project";
@@ -169,10 +170,13 @@ export default function ProjectDetailView({
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [isAnalisaModalOpen, setIsAnalisaModalOpen] = useState(false);
   const [selectedAnalisaItem, setSelectedAnalisaItem] = useState<{
+    id?: string;
     title: string;
     volume: number;
     unit: string;
+    analysis?: MaterialAnalysisItem[];
   } | null>(null);
+  const [itemAnalysesMap, setItemAnalysesMap] = useState<Record<string, MaterialAnalysisItem[]>>({});
   const [selectedWorkPointForMaterial, setSelectedWorkPointForMaterial] = useState<string | undefined>();
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
   const [isCoreTeamModalOpen, setIsCoreTeamModalOpen] = useState(false);
@@ -356,7 +360,8 @@ export default function ProjectDetailView({
       items: items.map((pt) => {
         const total = Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0);
         const bobot = paguNum > 0 ? (total / paguNum) * 100 : 0;
-        const vol = pt.proposedVolume ? (Number(pt.proposedVolume) / 100).toString() : "1";
+        const volNum = pt.proposedVolume ? Math.max(0, Number(pt.proposedVolume)) : 1;
+        const vol = volNum.toString();
         const unit = pt.proposedUnit || "paket";
         const comp = pt.completedVolume ?? 0;
 
@@ -364,13 +369,17 @@ export default function ProjectDetailView({
         const maybeCode = titleParts[0]?.includes(".") ? titleParts[0] : "";
         const cleanTitle = maybeCode ? titleParts.slice(1).join(" ") : pt.title;
 
+        const unitPrice = pt.proposedUnitPrice && Number(pt.proposedUnitPrice) > 0
+          ? Math.round(Number(pt.proposedUnitPrice))
+          : (volNum > 0 ? Math.round(total / volNum) : total);
+
         return {
           id: pt.id,
           code: maybeCode || "•",
           title: cleanTitle,
           section: sectionName,
           volumeText: vol + " " + unit,
-          unitPrice: (pt.proposedVolume && Number(pt.proposedVolume) > 0) ? Math.round(total / (Number(pt.proposedVolume) / 100)) : total,
+          unitPrice,
           totalPrice: total,
           bobot,
           terpasangText: comp + " " + unit,
@@ -379,16 +388,19 @@ export default function ProjectDetailView({
       }),
     }));
 
-    const opnameList: OpnameWorkPointItem[] = points.map((p) => ({
-      id: p.id,
-      code: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ")[0] : "",
-      title: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ").slice(1).join(" ") : p.title,
-      section: p.location || "Pekerjaan Utama",
-      targetVolume: p.proposedVolume ? Number(p.proposedVolume) / 100 : 1,
-      unit: p.proposedUnit || "paket",
-      completedVolume: p.completedVolume ?? 0,
-      progress: p.progress ?? 0,
-    }));
+    const opnameList: OpnameWorkPointItem[] = points.map((p) => {
+      const volNum = p.proposedVolume ? Math.max(0, Number(p.proposedVolume)) : 1;
+      return {
+        id: p.id,
+        code: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ")[0] : "",
+        title: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ").slice(1).join(" ") : p.title,
+        section: p.location || "Pekerjaan Utama",
+        targetVolume: volNum,
+        unit: p.proposedUnit || "paket",
+        completedVolume: p.completedVolume ?? 0,
+        progress: p.progress ?? 0,
+      };
+    });
 
     return {
       rabGroups: groups,
@@ -1073,13 +1085,16 @@ export default function ProjectDetailView({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const parts = (it.volumeText || "100 M2").trim().split(" ");
-                                  const volNum = parseFloat(parts[0]) || 100;
-                                  const unitStr = parts.slice(1).join(" ") || "M2";
+                                  const parts = (it.volumeText || "1 m").trim().split(" ");
+                                  const volNum = parseFloat(parts[0]) || 1;
+                                  const unitStr = parts.slice(1).join(" ") || "m";
+                                  const existingAnalysis = itemAnalysesMap[it.id] || getStandardAnalysisForWorkItem(it.title, volNum, unitStr);
                                   setSelectedAnalisaItem({
+                                    id: it.id,
                                     title: (it.code ? it.code + " " : "") + it.title,
                                     volume: volNum,
                                     unit: unitStr,
+                                    analysis: existingAnalysis,
                                   });
                                   setIsAnalisaModalOpen(true);
                                 }}
@@ -1668,15 +1683,20 @@ export default function ProjectDetailView({
                 const parts = pt.title.split(" ");
                 const code = parts[0]?.includes(".") ? parts[0] : "";
                 const title = code ? parts.slice(1).join(" ") : pt.title;
+                const itemVol = pt.proposedVolume ? Math.max(1, Number(pt.proposedVolume)) : 1;
+                const total = Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0);
+                const unitPrice = pt.proposedUnitPrice && Number(pt.proposedUnitPrice) > 0
+                  ? Math.round(Number(pt.proposedUnitPrice))
+                  : (itemVol > 0 ? Math.round(total / itemVol) : total);
                 return {
                   id: pt.id,
                   section: pt.location || "A. Persiapan",
                   code,
                   title,
-                  volume: pt.proposedVolume ? Number(pt.proposedVolume) / 100 : 1,
+                  volume: itemVol,
                   unit: pt.proposedUnit || "paket",
-                  unitPrice: (pt.proposedVolume && Number(pt.proposedVolume) > 0) ? Math.round(Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0) / (Number(pt.proposedVolume) / 100)) : Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0),
-                  rapPrice: Math.round(((pt.proposedVolume && Number(pt.proposedVolume) > 0) ? Math.round(Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0) / (Number(pt.proposedVolume) / 100)) : Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0)) * 0.758),
+                  unitPrice,
+                  rapPrice: 0, // "kecuali harga RAP"
                   startDate: pt.plannedStartDate ? pt.plannedStartDate.slice(0, 10) : "",
                   endDate: pt.targetDate ? pt.targetDate.slice(0, 10) : "",
                 };
@@ -1717,8 +1737,17 @@ export default function ProjectDetailView({
         isOpen={isAnalisaModalOpen}
         onClose={() => setIsAnalisaModalOpen(false)}
         itemTitle={selectedAnalisaItem?.title || ""}
-        itemVolume={selectedAnalisaItem?.volume || 100}
-        itemUnit={selectedAnalisaItem?.unit || "M2"}
+        itemVolume={selectedAnalisaItem?.volume || 1}
+        itemUnit={selectedAnalisaItem?.unit || "m"}
+        initialMaterials={selectedAnalisaItem?.analysis}
+        onSave={(updatedMaterials) => {
+          if (selectedAnalisaItem?.id) {
+            setItemAnalysesMap((prev) => ({
+              ...prev,
+              [selectedAnalisaItem.id!]: updatedMaterials,
+            }));
+          }
+        }}
       />
 
       {/* Modal: Unggah Dokumen (Vasco Image 6) */}
