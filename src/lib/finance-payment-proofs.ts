@@ -5,6 +5,9 @@ import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
 
 export function isFinancePaymentProofUrl(url: string): boolean {
   if (isCloudinaryPrivateTicketReceiptPdf(url)) return true;
+  if (url.startsWith(`/uploads/${FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER}/`)) {
+    return true;
+  }
 
   try {
     const parsed = new URL(url);

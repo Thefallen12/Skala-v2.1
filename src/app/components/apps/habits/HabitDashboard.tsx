@@ -252,17 +252,17 @@ export default function HabitDashboard({
   ];
 
   return (
-    <div className="my-6 space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Kebiasaan saya</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Selesaikan rutinitas harian dan lihat konsistensi Anda bertumbuh.
+          <h2 className="text-lg font-semibold">Rutinitas &amp; Checklist SOP Harian</h2>
+          <p className="text-xs text-muted-foreground">
+            Jaga konsistensi standar operasional harian dan pantau capaian Anda setiap minggu.
           </p>
         </div>
-        <Button type="button" onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 size-4" aria-hidden="true" />
-          Tambah kebiasaan
+        <Button type="button" size="sm" onClick={() => setIsDialogOpen(true)}>
+          <Plus className="mr-1.5 size-4" aria-hidden="true" />
+          Tambah Rutinitas
         </Button>
       </div>
 
@@ -516,81 +516,114 @@ export default function HabitDashboard({
       <GlobalModal
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        title="Tambah kebiasaan"
-        description="Buat target yang ingin Anda lakukan secara konsisten."
+        title="Tambah Rutinitas / Checklist Harian"
+        description="Buat target standar operasional atau kebiasaan kerja yang dilakukan secara konsisten."
         className="sm:max-w-lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              disabled={isPending}
+            >
+              Batal
+            </Button>
+            <Button type="submit" form="create-habit-form" disabled={isPending}>
+              {isPending ? "Menyimpan..." : "Simpan Rutinitas"}
+            </Button>
+          </>
+        }
       >
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void handleCreateHabit(new FormData(event.currentTarget));
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="habit-title">Nama kebiasaan</Label>
-              <Input
-                id="habit-title"
-                name="title"
-                placeholder="Contoh: Membaca 10 halaman"
-                minLength={2}
-                maxLength={120}
-                required
-              />
+        <form
+          id="create-habit-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleCreateHabit(new FormData(event.currentTarget));
+          }}
+        >
+          <div className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground">
+              Template Cepat Operasional (Klik untuk mengisi):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Briefing K3 & Cek APD Pagi",
+                "Update Laporan Progres Harian",
+                "Inspeksi Stok Material & Alat",
+                "Rekap Jam Kerja (Timesheet)",
+              ].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    const input = document.getElementById(
+                      "habit-title",
+                    ) as HTMLInputElement | null;
+                    if (input) {
+                      input.value = preset;
+                      input.focus();
+                    }
+                  }}
+                  className="rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                >
+                  + {preset}
+                </button>
+              ))}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="habit-description">Catatan (opsional)</Label>
-              <textarea
-                id="habit-description"
-                name="description"
-                rows={3}
-                maxLength={500}
-                placeholder="Tambahkan target atau catatan singkat..."
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="habit-frequency">Jadwal</Label>
-              <select
-                id="habit-frequency"
-                name="frequency"
-                defaultValue={HabitFrequency.DAILY}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value={HabitFrequency.DAILY}>Setiap hari</option>
-                <option value={HabitFrequency.WEEKDAYS}>
-                  Hari kerja (Senin–Jumat)
-                </option>
-                <option value={HabitFrequency.WEEKENDS}>
-                  Akhir pekan (Sabtu–Minggu)
-                </option>
-              </select>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                disabled={isPending}
-              >
-                Batal
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Menyimpan..." : "Simpan kebiasaan"}
-              </Button>
-            </DialogFooter>
-          </form>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="habit-title">Nama Rutinitas / Checklist</Label>
+            <Input
+              id="habit-title"
+              name="title"
+              placeholder="Contoh: Briefing K3 & Cek APD Pagi"
+              minLength={2}
+              maxLength={120}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="habit-frequency">Frekuensi Pelaksanaan</Label>
+            <select
+              id="habit-frequency"
+              name="frequency"
+              defaultValue={HabitFrequency.WEEKDAYS}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value={HabitFrequency.WEEKDAYS}>
+                Hari Kerja (Senin–Jumat)
+              </option>
+              <option value={HabitFrequency.DAILY}>Setiap Hari (Senin–Minggu)</option>
+              <option value={HabitFrequency.WEEKENDS}>
+                Akhir Pekan (Sabtu–Minggu)
+              </option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="habit-description">Catatan / Kriteria Selesai (Opsional)</Label>
+            <textarea
+              id="habit-description"
+              name="description"
+              rows={3}
+              maxLength={500}
+              placeholder="Tambahkan target atau rincian standar operasional..."
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        </form>
       </GlobalModal>
 
       <GlobalModal
         isOpen={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        title="Hapus kebiasaan?"
-        description={`“${deleteTarget?.title ?? ""}” dan riwayat centangnya akan dihapus. Tindakan ini tidak dapat dibatalkan.`}
+        title="Hapus Rutinitas?"
+        description={`“${deleteTarget?.title ?? ""}” beserta riwayat capaiannya akan dihapus permanen.`}
         className="sm:max-w-md"
         footerNote="Tindakan ini tidak dapat dibatalkan."
-      >
-          <DialogFooter>
+        footer={
+          <>
             <Button
               type="button"
               variant="outline"
@@ -605,9 +638,14 @@ export default function HabitDashboard({
               onClick={() => void handleDeleteHabit()}
               disabled={isPending}
             >
-              {isPending ? "Menghapus..." : "Hapus"}
+              {isPending ? "Menghapus..." : "Ya, Hapus"}
             </Button>
-          </DialogFooter>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Pastikan rutinitas ini sudah tidak lagi digunakan dalam checklist harian Anda.
+        </p>
       </GlobalModal>
     </div>
   );

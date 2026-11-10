@@ -196,11 +196,11 @@ export default function ProjectTimesheet({
   };
 
   return (
-    <div className="my-4 space-y-3">
+    <div className="space-y-3">
       {message && (
         <p
           role={message.success ? "status" : "alert"}
-          className={`rounded-md border px-3 py-2 text-xs ${
+          className={`rounded-lg border px-3 py-2 text-xs font-medium ${
             message.success
               ? "border-success/30 bg-success/10 text-success"
               : "border-destructive/30 bg-destructive/10 text-destructive"
@@ -210,160 +210,203 @@ export default function ProjectTimesheet({
         </p>
       )}
       <CardBox className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div>
-            <h1 className="text-sm font-semibold">Timesheet</h1>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              {format(new Date(`${startDate}T12:00:00`), "d MMM", { locale: id })} –{" "}
+            <h2 className="text-base font-semibold">Tabel Timesheet Proyek</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Periode {format(new Date(`${startDate}T12:00:00`), "d MMM", { locale: id })} –{" "}
               {format(new Date(`${endDate}T12:00:00`), "d MMM yyyy", { locale: id })}
-              {" · "}{formatDuration(totalMinutes)} total
+              {" · "}Total tercatat: <strong className="text-foreground">{formatDuration(totalMinutes)} jam</strong>
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[10px]">
-            <FormLabel className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Member</span>
-              <select
-                aria-label="Filter anggota"
-                value={memberFilter}
-                onChange={(event) => {
-                  const memberId = event.target.value;
-                  setMemberFilter(memberId);
-                  onFiltersChange({
-                    memberId,
-                    team: teamFilter,
-                    projectId: projectFilter,
-                  });
-                  setPage(1);
-                }}
-                className="h-8 max-w-36 rounded border border-input bg-background px-2"
-              >
-                {canViewAll && <option value="all">All members</option>}
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>{member.name}</option>
-                ))}
-              </select>
-            </FormLabel>
-            <FormLabel className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Team</span>
-              <select
-                aria-label="Filter tim"
-                value={teamFilter}
-                onChange={(event) => {
-                  const team = event.target.value;
-                  setTeamFilter(team);
-                  onFiltersChange({
-                    memberId: memberFilter,
-                    team,
-                    projectId: projectFilter,
-                  });
-                  setPage(1);
-                }}
-                className="h-8 max-w-32 rounded border border-input bg-background px-2"
-              >
-                <option value="all">All teams</option>
-                {[...new Set(members.map(({ role }) => role))].map((role) => (
-                  <option key={role} value={role}>{role.replaceAll("_", " ")}</option>
-                ))}
-              </select>
-            </FormLabel>
-            <FormLabel className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">Time Frame</span>
-              <select
-                aria-label="Rentang waktu"
-                value={String(timeframe)}
-                onChange={(event) => changeTimeframe(event.target.value)}
-                className="h-8 rounded border border-input bg-background px-2"
-              >
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-              </select>
-            </FormLabel>
-            <FormLabel className="flex items-center gap-1.5">
-              <span className="text-muted-foreground">More filters</span>
-              <select
-                aria-label="Filter proyek"
-                value={projectFilter}
-                onChange={(event) => {
-                  const projectId = event.target.value;
-                  setProjectFilter(projectId);
-                  onFiltersChange({
-                    memberId: memberFilter,
-                    team: teamFilter,
-                    projectId,
-                  });
-                  setPage(1);
-                }}
-                className="h-8 max-w-36 rounded border border-input bg-background px-2"
-              >
-                <option value="all">All projects</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.code}</option>
-                ))}
-              </select>
-            </FormLabel>
-            <Button size="sm" className="h-8 px-2.5 text-[10px]" onClick={() => setIsDialogOpen(true)} disabled={!projects.length}>
-              <Plus className="mr-1 size-3.5" /> Catat jam
-            </Button>
-          </div>
-        </div>
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-          <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="icon" aria-label="Periode sebelumnya" className="size-7" onClick={() => navigatePeriod(-1)}>
-              <ArrowLeft className="size-3" />
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 px-2 text-[10px]" onClick={() => router.push(timesheetHref(today), { scroll: false })}>
-              Periode ini
-            </Button>
-            <Button variant="outline" size="icon" aria-label="Periode berikutnya" className="size-7" onClick={() => navigatePeriod(1)}>
-              <ArrowRight className="size-3" />
-            </Button>
-          </div>
-          <span className="text-[10px] text-muted-foreground">
-            {canViewAll ? "Data sesuai akses pengelola" : "Menampilkan timesheet Anda"}
-          </span>
-          <Button asChild variant="outline" size="sm" className="h-7 px-2 text-[10px]">
-            <Link href={summaryHref} scroll={false}>Ringkasan mingguan</Link>
+          <Button
+            size="sm"
+            onClick={() => setIsDialogOpen(true)}
+            disabled={!projects.length}
+          >
+            <Plus className="mr-1.5 size-4" />
+            Catat Jam Kerja
           </Button>
         </div>
+
+        {/* Filter Bar & Navigasi Periode */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/20 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Filter anggota"
+              value={memberFilter}
+              onChange={(event) => {
+                const memberId = event.target.value;
+                setMemberFilter(memberId);
+                onFiltersChange({
+                  memberId,
+                  team: teamFilter,
+                  projectId: projectFilter,
+                });
+                setPage(1);
+              }}
+              className="h-9 max-w-44 rounded-lg border border-input bg-background px-2.5 text-xs"
+            >
+              {canViewAll && <option value="all">Semua Anggota</option>}
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Filter divisi"
+              value={teamFilter}
+              onChange={(event) => {
+                const team = event.target.value;
+                setTeamFilter(team);
+                onFiltersChange({
+                  memberId: memberFilter,
+                  team,
+                  projectId: projectFilter,
+                });
+                setPage(1);
+              }}
+              className="h-9 max-w-40 rounded-lg border border-input bg-background px-2.5 text-xs"
+            >
+              <option value="all">Semua Divisi</option>
+              {[...new Set(members.map(({ role }) => role))].map((role) => (
+                <option key={role} value={role}>
+                  {role.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Filter proyek"
+              value={projectFilter}
+              onChange={(event) => {
+                const projectId = event.target.value;
+                setProjectFilter(projectId);
+                onFiltersChange({
+                  memberId: memberFilter,
+                  team: teamFilter,
+                  projectId,
+                });
+                setPage(1);
+              }}
+              className="h-9 max-w-48 rounded-lg border border-input bg-background px-2.5 text-xs"
+            >
+              <option value="all">Semua Proyek</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} — {project.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Rentang waktu"
+              value={String(timeframe)}
+              onChange={(event) => changeTimeframe(event.target.value)}
+              className="h-9 rounded-lg border border-input bg-background px-2.5 text-xs"
+            >
+              <option value="7">7 Hari</option>
+              <option value="14">14 Hari</option>
+              <option value="30">30 Hari</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Periode sebelumnya"
+              className="size-8"
+              onClick={() => navigatePeriod(-1)}
+            >
+              <ArrowLeft className="size-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 text-xs"
+              onClick={() => router.push(timesheetHref(today), { scroll: false })}
+            >
+              Hari Ini
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Periode berikutnya"
+              className="size-8"
+              onClick={() => navigatePeriod(1)}
+            >
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="app-data-table min-w-[850px] text-[10px]">
+          <table className="app-data-table min-w-[850px] text-xs">
             <thead>
               <tr className="bg-muted/30 text-left">
-                <th className="min-w-36 px-3 py-2 font-semibold">Project</th>
+                <th className="min-w-44 px-3 py-2.5 font-semibold">Proyek &amp; Personel</th>
                 {dates.map((date) => (
-                  <th key={date} className="min-w-[62px] px-1.5 py-2 text-center font-medium">
-                    {format(new Date(`${date}T12:00:00`), "EEE, d MMM", { locale: id })}
+                  <th
+                    key={date}
+                    className="min-w-[68px] px-1.5 py-2.5 text-center font-medium"
+                  >
+                    {format(new Date(`${date}T12:00:00`), "EEE, d MMM", {
+                      locale: id,
+                    })}
                   </th>
                 ))}
-                <th className="min-w-14 px-2 py-2 text-right font-semibold">Total</th>
-                <th className="w-8 px-1 py-2" aria-label="Tindakan" />
+                <th className="min-w-16 px-3 py-2.5 text-right font-semibold">Total</th>
+                <th className="w-10 px-2 py-2.5" aria-label="Tindakan" />
               </tr>
             </thead>
             <tbody>
               {visibleRows.map((row) => {
-                const total = row.minutes.reduce((sum, minutes) => sum + minutes, 0);
-                const ownedEntry = row.userId === currentUserId ? row.entryIds[0] : null;
+                const total = row.minutes.reduce(
+                  (sum, minutes) => sum + minutes,
+                  0,
+                );
+                const ownedEntry =
+                  row.userId === currentUserId ? row.entryIds[0] : null;
                 return (
                   <tr key={row.key} className="border-t border-border">
-                    <td className="max-w-40 px-3 py-2">
-                      <p className="truncate font-medium" title={row.project.name}>{row.project.name}</p>
-                      <p className="truncate text-[9px] text-muted-foreground">
-                        {canViewAll ? `${row.user.name} · ` : ""}{row.project.code}
+                    <td className="max-w-52 px-3 py-2.5">
+                      <p className="truncate font-semibold" title={row.project.name}>
+                        {row.project.name}
+                      </p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {canViewAll ? `${row.user.name} · ` : ""}
+                        {row.project.code}
                       </p>
                       {row.notes.length > 0 && (
-                        <p className="mt-0.5 truncate text-[9px] text-muted-foreground" title={row.notes.join(" · ")}>
+                        <p
+                          className="mt-0.5 truncate text-[11px] text-muted-foreground"
+                          title={row.notes.join(" · ")}
+                        >
                           {row.notes.join(" · ")}
                         </p>
                       )}
                     </td>
                     {row.minutes.map((minutes, index) => (
-                      <td key={`${row.key}-${dates[index]}`} className="whitespace-nowrap px-1.5 py-2 text-center text-muted-foreground">
-                        {minutes ? formatDuration(minutes) : "—"}
+                      <td
+                        key={`${row.key}-${dates[index]}`}
+                        className="whitespace-nowrap px-1.5 py-2.5 text-center"
+                      >
+                        {minutes ? (
+                          <span className="inline-block rounded-md bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
+                            {formatDuration(minutes)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
                       </td>
                     ))}
-                    <td className="whitespace-nowrap px-2 py-2 text-right font-semibold">{formatDuration(total)}</td>
-                    <td className="px-1 py-1">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold">
+                      {formatDuration(total)}
+                    </td>
+                    <td className="px-2 py-1.5">
                       {ownedEntry && (
                         <ActionIconButton
                           label={`Hapus satu catatan jam kerja untuk ${row.project.name}`}
@@ -380,8 +423,11 @@ export default function ProjectTimesheet({
               })}
               {!visibleRows.length && (
                 <tr>
-                  <td colSpan={dates.length + 3} className="p-10 text-center text-muted-foreground">
-                    Belum ada catatan jam kerja pada rentang ini.
+                  <td
+                    colSpan={dates.length + 3}
+                    className="p-10 text-center text-muted-foreground"
+                  >
+                    Belum ada catatan jam kerja pada rentang waktu ini.
                   </td>
                 </tr>
               )}
@@ -400,46 +446,129 @@ export default function ProjectTimesheet({
       <GlobalModal
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        title="Catat jam kerja"
-        description="Durasi dicatat untuk akun Anda sendiri dan dapat dihapus oleh Anda."
+        title="Catat Jam Kerja (Timesheet)"
+        description="Catat realisasi durasi kerja harian Anda pada proyek terkait."
         className="sm:max-w-lg"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              disabled={isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="timesheet-entry-form"
+              disabled={isPending}
+            >
+              {isPending ? "Menyimpan..." : "Simpan Jam Kerja"}
+            </Button>
+          </>
+        }
       >
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onCreateEntry(new FormData(event.currentTarget));
-            }}
-          >
+        <form
+          id="timesheet-entry-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onCreateEntry(new FormData(event.currentTarget));
+          }}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="timesheet-project">Proyek</Label>
+            <select
+              id="timesheet-project"
+              name="projectId"
+              required
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} — {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground">
+              Preset Durasi Cepat:
+            </span>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: "1 Jam", h: 1, m: 0 },
+                { label: "2 Jam", h: 2, m: 0 },
+                { label: "4 Jam (½ Hari)", h: 4, m: 0 },
+                { label: "8 Jam (1 Hari)", h: 8, m: 0 },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    const hInput = document.getElementById(
+                      "timesheet-hours",
+                    ) as HTMLInputElement | null;
+                    const mInput = document.getElementById(
+                      "timesheet-minutes",
+                    ) as HTMLInputElement | null;
+                    if (hInput) hInput.value = String(preset.h);
+                    if (mInput) mInput.value = String(preset.m);
+                  }}
+                  className="rounded-lg border border-border bg-muted/40 px-2 py-1.5 text-center text-xs font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="timesheet-project">Proyek</Label>
-              <select id="timesheet-project" name="projectId" required className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.code} — {project.name}</option>)}
-              </select>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="timesheet-date">Tanggal</Label>
-                <Input id="timesheet-date" name="workDate" type="date" defaultValue={selectedDate} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timesheet-hours">Jam</Label>
-                <Input id="timesheet-hours" name="hours" type="number" min={0} max={24} defaultValue={1} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timesheet-minutes">Menit</Label>
-                <Input id="timesheet-minutes" name="minutes" type="number" min={0} max={59} defaultValue={0} required />
-              </div>
+              <Label htmlFor="timesheet-date">Tanggal Kerja</Label>
+              <Input
+                id="timesheet-date"
+                name="workDate"
+                type="date"
+                defaultValue={selectedDate}
+                required
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="timesheet-note">Catatan (opsional)</Label>
-              <Input id="timesheet-note" name="note" maxLength={500} />
+              <Label htmlFor="timesheet-hours">Durasi (Jam)</Label>
+              <Input
+                id="timesheet-hours"
+                name="hours"
+                type="number"
+                min={0}
+                max={24}
+                defaultValue={2}
+                required
+              />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isPending}>Batal</Button>
-              <Button type="submit" disabled={isPending}>{isPending ? "Menyimpan..." : "Simpan jam kerja"}</Button>
-            </DialogFooter>
-          </form>
+            <div className="space-y-2">
+              <Label htmlFor="timesheet-minutes">Durasi (Menit)</Label>
+              <Input
+                id="timesheet-minutes"
+                name="minutes"
+                type="number"
+                min={0}
+                max={59}
+                defaultValue={0}
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="timesheet-note">Deskripsi Pekerjaan / Catatan</Label>
+            <Input
+              id="timesheet-note"
+              name="note"
+              placeholder="Contoh: Pengawasan pengecoran & opname lapangan"
+              maxLength={500}
+            />
+          </div>
+        </form>
       </GlobalModal>
     </div>
   );

@@ -75,7 +75,7 @@ const YearlyBreakup = ({
   ];
 
   return (
-    <CardBox className="dashboard-enter h-full min-w-0 border-slate-200/80 bg-white/80 p-4 shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-slate-700/80 dark:bg-[#1e293b]/55 sm:p-5">
+    <CardBox className="h-full min-w-0 border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
       <h2 className="mb-4 font-bold text-slate-900 dark:text-white">
         Status Proyek
       </h2>

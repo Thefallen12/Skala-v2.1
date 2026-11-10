@@ -30,7 +30,10 @@ const logisticsRoles: UserRole[] = [
   UserRole.MOVER,
   UserRole.KOORDINATOR,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
   UserRole.ADMINISTRATIONS,
+  UserRole.FINANCE,
+  UserRole.FIELD_TEAM,
 ];
 
 export default async function LogisticsPage({

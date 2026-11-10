@@ -171,10 +171,37 @@ export default function FinanceActionModal({
         setMessage("");
         onOpenChange(false);
       }}
-      title="Konfirmasi Pembayaran"
+      title="Konfirmasi Pembayaran Finance"
       description={`Periksa nilai dan tujuan dana berikut, lalu unggah bukti ${isCashPayment ? "pembayaran tunai" : "transfer"}. File PDF, JPG, PNG, atau WEBP maksimal 5 MB.`}
+      footer={
+        <div className="flex w-full items-center justify-end gap-2">
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={isPending}>
+              Tutup
+            </Button>
+          </DialogClose>
+          <Button
+            type="submit"
+            form="finance-action-form"
+            disabled={
+              !file ||
+              isPending ||
+              accountsLoading ||
+              accounts.length === 0 ||
+              (currentPaymentType !== PaymentType.FULL_PAYMENT &&
+                parseRupiahInput(paymentAmount) <= 0)
+            }
+          >
+            {isPending
+              ? "Menyimpan..."
+              : currentPaymentType === PaymentType.FULL_PAYMENT
+                ? "Selesaikan Pembayaran"
+                : "Catat Pembayaran DP"}
+          </Button>
+        </div>
+      }
     >
-        <form className="space-y-4" onSubmit={submit}>
+        <form id="finance-action-form" className="space-y-4" onSubmit={submit}>
           <section className="space-y-2 rounded-md border p-4 text-sm">
             <p className="font-semibold">
               {ticket.ticketNumber} · {ticket.title}
@@ -319,30 +346,6 @@ export default function FinanceActionModal({
               {message}
             </p>
           )}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isPending}>
-                Tutup
-              </Button>
-            </DialogClose>
-            <Button
-              type="submit"
-              disabled={
-                !file ||
-                isPending ||
-                accountsLoading ||
-                accounts.length === 0 ||
-                (currentPaymentType !== PaymentType.FULL_PAYMENT &&
-                  parseRupiahInput(paymentAmount) <= 0)
-              }
-            >
-              {isPending
-                ? "Menyimpan..."
-                : currentPaymentType === PaymentType.FULL_PAYMENT
-                  ? "Selesaikan Pembayaran"
-                  : "Catat Pembayaran DP"}
-            </Button>
-          </DialogFooter>
         </form>
     </GlobalModal>
   );

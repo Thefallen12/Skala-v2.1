@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Header from './layout/header/Header'
 import Sidebar from './layout/sidebar/Sidebar'
+import { MobileBottomNav } from './layout/mobile/MobileBottomNav'
 import type { DashboardNotification } from './layout/header/Notifications'
 import { useNotificationFeed } from './layout/header/useNotificationFeed'
 import type { NotificationFeedItem } from './layout/header/useNotificationFeed'
@@ -138,8 +139,8 @@ export default function DashboardLayoutClient({
             </div>
           </div>
         )}
-        <div className='page-wrapper flex min-w-0 flex-1'>
-          <div className='hidden xl:block xl:w-0 xl:shrink-0'>
+        <div className='page-wrapper flex min-w-0 flex-1 bg-background'>
+          <div className='hidden xl:block xl:w-[272px] xl:shrink-0'>
             <Sidebar
               canManageUsers={canManageUsers}
               canAccessLogistics={canAccessLogistics}
@@ -153,7 +154,7 @@ export default function DashboardLayoutClient({
               androidDownloadUrl={androidDownloadUrl}
             />
           </div>
-          <div className='body-wrapper min-w-0 flex-1 pt-16 md:pt-0'>
+          <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-16 md:pt-0'>
             <Header
               canManageUsers={canManageUsers}
               canAccessLogistics={canAccessLogistics}
@@ -173,7 +174,7 @@ export default function DashboardLayoutClient({
               notificationLoadFailed={Boolean(error)}
               refreshNotifications={mutate}
             />
-            <div className='container mx-auto w-full min-w-0 px-4 py-8 sm:px-6 sm:py-10 xl:py-30'>
+            <div className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3.5 pb-20 pt-4 sm:px-6 sm:pb-24 sm:pt-6 xl:pb-8'>
               {pageUnderMaintenance ? (
                 <UnderProductionState
                   className='mx-auto w-full max-w-[1200px]'
@@ -183,6 +184,7 @@ export default function DashboardLayoutClient({
                 children
               )}
             </div>
+            <MobileBottomNav userRole={userRole} />
           </div>
         </div>
       </div>

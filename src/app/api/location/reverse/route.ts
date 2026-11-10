@@ -1,31 +1,21 @@
 import { auth } from "../../../../../auth";
 
-type AmapResult = {
-  status: string;
-  info: string;
-  locations?: string;
-  regeocode?: {
-    addressComponent?: {
-      township?: string;
-      district?: string;
-      city?: string | string[];
-    };
+type NominatimResult = {
+  address?: {
+    village?: string;
+    suburb?: string;
+    town?: string;
+    city_district?: string;
+    municipality?: string;
+    city?: string;
+    county?: string;
+    state?: string;
   };
+  display_name?: string;
 };
 
 const isCoordinate = (value: number, min: number, max: number) =>
   Number.isFinite(value) && value >= min && value <= max;
-
-const requestAmap = async (url: URL): Promise<AmapResult> => {
-  const response = await fetch(url, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) {
-    throw new Error("AMap location service request failed.");
-  }
-  return (await response.json()) as AmapResult;
-};
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -49,79 +39,50 @@ export async function GET(request: Request) {
     );
   }
 
-  const apiKey = process.env.AMAP_WEB_SERVICE_KEY?.trim();
-  if (!apiKey) {
-    return Response.json(
-      { message: "AMap Web Service API belum dikonfigurasi." },
-      { status: 503 },
-    );
-  }
-
-  const convertUrl = new URL(
-    "https://restapi.amap.com/v3/assistant/coordinate/convert",
-  );
-  convertUrl.search = new URLSearchParams({
-    locations: `${longitude.toFixed(6)},${latitude.toFixed(6)}`,
-    coordsys: "gps",
-    output: "JSON",
-    key: apiKey,
-  }).toString();
-
-  let converted: AmapResult;
   try {
-    converted = await requestAmap(convertUrl);
-  } catch {
-    return Response.json(
-      { message: "Layanan konversi koordinat AMap tidak tersedia." },
-      { status: 502 },
-    );
-  }
-  if (converted.status !== "1" || !converted.locations) {
-    return Response.json(
-      {
-        message: `AMap gagal mengonversi koordinat (${converted.info}).`,
+    const nominatimUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+    nominatimUrl.search = new URLSearchParams({
+      format: "jsonv2",
+      lat: latitude.toFixed(6),
+      lon: longitude.toFixed(6),
+      zoom: "14",
+      "accept-language": "id",
+    }).toString();
+
+    const response = await fetch(nominatimUrl, {
+      headers: {
+        "User-Agent": "SkalaPrioritasERP/2.1",
       },
-      { status: 502 },
-    );
-  }
+      cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
+    });
 
-  const reverseUrl = new URL("https://restapi.amap.com/v3/geocode/regeo");
-  reverseUrl.search = new URLSearchParams({
-    location: converted.locations,
-    radius: "1000",
-    extensions: "base",
-    output: "JSON",
-    key: apiKey,
-  }).toString();
+    if (response.ok) {
+      const data = (await response.json()) as NominatimResult;
+      const addr = data.address;
+      const primary =
+        addr?.village ||
+        addr?.suburb ||
+        addr?.town ||
+        addr?.city_district ||
+        addr?.municipality;
+      const secondary = addr?.city || addr?.county || addr?.state;
+      const locationLabel =
+        primary && secondary
+          ? `${primary}, ${secondary}`
+          : primary || secondary || "Indonesia";
 
-  let reverse: AmapResult;
-  try {
-    reverse = await requestAmap(reverseUrl);
+      return Response.json({
+        name: locationLabel,
+        isVillage: Boolean(addr?.village || addr?.suburb),
+      });
+    }
   } catch {
-    return Response.json(
-      { message: "Layanan pencarian nama lokasi AMap tidak tersedia." },
-      { status: 502 },
-    );
-  }
-  if (reverse.status !== "1") {
-    return Response.json(
-      { message: `AMap gagal mencari lokasi (${reverse.info}).` },
-      { status: 502 },
-    );
-  }
-
-  const address = reverse.regeocode?.addressComponent;
-  const name = address?.township || address?.district || address?.city;
-  const normalizedName = Array.isArray(name) ? name[0] : name;
-  if (!normalizedName) {
-    return Response.json(
-      { message: "Nama desa tidak tersedia untuk lokasi ini." },
-      { status: 404 },
-    );
+    // Fallback below if offline or timeout
   }
 
   return Response.json({
-    name: normalizedName,
-    isVillage: Boolean(address?.township),
+    name: `Koordinat ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+    isVillage: false,
   });
 }

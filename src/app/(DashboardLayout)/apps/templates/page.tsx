@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { canManageUsers } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +11,16 @@ export const metadata: Metadata = {
   title: "Template Dokumen",
 };
 
+const templateRoles: UserRole[] = [
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.LOGISTICS,
+  UserRole.FINANCE,
+  UserRole.DRAFTER,
+  UserRole.KOORDINATOR,
+];
+
 export default async function TemplatesPage({
   searchParams,
 }: {
@@ -17,7 +28,9 @@ export default async function TemplatesPage({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
-  if (!canManageUsers(session.user.role)) redirect("/auth/unauthorized");
+  if (!templateRoles.includes(session.user.role) && !canManageUsers(session.user.role)) {
+    redirect("/");
+  }
 
   const [{ edit }, templates] = await Promise.all([
     searchParams,

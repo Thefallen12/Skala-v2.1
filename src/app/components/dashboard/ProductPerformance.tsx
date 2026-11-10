@@ -42,7 +42,7 @@ export const ProductPerformance = ({
 }: {
   projects: DashboardProject[];
 }) => (
-  <CardBox className="dashboard-enter w-full min-w-0 overflow-hidden border-indigo-200 bg-gradient-to-br from-white to-indigo-50/80 p-4 shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-slate-700/80 dark:from-[#1e293b] dark:to-[#1e1b4b]/40 sm:p-6">
+  <CardBox className="w-full min-w-0 overflow-hidden border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
       <div>
         <h2 className="font-bold text-slate-900 dark:text-white">
@@ -132,8 +132,11 @@ export const ProductPerformance = ({
             <TableHead className="w-[39%] text-xs font-semibold uppercase tracking-wide xl:w-[19%]">
               Progres
             </TableHead>
-            <TableHead className="hidden w-[10%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
+            <TableHead className="hidden w-[12%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
               Anggaran
+            </TableHead>
+            <TableHead className="w-[14%] text-right text-xs font-semibold uppercase tracking-wide">
+              Aksi
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -149,9 +152,12 @@ export const ProductPerformance = ({
                   {project.code}
                 </TableCell>
                 <TableCell className="truncate">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                  <Link
+                    href={`/apps/projects?projectId=${encodeURIComponent(project.id)}`}
+                    className="block truncate text-sm font-semibold text-slate-900 hover:text-primary dark:text-white"
+                  >
                     {project.name}
-                  </p>
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <Badge
@@ -177,15 +183,23 @@ export const ProductPerformance = ({
                     </span>
                   </div>
                 </TableCell>
-                <TableCell className="hidden truncate whitespace-nowrap text-sm text-muted-foreground xl:table-cell">
+                <TableCell className="hidden truncate whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground xl:table-cell">
                   {project.budget}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Link
+                    href={`/apps/projects?projectId=${encodeURIComponent(project.id)}`}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-primary hover:bg-primary hover:text-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    Kelola
+                  </Link>
                 </TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="py-8 text-center text-sm text-muted-foreground"
               >
                 Belum ada proyek.

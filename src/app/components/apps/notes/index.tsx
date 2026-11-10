@@ -129,18 +129,21 @@ const NotesApp = () => {
           <Sheet open={isOpen} onOpenChange={handleClose}>
             <SheetContent
               side='left'
-              className='max-w-[320px] sm:max-w-[320px] w-full h-full lg:hidden block'
+              className='max-w-[320px] sm:max-w-[320px] w-full h-full lg:hidden block p-4'
             >
               <NotesSidebar
                 notes={notes}
                 loading={loading}
                 selectedNoteId={selectedNoteId}
-                onSelectNote={(id: string) => setSelectedNoteId(id)}
+                onSelectNote={(id: string) => {
+                  setSelectedNoteId(id)
+                  setIsOpen(false)
+                }}
                 onDeleteNote={deleteNote}
               />
             </SheetContent>
           </Sheet>
-          <div className='max-w-[320px] h-auto lg:block hidden'>
+          <div className='w-[300px] h-auto lg:block hidden border-r border-border p-4'>
             <NotesSidebar
               notes={notes}
               loading={loading}
@@ -152,17 +155,19 @@ const NotesApp = () => {
         </div>
 
         {/* Content */}
-        <div className='w-full'>
-          <div className='flex justify-between items-center border-b border-ld py-4 px-6'>
-            <div className='flex gap-3 items-center'>
+        <div className='w-full min-w-0'>
+          <div className='flex justify-between items-center border-b border-ld py-3.5 px-4 sm:px-6'>
+            <div className='flex gap-2.5 items-center'>
               <Button
-                color={'lightprimary'}
+                variant='outline'
+                size='sm'
                 onClick={() => setIsOpen(true)}
-                className='btn-circle p-0 lg:!hidden flex'
+                className='lg:hidden flex items-center gap-1.5'
               >
                 <Icon icon='tabler:menu-2' height={18} />
+                <span className='text-xs'>Daftar ({notes.length})</span>
               </Button>
-              <h6 className='text-base'>Edit Note</h6>
+              <h6 className='text-sm sm:text-base font-semibold'>Isi Catatan</h6>
             </div>
             <AddNotes colors={colorVariation} addNote={addNote} />
           </div>

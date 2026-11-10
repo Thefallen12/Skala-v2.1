@@ -155,253 +155,274 @@ export default function ProjectFormModal({
       }
     >
         <form id="project-form" className="space-y-5" onSubmit={submit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="project-code">Kode proyek *</Label>
-              <Input
-                id="project-code"
-                required
-                maxLength={40}
-                value={values.code}
-                disabled={isPending}
-                onChange={(event) => updateValue("code", event.target.value)}
-              />
+          {/* Bagian 1: Identitas & Lokasi Proyek */}
+          <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-3.5 sm:p-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
+              1. Identitas &amp; Lokasi Proyek
+            </h4>
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="project-code">Kode Proyek *</Label>
+                <Input
+                  id="project-code"
+                  required
+                  placeholder="Contoh: PRJ-2026-001"
+                  maxLength={40}
+                  value={values.code}
+                  disabled={isPending}
+                  onChange={(event) => updateValue("code", event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-title">Nama Proyek *</Label>
+                <Input
+                  id="project-title"
+                  required
+                  placeholder="Nama paket pekerjaan"
+                  maxLength={180}
+                  value={values.title}
+                  disabled={isPending}
+                  onChange={(event) => updateValue("title", event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-group">Kelompok Tani / Mitra *</Label>
+                <Input
+                  id="project-group"
+                  required
+                  placeholder="Nama kelompok tani atau penerima"
+                  maxLength={160}
+                  value={values.kelompokTani}
+                  disabled={isPending}
+                  onChange={(event) =>
+                    updateValue("kelompokTani", event.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-work-type">Jenis Pekerjaan</Label>
+                <Input
+                  id="project-work-type"
+                  maxLength={180}
+                  placeholder="Contoh: Rehabilitasi jaringan irigasi"
+                  value={values.jenisPekerjaan}
+                  disabled={isPending}
+                  onChange={(event) =>
+                    updateValue("jenisPekerjaan", event.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-address">Alamat Lengkap *</Label>
+                <Input
+                  id="project-address"
+                  required
+                  placeholder="Desa, Kecamatan, Kabupaten"
+                  maxLength={240}
+                  value={values.address}
+                  disabled={isPending}
+                  onChange={(event) => updateValue("address", event.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-location">Titik / Wilayah Lokasi</Label>
+                <Input
+                  id="project-location"
+                  maxLength={240}
+                  placeholder="Koordinat atau nama daerah"
+                  value={values.location}
+                  disabled={isPending}
+                  onChange={(event) => updateValue("location", event.target.value)}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-title">Nama proyek *</Label>
-              <Input
-                id="project-title"
-                required
-                maxLength={180}
-                value={values.title}
-                disabled={isPending}
-                onChange={(event) => updateValue("title", event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-group">Kelompok tani *</Label>
-              <Input
-                id="project-group"
-                required
-                maxLength={160}
-                value={values.kelompokTani}
-                disabled={isPending}
-                onChange={(event) =>
-                  updateValue("kelompokTani", event.target.value)
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-address">Alamat *</Label>
-              <Input
-                id="project-address"
-                required
-                maxLength={240}
-                value={values.address}
-                disabled={isPending}
-                onChange={(event) => updateValue("address", event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-work-type">Jenis pekerjaan</Label>
-              <Input
-                id="project-work-type"
-                maxLength={180}
-                placeholder="Contoh: Rehabilitasi jaringan irigasi"
-                value={values.jenisPekerjaan}
-                disabled={isPending}
-                onChange={(event) =>
-                  updateValue("jenisPekerjaan", event.target.value)
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-field-pic">Penunjukan PIC Lapangan</Label>
-              <Select
-                value={values.fieldPicId || "unassigned"}
-                disabled={isPending}
-                onValueChange={(value) =>
-                  updateValue("fieldPicId", value === "unassigned" ? "" : value)
-                }
-              >
-                <SelectTrigger id="project-field-pic" className="w-full">
-                  <SelectValue placeholder="Pilih PIC lapangan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Belum ditentukan</SelectItem>
-                  {fieldTeamUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Pilih Team Lapangan atau Koordinator Lapangan. Proyek baru
-                berstatus PENDING SETUP sampai PIC dan upah disetujui Direktur.
-              </p>
-              {fieldTeamUsers.length === 0 && (
-                <p className="text-sm text-warning">
-                  Belum ada akun Team Lapangan atau Koordinator Lapangan aktif
-                  yang dapat ditetapkan sebagai PIC. Buat atau aktifkan akun
-                  dengan salah satu role tersebut melalui Manajemen Pengguna.
-                  {canManageUsers && (
-                    <>
-                      {" "}
-                      <Link href="/apps/settings?tab=users" className="font-medium underline">
-                        Buka Manajemen Pengguna
-                      </Link>
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-            {canViewBudget && (
-              <div className="space-y-2">
-              <Label htmlFor="project-budget-plan">
-                {project ? "Pagu terbaru setelah CCO (Rp) *" : "Pagu (Rp) *"}
-              </Label>
-              <Input
-                id="project-budget-plan"
-                type="number"
-                inputMode="decimal"
-                min="0.01"
-                max="9999999999999999.99"
-                step="0.01"
-                required
-                value={values.pagu}
-                disabled={isPending}
-                onChange={(event) => updateValue("pagu", event.target.value)}
-              />
-              {project && (
+          </div>
+
+          {/* Bagian 2: Pelaksana, Prioritas & Jadwal */}
+          <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-3.5 sm:p-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
+              2. Pelaksana, Prioritas &amp; Jadwal
+            </h4>
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="project-field-pic">Penunjukan PIC Lapangan</Label>
+                <Select
+                  value={values.fieldPicId || "unassigned"}
+                  disabled={isPending}
+                  onValueChange={(value) =>
+                    updateValue("fieldPicId", value === "unassigned" ? "" : value)
+                  }
+                >
+                  <SelectTrigger id="project-field-pic" className="w-full">
+                    <SelectValue placeholder="Pilih PIC lapangan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Belum ditentukan</SelectItem>
+                    {fieldTeamUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <p className="text-xs text-muted-foreground">
-                  Perbarui pagu sesuai nilai yang berlaku setelah CCO, jika ada.
+                  Proyek baru berstatus PENDING SETUP sampai PIC dan upah disetujui Direktur.
                 </p>
+                {fieldTeamUsers.length === 0 && (
+                  <p className="text-xs text-warning">
+                    Belum ada akun Team Lapangan atau Koordinator aktif.
+                    {canManageUsers && (
+                      <>
+                        {" "}
+                        <Link href="/apps/settings?tab=users" className="font-medium underline">
+                          Buka Manajemen Pengguna
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-priority">Prioritas</Label>
+                <Select
+                  value={values.priority}
+                  disabled={isPending}
+                  onValueChange={(value) => {
+                    if (isProjectPriority(value)) updateValue("priority", value);
+                  }}
+                >
+                  <SelectTrigger id="project-priority" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priorityOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-progress">Progres Fisik (%)</Label>
+                <Input
+                  id="project-progress"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  required
+                  value={values.progress}
+                  disabled={isPending}
+                  onChange={(event) =>
+                    updateValue("progress", event.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-start-date">Tanggal Mulai</Label>
+                <Input
+                  id="project-start-date"
+                  type="date"
+                  value={values.startDate}
+                  disabled={isPending}
+                  onChange={(event) =>
+                    updateValue("startDate", event.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="project-end-date">Target Selesai</Label>
+                <Input
+                  id="project-end-date"
+                  type="date"
+                  value={values.endDate}
+                  disabled={isPending}
+                  onChange={(event) => updateValue("endDate", event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bagian 3: Anggaran, Lahan & Klien */}
+          <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-3.5 sm:p-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
+              3. Nilai Anggaran, Luas Lahan &amp; Klien
+            </h4>
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              {canViewBudget && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="project-budget-plan">
+                    {project ? "Pagu Terbaru / CCO (Rp) *" : "Nilai Pagu (Rp) *"}
+                  </Label>
+                  <Input
+                    id="project-budget-plan"
+                    type="number"
+                    inputMode="decimal"
+                    min="0.01"
+                    max="9999999999999999.99"
+                    step="0.01"
+                    required
+                    value={values.pagu}
+                    disabled={isPending}
+                    onChange={(event) => updateValue("pagu", event.target.value)}
+                  />
+                </div>
               )}
+              {canViewBudget && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="project-budget">Anggaran Tambahan (Rp)</Label>
+                  <Input
+                    id="project-budget"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max="9999999999999999.99"
+                    step="0.01"
+                    value={values.budget}
+                    disabled={isPending}
+                    onChange={(event) => updateValue("budget", event.target.value)}
+                  />
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="project-area">Luas Lahan Layanan (Ha)</Label>
+                <Input
+                  id="project-area"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max="9999999999.99"
+                  step="0.01"
+                  value={values.landArea}
+                  disabled={isPending}
+                  onChange={(event) =>
+                    updateValue("landArea", event.target.value)
+                  }
+                />
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="project-area">Luas lahan (Ha)</Label>
-              <Input
-                id="project-area"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                max="9999999999.99"
-                step="0.01"
-                value={values.landArea}
-                disabled={isPending}
-                onChange={(event) =>
-                  updateValue("landArea", event.target.value)
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-progress">Progres (%)</Label>
-              <Input
-                id="project-progress"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                required
-                value={values.progress}
-                disabled={isPending}
-                onChange={(event) =>
-                  updateValue("progress", event.target.value)
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-priority">Prioritas</Label>
-              <Select
-                value={values.priority}
-                disabled={isPending}
-                onValueChange={(value) => {
-                  if (isProjectPriority(value)) updateValue("priority", value);
-                }}
-              >
-                <SelectTrigger id="project-priority" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorityOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-vendor">Vendor</Label>
-              <Input
-                id="project-vendor"
-                maxLength={160}
-                value={values.vendor}
-                disabled={isPending}
-                onChange={(event) => updateValue("vendor", event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-client">Nama klien</Label>
-              <Input
-                id="project-client"
-                maxLength={160}
-                value={values.clientName}
-                disabled={isPending}
-                onChange={(event) =>
-                  updateValue("clientName", event.target.value)
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-location">Lokasi</Label>
-              <Input
-                id="project-location"
-                maxLength={240}
-                value={values.location}
-                disabled={isPending}
-                onChange={(event) => updateValue("location", event.target.value)}
-              />
-            </div>
-            {canViewBudget && (
-              <div className="space-y-2">
-              <Label htmlFor="project-budget">Anggaran tambahan (Rp)</Label>
-              <Input
-                id="project-budget"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                max="9999999999999999.99"
-                step="0.01"
-                value={values.budget}
-                disabled={isPending}
-                onChange={(event) => updateValue("budget", event.target.value)}
-              />
+              <div className="space-y-1.5">
+                <Label htmlFor="project-vendor">Pelaksana / Vendor</Label>
+                <Input
+                  id="project-vendor"
+                  maxLength={160}
+                  value={values.vendor}
+                  disabled={isPending}
+                  onChange={(event) => updateValue("vendor", event.target.value)}
+                />
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="project-start-date">Tanggal mulai</Label>
-              <Input
-                id="project-start-date"
-                type="date"
-                value={values.startDate}
-                disabled={isPending}
-                onChange={(event) =>
-                  updateValue("startDate", event.target.value)
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-end-date">Tanggal selesai</Label>
-              <Input
-                id="project-end-date"
-                type="date"
-                value={values.endDate}
-                disabled={isPending}
-                onChange={(event) => updateValue("endDate", event.target.value)}
-              />
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="project-client">Instansi / Nama Klien</Label>
+                <Input
+                  id="project-client"
+                  maxLength={160}
+                  value={values.clientName}
+                  disabled={isPending}
+                  onChange={(event) =>
+                    updateValue("clientName", event.target.value)
+                  }
+                />
+              </div>
             </div>
           </div>
 

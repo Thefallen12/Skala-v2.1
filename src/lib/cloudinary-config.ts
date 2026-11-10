@@ -1,3 +1,4 @@
+import "@/lib/sanitize-env";
 import "server-only";
 
 export type CloudinaryCredentials = {

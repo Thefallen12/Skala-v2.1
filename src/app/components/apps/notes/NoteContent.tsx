@@ -57,37 +57,40 @@ const NoteContent: React.FC<NoteContentProps> = ({ note, updateNote }) => {
 
   if (!note) {
     return (
-      <div className="text-center w-full py-6 text-2xl text-muted-foreground">
-        Select a Note
+      <div className="text-center w-full py-12 text-sm text-muted-foreground">
+        Pilih catatan di sebelah kiri atau buat catatan baru.
       </div>
     );
   }
 
   return (
-    <div className="flex grow p-6">
-      <div className="w-full">
+    <div className="flex grow p-4 sm:p-6">
+      <div className="w-full space-y-4">
         <Textarea
-          placeholder="Edit Note"
-          rows={5}
+          placeholder="Tulis isi catatan..."
+          rows={6}
           value={displayTitle}
           onChange={handleTitleChange}
           onBlur={handleBlur}
-          className="w-full p-6 form-control-textarea"
+          className="w-full p-4 form-control-textarea"
         />
-        <br />
-        <h6 className="text-base mb-3">Change Note Color</h6>
-        <div className="flex gap-2 items-center">
-          {colorOptions.map((color) => (
-            <div
-              key={color.id}
-              onClick={() => handleColorChange(color.disp)}
-              className={`h-7 w-7 flex justify-center items-center rounded-full cursor-pointer 
-                ${note.color === color.disp ? "border-2 border-black" : ""} 
-                ${colorClassMap[color.disp] ?? colorClassMap.primary}`}
-            >
-              {note.color === color.disp && <TbCheck size={18} className="text-white" />}
-            </div>
-          ))}
+        <div>
+          <h6 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2.5">
+            Label Warna Catatan
+          </h6>
+          <div className="flex gap-2.5 items-center">
+            {colorOptions.map((color) => (
+              <div
+                key={color.id}
+                onClick={() => handleColorChange(color.disp)}
+                className={`h-7 w-7 flex justify-center items-center rounded-full cursor-pointer 
+                  ${note.color === color.disp ? "ring-2 ring-primary ring-offset-2" : ""} 
+                  ${colorClassMap[color.disp] ?? colorClassMap.primary}`}
+              >
+                {note.color === color.disp && <TbCheck size={16} className="text-foreground" />}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

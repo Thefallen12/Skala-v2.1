@@ -3,6 +3,9 @@ import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-confi
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
 
 export function isTicketRequestReceiptUrl(url: string): boolean {
+  if (url.startsWith(`/uploads/${REQUEST_DOCUMENT_CLOUDINARY_FOLDER}/`)) {
+    return true;
+  }
   try {
     const parsed = new URL(url);
     const cloudName = getCloudinaryCredentials()?.cloudName;

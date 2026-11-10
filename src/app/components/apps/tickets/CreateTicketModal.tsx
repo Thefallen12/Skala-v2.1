@@ -571,6 +571,7 @@ export default function CreateTicketModal({
   requesterRole,
   movers = [],
   triggerLabel = "Tambah Tiket Baru",
+  defaultOpen = false,
   initialWageRequest,
 }: {
   projects: TicketProjectOption[];
@@ -583,13 +584,14 @@ export default function CreateTicketModal({
   requesterRole?: UserRole;
   movers?: Array<{ id: string; name: string }>;
   triggerLabel?: string;
+  defaultOpen?: boolean;
   initialWageRequest?: {
     projectId: string;
     projectTitle: string;
     workPointTitle: string;
   };
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [error, setError] = useState("");
   const [requestedAmountEdit, setRequestedAmountEdit] = useState<string | null>(
     null,
@@ -1069,35 +1071,40 @@ export default function CreateTicketModal({
       <GlobalModal
         isOpen={open}
         onClose={() => setOpen(false)}
-        title="Tambah tiket ERP"
-        description="Isi proyek, jenis permintaan, data penerima atau rincian item, prioritas, dan tanggal kebutuhan."
-        className="ticket-create-modal max-w-4xl"
+        title="Buat Tiket & Permintaan Baru"
+        description="Lengkapi 3 langkah di bawah ini: (1) Proyek & Jenis Permintaan, (2) Rincian Barang / Dana & Bukti, dan (3) Prioritas & Target Tanggal."
+        className="max-w-4xl"
         footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={form.formState.isSubmitting}
-            >
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              form="ticket-form"
-              disabled={form.formState.isSubmitting}
-              aria-busy={form.formState.isSubmitting}
-            >
-              {form.formState.isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" aria-hidden="true" />
-                  Menyimpan...
-                </>
-              ) : (
-                "Simpan draft"
-              )}
-            </Button>
-          </>
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              Setelah draft disimpan, klik tombol <strong>Ajukan</strong> pada tabel untuk meneruskan ke Direktur.
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={form.formState.isSubmitting}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                form="ticket-form"
+                disabled={form.formState.isSubmitting}
+                aria-busy={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="animate-spin" aria-hidden="true" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Draft Tiket"
+                )}
+              </Button>
+            </div>
+          </div>
         }
       >
         {error && (
@@ -1110,12 +1117,26 @@ export default function CreateTicketModal({
           </p>
         )}
 
-        <form id="ticket-form" onSubmit={submit} className="ticket-create-form space-y-5">
+        <form id="ticket-form" onSubmit={submit} className="space-y-5">
           <fieldset
             disabled={form.formState.isSubmitting}
             className="contents"
           >
-          <div className="ticket-create-top-fields grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-2.5">
+              <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">
+                1
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">
+                  Proyek &amp; Kategori Permintaan
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Pilih proyek tujuan dan kategori kebutuhan lapangan atau operasional
+                </p>
+              </div>
+            </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="ticket-project-field space-y-2">
               <Label htmlFor="ticket-project">Pilih Proyek</Label>
               <Controller
@@ -1694,6 +1715,21 @@ export default function CreateTicketModal({
               </div>
             )}
 
+          </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">
+              2
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">
+                Rincian Kebutuhan (Barang / Dana / Rekening Penerima)
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Masukkan daftar item material, nominal dana, atau tujuan transfer sesuai jenis permintaan
+              </p>
+            </div>
           </div>
 
           {isAPHRequest && (
@@ -2365,8 +2401,23 @@ export default function CreateTicketModal({
             )}
           </section>}
 
-          <div className="ticket-priority-section space-y-3 px-1 py-2">
-            <Label>Tingkat Prioritas</Label>
+          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+            <div className="flex items-center gap-2 border-b border-border pb-2.5">
+              <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">
+                3
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-foreground">
+                  Tingkat Prioritas &amp; Target Waktu
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Tentukan urgensi penanganan dan tanggal kapan barang/dana dibutuhkan
+                </p>
+              </div>
+            </div>
+
+          <div className="space-y-3">
+            <Label>Tingkat Prioritas Penanganan</Label>
             <Controller
               control={form.control}
               name="priority"
@@ -2374,53 +2425,71 @@ export default function CreateTicketModal({
                 <RadioGroup
                   value={field.value}
                   onValueChange={field.onChange}
-                  className="grid grid-cols-3 gap-2 sm:gap-3"
+                  className="grid grid-cols-1 gap-2.5 sm:grid-cols-3"
                   aria-label="Tingkat Prioritas"
                 >
                   <Label
                     htmlFor="priority-non-urgent"
                     className={cn(
-                      "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
-                      field.value === "NON_URGENT" &&
-                        "border-green-600 text-green-700 dark:text-green-400",
+                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-xs transition-all sm:text-sm",
+                      field.value === "NON_URGENT"
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30"
+                        : "border-border hover:border-primary/40",
                     )}
                   >
                     <RadioGroupItem
                       id="priority-non-urgent"
                       value="NON_URGENT"
-                      className="!min-h-0"
+                      className="mt-0.5 !min-h-0"
                     />
-                    Non-Urgent
+                    <div>
+                      <span className="block font-bold">Non-Urgent (Standar)</span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                        Kebutuhan terjadwal normal
+                      </span>
+                    </div>
                   </Label>
                   <Label
                     htmlFor="priority-urgent"
                     className={cn(
-                      "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
-                      field.value === "URGENT" &&
-                        "border-amber-500 text-amber-700 dark:text-amber-400",
+                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-xs transition-all sm:text-sm",
+                      field.value === "URGENT"
+                        ? "border-amber-500 bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30"
+                        : "border-border hover:border-primary/40",
                     )}
                   >
                     <RadioGroupItem
                       id="priority-urgent"
                       value="URGENT"
-                      className="!min-h-0"
+                      className="mt-0.5 !min-h-0"
                     />
-                    Urgent
+                    <div>
+                      <span className="block font-bold">Urgent (Tinggi)</span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                        Perlu segera diproses hari ini
+                      </span>
+                    </div>
                   </Label>
                   <Label
                     htmlFor="priority-emergency"
                     className={cn(
-                      "flex min-w-0 cursor-pointer items-center gap-1.5 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
-                      field.value === "EMERGENCY" &&
-                        "border-destructive text-destructive",
+                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-xs transition-all sm:text-sm",
+                      field.value === "EMERGENCY"
+                        ? "border-rose-500 bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/30"
+                        : "border-border hover:border-primary/40",
                     )}
                   >
                     <RadioGroupItem
                       id="priority-emergency"
                       value="EMERGENCY"
-                      className="!min-h-0"
+                      className="mt-0.5 !min-h-0"
                     />
-                    Emergency
+                    <div>
+                      <span className="block font-bold">Emergency (Mendesak)</span>
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                        Kondisi kritis / darurat lapangan
+                      </span>
+                    </div>
                   </Label>
                 </RadioGroup>
               )}
@@ -2428,8 +2497,8 @@ export default function CreateTicketModal({
           </div>
 
           {!usesItemDeliveryDates && !isAPHRequest && !isInternalFunding && (
-            <div className="ticket-needed-date-section space-y-3 px-1 py-2">
-              <Label>Tanggal Perlu Dibayarkan/Disediakan</Label>
+            <div className="space-y-2 pt-1">
+              <Label>Tanggal Perlu Dibayarkan / Disediakan</Label>
               <Controller
                 control={form.control}
                 name="neededDate"
@@ -2448,7 +2517,7 @@ export default function CreateTicketModal({
                         <CalendarDays aria-hidden="true" />
                         {field.value
                           ? format(field.value, "d MMMM yyyy", { locale: id })
-                          : "Pilih tanggal"}
+                          : "Pilih tanggal target kebutuhan"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent align="start" className="w-auto p-0">
@@ -2470,6 +2539,7 @@ export default function CreateTicketModal({
               )}
             </div>
           )}
+          </div>
 
           </fieldset>
         </form>

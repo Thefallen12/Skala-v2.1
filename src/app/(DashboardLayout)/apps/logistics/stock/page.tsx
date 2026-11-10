@@ -19,7 +19,12 @@ export const metadata: Metadata = {
 const logisticsRoles: UserRole[] = [
   UserRole.LOGISTICS,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
   UserRole.ADMINISTRATIONS,
+  UserRole.KOORDINATOR,
+  UserRole.FINANCE,
+  UserRole.FIELD_TEAM,
+  UserRole.MOVER,
 ];
 
 export default async function LogisticsStockPage({

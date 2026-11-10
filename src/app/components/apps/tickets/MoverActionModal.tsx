@@ -51,31 +51,49 @@ export default function MoverActionModal({
         setMessage("");
         onOpenChange(false);
       }}
-      title="Konfirmasi Barang Tiba"
-      description="Unggah bukti serah terima barang di lapangan. File PDF, JPG, PNG, atau WEBP maksimal 5 MB."
+      title="Konfirmasi Barang Tiba di Lokasi"
+      description="Unggah bukti foto serah terima barang di lapangan. File PDF, JPG, PNG, atau WEBP maksimal 5 MB."
+      footer={
+        <div className="flex w-full items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => {
+              setFile(null);
+              setMessage("");
+              onOpenChange(false);
+            }}
+          >
+            Batal
+          </Button>
+          <Button
+            type="submit"
+            form="mover-action-form"
+            disabled={!file || isPending}
+          >
+            {isPending ? "Menyimpan..." : "Konfirmasi & Selesaikan Tiket"}
+          </Button>
+        </div>
+      }
     >
-        <form className="space-y-4" onSubmit={submit}>
-          <FormLabel className="block space-y-2 text-sm font-medium">
-            Upload Foto Barang Tiba / Bukti DO
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              required
-              disabled={isPending}
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            />
-          </FormLabel>
-          {message && (
-            <p className="text-sm text-muted-foreground" role="status">
-              {message}
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="submit" disabled={!file || isPending}>
-              {isPending ? "Menyimpan..." : "Selesaikan Tiket"}
-            </Button>
-          </DialogFooter>
-        </form>
+      <form id="mover-action-form" className="space-y-4" onSubmit={submit}>
+        <FormLabel className="block space-y-2 text-sm font-medium">
+          Unggah Foto Barang Tiba / Bukti DO
+          <Input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            required
+            disabled={isPending}
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </FormLabel>
+        {message && (
+          <p className="text-sm text-muted-foreground" role="status">
+            {message}
+          </p>
+        )}
+      </form>
     </GlobalModal>
   );
 }

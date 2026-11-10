@@ -4,7 +4,7 @@ import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { canManageUsers } from "@/lib/user-access";
-import { TicketStatus, TicketType } from "@prisma/client";
+import { TicketStatus, TicketType, UserRole } from "@prisma/client";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import DocumentWorkspace from "@/app/components/apps/documents/DocumentWorkspace";
 
@@ -12,10 +12,21 @@ export const metadata: Metadata = {
   title: "Dokumen PO & DO",
 };
 
+const documentRoles: UserRole[] = [
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.LOGISTICS,
+  UserRole.FINANCE,
+  UserRole.KOORDINATOR,
+];
+
 export default async function DocumentsPage() {
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
-  if (!canManageUsers(session.user.role)) redirect("/apps/logistics");
+  if (!documentRoles.includes(session.user.role) && !canManageUsers(session.user.role)) {
+    redirect("/apps/documents/issued");
+  }
 
   const [templates, tickets, documents] = await Promise.all([
     prisma.operationalDocumentTemplate.findMany({

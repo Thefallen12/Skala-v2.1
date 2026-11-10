@@ -58,34 +58,52 @@ export default function ExpeditionArrivalModal({
         setMessage("");
         onOpenChange(false);
       }}
-      title="Terima Material dan Selesaikan Tiket"
-      description={`Tiket ${ticketNumber} · DO ${doNumber}. Unggah foto saat material tiba di gudang. Status DO dan tiket akan diselesaikan bersama.`}
+      title="Terima Material & Selesaikan Tiket"
+      description={`Tiket ${ticketNumber} · DO ${doNumber}. Unggah foto saat material tiba di gudang/lokasi. Status DO dan tiket akan diselesaikan bersama.`}
+      footer={
+        <div className="flex w-full items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => {
+              setPhoto(null);
+              setMessage("");
+              onOpenChange(false);
+            }}
+          >
+            Batal
+          </Button>
+          <Button
+            type="submit"
+            form="expedition-arrival-form"
+            disabled={!photo || isPending}
+          >
+            {isPending ? "Menyelesaikan..." : "Terima & Selesaikan Tiket"}
+          </Button>
+        </div>
+      }
     >
-        <form className="space-y-4" onSubmit={submit}>
-          <FormLabel className="block space-y-2 text-sm font-medium">
-            Foto bukti material tiba
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              required
-              disabled={isPending}
-              onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
-            />
-          </FormLabel>
-          <p className="text-xs text-muted-foreground">
-            Format JPG, PNG, atau WEBP; maksimal 5 MB.
+      <form id="expedition-arrival-form" className="space-y-4" onSubmit={submit}>
+        <FormLabel className="block space-y-2 text-sm font-medium">
+          Foto Bukti Material Tiba
+          <Input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            required
+            disabled={isPending}
+            onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+          />
+        </FormLabel>
+        <p className="text-xs text-muted-foreground">
+          Format JPG, PNG, atau WEBP; maksimal 5 MB.
+        </p>
+        {message && (
+          <p className="text-sm text-destructive" role="alert">
+            {message}
           </p>
-          {message && (
-            <p className="text-sm text-destructive" role="alert">
-              {message}
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="submit" disabled={!photo || isPending}>
-              {isPending ? "Menyelesaikan..." : "Selesaikan Tiket"}
-            </Button>
-          </DialogFooter>
-        </form>
+        )}
+      </form>
     </GlobalModal>
   );
 }

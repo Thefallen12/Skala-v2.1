@@ -47,6 +47,7 @@ next-env.d.ts
 
 # IDE config
 .idea/
+.antigravity/
 
 # Android build outputs
 *.apk

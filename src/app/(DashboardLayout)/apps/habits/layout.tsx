@@ -5,5 +5,5 @@ export default function HabitWorkspaceLayout({
 }: {
   children: ReactNode;
 }) {
-  return <div className="px-3 py-4 sm:px-5 sm:py-5">{children}</div>;
+  return <div className="w-full min-w-0">{children}</div>;
 }

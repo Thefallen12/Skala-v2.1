@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { WorkTaskStatus } from "@prisma/client";
 import {
+  createTimesheetEntry,
   createWorkspaceTask,
   deleteWorkspaceTask,
   updateWorkspaceTaskColor,
@@ -463,30 +464,42 @@ export default function DailyTaskBoard({
     });
   };
 
+  const onLogToTimesheet = (task: TaskRecord) => {
+    const startMs = new Date(task.startsAt).getTime();
+    const endMs = new Date(task.endsAt).getTime();
+    const diffMinutes = Math.max(30, Math.round((endMs - startMs) / 60_000));
+    const workDate = getJakartaDateKey(new Date(task.startsAt));
+    startTransition(async () => {
+      const result = await createTimesheetEntry({
+        projectId: task.projectId,
+        date: workDate,
+        durationMinutes: Math.min(1440, diffMinutes),
+        note: `Tugas: ${task.title}`,
+      });
+      setMessage(result);
+      if (result.success) router.refresh();
+    });
+  };
+
   return (
-    <div className="my-4 space-y-5 sm:my-6 sm:space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/[0.07] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            Ruang kerja tim
-          </p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
-            Tugas harian & proyek
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Atur jadwal, pantau progres, dan pastikan setiap tugas memiliki penanggung jawab.
+          <h2 className="text-lg font-semibold">Papan Tugas Harian &amp; Proyek</h2>
+          <p className="text-xs text-muted-foreground">
+            Atur jadwal pekerjaan tim, perbarui status eksekusi, dan kirim realisasi jam kerja langsung ke Timesheet.
           </p>
         </div>
         <Button
+          size="sm"
           onClick={() => {
             setMessage(null);
             setIsDialogOpen(true);
           }}
           disabled={!projects.length}
-          className="w-full shrink-0 sm:w-auto"
         >
-          <Plus className="mr-2 size-4" aria-hidden="true" />
-          Tambah tugas
+          <Plus className="mr-1.5 size-4" aria-hidden="true" />
+          Tambah Tugas Proyek
         </Button>
       </div>
 
@@ -494,7 +507,7 @@ export default function DailyTaskBoard({
         {taskStats.map(({ label, value, icon: Icon, iconClass }) => (
           <CardBox
             key={label}
-            className="flex min-h-24 items-center gap-3 p-3 sm:p-4"
+            className="flex items-center gap-3 p-3.5"
           >
             <span
               className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
@@ -503,10 +516,7 @@ export default function DailyTaskBoard({
             </span>
             <div className="min-w-0">
               <p className="text-xs font-medium text-muted-foreground">{label}</p>
-              <p className="mt-1 text-2xl font-semibold leading-none">{value}</p>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                pada periode terpilih
-              </p>
+              <p className="mt-0.5 text-xl font-bold leading-none">{value}</p>
             </div>
           </CardBox>
         ))}
@@ -710,6 +720,20 @@ export default function DailyTaskBoard({
                   </select>
                 )}
                 {canEdit && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onLogToTimesheet(task)}
+                    title="Catat durasi tugas ini langsung ke Timesheet proyek"
+                    className="h-9 gap-1.5 text-xs"
+                  >
+                    <Clock3 className="size-3.5 text-primary" />
+                    <span>+ Timesheet</span>
+                  </Button>
+                )}
+                {canEdit && (
                   <ActionIconButton
                     label={`Hapus tugas ${task.title}`}
                     tooltip={`Hapus tugas ${task.title}`}
@@ -773,23 +797,44 @@ export default function DailyTaskBoard({
       <GlobalModal
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        title="Tambah tugas proyek"
+        title="Tambah Tugas Proyek"
         description="Jadwalkan pekerjaan, tentukan proyek, dan tugaskan ke anggota tim aktif."
         className="sm:max-w-xl"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              disabled={isPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="workspace-task-form"
+              disabled={isPending || !projects.length}
+            >
+              {isPending ? "Menyimpan..." : "Simpan Tugas"}
+            </Button>
+          </>
+        }
       >
-            {message && (
-              <p
-                role={message.success ? "status" : "alert"}
-                className={`rounded-md border px-3 py-2 text-xs ${
-                  message.success
-                    ? "border-success/30 bg-lightsuccess text-success"
-                    : "border-destructive/30 bg-destructive/10 text-destructive"
-                }`}
-              >
-                {message.message}
-              </p>
-            )}
+        <div className="space-y-4">
+          {message && (
+            <p
+              role={message.success ? "status" : "alert"}
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                message.success
+                  ? "border-success/30 bg-lightsuccess text-success"
+                  : "border-destructive/30 bg-destructive/10 text-destructive"
+              }`}
+            >
+              {message.message}
+            </p>
+          )}
           <form
+            id="workspace-task-form"
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={(event) => {
               event.preventDefault();
@@ -797,27 +842,75 @@ export default function DailyTaskBoard({
             }}
           >
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="workspace-task-title">Nama tugas</Label>
-              <Input id="workspace-task-title" name="title" required minLength={2} maxLength={160} />
+              <Label htmlFor="workspace-task-title">Nama Tugas Pekerjaan</Label>
+              <Input
+                id="workspace-task-title"
+                name="title"
+                placeholder="Contoh: Pemasangan bekisting / Pengecekan struktur"
+                required
+                minLength={2}
+                maxLength={160}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="workspace-task-project">Proyek</Label>
-              <select id="workspace-task-project" name="projectId" required className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-                {projects.map((project) => <option key={project.id} value={project.id}>{project.code} — {project.name}</option>)}
+              <select
+                id="workspace-task-project"
+                name="projectId"
+                required
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.code} — {project.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="workspace-task-assignee">Lead</Label>
-              <select id="workspace-task-assignee" name="assigneeId" defaultValue={currentUserId} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <Label htmlFor="workspace-task-assignee">Penanggung Jawab (Lead)</Label>
+              <select
+                id="workspace-task-assignee"
+                name="assigneeId"
+                defaultValue={currentUserId}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
                 <option value="">Tanpa lead</option>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="workspace-task-start">Mulai (WIB)</Label>
+              <Input
+                id="workspace-task-start"
+                name="startsAt"
+                type="datetime-local"
+                defaultValue={toLocalInput(selectedDate, "09:00")}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workspace-task-end">Selesai (WIB)</Label>
+              <Input
+                id="workspace-task-end"
+                name="endsAt"
+                type="datetime-local"
+                defaultValue={toLocalInput(selectedDate, "11:00")}
+                required
+              />
+            </div>
             <fieldset className="space-y-2 sm:col-span-2">
-              <legend className="text-sm font-medium">Anggota tugas</legend>
-              <div className="grid max-h-28 gap-2 overflow-y-auto rounded-md border border-input p-3 sm:grid-cols-2">
+              <legend className="text-xs font-semibold">Anggota Tim Terlibat</legend>
+              <div className="grid max-h-28 gap-2 overflow-y-auto rounded-lg border border-input bg-muted/20 p-3 sm:grid-cols-2">
                 {members.map((member) => (
-                  <FormLabel key={member.id} className="flex items-center gap-2 text-xs">
+                  <FormLabel
+                    key={member.id}
+                    className="flex cursor-pointer items-center gap-2 text-xs"
+                  >
                     <input
                       type="checkbox"
                       name="memberIds"
@@ -831,7 +924,7 @@ export default function DailyTaskBoard({
               </div>
             </fieldset>
             <fieldset className="space-y-2 sm:col-span-2">
-              <legend className="text-sm font-medium">Warna bar tugas</legend>
+              <legend className="text-xs font-semibold">Warna Label Tugas</legend>
               <div className="flex flex-wrap gap-2">
                 {habitTaskColors.map((color, index) => (
                   <FormLabel
@@ -854,23 +947,19 @@ export default function DailyTaskBoard({
                 ))}
               </div>
             </fieldset>
-            <div className="space-y-2">
-              <Label htmlFor="workspace-task-start">Mulai</Label>
-              <Input id="workspace-task-start" name="startsAt" type="datetime-local" defaultValue={toLocalInput(selectedDate, "09:00")} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workspace-task-end">Selesai</Label>
-              <Input id="workspace-task-end" name="endsAt" type="datetime-local" defaultValue={toLocalInput(selectedDate, "10:00")} required />
-            </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="workspace-task-description">Catatan</Label>
-              <textarea id="workspace-task-description" name="description" rows={3} maxLength={1000} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Label htmlFor="workspace-task-description">Catatan (Opsional)</Label>
+              <textarea
+                id="workspace-task-description"
+                name="description"
+                rows={2}
+                maxLength={1000}
+                placeholder="Detail instruksi atau target capaian..."
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
             </div>
-            <DialogFooter className="sm:col-span-2">
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isPending}>Batal</Button>
-              <Button type="submit" disabled={isPending || !projects.length}>{isPending ? "Menyimpan..." : "Simpan tugas"}</Button>
-            </DialogFooter>
           </form>
+        </div>
       </GlobalModal>
     </div>
   );

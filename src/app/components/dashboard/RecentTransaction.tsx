@@ -39,7 +39,7 @@ export const RecentTransaction = ({
 }: {
   tickets: DashboardTicket[];
 }) => (
-  <CardBox className="dashboard-enter h-full w-full border-orange-200 bg-gradient-to-br from-white to-orange-50 p-5 shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-slate-700/80 dark:from-[#1e293b] dark:to-[#312318]/50 sm:p-6">
+  <CardBox className="h-full w-full border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
     <div className="mb-5 flex items-center justify-between gap-3 border-b border-border pb-4">
       <div>
         <h2 className="font-bold text-slate-900 dark:text-white">

@@ -1,5 +1,5 @@
 .page-wrapper {
-    margin-left: calc(0px + 270px);
+    margin-left: 0;
     transition: .2s ease-in;
 }
 .custom-dropdown{
@@ -11,18 +11,5 @@
 .btn-circle{
     width: 40px;
     height:40px;
-}
-
-@media screen and (max-width:1280px) {
-    .page-wrapper{
-        margin-left: 0;
-    }
-}
-
-/* Android WebView / mobile: pastikan tidak ada margin sidebar */
-@media screen and (max-width:1280px), (hover: none) {
-    .page-wrapper {
-        margin-left: 0 !important;
-    }
 }
 

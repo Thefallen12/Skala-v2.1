@@ -333,58 +333,48 @@ export default function LogisticsHub({
       onValueChange={setActiveTab}
       className="space-y-5"
     >
-      <TabsList className="h-auto w-full flex-wrap justify-center gap-1 rounded-lg border border-border bg-muted p-2 md:justify-start">
+      <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 sm:grid-cols-3 xl:grid-cols-6">
         <TabsTrigger
           value="tickets"
-          aria-label="Tiket Masuk"
-          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
         >
           <TicketCheck className="size-4 shrink-0" aria-hidden="true" />
-          <span className="sr-only md:not-sr-only">Tiket Masuk</span>
+          <span className="truncate">1. Tiket Masuk</span>
         </TabsTrigger>
         <TabsTrigger
           value="stock"
-          aria-label="Stok Gudang"
-          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
         >
           <Boxes className="size-4 shrink-0" aria-hidden="true" />
-          <span className="sr-only md:not-sr-only">Stok Gudang</span>
+          <span className="truncate">2. Stok Gudang</span>
         </TabsTrigger>
         <TabsTrigger
           value="documents"
-          aria-label="Dokumen PO & DO"
-          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
         >
           <FileText className="size-4 shrink-0" aria-hidden="true" />
-          <span className="sr-only md:not-sr-only">Dokumen PO & DO</span>
+          <span className="truncate">3. Dokumen PO &amp; DO</span>
         </TabsTrigger>
         <TabsTrigger
           value="equipment"
-          aria-label="Logistik, Kendaraan & BBM"
-          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
         >
           <Fuel className="size-4 shrink-0" aria-hidden="true" />
-          <span className="sr-only md:not-sr-only">
-            Logistik, Kendaraan & BBM
-          </span>
+          <span className="truncate">4. Alat &amp; BBM</span>
         </TabsTrigger>
         <TabsTrigger
           value="vehicles"
-          aria-label="Data Kendaraan & Armada"
-          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
         >
           <Truck className="size-4 shrink-0" aria-hidden="true" />
-          <span className="sr-only md:not-sr-only">
-            Data Kendaraan & Armada
-          </span>
+          <span className="truncate">5. Armada</span>
         </TabsTrigger>
         <TabsTrigger
           value="vendors"
-          aria-label="Katalog Vendor"
-          className="h-10 w-10 gap-2 p-0 md:h-auto md:w-auto md:px-3"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
         >
           <Store className="size-4 shrink-0" aria-hidden="true" />
-          <span className="sr-only md:not-sr-only">Katalog Vendor</span>
+          <span className="truncate">6. Katalog Vendor</span>
         </TabsTrigger>
       </TabsList>
 

@@ -726,12 +726,12 @@ export default function HabitCalendar({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">Kalender</h2>
+          <h2 className="text-lg font-semibold">Kalender Proyek &amp; Operasional</h2>
           <p className="text-xs text-muted-foreground">
-            Jadwal proyek, roadmap, dan tugas harian dari data yang sama.
+            Jadwal proyek, rapat koordinasi, pengiriman material, dan tugas harian terpadu.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -739,7 +739,19 @@ export default function HabitCalendar({
             onClick={() => exportCalendar(visibleItems)}
           >
             <ArrowDownToLine className="mr-1.5 size-3.5" aria-hidden="true" />
-            Ekspor
+            Ekspor CSV
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setTaskMessage(null);
+              setTaskSlot({ date: selectedDate, hour: 9 });
+            }}
+          >
+            <Plus className="mr-1.5 size-3.5" aria-hidden="true" />
+            Jadwalkan Tugas
           </Button>
           <Button
             type="button"
@@ -747,7 +759,7 @@ export default function HabitCalendar({
             onClick={() => onAddSchedule(selectedDate)}
           >
             <Plus className="mr-1.5 size-3.5" aria-hidden="true" />
-            Tambah agenda
+            Tambah Agenda / Rapat
           </Button>
         </div>
       </div>
@@ -812,10 +824,7 @@ export default function HabitCalendar({
                     aria-label={format(date, "EEEE, d MMMM yyyy", { locale: id })}
                     title={holidayName ?? (isSunday ? "Hari Minggu" : undefined)}
                     aria-pressed={isSelected}
-                    onClick={() => {
-                      navigate(date);
-                      onAddSchedule(dateKey);
-                    }}
+                    onClick={() => navigate(date)}
                     className={`relative mx-auto grid size-7 place-items-center rounded text-[10px] transition-colors ${
                       isSelected
                         ? "bg-primary text-primary-foreground"
@@ -1063,10 +1072,7 @@ export default function HabitCalendar({
                     <div className="mb-1 flex items-center justify-between">
                       <button
                         type="button"
-                        onClick={() => {
-                          navigate(date);
-                          onAddSchedule(dateKey);
-                        }}
+                        onClick={() => navigate(date)}
                         className={`grid size-6 place-items-center rounded-full text-[10px] font-semibold ${
                           holidayName || isSunday
                             ? "bg-red-600 text-white"
@@ -1077,9 +1083,19 @@ export default function HabitCalendar({
                       >
                         {format(date, "d")}
                       </button>
-                      {isToday && (
-                        <Badge className="px-1.5 py-0 text-[8px]">Hari ini</Badge>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {isToday && (
+                          <Badge className="px-1.5 py-0 text-[8px]">Hari ini</Badge>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onAddSchedule(dateKey)}
+                          title={`Tambah agenda pada ${format(date, "d MMM yyyy", { locale: id })}`}
+                          className="grid size-5 place-items-center rounded text-muted-foreground hover:bg-primary/15 hover:text-primary"
+                        >
+                          <Plus className="size-3" />
+                        </button>
+                      </div>
                     </div>
                     {holidayName && visibleCategories.has("holiday") && (
                       <p
@@ -1126,18 +1142,38 @@ export default function HabitCalendar({
           setTaskSlot(null);
           setTaskMessage(null);
         }}
-        title="Tambah tugas dari kalender"
+        title="Jadwalkan Tugas Proyek"
         description={
           taskSlot
-            ? `${format(dateFromKey(taskSlot.date), "EEEE, d MMMM yyyy", { locale: id })} · ${String(taskSlot.hour).padStart(2, "0")}.00 WIB`
-            : "Isi detail tugas yang akan dijadwalkan."
+            ? `${format(dateFromKey(taskSlot.date), "EEEE, d MMMM yyyy", { locale: id })} · Mulai pukul ${String(taskSlot.hour).padStart(2, "0")}.00 WIB`
+            : "Isi detail tugas proyek yang akan dijadwalkan."
         }
         className="sm:max-w-xl"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTaskSlot(null)}
+              disabled={isSavingTask}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="calendar-task-form"
+              disabled={isSavingTask || projects.length === 0}
+            >
+              {isSavingTask ? "Menyimpan..." : "Simpan Tugas"}
+            </Button>
+          </>
+        }
       >
+        <div className="space-y-4">
           {taskMessage && (
             <p
               role={taskMessage.success ? "status" : "alert"}
-              className={`rounded-md border px-3 py-2 text-sm ${
+              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
                 taskMessage.success
                   ? "border-success/30 bg-success/10 text-success"
                   : "border-destructive/30 bg-destructive/10 text-destructive"
@@ -1147,6 +1183,7 @@ export default function HabitCalendar({
             </p>
           )}
           <form
+            id="calendar-task-form"
             key={`${taskSlot?.date ?? ""}-${taskSlot?.hour ?? ""}`}
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={(event) => {
@@ -1155,18 +1192,18 @@ export default function HabitCalendar({
             }}
           >
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="calendar-task-title">Nama tugas</Label>
+              <Label htmlFor="calendar-task-title">Nama Tugas Pekerjaan</Label>
               <Input
                 id="calendar-task-title"
                 name="title"
-                placeholder="Contoh: Pengecoran pondasi"
+                placeholder="Contoh: Pengecoran pondasi / Inspeksi lapangan"
                 minLength={2}
                 maxLength={160}
                 required
                 autoFocus
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="calendar-task-project">Proyek</Label>
               <select
                 id="calendar-task-project"
@@ -1181,6 +1218,22 @@ export default function HabitCalendar({
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.code} · {project.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="calendar-task-lead">Penanggung Jawab (Lead)</Label>
+              <select
+                id="calendar-task-lead"
+                name="assigneeId"
+                defaultValue={currentUserId}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Tanpa lead</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
                   </option>
                 ))}
               </select>
@@ -1215,29 +1268,13 @@ export default function HabitCalendar({
                 required
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="calendar-task-lead">Lead</Label>
-              <select
-                id="calendar-task-lead"
-                name="assigneeId"
-                defaultValue={currentUserId}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">Tanpa lead</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </div>
             <fieldset className="space-y-2 sm:col-span-2">
-              <legend className="text-sm font-medium">Anggota tugas</legend>
-              <div className="grid max-h-28 gap-2 overflow-y-auto rounded-md border border-input p-3 sm:grid-cols-2">
+              <legend className="text-xs font-semibold">Anggota Tim Terlibat</legend>
+              <div className="grid max-h-28 gap-2 overflow-y-auto rounded-lg border border-input bg-muted/20 p-3 sm:grid-cols-2">
                 {members.map((member) => (
                   <FormLabel
                     key={member.id}
-                    className="flex items-center gap-2 text-xs"
+                    className="flex cursor-pointer items-center gap-2 text-xs"
                   >
                     <input
                       type="checkbox"
@@ -1252,7 +1289,7 @@ export default function HabitCalendar({
               </div>
             </fieldset>
             <fieldset className="space-y-2 sm:col-span-2">
-              <legend className="text-sm font-medium">Warna bar tugas</legend>
+              <legend className="text-xs font-semibold">Warna Label Tugas</legend>
               <div className="flex flex-wrap gap-2">
                 {habitTaskColors.map((color, index) => (
                   <FormLabel
@@ -1276,32 +1313,18 @@ export default function HabitCalendar({
               </div>
             </fieldset>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="calendar-task-description">Catatan</Label>
+              <Label htmlFor="calendar-task-description">Catatan (Opsional)</Label>
               <textarea
                 id="calendar-task-description"
                 name="description"
-                rows={3}
+                rows={2}
                 maxLength={1000}
+                placeholder="Instruksi atau detail pekerjaan..."
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
-            <DialogFooter className="sm:col-span-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setTaskSlot(null)}
-                disabled={isSavingTask}
-              >
-                Batal
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSavingTask || projects.length === 0}
-              >
-                {isSavingTask ? "Menyimpan..." : "Simpan tugas"}
-              </Button>
-            </DialogFooter>
           </form>
+        </div>
       </GlobalModal>
     </div>
   );

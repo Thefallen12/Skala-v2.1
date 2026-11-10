@@ -157,7 +157,7 @@ export default function SettingsClient({
             Kontrol Navigasi &amp; Maintenance
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)] border-b border-border bg-muted/70 text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+          <div className="hidden grid-cols-[minmax(0,1.8fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)] border-b border-border bg-muted/70 text-[12px] font-bold uppercase tracking-[0.08em] text-muted-foreground sm:grid">
             <div className="px-4 py-3">Halaman / Sub-Menu</div>
             <div className="px-4 py-3">Alamat Halaman</div>
             <div className="px-4 py-3 text-right">Maintenance</div>
@@ -172,7 +172,7 @@ export default function SettingsClient({
 
               return (
                 <section key={section} aria-label={section} className="bg-card">
-                  <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)] items-center bg-card px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 bg-card px-4 py-3 sm:grid sm:grid-cols-[minmax(0,1.8fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)]">
                     <button
                       type="button"
                       onClick={() => toggleGroup(section)}
@@ -196,7 +196,7 @@ export default function SettingsClient({
                         </span>
                       )}
                     </button>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
                       {pages.length} halaman
                     </span>
                     <span className="text-right text-xs font-medium text-muted-foreground">
@@ -216,9 +216,9 @@ export default function SettingsClient({
                       return (
                         <div
                           key={page.key}
-                          className="grid grid-cols-[minmax(0,1.8fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)] items-center border-t border-border bg-card px-4 py-3"
+                          className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-4 py-3 sm:grid sm:grid-cols-[minmax(0,1.8fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)]"
                         >
-                          <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
                             <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                               <Folder className="size-4" />
                             </span>
@@ -238,16 +238,20 @@ export default function SettingsClient({
                                   {page.description}
                                 </span>
                               )}
+                              <code className="mt-0.5 block truncate text-[11px] text-muted-foreground sm:hidden">
+                                {page.path}
+                                {query}
+                              </code>
                             </div>
                           </div>
 
-                          <code className="truncate text-xs text-muted-foreground">
+                          <code className="hidden truncate text-xs text-muted-foreground sm:block">
                             {page.path}
                             {query}
                           </code>
 
-                          <div className="flex items-center justify-end gap-3">
-                            <span className="text-sm font-medium text-muted-foreground">
+                          <div className="flex shrink-0 items-center justify-end gap-3">
+                            <span className="text-xs font-medium text-muted-foreground sm:text-sm">
                               {page.manageable === false
                                 ? "Selalu aktif"
                                 : isEnabled

@@ -21,6 +21,9 @@ export const metadata: Metadata = {
 const executiveRoles: UserRole[] = [
   UserRole.DIRECTOR,
   UserRole.DEPUTY_DIRECTOR,
+  UserRole.ADMINISTRATIONS,
+  UserRole.KOORDINATOR,
+  UserRole.FINANCE,
 ];
 
 export default async function ApprovalsPage({
@@ -109,7 +112,15 @@ export default async function ApprovalsPage({
             id: true,
             ticketNumber: true,
             title: true,
+            description: true,
             type: true,
+            priority: true,
+            requestCategory: true,
+            requestPaymentMethod: true,
+            requestPaymentDescription: true,
+            attachmentUrl: true,
+            receiptUrls: true,
+            purchaseReceiptUrl: true,
             totalAmount: true,
             requestedAmount: true,
             recipientName: true,
@@ -254,11 +265,28 @@ export default async function ApprovalsPage({
             id: true,
             purchaseNumber: true,
             vendorName: true,
+            paymentMethod: true,
+            paymentBankName: true,
+            paymentAccountNumber: true,
+            paymentAccountName: true,
+            notes: true,
             totalAmount: true,
             createdAt: true,
             createdBy: { select: { name: true } },
+            ticket: {
+              select: {
+                ticketNumber: true,
+                project: { select: { title: true, kelompokTani: true } },
+              },
+            },
             items: {
-              select: { itemName: true, quantity: true, unit: true },
+              select: {
+                itemName: true,
+                quantity: true,
+                unit: true,
+                unitPrice: true,
+                totalPrice: true,
+              },
             },
           },
         })
@@ -267,7 +295,10 @@ export default async function ApprovalsPage({
       session.user.role === UserRole.DEPUTY_DIRECTOR)
       ? prisma.projectWorkPoint.findMany({
           where: {
-            approvedTotalWage: null,
+            OR: [
+              { approvedTotalWage: null },
+              { approvedTotalWage: { isSet: false } },
+            ],
             project: { isDeleted: false },
           },
           orderBy: { createdAt: "asc" },
@@ -280,6 +311,7 @@ export default async function ApprovalsPage({
             proposedUnitPrice: true,
             proposedTotalWage: true,
             approvedTotalWage: true,
+            createdAt: true,
             proposedBy: { select: { name: true } },
             project: { select: { title: true, kelompokTani: true } },
           },
@@ -319,6 +351,7 @@ export default async function ApprovalsPage({
         workScope: true,
         contractValue: true,
         createdById: true,
+        createdAt: true,
         project: { select: { title: true, kelompokTani: true } },
       },
     }),
@@ -331,6 +364,7 @@ export default async function ApprovalsPage({
         budgetChange: true,
         timeExtension: true,
         reason: true,
+        createdAt: true,
         project: { select: { title: true, kelompokTani: true } },
       },
     }),
@@ -520,19 +554,38 @@ export default async function ApprovalsPage({
           id: purchase.id,
           purchaseNumber: purchase.purchaseNumber,
           vendorName: purchase.vendorName,
+          paymentMethod: purchase.paymentMethod,
+          paymentBankName: purchase.paymentBankName,
+          paymentAccountNumber: purchase.paymentAccountNumber,
+          paymentAccountName: purchase.paymentAccountName,
+          notes: purchase.notes,
+          projectName: purchase.ticket?.project
+            ? `${purchase.ticket.project.kelompokTani} · ${purchase.ticket.project.title}`
+            : null,
+          ticketNumber: purchase.ticket?.ticketNumber ?? null,
           totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
           createdAt: purchase.createdAt.toISOString(),
           createdByName: purchase.createdBy.name,
           items: purchase.items.map((item) => ({
             ...item,
             quantity: decimalStringFromScaledInteger(item.quantity),
+            unitPrice: decimalStringFromScaledInteger(item.unitPrice),
+            totalPrice: decimalStringFromScaledInteger(item.totalPrice),
           })),
         }))}
         tickets={tickets.map((ticket) => ({
           id: ticket.id,
           ticketNumber: ticket.ticketNumber,
           title: ticket.title,
+          description: ticket.description,
           type: ticket.type,
+          priority: ticket.priority,
+          requestCategory: ticket.requestCategory,
+          requestPaymentMethod: ticket.requestPaymentMethod,
+          requestPaymentDescription: ticket.requestPaymentDescription,
+          attachmentUrl: ticket.attachmentUrl,
+          receiptUrls: ticket.receiptUrls,
+          purchaseReceiptUrl: ticket.purchaseReceiptUrl,
           totalAmount:
             (ticket.totalAmount !== null
               ? decimalStringFromScaledInteger(ticket.totalAmount)
@@ -573,6 +626,7 @@ export default async function ApprovalsPage({
             workPoint.approvedTotalWage !== null
               ? decimalStringFromScaledInteger(workPoint.approvedTotalWage)
               : null,
+          createdAt: workPoint.createdAt.toISOString(),
           proposedByName: workPoint.proposedBy.name,
         }))}
         termyns={termyns.map((termyn) => ({
@@ -595,6 +649,7 @@ export default async function ApprovalsPage({
           workScope: contract.workScope,
           contractValue: decimalStringFromScaledInteger(contract.contractValue),
           createdById: contract.createdById,
+          createdAt: contract.createdAt.toISOString(),
           projectName: `${contract.project.kelompokTani} · ${contract.project.title}`,
         }))}
         addendums={addendums.map((addendum) => ({
@@ -603,6 +658,7 @@ export default async function ApprovalsPage({
           budgetChange: decimalStringFromScaledInteger(addendum.budgetChange),
           timeExtension: addendum.timeExtension,
           reason: addendum.reason,
+          createdAt: addendum.createdAt.toISOString(),
           projectName: `${addendum.project.kelompokTani} · ${addendum.project.title}`,
         }))}
         bastDocuments={bastDocuments.map((bast) => ({

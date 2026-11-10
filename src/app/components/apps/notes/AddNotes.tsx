@@ -46,50 +46,61 @@ const AddNotes = ({ colors, addNote }: Props) => {
 
   return (
     <>
-      <Button className='rounded-md' onClick={() => setOpenNoteModal(true)}>Add Note</Button>
+      <Button size='sm' className='rounded-lg' onClick={() => setOpenNoteModal(true)}>
+        + Catatan Baru
+      </Button>
       <GlobalModal
         isOpen={openNoteModal}
         onClose={() => setOpenNoteModal(false)}
-        title='Add New Note'
+        title='Tambah Catatan Baru'
+        description='Simpan catatan singkat operasional atau pengingat kerja.'
         className='sm:max-w-lg'
+        footer={
+          <>
+            <Button
+              variant='outline'
+              onClick={() => setOpenNoteModal(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              disabled={!title.trim() || saving}
+              onClick={() => void handleSave()}
+            >
+              {saving ? 'Menyimpan...' : 'Simpan Catatan'}
+            </Button>
+          </>
+        }
       >
-          <div className='space-y-2'>
-            <Textarea
-              rows={5}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className='w-full'
-              placeholder='Write your note here...'
-            />
-            <h6 className='text-base pt-4'>Change Note Color</h6>
-            <div className='flex gap-2 items-center'>
+        <div className='space-y-3'>
+          <Textarea
+            rows={5}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className='w-full'
+            placeholder='Tulis catatan Anda di sini...'
+          />
+          <div>
+            <h6 className='text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2'>
+              Pilih Warna Label
+            </h6>
+            <div className='flex gap-2.5 items-center'>
               {colors?.map((color) => (
                 <div
                   key={color.disp}
                   onClick={() => setColor(color.disp)}
-                  className={`h-7 w-7 flex justify-center items-center rounded-full cursor-pointer ${colorClassMap[color.disp] ?? colorClassMap.primary}`}>
+                  className={`h-7 w-7 flex justify-center items-center rounded-full cursor-pointer ${
+                    scolor === color.disp ? 'ring-2 ring-primary ring-offset-2' : ''
+                  } ${colorClassMap[color.disp] ?? colorClassMap.primary}`}
+                >
                   {scolor === color.disp && (
-                    <TbCheck size={18} className='text-white' />
+                    <TbCheck size={16} className='text-foreground' />
                   )}
                 </div>
               ))}
             </div>
           </div>
-
-          <DialogFooter className='pt-4'>
-            <Button
-              disabled={!title.trim() || saving}
-              onClick={() => void handleSave()}
-              className='rounded-md'>
-              Save
-            </Button>
-            <Button
-              variant='outline'
-              className='rounded-md'
-              onClick={() => setOpenNoteModal(false)}>
-              Close
-            </Button>
-          </DialogFooter>
+        </div>
       </GlobalModal>
     </>
   )

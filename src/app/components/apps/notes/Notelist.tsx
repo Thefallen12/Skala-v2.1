@@ -40,40 +40,45 @@ const Notelist: React.FC<NotelistProps> = ({ notes, loading, selectedNoteId, onS
     onSelectNote(noteId);
   };
 
-  if (loading) return <p>Loading notes...</p>;
+  if (loading) return <p className="text-sm text-muted-foreground">Memuat catatan...</p>;
 
   return (
     <div>
       <Input
         type="text"
-        placeholder="Search Notes"
+        placeholder="Cari catatan..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         className="w-full"
       />
-      <h6 className="text-base mt-6">All Notes</h6>
-      <div className="flex flex-col gap-3 mt-4">
+      <h6 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-4">
+        Semua Catatan ({filteredNotes.length})
+      </h6>
+      <div className="flex flex-col gap-2.5 mt-3">
         {filteredNotes.length ? (
           filteredNotes.map((note) => {
             const colorClasses = colorClassMap[note.color || "primary"];
             return (
               <div key={note.id}>
                 <div
-                  className={`cursor-pointer relative p-4 rounded-md ${colorClasses} ${
-                    effectiveActiveNoteId === note.id ? "scale-100" : "scale-95"
-                  } transition-transform duration-200`}
+                  className={`cursor-pointer relative p-3.5 rounded-lg ${colorClasses} ${
+                    effectiveActiveNoteId === note.id ? "ring-2 ring-primary/40" : "opacity-90"
+                  } transition-all duration-150`}
                   onClick={() => handleNoteClick(note.id)}
                 >
-                  <h6 className="text-base truncate">{note.title}</h6>
-                  <div className="flex items-center justify-between">
+                  <h6 className="text-sm font-medium truncate">{note.title}</h6>
+                  <div className="flex items-center justify-between mt-1">
                     <p className="text-xs text-muted-foreground">
-                      {note.datef ? new Date(note.datef).toLocaleDateString() : "-"}
+                      {note.datef ? new Date(note.datef).toLocaleDateString("id-ID") : "-"}
                     </p>
                     <ActionIconButton
                       label={`Hapus catatan ${note.title}`}
                       tooltip={`Hapus catatan ${note.title}`}
                       icon={Trash2}
-                      onClick={() => onDeleteNote(note.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteNote(note.id);
+                      }}
                       variant="ghost"
                     />
                   </div>
@@ -82,8 +87,8 @@ const Notelist: React.FC<NotelistProps> = ({ notes, loading, selectedNoteId, onS
             );
           })
         ) : (
-          <Alert variant="destructive">
-            <AlertTitle>No Notes Found!</AlertTitle>
+          <Alert>
+            <AlertTitle className="text-xs">Belum ada catatan yang sesuai.</AlertTitle>
           </Alert>
         )}
       </div>

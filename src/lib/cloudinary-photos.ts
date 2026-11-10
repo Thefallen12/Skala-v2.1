@@ -1,9 +1,19 @@
+import "@/lib/sanitize-env";
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
 
 const photoMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 type PhotoMimeType = (typeof photoMimeTypes)[number];
+
+const extByMime: Record<PhotoMimeType, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 export class CloudinaryPhotoValidationError extends Error {
   constructor(message: string) {
@@ -79,6 +89,22 @@ export async function uploadCloudinaryPhoto(
     );
   }
 
+  const credentials = getCloudinaryCredentials();
+  if (!credentials) {
+    const safeFolder = folder.replace(/[^a-zA-Z0-9/_-]/g, "");
+    const ext = extByMime[file.type as PhotoMimeType] ?? "jpg";
+    const fileName = `${randomUUID()}.${ext}`;
+    const relativeDir = path.posix.join("uploads", safeFolder);
+    const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
+    await mkdir(absDir, { recursive: true });
+    await writeFile(path.join(absDir, fileName), bytes);
+    const localUrl = `/${relativeDir}/${fileName}`;
+    return {
+      secureUrl: localUrl,
+      publicId: `${safeFolder}/${fileName.replace(/\.[^.]+$/, "")}`,
+    };
+  }
+
   configureCloudinary();
   return new Promise((resolveUpload, rejectUpload) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -103,6 +129,11 @@ export async function uploadCloudinaryPhoto(
 }
 
 export function getCloudinaryPublicId(url: string): string | null {
+  if (url.startsWith("/uploads/")) {
+    return url
+      .replace(/^\/uploads\//, "")
+      .replace(/\.[^.]+$/, "");
+  }
   try {
     const parsed = new URL(url);
     if (parsed.hostname !== "res.cloudinary.com") return null;
@@ -122,6 +153,9 @@ export function getCloudinaryPublicId(url: string): string | null {
 }
 
 export async function removeCloudinaryPhoto(url: string): Promise<boolean> {
+  if (url.startsWith("/uploads/")) {
+    return true;
+  }
   const publicId = getCloudinaryPublicId(url);
   if (!publicId) return false;
   await deleteCloudinaryPhoto(publicId);

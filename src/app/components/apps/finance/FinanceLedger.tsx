@@ -1,57 +1,64 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  createFinanceAccount,
-  recordHistoricalPaymentCashflow,
-} from "@/app/actions/finance-cashflow";
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowRightLeft,
+  ArrowUpRight,
+  CreditCard,
+  ExternalLink,
+  Eye,
+  Landmark,
+  Plus,
+  Search,
+  Wallet,
+} from "lucide-react";
+import { createFinanceAccount } from "@/app/actions/finance-cashflow";
 import IncomingFundModal, {
   type FinanceAccountOption,
   type FinanceProjectOption,
 } from "@/app/components/apps/finance/IncomingFundModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { GlobalModal } from "@/components/ui/global-modal";
-import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  ArrowDownLeft,
-  ArrowLeftRight,
-  ArrowUpRight,
-  Eye,
-  Plus,
-  Wallet,
-} from "lucide-react";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import { PaymentType } from "@prisma/client";
+
+export type FinanceAccountCard = FinanceAccountOption;
 
 export type FinanceCashflowRow = {
   id: string;
-  type: string;
+  type: "IN" | "OUT";
   amount: number;
   sourceDesc: string;
-  paymentMethod: string;
+  paymentMethod: "TRANSFER" | "CASH" | "DEPOSIT" | null;
   senderName: string | null;
   transferGroupId: string | null;
-  proofUrl: string | null;
+  proofUrl: string;
   createdAt: string;
   account: { id: string; accountName: string };
-  project: { kelompokTani: string | null } | null;
-  recorder: { name: string | null };
+  project: { kelompokTani: string } | null;
+  recorder: { name: string };
 };
 
 export type FinanceHistoricalPayment = {
   id: string;
   amount: number;
   paidAt: string;
-  paymentType: string;
+  paymentType: PaymentType;
   proofUrl: string | null;
   category: string;
   sourceDesc: string;
@@ -64,19 +71,68 @@ const currency = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount);
 
+const formatDateTime = (iso: string) =>
+  new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(iso));
+
+const isImageUrl = (url: string) =>
+  /\.(?:jpe?g|png|webp)$/i.test(url.split(/[?#]/, 1)[0]);
+
+const paymentMethodLabel = (
+  method: "TRANSFER" | "CASH" | "DEPOSIT" | string | null,
+) => {
+  if (method === "CASH") return "Kas Tunai (Cash)";
+  if (method === "DEPOSIT") return "Setor Tunai / Deposit";
+  return "Transfer Bank";
+};
+
 const financeInstitutions = {
   Bank: [
-    "Bank Syariah Indonesia (BSI)",
-    "Bank Syariah Aceh (BPD)",
-    "Bank Mandiri",
     "Bank BCA",
-    "Bank BTN",
+    "Bank Mandiri",
     "Bank BNI",
-    "Seabank",
-    "Bank Jago",
+    "Bank BRI",
+    "Bank BSI",
+    "Bank CIMB Niaga",
+    "Bank Permata",
+    "Bank Danamon",
+    "Bank BTN",
+    "Bank Syariah Lainnya",
   ],
-  Ewallet: ["DANA", "OVO", "GoPay", "ShopeePay"],
-  Cash: ["Kas Tunai"],
+  Ewallet: ["GoPay", "OVO", "Dana", "ShopeePay", "LinkAja"],
+  Cash: ["Kas Kecil (Petty Cash)", "Kas Operasional Tunai", "Kas Proyek Tunai"],
+} as const;
+
+const paymentTypeLabel = (type: PaymentType) => {
+  if (type === PaymentType.DOWN_PAYMENT) return "Down Payment";
+  if (type === PaymentType.PROGRESS_PAYMENT) return "Termin";
+  return "Pelunasan";
+};
+
+const getAccountIcon = (accountName: string) => {
+  if (/ovo|gopay|dana|shopeepay|linkaja/i.test(accountName)) {
+    return CreditCard;
+  }
+  if (/kas|petty|tunai/i.test(accountName)) {
+    return Wallet;
+  }
+  return Landmark;
+};
+
+type UnifiedLedgerRow = {
+  id: string;
+  createdAt: string;
+  direction: "IN" | "OUT";
+  badgeLabel: string;
+  description: string;
+  subDescription: string;
+  accountId: string | null;
+  accountName: string;
+  methodAndCounterparty: string;
+  amount: number;
+  proofUrl: string | null;
 };
 
 export default function FinanceLedger({
@@ -99,587 +155,524 @@ export default function FinanceLedger({
   fundMode: "incoming" | "transfer" | null;
   onFundModeChange: (mode: "incoming" | "transfer" | null) => void;
   typeFilter: "IN" | "OUT" | null;
-  onTypeFilterChange: (type: "IN" | "OUT" | null) => void;
+  onTypeFilterChange: (filter: "IN" | "OUT" | null) => void;
   onPreviewProof: (url: string, label: string) => void;
 }) {
   const router = useRouter();
   const [accountModalOpen, setAccountModalOpen] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [accountMessage, setAccountMessage] = useState("");
-  const [accountSelections, setAccountSelections] = useState<
-    Record<string, string>
-  >({});
-  const [historicalMessage, setHistoricalMessage] = useState("");
-  const [recordingPaymentId, setRecordingPaymentId] = useState<string | null>(
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
   );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [accountMessage, setAccountMessage] = useState("");
   const [isPending, startTransition] = useTransition();
-  const hasCashAccount = accounts.some(
-    (account) => account.accountName === "Kas Tunai",
+
+  const selectedAccount =
+    accounts.find((account) => account.id === selectedAccountId) ?? null;
+
+  const totalBalance = accounts.reduce(
+    (sum, account) => sum + account.balance,
+    0,
   );
+
+  const allLedgerRows = useMemo<UnifiedLedgerRow[]>(() => {
+    const cfRows: UnifiedLedgerRow[] = cashflows.map((cf) => {
+      const isIn = cf.type === "IN";
+      const badgeLabel = cf.transferGroupId
+        ? isIn
+          ? "Transfer Masuk"
+          : "Transfer Keluar"
+        : isIn
+          ? "Dana Masuk"
+          : "Kas Keluar";
+
+      return {
+        id: `cf-${cf.id}`,
+        createdAt: cf.createdAt,
+        direction: cf.type,
+        badgeLabel,
+        description: cf.sourceDesc,
+        subDescription: [
+          cf.project?.kelompokTani ? `Proyek: ${cf.project.kelompokTani}` : null,
+          `Oleh ${cf.recorder.name}`,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        accountId: cf.account.id,
+        accountName: cf.account.accountName,
+        methodAndCounterparty: [
+          paymentMethodLabel(cf.paymentMethod),
+          cf.senderName,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        amount: cf.amount,
+        proofUrl: cf.proofUrl ? withLocalPhotoPreview(cf.proofUrl) : null,
+      };
+    });
+
+    const histRows: UnifiedLedgerRow[] = historicalPayments.map((hp) => ({
+      id: `hp-${hp.id}`,
+      createdAt: hp.paidAt,
+      direction: "OUT" as const,
+      badgeLabel: `${hp.category} (${paymentTypeLabel(hp.paymentType)})`,
+      description: hp.sourceDesc,
+      subDescription: `Pembayaran ${hp.category}`,
+      accountId: null,
+      accountName: "Riwayat Pembayaran",
+      methodAndCounterparty: paymentTypeLabel(hp.paymentType),
+      amount: hp.amount,
+      proofUrl: hp.proofUrl ? withLocalPhotoPreview(hp.proofUrl) : null,
+    }));
+
+    return [...cfRows, ...histRows].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [cashflows, historicalPayments]);
+
+  const selectedAccountStats = useMemo(() => {
+    if (!selectedAccount) return null;
+    let totalIn = 0;
+    let totalOut = 0;
+    for (const row of allLedgerRows) {
+      if (row.accountId !== selectedAccount.id) continue;
+      if (row.direction === "IN") totalIn += row.amount;
+      else totalOut += row.amount;
+    }
+    return { totalIn, totalOut };
+  }, [allLedgerRows, selectedAccount]);
+
+  const visibleLedgerRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return allLedgerRows.filter((row) => {
+      if (selectedAccount && row.accountId !== selectedAccount.id) {
+        return false;
+      }
+      if (typeFilter && row.direction !== typeFilter) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        row.description.toLowerCase().includes(q) ||
+        row.subDescription.toLowerCase().includes(q) ||
+        row.accountName.toLowerCase().includes(q) ||
+        row.badgeLabel.toLowerCase().includes(q) ||
+        row.methodAndCounterparty.toLowerCase().includes(q)
+      );
+    });
+  }, [allLedgerRows, selectedAccount, typeFilter, searchQuery]);
 
   const submitAccount = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const accountName = String(formData.get("accountName") ?? "");
+    const accountNumber = String(formData.get("accountNumber") ?? "");
+    const holderName = String(formData.get("holderName") ?? "");
+
     setAccountMessage("");
     startTransition(async () => {
       try {
         const result = await createFinanceAccount({
-          accountName: String(formData.get("accountName") ?? ""),
-          accountNumber: String(formData.get("accountNumber") ?? ""),
-          holderName: String(formData.get("holderName") ?? ""),
+          accountName,
+          accountNumber,
+          holderName,
         });
-        setAccountMessage(result.message);
-        if (result.success) {
-          setAccountModalOpen(false);
-          router.refresh();
+        if (!result.success) {
+          setAccountMessage(result.message);
+          return;
         }
+        form.reset();
+        setAccountModalOpen(false);
+        router.refresh();
       } catch (error) {
-        console.error("Finance account form submission failed:", error);
-        setAccountMessage("Akun keuangan gagal dibuat. Silakan coba kembali.");
+        console.error("Create finance account failed:", error);
+        setAccountMessage("Gagal membuat buku bank/kas. Silakan coba kembali.");
       }
     });
   };
 
-  const addCashAccount = () => {
-    setAccountMessage("");
-    startTransition(async () => {
-      try {
-        const result = await createFinanceAccount({
-          accountName: "Kas Tunai",
-          holderName: "Kas Perusahaan",
-        });
-        setAccountMessage(result.message);
-        if (result.success) router.refresh();
-      } catch (error) {
-        console.error("Cash account creation failed:", error);
-        setAccountMessage("Akun Kas Tunai gagal dibuat. Silakan coba kembali.");
-      }
-    });
-  };
-
-  const submitHistoricalPayment = (
-    event: FormEvent<HTMLFormElement>,
-    payment: FinanceHistoricalPayment,
-  ) => {
-    event.preventDefault();
-    const financeAccountId = accountSelections[payment.id];
-    if (!financeAccountId) {
-      setHistoricalMessage("Pilih rekening sumber untuk pembayaran historis.");
-      return;
+  const renderProofAction = (proofUrl: string | null, label: string) => {
+    if (!proofUrl) {
+      return <span className="text-xs text-muted-foreground">—</span>;
     }
-
-    setHistoricalMessage("");
-    setRecordingPaymentId(payment.id);
-    startTransition(async () => {
-      try {
-        const result = await recordHistoricalPaymentCashflow({
-          paymentTransactionId: payment.id,
-          financeAccountId,
-        });
-        setHistoricalMessage(result.message);
-        if (result.success) {
-          setAccountSelections((current) => {
-            const updated = { ...current };
-            delete updated[payment.id];
-            return updated;
-          });
-          router.refresh();
-        }
-      } catch (error) {
-        console.error("Historical payment recording failed:", error);
-        setHistoricalMessage(
-          "Pembayaran historis gagal dicatat. Saldo rekening tidak diubah.",
-        );
-      } finally {
-        setRecordingPaymentId(null);
-      }
-    });
-  };
-
-  const ledgerEntries = [
-    ...cashflows.map((cashflow) => ({
-      kind: "cashflow" as const,
-      id: cashflow.id,
-      timestamp: new Date(cashflow.createdAt).getTime(),
-      cashflow,
-    })),
-    ...historicalPayments.map((payment) => ({
-      kind: "historical" as const,
-      id: payment.id,
-      timestamp: new Date(payment.paidAt).getTime(),
-      payment,
-    })),
-  ].sort((first, second) => second.timestamp - first.timestamp);
-  const visibleLedgerEntries = ledgerEntries.filter((entry) => {
-    if (selectedAccountId) {
+    if (isImageUrl(proofUrl)) {
       return (
-        entry.kind === "cashflow" &&
-        entry.cashflow.account.id === selectedAccountId &&
-        entry.cashflow.type === "OUT" &&
-        entry.cashflow.transferGroupId === null
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onPreviewProof(proofUrl, label)}
+          className="h-7 gap-1.5 px-2.5 text-xs"
+        >
+          <Eye className="size-3.5" />
+          Lihat Bukti
+        </Button>
       );
     }
-    if (!typeFilter) return true;
-    return entry.kind === "historical"
-      ? typeFilter === "OUT"
-      : entry.cashflow.type === typeFilter;
-  });
-  const selectAccount = (accountId: string) => {
-    setSelectedAccountId((current) =>
-      current === accountId ? null : accountId,
+    return (
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className="h-7 gap-1.5 px-2.5 text-xs"
+      >
+        <a href={proofUrl} target="_blank" rel="noreferrer">
+          <ExternalLink className="size-3.5" />
+          Buka Dokumen
+        </a>
+      </Button>
     );
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById("finance-cashflow-history")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">Buku Kas & Arus Dana</h2>
-          <p className="text-sm text-muted-foreground">
-            Saldo setiap rekening dan kas berdasarkan transaksi yang tercatat.
-          </p>
-        </div>
-        {canManage ? (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAccountModalOpen(true)}
-            >
-              <Plus className="mr-2 size-4" aria-hidden="true" />
-              Tambah Rekening / Kas
-            </Button>
-            {!hasCashAccount && (
+    <div className="space-y-6">
+      {/* Bagian Atas: Kartu Saldo Buku Bank / Kas */}
+      <Card className="p-5 space-y-5">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">BUKU KAS &amp; REKENING</Badge>
+              <span className="text-xs text-muted-foreground">
+                Total Saldo Gabungan:{" "}
+                <strong className="text-foreground">
+                  {currency(totalBalance)}
+                </strong>
+              </span>
+            </div>
+            <h2 className="mt-1 text-lg font-bold text-foreground">
+              Daftar Rekening Bank, E-Wallet &amp; Kas Tunai
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Klik salah satu kartu rekening untuk menyaring buku mutasi khusus rekening tersebut.
+            </p>
+          </div>
+          {canManage && (
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={addCashAccount}
-                disabled={isPending}
+                onClick={() => setAccountModalOpen(true)}
+                className="gap-1.5"
               >
-                <Wallet className="mr-2 size-4" aria-hidden="true" />
-                Tambah Kas Tunai
-              </Button>
-            )}
-            <Button
-              type="button"
-              onClick={() => onFundModeChange("incoming")}
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              <ArrowDownLeft className="mr-2 size-4" aria-hidden="true" />
-              Catat Dana Masuk
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onFundModeChange("transfer")}
-              disabled={accounts.length < 2}
-            >
-              <ArrowLeftRight className="mr-2 size-4" aria-hidden="true" />
-              Transfer Antar Kas
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Hanya Keuangan yang dapat mengubah saldo dan mencatat transaksi.
-          </p>
-        )}
-      </div>
-
-      {accounts.length ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">
-              Pilih rekening untuk melihat riwayat transaksinya di bawah.
-            </p>
-            {selectedAccountId && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setSelectedAccountId(null)}
-              >
-                Tampilkan semua rekening
-              </Button>
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {accounts.map((account) => (
-            <Card
-              key={account.id}
-              role="button"
-              tabIndex={0}
-              aria-pressed={selectedAccountId === account.id}
-              className={`cursor-pointer transition-colors hover:border-primary ${
-                selectedAccountId === account.id
-                  ? "border-primary ring-1 ring-primary"
-                  : ""
-              }`}
-              onClick={() => selectAccount(account.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  selectAccount(account.id);
-                }
-              }}
-            >
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-base">{account.accountName}</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    a.n. {account.holderName}
-                    {account.accountNumber
-                      ? ` · Rekening ${account.accountNumber}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <Wallet className="ml-auto size-5 text-primary" aria-hidden="true" />
-                  <p className="mt-2 text-xl font-bold text-primary">
-                    {currency(account.balance)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Saldo saat ini</p>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
-          </div>
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-10 text-center">
-            <Wallet className="mx-auto mb-3 size-8 text-muted-foreground" />
-            <p className="font-semibold">Belum ada buku bank atau kas.</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tambahkan akun penyimpanan dana sebelum mencatat penerimaan.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {accountMessage && !accountModalOpen && (
-        <p className="text-sm text-muted-foreground" role="status">
-          {accountMessage}
-        </p>
-      )}
-
-      <Card id="finance-cashflow-history" className="scroll-mt-24">
-        <CardHeader>
-          <CardTitle>
-            {selectedAccountId
-              ? `Riwayat Pembelanjaan / Pembayaran · ${
-                  accounts.find((account) => account.id === selectedAccountId)
-                    ?.accountName ?? "Rekening"
-                }`
-              : "Riwayat Arus Dana"}
-          </CardTitle>
-          {selectedAccountId ? (
-            <p className="text-sm text-muted-foreground">
-              Menampilkan riwayat pembelanjaan dan pembayaran dari rekening ini.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={typeFilter === null ? "default" : "outline"}
-                onClick={() => onTypeFilterChange(null)}
-              >
-                Semua
+                <Plus className="size-4" />
+                Tambah Rekening / Kas
               </Button>
               <Button
                 type="button"
-                size="sm"
-                variant={typeFilter === "IN" ? "default" : "outline"}
-                onClick={() => onTypeFilterChange("IN")}
+                onClick={() => onFundModeChange("incoming")}
+                className="gap-1.5"
               >
-                Dana Masuk
+                <Plus className="size-4" />
+                Catat Dana Masuk
               </Button>
               <Button
                 type="button"
-                size="sm"
-                variant={typeFilter === "OUT" ? "default" : "outline"}
-                onClick={() => onTypeFilterChange("OUT")}
+                variant="secondary"
+                onClick={() => onFundModeChange("transfer")}
+                className="gap-1.5"
               >
-                Dana Keluar
+                <ArrowRightLeft className="size-4" />
+                Transfer Antar Kas
               </Button>
             </div>
           )}
-          {!selectedAccountId &&
-            historicalPayments.length > 0 &&
-            typeFilter !== "IN" && (
-            <p className="text-sm text-muted-foreground">
-              Pembayaran lama yang belum dicatat ditampilkan bersama arus kas.
-              Pilih rekening sumber pada baris tersebut untuk mencatatnya dan
-              mengurangi saldo.
-            </p>
-            )}
-        </CardHeader>
-        <CardContent>
-          {historicalMessage && (
-            <p className="mb-3 text-sm text-muted-foreground" role="status">
-              {historicalMessage}
-            </p>
-          )}
-          <NativeDataTable itemLabel="transaksi">
-            <table className="app-data-table w-full min-w-[920px] text-sm">
-              <thead className="bg-muted/60 text-left">
-                <tr>
-                  <th className="px-3 py-3 font-semibold">Tanggal</th>
-                  <th className="px-3 py-3 font-semibold">Tipe</th>
-                  <th className="px-3 py-3 font-semibold">Sumber / Deskripsi</th>
-                  <th className="px-3 py-3 font-semibold">Nominal</th>
-                  <th className="px-3 py-3 font-semibold">Akun</th>
-                  <th className="px-3 py-3 font-semibold">Metode</th>
-                  <th className="px-3 py-3 font-semibold">Bukti</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleLedgerEntries.map((entry) => {
-                  if (entry.kind === "historical") {
-                    const { payment } = entry;
-                    return (
-                      <tr key={`historical-${payment.id}`} className="border-t">
-                        <td className="whitespace-nowrap px-3 py-3">
-                          {new Date(payment.paidAt).toLocaleString("id-ID")}
-                        </td>
-                        <td className="px-3 py-3">
-                          <Badge variant="warning">
-                            <ArrowUpRight
-                              className="mr-1 size-3"
-                              aria-hidden="true"
-                            />
-                            Dana Keluar · Belum dicatat
-                          </Badge>
-                        </td>
-                        <td className="max-w-[360px] px-3 py-3">
-                          <p className="font-medium">{payment.sourceDesc}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {payment.category} ·{" "}
-                            {payment.paymentType === "DOWN_PAYMENT"
-                              ? "DP"
-                              : payment.paymentType === "PROGRESS_PAYMENT"
-                                ? "Termin"
-                                : "Pelunasan"}
-                          </p>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-3 font-semibold text-rose-700">
-                          -{currency(payment.amount)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <form
-                            className="flex min-w-[280px] items-center gap-2"
-                            onSubmit={(event) =>
-                              submitHistoricalPayment(event, payment)
-                            }
-                          >
-                            <select
-                              aria-label={`Pilih rekening sumber untuk ${payment.sourceDesc}`}
-                              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                              value={accountSelections[payment.id] ?? ""}
-                              onChange={(event) =>
-                                setAccountSelections((current) => ({
-                                  ...current,
-                                  [payment.id]: event.target.value,
-                                }))
-                              }
-                              disabled={
-                                !canManage ||
-                                accounts.length === 0 ||
-                                isPending
-                              }
-                            >
-                              <option value="">
-                                {accounts.length
-                                  ? "Pilih rekening"
-                                  : "Buat rekening terlebih dahulu"}
-                              </option>
-                              {accounts.map((account) => (
-                                <option key={account.id} value={account.id}>
-                                  {account.accountName}
-                                </option>
-                              ))}
-                            </select>
-                            {canManage && (
-                              <Button
-                                type="submit"
-                                size="sm"
-                                disabled={
-                                  !accountSelections[payment.id] ||
-                                  isPending ||
-                                  accounts.length === 0
-                                }
-                              >
-                                {recordingPaymentId === payment.id
-                                  ? "Mencatat..."
-                                  : "Catat"}
-                              </Button>
-                            )}
-                          </form>
-                        </td>
-                        <td className="px-3 py-3">
-                          {payment.proofUrl ? (
-                            <ActionIconButton
-                              type="button"
-                              label={`Lihat bukti transfer ${payment.sourceDesc}`}
-                              tooltip="Lihat Bukti"
-                              icon={Eye}
-                              onClick={() =>
-                                onPreviewProof(
-                                  payment.proofUrl!,
-                                  `Bukti transfer ${payment.sourceDesc}`,
-                                )
-                              }
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Bukti belum tersedia
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  }
+        </div>
 
-                  const { cashflow } = entry;
+        {accounts.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            Belum ada buku bank atau kas. Klik{" "}
+            <strong>Tambah Rekening / Kas</strong> untuk memulai pencatatan.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {accounts.map((account) => {
+              const Icon = getAccountIcon(account.accountName);
+              const isSelected = selectedAccount?.id === account.id;
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  onClick={() =>
+                    setSelectedAccountId(isSelected ? null : account.id)
+                  }
+                  className={`flex flex-col justify-between rounded-xl border p-4 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                    isSelected
+                      ? "border-primary bg-primary/10 shadow-xs"
+                      : "border-border/80 bg-muted/15 hover:border-primary/40 hover:bg-muted/30"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-semibold text-foreground">
+                          {account.accountName}
+                        </p>
+                        {isSelected && (
+                          <Badge variant="default" className="text-[10px]">
+                            Aktif
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {account.accountNumber
+                          ? `${account.accountNumber} · ${account.holderName}`
+                          : `Kas Tunai · ${account.holderName}`}
+                      </p>
+                    </div>
+                    <span className="rounded-lg bg-primary/10 p-2 text-primary">
+                      <Icon className="size-4" aria-hidden="true" />
+                    </span>
+                  </div>
+                  <p className="mt-4 text-xl font-bold tracking-tight tabular-nums text-foreground">
+                    {currency(account.balance)}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* Bagian Bawah: Tabel Buku Mutasi Arus Kas */}
+      <Card className="p-5 space-y-4">
+        <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
+          <div>
+            {selectedAccount ? (
+              <div className="space-y-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="-ml-2 h-7 px-2 text-xs text-primary"
+                  onClick={() => setSelectedAccountId(null)}
+                >
+                  <ArrowLeft className="mr-1.5 size-3.5" aria-hidden="true" />
+                  Kembali ke Semua Buku Kas
+                </Button>
+                <h2 className="text-base font-bold text-foreground">
+                  Buku Mutasi Rekening: {selectedAccount.accountName}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {selectedAccount.accountNumber ?? "Kas Tunai"} · Atas Nama{" "}
+                  <strong>{selectedAccount.holderName}</strong>
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-base font-bold text-foreground">
+                  Buku Besar Mutasi Arus Kas (Semua Rekening)
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Menampilkan {visibleLedgerRows.length} catatan transaksi dari seluruh buku kas/bank.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[220px]">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari uraian, proyek, pengirim..."
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center rounded-lg border border-border p-0.5">
+              {(
+                [
+                  [null, "Semua Mutasi"],
+                  ["IN", "Dana Masuk (+)"],
+                  ["OUT", "Dana Keluar (-)"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => onTypeFilterChange(value)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                    typeFilter === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Ringkasan Akun Terpilih */}
+        {selectedAccount && selectedAccountStats && (
+          <div className="grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3.5 sm:grid-cols-3">
+            <div>
+              <span className="text-xs text-muted-foreground">
+                Saldo Saat Ini ({selectedAccount.accountName})
+              </span>
+              <p className="mt-0.5 text-base font-bold tabular-nums text-foreground">
+                {currency(selectedAccount.balance)}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground">
+                Total Dana Masuk ke Akun Ini
+              </span>
+              <p className="mt-0.5 text-base font-bold tabular-nums text-foreground">
+                +{currency(selectedAccountStats.totalIn)}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground">
+                Total Dana Keluar dari Akun Ini
+              </span>
+              <p className="mt-0.5 text-base font-bold tabular-nums text-primary">
+                -{currency(selectedAccountStats.totalOut)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Daftar Mobile */}
+        <div className="space-y-3 md:hidden">
+          {visibleLedgerRows.length === 0 ? (
+            <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+              Tidak ada transaksi yang sesuai dengan filter saat ini.
+            </div>
+          ) : (
+            visibleLedgerRows.map((row) => {
+              const isIn = row.direction === "IN";
+              return (
+                <div
+                  key={row.id}
+                  className="space-y-2.5 rounded-xl border border-border/80 bg-muted/10 p-4 text-sm"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {row.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(row.createdAt)}
+                      </p>
+                    </div>
+                    <Badge variant={isIn ? "default" : "outline"}>
+                      {row.badgeLabel}
+                    </Badge>
+                  </div>
+                  <p
+                    className={`text-base font-bold tabular-nums ${
+                      isIn ? "text-foreground" : "text-primary"
+                    }`}
+                  >
+                    {isIn ? "+" : "-"}
+                    {currency(row.amount)}
+                  </p>
+                  <div className="grid gap-1 text-xs text-muted-foreground">
+                    <p>
+                      Buku Kas/Bank:{" "}
+                      <strong className="text-foreground">
+                        {row.accountName}
+                      </strong>
+                    </p>
+                    <p>Metode: {row.methodAndCounterparty}</p>
+                    {row.subDescription && <p>{row.subDescription}</p>}
+                  </div>
+                  <div className="pt-1">
+                    {renderProofAction(row.proofUrl, row.description)}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Tabel Desktop */}
+        <div className="hidden overflow-x-auto md:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tanggal</TableHead>
+                <TableHead>Kategori</TableHead>
+                <TableHead>Deskripsi &amp; Proyek</TableHead>
+                <TableHead>Buku Kas / Bank</TableHead>
+                <TableHead>Metode &amp; Pihak Terkait</TableHead>
+                <TableHead className="text-right">Nominal</TableHead>
+                <TableHead className="text-right">Bukti</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleLedgerRows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="py-8 text-center text-muted-foreground"
+                  >
+                    Tidak ada catatan mutasi yang sesuai dengan filter.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                visibleLedgerRows.map((row) => {
+                  const isIn = row.direction === "IN";
                   return (
-                    <tr key={cashflow.id} className="border-t">
-                      <td className="whitespace-nowrap px-3 py-3">
-                        {new Date(cashflow.createdAt).toLocaleString("id-ID")}
-                      </td>
-                      <td className="px-3 py-3">
-                        <Badge
-                          variant={
-                            cashflow.transferGroupId
-                              ? "secondary"
-                              : cashflow.type === "IN"
-                                ? "lightSuccess"
-                                : "warning"
-                          }
-                        >
-                          {cashflow.transferGroupId ? (
-                            <ArrowLeftRight
-                              className="mr-1 size-3"
-                              aria-hidden="true"
-                            />
-                          ) : cashflow.type === "IN" ? (
-                            <ArrowDownLeft
-                              className="mr-1 size-3"
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <ArrowUpRight
-                              className="mr-1 size-3"
-                              aria-hidden="true"
-                            />
-                          )}
-                          {cashflow.transferGroupId
-                            ? cashflow.type === "IN"
-                              ? "Transfer Masuk"
-                              : "Transfer Keluar"
-                            : cashflow.type === "IN"
-                              ? "Dana Masuk"
-                              : "Dana Keluar"}
+                    <TableRow key={row.id}>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {formatDateTime(row.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={isIn ? "default" : "outline"}>
+                          {row.badgeLabel}
                         </Badge>
-                      </td>
-                      <td className="max-w-[360px] px-3 py-3">
-                        <p className="font-medium">{cashflow.sourceDesc}</p>
-                        {cashflow.project && (
-                          <p className="text-xs text-muted-foreground">
-                            Proyek: {cashflow.project.kelompokTani || "—"}
-                          </p>
-                        )}
-                        {cashflow.senderName && (
-                          <p className="text-xs text-muted-foreground">
-                            Pengirim: {cashflow.senderName}
-                          </p>
-                        )}
-                      </td>
-                      <td
-                        className={`whitespace-nowrap px-3 py-3 font-semibold ${
-                          cashflow.type === "IN"
-                            ? "text-emerald-700"
-                            : "text-rose-700"
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium text-foreground">
+                          {row.description}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.subDescription}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {row.accountName}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {row.methodAndCounterparty}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-semibold tabular-nums whitespace-nowrap ${
+                          isIn ? "text-foreground" : "text-primary"
                         }`}
                       >
-                        {cashflow.type === "IN" ? "+" : "-"}
-                        {currency(cashflow.amount)}
-                      </td>
-                      <td className="px-3 py-3">
-                        {cashflow.account.accountName}
-                      </td>
-                      <td className="px-3 py-3">
-                        {cashflow.transferGroupId
-                          ? "Antar rekening"
-                          : cashflow.paymentMethod.startsWith("HISTORICAL_")
-                            ? (
-                                <>
-                                  {cashflow.paymentMethod === "HISTORICAL_CASH"
-                                    ? "Tunai"
-                                    : "Transfer"}
-                                  <span className="block text-xs text-muted-foreground">
-                                    Histori · saldo telah dikurangi
-                                  </span>
-                                </>
-                              )
-                            : cashflow.paymentMethod === "DEPOSIT"
-                              ? "Setor Tunai"
-                              : cashflow.paymentMethod === "CASH"
-                                ? "Tunai"
-                                : "Transfer"}
-                      </td>
-                      <td className="px-3 py-3">
-                        {cashflow.proofUrl ? (
-                          <ActionIconButton
-                            type="button"
-                            label={`Lihat bukti transaksi ${cashflow.sourceDesc}`}
-                            tooltip="Lihat Bukti"
-                            icon={Eye}
-                            onClick={() =>
-                              onPreviewProof(
-                                cashflow.proofUrl!,
-                                `Bukti transaksi ${cashflow.sourceDesc}`,
-                              )
-                            }
-                          />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            Bukti belum tersedia
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+                        <span className="inline-flex items-center gap-1">
+                          {isIn ? (
+                            <ArrowDownLeft
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <ArrowUpRight
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                          )}
+                          {isIn ? "+" : "-"}
+                          {currency(row.amount)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderProofAction(row.proofUrl, row.description)}
+                      </TableCell>
+                    </TableRow>
                   );
-                })}
-                {visibleLedgerEntries.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-3 py-10 text-center text-muted-foreground"
-                    >
-                      {selectedAccountId
-                        ? "Belum ada riwayat pembelanjaan atau pembayaran pada rekening ini."
-                        : typeFilter
-                        ? `Belum ada transaksi dana ${typeFilter === "IN" ? "masuk" : "keluar"}.`
-                        : "Belum ada transaksi arus kas."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </NativeDataTable>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Ditampilkan hingga 200 transaksi terbaru. Saldo berubah otomatis
-            saat pembayaran baru, dana masuk, atau transfer antar akun dicatat.
-            Pembayaran lama yang dimasukkan sebagai histori juga mengurangi
-            saldo akun sumber.
-          </p>
-        </CardContent>
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       <IncomingFundModal
@@ -692,13 +685,10 @@ export default function FinanceLedger({
 
       <GlobalModal
         isOpen={accountModalOpen}
-        onClose={() => {
-          setAccountModalOpen(false);
-          setAccountMessage("");
-        }}
-        title="Tambah Rekening / Kas"
+        onClose={() => setAccountModalOpen(false)}
+        title="Tambah Rekening / Buku Kas"
         icon={<Wallet aria-hidden="true" className="size-5" />}
-        description="Daftarkan rekening atau e-wallet. Saldo awal akun baru adalah Rp 0."
+        description="Daftarkan rekening bank, e-wallet, atau kas tunai. Saldo awal akun baru adalah Rp 0."
         className="max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] sm:max-w-md"
         bodyClassName="overscroll-y-contain"
         footer={
@@ -732,10 +722,10 @@ export default function FinanceLedger({
               name="accountName"
               required
               defaultValue=""
-              className="border-input focus-visible:ring-ring w-full max-w-sm rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2"
+              className="border-input focus-visible:ring-ring h-10 w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2"
             >
               <option value="" disabled>
-                Pilih bank, e-wallet, atau kas
+                Pilih bank, e-wallet, atau kas tunai
               </option>
               <optgroup label="Bank">
                 {financeInstitutions.Bank.map((institution) => (
@@ -751,7 +741,7 @@ export default function FinanceLedger({
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="Kas">
+              <optgroup label="Kas Tunai">
                 {financeInstitutions.Cash.map((institution) => (
                   <option key={institution} value={institution}>
                     {institution}
@@ -762,23 +752,25 @@ export default function FinanceLedger({
           </div>
           <div className="space-y-2">
             <Label htmlFor="finance-account-number">
-              Nomor Rekening (opsional)
+              Nomor Rekening (opsional untuk Kas Tunai)
             </Label>
             <Input
               id="finance-account-number"
               name="accountNumber"
               maxLength={80}
-              placeholder="Kosongkan untuk kas tunai"
+              placeholder="Contoh: 1234567890"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="finance-account-holder">Atas Nama / Pemegang Kas</Label>
+            <Label htmlFor="finance-account-holder">
+              Atas Nama / Pemegang Kas
+            </Label>
             <Input
               id="finance-account-holder"
               name="holderName"
               required
               maxLength={120}
-              placeholder="Nama perusahaan atau pemegang kas"
+              placeholder="Contoh: PT. Skala Prioritas Engineering"
             />
           </div>
           {accountMessage && (

@@ -54,7 +54,7 @@ const MonthlyEarning = ({
   };
 
   return (
-    <CardBox className="dashboard-enter mt-0! overflow-hidden border-emerald-200 bg-gradient-to-r from-white to-emerald-100 p-0! shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-emerald-500/25 dark:from-[#1e293b] dark:to-[#064e3b]/40">
+    <CardBox className="mt-0! overflow-hidden border border-slate-200 bg-white p-0! shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="px-5 pt-5">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="font-bold text-slate-900 dark:text-white">

@@ -222,14 +222,49 @@ export default function LogisticsActionModal({
         setActionType("READY_WAREHOUSE");
         onOpenChange(false);
       }}
-      title="Proses Material"
+      title="Proses Pemenuhan Material (Logistik)"
       description={
         existingDeliveryOrder
           ? "Tiket ini sudah memiliki Surat Jalan. Lanjutkan dengan dokumen yang ada tanpa menerbitkan DO atau mengurangi stok lagi."
           : "Pilih sumber material sekali. Jika stok tersedia, sistem membuat DO dan mencadangkan stok. Jika stok kurang, buat PO lalu kirim invoice ke Keuangan setelah PO disetujui."
       }
+      footer={
+        <div className="flex w-full items-center justify-end gap-2">
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={isPending}>
+              Tutup
+            </Button>
+          </DialogClose>
+          {actionType === "READY_WAREHOUSE" ||
+          (actionType === "BUY_STORE" &&
+            purchaseOrderApproved &&
+            !purchaseOrderPaid) ? (
+            <Button
+              type="submit"
+              form="logistics-action-form"
+              disabled={
+                isPending ||
+                (actionType === "BUY_STORE" &&
+                  purchaseOrderApproved &&
+                  !purchaseOrderPaid &&
+                  !invoiceFile)
+              }
+            >
+              {isPending
+                ? "Memproses..."
+                : existingDeliveryOrder
+                  ? "Lanjutkan dengan DO yang Ada"
+                  : actionType === "READY_WAREHOUSE"
+                  ? "Terbitkan DO & Cadangkan Stok"
+                  : purchaseOrderApproved
+                    ? "Kirim Invoice ke Keuangan"
+                    : "Buat PO"}
+            </Button>
+          ) : null}
+        </div>
+      }
     >
-        <form className="space-y-4" onSubmit={submit}>
+        <form id="logistics-action-form" className="space-y-4" onSubmit={submit}>
           {existingDeliveryOrder ? (
             <section className="space-y-3 rounded-md border p-3">
               <div>
@@ -547,38 +582,6 @@ export default function LogisticsActionModal({
               {message}
             </p>
           )}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isPending}>
-                Tutup
-              </Button>
-            </DialogClose>
-            {actionType === "READY_WAREHOUSE" ||
-            (actionType === "BUY_STORE" &&
-              purchaseOrderApproved &&
-              !purchaseOrderPaid) ? (
-              <Button
-                type="submit"
-                disabled={
-                  isPending ||
-                  (actionType === "BUY_STORE" &&
-                    purchaseOrderApproved &&
-                    !purchaseOrderPaid &&
-                    !invoiceFile)
-                }
-              >
-                {isPending
-                  ? "Memproses..."
-                  : existingDeliveryOrder
-                    ? "Lanjutkan dengan DO yang Ada"
-                    : actionType === "READY_WAREHOUSE"
-                    ? "Terbitkan DO & Cadangkan Stok"
-                    : purchaseOrderApproved
-                      ? "Kirim Invoice ke Keuangan"
-                      : "Buat PO"}
-              </Button>
-            ) : null}
-          </DialogFooter>
         </form>
     </GlobalModal>
   );

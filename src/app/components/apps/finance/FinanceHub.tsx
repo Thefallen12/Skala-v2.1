@@ -358,6 +358,10 @@ export default function FinanceHub({
   expenseCategories,
   monthInflow,
   monthOutflow,
+  financeSignerName,
+  financeQrDataUrl,
+  coordinatorSignerName,
+  directorSignerName,
 }: {
   purchaseOrders: FinanceOrder[];
   documentSignoffTasks: DocumentSignoffTask[];
@@ -384,6 +388,10 @@ export default function FinanceHub({
   expenseCategories: FinanceExpenseCategory[];
   monthInflow: number;
   monthOutflow: number;
+  financeSignerName?: string;
+  financeQrDataUrl?: string | null;
+  coordinatorSignerName?: string;
+  directorSignerName?: string;
 }) {
   const router = useRouter();
   const legacyOperationalTabs = ["subcontract", "fuel-logs", "fuel-requests"];
@@ -399,7 +407,8 @@ export default function FinanceHub({
   };
   const resolvedTab = legacyOperationalTabs.includes(initialTab ?? "")
     ? "operations"
-    : tabAliases[initialTab ?? ""] ?? "check";
+    : tabAliases[initialTab ?? ""] ??
+      (purchaseOrders.length > 0 ? "check" : "ledger");
   const [activeTab, setActiveTab] = useState(resolvedTab);
   const [navigationRequest, setNavigationRequest] = useState(0);
   const [ledgerFundMode, setLedgerFundMode] = useState<
@@ -1019,30 +1028,40 @@ export default function FinanceHub({
       }
 
       return (
-        <ActionIconButton
+        <Button
           type="button"
-          label={`Lihat pratinjau ${label}`}
-          tooltip={`Lihat foto ${label}`}
-          icon={Eye}
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 px-2.5 text-xs"
           onClick={(event) => {
             event.stopPropagation();
             setReceiptPreview({ label, url });
           }}
-        />
+        >
+          <Eye className="size-3.5" aria-hidden="true" />
+          Lihat Bukti
+        </Button>
       );
     }
 
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <ActionIconButton
-          label={`Lihat bukti transfer ${label}`}
-          tooltip="Lihat Bukti Transfer"
-          icon={ExternalLink}
-          href={paymentReceiptHref(url)}
-          target="_blank"
-          rel="noreferrer"
-          onLinkClick={(event) => event.stopPropagation()}
-        />
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 px-2.5 text-xs"
+        >
+          <a
+            href={paymentReceiptHref(url)}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <ExternalLink className="size-3.5" aria-hidden="true" />
+            Buka Dokumen
+          </a>
+        </Button>
         {url.startsWith("/api/tickets/receipts/") && (
           <FinancePaymentProofReplacement
             paymentTransactionId={paymentTransactionId}
@@ -1105,6 +1124,63 @@ export default function FinanceHub({
     setLedgerFundMode("incoming");
   };
 
+  const openTransferFund = () => {
+    setActiveTab("ledger");
+    setLedgerTypeFilter(null);
+    setLedgerFundMode("transfer");
+  };
+
+  const reportPayables = pendingPaymentRows.map((row) => ({
+    id: `${row.kind}-${row.id}`,
+    reference: row.reference,
+    title: row.title,
+    vendorOrRequester: row.requesterName ?? row.title,
+    sourceLabel:
+      row.kind === "ticket"
+        ? "Tiket & Permintaan"
+        : row.kind === "standalone-po"
+          ? "Purchase Order (PO)"
+          : "Belanja Material Langsung",
+    grandTotal: row.grandTotal,
+    paidAmount: row.paidAmount,
+    remainingAmount: Math.max(0, row.grandTotal - row.paidAmount),
+    transferDestination: row.transferDestination,
+  }));
+
+  const existingTxIds = new Set(dashboardTransactions.map((tx) => tx.id));
+  const extraIncomingFromCashflows: FinanceDashboardTransaction[] = cashflows
+    .filter(
+      (cf) =>
+        cf.type === "IN" && !cf.transferGroupId && !existingTxIds.has(cf.id),
+    )
+    .map((cf) => ({
+      id: cf.id,
+      createdAt: cf.createdAt,
+      type: "IN" as const,
+      category: "Dana Masuk",
+      sourceDesc: cf.sourceDesc,
+      paymentMethod:
+        cf.paymentMethod === "DEPOSIT"
+          ? "Setor tunai"
+          : cf.paymentMethod === "CASH"
+            ? "Tunai"
+            : "Transfer",
+      counterparty: cf.senderName || cf.recorder.name || "—",
+      accountOrDestination: cf.account.accountName,
+      projectName: cf.project?.kelompokTani ?? null,
+      amount: cf.amount,
+      proofUrl: cf.proofUrl,
+    }));
+
+  const allDashboardTransactions = [
+    ...dashboardTransactions,
+    ...extraIncomingFromCashflows,
+  ].sort(
+    (first, second) =>
+      new Date(second.createdAt).getTime() -
+      new Date(first.createdAt).getTime(),
+  );
+
   return (
     <div className="space-y-5">
       <FinanceDashboard
@@ -1117,164 +1193,148 @@ export default function FinanceHub({
         )}
         months={dashboardMonths}
         accounts={financeAccounts}
-        transactions={dashboardTransactions}
+        transactions={allDashboardTransactions}
         expenseCategories={expenseCategories}
         monthInflow={monthInflow}
         monthOutflow={monthOutflow}
+        payables={reportPayables}
+        financeSignerName={financeSignerName}
+        financeQrDataUrl={financeQrDataUrl}
+        coordinatorSignerName={coordinatorSignerName}
+        directorSignerName={directorSignerName}
         onNavigate={navigateFromDashboard}
         onOpenIncoming={openIncomingFund}
+        onOpenTransfer={openTransferFund}
+        onOpenOfficeExpense={
+          canManageOfficeExpenses ? () => setOfficeExpenseOpen(true) : undefined
+        }
         onPreviewProof={(url, label) => setReceiptPreview({ url, label })}
       />
 
-      <DocumentSignoffQueue
-        tasks={documentSignoffTasks}
-        title="Tanda Tangan & Konfirmasi Dokumen"
-        description="Invoice ditandatangani Keuangan lalu diketahui Direktur. KO ditandatangani Logistik lalu diketahui Keuangan."
-      />
+      {documentSignoffTasks.length > 0 && (
+        <DocumentSignoffQueue
+          tasks={documentSignoffTasks}
+          title="Tanda Tangan & Konfirmasi Dokumen"
+          description="Invoice ditandatangani Keuangan lalu diketahui Direktur. KO ditandatangani Logistik lalu diketahui Keuangan."
+        />
+      )}
 
       <Tabs
         value={activeTab}
         onValueChange={setActiveTab}
-        className="space-y-5"
+        className="space-y-4"
       >
-        <TabsList
-          className={`grid h-auto w-full ${canManageOfficeExpenses ? "grid-cols-6" : "grid-cols-5"} gap-1 rounded-xl border border-border/70 bg-muted/40 p-1.5 min-[480px]:grid-cols-2 min-[480px]:gap-2 min-[480px]:p-2 xl:grid-cols-6`}
+        <div
+          role="tablist"
+          aria-label="Navigasi Tahapan Finance Hub"
+          className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${
+            canManageOfficeExpenses ? " xl:grid-cols-6" : "xl:grid-cols-5"
+          }`}
         >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <TabsTrigger
-                value="check"
-                aria-label={`Perlu Diperiksa (PO & Tiket), ${purchaseOrders.length}`}
-                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
+          {(
+            [
+              {
+                value: "check",
+                title: "Periksa PO",
+                subtitle: "Verifikasi draft PO & pajak",
+                count: `${purchaseOrders.length} PO`,
+                badgeVariant:
+                  purchaseOrders.length > 0
+                    ? ("warning" as const)
+                    : ("outline" as const),
+              },
+              {
+                value: "payment",
+                title: "Antrean Bayar",
+                subtitle: "Eksekusi tagihan PO & tiket",
+                count: `${pendingPaymentCount} Tagihan`,
+                badgeVariant:
+                  pendingPaymentCount > 0
+                    ? ("error" as const)
+                    : ("outline" as const),
+              },
+              {
+                value: "ledger",
+                title: "Buku Kas & Mutasi",
+                subtitle: "Saldo rekening & arus dana",
+                count: `${financeAccounts.length} Akun`,
+                badgeVariant: "outline" as const,
+              },
+              {
+                value: "history",
+                title: "Riwayat Bukti",
+                subtitle: "Arsip bukti transfer lunas",
+                count: `${paymentHistoryRows.length} Bukti`,
+                badgeVariant: "outline" as const,
+              },
+              ...(canManageOfficeExpenses
+                ? [
+                    {
+                      value: "office-expense",
+                      title: "Kas Kantor",
+                      subtitle: "Gaji, kasbon & reimburse",
+                      count: `${officeExpenses.length} Data`,
+                      badgeVariant: "outline" as const,
+                    },
+                  ]
+                : []),
+              {
+                value: "operations",
+                title: "Subkon & BBM",
+                subtitle: "Termin subkon & klaim BBM",
+                count: `${termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length} Item`,
+                badgeVariant: "outline" as const,
+              },
+            ] as const
+          ).map((item, idx) => {
+            const isActive = activeTab === item.value;
+            const stepNum = String(idx + 1).padStart(2, "0");
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(item.value)}
+                className={`group flex flex-col justify-between gap-2 rounded-xl border p-3.5 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                  isActive
+                    ? "border-primary bg-primary/10 shadow-xs"
+                    : "border-border/80 bg-card hover:border-primary/40 hover:bg-muted/20"
+                }`}
               >
-                <FileCheck2 className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
-                  1. Perlu Diperiksa (PO & Tiket)
-                </span>
-                <Badge
-                  variant="secondary"
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
-                >
-                  {purchaseOrders.length}
-                </Badge>
-              </TabsTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Perlu Diperiksa (PO & Tiket)</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <TabsTrigger
-                value="payment"
-                aria-label={`Antrean Pembayaran, ${pendingPaymentCount}`}
-                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
-              >
-                <ReceiptText className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
-                  2. Antrean Pembayaran
-                </span>
-                <Badge
-                  variant="secondary"
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
-                >
-                  {pendingPaymentCount}
-                </Badge>
-              </TabsTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Antrean Pembayaran</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <TabsTrigger
-                value="history"
-                aria-label={`Riwayat & Bukti Transfer, ${paymentHistoryRows.length}`}
-                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
-              >
-                <History className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
-                  3. Riwayat & Bukti Transfer
-                </span>
-                <Badge
-                  variant="secondary"
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
-                >
-                  {paymentHistoryRows.length}
-                </Badge>
-              </TabsTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Riwayat & Bukti Transfer</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <TabsTrigger
-                value="ledger"
-                aria-label={`Buku Kas & Arus Dana, ${cashflows.length}`}
-                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
-              >
-                <Wallet className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
-                  4. Buku Kas &amp; Arus Dana
-                </span>
-                <Badge
-                  variant="secondary"
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
-                >
-                  {cashflows.length}
-                </Badge>
-              </TabsTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Buku Kas & Arus Dana</TooltipContent>
-          </Tooltip>
-          {canManageOfficeExpenses && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <TabsTrigger
-                  value="office-expense"
-                  aria-label={`Pengeluaran Kantor & Tim, ${officeExpenses.length}`}
-                  className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
-                >
-                  <ReceiptText className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
-                    5. Pengeluaran Kantor &amp; Tim
-                  </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground group-hover:text-foreground"
+                      }`}
+                    >
+                      {stepNum}
+                    </span>
+                    <span
+                      className={`truncate text-xs font-bold tracking-wide uppercase ${
+                        isActive ? "text-primary" : "text-foreground"
+                      }`}
+                    >
+                      {item.title}
+                    </span>
+                  </div>
                   <Badge
-                    variant="secondary"
-                    aria-hidden="true"
-                    className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
+                    variant={isActive ? "default" : item.badgeVariant}
+                    className="shrink-0 px-1.5 py-0 text-[10px] tabular-nums"
                   >
-                    {officeExpenses.length}
+                    {item.count}
                   </Badge>
-                </TabsTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Pengeluaran Kantor & Tim</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <TabsTrigger
-                value="operations"
-                aria-label={`Operasional Lainnya, ${termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length}`}
-                className="relative h-11 min-h-11 min-w-0 justify-center gap-0 rounded-lg p-0 leading-none data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm min-[480px]:h-auto min-[480px]:justify-start min-[480px]:gap-2 min-[480px]:whitespace-normal min-[480px]:px-3 min-[480px]:py-2 min-[480px]:text-left min-[480px]:leading-snug"
-              >
-                <Fuel className="size-4 shrink-0" aria-hidden="true" />
-                <span className="sr-only min-[480px]:not-sr-only min-[480px]:min-w-0 min-[480px]:flex-1">
-                  Operasional Lainnya
-                </span>
-                <Badge
-                  variant="secondary"
-                  aria-hidden="true"
-                  className="absolute -right-1 -top-1 h-4 min-w-4 justify-center px-1 py-0 text-[9px] leading-none min-[480px]:static min-[480px]:h-auto min-[480px]:min-w-0 min-[480px]:px-2.5 min-[480px]:py-1"
-                >
-                  {termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length}
-                </Badge>
-              </TabsTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">Operasional Lainnya</TooltipContent>
-          </Tooltip>
-        </TabsList>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-1">
+                  {item.subtitle}
+                </p>
+              </button>
+            );
+          })}
+        </div>
 
         <div id="finance-ledger-tab">
           <TabsContent value="ledger">
@@ -1310,7 +1370,6 @@ export default function FinanceHub({
                 <Button
                   type="button"
                   onClick={() => setOfficeExpenseOpen(true)}
-                  className="bg-orange-600 text-white hover:bg-orange-700"
                 >
                   <Plus className="mr-2 size-4" aria-hidden="true" />
                   Catat Pengeluaran Internal
@@ -1443,24 +1502,27 @@ export default function FinanceHub({
                                 </p>
                               </td>
                               <td className="py-2">
-                                <div className="flex flex-col items-start gap-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
                                   <Badge variant="success">
                                     Lengkap · {expense.proofUrls.length} bukti
                                   </Badge>
                                   {expense.proofUrls.map((url, index) => (
-                                    <ActionIconButton
+                                    <Button
                                       key={url}
                                       type="button"
-                                      label={`Lihat bukti ${typeLabel} ${index + 1} untuk ${expense.recipientName}`}
-                                      tooltip={`Lihat bukti ${index + 1}`}
-                                      icon={Eye}
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 gap-1.5 px-2.5 text-xs"
                                       onClick={() =>
                                         setReceiptPreview({
                                           url,
                                           label: `Bukti ${typeLabel} · ${expense.recipientName} (${index + 1})`,
                                         })
                                       }
-                                    />
+                                    >
+                                      <Eye className="size-3.5" aria-hidden="true" />
+                                      Bukti {index + 1}
+                                    </Button>
                                   ))}
                                 </div>
                               </td>
@@ -1480,7 +1542,12 @@ export default function FinanceHub({
         <TabsContent value="check">
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>PO Menunggu Checked By Finance</CardTitle>
+              <div className="space-y-1">
+                <CardTitle>1. Verifikasi Purchase Order (PO Menunggu Checked By Finance)</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Periksa rincian harga, pajak PPN 11%, dan rekening vendor sebelum PO diteruskan ke Direktur.
+                </p>
+              </div>
               <div className="relative w-full sm:max-w-xs">
                 <Search
                   className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -1499,7 +1566,7 @@ export default function FinanceHub({
               {filteredReviewOrders.length === 0 ? (
                 <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                   {purchaseOrders.length === 0
-                    ? "Tidak ada PO draft yang menunggu pemeriksaan."
+                    ? "Tidak ada PO draft yang menunggu pemeriksaan Finance."
                     : "Tidak ada PO yang cocok dengan pencarian."}
                 </p>
               ) : (
@@ -1507,61 +1574,118 @@ export default function FinanceHub({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Nomor Ref</TableHead>
-                        <TableHead>Vendor</TableHead>
+                        <TableHead>Nomor PO</TableHead>
+                        <TableHead>Vendor &amp; Metode</TableHead>
                         <TableHead>Tanggal</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Aksi</TableHead>
+                        <TableHead>Jumlah Item</TableHead>
+                        <TableHead className="text-right">Total Nilai PO</TableHead>
+                        <TableHead className="text-right">Aksi Pemeriksaan</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredReviewOrders.map((order) => (
-                        <TableRow
-                          key={order.publicCode}
-                          className="cursor-pointer"
-                          tabIndex={0}
-                          onClick={() => {
-                            setMessage("");
-                            setSelection({ kind: "po", id: order.publicCode });
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
+                      {filteredReviewOrders.map((order) => {
+                        const subtotal = order.items.reduce(
+                          (sum, item) => sum + item.totalPrice,
+                          0,
+                        );
+                        const poGrandTotal =
+                          Math.round(
+                            subtotal * (order.includeTax ? 1.11 : 1) * 100,
+                          ) / 100;
+                        return (
+                          <TableRow
+                            key={order.publicCode}
+                            className="cursor-pointer"
+                            tabIndex={0}
+                            onClick={() => {
+                              setMessage("");
                               setSelection({ kind: "po", id: order.publicCode });
-                            }
-                          }}
-                        >
-                          <TableCell className="font-semibold">
-                            {order.poNumber}
-                          </TableCell>
-                          <TableCell>{order.vendorName}</TableCell>
-                          <TableCell>
-                            {new Date(order.createdAt).toLocaleDateString("id-ID")}
-                          </TableCell>
-                          <TableCell>{order.items.length}</TableCell>
-                          <TableCell className="text-right">
-                            {role === UserRole.FINANCE && !order.paidAt && (
-                              <ActionIconButton
-                                label={`Tandai PO ${order.poNumber} diperiksa`}
-                                tooltip="Tandai Diperiksa"
-                                icon={FileCheck2}
-                                disabled={isPending}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  runReview(order.publicCode);
-                                }}
-                              />
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setSelection({ kind: "po", id: order.publicCode });
+                              }
+                            }}
+                          >
+                            <TableCell className="font-semibold">
+                              {order.poNumber}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-foreground">
+                                {order.vendorName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {order.paymentMethod === "CASH"
+                                  ? "Tunai (Cash)"
+                                  : `Transfer${order.paymentBankName ? ` · ${order.paymentBankName}` : ""}`}
+                              </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleDateString("id-ID", {
+                                dateStyle: "medium",
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {order.items.length} item
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold tabular-nums">
+                              {currency(poGrandTotal)}
+                              {order.includeTax && (
+                                <span className="block text-[10px] font-normal text-muted-foreground">
+                                  Termasuk PPN 11%
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {role === UserRole.FINANCE && !order.paidAt ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs"
+                                  disabled={isPending}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    runReview(order.publicCode);
+                                  }}
+                                >
+                                  <FileCheck2
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  Tandai Diperiksa
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setMessage("");
+                                    setSelection({
+                                      kind: "po",
+                                      id: order.publicCode,
+                                    });
+                                  }}
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Lihat PO
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
               )}
-              <p className="text-sm text-muted-foreground">
-                Pembelian langsung menunggu persetujuan eksekutif terlebih dahulu;
-                setelah disetujui, tagihan masuk ke antrean pembayaran.
+              <p className="text-xs text-muted-foreground">
+                Klik baris PO untuk melihat dokumen lengkap. Pembelian langsung dan tiket biaya yang sudah disetujui Direktur masuk ke tab <strong>2. Antrean Bayar</strong>.
               </p>
             </CardContent>
           </Card>
@@ -1571,7 +1695,12 @@ export default function FinanceHub({
           <TabsContent value="payment">
             <Card>
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <CardTitle>Tagihan & Pembelian Disetujui</CardTitle>
+                <div className="space-y-1">
+                  <CardTitle>2. Antrean Pembayaran Tagihan &amp; Pengajuan Disetujui</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Klik baris untuk melihat rincian tagihan, atau klik <strong>Bayar Tagihan</strong> untuk mencatat bukti pembayaran.
+                  </p>
+                </div>
                 <div className="relative w-full sm:max-w-xs">
                   <Search
                     className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -1591,12 +1720,13 @@ export default function FinanceHub({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nomor Ref</TableHead>
-                      <TableHead>Tagihan (Grand Total)</TableHead>
-                      <TableHead>Total Terbayar</TableHead>
-                      <TableHead>Sisa Hutang</TableHead>
+                      <TableHead>Nomor Ref &amp; Keperluan</TableHead>
+                      <TableHead>Tujuan Pembayaran / Rekening</TableHead>
+                      <TableHead className="text-right">Total Tagihan</TableHead>
+                      <TableHead className="text-right">Terbayar</TableHead>
+                      <TableHead className="text-right">Sisa Hutang</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead className="text-right">Aksi Pembayaran</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1619,14 +1749,27 @@ export default function FinanceHub({
                           }}
                         >
                           <TableCell>
-                            <span className="font-semibold">{row.reference}</span>
+                            <span className="font-semibold text-foreground">
+                              {row.reference}
+                            </span>
                             <span className="block text-xs text-muted-foreground">
                               {row.title}
                             </span>
                           </TableCell>
-                          <TableCell>{currency(row.grandTotal)}</TableCell>
-                          <TableCell>{currency(row.paidAmount)}</TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="max-w-xs text-xs text-muted-foreground">
+                            {row.transferDestination || (
+                              <span className="italic">
+                                Klik baris untuk melihat tujuan
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {currency(row.grandTotal)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                            {currency(row.paidAmount)}
+                          </TableCell>
+                          <TableCell className="text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
                             {currency(outstanding)}
                           </TableCell>
                           <TableCell>
@@ -1647,38 +1790,42 @@ export default function FinanceHub({
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex flex-wrap justify-end gap-2">
-                              {row.paidAmount > 0 && (
-                                <ActionIconButton
-                                  type="button"
-                                  label={`Lihat bukti pembayaran ${row.title}`}
-                                  tooltip="Lihat Bukti"
-                                  icon={Eye}
-                                  disabled={isPending}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    openPaymentHistory(row);
-                                  }}
+                            {outstanding > 0 && role === UserRole.FINANCE ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                disabled={isPending}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setPaymentModalSelection({
+                                    kind: row.kind,
+                                    id: row.id,
+                                  });
+                                }}
+                              >
+                                <Wallet
+                                  className="size-3.5"
+                                  aria-hidden="true"
                                 />
-                              )}
-                              {outstanding > 0 && (
-                                <ActionIconButton
-                                  label={`Catat pembayaran ${row.title}`}
-                                  tooltip={`Catat pembayaran ${row.title}`}
-                                  icon={Wallet}
-                                  disabled={
-                                    isPending || role !== UserRole.FINANCE
-                                  }
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setPaymentModalSelection({
-                                      kind: row.kind,
-                                      id: row.id,
-                                    });
-                                  }}
-                                />
-                              )}
-                            </div>
+                                Bayar Tagihan
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                disabled={isPending}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openPaymentHistory(row);
+                                }}
+                              >
+                                <Eye className="size-3.5" aria-hidden="true" />
+                                Rincian
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
@@ -1686,7 +1833,7 @@ export default function FinanceHub({
                     {filteredPendingPaymentRows.length === 0 && (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="py-10 text-center text-muted-foreground"
                         >
                           {pendingPaymentRows.length === 0
@@ -2095,14 +2242,26 @@ export default function FinanceHub({
                         {terbilangRupiah(Number(request.requestedAmount))}
                       </p>
                       {request.transferProofUrl && (
-                        <ActionIconButton
-                          label={`Lihat bukti transfer permintaan ${request.doNumber}`}
-                          tooltip="Lihat bukti transfer"
-                          icon={ExternalLink}
-                          href={photoDownloadHref(request.transferProofUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                        />
+                        <div className="pt-2">
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1.5 text-xs"
+                          >
+                            <a
+                              href={photoDownloadHref(request.transferProofUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <ExternalLink
+                                className="size-3.5"
+                                aria-hidden="true"
+                              />
+                              Bukti Transfer Pencairan
+                            </a>
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -2112,33 +2271,60 @@ export default function FinanceHub({
                     </p>
                   )}
                   <div className="flex flex-wrap gap-2 text-sm">
-                    <ActionIconButton
-                      label={`Lihat foto speedometer sebelum isi untuk DO ${request.doNumber}`}
-                      tooltip="Foto speedometer sebelum isi"
-                      icon={ExternalLink}
-                      href={photoDownloadHref(request.beforeFillingPhotoUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                    />
-                    {request.afterFillingPhotoUrl && (
-                      <ActionIconButton
-                        label={`Lihat foto speedometer setelah isi untuk DO ${request.doNumber}`}
-                        tooltip="Foto speedometer setelah isi"
-                        icon={ExternalLink}
-                        href={photoDownloadHref(request.afterFillingPhotoUrl)}
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <a
+                        href={photoDownloadHref(request.beforeFillingPhotoUrl)}
                         target="_blank"
                         rel="noreferrer"
-                      />
+                      >
+                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                        Foto ODO Awal
+                      </a>
+                    </Button>
+                    {request.afterFillingPhotoUrl && (
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                      >
+                        <a
+                          href={photoDownloadHref(request.afterFillingPhotoUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink
+                            className="size-3.5"
+                            aria-hidden="true"
+                          />
+                          Foto ODO Akhir
+                        </a>
+                      </Button>
                     )}
                     {request.receiptPhotoUrl && (
-                      <ActionIconButton
-                        label={`Lihat bon BBM untuk DO ${request.doNumber}`}
-                        tooltip="Bon BBM"
-                        icon={ExternalLink}
-                        href={photoDownloadHref(request.receiptPhotoUrl)}
-                        target="_blank"
-                        rel="noreferrer"
-                      />
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                      >
+                        <a
+                          href={photoDownloadHref(request.receiptPhotoUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink
+                            className="size-3.5"
+                            aria-hidden="true"
+                          />
+                          Foto Bon BBM
+                        </a>
+                      </Button>
                     )}
                   </div>
                   {request.status === "PENDING_FINANCE" && role === UserRole.FINANCE && (
@@ -2251,7 +2437,7 @@ export default function FinanceHub({
                   {request.status === "PROOF_SUBMITTED" &&
                     role === UserRole.FINANCE && (
                       <form
-                        className="grid gap-3 rounded-md border border-amber-200 bg-amber-50/50 p-3 md:grid-cols-[1fr_auto]"
+                        className="grid gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 md:grid-cols-[1fr_auto]"
                         onSubmit={(event) =>
                           submitFuelReconciliation(event, request.id)
                         }
@@ -2314,11 +2500,34 @@ export default function FinanceHub({
           activeTicket?.ticketNumber ??
           "Detail Finance"
         }
-        description="Pemeriksaan dokumen dan transaksi tersimpan di satu panel."
+        description={
+          activeTicket
+            ? `${activeTicket.title}${activeTicket.projectName ? ` · Proyek: ${activeTicket.projectName}` : ""}`
+            : activeDirectPurchase
+              ? `Pembelian Material Langsung · ${activeDirectPurchase.vendorName}`
+              : "Pemeriksaan dokumen dan transaksi tersimpan di satu panel."
+        }
         hideHeader={Boolean(previewOrder)}
         className="sm:max-w-2xl"
         footer={
-          previewOrder ? undefined : (
+          previewOrder ? (
+            activeOrder && role === UserRole.FINANCE && !activeOrder.paidAt ? (
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  PO ini menunggu pemeriksaan Finance sebelum diajukan ke Direktur.
+                </span>
+                <Button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => runReview(activeOrder.publicCode)}
+                  className="gap-1.5"
+                >
+                  <FileCheck2 className="size-4" aria-hidden="true" />
+                  Tandai PO Diperiksa (Checked)
+                </Button>
+              </div>
+            ) : undefined
+          ) : (
           <Button
             variant="outline"
             type="button"
@@ -2338,7 +2547,7 @@ export default function FinanceHub({
           )
         }
       >
-          <div className={previewOrder ? "flex min-h-0 flex-1 flex-col" : "mt-6 space-y-4"}>
+          <div className={previewOrder ? "flex min-h-0 flex-1 flex-col" : "space-y-4"}>
             {previewOrder && (
               <>
                 <UniversalDocumentPreview
@@ -2363,33 +2572,51 @@ export default function FinanceHub({
               </>
             )}
             {activeStandaloneOrder && isPaymentSettled && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">
-                {activeStandaloneOrder.paidAt
-                  ? `PO ini sudah lunas pada ${new Date(activeStandaloneOrder.paidAt).toLocaleDateString("id-ID")}.`
-                  : "PO ini sudah lunas."}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+                <span>
+                  {activeStandaloneOrder.paidAt
+                    ? `PO ini sudah lunas pada ${new Date(activeStandaloneOrder.paidAt).toLocaleDateString("id-ID")}.`
+                    : "PO ini sudah lunas."}
+                </span>
                 {activeStandaloneOrder.paymentReceiptUrl && (
-                  <ActionIconButton
-                    label={`Lihat bukti pelunasan PO ${activeStandaloneOrder.poNumber}`}
-                    tooltip="Lihat bukti pelunasan"
-                    icon={ExternalLink}
-                    href={photoDownloadHref(
-                      activeStandaloneOrder.paymentReceiptUrl,
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                  />
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <a
+                      href={photoDownloadHref(
+                        activeStandaloneOrder.paymentReceiptUrl,
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                      Lihat Bukti Pelunasan
+                    </a>
+                  </Button>
                 )}
               </div>
             )}
             {activeStandaloneOrder?.vendorInvoiceUrl && (
-              <ActionIconButton
-                label={`Lihat invoice/bon PO ${activeStandaloneOrder.poNumber} dari Logistik`}
-                tooltip="Lihat invoice/bon dari Logistik"
-                icon={ExternalLink}
-                href={photoDownloadHref(activeStandaloneOrder.vendorInvoiceUrl)}
-                target="_blank"
-                rel="noreferrer"
-              />
+              <div>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                >
+                  <a
+                    href={photoDownloadHref(activeStandaloneOrder.vendorInvoiceUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                    Lihat Invoice / Bon Vendor
+                  </a>
+                </Button>
+              </div>
             )}
             {activeStandaloneOrder && role === UserRole.FINANCE && !isPaymentSettled && (
               <form className="space-y-3" onSubmit={submitPayment}>
@@ -2547,20 +2774,44 @@ export default function FinanceHub({
                     </tbody>
                   </table>
                 </NativeDataTable>
-                <p className="text-sm">
-                  Total tagihan: <strong>{currency(paymentTotal)}</strong> · Dibayar:{" "}
-                  <strong>{currency(paidAmount)}</strong> · Sisa:{" "}
-                  <strong>{currency(remainingAmount)}</strong>
-                </p>
+                <div className="grid gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 text-xs sm:grid-cols-3">
+                  <div>
+                    <span className="text-muted-foreground">Total Tagihan</span>
+                    <strong className="mt-0.5 block text-sm tabular-nums text-foreground">
+                      {currency(paymentTotal)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Sudah Dibayar</span>
+                    <strong className="mt-0.5 block text-sm tabular-nums text-emerald-600 dark:text-emerald-400">
+                      {currency(paidAmount)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Sisa Hutang</span>
+                    <strong className="mt-0.5 block text-sm tabular-nums text-rose-600 dark:text-rose-400">
+                      {currency(remainingAmount)}
+                    </strong>
+                  </div>
+                </div>
                 {activeDirectPurchase.vendorInvoiceUrl && (
-                  <ActionIconButton
-                    label="Lihat invoice atau bon faktur pembelian langsung"
-                    tooltip="Lihat Invoice / BON Faktur"
-                    icon={ExternalLink}
-                    href={photoDownloadHref(activeDirectPurchase.vendorInvoiceUrl)}
-                    target="_blank"
-                    rel="noreferrer"
-                  />
+                  <div>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <a
+                        href={photoDownloadHref(activeDirectPurchase.vendorInvoiceUrl)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                        Lihat Invoice / Bon Faktur
+                      </a>
+                    </Button>
+                  </div>
                 )}
                 {role === UserRole.FINANCE &&
                   activeDirectPurchase.vendorInvoiceUrl &&
@@ -2675,50 +2926,111 @@ export default function FinanceHub({
             )}
             {activeTicket && (
               <>
-                <div className="space-y-1 rounded-lg border p-4 text-sm">
-                  <p>
-                    Nilai: <strong>{currency(activeTicket.totalAmount)}</strong>
-                  </p>
-                  {activeTicket.requestCategory ===
-                    TicketRequestCategory.APH && (
-                    <>
-                      <p>
-                        Type pembayaran:{" "}
-                        {activeTicket.requestPaymentMethod ===
-                        POPaymentMethod.CASH
-                          ? "Cash"
-                          : "Transfer"}
-                      </p>
-                      {activeTicket.requestPaymentMethod ===
-                        POPaymentMethod.TRANSFER && (
+                <div className="space-y-3 rounded-xl border border-border/80 bg-muted/15 p-4 text-sm">
+                  <div className="grid gap-2.5 sm:grid-cols-3">
+                    <div className="rounded-lg border border-border/70 bg-background/60 p-3">
+                      <span className="text-xs text-muted-foreground">
+                        Total Nilai Pengajuan
+                      </span>
+                      <strong className="mt-1 block text-base tabular-nums text-foreground">
+                        {currency(activeTicket.totalAmount)}
+                      </strong>
+                    </div>
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                        Total Sudah Dibayar
+                      </span>
+                      <strong className="mt-1 block text-base tabular-nums text-emerald-600 dark:text-emerald-400">
+                        {currency(paidAmount)}
+                      </strong>
+                    </div>
+                    <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
+                      <span className="text-xs text-rose-600 dark:text-rose-400">
+                        Sisa Tagihan
+                      </span>
+                      <strong className="mt-1 block text-base tabular-nums text-rose-600 dark:text-rose-400">
+                        {currency(remainingAmount)}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-background/50 p-3 space-y-2">
+                    <p className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+                      Tujuan Pembayaran &amp; Rekening Penerima
+                    </p>
+                    <div className="grid gap-2 text-xs sm:grid-cols-3">
+                      <div>
+                        <span className="text-muted-foreground">Nama Penerima</span>
+                        <strong className="mt-0.5 block text-foreground">
+                          {activeTicket.recipientName ?? activeTicket.requesterName}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Bank / Kas</span>
+                        <strong className="mt-0.5 block text-foreground">
+                          {activeTicket.bankName ??
+                            activeTicket.vendorBankName ??
+                            "Tidak dicantumkan"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Nomor Rekening</span>
+                        <strong className="mt-0.5 block font-mono text-foreground">
+                          {activeTicket.accountNumber ??
+                            activeTicket.vendorAccountNumber ??
+                            "Tidak dicantumkan"}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {activeTicket.requestCategory ===
+                      TicketRequestCategory.APH && (
+                      <div className="border-t border-border/60 pt-2 text-xs space-y-1">
                         <p>
-                          Tujuan transfer:{" "}
-                          {activeTicket.transferDestination || "—"}
+                          Metode Pembayaran:{" "}
+                          <strong>
+                            {activeTicket.requestPaymentMethod ===
+                            POPaymentMethod.CASH
+                              ? "Tunai (Cash)"
+                              : "Transfer"}
+                          </strong>
                         </p>
-                      )}
-                      <p className="whitespace-pre-wrap">
-                        Keterangan:{" "}
-                        {activeTicket.requestPaymentDescription || "—"}
-                      </p>
-                    </>
-                  )}
-                  <p>Penerima: {activeTicket.recipientName ?? "Tidak dicantumkan"}</p>
-                  <p>Bank: {activeTicket.bankName ?? "Tidak dicantumkan"}</p>
-                  <p>Rekening: {activeTicket.accountNumber ?? "Tidak dicantumkan"}</p>
-                  <p>Rekening PO: {activeTicket.vendorBankName ?? "Tidak dicantumkan"} · {activeTicket.vendorAccountNumber ?? "—"} · {activeTicket.vendorAccountName ?? "—"}</p>
-                  <p>
-                    Total dibayar: <strong>{currency(paidAmount)}</strong> ·
-                    Sisa tagihan: <strong>{currency(remainingAmount)}</strong>
-                  </p>
+                        {activeTicket.requestPaymentMethod ===
+                          POPaymentMethod.TRANSFER && (
+                          <p>
+                            Tujuan Transfer:{" "}
+                            <strong>
+                              {activeTicket.transferDestination || "—"}
+                            </strong>
+                          </p>
+                        )}
+                        {activeTicket.requestPaymentDescription && (
+                          <p className="whitespace-pre-wrap text-muted-foreground">
+                            Keterangan: {activeTicket.requestPaymentDescription}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {activeTicket.purchaseReceiptUrl && (
-                    <ActionIconButton
-                      label={`Lihat invoice atau bon dari Logistik untuk tiket ${activeTicket.ticketNumber}`}
-                      tooltip="Lihat invoice/bon dari Logistik"
-                      icon={ExternalLink}
-                      href={photoDownloadHref(activeTicket.purchaseReceiptUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                    />
+                    <div>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                      >
+                        <a
+                          href={photoDownloadHref(activeTicket.purchaseReceiptUrl)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink className="size-3.5" aria-hidden="true" />
+                          Lihat Invoice / Bon dari Logistik
+                        </a>
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <DocumentPdfGenerator

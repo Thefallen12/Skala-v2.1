@@ -19,6 +19,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import { auth } from "../../../../../auth";
+import { createBrandedQrDataUrl } from "@/lib/documents/qr-code";
 import { prisma } from "@/lib/prisma";
 import {
   decimalFromScaledInteger,
@@ -36,6 +37,7 @@ const financeRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
   UserRole.DEPUTY_DIRECTOR,
+  UserRole.KOORDINATOR,
 ];
 
 export default async function FinancePage({
@@ -59,12 +61,14 @@ export default async function FinancePage({
     : {
         OR: [
           { ticketId: null },
+          { ticketId: { isSet: false } },
           {
             ticket: {
               is: {
                 OR: [
                   { requestCategory: { not: TicketRequestCategory.APH } },
                   { requestCategory: null },
+                  { requestCategory: { isSet: false } },
                 ],
               },
             },
@@ -495,21 +499,20 @@ export default async function FinancePage({
           },
         })
       : Promise.resolve([]),
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.ADMINISTRATIONS
-      ? prisma.user.findMany({
-          where: { isActive: true },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true, role: true },
-        })
-      : Promise.resolve([]),
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, role: true },
+    }),
     prisma.cashflow.findMany({
       where: canViewAPH
         ? undefined
         : {
             OR: [
               { paymentTransactionId: null },
+              { paymentTransactionId: { isSet: false } },
               { paymentTransaction: { is: { ticketId: null } } },
+              { paymentTransaction: { is: { ticketId: { isSet: false } } } },
               {
                 paymentTransaction: {
                   is: {
@@ -522,6 +525,7 @@ export default async function FinancePage({
                             },
                           },
                           { requestCategory: null },
+                          { requestCategory: { isSet: false } },
                         ],
                       },
                     },
@@ -584,7 +588,10 @@ export default async function FinancePage({
       },
     }),
     prisma.cashflow.findMany({
-      where: { type: "IN", transferGroupId: null },
+      where: {
+        type: "IN",
+        OR: [{ transferGroupId: null }, { transferGroupId: { isSet: false } }],
+      },
       orderBy: { createdAt: "desc" },
       take: 200,
       select: {
@@ -625,6 +632,11 @@ export default async function FinancePage({
         additionalProofUrls: true,
         paymentType: true,
         paidAt: true,
+        cashflow: {
+          select: {
+            account: { select: { accountName: true } },
+          },
+        },
         ticket: {
           select: {
             ticketNumber: true,
@@ -761,15 +773,15 @@ export default async function FinancePage({
     prisma.cashflow.findMany({
       where: {
         type: "IN",
-        transferGroupId: null,
-        createdAt: { gte: cashflowDashboardStart, lte: currentDate },
+        OR: [{ transferGroupId: null }, { transferGroupId: { isSet: false } }],
+        createdAt: { gte: cashflowDashboardStart },
       },
       select: { createdAt: true, amount: true },
     }),
     prisma.paymentTransaction.findMany({
       where: {
         status: PaymentStatus.PAID,
-        paidAt: { gte: cashflowDashboardStart, lte: currentDate },
+        paidAt: { gte: cashflowDashboardStart },
         OR: [
           { ticketId: { not: null } },
           { poId: { not: null } },
@@ -784,8 +796,19 @@ export default async function FinancePage({
       },
     }),
     prisma.officeExpense.findMany({
-      where: { createdAt: { gte: cashflowDashboardStart, lte: currentDate } },
-      select: { createdAt: true, amount: true },
+      where: { createdAt: { gte: cashflowDashboardStart } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        expenseType: true,
+        description: true,
+        amount: true,
+        paymentMethod: true,
+        proofUrls: true,
+        createdAt: true,
+        recipient: { select: { name: true } },
+        account: { select: { accountName: true } },
+      },
     }),
     session.user.role === UserRole.FINANCE ||
     session.user.role === UserRole.ADMINISTRATIONS
@@ -1004,6 +1027,10 @@ export default async function FinancePage({
     })),
     ...dashboardPaidExpenses.flatMap((payment) => {
       if (!payment.paidAt) return [];
+      const accountName =
+        payment.cashflow?.account.accountName ||
+        payment.transferDestination ||
+        "Tujuan tidak dicatat";
       if (payment.ticket) {
         return [{
           id: payment.id,
@@ -1018,7 +1045,7 @@ export default async function FinancePage({
                 ? "Termin"
                 : "Pelunasan",
           counterparty: payment.ticket.requester.name,
-          accountOrDestination: payment.transferDestination || "Tujuan tidak dicatat",
+          accountOrDestination: accountName,
           projectName:
             payment.ticket.project?.kelompokTani ||
             payment.ticket.project?.title ||
@@ -1041,7 +1068,7 @@ export default async function FinancePage({
                 ? "Termin"
                 : "Pelunasan",
           counterparty: payment.po.vendorName,
-          accountOrDestination: payment.transferDestination || "Tujuan tidak dicatat",
+          accountOrDestination: accountName,
           projectName:
             payment.po.project?.kelompokTani ||
             payment.po.project?.title ||
@@ -1065,7 +1092,7 @@ export default async function FinancePage({
                 ? "Termin"
                 : "Pelunasan",
           counterparty: payment.directStockPurchase.vendorName,
-          accountOrDestination: payment.transferDestination || "Tujuan tidak dicatat",
+          accountOrDestination: accountName,
           projectName: project?.kelompokTani || project?.title || null,
           amount: payment.amount,
           proofUrl: payment.proofOfTransferUrl,
@@ -1073,6 +1100,25 @@ export default async function FinancePage({
       }
       return [];
     }),
+    ...dashboardOfficeExpenses.map((expense) => ({
+      id: expense.id,
+      createdAt: expense.createdAt.toISOString(),
+      type: "OUT" as const,
+      category: "Pengeluaran Kantor & Operasional",
+      sourceDesc: `${
+        expense.expenseType === "SALARY"
+          ? "Gaji"
+          : expense.expenseType === "ADVANCE"
+            ? "Kasbon / Ambilan"
+            : "Reimbursement"
+      } · ${expense.description}`,
+      paymentMethod: expense.paymentMethod === "CASH" ? "Tunai" : "Transfer",
+      counterparty: expense.recipient.name,
+      accountOrDestination: expense.account.accountName,
+      projectName: null,
+      amount: expense.amount,
+      proofUrl: expense.proofUrls[0] ?? null,
+    })),
   ].sort(
     (first, second) =>
       new Date(second.createdAt).getTime() -
@@ -1116,11 +1162,42 @@ export default async function FinancePage({
     }];
   });
 
+  const activeUsers = officeExpenseRecipients;
+  const financeRoleUsers = activeUsers.filter(
+    (user) => user.role === UserRole.FINANCE,
+  );
+  const financeSignerName =
+    (session.user.role === UserRole.FINANCE && session.user.name) ||
+    financeRoleUsers[0]?.name ||
+    cashflows[0]?.recorder?.name ||
+    "Bagian Keuangan (Finance)";
+  const coordinatorSignerName =
+    activeUsers.find((user) => user.role === UserRole.KOORDINATOR)?.name ||
+    activeUsers.find((user) => user.role === UserRole.ADMINISTRATIONS)?.name ||
+    "Koordinator / Administrasi";
+  const directorSignerName =
+    activeUsers.find((user) => user.role === UserRole.DIRECTOR)?.name ||
+    "Direktur Utama";
+
+  let financeQrDataUrl: string | null = null;
+  try {
+    financeQrDataUrl = await createBrandedQrDataUrl(
+      `SPE-FIN | ${financeSignerName}`,
+      240,
+    );
+  } catch (error) {
+    console.error("Failed to generate Finance report QR code:", error);
+  }
+
   return (
     <>
       <FinanceHub
         key={`${tab ?? ""}:${openSheet ?? ""}`}
         role={session.user.role}
+        financeSignerName={financeSignerName}
+        financeQrDataUrl={financeQrDataUrl}
+        coordinatorSignerName={coordinatorSignerName}
+        directorSignerName={directorSignerName}
         dashboardMonths={dashboardMonths}
         financeAccounts={financeAccounts}
         officeExpenses={officeExpenses.map((expense) => ({
@@ -1130,12 +1207,20 @@ export default async function FinancePage({
           recipientName: expense.recipient.name,
           recipientRole: expense.recipient.role,
         }))}
-        officeExpenseRecipients={officeExpenseRecipients}
+        officeExpenseRecipients={
+          session.user.role === UserRole.FINANCE ||
+          session.user.role === UserRole.ADMINISTRATIONS
+            ? officeExpenseRecipients
+            : []
+        }
         fundUsageSummary={fundUsageSummary}
         dashboardTransactions={dashboardTransactions}
         expenseCategories={expenseCategories}
         cashflows={cashflows.map((cashflow) => ({
           ...cashflow,
+          type: (cashflow.type === "IN" ? "IN" : "OUT") as "IN" | "OUT",
+          paymentMethod: (cashflow.paymentMethod === "TRANSFER" || cashflow.paymentMethod === "CASH" || cashflow.paymentMethod === "DEPOSIT" ? cashflow.paymentMethod : null),
+          proofUrl: cashflow.proofUrl ?? "",
           createdAt: cashflow.createdAt.toISOString(),
         }))}
         historicalPayments={historicalPayments}

@@ -269,6 +269,7 @@ export async function recordIncomingFund(
             proofUrl,
             accountId: account.id,
             recordedBy: session.user.id,
+            transferGroupId: null,
           },
         });
       },

@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     where: { code: { in: records.map((record) => record.code) } },
     select: { code: true },
   });
-  const existingCodes = new Set(existingProjects.map((project) => project.code));
+  const existingCodes = new Set(existingProjects.map((project: { code: string }) => project.code));
   const recordsToCreate = records.filter(
     (record) => !existingCodes.has(record.code),
   );
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
     select: { code: true, pagu: true },
   });
   const importedBudget = importedProjects.reduce(
-    (total, project) =>
+    (total: Prisma.Decimal, project: { code: string; pagu: bigint }) =>
       total.plus(decimalFromScaledInteger(project.pagu)),
     new Prisma.Decimal(0),
   );

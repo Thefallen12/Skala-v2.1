@@ -166,17 +166,24 @@ export default async function Layout({
         session.user.role === UserRole.LOGISTICS ||
         session.user.role === UserRole.MOVER ||
         session.user.role === UserRole.KOORDINATOR ||
+        session.user.role === UserRole.FINANCE ||
+        session.user.role === UserRole.FIELD_TEAM ||
+        session.user.role === UserRole.DEPUTY_DIRECTOR ||
         canManageUsers(session.user.role)
       }
       canAccessExecutive={
         session.user.role === UserRole.DIRECTOR ||
-        session.user.role === UserRole.DEPUTY_DIRECTOR
+        session.user.role === UserRole.DEPUTY_DIRECTOR ||
+        session.user.role === UserRole.ADMINISTRATIONS ||
+        session.user.role === UserRole.KOORDINATOR ||
+        session.user.role === UserRole.FINANCE
       }
       canAccessFinance={
         session.user.role === UserRole.FINANCE ||
         session.user.role === UserRole.ADMINISTRATIONS ||
         session.user.role === UserRole.DIRECTOR ||
-        session.user.role === UserRole.DEPUTY_DIRECTOR
+        session.user.role === UserRole.DEPUTY_DIRECTOR ||
+        session.user.role === UserRole.KOORDINATOR
       }
       canAccessProjects={
         session.user.role === UserRole.ADMINISTRATIONS ||
@@ -184,7 +191,10 @@ export default async function Layout({
         session.user.role === UserRole.DEPUTY_DIRECTOR ||
         session.user.role === UserRole.KOORDINATOR ||
         session.user.role === UserRole.FIELD_TEAM ||
-        session.user.role === UserRole.DRAFTER
+        session.user.role === UserRole.DRAFTER ||
+        session.user.role === UserRole.FINANCE ||
+        session.user.role === UserRole.LOGISTICS ||
+        session.user.role === UserRole.MOVER
       }
       canAccessDrafter={drawingAccessRoles.includes(session.user.role)}
       isMover={session.user.role === UserRole.MOVER}

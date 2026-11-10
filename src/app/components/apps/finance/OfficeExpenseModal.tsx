@@ -230,45 +230,84 @@ export default function OfficeExpenseModal({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor={`${formId}-account`}>Sumber Dana</Label>
-            <select
-              id={`${formId}-account`}
-              disabled={eligibleAccounts.length === 0}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground disabled:opacity-60"
-              {...form.register("accountId")}
-            >
-              <option value="">Pilih akun dengan saldo mencukupi</option>
-              {accounts.map((account) => (
-                <option
-                  key={account.id}
-                  value={account.id}
-                  disabled={account.balance < amount || account.balance <= 0}
-                >
-                  {account.accountName} · Saldo {currency(account.balance)}
-                </option>
-              ))}
-            </select>
-            {eligibleAccounts.length === 0 && (
-              <p className="text-sm text-destructive" role="alert">
-                Tidak ada akun dengan saldo yang mencukupi untuk nominal ini.
-              </p>
-            )}
-            {form.formState.errors.accountId && (
-              <p className="text-sm text-destructive" role="alert">
-                {form.formState.errors.accountId.message}
-              </p>
-            )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-amount`}>Nominal Pengeluaran (Rp)</Label>
+              <input type="hidden" {...form.register("amount")} />
+              <RupiahAmountInput
+                id={`${formId}-amount`}
+                value={amountInput}
+                onChange={(formatted) => {
+                  const parsed = parseRupiahInput(formatted);
+                  setAmountInput(formatted);
+                  form.setValue("amount", parsed, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                  const currentAcc = accounts.find((a) => a.id === accountId);
+                  if (!currentAcc || currentAcc.balance < parsed) {
+                    const fallbackAcc = accounts.find(
+                      (a) => a.balance >= parsed && a.balance > 0,
+                    );
+                    if (fallbackAcc) {
+                      form.setValue("accountId", fallbackAcc.id, {
+                        shouldValidate: true,
+                      });
+                    }
+                  }
+                }}
+                required
+              />
+              {form.formState.errors.amount && (
+                <p className="text-sm text-destructive" role="alert">
+                  {form.formState.errors.amount.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-account`}>Sumber Dana (Buku Kas / Bank)</Label>
+              <select
+                id={`${formId}-account`}
+                disabled={eligibleAccounts.length === 0}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground disabled:opacity-60"
+                {...form.register("accountId")}
+              >
+                <option value="">Pilih akun dengan saldo mencukupi</option>
+                {accounts.map((account) => (
+                  <option
+                    key={account.id}
+                    value={account.id}
+                    disabled={account.balance < amount || account.balance <= 0}
+                  >
+                    {account.accountName} · Saldo {currency(account.balance)}
+                  </option>
+                ))}
+              </select>
+              {eligibleAccounts.length === 0 && (
+                <p className="text-xs text-destructive" role="alert">
+                  Tidak ada akun dengan saldo yang mencukupi untuk nominal ini.
+                </p>
+              )}
+              {form.formState.errors.accountId && (
+                <p className="text-sm text-destructive" role="alert">
+                  {form.formState.errors.accountId.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label>Metode Pembayaran</Label>
             <div className="flex flex-wrap gap-4">
               {[
-                ["TRANSFER", "Transfer"],
-                ["CASH", "Cash"],
+                ["TRANSFER", "Transfer Bank / E-Wallet"],
+                ["CASH", "Kas Tunai (Cash)"],
               ].map(([value, label]) => (
-                <FormLabel key={value} className="flex items-center gap-2 text-sm">
+                <FormLabel
+                  key={value}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/80 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
+                >
                   <input
                     type="radio"
                     value={value}
@@ -278,28 +317,6 @@ export default function OfficeExpenseModal({
                 </FormLabel>
               ))}
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor={`${formId}-amount`}>Nominal (Rupiah)</Label>
-            <input type="hidden" {...form.register("amount")} />
-            <RupiahAmountInput
-              id={`${formId}-amount`}
-              value={amountInput}
-              onChange={(formatted) => {
-                setAmountInput(formatted);
-                form.setValue("amount", parseRupiahInput(formatted), {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-              }}
-              required
-            />
-            {form.formState.errors.amount && (
-              <p className="text-sm text-destructive" role="alert">
-                {form.formState.errors.amount.message}
-              </p>
-            )}
           </div>
 
           <div className="space-y-2">

@@ -14,7 +14,7 @@ export function getRoleHomePath(role: UserRole): string {
     case UserRole.DRAFTER:
       return "/apps/projects";
     case UserRole.MOVER:
-      return "/apps/tickets";
+      return "/apps/logistics";
     case UserRole.ADMINISTRATIONS:
       return "/";
   }

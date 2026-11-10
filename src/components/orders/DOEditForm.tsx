@@ -237,23 +237,19 @@ export default function DOEditForm({
 
   return (
     <form onSubmit={submit} className="order-editor-print-area space-y-6">
-      <Card className="space-y-5 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <Card className="space-y-5 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>
-            <p className="text-sm text-muted-foreground">
-              {publicCode ? "Edit DO / Surat Jalan" : "Buat DO / Surat Jalan"}
+            <h2 className="text-lg font-semibold text-foreground">
+              {publicCode ? `Delivery Order · ${doNumber}` : "1. Informasi Pengiriman & Kendaraan"}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {ticketNumber
+                ? `Referensi tiket ${ticketNumber}`
+                : poNumber
+                  ? `Terkait PO ${poNumber}`
+                  : "Pilih referensi tiket material, metode pengiriman, serta data pengemudi."}
             </p>
-            <h1 className="text-2xl font-semibold">Delivery Order</h1>
-              {ticketNumber && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Referensi tiket {ticketNumber}
-                </p>
-              )}
-              {poNumber && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Terkait PO {poNumber}
-                </p>
-              )}
           </div>
           <Badge variant={status === DOStatus.DELIVERED ? "default" : "secondary"}>
             {getStatusLabel(status ?? DOStatus.PENDING)}
@@ -649,11 +645,11 @@ export default function DOEditForm({
         )}
       </Card>
 
-      <Card className="space-y-4 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <Card className="space-y-4 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div>
-            <h2 className="text-lg font-semibold">Item pengiriman</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="text-lg font-semibold text-foreground">2. Item Pengiriman</h2>
+            <p className="text-xs text-muted-foreground">
               Jumlah terkirim tidak dapat melebihi jumlah yang dipesan.
             </p>
           </div>
@@ -667,15 +663,15 @@ export default function DOEditForm({
             <Plus className="mr-2 h-4 w-4" /> Tambah item
           </Button>
         </div>
-        <div className="overflow-x-auto">
-          <Table>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <Table className="min-w-[680px]">
             <TableHeader>
               <TableRow>
-                <TableHead>Nama barang</TableHead>
-                <TableHead className="w-36">Qty dipesan</TableHead>
-                <TableHead className="w-36">Qty dikirim</TableHead>
-                <TableHead className="w-24">Satuan</TableHead>
-                <TableHead>Catatan kondisi</TableHead>
+                <TableHead className="min-w-[180px]">Nama barang</TableHead>
+                <TableHead className="w-36 min-w-[110px]">Qty dipesan</TableHead>
+                <TableHead className="w-36 min-w-[110px]">Qty dikirim</TableHead>
+                <TableHead className="w-24 min-w-[90px]">Satuan</TableHead>
+                <TableHead className="min-w-[160px]">Catatan kondisi</TableHead>
                 <TableHead className="w-16"><span className="sr-only">Aksi</span></TableHead>
               </TableRow>
             </TableHeader>
@@ -804,7 +800,7 @@ export default function DOEditForm({
           {message}
         </p>
       )}
-      <div className="order-editor-actions flex flex-wrap gap-2">
+      <div className="order-editor-actions sticky bottom-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur xl:bottom-4">
         <Button type="submit" disabled={isSaving}>
           <Save className="mr-2 h-4 w-4" />
           {isSaving
@@ -813,28 +809,25 @@ export default function DOEditForm({
               ? "Simpan Perubahan"
               : "Buat Delivery Order"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!publicCode}
-          onClick={() => setIsPdfPreviewOpen(true)}
-        >
-          <Printer className="mr-2 h-4 w-4" /> Pratinjau / Cetak PDF
-        </Button>
-        {!publicCode && (
-          <p className="self-center text-xs text-muted-foreground">
-            Simpan DO terlebih dahulu untuk melihat pratinjau cetak.
-          </p>
+        {publicCode && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPdfPreviewOpen(true)}
+            >
+              <Printer className="mr-2 h-4 w-4" /> Pratinjau / Cetak PDF
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowQr((visible) => !visible)}
+            >
+              <QrCode className="mr-2 h-4 w-4" />
+              {showQr ? "Sembunyikan QR" : "Tampilkan QR verifikasi"}
+            </Button>
+          </>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!publicCode}
-          onClick={() => setShowQr((visible) => !visible)}
-        >
-          <QrCode className="mr-2 h-4 w-4" />
-          {showQr ? "Sembunyikan QR" : "Tampilkan QR verifikasi"}
-        </Button>
       </div>
       {publicCode && (
         <GlobalModal

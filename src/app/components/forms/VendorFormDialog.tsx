@@ -196,16 +196,17 @@ function VendorFormContent({
           {message}
         </p>
       )}
-      <DialogFooter>
+      <DialogFooter className="sticky -bottom-4 -mx-4 border-t border-border bg-card px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:px-6">
         <Button
           type="button"
           variant="outline"
+          className="w-full sm:w-auto"
           onClick={onClose}
           disabled={isPending}
         >
           Batal
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={isPending}>
           {isPending
             ? "Menyimpan..."
             : vendor

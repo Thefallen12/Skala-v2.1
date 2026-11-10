@@ -1,6 +1,9 @@
+import "@/lib/sanitize-env";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
@@ -68,6 +71,17 @@ export async function uploadCloudinaryRawFile(
     );
   }
 
+  const credentials = getCloudinaryCredentials();
+  if (!credentials) {
+    const safeFolder = folder.replace(/[^a-zA-Z0-9/_-]/g, "");
+    const fileName = `${randomUUID()}.${extension}`;
+    const relativeDir = path.posix.join("uploads", safeFolder);
+    const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
+    await mkdir(absDir, { recursive: true });
+    await writeFile(path.join(absDir, fileName), bytes);
+    return `/${relativeDir}/${fileName}`;
+  }
+
   configureCloudinary();
   const publicId = `${randomUUID()}.${extension}`;
   return new Promise((resolveUpload, rejectUpload) => {
@@ -90,6 +104,9 @@ export async function uploadCloudinaryRawFile(
 }
 
 export async function removeCloudinaryRawFile(url: string): Promise<boolean> {
+  if (url.startsWith("/uploads/")) {
+    return true;
+  }
   let parsed: URL;
   try {
     parsed = new URL(url);

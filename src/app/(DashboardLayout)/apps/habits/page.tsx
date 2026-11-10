@@ -15,7 +15,7 @@ import { canManageUsers } from "@/lib/user-access";
 import { UserRole } from "@prisma/client";
 
 export const metadata: Metadata = {
-  title: "Jadwal & Habit",
+  title: "Jadwal, Tugas & Timesheet · Skala ERP",
 };
 
 type SearchParams = {
@@ -278,10 +278,13 @@ export default async function HabitsPage({
   }));
 
   return (
-    <>
+    <div className="space-y-4">
       <BreadcrumbComp
-        title="Jadwal & Habit"
-        items={[{ to: "/", title: "Beranda" }, { title: "Jadwal & Habit" }]}
+        title="Jadwal, Tugas & Timesheet"
+        items={[
+          { to: "/", title: "Beranda" },
+          { title: "Jadwal, Tugas & Timesheet" },
+        ]}
       />
       <HabitsCommandHub
         initialTab={initialTab}
@@ -318,6 +321,6 @@ export default async function HabitsPage({
         initialProjectId={selectedProjectId}
         canViewAllTimesheets={canViewAllTimesheets}
       />
-    </>
+    </div>
   );
 }

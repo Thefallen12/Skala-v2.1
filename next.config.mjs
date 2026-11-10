@@ -1,5 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 
+if (
+    process.env.CLOUDINARY_URL &&
+    (process.env.CLOUDINARY_URL.includes("<") ||
+        !process.env.CLOUDINARY_URL.startsWith("cloudinary://"))
+) {
+    delete process.env.CLOUDINARY_URL;
+}
+
 const deploymentIdPath = new URL("./.deployment-id", import.meta.url);
 const generatedDeploymentId = existsSync(deploymentIdPath)
     ? readFileSync(deploymentIdPath, "utf8").trim()

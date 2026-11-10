@@ -217,9 +217,41 @@ export default function PaymentModal({
           : "Pilih tagihan yang akan dibayar."
       }
       className="sm:max-w-xl"
+      footer={
+        target ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                setProofFile(null);
+                setMessage("");
+                onOpenChange(false);
+              }}
+            >
+              Tutup
+            </Button>
+            {!isSettled && (
+              <Button
+                type="submit"
+                form="payment-modal-form"
+                disabled={
+                  isPending ||
+                  !proofFile ||
+                  !financeAccountId ||
+                  (target.isInternalFunding && insufficientInternalAccounts)
+                }
+              >
+                {isPending ? "Memproses..." : "Simpan Pembayaran"}
+              </Button>
+            )}
+          </>
+        ) : undefined
+      }
     >
         {target && (
-          <form className="space-y-4" onSubmit={submit}>
+          <form id="payment-modal-form" className="space-y-4" onSubmit={submit}>
             {target.isInternalFunding && (
               <>
                 <section className="space-y-3 rounded-lg border p-4">
@@ -444,17 +476,6 @@ export default function PaymentModal({
                     disabled={isPending}
                   />
                 </div>
-                <Button
-                  type="submit"
-                  disabled={
-                    isPending ||
-                    !proofFile ||
-                    !financeAccountId ||
-                    (target.isInternalFunding && insufficientInternalAccounts)
-                  }
-                >
-                  {isPending ? "Memproses..." : "Simpan Pembayaran"}
-                </Button>
               </>
             ) : (
               <p className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">

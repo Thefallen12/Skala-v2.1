@@ -118,33 +118,13 @@ const DashboardCardLink = ({
 
 const TopCards = ({ cards }: { cards: readonly DashboardCard[] }) => {
   return (
-    <Swiper
-      slidesPerView={1.15}
-      spaceBetween={12}
-      loop={cards.length > 5}
-      freeMode
-      grabCursor
-      speed={5000}
-      autoplay={{
-        delay: 1,
-        disableOnInteraction: false,
-        pauseOnMouseEnter: false,
-      }}
-      modules={[Autoplay, FreeMode]}
-      breakpoints={{
-        480: { slidesPerView: 2, spaceBetween: 12 },
-        768: { slidesPerView: 3, spaceBetween: 16 },
-        1024: { slidesPerView: 4, spaceBetween: 16 },
-        1200: { slidesPerView: 5, spaceBetween: 16 },
-      }}
-      className="mySwiper w-full min-w-0"
-    >
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 w-full min-w-0">
       {cards.map((card, index) => (
-        <SwiperSlide key={card.title} className="h-auto">
+        <div key={card.title} className="h-full">
           <DashboardCardLink card={card} index={index} />
-        </SwiperSlide>
+        </div>
       ))}
-    </Swiper>
+    </div>
   );
 };
 

@@ -6,6 +6,7 @@ import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
 import { getJakartaDateKey, getJakartaDayRange, shiftDateKey } from "@/lib/habit-date";
 import {
+  POStatus,
   ProjectStatus,
   TicketStatus,
   UserRole,
@@ -13,6 +14,7 @@ import {
 } from "@prisma/client";
 import ProfileWelcome from "../components/dashboard/ProfileWelcome";
 import { TopCards } from "../components/dashboard/TopCards";
+import { WorkflowSchemaBoard } from "../components/dashboard/WorkflowSchemaBoard";
 import SalesOverview from "../components/dashboard/SalesOverview";
 import { YearlyBreakup } from "../components/dashboard/YearlyBreakup";
 import { MonthlyEarning } from "../components/dashboard/MonthlyEarning";
@@ -105,6 +107,11 @@ export default async function DashboardPage() {
     timesheetByDay,
     projectsCreatedThisYear,
     ticketsCreatedThisYear,
+    drawingsCount,
+    stockItemsCount,
+    pendingTicketsForDirector,
+    pendingPOsForDirector,
+    issuedDocsCount,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
@@ -197,6 +204,15 @@ export default async function DashboardPage() {
       where: { createdAt: { gte: yearStart, lt: nextYearStart } },
       select: { createdAt: true },
     }),
+    prisma.drawingDocument.count(),
+    prisma.stockItem.count(),
+    prisma.ticket.count({
+      where: { status: TicketStatus.PENDING_DIRECTOR },
+    }),
+    prisma.purchaseOrder.count({
+      where: { status: POStatus.PENDING_APPROVAL },
+    }),
+    prisma.purchaseOrder.count(),
   ]);
 
   if (!user) redirect("/auth/login");
@@ -304,55 +320,44 @@ export default async function DashboardPage() {
     (projectCounts.get(ProjectStatus.DONE) ?? 0) +
     (projectCounts.get(ProjectStatus.COMPLETED) ?? 0);
 
+  const runningProjectsCount =
+    (projectCounts.get(ProjectStatus.RUNNING) ?? 0) +
+    (projectCounts.get(ProjectStatus.ON_PROGRESS) ?? 0) +
+    (projectCounts.get(ProjectStatus.ACTIVE) ?? 0);
+
   return (
-    <div className="w-full min-w-0 space-y-6">
+    <div className="w-full min-w-0 space-y-5">
       <ProfileWelcome
         name={user.name}
         role={user.role}
         profilePhotoUrl={user.profilePhotoUrl}
       />
       <TopCards cards={cards} />
+      <WorkflowSchemaBoard
+        counts={{
+          totalProjects: projectCount,
+          runningProjects: runningProjectsCount,
+          drawingsCount,
+          activeTicketsCount: activeTickets,
+          stockItemsCount,
+          pendingApprovalsCount:
+            pendingTicketsForDirector + pendingPOsForDirector,
+          pendingPOsCount: pendingPOsForDirector,
+          issuedDocsCount,
+        }}
+      />
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-3">
-        <div className="min-w-0 xl:col-span-2">
-          <SalesOverview
-            year={year}
-            projectCounts={monthlyProjectCounts}
-            ticketCounts={monthlyTicketCounts}
+        <div className="flex min-w-0 xl:col-span-2">
+          <ProductPerformance
+            projects={recentProjects.map((project) => ({
+              ...project,
+              statusLabel: projectStatusLabels[project.status],
+              budget: project.budget
+                ? rupiah.format(decimalNumberFromScaledInteger(project.budget))
+                : "—",
+            }))}
           />
         </div>
-        <div className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-1">
-          <YearlyBreakup
-            total={projectCount}
-            completed={completedProjects}
-            running={
-              (projectCounts.get(ProjectStatus.RUNNING) ?? 0) +
-              (projectCounts.get(ProjectStatus.ON_PROGRESS) ?? 0) +
-              (projectCounts.get(ProjectStatus.ACTIVE) ?? 0)
-            }
-            other={Math.max(
-              projectCount -
-                completedProjects -
-                (projectCounts.get(ProjectStatus.RUNNING) ?? 0) -
-                (projectCounts.get(ProjectStatus.ON_PROGRESS) ?? 0) -
-                (projectCounts.get(ProjectStatus.ACTIVE) ?? 0),
-              0,
-            )}
-          />
-          <MonthlyEarning
-            hours={Math.round(
-              (timesheetTotal._sum.durationMinutes ?? 0) / 6,
-            ) / 10}
-            dayLabels={days.map((dayKey) =>
-              new Intl.DateTimeFormat("id-ID", {
-                timeZone: "Asia/Jakarta",
-                weekday: "short",
-              }).format(new Date(`${dayKey}T12:00:00+07:00`)),
-            )}
-            hoursByDay={hoursByDay}
-          />
-        </div>
-      </div>
-      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-3">
         <div className="min-w-0">
           <RecentTransaction
             tickets={recentTickets.map((ticket) => ({
@@ -369,16 +374,37 @@ export default async function DashboardPage() {
             }))}
           />
         </div>
-        <div className="flex min-w-0 xl:col-span-2">
-          <ProductPerformance
-            projects={recentProjects.map((project) => ({
-              ...project,
-              statusLabel: projectStatusLabels[project.status],
-              budget: project.budget
-                ? rupiah.format(decimalNumberFromScaledInteger(project.budget))
-                : "—",
-            }))}
-            />
+      </div>
+      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-3">
+        <div className="min-w-0 xl:col-span-2">
+          <SalesOverview
+            year={year}
+            projectCounts={monthlyProjectCounts}
+            ticketCounts={monthlyTicketCounts}
+          />
+        </div>
+        <div className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-1">
+          <YearlyBreakup
+            total={projectCount}
+            completed={completedProjects}
+            running={runningProjectsCount}
+            other={Math.max(
+              projectCount - completedProjects - runningProjectsCount,
+              0,
+            )}
+          />
+          <MonthlyEarning
+            hours={Math.round(
+              (timesheetTotal._sum.durationMinutes ?? 0) / 6,
+            ) / 10}
+            dayLabels={days.map((dayKey) =>
+              new Intl.DateTimeFormat("id-ID", {
+                timeZone: "Asia/Jakarta",
+                weekday: "short",
+              }).format(new Date(`${dayKey}T12:00:00+07:00`)),
+            )}
+            hoursByDay={hoursByDay}
+          />
         </div>
       </div>
       <Footer />

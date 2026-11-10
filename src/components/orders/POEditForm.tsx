@@ -228,7 +228,6 @@ export default function POEditForm({
   };
 
   const handleSubmitForFinanceReview = async () => {
-    if (!publicCode) return;
     const isValid = await form.trigger();
     if (!isValid) {
       setIsError(true);
@@ -239,19 +238,34 @@ export default function POEditForm({
     setIsSaving(true);
     setMessage("");
     try {
-      const saved = await updatePurchaseOrder(publicCode, form.getValues());
-      if (!saved.success) {
-        setIsError(true);
-        setMessage(saved.message);
-        return;
+      let targetPublicCode = publicCode;
+      if (targetPublicCode) {
+        const saved = await updatePurchaseOrder(targetPublicCode, form.getValues());
+        if (!saved.success) {
+          setIsError(true);
+          setMessage(saved.message);
+          return;
+        }
+      } else {
+        const created = await createPurchaseOrder(form.getValues());
+        if (!created.success || !created.publicCode) {
+          setIsError(true);
+          setMessage(created.message || "Gagal membuat PO.");
+          return;
+        }
+        targetPublicCode = created.publicCode;
       }
 
-      const result = await submitPurchaseOrderForFinanceReview(publicCode);
+      const result = await submitPurchaseOrderForFinanceReview(targetPublicCode);
       setIsError(!result.success);
       setMessage(result.message);
       if (result.success) {
         setCurrentStatus("PENDING_FINANCE_REVIEW");
-        router.refresh();
+        if (!publicCode && targetPublicCode) {
+          router.replace(`/d/${targetPublicCode}`);
+        } else {
+          router.refresh();
+        }
       }
     } catch (error) {
       console.error("Purchase Order submission failed:", error);
@@ -315,13 +329,15 @@ export default function POEditForm({
   return (
     <>
       <form onSubmit={submit} className="order-editor-print-area space-y-6">
-      <Card className="space-y-5 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <Card className="space-y-5 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>
-            <p className="text-sm text-muted-foreground">
-              {publicCode ? "Edit Purchase Order" : "Buat Purchase Order"}
+            <h2 className="text-lg font-semibold text-foreground">
+              {publicCode ? `Purchase Order · ${poNumber}` : "1. Informasi Vendor & Pembayaran"}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Lengkapi identitas vendor, metode pembayaran, dan termin pengadaan material.
             </p>
-            <h1 className="text-2xl font-semibold">Purchase Order</h1>
           </div>
           <Badge variant={currentStatus === "APPROVED" ? "default" : "secondary"}>
             {statusLabels[currentStatus]}
@@ -456,11 +472,11 @@ export default function POEditForm({
         )}
       </Card>
 
-      <Card className="space-y-4 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <Card className="space-y-4 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div>
-            <h2 className="text-lg font-semibold">Rincian material</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="text-lg font-semibold text-foreground">2. Rincian Material & Harga</h2>
+            <p className="text-xs text-muted-foreground">
               Subtotal dan pajak dihitung otomatis dari jumlah serta harga satuan.
             </p>
           </div>
@@ -475,15 +491,15 @@ export default function POEditForm({
             <Plus className="mr-2 h-4 w-4" /> Tambah item material
           </Button>
         </div>
-        <div className="overflow-x-auto">
-          <Table>
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow>
-                <TableHead>Nama barang</TableHead>
-                <TableHead className="w-28">Qty</TableHead>
-                <TableHead className="w-32">Satuan</TableHead>
-                <TableHead className="w-44">Harga satuan</TableHead>
-                <TableHead className="w-44 text-right">Subtotal</TableHead>
+                <TableHead className="min-w-[200px]">Nama barang</TableHead>
+                <TableHead className="w-28 min-w-[96px]">Qty</TableHead>
+                <TableHead className="w-32 min-w-[100px]">Satuan</TableHead>
+                <TableHead className="w-44 min-w-[140px]">Harga satuan</TableHead>
+                <TableHead className="w-44 min-w-[130px] text-right">Subtotal</TableHead>
                 <TableHead className="w-16"><span className="sr-only">Aksi</span></TableHead>
               </TableRow>
             </TableHeader>
@@ -618,7 +634,7 @@ export default function POEditForm({
           {message}
         </p>
       )}
-      <div className="order-editor-actions flex flex-wrap gap-2">
+      <div className="order-editor-actions sticky bottom-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur xl:bottom-4">
         {publicCode && (
           <Button
             type="button"
@@ -636,25 +652,31 @@ export default function POEditForm({
           </Button>
         )}
         {isEditable && (
-          <Button type="submit" disabled={isSaving}>
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving
-            ? "Menyimpan..."
-            : publicCode
-              ? "Simpan Perubahan"
-              : "Buat Purchase Order"}
+          <Button
+            type="submit"
+            variant={currentStatus === "DRAFT" ? "outline" : "default"}
+            disabled={isSaving}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving
+              ? "Menyimpan..."
+              : publicCode
+                ? "Simpan Perubahan"
+                : "Simpan sebagai Draft"}
           </Button>
         )}
-        {publicCode &&
-          ((canEdit && currentStatus === "DRAFT") || canApprove) && (
+        {isEditable && currentStatus === "DRAFT" && (
           <Button
             type="button"
-            variant="destructive"
             disabled={isSaving}
-            onClick={() => setIsDeleteDialogOpen(true)}
+            onClick={handleSubmitForFinanceReview}
           >
-            <Trash2 className="mr-2 size-4" aria-hidden="true" />
-            {currentStatus === "DRAFT" ? "Hapus Draft" : "Hapus PO"}
+            <Check className="mr-2 h-4 w-4" />
+            {isSaving
+              ? "Mengajukan..."
+              : publicCode
+                ? "Simpan & Ajukan ke Keuangan"
+                : "Buat & Ajukan ke Keuangan"}
           </Button>
         )}
         {canReview &&
@@ -662,38 +684,36 @@ export default function POEditForm({
             currentStatus === "PENDING_FINANCE_REVIEW") && (
           <Button type="button" disabled={isSaving} onClick={handleReview}>
             <Check className="mr-2 h-4 w-4" />
-            Periksa PO (Manager Keuangan)
-          </Button>
-        )}
-        {publicCode && isEditable && (
-          <Button
-            type="button"
-            className="h-9"
-            disabled={isSaving}
-            onClick={handleSubmitForFinanceReview}
-          >
-            <Check className="mr-2 h-4 w-4" />
-            {isSaving ? "Mengajukan..." : "Simpan & Ajukan ke Keuangan"}
+            Verifikasi PO (Keuangan)
           </Button>
         )}
         {canApprove && currentStatus === "PENDING_APPROVAL" && (
           <Button type="button" disabled={isSaving} onClick={handleApproval}>
             <Check className="mr-2 h-4 w-4" />
-            Approve PO
+            Setujui PO (Direktur)
           </Button>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!publicCode}
-          onClick={() => setIsPdfPreviewOpen(true)}
-        >
-          <Printer className="mr-2 h-4 w-4" /> Pratinjau / Cetak PDF
-        </Button>
-        {!publicCode && (
-          <p className="self-center text-xs text-muted-foreground">
-            Simpan PO terlebih dahulu untuk melihat pratinjau cetak.
-          </p>
+        {publicCode && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsPdfPreviewOpen(true)}
+          >
+            <Printer className="mr-2 h-4 w-4" /> Pratinjau / Cetak PDF
+          </Button>
+        )}
+        {publicCode &&
+          ((canEdit && currentStatus === "DRAFT") || canApprove) && (
+          <Button
+            type="button"
+            variant="destructive"
+            className="sm:ml-auto"
+            disabled={isSaving}
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            <Trash2 className="mr-2 size-4" aria-hidden="true" />
+            {currentStatus === "DRAFT" ? "Hapus Draft" : "Hapus PO"}
+          </Button>
         )}
       </div>
       {publicCode && (

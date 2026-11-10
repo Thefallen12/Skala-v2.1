@@ -36,17 +36,21 @@ export default async function OrdersPage() {
   if (!session?.user) redirect("/auth/login");
   const canEditPO =
     session.user.role === UserRole.LOGISTICS ||
-    session.user.role === UserRole.ADMINISTRATIONS;
+    session.user.role === UserRole.ADMINISTRATIONS ||
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
+    session.user.role === UserRole.FINANCE ||
+    session.user.role === UserRole.KOORDINATOR;
   const canViewPO =
     canEditPO ||
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.DIRECTOR ||
-    session.user.role === UserRole.DEPUTY_DIRECTOR;
+    session.user.role === UserRole.FIELD_TEAM;
   const canEditDO =
     canManageUsers(session.user.role) ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
     session.user.role === UserRole.LOGISTICS ||
     session.user.role === UserRole.FIELD_TEAM ||
-    session.user.role === UserRole.KOORDINATOR;
+    session.user.role === UserRole.KOORDINATOR ||
+    session.user.role === UserRole.MOVER;
   if (!canEditDO && !canViewPO) redirect("/apps/documents/issued");
 
   const [purchaseOrders, deliveryOrders] = await Promise.all([

@@ -28,6 +28,9 @@ const projectRoles: UserRole[] = [
   UserRole.KOORDINATOR,
   UserRole.FIELD_TEAM,
   UserRole.DRAFTER,
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+  UserRole.MOVER,
 ];
 
 export default async function ProjectsWorkstationPage({

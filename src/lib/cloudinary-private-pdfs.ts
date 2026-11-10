@@ -1,4 +1,7 @@
+import "@/lib/sanitize-env";
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
@@ -98,6 +101,17 @@ export async function uploadCloudinaryPrivatePdf(
     );
   }
 
+  const credentials = getCloudinaryCredentials();
+  if (!credentials) {
+    const safeFolder = TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER.replace(/[^a-zA-Z0-9/_-]/g, "");
+    const fileName = `${randomUUID()}.pdf`;
+    const relativeDir = path.posix.join("uploads", safeFolder);
+    const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
+    await mkdir(absDir, { recursive: true });
+    await writeFile(path.join(absDir, fileName), bytes);
+    return `/${relativeDir}/${fileName}`;
+  }
+
   configureCloudinary();
   return new Promise((resolveUpload, rejectUpload) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -132,6 +146,9 @@ export async function uploadCloudinaryPrivatePdf(
 }
 
 export function isCloudinaryPrivateTicketReceiptPdf(url: string): boolean {
+  if (url.startsWith(`/uploads/${TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER}/`) && url.endsWith(".pdf")) {
+    return true;
+  }
   return parsePrivatePdfUrl(url) !== null;
 }
 
@@ -139,6 +156,9 @@ export function createCloudinaryPrivatePdfDownloadUrl(
   url: string,
   attachment: boolean,
 ): string {
+  if (url.startsWith("/uploads/")) {
+    return url;
+  }
   const asset = parsePrivatePdfUrl(url);
   if (!asset) {
     throw new Error("URL PDF privat Cloudinary tidak valid.");
@@ -154,6 +174,9 @@ export function createCloudinaryPrivatePdfDownloadUrl(
 }
 
 export async function removeCloudinaryPrivatePdf(url: string): Promise<boolean> {
+  if (url.startsWith("/uploads/")) {
+    return true;
+  }
   const asset = parsePrivatePdfUrl(url);
   if (!asset) return false;
 

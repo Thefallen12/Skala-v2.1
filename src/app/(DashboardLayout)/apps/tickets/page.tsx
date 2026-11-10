@@ -10,24 +10,24 @@ import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import type { TicketRow } from "../../types/ticket";
 import { redirect } from "next/navigation";
 export const metadata: Metadata = {
-  title: "Ticket App",
+  title: "Tiket & Permintaan",
 };
 
 const BCrumb = [
   {
     to: "/",
-    title: "Home",
+    title: "Beranda",
   },
   {
-    title: "Tickets",
+    title: "Tiket & Permintaan",
   },
 ];
 const Tickets = async ({
   searchParams,
 }: {
-  searchParams: Promise<{ openSheet?: string; filter?: string }>;
+  searchParams: Promise<{ openSheet?: string; filter?: string; create?: string }>;
 }) => {
-  const { openSheet, filter } = await searchParams;
+  const { openSheet, filter, create } = await searchParams;
   const session = await auth();
   if (!session?.user) {
     redirect("/auth/login");
@@ -357,15 +357,16 @@ const Tickets = async ({
 
   return (
     <>
-      <div className="tickets-page-brand">
+      <div>
         <BreadcrumbComp
-          title="Tickets App"
+          title="Tiket & Permintaan Lapangan"
           items={BCrumb}
           action={
             <CreateTicketModal
               projects={projects}
               requesterRole={session.user.role}
               movers={movers}
+              defaultOpen={create === "1"}
               stockItems={stockItems.map((item) => ({
                 ...item,
                 unitPrice: decimalStringFromScaledInteger(item.unitPrice),

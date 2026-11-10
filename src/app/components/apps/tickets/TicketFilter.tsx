@@ -1,9 +1,8 @@
 "use client";
 
-import { Activity, CircleCheck, ClipboardList, Clock3 } from "lucide-react";
+import { Activity, CircleCheck, ClipboardList, Clock3, Wallet } from "lucide-react";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import { TicketStatus } from "@prisma/client";
-import { Button } from "@/components/ui/button";
 import {
   formatTicketCurrency,
   getTotalTicketValueInCents,
@@ -20,90 +19,136 @@ export default function TicketFilter({
   setFilter: (filter: string) => void;
   actionRequiredCount: number;
 }) {
+  const activeCount = tickets.filter(
+    (ticket) =>
+      ticket.status !== TicketStatus.DRAFT &&
+      ticket.status !== TicketStatus.COMPLETED &&
+      ticket.status !== TicketStatus.REJECTED,
+  ).length;
+
+  const completedCount = tickets.filter(
+    (ticket) => ticket.status === TicketStatus.COMPLETED,
+  ).length;
+
   const cards = [
     {
       filter: "ALL",
-      title: "Total tiket",
-      mobileTitle: "Total",
+      title: "Semua Tiket",
+      subtitle: "Total seluruh pengajuan",
       count: tickets.length,
       icon: ClipboardList,
-      style: "bg-lightprimary text-primary",
-    },
-    {
-      filter: "ACTIVE",
-      title: "Tiket aktif",
-      mobileTitle: "Aktif",
-      count: tickets.filter(
-        (ticket) =>
-          ticket.status !== TicketStatus.DRAFT &&
-          ticket.status !== TicketStatus.COMPLETED &&
-          ticket.status !== TicketStatus.REJECTED,
-      ).length,
-      icon: Activity,
-      style: "bg-lightinfo text-info",
+      iconStyle: "bg-primary/15 text-primary border-primary/25",
+      activeRing: "border-primary bg-primary/5 ring-2 ring-primary/25",
     },
     {
       filter: "ACTION_REQUIRED",
-      title: "Memerlukan tindakan",
-      mobileTitle: "Tindakan",
+      title: "Perlu Tindakan Anda",
+      subtitle:
+        actionRequiredCount > 0
+          ? "Menunggu persetujuan / proses Anda"
+          : "Tidak ada antrean tertunda",
       count: actionRequiredCount,
       icon: Clock3,
-      style: "bg-lightwarning text-warning",
+      iconStyle: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+      activeRing: "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/25",
+      highlight: actionRequiredCount > 0,
+    },
+    {
+      filter: "ACTIVE",
+      title: "Sedang Diproses",
+      subtitle: "Berjalan di Direktur / Logistik / Finance",
+      count: activeCount,
+      icon: Activity,
+      iconStyle: "bg-sky-500/15 text-sky-500 border-sky-500/25",
+      activeRing: "border-sky-500 bg-sky-500/5 ring-2 ring-sky-500/25",
     },
     {
       filter: TicketStatus.COMPLETED,
-      title: "Selesai",
-      mobileTitle: "Selesai",
-      count: tickets.filter((ticket) => ticket.status === TicketStatus.COMPLETED)
-        .length,
+      title: "Selesai / Tuntas",
+      subtitle: "Barang diterima / dana cair",
+      count: completedCount,
       icon: CircleCheck,
-      style: "bg-lightsuccess text-success",
+      iconStyle: "bg-emerald-500/15 text-emerald-500 border-emerald-500/25",
+      activeRing: "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/25",
     },
   ];
 
   return (
-    <div className="ticket-filter-grid grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
-      {cards.map(({ filter, title, mobileTitle, count, icon: Icon, style }) => (
-        <Button
-          key={title}
-          type="button"
-          variant="ghost"
-          aria-pressed={activeFilter === filter}
-          onClick={() => setFilter(filter)}
-          className={`h-auto min-h-24 justify-start gap-2 rounded-md border border-border p-3 text-left hover:brightness-95 focus-visible:ring-2 focus-visible:ring-primary sm:min-h-28 sm:gap-4 sm:p-5 ${style} ${
-            activeFilter === filter ? "ring-2 ring-primary" : ""
-          }`}
-        >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-background/70 sm:size-12">
-            <Icon className="size-4 sm:size-5" aria-hidden="true" />
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      {cards.map(
+        ({
+          filter,
+          title,
+          subtitle,
+          count,
+          icon: Icon,
+          iconStyle,
+          activeRing,
+          highlight,
+        }) => {
+          const isActive = activeFilter === filter;
+          return (
+            <button
+              key={filter}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => setFilter(filter)}
+              className={`group flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all sm:p-4 ${
+                isActive
+                  ? activeRing
+                  : highlight
+                    ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-muted/30"
+              }`}
+            >
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground">
+                  {title}
+                </span>
+                <span
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-lg border ${iconStyle}`}
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-extrabold tracking-tight text-foreground tabular-nums">
+                    {count}
+                  </span>
+                  {highlight && (
+                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-500">
+                      Prioritas
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                  {subtitle}
+                </p>
+              </div>
+            </button>
+          );
+        },
+      )}
+
+      <div className="col-span-2 flex flex-col justify-between rounded-xl border border-border bg-card p-3.5 sm:p-4 lg:col-span-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-muted-foreground">
+            Total Estimasi Tiket
           </span>
-          <span className="min-w-0">
-            <span className="block text-xl font-semibold sm:text-2xl">{count}</span>
-            <span className="mt-1 block truncate text-xs sm:text-sm">
-              <span className="hidden sm:inline">{title}</span>
-              <span className="sm:hidden">{mobileTitle}</span>
-            </span>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/15 text-indigo-400">
+            <Wallet className="size-4" aria-hidden="true" />
           </span>
-        </Button>
-      ))}
-      <Button
-        type="button"
-        variant="ghost"
-        aria-label="Tampilkan semua tiket untuk melihat total nilai"
-        aria-pressed={activeFilter === "ALL"}
-        onClick={() => setFilter("ALL")}
-        className={`ticket-total-card col-span-2 h-auto min-h-24 w-full flex-col items-start justify-center rounded-md border border-border bg-lightinfo p-4 text-left text-info hover:brightness-95 focus-visible:ring-2 focus-visible:ring-primary sm:min-h-28 sm:p-5 xl:col-span-1 ${
-          activeFilter === "ALL" ? "ring-2 ring-primary" : ""
-        }`}
-      >
-        <span className="ticket-total-copy">
-          <span className="ticket-total-label">Total nilai tiket:</span>
-          <span className="ticket-total-value">
+        </div>
+        <div className="mt-2">
+          <p className="truncate text-lg font-extrabold tracking-tight text-foreground tabular-nums sm:text-xl">
             {formatTicketCurrency(getTotalTicketValueInCents(tickets))}
-          </span>
-        </span>
-        <span className="ticket-total-action">Lihat semua data ↗</span>
-      </Button>
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Akumulasi seluruh tiket terdaftar
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

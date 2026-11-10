@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function BlueprintsPage() {
-  redirect("/apps/projects?view=drawings");
+  redirect("/apps/drafter");
 }

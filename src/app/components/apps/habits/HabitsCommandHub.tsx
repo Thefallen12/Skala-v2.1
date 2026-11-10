@@ -78,13 +78,42 @@ type TimesheetEntry = {
 };
 type TabValue = "calendar" | "tasks" | "habits" | "timesheet";
 
-const tabLabels: { value: TabValue; label: string; icon: typeof CalendarDays }[] =
-  [
-    { value: "calendar", label: "Kalender & Jadwal", icon: CalendarDays },
-    { value: "tasks", label: "Tugas Harian", icon: CheckSquare },
-    { value: "habits", label: "Rutinitas (Habits)", icon: Repeat2 },
-    { value: "timesheet", label: "Timesheet", icon: Clock3 },
-  ];
+const tabLabels: {
+  value: TabValue;
+  step: string;
+  label: string;
+  subtitle: string;
+  icon: typeof CalendarDays;
+}[] = [
+  {
+    value: "calendar",
+    step: "Tahap 01",
+    label: "Kalender & Agenda",
+    subtitle: "Rapat, tenggat & jadwal proyek",
+    icon: CalendarDays,
+  },
+  {
+    value: "tasks",
+    step: "Tahap 02",
+    label: "Tugas Proyek Harian",
+    subtitle: "Delegasi & progres kerja tim",
+    icon: CheckSquare,
+  },
+  {
+    value: "habits",
+    step: "Tahap 03",
+    label: "Rutinitas & SOP",
+    subtitle: "Checklist disiplin harian",
+    icon: Repeat2,
+  },
+  {
+    value: "timesheet",
+    step: "Tahap 04",
+    label: "Timesheet & Evaluasi",
+    subtitle: "Rekap jam kerja & produktivitas",
+    icon: Clock3,
+  },
+];
 
 export default function HabitsCommandHub({
   initialTab,
@@ -214,33 +243,98 @@ export default function HabitsCommandHub({
     setScheduleSheetOpen(true);
   };
 
-  return (
-    <div className="my-4 space-y-4">
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/[0.07] p-4 shadow-sm sm:p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          Personal Productivity Hub
-        </p>
-        <h2 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">
-          Jadwal, tugas, rutinitas, dan waktu kerja
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Semua aktivitas personal dan proyek dalam satu ruang kerja.
-        </p>
-      </section>
+  const todayHabitsCompleted = useMemo(
+    () => completions.filter((c) => c.date === today).length,
+    [completions, today],
+  );
+  const weeklyHoursTotal = useMemo(() => {
+    const mins = weeklyEntries.reduce((sum, e) => sum + e.durationMinutes, 0);
+    return `${Math.floor(mins / 60)}j ${mins % 60}m`;
+  }, [weeklyEntries]);
 
+  const tabBadges: Record<TabValue, string> = {
+    calendar: `${calendarRecords.length} agenda`,
+    tasks: `${tasks.length} tugas`,
+    habits: `${todayHabitsCompleted}/${habits.length} selesai`,
+    timesheet: weeklyHoursTotal,
+  };
+
+  return (
+    <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl border bg-card p-1 sm:grid-cols-4">
-          {tabLabels.map(({ value, label, icon: Icon }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="min-h-11 gap-2 px-2 text-xs sm:text-sm"
-            >
-              <Icon className="size-4 shrink-0" aria-hidden="true" />
-              <span>{label}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        {/* Skema Alur 4 Tahap Jadwal & Produktivitas */}
+        <div className="rounded-xl border border-border bg-card p-3 shadow-2xs sm:p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
+                Skema Kerja Tim
+              </span>
+              <span className="text-xs text-muted-foreground">
+                1. Rencanakan Agenda → 2. Eksekusi Tugas Proyek → 3. Checklist Rutinitas → 4. Catat Jam Kerja (Timesheet)
+              </span>
+            </div>
+          </div>
+          <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-2 xl:grid-cols-4">
+            {tabLabels.map(({ value, step, label, subtitle, icon: Icon }) => {
+              const isActive = activeTab === value;
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className={`flex h-auto w-full items-start justify-between gap-3 rounded-xl border p-3 text-left transition-all ${
+                    isActive
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      : "border-border bg-background/60 text-foreground hover:border-primary/40 hover:bg-accent/50"
+                  }`}
+                >
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <span
+                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
+                        isActive
+                          ? "bg-white/20 text-primary-foreground"
+                          : "bg-primary/10 text-primary"
+                      }`}
+                    >
+                      <Icon className="size-4" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <span
+                        className={`block text-[10px] font-bold uppercase tracking-wider ${
+                          isActive
+                            ? "text-primary-foreground/80"
+                            : "text-primary"
+                        }`}
+                      >
+                        {step}
+                      </span>
+                      <span className="block truncate text-xs font-bold sm:text-sm">
+                        {label}
+                      </span>
+                      <span
+                        className={`mt-0.5 block truncate text-[11px] ${
+                          isActive
+                            ? "text-primary-foreground/80"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {subtitle}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      isActive
+                        ? "bg-white/20 text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {tabBadges[value]}
+                  </span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </div>
 
         <TabsContent value="calendar" className="mt-0">
           <HabitCalendar

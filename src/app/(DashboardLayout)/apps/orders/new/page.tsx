@@ -31,12 +31,18 @@ export default async function NewOrderPage({
   const isDeliveryOrder = type === "do";
   const canManagePurchaseOrders =
     session.user.role === UserRole.LOGISTICS ||
-    session.user.role === UserRole.ADMINISTRATIONS;
+    session.user.role === UserRole.ADMINISTRATIONS ||
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
+    session.user.role === UserRole.FINANCE ||
+    session.user.role === UserRole.KOORDINATOR;
   const canManageDeliveryOrders =
     canManageUsers(session.user.role) ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
     session.user.role === UserRole.LOGISTICS ||
     session.user.role === UserRole.FIELD_TEAM ||
-    session.user.role === UserRole.KOORDINATOR;
+    session.user.role === UserRole.KOORDINATOR ||
+    session.user.role === UserRole.MOVER;
 
   if (
     (isDeliveryOrder && !canManageDeliveryOrders) ||
@@ -104,7 +110,7 @@ export default async function NewOrderPage({
     : [[], []];
 
   return (
-    <>
+    <div className="space-y-4">
       <BreadcrumbComp
         title={isDeliveryOrder ? "Buat Delivery Order" : "Buat Purchase Order"}
         items={[
@@ -113,7 +119,7 @@ export default async function NewOrderPage({
           { title: isDeliveryOrder ? "DO Baru" : "PO Baru" },
         ]}
       />
-      <main className="mx-auto w-full max-w-6xl p-4 md:p-8">
+      <main className="w-full">
         {isDeliveryOrder ? (
           <DOEditForm
             status={DOStatus.PENDING}
@@ -151,6 +157,6 @@ export default async function NewOrderPage({
           <POEditForm createdAt={new Date().toLocaleDateString("id-ID")} />
         )}
       </main>
-    </>
+    </div>
   );
 }

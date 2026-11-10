@@ -2,6 +2,12 @@ import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-i
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
 
 export function isPurchaseOrderInvoiceUrl(url: string): boolean {
+  if (
+    url.startsWith(`/uploads/${PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER}/`) &&
+    /\.(pdf|jpe?g|png|webp)$/i.test(url)
+  ) {
+    return true;
+  }
   const cloudName = getCloudinaryCredentials()?.cloudName;
   if (!cloudName || url.length > 2048) return false;
 
