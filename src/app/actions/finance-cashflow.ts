@@ -40,6 +40,17 @@ export type IncomingFundInput = {
   transactionDate?: string;
 };
 
+export type OutgoingFundInput = {
+  amount: number;
+  sourceDesc: string;
+  accountId: string;
+  paymentMethod: CashflowPaymentMethod;
+  recipientName?: string;
+  proof: File;
+  projectId?: string;
+  transactionDate?: string;
+};
+
 export type FinanceAccountInput = {
   accountName: string;
   accountNumber?: string;
@@ -321,6 +332,112 @@ export async function recordIncomingFund(
 
   revalidatePath("/apps/finance");
   return { success: true, message: "Dana masuk berhasil dicatat." };
+}
+
+export async function recordOutgoingFund(
+  input: OutgoingFundInput,
+): Promise<FinanceActionResult> {
+  const session = await auth();
+  if (!session?.user || !isFinanceOperator(session.user.role)) {
+    return fail("Hanya Keuangan yang dapat mencatat dana keluar.");
+  }
+  if (
+    !input ||
+    typeof input !== "object" ||
+    !validAmount(input.amount) ||
+    !isText(input.sourceDesc ?? "", 300, 3) ||
+    !isText(input.accountId ?? "", 100) ||
+    !isCashflowPaymentMethod(input.paymentMethod) ||
+    !isValidFinanceProofFile(input.proof) ||
+    (input.recipientName !== undefined &&
+      input.recipientName !== null &&
+      typeof input.recipientName !== "string") ||
+    (typeof input.recipientName === "string" && input.recipientName.length > 160) ||
+    (input.projectId !== undefined &&
+      input.projectId !== "" &&
+      (typeof input.projectId !== "string" || input.projectId.length > 100))
+  ) {
+    return fail(
+      "Data dana keluar tidak valid. Bukti harus PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
+    );
+  }
+
+  let proofUrl: string;
+  try {
+    proofUrl = await uploadCashflowProof(input.proof);
+  } catch (error) {
+    console.error("Outgoing cashflow proof upload failed:", error);
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryConfigurationError ||
+      error instanceof CloudinaryPrivatePdfValidationError
+    ) {
+      return fail(error.message);
+    }
+    return fail("Bukti transaksi gagal diunggah. Silakan coba kembali.");
+  }
+
+  try {
+    await prisma.$transaction(
+      async (transaction) => {
+        const account = await transaction.financeAccount.findUnique({
+          where: { id: input.accountId },
+          select: { id: true, balance: true },
+        });
+        if (!account) throw new Error("Buku bank/kas yang dipilih tidak ditemukan.");
+        if (input.projectId) {
+          const project = await transaction.project.findUnique({
+            where: { id: input.projectId },
+            select: { id: true },
+          });
+          if (!project) throw new Error("Proyek yang dipilih tidak ditemukan.");
+        }
+
+        const debit = await transaction.financeAccount.updateMany({
+          where: {
+            id: account.id,
+            balance: { gte: input.amount },
+          },
+          data: { balance: { decrement: input.amount } },
+        });
+        if (debit.count !== 1) {
+          throw new Error("Saldo buku bank/kas tidak mencukupi untuk pengeluaran ini.");
+        }
+
+        const effectiveDate = parseTransactionDate(input.transactionDate);
+
+        await transaction.cashflow.create({
+          data: {
+            type: "OUT",
+            amount: input.amount,
+            sourceDesc: input.sourceDesc.trim(),
+            projectId: input.projectId || null,
+            paymentMethod: input.paymentMethod,
+            senderName: input.recipientName?.trim() || null,
+            proofUrl,
+            accountId: account.id,
+            recordedBy: session.user.id,
+            transferGroupId: null,
+            createdAt: effectiveDate,
+          },
+        });
+      },
+    );
+  } catch (error) {
+    console.error("Outgoing fund recording failed:", error);
+    await removeUploadedCashflowProof(proofUrl);
+    return fail(
+      error instanceof Error &&
+        (error.message.includes("tidak ditemukan") ||
+          error.message.includes("tidak mencukupi") ||
+          error.message.includes("tidak valid"))
+        ? error.message
+        : "Dana keluar gagal disimpan. Saldo akun tidak diubah.",
+    );
+  }
+
+  revalidatePath("/apps/finance");
+  return { success: true, message: "Dana keluar berhasil dicatat." };
 }
 
 export async function recordHistoricalPaymentCashflow(

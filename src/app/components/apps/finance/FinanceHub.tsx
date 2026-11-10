@@ -412,7 +412,7 @@ export default function FinanceHub({
   const [activeTab, setActiveTab] = useState(resolvedTab);
   const [navigationRequest, setNavigationRequest] = useState(0);
   const [ledgerFundMode, setLedgerFundMode] = useState<
-    "incoming" | "transfer" | null
+    "incoming" | "outgoing" | "transfer" | null
   >(null);
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState<"IN" | "OUT" | null>(
     null,

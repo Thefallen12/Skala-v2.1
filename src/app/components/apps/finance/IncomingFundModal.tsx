@@ -7,11 +7,13 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import {
   recordIncomingFund,
+  recordOutgoingFund,
   transferBetweenFinanceAccounts,
 } from "@/app/actions/finance-cashflow";
 import type {
   FinanceTransferInput,
   IncomingFundInput,
+  OutgoingFundInput,
 } from "@/app/actions/finance-cashflow";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { Button } from "@/components/ui/button";
@@ -89,7 +91,7 @@ export default function IncomingFundModal({
 }: {
   open: boolean;
   onClose: () => void;
-  mode: "incoming" | "transfer";
+  mode: "incoming" | "outgoing" | "transfer";
   accounts: FinanceAccountOption[];
   projects: FinanceProjectOption[];
 }) {
@@ -148,15 +150,18 @@ export default function IncomingFundModal({
       return;
     }
     setProofError("");
-    if (mode === "incoming") {
+    if (mode === "incoming" || mode === "outgoing") {
       if (!values.accountId) {
         form.setError("accountId", {
           type: "required",
-          message: "Pilih buku bank/kas.",
+          message:
+            mode === "incoming"
+              ? "Pilih buku bank/kas penerima."
+              : "Pilih buku bank/kas sumber dana.",
         });
         return;
       }
-      if (values.paymentMethod === "TRANSFER" && !values.senderName.trim()) {
+      if (mode === "incoming" && values.paymentMethod === "TRANSFER" && !values.senderName.trim()) {
         form.setError("senderName", {
           type: "required",
           message: "Nama pengirim wajib diisi untuk penerimaan transfer.",
@@ -178,26 +183,39 @@ export default function IncomingFundModal({
     setIsPending(true);
     setMessage("");
     try {
-      const result =
-        mode === "incoming"
-          ? await recordIncomingFund({
-              amount: values.amount,
-              sourceDesc: values.sourceDesc,
-              accountId: values.accountId,
-              paymentMethod: values.paymentMethod,
-              senderName: values.senderName,
-              proof: proofFile,
-              projectId: values.projectId || undefined,
-              transactionDate: values.transactionDate,
-            } satisfies IncomingFundInput)
-          : await transferBetweenFinanceAccounts({
-              amount: values.amount,
-              sourceAccountId: values.sourceAccountId,
-              destinationAccountId: values.destinationAccountId,
-              sourceDesc: values.sourceDesc,
-              proof: proofFile,
-              transactionDate: values.transactionDate,
-            } satisfies FinanceTransferInput);
+      let result;
+      if (mode === "incoming") {
+        result = await recordIncomingFund({
+          amount: values.amount,
+          sourceDesc: values.sourceDesc,
+          accountId: values.accountId,
+          paymentMethod: values.paymentMethod,
+          senderName: values.senderName,
+          proof: proofFile,
+          projectId: values.projectId || undefined,
+          transactionDate: values.transactionDate,
+        } satisfies IncomingFundInput);
+      } else if (mode === "outgoing") {
+        result = await recordOutgoingFund({
+          amount: values.amount,
+          sourceDesc: values.sourceDesc,
+          accountId: values.accountId,
+          paymentMethod: values.paymentMethod,
+          recipientName: values.senderName,
+          proof: proofFile,
+          projectId: values.projectId || undefined,
+          transactionDate: values.transactionDate,
+        } satisfies OutgoingFundInput);
+      } else {
+        result = await transferBetweenFinanceAccounts({
+          amount: values.amount,
+          sourceAccountId: values.sourceAccountId,
+          destinationAccountId: values.destinationAccountId,
+          sourceDesc: values.sourceDesc,
+          proof: proofFile,
+          transactionDate: values.transactionDate,
+        } satisfies FinanceTransferInput);
+      }
       setMessage(result.message);
       setIsError(!result.success);
       if (result.success) {
@@ -214,7 +232,11 @@ export default function IncomingFundModal({
   });
 
   const modalTitle =
-    mode === "incoming" ? "Catat Dana Masuk" : "Transfer Antar Kas";
+    mode === "incoming"
+      ? "Catat Dana Masuk"
+      : mode === "outgoing"
+        ? "Catat Dana Keluar"
+        : "Transfer Antar Kas";
   const formId = `finance-cashflow-${mode}-form`;
 
   return (
@@ -226,7 +248,9 @@ export default function IncomingFundModal({
       description={
         mode === "incoming"
           ? "Catat sumber, metode penerimaan, akun penyimpanan, dan bukti dana masuk."
-          : "Pindahkan saldo antar buku secara tercatat dan atomik."
+          : mode === "outgoing"
+            ? "Catat pengeluaran kas/bank manual atau susulan; saldo akun dipotong saat transaksi tersimpan."
+            : "Pindahkan saldo antar buku secara tercatat dan atomik."
       }
       className="sm:max-w-2xl"
       footer={
@@ -241,8 +265,19 @@ export default function IncomingFundModal({
               isPending || accounts.length === 0 ||
               (mode === "transfer" && accounts.length < 2)
             }
+            className={
+              mode === "outgoing"
+                ? "bg-rose-600 hover:bg-rose-700 text-white"
+                : undefined
+            }
           >
-            {isPending ? "Menyimpan..." : "Simpan Transaksi"}
+            {isPending
+              ? "Menyimpan..."
+              : mode === "incoming"
+                ? "Simpan Dana Masuk"
+                : mode === "outgoing"
+                  ? "Simpan Dana Keluar"
+                  : "Simpan Transaksi"}
           </Button>
         </>
       }
@@ -263,7 +298,11 @@ export default function IncomingFundModal({
                 {...form.register("transactionDate")}
               />
               <p className="text-[11px] text-muted-foreground">
-                Tanggal dana masuk (bebas disesuaikan jika input susulan/terlambat).
+                {mode === "incoming"
+                  ? "Tanggal dana masuk (bebas disesuaikan jika input susulan/terlambat)."
+                  : mode === "outgoing"
+                    ? "Tanggal dana keluar (bebas disesuaikan jika pengeluaran telat di-input)."
+                    : "Tanggal transaksi (bebas disesuaikan jika input susulan/terlambat)."}
               </p>
               {form.formState.errors.transactionDate && (
                 <p className="text-sm text-destructive" role="alert">
@@ -296,12 +335,22 @@ export default function IncomingFundModal({
           </div>
           <div className="space-y-2">
             <Label htmlFor={`${formId}-description`}>
-              Sumber Dana / Keterangan
+              {mode === "incoming"
+                ? "Sumber Dana / Keterangan"
+                : mode === "outgoing"
+                  ? "Keperluan Pengeluaran / Keterangan"
+                  : "Keterangan Transfer"}
             </Label>
             <Input
               id={`${formId}-description`}
               maxLength={300}
-              placeholder="Contoh: Pembayaran Termin 1 Project A"
+              placeholder={
+                mode === "incoming"
+                  ? "Contoh: Pembayaran Termin 1 Project A"
+                  : mode === "outgoing"
+                    ? "Contoh: Pembelian ATK kantor, bensin armada proyek, dsb"
+                    : "Contoh: Pindah kas operasional mingguan"
+              }
               {...form.register("sourceDesc")}
             />
             {form.formState.errors.sourceDesc && (
@@ -311,10 +360,14 @@ export default function IncomingFundModal({
             )}
           </div>
 
-          {mode === "incoming" ? (
+          {mode === "incoming" || mode === "outgoing" ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor={`${formId}-account`}>Disimpan Ke</Label>
+                <Label htmlFor={`${formId}-account`}>
+                  {mode === "incoming"
+                    ? "Disimpan Ke (Buku Kas/Bank)"
+                    : "Sumber Dana / Dipotong Dari"}
+                </Label>
                 <select
                   id={`${formId}-account`}
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
@@ -334,12 +387,12 @@ export default function IncomingFundModal({
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Metode Penerimaan</Label>
+                <Label>Metode {mode === "incoming" ? "Penerimaan" : "Pembayaran"}</Label>
                 <div className="flex flex-wrap gap-4">
                   {[
                     ["TRANSFER", "Transfer"],
                     ["CASH", "Tunai"],
-                    ["DEPOSIT", "Setor Tunai"],
+                    ...(mode === "incoming" ? [["DEPOSIT", "Setor Tunai"]] : []),
                   ].map(([value, label]) => (
                     <FormLabel
                       key={value}
@@ -355,23 +408,28 @@ export default function IncomingFundModal({
                   ))}
                 </div>
               </div>
-              {paymentMethod === "TRANSFER" && (
-                <div className="space-y-2">
-                  <Label htmlFor={`${formId}-sender`}>
-                    Nama Pengirim / Bank Pengirim
-                  </Label>
-                  <Input
-                    id={`${formId}-sender`}
-                    maxLength={160}
-                    {...form.register("senderName")}
-                  />
-                  {form.formState.errors.senderName && (
-                    <p className="text-sm text-destructive" role="alert">
-                      {form.formState.errors.senderName.message}
-                    </p>
-                  )}
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor={`${formId}-sender`}>
+                  {mode === "incoming"
+                    ? "Nama Pengirim / Bank Pengirim"
+                    : "Nama Penerima / Toko / Vendor (Opsional)"}
+                </Label>
+                <Input
+                  id={`${formId}-sender`}
+                  maxLength={160}
+                  placeholder={
+                    mode === "incoming"
+                      ? "Contoh: PT Mitra Sejahtera / Bank BCA"
+                      : "Contoh: Toko Bangunan Berkah / Penerima"
+                  }
+                  {...form.register("senderName")}
+                />
+                {form.formState.errors.senderName && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {form.formState.errors.senderName.message}
+                  </p>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor={`${formId}-project`}>
                   Proyek terkait (opsional)
@@ -431,7 +489,13 @@ export default function IncomingFundModal({
           )}
 
           <div className="space-y-2 rounded-lg border border-slate-700 p-4">
-            <Label>{mode === "incoming" ? proofLabels[paymentMethod] : "Unggah Bukti Transfer Antar Akun"}</Label>
+            <Label>
+              {mode === "incoming"
+                ? proofLabels[paymentMethod]
+                : mode === "outgoing"
+                  ? "Unggah Bukti Transaksi / Nota / Struk / Kwitansi"
+                  : "Unggah Bukti Transfer Antar Akun"}
+            </Label>
             <FinancePaymentProofUpload
               value={proofFile}
               onChange={(file) => {

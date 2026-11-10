@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Eye,
   Landmark,
+  Minus,
   Plus,
   Search,
   Wallet,
@@ -152,8 +153,8 @@ export default function FinanceLedger({
   historicalPayments: FinanceHistoricalPayment[];
   projects: FinanceProjectOption[];
   canManage: boolean;
-  fundMode: "incoming" | "transfer" | null;
-  onFundModeChange: (mode: "incoming" | "transfer" | null) => void;
+  fundMode: "incoming" | "outgoing" | "transfer" | null;
+  onFundModeChange: (mode: "incoming" | "outgoing" | "transfer" | null) => void;
   typeFilter: "IN" | "OUT" | null;
   onTypeFilterChange: (filter: "IN" | "OUT" | null) => void;
   onPreviewProof: (url: string, label: string) => void;
@@ -362,10 +363,19 @@ export default function FinanceLedger({
               <Button
                 type="button"
                 onClick={() => onFundModeChange("incoming")}
-                className="gap-1.5"
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 <Plus className="size-4" />
                 Catat Dana Masuk
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => onFundModeChange("outgoing")}
+                className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                <Minus className="size-4" />
+                Catat Dana Keluar
               </Button>
               <Button
                 type="button"
