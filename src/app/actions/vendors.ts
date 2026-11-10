@@ -58,9 +58,11 @@ export async function createVendor(
   if (
     !session?.user?.id ||
     (session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.ADMINISTRATIONS)
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
   ) {
-    return failure("Hanya Logistik yang dapat menambahkan vendor.");
+    return failure("Hanya Logistik, Administrasi, atau Direktur yang dapat menambahkan vendor.");
   }
   if (
     !input ||
@@ -150,9 +152,11 @@ export async function updateVendor(
   if (
     !session?.user?.id ||
     (session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.ADMINISTRATIONS)
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
   ) {
-    return failure("Hanya Logistik atau Administrasi yang dapat mengubah vendor.");
+    return failure("Hanya Logistik, Administrasi, atau Direktur yang dapat mengubah vendor.");
   }
   if (
     typeof vendorId !== "string" ||

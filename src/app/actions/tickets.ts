@@ -729,9 +729,11 @@ export async function saveLogisticsStockItem(input: {
   }
   if (
     session.user.role !== UserRole.LOGISTICS &&
-    session.user.role !== UserRole.ADMINISTRATIONS
+    session.user.role !== UserRole.ADMINISTRATIONS &&
+    session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
   ) {
-    return actionFailure("Hanya Logistik yang dapat mengelola persediaan.");
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat mengelola persediaan.");
   }
   if (
     !input ||
@@ -916,10 +918,12 @@ export async function createDirectStockPurchase(input: {
   if (
     !session?.user?.id ||
     (session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.ADMINISTRATIONS)
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
   ) {
     return directPurchaseFailure(
-      "Hanya Logistik atau Administrasi yang dapat mencatat pembelian stok.",
+      "Hanya Logistik, Administrasi, atau Direktur yang dapat mencatat pembelian stok.",
     );
   }
   if (
@@ -947,8 +951,6 @@ export async function createDirectStockPurchase(input: {
         !item ||
         typeof item.stockItemId !== "string" ||
         !item.stockItemId.trim() ||
-        typeof item.quantity !== "string" ||
-        typeof item.unitPrice !== "string" ||
         (item.ticketItemId !== undefined &&
           !isBoundedText(item.ticketItemId, 64)),
     )
@@ -956,16 +958,34 @@ export async function createDirectStockPurchase(input: {
     return directPurchaseFailure("Data pembelian stok langsung tidak valid.");
   }
 
-  const quantityPattern = /^\d{1,11}(?:\.\d{1,3})?$/;
-  const pricePattern = /^\d{1,16}(?:\.\d{1,2})?$/;
-  if (input.items.some((item) =>
-    !quantityPattern.test(item.quantity) ||
-    new Prisma.Decimal(item.quantity).lte(0) ||
-    !pricePattern.test(item.unitPrice) ||
-    new Prisma.Decimal(item.unitPrice).lte(0),
-  )) {
+  const parsedItems = input.items.map((item) => {
+    const rawQty = (item.quantity ?? "").toString().trim().replace(",", ".");
+    const rawPrice = (item.unitPrice ?? "")
+      .toString()
+      .trim()
+      .replace(/[^0-9.,]/g, "")
+      .replace(/\.(?=.*\.)/g, "")
+      .replace(",", ".");
+    return {
+      ...item,
+      quantity: rawQty,
+      unitPrice: rawPrice,
+    };
+  });
+
+  if (
+    parsedItems.some((item) => {
+      try {
+        const q = new Prisma.Decimal(item.quantity);
+        const p = new Prisma.Decimal(item.unitPrice);
+        return q.lte(0) || p.lte(0) || !Number.isFinite(q.toNumber()) || !Number.isFinite(p.toNumber());
+      } catch {
+        return true;
+      }
+    })
+  ) {
     return directPurchaseFailure(
-      "Jumlah dan harga satuan harus lebih dari nol dengan angka yang valid.",
+      "Jumlah dan harga satuan harus berupa angka lebih dari nol.",
     );
   }
 
@@ -1035,11 +1055,11 @@ export async function createDirectStockPurchase(input: {
         where: { id: { in: input.items.map((item) => item.stockItemId) } },
         select: { id: true, name: true, unit: true },
       });
-      if (stockItems.length !== new Set(input.items.map((item) => item.stockItemId)).size) {
+      if (stockItems.length !== new Set(parsedItems.map((item) => item.stockItemId)).size) {
         throw new Error("Satu atau lebih barang katalog tidak ditemukan.");
       }
       const stockItemById = new Map(stockItems.map((item) => [item.id, item]));
-      const items = input.items.map((item) => {
+      const items = parsedItems.map((item) => {
         const stockItem = stockItemById.get(item.stockItemId);
         if (!stockItem) throw new Error("Barang persediaan tidak ditemukan.");
         const quantity = new Prisma.Decimal(item.quantity);
@@ -1054,7 +1074,7 @@ export async function createDirectStockPurchase(input: {
         };
       });
       if (ticket) {
-        const selectedTicketItemIds = input.items
+        const selectedTicketItemIds = parsedItems
           .map((item) => item.ticketItemId)
           .filter((id): id is string => Boolean(id));
         if (new Set(selectedTicketItemIds).size !== selectedTicketItemIds.length) {
@@ -1083,7 +1103,7 @@ export async function createDirectStockPurchase(input: {
           }
         }
         for (const [index, item] of items.entries()) {
-          const inputItem = input.items[index];
+          const inputItem = parsedItems[index];
           const key = ticketStockItemKey(item.itemName, item.unit);
           const activePurchaseNumber = activePurchaseByItem.get(key);
           if (activePurchaseNumber) {
@@ -1209,12 +1229,7 @@ export async function createDirectStockPurchase(input: {
   } catch (error) {
     console.error("Direct stock purchase creation failed:", error);
     return directPurchaseFailure(
-      error instanceof Error &&
-        (error.message.startsWith("Vendor ") ||
-        error.message.startsWith("Tiket ") ||
-        error.message.startsWith("Item tiket ") ||
-        error.message.startsWith("Satu atau lebih") ||
-        error.message.startsWith("Rekening "))
+      error instanceof Error
         ? error.message
         : "Pembelian stok gagal dicatat. Periksa data lalu coba kembali.",
     );
@@ -1727,9 +1742,11 @@ export async function deleteLogisticsStockItem(
   }
   if (
     session.user.role !== UserRole.LOGISTICS &&
-    session.user.role !== UserRole.ADMINISTRATIONS
+    session.user.role !== UserRole.ADMINISTRATIONS &&
+    session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
   ) {
-    return actionFailure("Hanya Logistik yang dapat menghapus barang persediaan.");
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat menghapus barang persediaan.");
   }
   if (typeof id !== "string" || !id.trim()) {
     return actionFailure("Barang persediaan yang dipilih tidak valid.");
@@ -3962,8 +3979,14 @@ export async function createLogisticsPurchaseOrderForTicket(
   },
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return actionFailure("Hanya Logistik yang dapat membuat PO dari tiket material.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.LOGISTICS &&
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat membuat PO.");
   }
   if (
     !isBoundedText(ticketId, 64) ||

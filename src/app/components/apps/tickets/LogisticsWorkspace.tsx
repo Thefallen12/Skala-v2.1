@@ -706,7 +706,10 @@ export default function LogisticsWorkspace({
 
   if (mode === "stock") {
     const canCreatePurchaseOrder =
-      role === "LOGISTICS" || role === "ADMINISTRATIONS";
+      role === "LOGISTICS" ||
+      role === "ADMINISTRATIONS" ||
+      role === "DIRECTOR" ||
+      role === "DEPUTY_DIRECTOR";
     const lowStockCount = stockItems.filter(
       (item) => Number(item.stockQuantity) <= Number(item.minimumStock),
     ).length;

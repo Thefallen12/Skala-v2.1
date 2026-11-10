@@ -2,7 +2,19 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   createDirectStockPurchase,
   saveLogisticsStockItem,
@@ -24,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getVendorBankAccounts } from "@/lib/vendor-bank-accounts";
+import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { Switch } from "@/components/ui/switch";
 import {
   DialogFooter,
@@ -118,6 +131,7 @@ export default function DirectStockPurchaseForm({
   const [vendorId, setVendorId] = useState("");
   const [vendorBankAccountId, setVendorBankAccountId] = useState("");
   const [availableVendors, setAvailableVendors] = useState(vendors);
+  const [openStockPickerKey, setOpenStockPickerKey] = useState<number | null>(null);
   const [ticketId, setTicketId] = useState(initialTicketId ?? "");
   const [newItemDialogOpen, setNewItemDialogOpen] = useState(false);
   const [newItemName, setNewItemName] = useState("");
@@ -246,8 +260,33 @@ export default function DirectStockPurchaseForm({
       setMessage("Pilih vendor dari katalog sebelum mencatat pembelian.");
       return;
     }
+    const activeLines = items.filter(
+      (line) => line.stockItemId || line.quantity.trim() || line.unitPrice.trim(),
+    );
+    if (activeLines.length === 0) {
+      setMessage("Pilih minimal satu barang untuk dicatat dalam pembelian.");
+      return;
+    }
+    const formattedItems = activeLines.map((line) => {
+      const rawQty = (line.quantity ?? "").toString().trim().replace(",", ".");
+      let numPrice = parseRupiahInput(line.unitPrice);
+      if (!Number.isFinite(numPrice) || numPrice <= 0) {
+        numPrice = Number(
+          (line.unitPrice ?? "").toString().trim().replace(",", "."),
+        );
+      }
+      return {
+        stockItemId: line.stockItemId,
+        quantity: rawQty,
+        unitPrice:
+          Number.isFinite(numPrice) && numPrice > 0
+            ? numPrice.toFixed(2)
+            : "0",
+        ticketItemId: line.ticketItemId,
+      };
+    });
     if (
-      items.some(
+      formattedItems.some(
         (line) =>
           !line.stockItemId ||
           !Number.isFinite(Number(line.quantity)) ||
@@ -256,7 +295,7 @@ export default function DirectStockPurchaseForm({
           Number(line.unitPrice) <= 0,
       )
     ) {
-      setMessage("Pilih barang, lalu isi jumlah dan harga satuan dengan benar.");
+      setMessage("Pilih barang dari katalog, lalu isi jumlah dan harga satuan dengan benar.");
       return;
     }
 
@@ -267,12 +306,7 @@ export default function DirectStockPurchaseForm({
           vendorId: vendor.id,
           vendorBankAccountId: selectedBankAccount?.id,
           ...(ticketId ? { ticketId } : {}),
-          items: items.map(({ stockItemId, quantity, unitPrice, ticketItemId }) => ({
-            stockItemId,
-            quantity,
-            unitPrice,
-            ...(ticketItemId ? { ticketItemId } : {}),
-          })),
+          items: formattedItems,
           reference,
           notes,
           includeTax,
@@ -480,34 +514,73 @@ export default function DirectStockPurchaseForm({
               {items.map((line, index) => (
                 <TableRow key={line.key}>
                   <TableCell>
-                    <Select
-                      value={line.stockItemId || undefined}
-                      onValueChange={(stockItemId) => {
-                        const stockItem = catalogItems.find(
-                          (candidate) => candidate.id === stockItemId,
-                        );
-                        if (!stockItem) return;
-                        updateLine(line.key, {
-                          stockItemId,
-                          unitPrice: stockItem.unitPrice,
-                        });
-                      }}
-                      disabled={isPending || Boolean(initialTicketId)}
+                    <Popover
+                      open={openStockPickerKey === line.key}
+                      onOpenChange={(open) =>
+                        setOpenStockPickerKey(open ? line.key : null)
+                      }
                     >
-                      <SelectTrigger
-                        className="min-w-48"
-                        aria-label={`Barang pembelian ${index + 1}`}
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          role="combobox"
+                          aria-expanded={openStockPickerKey === line.key}
+                          disabled={isPending || Boolean(initialTicketId)}
+                          className="flex h-10 w-full min-w-56 items-center justify-between gap-2 overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-left">
+                            {(() => {
+                              const selected = catalogItems.find(
+                                (candidate) =>
+                                  candidate.id === line.stockItemId,
+                              );
+                              return selected
+                                ? `${selected.name} · ${selected.sku} (${selected.unit})`
+                                : "Pilih barang dan SKU";
+                            })()}
+                          </span>
+                          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        className="w-[--radix-popover-trigger-width] min-w-80 p-0"
                       >
-                        <SelectValue placeholder="Pilih barang dan SKU" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalogItems.map((stockItem) => (
-                          <SelectItem key={stockItem.id} value={stockItem.id}>
-                            {stockItem.name} · {stockItem.sku} ({stockItem.unit})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        <Command>
+                          <CommandInput placeholder="Cari nama barang atau SKU..." />
+                          <CommandList className="max-h-60 overflow-y-auto">
+                            <CommandEmpty>Barang tidak ditemukan.</CommandEmpty>
+                            {catalogItems.map((stockItem) => (
+                              <CommandItem
+                                key={stockItem.id}
+                                value={`${stockItem.name} ${stockItem.sku} ${stockItem.unit}`}
+                                onSelect={() => {
+                                  updateLine(line.key, {
+                                    stockItemId: stockItem.id,
+                                    unitPrice: stockItem.unitPrice,
+                                  });
+                                  setOpenStockPickerKey(null);
+                                }}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-foreground">
+                                    {stockItem.name}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    SKU: {stockItem.sku} · Satuan:{" "}
+                                    {stockItem.unit}
+                                  </span>
+                                </div>
+                                {line.stockItemId === stockItem.id && (
+                                  <Check className="size-4 shrink-0 text-primary" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </TableCell>
                   <TableCell>
                     <Input
@@ -628,8 +701,7 @@ export default function DirectStockPurchaseForm({
             isPending ||
             isSavingNewItem ||
             !availableVendors.length ||
-            !catalogItems.length ||
-            hasInvalidItems
+            !catalogItems.length
           }
         >
           {isPending ? "Mencatat..." : "Catat Pembelian"}

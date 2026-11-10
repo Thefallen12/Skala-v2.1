@@ -2,7 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   createPurchaseOrder,
   type OrderActionResult,
@@ -128,6 +140,7 @@ export default function CreatePOForm({
         })
       : [{ stockItemId: "", itemName: "", quantity: "", unit: "", unitPrice: "" }],
   );
+  const [openStockPickerIndex, setOpenStockPickerIndex] = useState<number | null>(null);
   const [includeTax, setIncludeTax] = useState(false);
   const [paymentPlan, setPaymentPlan] =
     useState<PurchasePaymentPlan>("CASH_FULL");
@@ -284,14 +297,27 @@ export default function CreatePOForm({
   };
 
   const submit = () => {
-    const parsedItems = items.map((item) => ({
-      ticketItemId: item.ticketItemId,
-      stockItemId: item.stockItemId,
-      itemName: item.itemName.trim(),
-      quantity: Number(item.quantity),
-      unit: item.unit.trim(),
-      unitPrice: parseRupiahInput(item.unitPrice),
-    }));
+    const activeItems = items.filter(
+      (item) => item.stockItemId || item.quantity.trim() || item.unitPrice.trim(),
+    );
+    if (activeItems.length === 0) {
+      setMessage("Pilih minimal satu barang dari katalog.");
+      return;
+    }
+
+    const parsedItems = activeItems.map((item) => {
+      const catalogItem = catalogItems.find((c) => c.id === item.stockItemId);
+      const rawQty = item.quantity.toString().replace(",", ".").trim();
+      const numQty = Number(rawQty);
+      return {
+        ticketItemId: item.ticketItemId,
+        stockItemId: item.stockItemId,
+        itemName: (item.itemName || catalogItem?.name || "").trim(),
+        quantity: Number.isFinite(numQty) && numQty > 0 ? numQty : 0,
+        unit: (item.unit || catalogItem?.unit || "").trim(),
+        unitPrice: parseRupiahInput(item.unitPrice),
+      };
+    });
     if (!selectedVendor) {
       setMessage("Pilih vendor dari katalog sebelum membuat PO.");
       return;
@@ -626,51 +652,91 @@ export default function CreatePOForm({
               {items.map((item, index) => (
                 <TableRow key={index}>
                   <TableCell className="min-w-0 overflow-hidden">
-                    <Select
-                      value={item.stockItemId}
-                      onValueChange={(stockItemId) => {
-                        const selectedItem = catalogItems.find(
-                          (catalogItem) => catalogItem.id === stockItemId,
-                        );
-                        if (!selectedItem) return;
-                        const linkedTicketItem = Boolean(item.ticketItemId);
-                        updateItem(index, {
-                          stockItemId,
-                          itemName: linkedTicketItem
-                            ? item.itemName
-                            : selectedItem.name,
-                          unit: linkedTicketItem ? item.unit : selectedItem.unit,
-                          unitPrice: formatRupiahInput(
-                            linkedTicketItem
-                              ? item.unitPrice || selectedItem.unitPrice || ""
-                              : selectedItem.unitPrice || "",
-                          ),
-                        });
-                      }}
-                      disabled={isPending || isSavingNewItem}
+                    <Popover
+                      open={openStockPickerIndex === index}
+                      onOpenChange={(open) =>
+                        setOpenStockPickerIndex(open ? index : null)
+                      }
                     >
-                      <SelectTrigger
-                        aria-label={`Barang katalog ${index + 1}`}
-                        title={
-                          catalogItems.find(
-                            (catalogItem) => catalogItem.id === item.stockItemId,
-                          )?.name
-                        }
-                        className="w-full min-w-0 max-w-full"
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          role="combobox"
+                          aria-expanded={openStockPickerIndex === index}
+                          disabled={
+                            isPending ||
+                            isSavingNewItem ||
+                            Boolean(ticketId && item.ticketItemId)
+                          }
+                          className="flex h-10 w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-left">
+                            {(() => {
+                              const selected = catalogItems.find(
+                                (c) => c.id === item.stockItemId,
+                              );
+                              return selected
+                                ? `${selected.name} · ${selected.sku} (${selected.unit})`
+                                : "Pilih barang dan SKU";
+                            })()}
+                          </span>
+                          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        className="w-[--radix-popover-trigger-width] min-w-80 p-0"
                       >
-                        <SelectValue
-                          placeholder="Pilih barang"
-                          className="min-w-0 flex-1 truncate text-left"
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {catalogItems.map((stockItem) => (
-                          <SelectItem key={stockItem.id} value={stockItem.id}>
-                            {stockItem.name} · {stockItem.sku} ({stockItem.unit})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        <Command>
+                          <CommandInput placeholder="Cari nama barang atau SKU..." />
+                          <CommandList className="max-h-60 overflow-y-auto">
+                            <CommandEmpty>Barang tidak ditemukan.</CommandEmpty>
+                            {catalogItems.map((stockItem) => (
+                              <CommandItem
+                                key={stockItem.id}
+                                value={`${stockItem.name} ${stockItem.sku} ${stockItem.unit}`}
+                                onSelect={() => {
+                                  const linkedTicketItem = Boolean(
+                                    item.ticketItemId,
+                                  );
+                                  updateItem(index, {
+                                    stockItemId: stockItem.id,
+                                    itemName: linkedTicketItem
+                                      ? item.itemName
+                                      : stockItem.name,
+                                    unit: linkedTicketItem
+                                      ? item.unit
+                                      : stockItem.unit,
+                                    unitPrice: formatRupiahInput(
+                                      linkedTicketItem
+                                        ? item.unitPrice ||
+                                            stockItem.unitPrice ||
+                                            ""
+                                        : stockItem.unitPrice || "",
+                                    ),
+                                  });
+                                  setOpenStockPickerIndex(null);
+                                }}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-foreground">
+                                    {stockItem.name}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    SKU: {stockItem.sku} · Satuan:{" "}
+                                    {stockItem.unit}
+                                  </span>
+                                </div>
+                                {item.stockItemId === stockItem.id && (
+                                  <Check className="size-4 shrink-0 text-primary" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {ticketId && !item.stockItemId && (
                       <p className="mt-1 text-xs text-muted-foreground">
                         Barang belum terdaftar. Tambahkan jenis barang agar bisa

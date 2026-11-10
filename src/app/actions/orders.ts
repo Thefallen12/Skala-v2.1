@@ -287,7 +287,9 @@ function isValidKilometer(value: unknown): value is number {
 function canEditPurchaseOrders(role: UserRole): boolean {
   return (
     role === UserRole.LOGISTICS ||
-    role === UserRole.ADMINISTRATIONS
+    role === UserRole.ADMINISTRATIONS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR
   );
 }
 
@@ -400,23 +402,19 @@ export async function createPurchaseOrder(
         transaction,
         input.items,
       );
-      const normalizeCatalogValue = (value: string) =>
-        value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
-      if (
-        input.items.some((item) => {
-          if (!item.stockItemId) return false;
+      const preparedItems = input.items.map((item) => {
+        if (item.stockItemId) {
           const stockItem = selectedStockById.get(item.stockItemId);
-          return (
-            !stockItem ||
-            normalizeCatalogValue(stockItem.name) !==
-              normalizeCatalogValue(item.itemName) ||
-            normalizeCatalogValue(stockItem.unit) !==
-              normalizeCatalogValue(item.unit)
-          );
-        })
-      ) {
-        throw new Error("Nama dan satuan PO harus sesuai dengan katalog barang.");
-      }
+          if (stockItem) {
+            return {
+              ...item,
+              itemName: stockItem.name,
+              unit: stockItem.unit,
+            };
+          }
+        }
+        return item;
+      });
       const vendorBankAccount = vendor
         ? resolveVendorBankAccount(
             vendor.bankAccounts,
@@ -467,7 +465,7 @@ export async function createPurchaseOrder(
           paymentTerms: input.paymentTerms?.trim() || null,
           includeTax: input.includeTax ?? false,
           items: {
-            create: input.items.map((item) => ({
+            create: preparedItems.map((item) => ({
               ...item,
               itemCode: item.stockItemId
                 ? (selectedStockById.get(item.stockItemId)?.sku ?? null)
