@@ -51,6 +51,7 @@ next-env.d.ts
 
 # Android build outputs
 *.apk
+!public/*.apk
 /android/app/build
 /android/.gradle
 /android/build

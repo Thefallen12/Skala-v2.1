@@ -233,12 +233,13 @@ const SidebarLayout = ({
             <div className="border-t border-border/70 px-2 pt-3">
               <a
                 href={androidDownloadUrl}
+                download={androidDownloadUrl.startsWith("/") ? "Skala-Prioritas.apk" : undefined}
                 target="_blank"
                 rel="noreferrer"
                 className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
               >
                 <Icon icon="tabler:download" height={16} width={16} />
-                Unduh Aplikasi Android (APK)
+                Unduh Aplikasi Android (APK v2.1)
               </a>
             </div>
           )}
