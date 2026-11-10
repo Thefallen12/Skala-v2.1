@@ -37,6 +37,7 @@ export type IncomingFundInput = {
   senderName?: string;
   proof: File;
   projectId?: string;
+  transactionDate?: string;
 };
 
 export type FinanceAccountInput = {
@@ -51,6 +52,7 @@ export type FinanceTransferInput = {
   destinationAccountId: string;
   sourceDesc: string;
   proof: File;
+  transactionDate?: string;
 };
 
 export type HistoricalPaymentCashflowInput = {
@@ -97,6 +99,34 @@ function isValidFinanceProofFile(file: unknown): file is File {
       file.type,
     )
   );
+}
+
+function parseTransactionDate(dateStr?: string | null): Date {
+  if (!dateStr || typeof dateStr !== "string" || !dateStr.trim()) {
+    return new Date();
+  }
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-").map(Number);
+    const now = new Date();
+    const d = new Date(
+      year,
+      month - 1,
+      day,
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds(),
+    );
+    if (!Number.isNaN(d.getTime())) {
+      return d;
+    }
+  }
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  return new Date();
 }
 
 export async function uploadCashflowProof(file: File): Promise<string> {
@@ -251,6 +281,8 @@ export async function recordIncomingFund(
           if (!project) throw new Error("Proyek yang dipilih tidak ditemukan.");
         }
 
+        const effectiveDate = parseTransactionDate(input.transactionDate);
+
         await transaction.financeAccount.update({
           where: { id: account.id },
           data: { balance: { increment: input.amount } },
@@ -270,6 +302,7 @@ export async function recordIncomingFund(
             accountId: account.id,
             recordedBy: session.user.id,
             transferGroupId: null,
+            createdAt: effectiveDate,
           },
         });
       },
@@ -504,6 +537,7 @@ export async function transferBetweenFinanceAccounts(
           data: { balance: { increment: input.amount } },
         });
 
+        const effectiveDate = parseTransactionDate(input.transactionDate);
         const description = input.sourceDesc.trim();
         await transaction.cashflow.createMany({
           data: [
@@ -517,6 +551,7 @@ export async function transferBetweenFinanceAccounts(
               accountId: source.id,
               recordedBy: session.user.id,
               transferGroupId,
+              createdAt: effectiveDate,
             },
             {
               type: "IN",
@@ -528,6 +563,7 @@ export async function transferBetweenFinanceAccounts(
               accountId: destination.id,
               recordedBy: session.user.id,
               transferGroupId,
+              createdAt: effectiveDate,
             },
           ],
         });

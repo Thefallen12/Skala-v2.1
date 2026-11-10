@@ -38,6 +38,7 @@ export type FinanceProjectOption = {
 type FundFormValues = {
   amount: number;
   sourceDesc: string;
+  transactionDate: string;
   accountId: string;
   paymentMethod: "TRANSFER" | "CASH" | "DEPOSIT";
   senderName: string;
@@ -46,9 +47,18 @@ type FundFormValues = {
   destinationAccountId: string;
 };
 
+const getTodayDateStr = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const fundFormSchema = z.object({
   amount: z.number().positive("Nominal harus lebih besar dari nol."),
   sourceDesc: z.string().trim().min(3).max(300),
+  transactionDate: z.string().min(1, "Pilih tanggal transaksi."),
   accountId: z.string(),
   paymentMethod: z.enum(["TRANSFER", "CASH", "DEPOSIT"]),
   senderName: z.string().max(160),
@@ -95,6 +105,7 @@ export default function IncomingFundModal({
     defaultValues: {
       amount: 0,
       sourceDesc: "",
+      transactionDate: getTodayDateStr(),
       accountId: accounts[0]?.id ?? "",
       paymentMethod: "TRANSFER",
       senderName: "",
@@ -112,6 +123,7 @@ export default function IncomingFundModal({
     form.reset({
       amount: 0,
       sourceDesc: "",
+      transactionDate: getTodayDateStr(),
       accountId: accounts[0]?.id ?? "",
       paymentMethod: "TRANSFER",
       senderName: "",
@@ -176,6 +188,7 @@ export default function IncomingFundModal({
               senderName: values.senderName,
               proof: proofFile,
               projectId: values.projectId || undefined,
+              transactionDate: values.transactionDate,
             } satisfies IncomingFundInput)
           : await transferBetweenFinanceAccounts({
               amount: values.amount,
@@ -183,6 +196,7 @@ export default function IncomingFundModal({
               destinationAccountId: values.destinationAccountId,
               sourceDesc: values.sourceDesc,
               proof: proofFile,
+              transactionDate: values.transactionDate,
             } satisfies FinanceTransferInput);
       setMessage(result.message);
       setIsError(!result.success);
@@ -239,26 +253,46 @@ export default function IncomingFundModal({
         </p>
       ) : (
         <form id={formId} className="space-y-5" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor={`${formId}-amount`}>Nominal (Rp)</Label>
-            <input type="hidden" {...form.register("amount")} />
-            <RupiahAmountInput
-              id={`${formId}-amount`}
-              value={amountInput}
-              onChange={(formatted) => {
-                setAmountInput(formatted);
-                form.setValue("amount", parseRupiahInput(formatted), {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-              }}
-              required
-            />
-            {form.formState.errors.amount && (
-              <p className="text-sm text-destructive" role="alert">
-                {form.formState.errors.amount.message}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-date`}>Tanggal Transaksi</Label>
+              <Input
+                id={`${formId}-date`}
+                type="date"
+                className="h-10 w-full"
+                {...form.register("transactionDate")}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Tanggal dana masuk (bebas disesuaikan jika input susulan/terlambat).
               </p>
-            )}
+              {form.formState.errors.transactionDate && (
+                <p className="text-sm text-destructive" role="alert">
+                  {form.formState.errors.transactionDate.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-amount`}>Nominal (Rp)</Label>
+              <input type="hidden" {...form.register("amount")} />
+              <RupiahAmountInput
+                id={`${formId}-amount`}
+                value={amountInput}
+                onChange={(formatted) => {
+                  setAmountInput(formatted);
+                  form.setValue("amount", parseRupiahInput(formatted), {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                }}
+                required
+              />
+              {form.formState.errors.amount && (
+                <p className="text-sm text-destructive" role="alert">
+                  {form.formState.errors.amount.message}
+                </p>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor={`${formId}-description`}>
