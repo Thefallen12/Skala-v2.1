@@ -26,6 +26,7 @@ import {
   decimalNumberFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
+import { parseDrtRabWorkbook } from "@/lib/drt-rab-parser";
 
 export type ProjectFinancialCategory = {
   key: "MATERIAL" | "LABOR" | "TRANSPORT" | "OPERATIONAL";
@@ -2130,5 +2131,157 @@ export async function deleteProjectMilestone(
   } catch (error) {
     console.error("Delete milestone error:", error);
     return { success: false, message: "Gagal menghapus milestone." };
+  }
+}
+
+export async function importDrtRabProject(input: {
+  fileBase64: string;
+  fileName: string;
+  targetProjectId?: string;
+}): Promise<ProjectMutationResult & { projectId?: string; summary?: any }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengimpor RAB." };
+  }
+
+  try {
+    const buffer = Buffer.from(input.fileBase64, "base64");
+    const parsed = await parseDrtRabWorkbook(buffer);
+
+    if (!parsed.success || parsed.workItems.length === 0) {
+      return {
+        success: false,
+        message: parsed.message || "Gagal membaca item RAB dari file Excel.",
+      };
+    }
+
+    let projectId = input.targetProjectId;
+
+    if (projectId) {
+      // Update existing project with parsed RAB items
+      const existing = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, pagu: true, kelompokTani: true },
+      });
+
+      if (!existing) {
+        return { success: false, message: "Proyek target tidak ditemukan." };
+      }
+
+      await prisma.project.update({
+        where: { id: projectId },
+        data: {
+          pagu: BigInt(Math.round(parsed.metadata.totalBudget * 100)),
+          ...(parsed.metadata.poktanName && !existing.kelompokTani
+            ? { kelompokTani: parsed.metadata.poktanName }
+            : {}),
+          ...(parsed.metadata.landAreaHa > 0
+            ? { landArea: BigInt(Math.round(parsed.metadata.landAreaHa * 100)) }
+            : {}),
+        },
+      });
+
+      // Save work items
+      await saveProjectRab(projectId, {
+        items: parsed.workItems,
+        replaceExisting: true,
+      });
+
+      revalidatePath(`/apps/projects/${projectId}`);
+      revalidatePath("/apps/projects");
+      return {
+        success: true,
+        message: `RAB berhasil diimpor: ${parsed.workItems.length} item pekerjaan diterapkan (Total: Rp ${parsed.metadata.totalBudget.toLocaleString("id-ID")}).`,
+        projectId,
+        summary: parsed.metadata,
+      };
+    } else {
+      // Automatically create new Project in database
+      const newProjectId = `prj_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      let uniqueCode = parsed.metadata.code;
+
+      const codeExists = await prisma.project.findUnique({
+        where: { code: uniqueCode },
+        select: { id: true },
+      });
+      if (codeExists) {
+        uniqueCode = `PRJ-${parsed.metadata.year || "2026"}-${Math.floor(100 + Math.random() * 900)}`;
+      }
+
+      const created = await prisma.project.create({
+        data: {
+          id: newProjectId,
+          code: uniqueCode,
+          title: parsed.metadata.title,
+          name: parsed.metadata.title,
+          kelompokTani: parsed.metadata.poktanName || "Poktan Bintang Kejora",
+          address: parsed.metadata.address || "Aceh Tengah",
+          location: parsed.metadata.address || "Aceh Tengah",
+          jenisPekerjaan: parsed.metadata.activityName || "DRT/SID Rehabilitasi Lahan Sawah",
+          landArea: parsed.metadata.landAreaHa > 0 ? BigInt(Math.round(parsed.metadata.landAreaHa * 100)) : null,
+          pagu: BigInt(Math.round(parsed.metadata.totalBudget * 100)),
+          budget: null, // "kecuali harga RAP"
+          priority: ProjectPriority.MEDIUM,
+          status: ProjectStatus.RUNNING,
+          progress: 0,
+        },
+      });
+
+      projectId = created.id;
+
+      // Save work items
+      await saveProjectRab(projectId, {
+        items: parsed.workItems,
+        replaceExisting: false,
+      });
+
+      revalidatePath("/apps/projects");
+      return {
+        success: true,
+        message: `Proyek '${parsed.metadata.title}' berhasil dibuat dari Excel RAB dengan ${parsed.workItems.length} item pekerjaan!`,
+        projectId,
+        summary: parsed.metadata,
+      };
+    }
+  } catch (err: any) {
+    console.error("importDrtRabProject error:", err);
+    return {
+      success: false,
+      message: `Gagal memproses file Excel: ${err?.message || "Format tidak valid"}`,
+    };
+  }
+}
+
+export async function parseDrtRabFileAction(input: {
+  fileBase64: string;
+  fileName: string;
+}) {
+  try {
+    const buffer = Buffer.from(input.fileBase64, "base64");
+    return await parseDrtRabWorkbook(buffer);
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || "Gagal memproses file Excel",
+      metadata: {
+        code: "",
+        title: "",
+        poktanName: "",
+        desa: "",
+        kecamatan: "",
+        kabupaten: "",
+        provinsi: "",
+        address: "",
+        activityName: "",
+        satuanKerja: "",
+        year: "",
+        landAreaHa: 0,
+        totalBudget: 0,
+      },
+      workItems: [],
+      materials: [],
+      laborRates: [],
+      divisions: [],
+    };
   }
 }

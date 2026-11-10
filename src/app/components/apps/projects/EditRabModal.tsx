@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import {
   FileSpreadsheet,
   FileUp,
@@ -11,10 +11,12 @@ import {
   Sparkles,
   ClipboardPaste,
   Calendar,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { saveProjectRab, type RabItemInput } from "@/app/actions/project";
+import { saveProjectRab, parseDrtRabFileAction, type RabItemInput } from "@/app/actions/project";
 
 export type EditableRabItem = {
   id?: string;
@@ -113,6 +115,9 @@ export default function EditRabModal({
   const [pasteText, setPasteText] = useState("");
   const [showGuide, setShowGuide] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [importSuccessMsg, setImportSuccessMsg] = useState("");
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
   if (!open) return null;
@@ -176,6 +181,67 @@ export default function EditRabModal({
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
     );
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsingExcel(true);
+    setErrorMsg("");
+    setImportSuccessMsg("");
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64 = (reader.result as string).split(",")[1];
+          const parsed = await parseDrtRabFileAction({
+            fileBase64: base64,
+            fileName: file.name,
+          });
+
+          if (!parsed.success || parsed.workItems.length === 0) {
+            setErrorMsg(parsed.message || "Gagal membaca item RAB dari file Excel.");
+            return;
+          }
+
+          const today = new Date();
+          const mappedItems: EditableRabItem[] = parsed.workItems.map((w, idx) => {
+            const dStart = new Date(today);
+            dStart.setDate(dStart.getDate() + Math.floor(idx / 2) * 7);
+            const dEnd = new Date(dStart);
+            dEnd.setDate(dEnd.getDate() + 7);
+
+            return {
+              section: w.section || "Pekerjaan",
+              code: w.code || `ITM-${idx + 1}`,
+              title: w.title,
+              volume: w.volume,
+              unit: w.unit || "unit",
+              unitPrice: w.unitPrice,
+              rapPrice: 0, // "kecuali harga RAP"
+              startDate: dStart.toISOString().split("T")[0],
+              endDate: dEnd.toISOString().split("T")[0],
+            };
+          });
+
+          setItems(mappedItems);
+          setImportSuccessMsg(
+            `Berhasil memuat ${mappedItems.length} item pekerjaan dari file Excel (${file.name}). Harga RAP dikosongkan (dapat diisi kemudian).`,
+          );
+        } catch (err: any) {
+          setErrorMsg(`Error memproses file Excel: ${err?.message || "Format tidak sesuai"}`);
+        } finally {
+          setIsParsingExcel(false);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setErrorMsg(`Error membaca file: ${err?.message}`);
+      setIsParsingExcel(false);
+    }
   };
 
   const handleParsePaste = () => {
@@ -299,15 +365,33 @@ export default function EditRabModal({
               <ClipboardPaste className="size-3.5 text-muted-foreground" />
               <span>Tempel dari Excel</span>
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileChange}
+              className="hidden"
+            />
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setShowPasteModal(true)}
-              className="h-8 gap-1.5 text-xs"
+              disabled={isParsingExcel}
+              onClick={() => fileInputRef.current?.click()}
+              className="h-8 gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
+              title="Unggah file Excel RAB / DRT pemerintah untuk otomatis membaca seluruh item pekerjaan"
             >
-              <FileUp className="size-3.5 text-muted-foreground" />
-              <span>Impor file</span>
+              {isParsingExcel ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>Membaca Excel...</span>
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Impor Excel / DRT</span>
+                </>
+              )}
             </Button>
             <Button
               type="button"
@@ -347,6 +431,13 @@ export default function EditRabModal({
           {errorMsg && (
             <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-xs font-medium text-destructive">
               {errorMsg}
+            </div>
+          )}
+
+          {importSuccessMsg && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-500/10 p-3 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="size-4 shrink-0" />
+              <span>{importSuccessMsg}</span>
             </div>
           )}
 
