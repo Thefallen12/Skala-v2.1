@@ -2285,3 +2285,65 @@ export async function parseDrtRabFileAction(input: {
     };
   }
 }
+
+export async function updateProjectKanbanStatus(
+  projectId: string,
+  targetColumnKey: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda",
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengubah status proyek." };
+  }
+
+  try {
+    const existing = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, status: true, progress: true },
+    });
+
+    if (!existing) {
+      return { success: false, message: "Proyek tidak ditemukan." };
+    }
+
+    let nextStatus: ProjectStatus = existing.status;
+    let nextProgress = existing.progress;
+
+    switch (targetColumnKey) {
+      case "tender":
+        nextStatus = ProjectStatus.PENDING_SETUP;
+        break;
+      case "perencanaan":
+        nextStatus = ProjectStatus.PENDING;
+        break;
+      case "berjalan":
+        nextStatus = ProjectStatus.RUNNING;
+        if (nextProgress >= 85) nextProgress = 50;
+        break;
+      case "hampir_selesai":
+        nextStatus = ProjectStatus.RUNNING;
+        if (nextProgress < 85 || nextProgress >= 100) nextProgress = 90;
+        break;
+      case "selesai":
+        nextStatus = ProjectStatus.DONE;
+        nextProgress = 100;
+        break;
+      case "ditunda":
+        nextStatus = ProjectStatus.TERHAMBAT;
+        break;
+    }
+
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        status: nextStatus,
+        progress: nextProgress,
+      },
+    });
+
+    revalidatePath("/apps/projects");
+    return { success: true, message: "Status proyek berhasil diperbarui." };
+  } catch (err: any) {
+    console.error("updateProjectKanbanStatus error:", err);
+    return { success: false, message: err?.message || "Gagal memperbarui status proyek." };
+  }
+}

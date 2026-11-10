@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, useEffect, type FormEvent } from "react";
 import {
   addProjectProgress,
   assignProjectFieldPic,
@@ -11,6 +11,7 @@ import {
   createProjectWorkPoint,
   deleteProject,
   editApprovedProjectWorkPointWage,
+  updateProjectKanbanStatus,
 } from "@/app/actions/project";
 import {
   createBlueprint,
@@ -572,11 +573,136 @@ export default function ProjectWorkstationMaster({
   const [blueprintStatus, setBlueprintStatus] = useState("ALL");
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const [projectList, setProjectList] = useState<ProjectWorkstationMasterData[]>(projects);
+  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
+  const [dragOverColumnKey, setDragOverColumnKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProjectList(projects);
+  }, [projects]);
+
+  const kanbanColumns = [
+    {
+      key: "tender" as const,
+      title: "Tender",
+      match: (p: ProjectWorkstationMasterData) => p.status === "PENDING_SETUP",
+    },
+    {
+      key: "perencanaan" as const,
+      title: "Perencanaan",
+      match: (p: ProjectWorkstationMasterData) =>
+        p.status === "PENDING" || p.status === "PLANNED",
+    },
+    {
+      key: "berjalan" as const,
+      title: "Berjalan",
+      match: (p: ProjectWorkstationMasterData) =>
+        (p.status === "RUNNING" || p.status === "ON_PROGRESS" || p.status === "ACTIVE") &&
+        p.progress < 85,
+    },
+    {
+      key: "hampir_selesai" as const,
+      title: "Hampir Selesai",
+      match: (p: ProjectWorkstationMasterData) =>
+        (p.status === "RUNNING" || p.status === "ON_PROGRESS" || p.status === "ACTIVE") &&
+        p.progress >= 85 &&
+        p.progress < 100,
+    },
+    {
+      key: "selesai" as const,
+      title: "Selesai",
+      match: (p: ProjectWorkstationMasterData) => p.status === "DONE" || p.progress >= 100,
+    },
+    {
+      key: "ditunda" as const,
+      title: "Ditunda & batal",
+      match: (p: ProjectWorkstationMasterData) =>
+        p.status === "TERHAMBAT" || (p.status as string) === "ON_HOLD",
+    },
+  ];
+
+  const handleCardDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedProjectId(id);
+  };
+
+  const handleCardDragEnd = () => {
+    setDraggedProjectId(null);
+    setDragOverColumnKey(null);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, key: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverColumnKey !== key) {
+      setDragOverColumnKey(key);
+    }
+  };
+
+  const handleColumnDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverColumnKey(null);
+  };
+
+  const handleColumnDrop = async (
+    e: React.DragEvent,
+    targetKey: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda",
+  ) => {
+    e.preventDefault();
+    setDragOverColumnKey(null);
+    const pId = e.dataTransfer.getData("text/plain") || draggedProjectId;
+    setDraggedProjectId(null);
+    if (!pId) return;
+
+    const pToMove = projectList.find((p) => p.id === pId);
+    if (!pToMove) return;
+
+    let nextStatus: any = pToMove.status;
+    let nextProgress = pToMove.progress;
+
+    if (targetKey === "tender") {
+      nextStatus = "PENDING_SETUP";
+    } else if (targetKey === "perencanaan") {
+      nextStatus = "PENDING";
+    } else if (targetKey === "berjalan") {
+      nextStatus = "RUNNING";
+      if (nextProgress >= 85) nextProgress = 50;
+    } else if (targetKey === "hampir_selesai") {
+      nextStatus = "RUNNING";
+      if (nextProgress < 85 || nextProgress >= 100) nextProgress = 90;
+    } else if (targetKey === "selesai") {
+      nextStatus = "DONE";
+      nextProgress = 100;
+    } else if (targetKey === "ditunda") {
+      nextStatus = "TERHAMBAT";
+    }
+
+    const previousList = [...projectList];
+    setProjectList((prev) =>
+      prev.map((p) =>
+        p.id === pId ? { ...p, status: nextStatus, progress: nextProgress } : p,
+      ),
+    );
+
+    try {
+      const res = await updateProjectKanbanStatus(pId, targetKey);
+      if (!res.success) {
+        setProjectList(previousList);
+        alert(res.message || "Gagal memindahkan proyek.");
+      }
+    } catch (err: any) {
+      setProjectList(previousList);
+      alert(err?.message || "Gagal memindahkan proyek.");
+    }
+  };
+
   const isProjectManager =
     currentUserRole === "ADMINISTRATIONS" || currentUserRole === "DIRECTOR";
   const canViewFinancials = true;
 
-  const runningProjects = projects.filter(
+  const runningProjects = projectList.filter(
     (p) => p.status === "RUNNING" || p.status === "ON_PROGRESS" || p.status === "ACTIVE",
   );
 
@@ -619,7 +745,7 @@ export default function ProjectWorkstationMaster({
         blueprint.category === blueprintCategory) &&
       (blueprintStatus === "ALL" || blueprint.status === blueprintStatus),
   ) ?? [];
-  const filteredProjects = projects.filter((project) => {
+  const filteredProjects = projectList.filter((project) => {
     const query = search.trim().toLocaleLowerCase("id-ID");
     const matchesStatus =
       projectStatusFilter === "ALL" ||
@@ -1461,36 +1587,21 @@ export default function ProjectWorkstationMaster({
           {/* PAPAN (KANBAN) VIEW */}
           {projectViewMode === "papan" && (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3.5 items-start">
-              {[
-                { title: "Tender", match: (p: ProjectWorkstationMasterData) => p.status === "PENDING_SETUP" },
-                { title: "Perencanaan", match: (p: ProjectWorkstationMasterData) => p.status === "PENDING" },
-                {
-                  title: "Berjalan",
-                  match: (p: ProjectWorkstationMasterData) =>
-                    (p.status === "RUNNING" || p.status === "ON_PROGRESS" || p.status === "ACTIVE") &&
-                    p.progress < 85,
-                },
-                {
-                  title: "Hampir Selesai",
-                  match: (p: ProjectWorkstationMasterData) =>
-                    (p.status === "RUNNING" || p.status === "ON_PROGRESS") &&
-                    p.progress >= 85 &&
-                    p.progress < 100,
-                },
-                {
-                  title: "Selesai",
-                  match: (p: ProjectWorkstationMasterData) => p.status === "DONE" || p.progress >= 100,
-                },
-                {
-                  title: "Ditunda & batal",
-                  match: (p: ProjectWorkstationMasterData) => p.status === "TERHAMBAT" || (p.status as string) === "ON_HOLD",
-                },
-              ].map((col, idx) => {
+              {kanbanColumns.map((col) => {
                 const colProjects = filteredProjects.filter(col.match);
+                const isDragOver = dragOverColumnKey === col.key;
+
                 return (
                   <div
-                    key={idx}
-                    className="flex flex-col rounded-xl border border-border/70 bg-muted/20 p-2.5"
+                    key={col.key}
+                    onDragOver={(e) => handleColumnDragOver(e, col.key)}
+                    onDragLeave={handleColumnDragLeave}
+                    onDrop={(e) => handleColumnDrop(e, col.key)}
+                    className={`flex flex-col rounded-xl border p-2.5 transition-all duration-150 min-h-[320px] ${
+                      isDragOver
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
+                        : "border-border/70 bg-muted/20"
+                    }`}
                   >
                     <div className="flex items-center justify-between pb-2">
                       <span className="text-xs font-bold text-foreground">{col.title}</span>
@@ -1499,38 +1610,77 @@ export default function ProjectWorkstationMaster({
                       </span>
                     </div>
 
-                    <div className="space-y-2 min-h-24">
-                      {colProjects.map((p) => (
-                        <Link
-                          key={p.id}
-                          href={`/apps/projects/${p.id}`}
-                          className="block rounded-lg border border-border/80 bg-card p-3 shadow-2xs hover:border-primary/50 transition group"
+                    <div className="space-y-2 min-h-24 flex-1">
+                      {colProjects.map((p) => {
+                        const isDragging = draggedProjectId === p.id;
+                        return (
+                          <div
+                            key={p.id}
+                            draggable
+                            onDragStart={(e) => handleCardDragStart(e, p.id)}
+                            onDragEnd={handleCardDragEnd}
+                            className={`block rounded-lg border bg-card p-3 shadow-2xs transition group select-none cursor-grab active:cursor-grabbing ${
+                              isDragging
+                                ? "opacity-30 border-dashed border-primary scale-95"
+                                : "border-border/80 hover:border-primary/50 hover:shadow-sm"
+                            }`}
+                          >
+                            <Link
+                              href={`/apps/projects/${p.id}`}
+                              onClick={(e) => {
+                                if (draggedProjectId) e.preventDefault();
+                              }}
+                              className="block space-y-1.5"
+                            >
+                              <div className="flex items-start justify-between gap-1">
+                                <span className="font-bold text-xs text-foreground group-hover:text-primary transition line-clamp-1">
+                                  {p.title}
+                                </span>
+                              </div>
+
+                              <div className="text-[11px] text-muted-foreground line-clamp-1">
+                                {p.code}
+                                {p.clientName ? ` · ${p.clientName}` : p.address ? ` · ${p.address}` : ""}
+                              </div>
+
+                              {Number(p.pagu) > 0 && (
+                                <div className="font-mono text-xs font-semibold text-foreground">
+                                  {currency(p.pagu)}
+                                </div>
+                              )}
+
+                              {p.progress > 0 && (
+                                <div className="space-y-1 pt-1">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="text-muted-foreground">Progres</span>
+                                    <span className="font-bold">{p.progress.toFixed(0)}%</span>
+                                  </div>
+                                  <Progress value={p.progress} className="h-1.5" />
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between border-t border-border/50 pt-1.5 text-[10px] text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="size-3 shrink-0" />
+                                  <span>{p.endDate ? formatProjectDate(p.endDate) : "—"}</span>
+                                </span>
+                              </div>
+                            </Link>
+                          </div>
+                        );
+                      })}
+
+                      {colProjects.length === 0 && (
+                        <div
+                          className={`flex h-28 items-center justify-center rounded-lg border border-dashed text-center text-xs transition-colors ${
+                            isDragOver
+                              ? "border-primary bg-primary/10 text-primary font-semibold"
+                              : "border-border/50 text-muted-foreground/70"
+                          }`}
                         >
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-bold text-xs text-foreground group-hover:text-primary transition line-clamp-1">
-                              {p.title}
-                            </span>
-                            <span className="font-mono text-[9px] text-muted-foreground">
-                              {p.code}
-                            </span>
-                          </div>
-
-                          <div className="mt-2.5 space-y-1">
-                            <div className="flex items-center justify-between text-[10px]">
-                              <span className="text-muted-foreground">Progres</span>
-                              <span className="font-bold">{p.progress.toFixed(0)}%</span>
-                            </div>
-                            <Progress value={p.progress} className="h-1.5" />
-                          </div>
-
-                          <div className="mt-2.5 flex items-center justify-between border-t border-border/50 pt-2 text-[10px] text-muted-foreground">
-                            <span>{p.endDate ? formatProjectDate(p.endDate) : "—"}</span>
-                            <span className="font-mono font-semibold text-foreground">
-                              {Number(p.pagu) > 0 ? currency(p.pagu) : "—"}
-                            </span>
-                          </div>
-                        </Link>
-                      ))}
+                          <span>{isDragOver ? "Lepas proyek di sini" : "Belum ada proyek"}</span>
+                        </div>
+                      )}
                     </div>
 
                     <Button

@@ -87,6 +87,69 @@ export default function ProjectScheduleGantt({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskModalData | null>(null);
 
+  // Drag and drop state for Kanban
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverTaskCol, setDragOverTaskCol] = useState<"todo" | "in_progress" | "done" | null>(null);
+
+  const handleTaskDragStart = (e: React.DragEvent, taskId: string) => {
+    e.dataTransfer.setData("text/plain", taskId);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedTaskId(taskId);
+  };
+
+  const handleTaskDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverTaskCol(null);
+  };
+
+  const handleTaskColDragOver = (e: React.DragEvent, col: "todo" | "in_progress" | "done") => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverTaskCol !== col) {
+      setDragOverTaskCol(col);
+    }
+  };
+
+  const handleTaskColDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setDragOverTaskCol(null);
+  };
+
+  const handleTaskColDrop = async (e: React.DragEvent, col: "todo" | "in_progress" | "done") => {
+    e.preventDefault();
+    setDragOverTaskCol(null);
+    const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
+    setDraggedTaskId(null);
+    if (!taskId) return;
+
+    const taskToMove = tasks.find((t) => t.id === taskId);
+    if (!taskToMove) return;
+
+    let targetProgress = 0;
+    if (col === "todo") targetProgress = 0;
+    else if (col === "in_progress") targetProgress = 50;
+    else if (col === "done") targetProgress = 100;
+
+    const prevTasks = [...tasks];
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, progress: targetProgress } : t)),
+    );
+
+    try {
+      await saveProjectScheduleTask(selectedProject.id, {
+        id: taskId,
+        title: taskToMove.title,
+        location: taskToMove.location,
+        progress: targetProgress,
+        plannedStartDate: taskToMove.plannedStartDate || undefined,
+        targetDate: taskToMove.targetDate || undefined,
+      });
+    } catch (err: any) {
+      setTasks(prevTasks);
+      alert(err?.message || "Gagal memindahkan task.");
+    }
+  };
+
   // New milestone state
   const [msTitle, setMsTitle] = useState("");
   const [msDate, setMsDate] = useState("");
@@ -912,7 +975,16 @@ export default function ProjectScheduleGantt({
             <div className="p-4 overflow-x-auto">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-[680px]">
                 {/* Belum mulai */}
-                <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col justify-between">
+                <div
+                  onDragOver={(e) => handleTaskColDragOver(e, "todo")}
+                  onDragLeave={handleTaskColDragLeave}
+                  onDrop={(e) => handleTaskColDrop(e, "todo")}
+                  className={`rounded-xl border p-3 flex flex-col justify-between transition-all duration-150 min-h-[350px] ${
+                    dragOverTaskCol === "todo"
+                      ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
+                      : "border-border bg-muted/10"
+                  }`}
+                >
                   <div>
                     <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
                       <span className="flex items-center gap-1.5">
@@ -929,8 +1001,17 @@ export default function ProjectScheduleGantt({
                         .map((t) => (
                           <div
                             key={t.id}
-                            onClick={() => handleOpenEditTask(t)}
-                            className="rounded-xl border border-border/80 bg-card p-3 shadow-xs cursor-pointer hover:border-primary transition-all space-y-1.5"
+                            draggable
+                            onDragStart={(e) => handleTaskDragStart(e, t.id)}
+                            onDragEnd={handleTaskDragEnd}
+                            onClick={() => {
+                              if (!draggedTaskId) handleOpenEditTask(t);
+                            }}
+                            className={`rounded-xl border bg-card p-3 shadow-xs select-none cursor-grab active:cursor-grabbing transition-all space-y-1.5 ${
+                              draggedTaskId === t.id
+                                ? "opacity-30 border-dashed border-primary scale-95"
+                                : "border-border/80 hover:border-primary"
+                            }`}
                           >
                             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
                               <span className="size-2 rounded-full bg-blue-600 shrink-0" />
@@ -951,6 +1032,17 @@ export default function ProjectScheduleGantt({
                             </div>
                           </div>
                         ))}
+                      {tasks.filter((t) => (t.progress || 0) === 0).length === 0 && (
+                        <div
+                          className={`flex h-24 items-center justify-center rounded-lg border border-dashed text-center text-xs transition-colors ${
+                            dragOverTaskCol === "todo"
+                              ? "border-primary bg-primary/10 text-primary font-semibold"
+                              : "border-border/50 text-muted-foreground/70"
+                          }`}
+                        >
+                          <span>{dragOverTaskCol === "todo" ? "Lepas task di sini" : "Belum ada task"}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
@@ -964,7 +1056,16 @@ export default function ProjectScheduleGantt({
                 </div>
 
                 {/* Berjalan */}
-                <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col justify-between">
+                <div
+                  onDragOver={(e) => handleTaskColDragOver(e, "in_progress")}
+                  onDragLeave={handleTaskColDragLeave}
+                  onDrop={(e) => handleTaskColDrop(e, "in_progress")}
+                  className={`rounded-xl border p-3 flex flex-col justify-between transition-all duration-150 min-h-[350px] ${
+                    dragOverTaskCol === "in_progress"
+                      ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
+                      : "border-border bg-muted/10"
+                  }`}
+                >
                   <div>
                     <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
                       <span className="flex items-center gap-1.5">
@@ -981,8 +1082,17 @@ export default function ProjectScheduleGantt({
                         .map((t) => (
                           <div
                             key={t.id}
-                            onClick={() => handleOpenEditTask(t)}
-                            className="rounded-xl border border-border/80 bg-card p-3 shadow-xs cursor-pointer hover:border-primary transition-all space-y-1.5"
+                            draggable
+                            onDragStart={(e) => handleTaskDragStart(e, t.id)}
+                            onDragEnd={handleTaskDragEnd}
+                            onClick={() => {
+                              if (!draggedTaskId) handleOpenEditTask(t);
+                            }}
+                            className={`rounded-xl border bg-card p-3 shadow-xs select-none cursor-grab active:cursor-grabbing transition-all space-y-1.5 ${
+                              draggedTaskId === t.id
+                                ? "opacity-30 border-dashed border-primary scale-95"
+                                : "border-border/80 hover:border-primary"
+                            }`}
                           >
                             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
                               <span className="size-2 rounded-full bg-blue-600 shrink-0" />
@@ -1014,6 +1124,17 @@ export default function ProjectScheduleGantt({
                             </div>
                           </div>
                         ))}
+                      {tasks.filter((t) => (t.progress || 0) > 0 && (t.progress || 0) < 100).length === 0 && (
+                        <div
+                          className={`flex h-24 items-center justify-center rounded-lg border border-dashed text-center text-xs transition-colors ${
+                            dragOverTaskCol === "in_progress"
+                              ? "border-primary bg-primary/10 text-primary font-semibold"
+                              : "border-border/50 text-muted-foreground/70"
+                          }`}
+                        >
+                          <span>{dragOverTaskCol === "in_progress" ? "Lepas task di sini" : "Belum ada task"}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
@@ -1027,7 +1148,16 @@ export default function ProjectScheduleGantt({
                 </div>
 
                 {/* Selesai */}
-                <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col justify-between">
+                <div
+                  onDragOver={(e) => handleTaskColDragOver(e, "done")}
+                  onDragLeave={handleTaskColDragLeave}
+                  onDrop={(e) => handleTaskColDrop(e, "done")}
+                  className={`rounded-xl border p-3 flex flex-col justify-between transition-all duration-150 min-h-[350px] ${
+                    dragOverTaskCol === "done"
+                      ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
+                      : "border-border bg-muted/10"
+                  }`}
+                >
                   <div>
                     <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
                       <span className="flex items-center gap-1.5">
@@ -1044,8 +1174,17 @@ export default function ProjectScheduleGantt({
                         .map((t) => (
                           <div
                             key={t.id}
-                            onClick={() => handleOpenEditTask(t)}
-                            className="rounded-xl border border-border/80 bg-card p-3 shadow-xs cursor-pointer hover:border-primary transition-all space-y-1.5"
+                            draggable
+                            onDragStart={(e) => handleTaskDragStart(e, t.id)}
+                            onDragEnd={handleTaskDragEnd}
+                            onClick={() => {
+                              if (!draggedTaskId) handleOpenEditTask(t);
+                            }}
+                            className={`rounded-xl border bg-card p-3 shadow-xs select-none cursor-grab active:cursor-grabbing transition-all space-y-1.5 ${
+                              draggedTaskId === t.id
+                                ? "opacity-30 border-dashed border-primary scale-95"
+                                : "border-border/80 hover:border-primary"
+                            }`}
                           >
                             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
                               <span className="size-2 rounded-full bg-blue-600 shrink-0" />
@@ -1071,6 +1210,17 @@ export default function ProjectScheduleGantt({
                             </div>
                           </div>
                         ))}
+                      {tasks.filter((t) => (t.progress || 0) >= 100).length === 0 && (
+                        <div
+                          className={`flex h-24 items-center justify-center rounded-lg border border-dashed text-center text-xs transition-colors ${
+                            dragOverTaskCol === "done"
+                              ? "border-primary bg-primary/10 text-primary font-semibold"
+                              : "border-border/50 text-muted-foreground/70"
+                          }`}
+                        >
+                          <span>{dragOverTaskCol === "done" ? "Lepas task di sini" : "Belum ada task"}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
