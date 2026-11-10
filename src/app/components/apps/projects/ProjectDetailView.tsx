@@ -3,7 +3,7 @@
 import React, { useState, useTransition, useMemo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { ApexOptions } from "apexcharts";
 import {
   AlertTriangle,
@@ -64,6 +64,7 @@ import AnalisaMaterialModal from "./AnalisaMaterialModal";
 import UploadDocumentModal from "./UploadDocumentModal";
 import CoreTeamModal from "./CoreTeamModal";
 import { applyRabAsContract, applyRapAsBudget } from "@/app/actions/project";
+import { ProjectPrintRabView, ProjectPrintProgressView } from "./ProjectPrintViews";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -147,6 +148,13 @@ export default function ProjectDetailView({
   currentUserRole?: UserRole;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const printParam = searchParams?.get("print");
+  const [printDocView, setPrintDocView] = useState<"none" | "rab" | "progres">(() => {
+    if (printParam === "rab") return "rab";
+    if (printParam === "progres") return "progres";
+    return "none";
+  });
   const [activeTab, setActiveTab] = useState("ringkasan");
   const [showBanner, setShowBanner] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -451,6 +459,30 @@ export default function ProjectDetailView({
   };
 
   const latestReport = project.reports[0];
+
+  if (printDocView === "rab") {
+    return (
+      <ProjectPrintRabView
+        project={project}
+        rabGroups={rabGroups}
+        totalRabNumber={totalRabNumber}
+        onBack={() => setPrintDocView("none")}
+      />
+    );
+  }
+
+  if (printDocView === "progres") {
+    return (
+      <ProjectPrintProgressView
+        project={project}
+        rabGroups={rabGroups}
+        totalRabNumber={totalRabNumber}
+        plannedToday={plannedToday}
+        deviation={deviation}
+        onBack={() => setPrintDocView("none")}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen space-y-6 pb-20">
@@ -822,7 +854,7 @@ export default function ProjectDetailView({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handlePrintRab}
+                    onClick={() => setPrintDocView("rab")}
                     className="h-8 gap-1.5 px-3 text-xs rounded-lg"
                   >
                     <Printer className="size-3.5 text-muted-foreground" />
@@ -832,7 +864,7 @@ export default function ProjectDetailView({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => window.print()}
+                    onClick={() => setPrintDocView("progres")}
                     className="h-8 gap-1.5 px-3 text-xs rounded-lg"
                   >
                     <Printer className="size-3.5 text-muted-foreground" />
