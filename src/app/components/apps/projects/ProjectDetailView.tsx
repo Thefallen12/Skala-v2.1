@@ -441,8 +441,11 @@ export default function ProjectDetailView({
       (sum, p) => sum + Number(p.approvedTotalWage ?? p.proposedTotalWage ?? 0),
       0,
     );
-    const paguNum = Number(project.pagu) > 0 ? Number(project.pagu) : computedTotal;
-    const rapNum = Number(project.budget) > 0 ? Number(project.budget) : Math.round(paguNum * 0.758);
+    const paguNum = computedTotal > 0 ? computedTotal : (Number(project.pagu) > 0 ? Number(project.pagu) : 0);
+    const rapNum =
+      Number(project.budget) > 0 && Math.abs(Number(project.budget) - paguNum) < paguNum * 0.5
+        ? Number(project.budget)
+        : Math.round(paguNum * 0.758);
 
     const groupsMap = new Map<string, typeof points>();
     for (const point of points) {

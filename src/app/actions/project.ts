@@ -1731,8 +1731,8 @@ export async function saveProjectRab(
       await tx.project.update({
         where: { id: projectId },
         data: {
-          pagu: BigInt(Math.round(totalRab * 100)),
-          budget: BigInt(Math.round(totalRap * 100)),
+          pagu: scaledIntegerFromDecimal(totalRab),
+          budget: scaledIntegerFromDecimal(totalRap),
           ...(firstStartDate ? { startDate: new Date(firstStartDate) } : {}),
           ...(lastEndDate ? { endDate: new Date(lastEndDate) } : {}),
         },
@@ -2176,7 +2176,7 @@ export async function importDrtRabProject(input: {
       await prisma.project.update({
         where: { id: projectId },
         data: {
-          pagu: BigInt(Math.round(parsed.metadata.totalBudget * 100)),
+          pagu: scaledIntegerFromDecimal(parsed.metadata.totalBudget),
           ...(parsed.metadata.poktanName && !existing.kelompokTani
             ? { kelompokTani: parsed.metadata.poktanName }
             : {}),
