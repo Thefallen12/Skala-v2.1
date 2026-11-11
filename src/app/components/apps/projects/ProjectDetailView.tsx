@@ -310,10 +310,6 @@ export default function ProjectDetailView({
       planToday = Math.round((3 * t ** 2 - 2 * t ** 3) * 1000) / 10;
     }
 
-    if (planToday === 0 && project.startDate && project.endDate) {
-      planToday = 32.3;
-    }
-
     const actual = Number((project.progress ?? 0).toFixed(1));
     const dev = Number((actual - planToday).toFixed(1));
 
@@ -335,18 +331,37 @@ export default function ProjectDetailView({
       const pointTime = startMs + (duration / (pointsCount - 1)) * i;
       const progressRatio = i / (pointsCount - 1);
       const easedProgress = Math.round((3 * progressRatio ** 2 - 2 * progressRatio ** 3) * 1000) / 10;
-
       targetPoints.push({ x: pointTime, y: easedProgress });
+    }
 
-      if (pointTime <= nowMs + 86400000) {
-        if (i === 0) actualPoints.push({ x: pointTime, y: 0 });
-        else if (pointTime <= nowMs) {
-          actualPoints.push({ x: pointTime, y: actual });
-        } else {
-          actualPoints.push({ x: pointTime, y: null });
-        }
+    // Aktual: riwayat laporan harian / opname (harian & mingguan), diurutkan per tanggal
+    const reportPoints = (project.reports ?? [])
+      .filter((r) => r.progress !== null && r.progress !== undefined)
+      .map((r) => ({ x: new Date(r.reportDate).getTime(), y: Number(r.progress) }))
+      .filter((pt) => Number.isFinite(pt.x) && Number.isFinite(pt.y))
+      .sort((a, b) => a.x - b.x);
+
+    // Satu titik per hari (ambil nilai terakhir di hari itu), progres tidak boleh turun
+    const byDay = new Map<number, number>();
+    for (const pt of reportPoints) {
+      const d = new Date(pt.x);
+      d.setHours(0, 0, 0, 0);
+      byDay.set(d.getTime(), pt.y);
+    }
+    actualPoints.push({ x: startMs, y: 0 });
+    let runningMax = 0;
+    for (const [day, value] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
+      runningMax = Math.max(runningMax, Math.min(100, value));
+      actualPoints.push({ x: Math.max(day, startMs), y: Math.round(runningMax * 10) / 10 });
+    }
+    // Titik hari ini mengikuti progres proyek terkini
+    if (nowMs > startMs) {
+      const lastX = actualPoints[actualPoints.length - 1]?.x ?? startMs;
+      const todayX = Math.min(nowMs, endMs);
+      if (todayX > lastX) {
+        actualPoints.push({ x: todayX, y: Math.max(runningMax, actual) });
       } else {
-        actualPoints.push({ x: pointTime, y: null });
+        actualPoints[actualPoints.length - 1].y = Math.max(runningMax, actual);
       }
     }
 
@@ -369,7 +384,7 @@ export default function ProjectDetailView({
         fontFamily: "inherit",
         foreColor: "#94a3b8",
       },
-      colors: ["#0f172a", "#64748b"],
+      colors: ["#f97316", "#64748b"],
       stroke: {
         curve: "smooth",
         width: [3, 2.5],
@@ -421,7 +436,7 @@ export default function ProjectDetailView({
       sCurveSeries: series,
       sCurveOptions: options,
     };
-  }, [project.startDate, project.endDate, project.progress]);
+  }, [project.startDate, project.endDate, project.progress, project.reports]);
 
   // Work Points parsed into grouped RAB table
   const { rabGroups, totalRabNumber, totalRapNumber, opnameWorkPointItems } = useMemo(() => {
@@ -1201,7 +1216,9 @@ export default function ProjectDetailView({
                         {project.endDate ? formatDateIndo(project.endDate) : "—"}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Perlu 7 hari opname
+                        {project.reports.length > 0
+                          ? `${project.reports.length} laporan progres tercatat`
+                          : "Belum ada laporan progres"}
                       </p>
                     </div>
                   </div>
@@ -1218,17 +1235,15 @@ export default function ProjectDetailView({
               <div className="space-y-2">
                 <h3 className="text-sm font-bold text-foreground">Kurva S</h3>
                 <div className="rounded-xl border border-border/70 p-4">
-                  {typeof window !== "undefined" && (
-                    <Chart
-                      options={sCurveOptions}
-                      series={sCurveSeries}
-                      type="line"
-                      height={280}
-                    />
-                  )}
+                  <Chart
+                    options={sCurveOptions}
+                    series={sCurveSeries}
+                    type="line"
+                    height={280}
+                  />
                   <div className="mt-2 flex items-center justify-center gap-6 text-xs font-medium text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2 rounded-full bg-foreground" />
+                      <span className="size-2 rounded-full bg-orange-500" />
                       <span>Aktual</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5">
@@ -1603,6 +1618,25 @@ export default function ProjectDetailView({
                           Progres: {report.progress ?? 0}%
                         </Badge>
                       </div>
+
+                      {(report.workSummary || report.notes) && (
+                        <div className="mt-3 space-y-1">
+                          {report.workSummary && (
+                            <p className="text-xs font-medium text-foreground">
+                              {report.workSummary.startsWith("Opname Mingguan") && (
+                                <Badge variant="outline" className="mr-2 border-sky-500/40 text-[10px] text-sky-500">Mingguan</Badge>
+                              )}
+                              {report.workSummary.startsWith("Laporan Progres Harian") && (
+                                <Badge variant="outline" className="mr-2 border-emerald-500/40 text-[10px] text-emerald-500">Harian</Badge>
+                              )}
+                              {report.workSummary}
+                            </p>
+                          )}
+                          {report.notes && (
+                            <p className="text-xs text-muted-foreground">Catatan: {report.notes}</p>
+                          )}
+                        </div>
+                      )}
 
                       {report.photoUrls && report.photoUrls.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">

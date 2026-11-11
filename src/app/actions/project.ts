@@ -1756,6 +1756,9 @@ export async function recordProjectOpname(
   input: {
     reportDate: string;
     isAdditional: boolean;
+    periodType?: "DAILY" | "WEEKLY";
+    weekNumber?: number;
+    notes?: string;
     items: Array<{
       workPointId: string;
       volume: number;
@@ -1793,7 +1796,9 @@ export async function recordProjectOpname(
         const wp = wpMap.get(opnameItem.workPointId);
         if (!wp) continue;
 
-        const targetVol = wp.proposedVolume ? Number(wp.proposedVolume) / 100 : 1;
+        const targetVol = wp.proposedVolume
+          ? decimalNumberFromScaledInteger(wp.proposedVolume)
+          : 1;
         const currentCompleted = wp.completedVolume ?? 0;
         const newCompleted = input.isAdditional
           ? currentCompleted + opnameItem.volume
@@ -1812,12 +1817,16 @@ export async function recordProjectOpname(
           },
         });
 
+        const periodLabel = input.periodType === "WEEKLY"
+          ? `Opname Mingguan ${input.weekNumber ? `Minggu ke-${input.weekNumber}` : ""}`
+          : "Opname Harian";
+
         await tx.projectWorkPointProgress.create({
           data: {
             workPointId: wp.id,
             reportDate,
             progress: progressPercent,
-            workSummary: "Opname terpasang: " + newCompleted + " " + (wp.proposedUnit || ""),
+            workSummary: `${periodLabel}: ${newCompleted} ${wp.proposedUnit || ""} (${progressPercent}%)`,
           },
         });
       }
@@ -1845,10 +1854,36 @@ export async function recordProjectOpname(
           updatedPoints.length;
       }
 
+      const roundedOverallProgress = Math.round(overallProgress * 10) / 10;
       await tx.project.update({
         where: { id: projectId },
         data: {
-          progress: Math.round(overallProgress * 10) / 10,
+          progress: roundedOverallProgress,
+        },
+      });
+
+      const summaryText = input.periodType === "WEEKLY"
+        ? `Opname Mingguan ${input.weekNumber ? `(Minggu ke-${input.weekNumber})` : ""}: Progres proyek mencapai ${roundedOverallProgress}%`
+        : `Laporan Progres Harian: Progres proyek mencapai ${roundedOverallProgress}%`;
+
+      await tx.dailyReport.upsert({
+        where: {
+          projectId_reportDate: {
+            projectId,
+            reportDate,
+          },
+        },
+        create: {
+          projectId,
+          reportDate,
+          progress: roundedOverallProgress,
+          workSummary: summaryText,
+          notes: input.notes?.trim() || null,
+        },
+        update: {
+          progress: roundedOverallProgress,
+          workSummary: summaryText,
+          notes: input.notes?.trim() || undefined,
         },
       });
     });
