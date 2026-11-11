@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import WorkCalendarModal from "./WorkCalendarModal";
 import TaskModal, { TaskModalData } from "./TaskModal";
+import { ProjectPrintScheduleView } from "./ProjectPrintViews";
 import {
   saveProjectScheduleTask,
   deleteProjectScheduleTask,
@@ -88,6 +89,7 @@ export default function ProjectScheduleGantt({
   const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [showOnboardingBanner, setShowOnboardingBanner] = useState(true);
+  const [isPrintScheduleView, setIsPrintScheduleView] = useState(false);
 
   // Modals state
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -544,6 +546,31 @@ export default function ProjectScheduleGantt({
     setTimeout(() => setBaselineUpdatedMsg(false), 2500);
   };
 
+  if (isPrintScheduleView) {
+    return (
+      <ProjectPrintScheduleView
+        project={{
+          id: selectedProject.id,
+          title: selectedProject.title,
+          code: selectedProject.code,
+          startDate: selectedProject.startDate,
+          endDate: selectedProject.endDate,
+          progress: selectedProject.progress,
+        }}
+        tasks={tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          location: t.location,
+          plannedStartDate: t.plannedStartDate,
+          targetDate: t.targetDate,
+          progress: t.progress,
+        }))}
+        totalWeeks={totalWeeks}
+        onBack={() => setIsPrintScheduleView(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4 pb-12">
       {/* Onboarding Step 3 Banner (matching screenshot) */}
@@ -618,7 +645,7 @@ export default function ProjectScheduleGantt({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => window.print()}
+            onClick={() => setIsPrintScheduleView(true)}
             className="h-8 gap-1.5 text-xs rounded-lg"
           >
             <Printer className="size-3.5" />

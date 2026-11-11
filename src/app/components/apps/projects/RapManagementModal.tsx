@@ -1,0 +1,700 @@
+"use client";
+
+import React, { useState, useEffect, useTransition } from "react";
+import {
+  X,
+  Plus,
+  Trash2,
+  Package,
+  Hammer,
+  TrendingUp,
+  RefreshCw,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  FileSpreadsheet,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { getProjectRap, saveProjectRap } from "@/app/actions/project";
+
+export interface RabMaterialOption {
+  id: string;
+  name: string;
+  unit: string;
+  rabPrice?: number;
+  quantity?: number;
+}
+
+export interface MaterialPlanItem {
+  id?: string;
+  materialName: string;
+  unit: string;
+  plannedQuantity: number;
+  actualQuantity: number;
+  unitPrice: number;
+  totalPrice?: number;
+  scope?: string;
+  notes?: string;
+}
+
+export interface LaborPlanItem {
+  id?: string;
+  workPointId?: string;
+  jobName: string;
+  volume: number;
+  unit: string;
+  boronganRate: number;
+  totalBorongan: number;
+  subkonName?: string;
+  notes?: string;
+}
+
+interface RapManagementModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  projectId: string;
+  projectTitle: string;
+  paguRab: number;
+  onSuccess?: () => void;
+}
+
+export default function RapManagementModal({
+  isOpen,
+  onClose,
+  projectId,
+  projectTitle,
+  paguRab,
+  onSuccess,
+}: RapManagementModalProps) {
+  const [activeTab, setActiveTab] = useState<"materials" | "labor">("materials");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // Data State
+  const [rabMaterials, setRabMaterials] = useState<RabMaterialOption[]>([]);
+  const [materialPlans, setMaterialPlans] = useState<MaterialPlanItem[]>([]);
+  const [laborPlans, setLaborPlans] = useState<LaborPlanItem[]>([]);
+
+  // Load data on open
+  useEffect(() => {
+    if (!isOpen || !projectId) return;
+    setIsLoading(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    getProjectRap(projectId)
+      .then((res) => {
+        if (res && res.success) {
+          setRabMaterials(res.rabMaterials || []);
+          if (res.materialPlans && res.materialPlans.length > 0) {
+            setMaterialPlans(res.materialPlans);
+          } else if (res.rabMaterials && res.rabMaterials.length > 0) {
+            // Auto populate from rab materials if empty
+            setMaterialPlans(
+              res.rabMaterials.map((m) => ({
+                materialName: m.name,
+                unit: m.unit,
+                plannedQuantity: m.quantity || 0,
+                actualQuantity: m.quantity || 0,
+                unitPrice: m.rabPrice ? Math.round(m.rabPrice * 0.85) : 0, // Estimasi awal RAP 85% harga RAB
+                totalPrice: 0,
+              }))
+            );
+          }
+
+          if (res.laborPlans && res.laborPlans.length > 0) {
+            setLaborPlans(res.laborPlans);
+          } else if (res.workPoints && res.workPoints.length > 0) {
+            // Auto populate labor items from work points
+            setLaborPlans(
+              res.workPoints.map((wp) => ({
+                workPointId: wp.id,
+                jobName: wp.title,
+                volume: wp.volume,
+                unit: wp.unit,
+                boronganRate: 0,
+                totalBorongan: Math.round(wp.totalRab * 0.3), // Estimasi porsi upah borongan 30% dari nilai pekerjaan
+                subkonName: "Mandor Lapangan",
+                notes: wp.location || "",
+              }))
+            );
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load RAP data:", err);
+        setErrorMsg("Gagal memuat data RAP dari server.");
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [isOpen, projectId]);
+
+  // Calculations
+  const totalMaterialCost = materialPlans.reduce(
+    (sum, m) => sum + Math.round((m.actualQuantity || 0) * (m.unitPrice || 0)),
+    0
+  );
+
+  const totalLaborCost = laborPlans.reduce((sum, l) => {
+    const total = l.totalBorongan > 0 ? l.totalBorongan : Math.round((l.volume || 1) * (l.boronganRate || 0));
+    return sum + total;
+  }, 0);
+
+  const totalRap = totalMaterialCost + totalLaborCost;
+  const profitAmount = paguRab - totalRap;
+  const profitMarginPercent = paguRab > 0 ? ((profitAmount / paguRab) * 100).toFixed(1) : "0.0";
+
+  // Handlers for Material Plan
+  const handleAddMaterialRow = () => {
+    const firstRabMat = rabMaterials[0];
+    setMaterialPlans((prev) => [
+      ...prev,
+      {
+        materialName: firstRabMat?.name || "",
+        unit: firstRabMat?.unit || "unit",
+        plannedQuantity: firstRabMat?.quantity || 0,
+        actualQuantity: firstRabMat?.quantity || 1,
+        unitPrice: firstRabMat?.rabPrice ? Math.round(firstRabMat.rabPrice * 0.85) : 0,
+      },
+    ]);
+  };
+
+  const handleSelectRabMaterial = (index: number, matName: string) => {
+    const selected = rabMaterials.find((m) => m.name === matName);
+    setMaterialPlans((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        return {
+          ...item,
+          materialName: matName,
+          unit: selected?.unit || item.unit,
+          plannedQuantity: selected?.quantity ?? item.plannedQuantity,
+          actualQuantity: selected?.quantity ?? item.actualQuantity,
+          unitPrice: selected?.rabPrice ? Math.round(selected.rabPrice * 0.85) : item.unitPrice,
+        };
+      })
+    );
+  };
+
+  const handleUpdateMaterial = (index: number, field: keyof MaterialPlanItem, value: any) => {
+    setMaterialPlans((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleRemoveMaterial = (index: number) => {
+    setMaterialPlans((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleSyncAllFromRab = () => {
+    if (rabMaterials.length === 0) return;
+    setMaterialPlans(
+      rabMaterials.map((m) => ({
+        materialName: m.name,
+        unit: m.unit,
+        plannedQuantity: m.quantity || 0,
+        actualQuantity: m.quantity || 0,
+        unitPrice: m.rabPrice ? Math.round(m.rabPrice * 0.85) : 0,
+      }))
+    );
+  };
+
+  // Handlers for Labor Plan ("Untuk Jasa Kita Borongkan")
+  const handleUpdateLabor = (index: number, field: keyof LaborPlanItem, value: any) => {
+    setLaborPlans((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const updated = { ...item, [field]: value };
+        if (field === "volume" || field === "boronganRate") {
+          const v = field === "volume" ? Number(value) : item.volume;
+          const r = field === "boronganRate" ? Number(value) : item.boronganRate;
+          updated.totalBorongan = Math.round(v * r);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const handleAddLaborRow = () => {
+    setLaborPlans((prev) => [
+      ...prev,
+      {
+        jobName: "Pekerjaan Borongan Tambahan",
+        volume: 1,
+        unit: "paket",
+        boronganRate: 0,
+        totalBorongan: 0,
+        subkonName: "Mandor Borongan",
+      },
+    ]);
+  };
+
+  const handleRemoveLabor = (index: number) => {
+    setLaborPlans((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  // Save RAP to DB
+  const handleSave = () => {
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    startTransition(async () => {
+      const res = await saveProjectRap(projectId, {
+        materialPlans: materialPlans.map((m) => ({
+          materialName: m.materialName,
+          unit: m.unit,
+          plannedQuantity: m.plannedQuantity,
+          actualQuantity: m.actualQuantity,
+          unitPrice: m.unitPrice,
+          scope: m.scope || "ALL",
+          notes: m.notes,
+        })),
+        laborPlans: laborPlans.map((l) => ({
+          workPointId: l.workPointId,
+          jobName: l.jobName,
+          volume: l.volume,
+          unit: l.unit,
+          boronganRate: l.boronganRate,
+          totalBorongan: l.totalBorongan,
+          subkonName: l.subkonName,
+          notes: l.notes,
+        })),
+      });
+
+      if (res.success) {
+        setSuccessMsg(res.message || "RAP berhasil disimpan ke database!");
+        if (onSuccess) onSuccess();
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      } else {
+        setErrorMsg(res.message || "Gagal menyimpan RAP.");
+      }
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border/80 p-5 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-foreground">
+                Penyusunan RAP (Bahan &amp; Jasa Borongan)
+              </h2>
+              <Badge variant="outline" className="text-xs font-semibold">
+                Tim ADM / Project Manager
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Proyek: <strong className="text-foreground">{projectTitle}</strong> · Nilai Kontrak RAB:{" "}
+              <strong className="text-foreground">Rp {paguRab.toLocaleString("id-ID")}</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
+          >
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {/* Tab Selector & Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-muted/20 px-5 py-3">
+          <div className="flex rounded-xl border border-border/70 bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("materials")}
+              className={`flex items-center gap-2 rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+                activeTab === "materials"
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Package className="size-3.5 text-primary" />
+              <span>1. Bahan RAP ({materialPlans.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("labor")}
+              className={`flex items-center gap-2 rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+                activeTab === "labor"
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Hammer className="size-3.5 text-amber-500" />
+              <span>2. Jasa Borongan ({laborPlans.length})</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {activeTab === "materials" && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSyncAllFromRab}
+                  className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  title="Tarik semua bahan dari analisa upload RAB"
+                >
+                  <RefreshCw className="size-3 text-muted-foreground" />
+                  <span>Sinkron Bahan RAB</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddMaterialRow}
+                  className="h-8 gap-1.5 text-xs bg-foreground text-background font-semibold"
+                >
+                  <Plus className="size-3.5" />
+                  <span>Tambah Bahan</span>
+                </Button>
+              </>
+            )}
+
+            {activeTab === "labor" && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleAddLaborRow}
+                className="h-8 gap-1.5 text-xs bg-foreground text-background font-semibold"
+              >
+                <Plus className="size-3.5" />
+                <span>Tambah Borongan</span>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {errorMsg && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-4 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="py-16 text-center text-xs text-muted-foreground">
+              <RefreshCw className="mx-auto size-6 animate-spin text-muted-foreground mb-2" />
+              <span>Memuat data RAB dan RAP proyek...</span>
+            </div>
+          ) : activeTab === "materials" ? (
+            /* ================= TAB 1: BAHAN RAP ================= */
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 rounded-xl border border-border/80 bg-muted/15 p-3 text-xs text-muted-foreground">
+                <FileSpreadsheet className="size-4 shrink-0 text-primary" />
+                <span>
+                  <strong>Dropdown Menu Bahan</strong> mengambil langsung dari daftar bahan yang di-upload pada RAB
+                  proyek ini ({rabMaterials.length} bahan terdeteksi). Anda hanya perlu menentukan kuantitas aktual dan harga satuan beli RAP.
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-border/80">
+                <table className="w-full min-w-[780px] text-left text-xs">
+                  <thead className="border-b border-border bg-muted/40 font-semibold text-muted-foreground">
+                    <tr>
+                      <th className="px-3.5 py-2.5 w-72">Bahan (Dari Upload RAB)</th>
+                      <th className="px-3 py-2.5 text-right w-24">Vol RAB</th>
+                      <th className="px-3 py-2.5 text-right w-28">Bahan Aktual</th>
+                      <th className="px-3 py-2.5 w-20">Satuan</th>
+                      <th className="px-3 py-2.5 text-right w-36">Harga Satuan RAP (Rp)</th>
+                      <th className="px-3 py-2.5 text-right w-36">Subtotal RAP</th>
+                      <th className="px-3 py-2.5 text-center w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {materialPlans.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-10 text-center text-muted-foreground">
+                          Belum ada bahan RAP. Klik <strong>Tambah Bahan</strong> atau{" "}
+                          <strong>Sinkron Bahan RAB</strong> untuk memulai.
+                        </td>
+                      </tr>
+                    ) : (
+                      materialPlans.map((mat, idx) => {
+                        const lineTotal = Math.round((mat.actualQuantity || 0) * (mat.unitPrice || 0));
+                        return (
+                          <tr key={idx} className="hover:bg-muted/10 transition">
+                            {/* Dropdown Menu Ambil Dari Bahan Upload RAB */}
+                            <td className="px-3.5 py-2">
+                              <select
+                                value={mat.materialName}
+                                onChange={(e) => handleSelectRabMaterial(idx, e.target.value)}
+                                className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs font-semibold text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+                              >
+                                {rabMaterials.length === 0 && (
+                                  <option value={mat.materialName}>{mat.materialName || "Pilih Bahan"}</option>
+                                )}
+                                {rabMaterials.map((rm) => (
+                                  <option key={rm.id || rm.name} value={rm.name}>
+                                    {rm.name} ({rm.unit})
+                                  </option>
+                                ))}
+                                {!rabMaterials.some((rm) => rm.name === mat.materialName) && mat.materialName && (
+                                  <option value={mat.materialName}>{mat.materialName}</option>
+                                )}
+                              </select>
+                            </td>
+
+                            {/* Volume Kebutuhan RAB */}
+                            <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                              {mat.plannedQuantity || "—"}
+                            </td>
+
+                            {/* Bahan Aktual RAP */}
+                            <td className="px-3 py-2 text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={mat.actualQuantity || ""}
+                                onChange={(e) =>
+                                  handleUpdateMaterial(idx, "actualQuantity", parseFloat(e.target.value) || 0)
+                                }
+                                placeholder="0"
+                                className="h-8 text-right text-xs font-bold"
+                              />
+                            </td>
+
+                            {/* Satuan */}
+                            <td className="px-3 py-2 text-muted-foreground font-medium">
+                              {mat.unit || "unit"}
+                            </td>
+
+                            {/* Harga Satuan RAP (Rp) */}
+                            <td className="px-3 py-2 text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="100"
+                                value={mat.unitPrice || ""}
+                                onChange={(e) =>
+                                  handleUpdateMaterial(idx, "unitPrice", parseFloat(e.target.value) || 0)
+                                }
+                                placeholder="0"
+                                className="h-8 text-right text-xs font-mono"
+                              />
+                            </td>
+
+                            {/* Subtotal RAP */}
+                            <td className="px-3 py-2 text-right font-mono font-bold text-foreground">
+                              Rp {lineTotal.toLocaleString("id-ID")}
+                            </td>
+
+                            {/* Hapus */}
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMaterial(idx)}
+                                className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* ================= TAB 2: JASA BORONGAN ================= */
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+                <Hammer className="size-4 shrink-0" />
+                <span>
+                  <strong>Skema Jasa Borongan:</strong> Tenaga kerja dan tukang diborongkan per item pekerjaan atau
+                  per mandor subkon. Masukkan nilai borongan jasa yang disepakati untuk tiap pekerjaan.
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-border/80">
+                <table className="w-full min-w-[780px] text-left text-xs">
+                  <thead className="border-b border-border bg-muted/40 font-semibold text-muted-foreground">
+                    <tr>
+                      <th className="px-3.5 py-2.5 w-64">Uraian Pekerjaan Borongan</th>
+                      <th className="px-3 py-2.5 text-right w-24">Volume</th>
+                      <th className="px-3 py-2.5 w-20">Satuan</th>
+                      <th className="px-3 py-2.5 text-right w-40">Nilai Borongan Jasa (Rp)</th>
+                      <th className="px-3 py-2.5 w-52">Mandor / Subkon Borongan</th>
+                      <th className="px-3 py-2.5 text-center w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {laborPlans.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                          Belum ada item jasa borongan. Klik <strong>Tambah Borongan</strong> untuk menambahkan.
+                        </td>
+                      </tr>
+                    ) : (
+                      laborPlans.map((labor, idx) => (
+                        <tr key={idx} className="hover:bg-muted/10 transition">
+                          {/* Nama Pekerjaan */}
+                          <td className="px-3.5 py-2">
+                            <Input
+                              type="text"
+                              value={labor.jobName}
+                              onChange={(e) => handleUpdateLabor(idx, "jobName", e.target.value)}
+                              placeholder="Nama pekerjaan borongan"
+                              className="h-8 text-xs font-semibold"
+                            />
+                          </td>
+
+                          {/* Volume */}
+                          <td className="px-3 py-2 text-right">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={labor.volume || ""}
+                              onChange={(e) =>
+                                handleUpdateLabor(idx, "volume", parseFloat(e.target.value) || 0)
+                              }
+                              className="h-8 text-right text-xs"
+                            />
+                          </td>
+
+                          {/* Satuan */}
+                          <td className="px-3 py-2">
+                            <Input
+                              type="text"
+                              value={labor.unit}
+                              onChange={(e) => handleUpdateLabor(idx, "unit", e.target.value)}
+                              placeholder="m / Ls"
+                              className="h-8 text-xs text-muted-foreground"
+                            />
+                          </td>
+
+                          {/* Total Borongan Jasa (Rp) */}
+                          <td className="px-3 py-2 text-right">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1000"
+                              value={labor.totalBorongan || ""}
+                              onChange={(e) =>
+                                handleUpdateLabor(idx, "totalBorongan", parseFloat(e.target.value) || 0)
+                              }
+                              placeholder="Rp 0"
+                              className="h-8 text-right text-xs font-mono font-bold text-amber-600 dark:text-amber-400"
+                            />
+                          </td>
+
+                          {/* Mandor / Subkon */}
+                          <td className="px-3 py-2">
+                            <Input
+                              type="text"
+                              value={labor.subkonName || ""}
+                              onChange={(e) => handleUpdateLabor(idx, "subkonName", e.target.value)}
+                              placeholder="Nama mandor / kelompok borongan"
+                              className="h-8 text-xs"
+                            />
+                          </td>
+
+                          {/* Hapus */}
+                          <td className="px-3 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLabor(idx)}
+                              className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Financial Summary Strip */}
+        <div className="border-t border-border/80 bg-muted/30 p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Total Bahan */}
+            <div className="rounded-xl border border-border/70 bg-card p-3">
+              <span className="text-[11px] font-medium text-muted-foreground">Total Bahan RAP</span>
+              <p className="mt-1 font-mono text-sm sm:text-base font-bold text-foreground">
+                Rp {totalMaterialCost.toLocaleString("id-ID")}
+              </p>
+            </div>
+
+            {/* Total Jasa Borongan */}
+            <div className="rounded-xl border border-border/70 bg-card p-3">
+              <span className="text-[11px] font-medium text-muted-foreground">Total Jasa Borongan</span>
+              <p className="mt-1 font-mono text-sm sm:text-base font-bold text-amber-600 dark:text-amber-400">
+                Rp {totalLaborCost.toLocaleString("id-ID")}
+              </p>
+            </div>
+
+            {/* Total RAP */}
+            <div className="rounded-xl border border-primary/40 bg-primary/5 p-3">
+              <span className="text-[11px] font-medium text-primary">Total RAP Pelaksanaan</span>
+              <p className="mt-1 font-mono text-sm sm:text-base font-extrabold text-foreground">
+                Rp {totalRap.toLocaleString("id-ID")}
+              </p>
+            </div>
+
+            {/* Estimasi Keuntungan / Margin */}
+            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-3">
+              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                <span>Rencana Laba Proyek</span>
+                <span className="font-bold">({profitMarginPercent}%)</span>
+              </span>
+              <p className="mt-1 font-mono text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400">
+                Rp {profitAmount.toLocaleString("id-ID")}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Buttons */}
+        <div className="flex items-center justify-between border-t border-border/80 p-4 bg-card">
+          <span className="text-xs text-muted-foreground">
+            Total RAB Kontrak: <strong>Rp {paguRab.toLocaleString("id-ID")}</strong>
+          </span>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={isPending || isLoading}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+            >
+              {isPending ? "Menyimpan RAP..." : "Simpan RAP ke Database"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

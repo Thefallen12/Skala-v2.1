@@ -8,7 +8,11 @@ import {
   createEquipmentLog,
   createEquipmentMaster,
 } from "@/app/actions/construction";
-import { submitPurchaseOrderForFinanceReview } from "@/app/actions/orders";
+import {
+  submitPurchaseOrderForFinanceReview,
+  reviewPurchaseOrder,
+  approvePurchaseOrder,
+} from "@/app/actions/orders";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
 import DocumentSignoffQueue, {
   type DocumentSignoffTask,
@@ -68,6 +72,7 @@ import {
   CheckCircle2,
   Clock3,
   Eye,
+  FileCheck2,
   FilePenLine,
   FileText,
   Fuel,
@@ -268,6 +273,40 @@ export default function LogisticsHub({
       }
     });
   };
+
+  const handleReviewPO = (publicCode: string) => {
+    setPurchaseOrderMessage("");
+    setPurchaseOrderMessageIsError(false);
+    startTransition(async () => {
+      try {
+        const result = await reviewPurchaseOrder(publicCode);
+        setPurchaseOrderMessage(result.message);
+        setPurchaseOrderMessageIsError(!result.success);
+        if (result.success) router.refresh();
+      } catch (error) {
+        console.error("PO finance review failed:", error);
+        setPurchaseOrderMessage("Pemeriksaan PO gagal. Silakan coba kembali.");
+        setPurchaseOrderMessageIsError(true);
+      }
+    });
+  };
+
+  const handleApprovePO = (publicCode: string) => {
+    setPurchaseOrderMessage("");
+    setPurchaseOrderMessageIsError(false);
+    startTransition(async () => {
+      try {
+        const result = await approvePurchaseOrder(publicCode);
+        setPurchaseOrderMessage(result.message);
+        setPurchaseOrderMessageIsError(!result.success);
+        if (result.success) router.refresh();
+      } catch (error) {
+        console.error("PO approval failed:", error);
+        setPurchaseOrderMessage("Persetujuan PO gagal. Silakan coba kembali.");
+        setPurchaseOrderMessageIsError(true);
+      }
+    });
+  };
   const openDocumentPreview = (document: NonNullable<DocumentSelection>) => {
     setSelection(document);
   };
@@ -449,6 +488,22 @@ export default function LogisticsHub({
                       <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString("id-ID")}
                       </p>
+                      {/* Timeline flow helper */}
+                      {order.status === POStatus.PENDING_FINANCE_REVIEW && (
+                        <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Menunggu pemeriksaan Keuangan (Checked By)
+                        </p>
+                      )}
+                      {order.status === POStatus.PENDING_APPROVAL && (
+                        <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                          Menunggu persetujuan &amp; TTD Direktur
+                        </p>
+                      )}
+                      {order.status === POStatus.DRAFT && (
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">
+                          Draft PO (Klik Ajukan ke Keuangan)
+                        </p>
+                      )}
                       {!order.ticketId && order.paidAt && (
                         <div className="mt-2 space-y-1">
                           <Badge variant={order.receivedAt ? "success" : "warning"}>
@@ -515,13 +570,50 @@ export default function LogisticsHub({
                           )}
                         </>
                       ) : order.status !== POStatus.APPROVED ? (
-                        <div className="flex w-12 flex-col items-center">
-                          <ActionIconButton
-                            label="Lihat PO"
-                            tooltip="Lihat PO"
-                            icon={Eye}
-                            href={`/d/${encodeURIComponent(order.publicCode)}`}
-                          />
+                        <div className="flex flex-nowrap items-center gap-1.5">
+                          <div className="flex w-10 flex-col items-center">
+                            <ActionIconButton
+                              label="Lihat PO"
+                              tooltip="Lihat Detail PO"
+                              icon={Eye}
+                              href={`/d/${encodeURIComponent(order.publicCode)}`}
+                            />
+                          </div>
+                          {order.status === POStatus.PENDING_FINANCE_REVIEW &&
+                            (role === UserRole.FINANCE ||
+                              role === UserRole.ADMINISTRATIONS ||
+                              role === UserRole.DIRECTOR ||
+                              role === UserRole.DEPUTY_DIRECTOR) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1 rounded-md border-amber-500/50 px-2 text-xs text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/40"
+                                onClick={() => handleReviewPO(order.publicCode)}
+                                disabled={isPending}
+                                title="Verifikasi PO (Keuangan)"
+                              >
+                                <FileCheck2 className="size-3.5" />
+                                <span>Verifikasi</span>
+                              </Button>
+                            )}
+                          {order.status === POStatus.PENDING_APPROVAL &&
+                            (role === UserRole.DIRECTOR ||
+                              role === UserRole.DEPUTY_DIRECTOR ||
+                              role === UserRole.ADMINISTRATIONS) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1 rounded-md border-emerald-500/50 px-2 text-xs text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40"
+                                onClick={() => handleApprovePO(order.publicCode)}
+                                disabled={isPending}
+                                title="Setujui PO (Direktur)"
+                              >
+                                <CheckCircle2 className="size-3.5" />
+                                <span>Setujui</span>
+                              </Button>
+                            )}
                         </div>
                       ) : role === UserRole.LOGISTICS ? (
                         <>
@@ -585,28 +677,29 @@ export default function LogisticsHub({
                         )}
                         {order.status !== POStatus.APPROVED && (
                           <Badge
-                            className="h-6 shrink-0 whitespace-nowrap px-2 text-[0.6875rem]"
+                            className={`h-7 shrink-0 whitespace-nowrap px-2.5 text-xs font-medium gap-1.5 ${
+                              order.status === POStatus.PENDING_FINANCE_REVIEW
+                                ? "border-amber-500/40 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                                : order.status === POStatus.PENDING_APPROVAL
+                                  ? "border-blue-500/40 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                                  : order.status === POStatus.REJECTED
+                                    ? "border-rose-500/40 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                                    : "border-slate-300 bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            }`}
                             variant="outline"
                           >
-                            {order.status === POStatus.PENDING_FINANCE_REVIEW ? (
-                              <>
-                                <Clock3 className="size-4" aria-hidden="true" />
-                                <span className="sr-only">Menunggu Keuangan</span>
-                              </>
-                            )
-                              : order.status === POStatus.PENDING_APPROVAL ? (
-                                <>
-                                  <Clock3 className="size-4" aria-hidden="true" />
-                                  <span className="sr-only">
-                                    Menunggu Persetujuan Direksi
-                                  </span>
-                                </>
-                              )
-                                : order.status === POStatus.REJECTED
-                                  ? "Ditolak"
-                                  : order.status === POStatus.CANCELLED
-                                    ? "Dibatalkan"
-                                    : "Draft"}
+                            <Clock3 className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span>
+                              {order.status === POStatus.PENDING_FINANCE_REVIEW
+                                ? "Menunggu Keuangan"
+                                : order.status === POStatus.PENDING_APPROVAL
+                                  ? "Menunggu Direktur"
+                                  : order.status === POStatus.REJECTED
+                                    ? "Ditolak"
+                                    : order.status === POStatus.CANCELLED
+                                      ? "Dibatalkan"
+                                      : "Draft"}
+                            </span>
                           </Badge>
                         )}
                         {order.status === POStatus.APPROVED && !order.vendorPoSentAt && (

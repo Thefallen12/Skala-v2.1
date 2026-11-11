@@ -522,7 +522,10 @@ export default async function LogisticsPage({
           in: [
             POStatus.DRAFT,
             POStatus.PENDING_FINANCE_REVIEW,
+            POStatus.PENDING_APPROVAL,
             POStatus.APPROVED,
+            POStatus.REJECTED,
+            POStatus.CANCELLED,
           ],
         },
       },

@@ -4238,6 +4238,7 @@ export async function createLogisticsPurchaseOrderForTicket(
             .filter(Boolean)
             .join(" - "),
           includeTax: payment.includeTax ?? false,
+          status: POStatus.PENDING_FINANCE_REVIEW,
           createdById: session.user.id,
           ticketId,
           items: {

@@ -658,3 +658,322 @@ export function ProjectPrintProgressView({
     </div>
   );
 }
+
+// =========================================================================
+// 3. CETAK JADWAL PROYEK (Matching Image media_1794381659449_48c313f1.png)
+// =========================================================================
+export interface ProjectPrintScheduleTask {
+  id: string;
+  title: string;
+  location: string; // Fase, e.g. "A. Persiapan"
+  plannedStartDate: string | null;
+  targetDate: string | null;
+  progress: number;
+  dependencies?: string | null;
+}
+
+export interface ProjectPrintScheduleProps {
+  project: {
+    id: string;
+    title: string;
+    code?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    progress: number;
+  };
+  tasks: ProjectPrintScheduleTask[];
+  totalWeeks?: number;
+  onBack: () => void;
+}
+
+export function ProjectPrintScheduleView({
+  project,
+  tasks,
+  totalWeeks = 8,
+  onBack,
+}: ProjectPrintScheduleProps) {
+  const currentDateFormatted = new Date().toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  const weeksCount = Math.max(4, Math.min(24, totalWeeks));
+  const weekNumbers = Array.from({ length: weeksCount }, (_, i) => i + 1);
+
+  // Group tasks by phase/location
+  const phaseOrder: string[] = [];
+  const tasksByPhase = new Map<string, ProjectPrintScheduleTask[]>();
+
+  for (const t of tasks) {
+    const phase = t.location?.trim() || "A. Pekerjaan Utama";
+    if (!tasksByPhase.has(phase)) {
+      phaseOrder.push(phase);
+      tasksByPhase.set(phase, []);
+    }
+    tasksByPhase.get(phase)!.push(t);
+  }
+
+  // Calculate task status label
+  const getTaskStatus = (prog: number) => {
+    if (prog >= 100) return "Selesai";
+    if (prog > 0) return "Berjalan";
+    return "Belum mulai";
+  };
+
+  // Helper to estimate week span for gantt bar
+  const getTaskWeekSpan = (task: ProjectPrintScheduleTask, index: number) => {
+    // If dates are provided, compute relative to project startDate
+    if (task.plannedStartDate && project.startDate) {
+      try {
+        const pStart = new Date(project.startDate).getTime();
+        const tStart = new Date(task.plannedStartDate).getTime();
+        const tEnd = task.targetDate ? new Date(task.targetDate).getTime() : tStart + 7 * 86400000;
+        const startW = Math.max(1, Math.min(weeksCount, Math.floor((tStart - pStart) / (7 * 86400000)) + 1));
+        const endW = Math.max(startW, Math.min(weeksCount, Math.ceil((tEnd - pStart) / (7 * 86400000))));
+        return { startWeek: startW, endWeek: endW };
+      } catch {
+        // fallback
+      }
+    }
+    // Fallback: stagger tasks evenly
+    const spanStart = Math.min(weeksCount, Math.max(1, (index % weeksCount) + 1));
+    const spanEnd = Math.min(weeksCount, spanStart + (index === 0 ? 0 : index === 1 ? 2 : 2));
+    return { startWeek: spanStart, endWeek: spanEnd };
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 print:bg-white print:p-0">
+      {/* Top action bar (hidden on print) */}
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur-xs print:hidden">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onBack}
+            className="gap-2 text-sm text-slate-600 hover:text-slate-900"
+          >
+            <ArrowLeft className="size-4" />
+            Kembali ke Jadwal proyek
+          </Button>
+
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => window.print()}
+            className="gap-2 rounded-lg bg-slate-900 text-xs font-semibold text-white shadow-xs hover:bg-slate-800"
+          >
+            <Printer className="size-3.5" />
+            Cetak / PDF
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Print Container */}
+      <main className="mx-auto max-w-6xl p-6 sm:p-10 print:p-0">
+        {/* Title Header */}
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-slate-500">Skala-prioritas</p>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950">
+            Jadwal proyek · {project.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs text-slate-600">
+            <span>
+              Dicetak: <strong className="text-slate-800">{currentDateFormatted}</strong>
+            </span>
+            <span>
+              Total task: <strong className="text-slate-800">{tasks.length}</strong>
+            </span>
+            <span>
+              Rentang: <strong className="text-slate-800">{weeksCount} minggu</strong>
+            </span>
+            <span>
+              Progres keseluruhan: <strong className="text-slate-800">{Math.round(project.progress)}%</strong>
+            </span>
+            <span>
+              Mulai proyek: <strong className="text-slate-800">{formatDateIndo(project.startDate)}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div className="my-5 border-b border-slate-200" />
+
+        {/* 1. Table of Tasks */}
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-700">
+              <tr>
+                <th className="px-3.5 py-2.5">Task</th>
+                <th className="px-3.5 py-2.5">Fase</th>
+                <th className="px-3.5 py-2.5">Mulai</th>
+                <th className="px-3.5 py-2.5">Selesai</th>
+                <th className="px-3.5 py-2.5 text-center">Progres</th>
+                <th className="px-3.5 py-2.5">Status</th>
+                <th className="px-3.5 py-2.5">Tergantung pada</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-normal text-slate-800">
+              {tasks.map((task) => (
+                <tr key={task.id} className="hover:bg-slate-50/60">
+                  <td className="px-3.5 py-2 font-medium text-slate-950">{task.title}</td>
+                  <td className="px-3.5 py-2 text-slate-600">{task.location}</td>
+                  <td className="px-3.5 py-2 whitespace-nowrap text-slate-600">
+                    {formatDateIndo(task.plannedStartDate)}
+                  </td>
+                  <td className="px-3.5 py-2 whitespace-nowrap text-slate-600">
+                    {formatDateIndo(task.targetDate)}
+                  </td>
+                  <td className="px-3.5 py-2 text-center font-medium">
+                    {Math.round(task.progress)}%
+                  </td>
+                  <td className="px-3.5 py-2">
+                    <span
+                      className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                        task.progress >= 100
+                          ? "bg-emerald-50 text-emerald-700"
+                          : task.progress > 0
+                            ? "bg-blue-50 text-blue-700"
+                            : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {getTaskStatus(task.progress)}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-2 text-slate-400">
+                    {task.dependencies || "—"}
+                  </td>
+                </tr>
+              ))}
+              {tasks.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-slate-400">
+                    Belum ada task dalam jadwal proyek ini.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 2. Timeline (per minggu) Gantt View */}
+        <div className="mt-8 space-y-3">
+          <h2 className="text-sm font-bold text-slate-900">Timeline (per minggu)</h2>
+
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                  <th className="w-72 border-r border-slate-200 px-3.5 py-2.5 font-semibold text-slate-700">
+                    Task
+                  </th>
+                  {weekNumbers.map((w) => (
+                    <th
+                      key={w}
+                      className="border-r border-slate-100 px-2 py-2.5 text-center font-semibold text-slate-600 last:border-r-0"
+                    >
+                      {w}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
+                {phaseOrder.map((phase) => {
+                  const phaseTasks = tasksByPhase.get(phase) || [];
+                  return (
+                    <React.Fragment key={phase}>
+                      {/* Phase Header row */}
+                      <tr className="bg-slate-50/70">
+                        <td
+                          colSpan={weeksCount + 1}
+                          className="px-3.5 py-1.5 text-[11px] font-bold text-slate-700"
+                        >
+                          {phase}
+                        </td>
+                      </tr>
+
+                      {/* Tasks under this phase */}
+                      {phaseTasks.map((task, tIndex) => {
+                        const globalIndex = tasks.findIndex((t) => t.id === task.id);
+                        const { startWeek, endWeek } = getTaskWeekSpan(task, globalIndex >= 0 ? globalIndex : tIndex);
+                        const spanLength = Math.max(1, endWeek - startWeek + 1);
+
+                        return (
+                          <tr key={task.id} className="hover:bg-slate-50/40">
+                            <td className="border-r border-slate-200 px-3.5 py-2 font-medium text-slate-900">
+                              <span className="block truncate max-w-64" title={task.title}>
+                                {task.title}
+                              </span>
+                            </td>
+
+                            {weekNumbers.map((w) => {
+                              // If current week is start of the span, render the bar with colSpan
+                              if (w === startWeek) {
+                                return (
+                                  <td
+                                    key={w}
+                                    colSpan={spanLength}
+                                    className="border-r border-slate-100 px-1 py-1.5 text-center align-middle"
+                                  >
+                                    <div className="relative h-6 w-full overflow-hidden rounded-md bg-slate-200">
+                                      {/* Completed Progress Bar */}
+                                      <div
+                                        className="h-full rounded-md bg-slate-800 transition-all"
+                                        style={{ width: `${Math.min(100, Math.max(0, task.progress))}%` }}
+                                      />
+                                      {/* Bar label if space allows */}
+                                      {task.progress > 0 && (
+                                        <span className="absolute inset-0 flex items-center justify-start pl-2 text-[10px] font-bold text-white">
+                                          {Math.round(task.progress)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              }
+                              // Skip cells that are swallowed by colSpan
+                              if (w > startWeek && w <= endWeek) {
+                                return null;
+                              }
+                              // Empty week cell
+                              return (
+                                <td
+                                  key={w}
+                                  className="border-r border-slate-100 px-2 py-2 text-center text-slate-300 last:border-r-0"
+                                >
+                                  ·
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer print signature strip */}
+        <div className="mt-12 hidden print:grid grid-cols-3 gap-8 text-center text-xs text-slate-600">
+          <div>
+            <p>Dibuat oleh</p>
+            <div className="h-16" />
+            <div className="border-t border-slate-800 pt-1 font-bold text-slate-900">Skala-prioritas</div>
+          </div>
+          <div>
+            <p>Diperiksa oleh</p>
+            <div className="h-16" />
+            <div className="border-t border-slate-800 pt-1 font-mono text-slate-500">(....................)</div>
+          </div>
+          <div>
+            <p>Disetujui oleh</p>
+            <div className="h-16" />
+            <div className="border-t border-slate-800 pt-1 font-bold text-slate-900">Manajer Proyek</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

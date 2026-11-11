@@ -656,6 +656,9 @@ model Project {
   vehicleFuelRequests VehicleFuelRequest[]
   addendums           ProjectAddendum[]
   bastDocuments       BASTDocument[]
+  materialPlans       ProjectMaterialPlan[]
+  rabMaterials        ProjectRabMaterial[]
+  laborPlans          ProjectLaborPlan[]
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -812,6 +815,61 @@ model ProjectWorkPoint {
 
   @@index([projectId, createdAt])
   @@index([proposedById])
+}
+
+// Master Bahan dari Upload RAB (analisa / daftar bahan RAB)
+model ProjectRabMaterial {
+  id        String   @id @default(cuid()) @map("_id")
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  unit      String
+  category  String?  @default("BAHAN")
+  rabPrice  BigInt?  @default(0)
+  quantity  Float?   @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, name])
+}
+
+// Bahan RAP yang diisi Tim ADM / Manajer Proyek
+model ProjectMaterialPlan {
+  id              String   @id @default(cuid()) @map("_id")
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workPointId     String?
+  materialName    String
+  unit            String
+  plannedQuantity Float    @default(0) // Kebutuhan dari analisa RAB
+  actualQuantity  Float    @default(0) // Bahan Aktual yang diisi Tim ADM / PM
+  unitPrice       BigInt   @default(0) // Harga satuan RAP beli
+  totalPrice      BigInt   @default(0) // Total biaya bahan RAP
+  scope           String   @default("ALL")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+// Jasa Borongan RAP ("Untuk Jasa Kita Borongkan")
+model ProjectLaborPlan {
+  id            String   @id @default(cuid()) @map("_id")
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workPointId   String?  // Id item pekerjaan RAB terkait
+  jobName       String   // Uraian pekerjaan borongan
+  volume        Float    @default(1)
+  unit          String   @default("paket")
+  boronganRate  BigInt   @default(0) // Harga borongan per unit
+  totalBorongan BigInt   @default(0) // Total upah jasa borongan
+  subkonName    String?  // Nama mandor / subkon / kelompok kerja borongan
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
 }
 
 model Blueprint {

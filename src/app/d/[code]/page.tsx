@@ -287,10 +287,16 @@ export default async function OrderEditPage({
           }
           initialPreviewOpen={query.preview === "1"}
           canEdit={canEditPurchaseOrder(session.user.role)}
-          canReview={session.user.role === UserRole.FINANCE}
-          canApprove={
+          canReview={
+            session.user.role === UserRole.FINANCE ||
+            session.user.role === UserRole.ADMINISTRATIONS ||
             session.user.role === UserRole.DIRECTOR ||
             session.user.role === UserRole.DEPUTY_DIRECTOR
+          }
+          canApprove={
+            session.user.role === UserRole.DIRECTOR ||
+            session.user.role === UserRole.DEPUTY_DIRECTOR ||
+            session.user.role === UserRole.ADMINISTRATIONS
           }
           createdAt={purchaseOrder.createdAt.toLocaleDateString("id-ID")}
           logisticsStaffName={purchaseOrder.createdBy?.name}

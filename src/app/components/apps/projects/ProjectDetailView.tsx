@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ApexOptions } from "apexcharts";
 import {
+  Calculator,
   AlertTriangle,
   ArrowLeft,
   BookmarkCheck,
@@ -41,6 +42,7 @@ import {
   ShoppingCart,
   Trash2,
   User,
+  WalletCards,
   X,
 } from "lucide-react";
 import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
@@ -66,6 +68,7 @@ import {
   saveProjectScheduleTask,
 } from "@/app/actions/project";
 import EditRabModal, { type EditableRabItem } from "./EditRabModal";
+import RapManagementModal from "./RapManagementModal";
 import ProjectScheduleGantt, { type ScheduleMilestoneItem } from "./ProjectScheduleGantt";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
 import ProgressScheduleRows, { type ProgressScheduleItem } from "./ProgressScheduleRows";
@@ -203,6 +206,7 @@ export default function ProjectDetailView({
   const [isOpnameModalOpen, setIsOpnameModalOpen] = useState(false);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [isAnalisaModalOpen, setIsAnalisaModalOpen] = useState(false);
+  const [isRapModalOpen, setIsRapModalOpen] = useState(false);
   const [selectedAnalisaItem, setSelectedAnalisaItem] = useState<{
     id?: string;
     title: string;
@@ -896,58 +900,90 @@ export default function ProjectDetailView({
         </div>
       </div>
 
-      {/* 4. 5-Column Metadata Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <MapPin className="size-3.5 shrink-0" />
-            <span>Alamat proyek</span>
-          </div>
-          <p className="mt-1 line-clamp-1 text-xs font-bold text-foreground">
-            {project.address || project.location || "Belum diisi"}
-          </p>
-        </div>
+      {/* 4. 6-Column Metadata Cards */}
+      {(() => {
+        const totalRequestedFunds = (project.wageTicketPayments || []).reduce(
+          (sum, p) => sum + (p.status !== "REJECTED" ? Number(p.amount || 0) : 0),
+          0,
+        );
+        const totalPaidFunds = (project.wageTicketPayments || []).reduce(
+          (sum, p) => sum + (p.paid ? Number(p.amount || 0) : 0),
+          0,
+        );
+        const effectiveRealized = Math.max(totalPaidFunds, Number(project.realized || 0));
+        const effectiveRequested = Math.max(totalRequestedFunds, effectiveRealized);
 
-        <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <User className="size-3.5 shrink-0" />
-            <span>Manajer / PM</span>
-          </div>
-          <p className="mt-1 line-clamp-1 text-xs font-bold text-foreground">
-            {project.fieldPicName || "Belum ditentukan"}
-          </p>
-        </div>
+        return (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0" />
+                <span>Alamat proyek</span>
+              </div>
+              <p className="mt-1 line-clamp-1 text-xs font-bold text-foreground">
+                {project.address || project.location || "Belum diisi"}
+              </p>
+            </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Calendar className="size-3.5 shrink-0" />
-            <span>Mulai</span>
-          </div>
-          <p className="mt-1 text-xs font-bold text-foreground">
-            {formatDateIndo(project.startDate)}
-          </p>
-        </div>
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <User className="size-3.5 shrink-0" />
+                <span>Manajer / PM</span>
+              </div>
+              <p className="mt-1 line-clamp-1 text-xs font-bold text-foreground">
+                {project.fieldPicName || "Belum ditentukan"}
+              </p>
+            </div>
 
-        <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Calendar className="size-3.5 shrink-0" />
-            <span>Selesai</span>
-          </div>
-          <p className="mt-1 text-xs font-bold text-foreground">
-            {formatDateIndo(project.endDate)}
-          </p>
-        </div>
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="size-3.5 shrink-0" />
+                <span>Mulai</span>
+              </div>
+              <p className="mt-1 text-xs font-bold text-foreground">
+                {formatDateIndo(project.startDate)}
+              </p>
+            </div>
 
-        <div className="col-span-2 rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs sm:col-span-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Coins className="size-3.5 shrink-0" />
-            <span>Nilai kontrak</span>
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Calendar className="size-3.5 shrink-0" />
+                <span>Selesai</span>
+              </div>
+              <p className="mt-1 text-xs font-bold text-foreground">
+                {formatDateIndo(project.endDate)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Coins className="size-3.5 shrink-0" />
+                <span>Nilai kontrak</span>
+              </div>
+              <p className="mt-1 text-xs font-bold text-foreground">
+                {currency(totalRabNumber)}
+              </p>
+            </div>
+
+            <div className="col-span-2 rounded-xl border border-amber-500/30 bg-card p-3.5 shadow-2xs sm:col-span-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <WalletCards className="size-3.5 shrink-0 text-amber-500" />
+                <span className="truncate">Penggunaan dana (Request)</span>
+              </div>
+              <p className="mt-1 text-xs font-bold text-amber-600 dark:text-amber-400">
+                {currency(effectiveRequested)}
+              </p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {effectiveRealized > 0
+                  ? `Realisasi cair: ${currency(effectiveRealized)}`
+                  : totalRabNumber > 0 && effectiveRequested > 0
+                    ? `${Math.round((effectiveRequested / totalRabNumber) * 100)}% dari kontrak`
+                    : "Belum ada pencairan"}
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-xs font-bold text-foreground">
-            {currency(totalRabNumber)}
-          </p>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 5. Main Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1391,13 +1427,24 @@ export default function ProjectDetailView({
               </div>
 
               {/* RAP and Profit info */}
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>
-                  RAP dari RAB: <strong className="text-foreground">{currency(totalRapNumber)}</strong> · RAP proyek saat ini <strong className="text-foreground">{currency(totalRapNumber)}</strong>
-                </p>
-                <p>
-                  Rencana laba: <strong className="text-emerald-600 dark:text-emerald-400">{currency(profitAmount)} ({profitPercent}%)</strong>
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  <p>
+                    Nilai Kontrak RAB (Pagu): <strong className="text-foreground">{currency(totalRabNumber)}</strong> · RAP Proyek: <strong className="text-foreground">{currency(totalRapNumber)}</strong>
+                  </p>
+                  <p>
+                    Estimasi Keuntungan: <strong className="text-emerald-600 dark:text-emerald-400">{currency(profitAmount)} ({profitPercent}%)</strong> · Skema Jasa: <strong className="text-amber-500">Upah Borongan</strong>
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setIsRapModalOpen(true)}
+                  className="h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+                >
+                  <Calculator className="size-3.5" />
+                  <span>Susun RAP (Bahan &amp; Jasa Borongan)</span>
+                </Button>
               </div>
 
               {/* Rencana Material Section (Image 2 & 5) */}
@@ -1419,6 +1466,15 @@ export default function ProjectDetailView({
                     >
                       <Printer className="size-3.5 text-muted-foreground" />
                       <span>Cetak</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setIsRapModalOpen(true)}
+                      className="h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+                    >
+                      <Calculator className="size-3.5" />
+                      <span>Susun Bahan &amp; Jasa RAP</span>
                     </Button>
                     <Button
                       type="button"
@@ -2089,6 +2145,16 @@ export default function ProjectDetailView({
             handleSaveAnalisaMaterial(selectedAnalisaItem.id, updatedMaterials);
           }
         }}
+      />
+
+      {/* Modal: Penyusunan RAP (Bahan dari Upload RAB & Jasa Borongan) */}
+      <RapManagementModal
+        isOpen={isRapModalOpen}
+        onClose={() => setIsRapModalOpen(false)}
+        projectId={project.id}
+        projectTitle={project.title}
+        paguRab={totalRabNumber}
+        onSuccess={() => router.refresh()}
       />
 
       {/* Modal: Unggah Dokumen (Vasco Image 6) */}

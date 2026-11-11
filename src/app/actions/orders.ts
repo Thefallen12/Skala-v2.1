@@ -297,7 +297,8 @@ function canEditPurchaseOrders(role: UserRole): boolean {
 function canApprovePurchaseOrders(role: UserRole): boolean {
   return (
     role === UserRole.DIRECTOR ||
-    role === UserRole.DEPUTY_DIRECTOR
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.ADMINISTRATIONS
   );
 }
 
@@ -465,6 +466,7 @@ export async function createPurchaseOrder(
               : null,
           paymentTerms: input.paymentTerms?.trim() || null,
           includeTax: input.includeTax ?? false,
+          status: POStatus.PENDING_FINANCE_REVIEW,
           items: {
             create: preparedItems.map((item) => ({
               ...item,
@@ -581,6 +583,7 @@ export async function updatePurchaseOrder(
               : null,
           paymentTerms: input.paymentTerms?.trim() || null,
           includeTax: input.includeTax ?? false,
+          status: POStatus.PENDING_FINANCE_REVIEW,
           items: {
             deleteMany: {},
             create: input.items.map((item) => ({
@@ -672,8 +675,13 @@ export async function reviewPurchaseOrder(
   publicCode: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
-  if (!session?.user || session.user.role !== UserRole.FINANCE) {
-    return fail("Hanya Manager Keuangan yang dapat memeriksa Purchase Order.");
+  const canReview =
+    session?.user?.role === UserRole.FINANCE ||
+    session?.user?.role === UserRole.ADMINISTRATIONS ||
+    session?.user?.role === UserRole.DIRECTOR ||
+    session?.user?.role === UserRole.DEPUTY_DIRECTOR;
+  if (!session?.user || !canReview) {
+    return fail("Hanya Manager Keuangan, Administrasi, atau Direktur yang dapat memeriksa Purchase Order.");
   }
   if (!validPublicCode(publicCode)) {
     return fail("Kode Purchase Order tidak valid.");
@@ -835,10 +843,18 @@ export async function approvePurchaseOrder(
       const update = await transaction.purchaseOrder.updateMany({
         where: {
           publicCode,
-          status: POStatus.PENDING_APPROVAL,
+          status: {
+            in: [
+              POStatus.PENDING_APPROVAL,
+              POStatus.PENDING_FINANCE_REVIEW,
+              POStatus.DRAFT,
+            ],
+          },
         },
         data: {
           status: POStatus.APPROVED,
+          reviewedById: session.user.id,
+          reviewedAt: approvalTime,
           approvedById: session.user.id,
           approvedAt: approvalTime,
         },

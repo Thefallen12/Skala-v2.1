@@ -26,7 +26,10 @@ import {
   decimalNumberFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
-import { parseDrtRabWorkbook } from "@/lib/drt-rab-parser";
+import {
+  parseDrtRabWorkbook,
+  getStandardAnalysisForWorkItem,
+} from "@/lib/drt-rab-parser";
 
 export type ProjectFinancialCategory = {
   key: "MATERIAL" | "LABOR" | "TRANSPORT" | "OPERATIONAL";
@@ -2226,7 +2229,7 @@ export async function applyRapAsBudget(
   try {
     await prisma.project.update({
       where: { id: projectId },
-      data: { budget: BigInt(Math.round(rapAmount * 100)) },
+      data: { budget: scaledIntegerFromDecimal(rapAmount) },
     });
 
     revalidatePath(`/apps/projects/${projectId}`);
@@ -2234,6 +2237,268 @@ export async function applyRapAsBudget(
   } catch (error) {
     console.error("Apply RAP as budget error:", error);
     return { success: false, message: "Gagal menyimpan RAP sebagai budget." };
+  }
+}
+
+/**
+ * Auto-populate daftar bahan yang di-upload dari RAB (analisa standar atau Excel)
+ */
+export async function populateProjectRabMaterialsFromWorkPoints(projectId: string) {
+  try {
+    const points = await prisma.projectWorkPoint.findMany({
+      where: { projectId },
+      select: { id: true, title: true, proposedVolume: true, proposedUnit: true },
+    });
+
+    const seen = new Set<string>();
+    const toInsert: Array<{ name: string; unit: string; quantity: number }> = [];
+
+    for (const pt of points) {
+      const analysis = getStandardAnalysisForWorkItem(pt.title);
+      const volNum = pt.proposedVolume ? decimalNumberFromScaledInteger(pt.proposedVolume) : 1;
+      for (const item of analysis) {
+        // Abaikan tenaga kerja (OH/Mandor) karena jasa diborongkan
+        const isLabor = /OH|OJ|Mandor|Pekerja|Tukang|Kepala/i.test(item.unit) || /Mandor|Pekerja|Tukang|Kepala/i.test(item.materialName);
+        if (isLabor) continue;
+
+        const key = `${item.materialName}_${item.unit}`.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          toInsert.push({
+            name: item.materialName.trim(),
+            unit: item.unit.trim(),
+            quantity: Math.round(volNum * (item.coefficient || 1) * 100) / 100,
+          });
+        }
+      }
+    }
+
+    for (const it of toInsert) {
+      await prisma.projectRabMaterial.create({
+        data: {
+          projectId,
+          name: it.name,
+          unit: it.unit,
+          category: "BAHAN",
+          quantity: it.quantity,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("Error populating rab materials from work points:", err);
+  }
+}
+
+/**
+ * Mengambil data RAP lengkap: bahan RAB untuk dropdown, bahan RAP, dan jasa borongan
+ */
+export async function getProjectRap(projectId: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk terlebih dahulu." };
+  }
+
+  // Ambil atau populate bahan RAB
+  let rabMaterials = await prisma.projectRabMaterial.findMany({
+    where: { projectId },
+    orderBy: { name: "asc" },
+  });
+
+  if (rabMaterials.length === 0) {
+    await populateProjectRabMaterialsFromWorkPoints(projectId);
+    rabMaterials = await prisma.projectRabMaterial.findMany({
+      where: { projectId },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  const materialPlans = await prisma.projectMaterialPlan.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const laborPlans = await prisma.projectLaborPlan.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const workPoints = await prisma.projectWorkPoint.findMany({
+    where: { projectId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      title: true,
+      location: true,
+      proposedVolume: true,
+      proposedUnit: true,
+      proposedUnitPrice: true,
+      proposedTotalWage: true,
+    },
+  });
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { pagu: true, budget: true, title: true },
+  });
+
+  return {
+    success: true,
+    rabMaterials: rabMaterials.map((m) => ({
+      id: m.id,
+      name: m.name,
+      unit: m.unit,
+      rabPrice: m.rabPrice ? decimalNumberFromScaledInteger(m.rabPrice) : 0,
+      quantity: m.quantity || 0,
+    })),
+    materialPlans: materialPlans.map((m) => ({
+      id: m.id,
+      materialName: m.materialName,
+      unit: m.unit,
+      plannedQuantity: m.plannedQuantity,
+      actualQuantity: m.actualQuantity,
+      unitPrice: decimalNumberFromScaledInteger(m.unitPrice),
+      totalPrice: decimalNumberFromScaledInteger(m.totalPrice),
+      scope: m.scope,
+      notes: m.notes || "",
+    })),
+    laborPlans: laborPlans.map((l) => ({
+      id: l.id,
+      workPointId: l.workPointId || "",
+      jobName: l.jobName,
+      volume: l.volume,
+      unit: l.unit,
+      boronganRate: decimalNumberFromScaledInteger(l.boronganRate),
+      totalBorongan: decimalNumberFromScaledInteger(l.totalBorongan),
+      subkonName: l.subkonName || "",
+      notes: l.notes || "",
+    })),
+    workPoints: workPoints.map((wp) => ({
+      id: wp.id,
+      title: wp.title,
+      location: wp.location || "Pekerjaan Utama",
+      volume: wp.proposedVolume ? decimalNumberFromScaledInteger(wp.proposedVolume) : 1,
+      unit: wp.proposedUnit || "paket",
+      totalRab: Number(wp.proposedTotalWage),
+    })),
+    totalRab: project?.pagu ? decimalNumberFromScaledInteger(project.pagu) : 0,
+    totalBudget: project?.budget ? decimalNumberFromScaledInteger(project.budget) : 0,
+  };
+}
+
+/**
+ * Menyimpan data Bahan RAP dan Jasa Borongan RAP yang diisi Tim ADM / Manajer Proyek
+ */
+export async function saveProjectRap(
+  projectId: string,
+  input: {
+    materialPlans: Array<{
+      id?: string;
+      materialName: string;
+      unit: string;
+      plannedQuantity?: number;
+      actualQuantity: number;
+      unitPrice: number;
+      scope?: string;
+      notes?: string;
+    }>;
+    laborPlans: Array<{
+      id?: string;
+      workPointId?: string;
+      jobName: string;
+      volume: number;
+      unit: string;
+      boronganRate: number;
+      totalBorongan: number;
+      subkonName?: string;
+      notes?: string;
+    }>;
+  },
+): Promise<ProjectMutationResult & { totalRap?: number; totalMaterial?: number; totalLabor?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk terlebih dahulu." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    let totalMaterial = 0;
+    let totalLabor = 0;
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Simpan Bahan RAP
+      await tx.projectMaterialPlan.deleteMany({ where: { projectId } });
+
+      for (const m of input.materialPlans) {
+        if (!m.materialName?.trim()) continue;
+        const actualQty = Math.max(0, m.actualQuantity || 0);
+        const unitP = Math.max(0, m.unitPrice || 0);
+        const lineTotal = Math.round(actualQty * unitP);
+        totalMaterial += lineTotal;
+
+        await tx.projectMaterialPlan.create({
+          data: {
+            projectId,
+            materialName: m.materialName.trim(),
+            unit: m.unit || "unit",
+            plannedQuantity: m.plannedQuantity || 0,
+            actualQuantity: actualQty,
+            unitPrice: scaledIntegerFromDecimal(unitP),
+            totalPrice: scaledIntegerFromDecimal(lineTotal),
+            scope: m.scope || "ALL",
+            notes: m.notes?.trim() || null,
+          },
+        });
+      }
+
+      // 2. Simpan Jasa Borongan ("Untuk Jasa Kita Borongkan")
+      await tx.projectLaborPlan.deleteMany({ where: { projectId } });
+
+      for (const l of input.laborPlans) {
+        if (!l.jobName?.trim()) continue;
+        const vol = Math.max(0, l.volume || 1);
+        const rate = Math.max(0, l.boronganRate || 0);
+        const lineTotal = l.totalBorongan > 0 ? l.totalBorongan : Math.round(vol * rate);
+        totalLabor += lineTotal;
+
+        await tx.projectLaborPlan.create({
+          data: {
+            projectId,
+            workPointId: l.workPointId || null,
+            jobName: l.jobName.trim(),
+            volume: vol,
+            unit: l.unit || "paket",
+            boronganRate: scaledIntegerFromDecimal(rate),
+            totalBorongan: scaledIntegerFromDecimal(lineTotal),
+            subkonName: l.subkonName?.trim() || null,
+            notes: l.notes?.trim() || null,
+          },
+        });
+      }
+
+      // 3. Update Total RAP (Budget) Proyek
+      const totalRap = totalMaterial + totalLabor;
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          budget: scaledIntegerFromDecimal(totalRap),
+        },
+      });
+    });
+
+    const grandTotalRap = totalMaterial + totalLabor;
+    revalidatePath(`/apps/projects/${projectId}`);
+    return {
+      success: true,
+      message: `RAP berhasil disimpan: Bahan Rp ${totalMaterial.toLocaleString("id-ID")}, Jasa Borongan Rp ${totalLabor.toLocaleString("id-ID")} (Total RAP: Rp ${grandTotalRap.toLocaleString("id-ID")}).`,
+      totalRap: grandTotalRap,
+      totalMaterial,
+      totalLabor,
+    };
+  } catch (error) {
+    console.error("Save project RAP error:", error);
+    return { success: false, message: "Gagal menyimpan RAP proyek." };
   }
 }
 
@@ -2314,6 +2579,26 @@ export async function importDrtRabProject(input: {
         replaceExisting: true,
       });
 
+      // Simpan bahan-bahan dari RAB ke ProjectRabMaterial agar bisa dipilih di dropdown RAP
+      if (parsed.materials && parsed.materials.length > 0) {
+        await prisma.projectRabMaterial.deleteMany({ where: { projectId } });
+        for (const m of parsed.materials) {
+          if (!m.name?.trim()) continue;
+          await prisma.projectRabMaterial.create({
+            data: {
+              projectId,
+              name: m.name.trim(),
+              unit: m.unit || "unit",
+              category: "BAHAN",
+              rabPrice: m.unitPrice ? scaledIntegerFromDecimal(m.unitPrice) : null,
+              quantity: m.quantity || 0,
+            },
+          });
+        }
+      } else {
+        await populateProjectRabMaterialsFromWorkPoints(projectId);
+      }
+
       revalidatePath(`/apps/projects/${projectId}`);
       revalidatePath("/apps/projects");
       return {
@@ -2361,6 +2646,26 @@ export async function importDrtRabProject(input: {
         items: parsed.workItems,
         replaceExisting: false,
       });
+
+      // Simpan bahan-bahan dari RAB ke ProjectRabMaterial agar bisa dipilih di dropdown RAP
+      if (parsed.materials && parsed.materials.length > 0) {
+        await prisma.projectRabMaterial.deleteMany({ where: { projectId } });
+        for (const m of parsed.materials) {
+          if (!m.name?.trim()) continue;
+          await prisma.projectRabMaterial.create({
+            data: {
+              projectId,
+              name: m.name.trim(),
+              unit: m.unit || "unit",
+              category: "BAHAN",
+              rabPrice: m.unitPrice ? scaledIntegerFromDecimal(m.unitPrice) : null,
+              quantity: m.quantity || 0,
+            },
+          });
+        }
+      } else {
+        await populateProjectRabMaterialsFromWorkPoints(projectId);
+      }
 
       revalidatePath("/apps/projects");
       return {
