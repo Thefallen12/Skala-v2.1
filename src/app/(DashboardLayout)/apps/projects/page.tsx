@@ -343,7 +343,11 @@ export default async function ProjectsWorkstationPage({
     realized: realizedMap?.get(project.id)?.total.toString() ?? "0",
     reports: project.dailyReports.map((report) => ({
       id: report.id,
-      reportDate: report.reportDate.toISOString().slice(0, 10),
+      reportDate: report.reportDate
+        ? typeof report.reportDate === "string"
+          ? (report.reportDate as string).slice(0, 10)
+          : report.reportDate.toISOString().slice(0, 10)
+        : "",
       weather: report.weather,
       workersCount: report.workersCount,
       progress: report.progress,
@@ -357,8 +361,16 @@ export default async function ProjectsWorkstationPage({
       id: point.id,
       title: point.title,
       location: point.location,
-      plannedStartDate: point.plannedStartDate?.toISOString().slice(0, 10) ?? null,
-      targetDate: point.targetDate?.toISOString().slice(0, 10) ?? null,
+      plannedStartDate: point.plannedStartDate
+        ? typeof point.plannedStartDate === "string"
+          ? (point.plannedStartDate as string).slice(0, 10)
+          : point.plannedStartDate.toISOString().slice(0, 10)
+        : null,
+      targetDate: point.targetDate
+        ? typeof point.targetDate === "string"
+          ? (point.targetDate as string).slice(0, 10)
+          : point.targetDate.toISOString().slice(0, 10)
+        : null,
       progress: point.progress,
       proposedVolume:
         point.proposedVolume !== null
@@ -381,13 +393,21 @@ export default async function ProjectsWorkstationPage({
         oldWage: decimalStringFromScaledInteger(log.oldWage),
         newWage: decimalStringFromScaledInteger(log.newWage),
         reason: log.reason,
-        createdAt: log.createdAt.toISOString(),
-        changedByName: log.changedBy.name,
+        createdAt: log.createdAt
+          ? typeof log.createdAt === "string"
+            ? log.createdAt
+            : log.createdAt.toISOString()
+          : new Date().toISOString(),
+        changedByName: log.changedBy?.name ?? "Admin",
       })),
       progressReports: [
         ...point.progressReports.map((report) => ({
           id: report.id,
-          reportDate: report.reportDate.toISOString().slice(0, 10),
+          reportDate: report.reportDate
+            ? typeof report.reportDate === "string"
+              ? (report.reportDate as string).slice(0, 10)
+              : report.reportDate.toISOString().slice(0, 10)
+            : "",
           progress: report.progress,
           workSummary: report.workSummary,
           photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
@@ -399,7 +419,11 @@ export default async function ProjectsWorkstationPage({
           )
           .map((report) => ({
             id: report.id,
-            reportDate: report.reportDate.toISOString().slice(0, 10),
+            reportDate: report.reportDate
+              ? typeof report.reportDate === "string"
+                ? (report.reportDate as string).slice(0, 10)
+                : report.reportDate.toISOString().slice(0, 10)
+              : "",
             progress: report.progress!,
             workSummary: report.workSummary,
             photoUrls: report.progressPhotos.map(
@@ -417,7 +441,7 @@ export default async function ProjectsWorkstationPage({
       revision: blueprint.revision,
       fileUrl: blueprint.fileUrl,
       status: blueprint.status,
-      drafterName: blueprint.drafter.name,
+      drafterName: blueprint.drafter?.name ?? "Drafter",
     })),
     subkonContracts: isFieldRole ? [] : project.subkonContracts.map((contract) => ({
       id: contract.id,
@@ -440,7 +464,11 @@ export default async function ProjectsWorkstationPage({
       publicCode: bast.publicCode,
       bastNumber: bast.bastNumber,
       type: bast.type,
-      date: bast.date.toISOString().slice(0, 10),
+      date: bast.date
+        ? typeof bast.date === "string"
+          ? (bast.date as string).slice(0, 10)
+          : bast.date.toISOString().slice(0, 10)
+        : "",
       isApproved: bast.isApproved,
     })),
     wageTicketPayments: project.tickets.map((ticket) => ({
@@ -453,9 +481,12 @@ export default async function ProjectsWorkstationPage({
           ? decimalStringFromScaledInteger(ticket.totalAmount)
           : null,
       paid: ticket.transferReceiptUrl !== null,
-      paidAt:
-        ticket.auditLogs[0]?.createdAt.toISOString().slice(0, 10) ?? null,
-      requesterName: ticket.requester.name,
+      paidAt: ticket.auditLogs[0]?.createdAt
+        ? typeof ticket.auditLogs[0].createdAt === "string"
+          ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
+          : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
+        : null,
+      requesterName: ticket.requester?.name ?? "Pemohon",
     })),
   }));
 
