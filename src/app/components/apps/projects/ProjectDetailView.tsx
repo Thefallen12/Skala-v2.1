@@ -1884,6 +1884,8 @@ export default function ProjectDetailView({
               endDate: project.endDate,
               progress: project.progress,
             }}
+            defaultAssigneeName={project.fieldPicName}
+            teamMembers={fieldTeamUsers}
             initialTasks={project.workPoints.map((wp) => ({
               id: wp.id,
               title: wp.title,

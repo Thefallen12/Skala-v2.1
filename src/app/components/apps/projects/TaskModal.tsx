@@ -26,6 +26,8 @@ interface TaskModalProps {
   onClose: () => void;
   initialData?: TaskModalData | null;
   projectStartDate?: string;
+  defaultAssigneeName?: string | null;
+  teamMembers?: Array<{ id: string; name: string; role?: string }>;
   onSave: (data: TaskModalData) => Promise<void> | void;
   onDelete?: (id: string) => Promise<void> | void;
 }
@@ -55,6 +57,8 @@ export default function TaskModal({
   isOpen,
   onClose,
   initialData,
+  defaultAssigneeName,
+  teamMembers,
   onSave,
   onDelete,
 }: TaskModalProps) {
@@ -77,13 +81,16 @@ export default function TaskModal({
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        assigneeName: initialData.assigneeName || defaultAssigneeName || "",
+      });
     } else {
       setFormData({
         title: "",
         location: "A. Persiapan",
         status: "auto",
-        assigneeName: "",
+        assigneeName: defaultAssigneeName || "",
         hasConstraint: false,
         needsCheck: false,
         startWeek: 0,
@@ -94,7 +101,7 @@ export default function TaskModal({
         dailyReportLink: "",
       });
     }
-  }, [initialData, isOpen]);
+  }, [initialData, isOpen, defaultAssigneeName]);
 
   if (!isOpen) return null;
 
@@ -194,9 +201,26 @@ export default function TaskModal({
                 className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
               >
                 <option value="">Tanpa penanggung jawab</option>
-                <option value="Angga Okta Pratama">Angga Okta Pratama (PM)</option>
-                <option value="Bambang Gunawan">Bambang Gunawan (Koordinator)</option>
-                <option value="Athariq Virziansyah">Athariq Virziansyah (Field Team)</option>
+                {defaultAssigneeName && (
+                  <option value={defaultAssigneeName}>
+                    {defaultAssigneeName} (PIC Proyek)
+                  </option>
+                )}
+                {teamMembers && teamMembers.length > 0 ? (
+                  teamMembers
+                    .filter((m) => m.name !== defaultAssigneeName)
+                    .map((m) => (
+                      <option key={m.id} value={m.name}>
+                        {m.name} ({m.role || "Tim Lapangan"})
+                      </option>
+                    ))
+                ) : (
+                  <>
+                    <option value="Angga Okta Pratama">Angga Okta Pratama (PM)</option>
+                    <option value="Bambang Gunawan">Bambang Gunawan (Koordinator)</option>
+                    <option value="Athariq Virziansyah">Athariq Virziansyah (Field Team)</option>
+                  </>
+                )}
               </select>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Dapat tugas dengan batas tanggal Selesai.

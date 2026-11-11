@@ -65,6 +65,8 @@ interface ProjectScheduleGanttProps {
   initialTasks: ScheduleTaskItem[];
   initialMilestones: ScheduleMilestoneItem[];
   embedded?: boolean;
+  defaultAssigneeName?: string | null;
+  teamMembers?: Array<{ id: string; name: string; role?: string }>;
 }
 
 export default function ProjectScheduleGantt({
@@ -73,6 +75,8 @@ export default function ProjectScheduleGantt({
   initialTasks,
   initialMilestones,
   embedded = false,
+  defaultAssigneeName,
+  teamMembers,
 }: ProjectScheduleGanttProps) {
   const router = useRouter();
 
@@ -1467,6 +1471,8 @@ export default function ProjectScheduleGantt({
         onClose={() => setIsTaskModalOpen(false)}
         initialData={editingTask}
         projectStartDate={selectedProject.startDate || undefined}
+        defaultAssigneeName={defaultAssigneeName || selectedProject.name}
+        teamMembers={teamMembers}
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
       />
