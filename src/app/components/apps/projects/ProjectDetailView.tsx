@@ -22,6 +22,7 @@ import {
   Columns,
   Copy,
   Download,
+  Ellipsis,
   ExternalLink,
   FileDown,
   FileText,
@@ -49,6 +50,12 @@ import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -60,6 +67,7 @@ import { Progress } from "@/components/ui/progress";
 import { GlobalModal } from "@/components/ui/global-modal";
 import ProjectFormModal from "@/app/components/project/ProjectFormModal";
 import type { ProjectWorkstationMasterData } from "./ProjectWorkstationMaster";
+import ProjectActionButton from "./ProjectActionButton";
 import type { FieldTeamOption } from "@/app/(DashboardLayout)/types/project";
 import {
   deleteProject,
@@ -220,6 +228,10 @@ export default function ProjectDetailView({
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
   const [isCoreTeamModalOpen, setIsCoreTeamModalOpen] = useState(false);
   const [materialPlanList, setMaterialPlanList] = useState<MaterialPlanRow[]>([]);
+  const canAccessMaterialPlanning =
+    currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.ADMINISTRATIONS ||
+    currentUserRole === UserRole.LOGISTICS;
 
   // Papan & Status Kanban integration
   const [currentKanbanKey, setCurrentKanbanKey] = useState<"tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda">(() =>
@@ -460,6 +472,20 @@ export default function ProjectDetailView({
   }, [project.startDate, project.endDate, project.progress, project.reports]);
 
   // Work Points parsed into grouped RAB table
+  const savedRapMaterials = project.rapMaterialPlans ?? [];
+  const savedRapLaborPlans = project.rapLaborPlans ?? [];
+  const savedRapMaterialTotal = savedRapMaterials.reduce(
+    (sum, plan) => sum + Number(plan.totalPrice),
+    0,
+  );
+  const savedRapLaborTotal = savedRapLaborPlans.reduce((sum, plan) => {
+    const total = Number(plan.totalBorongan);
+    return sum + (total > 0 ? total : Math.round(plan.volume * Number(plan.boronganRate)));
+  }, 0);
+  const hasSavedRapPlans =
+    savedRapMaterials.length > 0 || savedRapLaborPlans.length > 0;
+  const savedRapTotal = savedRapMaterialTotal + savedRapLaborTotal;
+
   const { rabGroups, totalRabNumber, totalRapNumber, opnameWorkPointItems } = useMemo(() => {
     const points = project.workPoints;
 
@@ -468,7 +494,7 @@ export default function ProjectDetailView({
       return {
         rabGroups: [],
         totalRabNumber: 0,
-        totalRapNumber: 0,
+        totalRapNumber: hasSavedRapPlans ? savedRapTotal : 0,
         opnameWorkPointItems: [],
       };
     }
@@ -478,8 +504,9 @@ export default function ProjectDetailView({
       0,
     );
     const paguNum = computedTotal > 0 ? computedTotal : (Number(project.pagu) > 0 ? Number(project.pagu) : 0);
-    const rapNum =
-      Number(project.budget) > 0 && Math.abs(Number(project.budget) - paguNum) < paguNum * 0.5
+    const rapNum = hasSavedRapPlans
+      ? savedRapTotal
+      : Number(project.budget) > 0 && Math.abs(Number(project.budget) - paguNum) < paguNum * 0.5
         ? Number(project.budget)
         : Math.round(paguNum * 0.758);
 
@@ -544,7 +571,13 @@ export default function ProjectDetailView({
       totalRapNumber: rapNum,
       opnameWorkPointItems: opnameList,
     };
-  }, [project.workPoints, project.pagu, project.budget]);
+  }, [
+    project.workPoints,
+    project.pagu,
+    project.budget,
+    hasSavedRapPlans,
+    savedRapTotal,
+  ]);
 
   const scheduleItems: ProgressScheduleItem[] = useMemo(
     () =>
@@ -754,9 +787,11 @@ export default function ProjectDetailView({
                 : "Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+            <ProjectActionButton
               type="button"
+              label={project.workPoints.length === 0 ? "Isi RAB" : "Buka jadwal"}
+              icon={project.workPoints.length === 0 ? <ClipboardList /> : <CalendarDays />}
               size="sm"
               onClick={() =>
                 project.workPoints.length === 0
@@ -764,13 +799,13 @@ export default function ProjectDetailView({
                   : setActiveTab("papan")
               }
               className="h-8 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
-            >
-              {project.workPoints.length === 0 ? "Isi RAB" : "Buka jadwal"}
-            </Button>
+            />
             <button
               type="button"
+              aria-label="Tutup panduan"
+              title="Tutup panduan"
               onClick={() => setShowBanner(false)}
-              className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
             >
               <X className="size-4" />
             </button>
@@ -831,73 +866,116 @@ export default function ProjectDetailView({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setIsEditModalOpen(true)}
-            className="h-8 gap-1.5 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
-          >
-            <Pencil className="size-3.5" />
-            <span>Ubah proyek</span>
-          </Button>
+        <div className="ml-auto flex items-center justify-end">
+          <div className="sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Aksi proyek"
+                  title="Aksi proyek"
+                  className="h-11 w-11"
+                >
+                  <Ellipsis className="size-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuItem onSelect={() => setIsEditModalOpen(true)}>
+                  <Pencil />
+                  Ubah proyek
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsClientPortalOpen(true)}>
+                  <Globe />
+                  Portal klien
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)}>
+                  <LayoutTemplate />
+                  Pasang template
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)}>
+                  <BookmarkCheck />
+                  Simpan sebagai template
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleDuplicate} disabled={isPending}>
+                  <Copy />
+                  Duplikat proyek
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => setIsDeleteModalOpen(true)}
+                  disabled={isPending}
+                  className="text-rose-600 focus:bg-rose-50 focus:text-rose-700 dark:focus:bg-rose-950/30"
+                >
+                  <Trash2 />
+                  Hapus proyek
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsClientPortalOpen(true)}
-            className="h-8 gap-1.5 px-3 text-xs"
-          >
-            <Globe className="size-3.5 text-muted-foreground" />
-            <span>Portal klien</span>
-          </Button>
+          <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+            <ProjectActionButton
+              type="button"
+              label="Ubah proyek"
+              icon={<Pencil className="size-3.5" />}
+              size="sm"
+              onClick={() => setIsEditModalOpen(true)}
+              className="h-8 gap-1.5 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
+            />
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="h-8 gap-1.5 px-3 text-xs"
-          >
-            <LayoutTemplate className="size-3.5 text-muted-foreground" />
-            <span>Pasang template</span>
-          </Button>
+            <ProjectActionButton
+              type="button"
+              label="Portal klien"
+              icon={<Globe className="size-3.5 text-muted-foreground" />}
+              variant="outline"
+              size="sm"
+              onClick={() => setIsClientPortalOpen(true)}
+              className="h-8 gap-1.5 px-3 text-xs"
+            />
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="h-8 gap-1.5 px-3 text-xs"
-          >
-            <BookmarkCheck className="size-3.5 text-muted-foreground" />
-            <span>Simpan sebagai template</span>
-          </Button>
+            <ProjectActionButton
+              type="button"
+              label="Pasang template"
+              icon={<LayoutTemplate className="size-3.5 text-muted-foreground" />}
+              variant="outline"
+              size="sm"
+              onClick={() => setIsTemplateModalOpen(true)}
+              className="h-8 gap-1.5 px-3 text-xs"
+            />
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleDuplicate}
-            disabled={isPending}
-            className="h-8 gap-1.5 px-3 text-xs"
-          >
-            <Copy className="size-3.5 text-muted-foreground" />
-            <span>Duplikat proyek</span>
-          </Button>
+            <ProjectActionButton
+              type="button"
+              label="Simpan sebagai template"
+              icon={<BookmarkCheck className="size-3.5 text-muted-foreground" />}
+              variant="outline"
+              size="sm"
+              onClick={() => setIsTemplateModalOpen(true)}
+              className="h-8 gap-1.5 px-3 text-xs"
+            />
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsDeleteModalOpen(true)}
-            disabled={isPending}
-            className="h-8 gap-1.5 border-rose-500/30 px-3 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30"
-          >
-            <Trash2 className="size-3.5" />
-            <span>Hapus proyek</span>
-          </Button>
+            <ProjectActionButton
+              type="button"
+              label="Duplikat proyek"
+              icon={<Copy className="size-3.5 text-muted-foreground" />}
+              variant="outline"
+              size="sm"
+              onClick={handleDuplicate}
+              disabled={isPending}
+              className="h-8 gap-1.5 px-3 text-xs"
+            />
+
+            <ProjectActionButton
+              type="button"
+              label="Hapus proyek"
+              icon={<Trash2 className="size-3.5" />}
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteModalOpen(true)}
+              disabled={isPending}
+              className="h-8 gap-1.5 border-rose-500/30 px-3 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30"
+            />
+          </div>
         </div>
       </div>
 
@@ -1035,6 +1113,9 @@ export default function ProjectDetailView({
                     <p className="text-xs text-muted-foreground">
                       oleh <strong className="text-foreground">{project.fieldPicName || "Field Team"}</strong> · {latestReport.workersCount} pekerja
                     </p>
+                    <p className="text-xs font-medium text-foreground">
+                      Akumulasi progres proyek: {latestReport.progress ?? 0}%
+                    </p>
                     {latestReport.photoUrls && latestReport.photoUrls.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {latestReport.photoUrls.map((photo, i) => (
@@ -1066,56 +1147,57 @@ export default function ProjectDetailView({
           </Card>
 
           {/* Pintasan / Quick actions */}
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-bold text-foreground">Pintasan</h3>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
+            <div className="ml-auto grid w-fit grid-cols-3 justify-items-end gap-2 sm:flex sm:flex-wrap sm:justify-end">
+              <ProjectActionButton
                 type="button"
+                label="Laporan harian"
+                icon={<ClipboardList className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTab("lapangan")}
                 className="h-8 gap-1.5 text-xs"
-              >
-                <ClipboardList className="size-3.5 text-muted-foreground" />
-                <span>Laporan harian</span>
-              </Button>
+              />
 
-              <Button
+              <ProjectActionButton
                 type="button"
+                label="Papan & Jadwal"
+                icon={<CalendarDays className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTab("papan")}
                 className="h-8 gap-1.5 text-xs font-semibold"
-              >
-                <CalendarDays className="size-3.5 text-muted-foreground" />
-                <span>Papan &amp; Jadwal</span>
-              </Button>
+              />
 
-              <Button
+              <ProjectActionButton
                 type="button"
+                label="Quotation & Invoice"
+                icon={<FileText className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTab("tagihan")}
                 className="h-8 gap-1.5 text-xs font-semibold"
-              >
-                <FileText className="size-3.5 text-muted-foreground" />
-                <span>Quotation &amp; Invoice</span>
-              </Button>
+              />
 
               <Link
                 href="/apps/logistics?tab=warehouse"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
+                aria-label="Stok"
+                title="Stok"
+                className="inline-flex size-11 items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted sm:h-8 sm:w-auto sm:min-w-0 sm:px-3"
               >
                 <Package className="size-3.5 text-muted-foreground" />
-                <span>Stok</span>
+                <span className="sr-only sm:not-sr-only">Stok</span>
               </Link>
 
               <Link
                 href="/apps/orders/new?type=po"
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
+                aria-label="Buat PO"
+                title="Buat PO"
+                className="inline-flex size-11 items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted sm:h-8 sm:w-auto sm:min-w-0 sm:px-3"
               >
                 <ShoppingCart className="size-3.5 text-muted-foreground" />
-                <span>Buat PO</span>
+                <span className="sr-only sm:not-sr-only">Buat PO</span>
               </Link>
             </div>
           </div>
@@ -1135,67 +1217,48 @@ export default function ProjectDetailView({
               </div>
 
               {project.workPoints.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => router.refresh()}
-                    className="size-8 rounded-lg"
-                    title="Segarkan data"
-                  >
-                    <RefreshCw className="size-3.5 text-muted-foreground" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPrintDocView("rab")}
-                    className="h-8 gap-1.5 px-3 text-xs rounded-lg"
-                  >
-                    <Printer className="size-3.5 text-muted-foreground" />
-                    <span>Cetak RAB</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPrintDocView("progres")}
-                    className="h-8 gap-1.5 px-3 text-xs rounded-lg"
-                  >
-                    <Printer className="size-3.5 text-muted-foreground" />
-                    <span>Cetak progres</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExportRab}
-                    className="h-8 gap-1.5 px-3 text-xs rounded-lg"
-                  >
-                    <Download className="size-3.5 text-muted-foreground" />
-                    <span>Ekspor</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsOpnameModalOpen(true)}
-                    className="h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
-                  >
-                    <ClipboardList className="size-3.5" />
-                    <span>Catat progres</span>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditRabModalOpen(true)}
-                    className="h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
-                  >
-                    <Pencil className="size-3.5" />
-                    <span>Ubah RAB</span>
-                  </Button>
+                <div className="ml-auto flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label="Aksi RAB dan progres"
+                        title="Aksi RAB dan progres"
+                        className="h-11 min-w-11 gap-2 rounded-lg px-0 sm:px-3"
+                      >
+                        <Ellipsis className="size-4" />
+                        <span className="sr-only sm:not-sr-only">Aksi</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-52">
+                      <DropdownMenuItem onSelect={() => router.refresh()}>
+                        <RefreshCw />
+                        Segarkan data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
+                        <Printer />
+                        Cetak RAB
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPrintDocView("progres")}>
+                        <Printer />
+                        Cetak progres
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleExportRab}>
+                        <Download />
+                        Ekspor
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setIsOpnameModalOpen(true)}>
+                        <ClipboardList />
+                        Catat progres
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setIsEditRabModalOpen(true)}>
+                        <Pencil />
+                        Ubah RAB
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )}
             </CardHeader>
@@ -1208,47 +1271,48 @@ export default function ProjectDetailView({
                     <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
                       Belum ada RAB untuk proyek ini. Isi item pekerjaan dengan volume dan harga satuan, atau tempel langsung dari Excel. Setelah itu progres dicatat per item lewat opname.
                     </p>
-                    <Button
+                    <ProjectActionButton
                       type="button"
+                      label="Isi RAB"
+                      icon={<ClipboardList className="size-3.5" />}
                       onClick={() => setIsEditRabModalOpen(true)}
                       className="h-8 gap-1.5 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium rounded-lg"
-                    >
-                      <ClipboardList className="size-3.5" />
-                      <span>Isi RAB</span>
-                    </Button>
+                    />
                   </div>
 
-                  <div className="pt-4 border-t border-border/60">
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                      <div>
-                        <h4 className="text-xs font-semibold text-foreground">Rencana material</h4>
-                        <p className="text-[11px] text-muted-foreground">
-                          Kebutuhan material dibanding pemakaian dari gudang. &quot;Seharusnya&quot; dihitung dari progres.
-                        </p>
+                  {canAccessMaterialPlanning && (
+                    <div className="pt-4 border-t border-border/60">
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                        <div>
+                          <h4 className="text-xs font-semibold text-foreground">Rencana material</h4>
+                          <p className="text-[11px] text-muted-foreground">
+                            Kebutuhan material dibanding pemakaian dari gudang. &quot;Seharusnya&quot; dihitung dari progres.
+                          </p>
+                        </div>
+                        <div className="ml-auto grid w-fit grid-cols-2 justify-items-end gap-2 sm:flex sm:justify-end">
+                          <ProjectActionButton
+                            type="button"
+                            label="Cetak rencana material"
+                            icon={<Printer className="size-3.5 text-muted-foreground" />}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.print()}
+                            className="h-8 gap-1.5 text-xs rounded-lg"
+                          />
+                          <ProjectActionButton
+                            type="button"
+                            label="Isi rencana material"
+                            icon={<Plus className="size-3.5 text-primary" />}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsMaterialModalOpen(true)}
+                            className="h-8 gap-1.5 text-xs rounded-lg"
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.print()}
-                          className="h-8 gap-1.5 text-xs rounded-lg"
-                        >
-                          <Printer className="size-3.5 text-muted-foreground" />
-                          <span>Cetak</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsMaterialModalOpen(true)}
-                          className="h-8 gap-1.5 text-xs rounded-lg"
-                        >
-                          <Plus className="size-3.5 text-primary" />
-                          <span>Isi rencana material</span>
-                        </Button>
-                      </div>
+                      <p className="text-xs text-muted-foreground py-2">Belum ada rencana material.</p>
                     </div>
-                    <p className="text-xs text-muted-foreground py-2">Belum ada rencana material.</p>
-                  </div>
+                  )}
                 </div>
               ) : (
                 /* When workPoints exist in DB (Image 5) */
@@ -1326,8 +1390,12 @@ export default function ProjectDetailView({
               </div>
 
               {/* RAB & Progres Grouped Table (Image 1 & 2) */}
-              <div className="overflow-x-auto rounded-xl border border-border/80">
-                <table className="w-full min-w-[850px] table-fixed text-left text-xs">
+              <div
+                className="overflow-x-auto rounded-xl border border-border/80"
+                tabIndex={0}
+                aria-label="Tabel RAB dan progres; geser horizontal untuk melihat semua kolom"
+              >
+                <table className="w-full min-w-[850px] table-fixed text-left align-middle text-xs">
                   <colgroup>
                     <col className="w-auto min-w-[240px]" />
                     <col className="w-24" />
@@ -1368,6 +1436,8 @@ export default function ProjectDetailView({
                               </p>
                               <button
                                 type="button"
+                                aria-label={`Isi analisa material untuk ${it.title}`}
+                                title="Isi analisa material"
                                 onClick={() => {
                                   const parts = (it.volumeText || "1 m").trim().split(" ");
                                   const volNum = parseFloat(parts[0]) || 1;
@@ -1382,9 +1452,10 @@ export default function ProjectDetailView({
                                   });
                                   setIsAnalisaModalOpen(true);
                                 }}
-                                className="mt-0.5 text-[11px] font-medium text-sky-600 hover:underline dark:text-sky-400"
+                                className="mt-0.5 inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium text-sky-600 hover:bg-sky-500/10 dark:text-sky-400 sm:min-h-0 sm:min-w-0 sm:px-0 sm:py-0 sm:hover:bg-transparent"
                               >
-                                Isi analisa material
+                                <Package className="size-3.5" aria-hidden="true" />
+                                <span className="sr-only sm:not-sr-only">Isi analisa material</span>
                               </button>
                             </td>
                             <td className="px-3.5 py-3 text-right whitespace-nowrap text-muted-foreground">{it.volumeText}</td>
@@ -1440,18 +1511,18 @@ export default function ProjectDetailView({
                     Estimasi Keuntungan: <strong className="text-emerald-600 dark:text-emerald-400">{currency(profitAmount)} ({profitPercent}%)</strong> · Skema Jasa: <strong className="text-amber-500">Upah Borongan</strong>
                   </p>
                 </div>
-                <Button
+                <ProjectActionButton
                   type="button"
+                  label="Susun RAP bahan dan jasa borongan"
+                  icon={<Calculator className="size-3.5" />}
                   size="sm"
                   onClick={() => setIsRapModalOpen(true)}
-                  className="h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-                >
-                  <Calculator className="size-3.5" />
-                  <span>Susun RAP (Bahan &amp; Jasa Borongan)</span>
-                </Button>
+                  className="ml-auto h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+                />
               </div>
 
               {/* Rencana Material Section (Image 2 & 5) */}
+              {canAccessMaterialPlanning && (
               <div className="space-y-3 border-t border-border/60 pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1460,28 +1531,28 @@ export default function ProjectDetailView({
                       Kebutuhan material dibanding pemakaian dari gudang. &quot;Seharusnya&quot; dihitung dari progres.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
+                  <div className="ml-auto grid w-fit grid-cols-3 justify-items-end gap-2 sm:flex sm:justify-end">
+                    <ProjectActionButton
                       type="button"
+                      label="Cetak rencana material"
+                      icon={<Printer className="size-3.5 text-muted-foreground" />}
                       variant="outline"
                       size="sm"
                       onClick={handlePrintMaterials}
                       className="h-8 gap-1.5 px-3 text-xs"
-                    >
-                      <Printer className="size-3.5 text-muted-foreground" />
-                      <span>Cetak</span>
-                    </Button>
-                    <Button
+                    />
+                    <ProjectActionButton
                       type="button"
+                      label="Susun bahan dan jasa RAP"
+                      icon={<Calculator className="size-3.5" />}
                       size="sm"
                       onClick={() => setIsRapModalOpen(true)}
                       className="h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-                    >
-                      <Calculator className="size-3.5" />
-                      <span>Susun Bahan &amp; Jasa RAP</span>
-                    </Button>
-                    <Button
+                    />
+                    <ProjectActionButton
                       type="button"
+                      label="Isi rencana material"
+                      icon={<Plus className="size-3.5 text-primary" />}
                       variant="outline"
                       size="sm"
                       onClick={() => {
@@ -1489,18 +1560,19 @@ export default function ProjectDetailView({
                         setIsMaterialModalOpen(true);
                       }}
                       className="h-8 gap-1.5 px-3 text-xs font-semibold"
-                    >
-                      <Plus className="size-3.5 text-primary" />
-                      <span>Isi rencana material</span>
-                    </Button>
+                    />
                   </div>
                 </div>
 
                 {materialPlanList.length === 0 ? (
                   <p className="py-2 text-xs text-muted-foreground">Belum ada rencana material.</p>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-border/80">
-                    <table className="w-full text-left text-xs">
+                  <div
+                    className="overflow-x-auto rounded-xl border border-border/80"
+                    tabIndex={0}
+                    aria-label="Tabel rencana material; geser horizontal untuk melihat semua kolom"
+                  >
+                    <table className="w-full min-w-[860px] table-fixed text-left align-middle text-xs">
                       <thead className="bg-[#102A4D] text-white font-semibold">
                         <tr>
                           <th className="px-3.5 py-2.5">Material / Bahan</th>
@@ -1583,8 +1655,135 @@ export default function ProjectDetailView({
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
+
+          <section className="space-y-3 border-t border-border/60 pt-6">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-foreground">RAP yang disusun</h3>
+                <p className="text-xs text-muted-foreground">
+                  Rincian bahan dan jasa borongan dari RAP tersimpan.
+                </p>
+              </div>
+              {savedRapMaterials.length === 0 && savedRapLaborPlans.length === 0 && (
+                <ProjectActionButton
+                  type="button"
+                  label="Susun RAP"
+                  icon={<Calculator className="size-3.5" />}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsRapModalOpen(true)}
+                  className="ml-auto h-8 gap-1.5 text-xs"
+                />
+              )}
+            </div>
+
+            {savedRapMaterials.length === 0 && savedRapLaborPlans.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
+                Belum ada rincian RAP tersimpan.
+              </p>
+            ) : (
+              <div
+                className="overflow-x-auto rounded-xl border border-border/80"
+                tabIndex={0}
+                aria-label="Tabel rincian RAP; geser horizontal untuk melihat semua kolom"
+              >
+                <table className="w-full min-w-[760px] text-left align-middle text-xs">
+                  <thead className="bg-muted/40 font-semibold text-muted-foreground">
+                    <tr className="border-b border-border">
+                      <th className="px-3.5 py-3">Jenis</th>
+                      <th className="px-3.5 py-3">Uraian</th>
+                      <th className="px-3.5 py-3 text-right">Volume RAP</th>
+                      <th className="px-3.5 py-3 text-right">Harga satuan</th>
+                      <th className="px-3.5 py-3 text-right">Jumlah RAP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {savedRapMaterials.map((material) => {
+                      const scopeTitle =
+                        material.scope === "ALL" || !material.scope
+                          ? "Seluruh proyek"
+                          : project.workPoints.find((point) => point.id === material.scope)?.title ??
+                            material.scope;
+
+                      return (
+                        <tr key={material.id} className="hover:bg-muted/10">
+                          <td className="px-3.5 py-3 text-muted-foreground">Bahan</td>
+                          <td className="px-3.5 py-3">
+                            <span className="block font-semibold text-foreground">{material.materialName}</span>
+                            <span className="block text-[11px] text-muted-foreground">{scopeTitle}</span>
+                            {material.notes && (
+                              <span className="block text-[11px] text-muted-foreground">{material.notes}</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3 text-right font-mono">
+                            {material.actualQuantity.toLocaleString("id-ID", { maximumFractionDigits: 3 })}{" "}
+                            {material.unit}
+                            {material.plannedQuantity > 0 && (
+                              <span className="block text-[10px] text-muted-foreground">
+                                RAB: {material.plannedQuantity.toLocaleString("id-ID", { maximumFractionDigits: 3 })}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">
+                            {currency(material.unitPrice)}
+                          </td>
+                          <td className="px-3.5 py-3 text-right font-mono font-semibold whitespace-nowrap">
+                            {currency(material.totalPrice)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {savedRapLaborPlans.map((labor) => (
+                      <tr key={labor.id} className="hover:bg-muted/10">
+                        <td className="px-3.5 py-3 text-muted-foreground">Jasa</td>
+                        <td className="px-3.5 py-3">
+                          <span className="block font-semibold text-foreground">{labor.jobName}</span>
+                          {labor.subkonName && (
+                            <span className="block text-[11px] text-muted-foreground">{labor.subkonName}</span>
+                          )}
+                          {labor.notes && (
+                            <span className="block text-[11px] text-muted-foreground">{labor.notes}</span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-3 text-right font-mono">
+                          {labor.volume.toLocaleString("id-ID", { maximumFractionDigits: 3 })} {labor.unit}
+                        </td>
+                        <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">
+                          {currency(labor.boronganRate)}
+                        </td>
+                        <td className="px-3.5 py-3 text-right font-mono font-semibold whitespace-nowrap">
+                          {currency(labor.totalBorongan)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-border bg-muted/30 font-semibold">
+                    <tr>
+                      <td colSpan={4} className="px-3.5 py-2.5 text-foreground">Total bahan</td>
+                      <td className="px-3.5 py-2.5 text-right font-mono whitespace-nowrap">
+                        {currency(savedRapMaterialTotal)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="px-3.5 py-2.5 text-foreground">Total jasa borongan</td>
+                      <td className="px-3.5 py-2.5 text-right font-mono whitespace-nowrap">
+                        {currency(savedRapLaborTotal)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-border">
+                      <td colSpan={4} className="px-3.5 py-3 text-foreground">Total RAP</td>
+                      <td className="px-3.5 py-3 text-right font-mono font-bold text-foreground whitespace-nowrap">
+                        {currency(savedRapTotal)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </section>
         </CardContent>
           </Card>
         </TabsContent>
@@ -1717,7 +1916,7 @@ export default function ProjectDetailView({
                           </p>
                         </div>
                         <Badge variant="outline" className="font-mono font-semibold">
-                          Progres: {report.progress ?? 0}%
+                          Akumulasi proyek: {report.progress ?? 0}%
                         </Badge>
                       </div>
 
@@ -1777,16 +1976,15 @@ export default function ProjectDetailView({
                   Penanggung jawab lapangan (Field PIC) dan koordinat peta proyek.
                 </CardDescription>
               </div>
-              <Button
+              <ProjectActionButton
                 type="button"
+                label="Tim inti proyek"
+                icon={<User className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setIsCoreTeamModalOpen(true)}
-                className="h-8 gap-1.5 text-xs rounded-lg"
-              >
-                <User className="size-3.5 text-muted-foreground" />
-                <span>Tim inti proyek</span>
-              </Button>
+                className="ml-auto h-8 gap-1.5 text-xs rounded-lg"
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
@@ -1814,10 +2012,12 @@ export default function ProjectDetailView({
                 </div>
                 <Link
                   href={"/apps/projects?section=surveys&view=map&projectId=" + encodeURIComponent(project.id)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-sky-700"
+                  aria-label="Buka peta dan survei GIS"
+                  title="Buka peta dan survei GIS"
+                  className="ml-auto inline-flex size-11 items-center justify-center gap-1.5 rounded-lg bg-sky-600 text-xs font-semibold text-white shadow-xs hover:bg-sky-700 sm:h-8 sm:w-auto sm:min-w-0 sm:px-3"
                 >
                   <MapPinned className="size-3.5" />
-                  <span>Buka Peta &amp; Survei GIS</span>
+                  <span className="sr-only sm:not-sr-only">Buka Peta &amp; Survei GIS</span>
                 </Link>
               </div>
             </CardContent>
@@ -1834,16 +2034,15 @@ export default function ProjectDetailView({
                   Kontrak, gambar kerja, izin dan berita acara. Unggah dan bagikan ke klien atau tim lapangan.
                 </CardDescription>
               </div>
-              <Button
+              <ProjectActionButton
                 type="button"
+                label="Unggah dokumen"
+                icon={<Paperclip className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setIsUploadDocModalOpen(true)}
-                className="h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
-              >
-                <Paperclip className="size-3.5 text-muted-foreground" />
-                <span>Unggah dokumen</span>
-              </Button>
+                className="ml-auto h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Contract Strip */}
@@ -1872,16 +2071,15 @@ export default function ProjectDetailView({
                     </strong>
                   </div>
                 </div>
-                <Button
+                <ProjectActionButton
                   type="button"
+                  label="Ubah kontrak"
+                  icon={<Pencil className="size-3" />}
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsEditModalOpen(true)}
-                  className="h-7 gap-1 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <Pencil className="size-3" />
-                  <span>Ubah kontrak</span>
-                </Button>
+                  className="ml-auto h-8 gap-1 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                />
               </div>
 
               {project.blueprints.length === 0 ? (
@@ -1889,16 +2087,15 @@ export default function ProjectDetailView({
                   <p className="text-xs text-muted-foreground">
                     Belum ada dokumen: unggah kontrak, gambar kerja atau izin proyek ini agar mudah ditelusuri.
                   </p>
-                  <Button
+                  <ProjectActionButton
                     type="button"
+                    label="Unggah dokumen pertama"
+                    icon={<Paperclip className="size-3.5" />}
                     variant="outline"
                     size="sm"
                     onClick={() => setIsUploadDocModalOpen(true)}
                     className="mt-3 h-8 gap-1.5 text-xs"
-                  >
-                    <Paperclip className="size-3.5" />
-                    <span>Unggah dokumen pertama</span>
-                  </Button>
+                  />
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -1929,10 +2126,12 @@ export default function ProjectDetailView({
                           href={bp.fileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                          aria-label={`Lihat ${bp.title}`}
+                          title={`Lihat ${bp.title}`}
+                          className="inline-flex size-11 items-center justify-center gap-1 rounded-lg border border-border/70 bg-card text-xs font-medium text-foreground hover:bg-muted sm:h-8 sm:w-auto sm:min-w-0 sm:px-2.5"
                         >
                           <ExternalLink className="size-3" />
-                          <span>Lihat</span>
+                          <span className="sr-only sm:not-sr-only">Lihat</span>
                         </a>
                       </div>
                     </div>
@@ -2018,17 +2217,17 @@ export default function ProjectDetailView({
                 value={typeof window !== "undefined" ? window.location.origin + "/verify/" + project.code : ""}
                 className="w-full rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs text-foreground"
               />
-              <Button
+              <ProjectActionButton
                 type="button"
+                label="Salin tautan portal klien"
+                icon={<Copy className="size-3.5" />}
                 size="sm"
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.origin + "/verify/" + project.code);
                   alert("Tautan portal klien berhasil disalin!");
                 }}
                 className="h-8 shrink-0 text-xs"
-              >
-                Salin Link
-              </Button>
+              />
             </div>
           </div>
         </div>
@@ -2047,12 +2246,13 @@ export default function ProjectDetailView({
           </p>
           <Button
             type="button"
-            className="w-full text-xs font-semibold"
+            className="min-h-11 w-full gap-2 text-xs font-semibold"
             onClick={() => {
               alert("Template berhasil disimpan!");
               setIsTemplateModalOpen(false);
             }}
           >
+            <BookmarkCheck className="size-4" />
             Simpan Struktur Proyek Ini Sebagai Template
           </Button>
         </div>
@@ -2071,6 +2271,7 @@ export default function ProjectDetailView({
             variant="outline"
             size="sm"
             onClick={() => setIsDeleteModalOpen(false)}
+            className="min-h-11 sm:min-h-8"
           >
             Batal
           </Button>
@@ -2080,6 +2281,7 @@ export default function ProjectDetailView({
             size="sm"
             onClick={handleDelete}
             disabled={isPending}
+            className="min-h-11 sm:min-h-8"
           >
             {isPending ? "Menghapus..." : "Ya, Hapus Proyek"}
           </Button>
@@ -2131,21 +2333,23 @@ export default function ProjectDetailView({
       />
 
       {/* Modal: Rencana Material (Vasco Image 5) */}
-      <MaterialPlanModal
-        open={isMaterialModalOpen}
-        onClose={() => setIsMaterialModalOpen(false)}
-        projectId={project.id}
-        rabItems={project.workPoints.map((p) => ({
-          id: p.id,
-          code: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ")[0] : "",
-          title: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ").slice(1).join(" ") : p.title,
-        }))}
-        stockItems={stockItems}
-        initialMaterials={materialPlanList}
-        analysisMaterials={compiledMaterialsFromAnalysis}
-        preselectedWorkPointId={selectedWorkPointForMaterial}
-        onSave={handleSaveMaterialPlan}
-      />
+      {canAccessMaterialPlanning && (
+        <MaterialPlanModal
+          open={isMaterialModalOpen}
+          onClose={() => setIsMaterialModalOpen(false)}
+          projectId={project.id}
+          rabItems={project.workPoints.map((p) => ({
+            id: p.id,
+            code: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ")[0] : "",
+            title: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ").slice(1).join(" ") : p.title,
+          }))}
+          stockItems={stockItems}
+          initialMaterials={materialPlanList}
+          analysisMaterials={compiledMaterialsFromAnalysis}
+          preselectedWorkPointId={selectedWorkPointForMaterial}
+          onSave={handleSaveMaterialPlan}
+        />
+      )}
 
       {/* Modal: Analisa Material Per Item (Vasco Image) */}
       <AnalisaMaterialModal

@@ -21,6 +21,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import ProjectActionButton from "./ProjectActionButton";
 import { Input } from "@/components/ui/input";
 
 export type FundCategoryKey = "TUKANG" | "BAHAN" | "INVENTARIS" | "OPERASIONAL";
@@ -324,28 +325,26 @@ export default function ProjectFundRecapTab({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
+        <div className="ml-auto flex items-center justify-end gap-2">
+          <ProjectActionButton
             type="button"
+            label="Ekspor CSV"
+            icon={<Download className="size-3.5" />}
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
             className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Download className="size-3.5" />
-            <span>Ekspor CSV</span>
-          </Button>
+          />
 
-          <Button
+          <ProjectActionButton
             type="button"
+            label="Cetak rekap"
+            icon={<Printer className="size-3.5" />}
             variant="outline"
             size="sm"
             onClick={() => window.print()}
             className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Printer className="size-3.5" />
-            <span>Cetak Rekap</span>
-          </Button>
+          />
         </div>
       </div>
 
@@ -538,13 +537,18 @@ export default function ProjectFundRecapTab({
           </div>
 
           {/* Filters Toolbar */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {/* Payment filter pills */}
-            <div className="flex items-center rounded-lg border border-border/80 bg-muted/30 p-0.5 text-xs">
+            <div
+              tabIndex={0}
+              aria-label="Filter status pembayaran"
+              className="flex items-center overflow-x-auto rounded-lg border border-border/80 bg-muted/30 p-0.5 text-xs"
+            >
               <button
                 type="button"
+                aria-pressed={paymentStatusFilter === "ALL"}
                 onClick={() => setPaymentStatusFilter("ALL")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                className={`min-h-11 shrink-0 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-8 sm:px-2.5 ${
                   paymentStatusFilter === "ALL" ? "bg-background text-foreground shadow-2xs" : "text-muted-foreground"
                 }`}
               >
@@ -552,8 +556,9 @@ export default function ProjectFundRecapTab({
               </button>
               <button
                 type="button"
+                aria-pressed={paymentStatusFilter === "PAID"}
                 onClick={() => setPaymentStatusFilter("PAID")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                className={`min-h-11 shrink-0 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-8 sm:px-2.5 ${
                   paymentStatusFilter === "PAID" ? "bg-background text-foreground shadow-2xs" : "text-muted-foreground"
                 }`}
               >
@@ -561,8 +566,9 @@ export default function ProjectFundRecapTab({
               </button>
               <button
                 type="button"
+                aria-pressed={paymentStatusFilter === "PENDING"}
                 onClick={() => setPaymentStatusFilter("PENDING")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                className={`min-h-11 shrink-0 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-8 sm:px-2.5 ${
                   paymentStatusFilter === "PENDING" ? "bg-background text-foreground shadow-2xs" : "text-muted-foreground"
                 }`}
               >
@@ -669,10 +675,16 @@ export default function ProjectFundRecapTab({
                           asChild
                           variant="ghost"
                           size="sm"
-                          className="h-7 text-xs text-primary hover:text-primary"
+                          className="min-h-11 min-w-11 px-0 text-xs text-primary hover:text-primary sm:min-h-8 sm:min-w-0 sm:px-2.5"
                         >
-                          <Link href={`/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`}>
-                            Buka Tiket
+                          <Link
+                            href={`/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`}
+                            aria-label={`Buka tiket ${ticket.ticketNumber}`}
+                            title="Buka tiket"
+                            className="inline-flex items-center gap-1.5"
+                          >
+                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                            <span className="sr-only sm:not-sr-only">Buka Tiket</span>
                           </Link>
                         </Button>
                       </td>

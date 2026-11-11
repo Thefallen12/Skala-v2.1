@@ -20,12 +20,18 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ProjectActionButton from "./ProjectActionButton";
 import { Input } from "@/components/ui/input";
 import WorkCalendarModal from "./WorkCalendarModal";
-import TaskModal, { TaskModalData } from "./TaskModal";
+import TaskModal, {
+  type TaskModalData,
+  type TaskModalSaveData,
+  type TaskModalSaveOutcome,
+} from "./TaskModal";
 import { ProjectPrintScheduleView } from "./ProjectPrintViews";
 import {
   saveProjectScheduleTask,
+  uploadProjectScheduleTaskPhoto,
   deleteProjectScheduleTask,
   saveProjectMilestone,
   deleteProjectMilestone,
@@ -414,33 +420,40 @@ export default function ProjectScheduleGantt({
     setIsTaskModalOpen(true);
   };
 
-  const handleSaveTask = async (data: TaskModalData) => {
-    // Calculate dates based on startWeek & duration if not provided
-    let sDate = data.startDate;
-    let eDate = data.endDate;
-    if (!sDate) {
-      const d1 = new Date(projectStart);
-      d1.setDate(d1.getDate() + data.startWeek * 7);
-      sDate = d1.toISOString().split("T")[0];
-    }
-    if (!eDate) {
-      const d2 = new Date(sDate);
-      d2.setDate(d2.getDate() + data.durationWeeks * 7);
-      eDate = d2.toISOString().split("T")[0];
-    }
+  const handleSaveTask = async (
+    data: TaskModalSaveData,
+  ): Promise<TaskModalSaveOutcome> => {
+    let taskId = data.id ?? "";
+    let progressReportId = data.progressReportId ?? "";
 
-    const res = await saveProjectScheduleTask(selectedProject.id, {
-      id: data.id,
-      title: data.title,
-      location: data.location,
-      plannedStartDate: sDate,
-      targetDate: eDate,
-      progress: data.progress,
-      kendala: data.hasConstraint,
-      perluDicek: data.needsCheck,
-    });
+    if (!progressReportId) {
+      let sDate = data.startDate;
+      let eDate = data.endDate;
+      if (!sDate) {
+        const d1 = new Date(projectStart);
+        d1.setDate(d1.getDate() + data.startWeek * 7);
+        sDate = d1.toISOString().split("T")[0];
+      }
+      if (!eDate) {
+        const d2 = new Date(sDate);
+        d2.setDate(d2.getDate() + data.durationWeeks * 7);
+        eDate = d2.toISOString().split("T")[0];
+      }
 
-    if (res.success) {
+      const result = await saveProjectScheduleTask(selectedProject.id, {
+        id: data.id,
+        title: data.title,
+        location: data.location,
+        plannedStartDate: sDate,
+        targetDate: eDate,
+        progress: data.progress,
+        kendala: data.hasConstraint,
+        perluDicek: data.needsCheck,
+      });
+      if (!result.success) return { error: result.message };
+
+      taskId = result.workPointId;
+      progressReportId = result.progressReportId;
       setTasks((prev) => {
         if (data.id) {
           return prev.map((t) =>
@@ -461,7 +474,7 @@ export default function ProjectScheduleGantt({
           return [
             ...prev,
             {
-              id: `wp_${Date.now()}`,
+              id: taskId,
               title: data.title,
               location: data.location,
               progress: data.progress,
@@ -469,11 +482,52 @@ export default function ProjectScheduleGantt({
               targetDate: eDate || null,
               hasConstraint: data.hasConstraint,
               needsCheck: data.needsCheck,
+              projectId: selectedProject.id,
+              projectName: selectedProject.name,
             },
           ];
         }
       });
     }
+
+    if (!taskId || !progressReportId) {
+      return { error: "Task belum tersimpan untuk menerima lampiran." };
+    }
+
+    let uploadedPhotosCount = 0;
+    for (const photo of data.photos) {
+      const photoData = new FormData();
+      photoData.append("progressReportId", progressReportId);
+      photoData.append("photo", photo);
+      try {
+        const result = await uploadProjectScheduleTaskPhoto(photoData);
+        if (!result.success) {
+          return {
+            savedTaskId: taskId,
+            progressReportId,
+            uploadedPhotosCount,
+            error: result.message,
+          };
+        }
+      } catch (error) {
+        return {
+          savedTaskId: taskId,
+          progressReportId,
+          uploadedPhotosCount,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Foto task gagal diunggah. Silakan coba kembali.",
+        };
+      }
+      uploadedPhotosCount += 1;
+    }
+
+    return {
+      savedTaskId: taskId,
+      progressReportId,
+      uploadedPhotosCount,
+    };
   };
 
   const handleDeleteTask = async (id: string) => {
@@ -585,13 +639,13 @@ export default function ProjectScheduleGantt({
               Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama.
             </p>
           </div>
-          <Button
+          <ProjectActionButton
             type="button"
+            label="Selesai"
+            icon={<CheckCircle2 className="size-3.5" />}
             onClick={() => setShowOnboardingBanner(false)}
-            className="h-8 px-4 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium shrink-0 rounded-lg"
-          >
-            Selesai
-          </Button>
+            className="ml-auto h-8 px-4 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium shrink-0 rounded-lg"
+          />
         </div>
       )}
 
@@ -629,61 +683,56 @@ export default function ProjectScheduleGantt({
         </div>
 
         {/* Action Buttons Toolbar */}
-        <div className="flex items-center flex-wrap gap-2">
-          <Button
+        <div className="ml-auto grid w-fit grid-cols-3 justify-items-end gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <ProjectActionButton
             type="button"
+            label="Ekspor CSV"
+            icon={<Download className="size-3.5" />}
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
             className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Download className="size-3.5" />
-            <span>CSV</span>
-          </Button>
+          />
 
-          <Button
+          <ProjectActionButton
             type="button"
+            label="Cetak jadwal"
+            icon={<Printer className="size-3.5" />}
             variant="outline"
             size="sm"
             onClick={() => setIsPrintScheduleView(true)}
             className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Printer className="size-3.5" />
-            <span>Cetak</span>
-          </Button>
+          />
 
-          <Button
+          <ProjectActionButton
             type="button"
+            label={baselineUpdatedMsg ? "Baseline disimpan" : "Perbarui baseline"}
+            icon={<Flag className="size-3.5" />}
             variant="outline"
             size="sm"
             onClick={handleUpdateBaseline}
             className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Flag className="size-3.5" />
-            <span>{baselineUpdatedMsg ? "Baseline Disimpan" : "Perbarui Baseline"}</span>
-          </Button>
+          />
 
-          <Button
+          <ProjectActionButton
             type="button"
+            label="Kalender kerja"
+            icon={<Calendar className="size-3.5" />}
             variant="outline"
             size="sm"
             onClick={() => setIsCalendarOpen(true)}
             className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Calendar className="size-3.5" />
-            <span>Kalender kerja</span>
-          </Button>
+          />
 
-          <Button
+          <ProjectActionButton
             type="button"
+            label="Tambah task"
+            icon={<Plus className="size-3.5" />}
             variant="default"
             size="sm"
             onClick={handleOpenAddTask}
             className="h-8 gap-1.5 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium"
-          >
-            <Plus className="size-3.5" />
-            <span>Tambah task</span>
-          </Button>
+          />
         </div>
       </div>
 
@@ -755,8 +804,9 @@ export default function ProjectScheduleGantt({
           <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/40">
             <button
               type="button"
+              aria-pressed={viewMode === "gantt"}
               onClick={() => setViewMode("gantt")}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+              className={`min-h-11 px-4 py-1 text-xs font-medium rounded-md transition-all sm:min-h-8 sm:px-3 ${
                 viewMode === "gantt"
                   ? "bg-card text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -766,8 +816,9 @@ export default function ProjectScheduleGantt({
             </button>
             <button
               type="button"
+              aria-pressed={viewMode === "papan"}
               onClick={() => setViewMode("papan")}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+              className={`min-h-11 px-4 py-1 text-xs font-medium rounded-md transition-all sm:min-h-8 sm:px-3 ${
                 viewMode === "papan"
                   ? "bg-card text-foreground shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
@@ -790,11 +841,16 @@ export default function ProjectScheduleGantt({
       {/* Filter Toolbar: Status tabs & Right filters */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {/* Status Pills */}
-        <div className="flex items-center flex-wrap gap-1.5 text-xs">
+        <div
+          tabIndex={0}
+          aria-label="Filter status task; geser horizontal untuk melihat semua pilihan"
+          className="flex max-w-full items-center gap-1.5 overflow-x-auto pb-1 text-xs lg:flex-wrap lg:overflow-visible"
+        >
           <button
             type="button"
+            aria-pressed={statusFilter === "all"}
             onClick={() => setStatusFilter("all")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "all"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -805,8 +861,9 @@ export default function ProjectScheduleGantt({
 
           <button
             type="button"
+            aria-pressed={statusFilter === "not_started"}
             onClick={() => setStatusFilter("not_started")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "not_started"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -817,8 +874,9 @@ export default function ProjectScheduleGantt({
 
           <button
             type="button"
+            aria-pressed={statusFilter === "in_progress"}
             onClick={() => setStatusFilter("in_progress")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "in_progress"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -829,8 +887,9 @@ export default function ProjectScheduleGantt({
 
           <button
             type="button"
+            aria-pressed={statusFilter === "done"}
             onClick={() => setStatusFilter("done")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "done"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -841,8 +900,9 @@ export default function ProjectScheduleGantt({
 
           <button
             type="button"
+            aria-pressed={statusFilter === "constraint"}
             onClick={() => setStatusFilter("constraint")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "constraint"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -853,8 +913,9 @@ export default function ProjectScheduleGantt({
 
           <button
             type="button"
+            aria-pressed={statusFilter === "needs_check"}
             onClick={() => setStatusFilter("needs_check")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "needs_check"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -865,8 +926,9 @@ export default function ProjectScheduleGantt({
 
           <button
             type="button"
+            aria-pressed={statusFilter === "delayed"}
             onClick={() => setStatusFilter("delayed")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`min-h-11 shrink-0 rounded-md px-3 py-1 transition-colors lg:min-h-8 lg:px-2.5 ${
               statusFilter === "delayed"
                 ? "bg-foreground text-background font-semibold"
                 : "text-muted-foreground hover:bg-muted"
@@ -1207,14 +1269,13 @@ export default function ProjectScheduleGantt({
                       )}
                     </div>
                   </div>
-                  <button
+                  <ProjectActionButton
                     type="button"
+                    label="Tambah task belum mulai"
+                    icon={<Plus className="size-3.5" />}
                     onClick={() => handleOpenAddTask("TODO")}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Tambah task</span>
-                  </button>
+                    className="ml-auto mt-3 h-11 w-11 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground sm:h-8 sm:w-full"
+                  />
                 </div>
 
                 {/* Berjalan */}
@@ -1299,14 +1360,13 @@ export default function ProjectScheduleGantt({
                       )}
                     </div>
                   </div>
-                  <button
+                  <ProjectActionButton
                     type="button"
+                    label="Tambah task berjalan"
+                    icon={<Plus className="size-3.5" />}
                     onClick={() => handleOpenAddTask("IN_PROGRESS")}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Tambah task</span>
-                  </button>
+                    className="ml-auto mt-3 h-11 w-11 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground sm:h-8 sm:w-full"
+                  />
                 </div>
 
                 {/* Selesai */}
@@ -1331,8 +1391,9 @@ export default function ProjectScheduleGantt({
                       </div>
                       <button
                         type="button"
+                        aria-label="Tambah task selesai"
                         onClick={() => handleOpenAddTask("DONE")}
-                        className="size-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+                        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted/60 hover:text-foreground sm:size-6"
                         title="Tambah task selesai"
                       >
                         <Plus className="size-3.5" />
@@ -1393,14 +1454,13 @@ export default function ProjectScheduleGantt({
                       )}
                     </div>
                   </div>
-                  <button
+                  <ProjectActionButton
                     type="button"
+                    label="Tambah task selesai"
+                    icon={<Plus className="size-3.5" />}
                     onClick={() => handleOpenAddTask("DONE")}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Tambah task</span>
-                  </button>
+                    className="ml-auto mt-3 h-11 w-11 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground sm:h-8 sm:w-full"
+                  />
                 </div>
               </div>
             </div>
@@ -1440,7 +1500,9 @@ export default function ProjectScheduleGantt({
                 variant="default"
                 size="icon"
                 disabled={isAddingMs}
-                className="size-8 shrink-0 bg-foreground text-background hover:bg-foreground/90"
+                aria-label="Tambah milestone"
+                title="Tambah milestone"
+                className="size-11 shrink-0 bg-foreground text-background hover:bg-foreground/90 sm:size-8"
               >
                 <Plus className="size-4" />
               </Button>
@@ -1474,8 +1536,10 @@ export default function ProjectScheduleGantt({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Hapus milestone ${m.title}`}
+                      title={`Hapus milestone ${m.title}`}
                       onClick={() => handleDeleteMilestone(m.id)}
-                      className="size-7 text-muted-foreground hover:text-destructive shrink-0"
+                      className="size-11 shrink-0 text-muted-foreground hover:text-destructive sm:size-8"
                     >
                       <Trash2 className="size-3" />
                     </Button>
@@ -1493,16 +1557,18 @@ export default function ProjectScheduleGantt({
         onClose={() => setIsCalendarOpen(false)}
       />
 
-      <TaskModal
-        isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
-        initialData={editingTask}
-        projectStartDate={selectedProject.startDate || undefined}
-        defaultAssigneeName={defaultAssigneeName || selectedProject.name}
-        teamMembers={teamMembers}
-        onSave={handleSaveTask}
-        onDelete={handleDeleteTask}
-      />
+      {isTaskModalOpen && (
+        <TaskModal
+          isOpen={isTaskModalOpen}
+          onClose={() => setIsTaskModalOpen(false)}
+          initialData={editingTask}
+          projectStartDate={selectedProject.startDate || undefined}
+          defaultAssigneeName={defaultAssigneeName || selectedProject.name}
+          teamMembers={teamMembers}
+          onSave={handleSaveTask}
+          onDelete={handleDeleteTask}
+        />
+      )}
     </div>
   );
 }

@@ -37,22 +37,93 @@ import {
 
 type DinasTabType = "rekapitulasi" | "rincian_sid" | "database_spk";
 
-export function DinasProjectReportPage() {
+type DinasProjectProgressSource = {
+  kelompokTani: string;
+  name: string;
+  title: string;
+  progress: number;
+};
+
+function normalizeGroupName(value: string): string {
+  return value.trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+}
+
+function calculateRealizedArea(areaHa: number, progressPercent: number): number {
+  return (areaHa * progressPercent) / 100;
+}
+
+export function DinasProjectReportPage({
+  projects,
+}: {
+  projects: DinasProjectProgressSource[];
+}) {
   const [activeTab, setActiveTab] = useState<DinasTabType>("rekapitulasi");
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedPoktanIndex, setSelectedPoktanIndex] = useState<number>(0);
 
+  const linkedProjectsByGroup = useMemo(() => {
+    const projectByGroup = new Map<string, DinasProjectProgressSource>();
+    const ambiguousGroups = new Set<string>();
+    for (const project of projects) {
+      const keys = new Set(
+        [project.kelompokTani, project.name, project.title]
+          .map(normalizeGroupName)
+          .filter(Boolean),
+      );
+      for (const key of keys) {
+        if (ambiguousGroups.has(key)) continue;
+        if (projectByGroup.has(key)) {
+          projectByGroup.delete(key);
+          ambiguousGroups.add(key);
+        } else {
+          projectByGroup.set(key, project);
+        }
+      }
+    }
+    return projectByGroup;
+  }, [projects]);
+
+  const projectReportData = useMemo(
+    () =>
+      DINAS_PROJECTS_DATA.map((record) => {
+        const linkedProject =
+          linkedProjectsByGroup.get(normalizeGroupName(record.poktan));
+        const sourceProgress =
+          linkedProject && Number.isFinite(linkedProject.progress)
+            ? linkedProject.progress
+            : record.progresFisikKonstruksiPercent;
+        const progress = Math.min(100, Math.max(0, sourceProgress));
+        const realizedArea = calculateRealizedArea(
+          record.luasLahanHa,
+          progress,
+        );
+        return {
+          ...record,
+          progresFisikKonstruksiPercent: progress,
+          realisasiHaKonstruksi: realizedArea,
+          biayaDigunakanKonstruksi:
+            record.luasLahanHa > 0
+              ? Math.round(
+                  (record.totalBiayaKonstruksi / record.luasLahanHa) *
+                    realizedArea,
+                )
+              : 0,
+        };
+      }),
+    [linkedProjectsByGroup],
+  );
+
   // Extract unique kecamatan
   const kecamatanList = useMemo(() => {
     const set = new Set<string>();
-    DINAS_PROJECTS_DATA.forEach((p) => set.add(p.kecamatan));
+    projectReportData.forEach((p) => set.add(p.kecamatan));
     return Array.from(set).sort();
-  }, []);
+  }, [projectReportData]);
 
   // Filtered dataset
   const filteredData = useMemo(() => {
-    return DINAS_PROJECTS_DATA.filter((item) => {
+    return projectReportData.filter((item) => {
       const matchKecamatan =
         selectedKecamatan === "ALL" || item.kecamatan.toLowerCase() === selectedKecamatan.toLowerCase();
       const query = searchQuery.trim().toLowerCase();
@@ -67,7 +138,7 @@ export function DinasProjectReportPage() {
 
       return matchKecamatan && matchSearch;
     });
-  }, [selectedKecamatan, searchQuery]);
+  }, [projectReportData, selectedKecamatan, searchQuery]);
 
   // Aggregate stats
   const aggregates = useMemo(() => {
@@ -199,7 +270,7 @@ export function DinasProjectReportPage() {
   };
 
   const selectedPoktan =
-    filteredData[selectedPoktanIndex] || filteredData[0] || DINAS_PROJECTS_DATA[0];
+    filteredData[selectedPoktanIndex] || filteredData[0] || projectReportData[0];
 
   return (
     <div className="space-y-6">
@@ -350,7 +421,7 @@ export function DinasProjectReportPage() {
               <SelectValue placeholder="Semua Kecamatan" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Semua Kecamatan ({DINAS_PROJECTS_DATA.length})</SelectItem>
+              <SelectItem value="ALL">Semua Kecamatan ({projectReportData.length})</SelectItem>
               {kecamatanList.map((kec) => (
                 <SelectItem key={kec} value={kec}>
                   Kec. {kec}
@@ -431,7 +502,9 @@ export function DinasProjectReportPage() {
                       {d.biayaDigunakanKonstruksi.toLocaleString("id-ID")}
                     </td>
                     <td className="px-2.5 py-2 text-right font-medium text-foreground border-r border-border/40">
-                      {d.realisasiHaKonstruksi}
+                      {d.realisasiHaKonstruksi.toLocaleString("id-ID", {
+                        maximumFractionDigits: 5,
+                      })}
                     </td>
                     <td className="px-2.5 py-2 text-center border-r border-border/40">
                       <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">

@@ -32,9 +32,10 @@ export type StoredProjectProgressPhoto = {
 async function saveProjectProgressPhotoToCloudinary(
   file: File,
   folder: string,
+  maxBytes = MAX_PHOTO_BYTES,
 ): Promise<StoredProjectProgressPhoto> {
   try {
-    const photo = await uploadCloudinaryPhoto(file, folder, MAX_PHOTO_BYTES);
+    const photo = await uploadCloudinaryPhoto(file, folder, maxBytes);
     return {
       url: photo.secureUrl,
       fileUrl: photo.secureUrl,
@@ -59,10 +60,12 @@ export async function saveProjectProgressPhoto(
 
 export async function saveProjectWorkPointPhoto(
   file: File,
+  maxBytes = MAX_PHOTO_BYTES,
 ): Promise<StoredProjectProgressPhoto> {
   return saveProjectProgressPhotoToCloudinary(
     file,
     PROJECT_WORK_POINT_PHOTO_CLOUDINARY_FOLDER,
+    maxBytes,
   );
 }
 

@@ -499,6 +499,7 @@ export default async function ProjectsWorkstationPage({
       surveyProjects={surveyProjects}
       surveys={surveys}
       surveyorName={session.user.name ?? "Pengguna"}
+      currentTimeMs={new Date().getTime()}
       captureTime={
         new Date().toLocaleString("id-ID", {
           timeZone: "Asia/Jakarta",

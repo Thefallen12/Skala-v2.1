@@ -233,6 +233,27 @@ export type ProjectWorkstationMasterData = {
   vendor: string | null;
   clientName: string | null;
   budget: string | null;
+  rapMaterialPlans?: {
+    id: string;
+    materialName: string;
+    unit: string;
+    plannedQuantity: number;
+    actualQuantity: number;
+    unitPrice: string;
+    totalPrice: string;
+    scope: string;
+    notes: string | null;
+  }[];
+  rapLaborPlans?: {
+    id: string;
+    jobName: string;
+    volume: number;
+    unit: string;
+    boronganRate: string;
+    totalBorongan: string;
+    subkonName: string | null;
+    notes: string | null;
+  }[];
   realized: string;
   startDate: string | null;
   endDate: string | null;
@@ -442,7 +463,7 @@ function getStatusBadgeClass(status: string) {
   return "border-border bg-muted text-muted-foreground";
 }
 
-function getSCurveSeries(project: ProjectWorkstationMasterData) {
+function getSCurveSeries(project: ProjectWorkstationMasterData, nowMs: number) {
   const reportDates = project.reports.map((report) => report.reportDate).sort();
   const plannedStartDates = project.workPoints
     .map((point) => point.plannedStartDate)
@@ -516,7 +537,7 @@ function getSCurveSeries(project: ProjectWorkstationMasterData) {
   }
   if (actual.length === 0 && project.progress > 0) {
     actual.push({
-      x: Math.max(Date.now(), start.getTime()),
+      x: Math.max(nowMs, start.getTime()),
       y: project.progress,
     });
   }
@@ -535,6 +556,7 @@ export default function ProjectWorkstationMaster({
   surveys,
   surveyorName,
   captureTime,
+  currentTimeMs,
   initialSurveyProjectId,
 }: {
   projects: ProjectWorkstationMasterData[];
@@ -545,6 +567,7 @@ export default function ProjectWorkstationMaster({
   surveys: FieldSurveySummary[];
   surveyorName: string;
   captureTime: string;
+  currentTimeMs: number;
   initialSurveyProjectId: string | null;
 }) {
   const router = useRouter();
@@ -587,13 +610,16 @@ export default function ProjectWorkstationMaster({
   const [notice, setNotice] = useState("");
   const [isPending, startTransition] = useTransition();
 
-  const [projectList, setProjectList] = useState<ProjectWorkstationMasterData[]>(projects);
+  const [projectList, setProjectList] =
+    useState<ProjectWorkstationMasterData[]>(projects);
+  const [previousProjects, setPreviousProjects] = useState(projects);
   const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
   const [dragOverColumnKey, setDragOverColumnKey] = useState<string | null>(null);
 
-  useEffect(() => {
+  if (projects !== previousProjects) {
+    setPreviousProjects(projects);
     setProjectList(projects);
-  }, [projects]);
+  }
 
   const kanbanColumns = [
     {
@@ -1739,7 +1765,7 @@ export default function ProjectWorkstationMaster({
           {/* LAPORAN RESMI DINAS TERKAIT VIEW */}
           {projectViewMode === "dinas" && (
             <div className="pt-2">
-              <DinasProjectReportPage />
+              <DinasProjectReportPage projects={projectList} />
             </div>
           )}
         </div>
@@ -2874,9 +2900,9 @@ export default function ProjectWorkstationMaster({
 
                 <TabsContent value="kurva" className="space-y-4">
                   {(() => {
-                    const series = getSCurveSeries(activeProject);
+                    const series = getSCurveSeries(activeProject, currentTimeMs);
                     const targetPoints = series[0]?.data ?? [];
-                    const nowMs = Date.now();
+                    const nowMs = currentTimeMs;
                     let plannedToday = 0;
                     if (targetPoints.length > 0) {
                       const firstX = Number(targetPoints[0].x);

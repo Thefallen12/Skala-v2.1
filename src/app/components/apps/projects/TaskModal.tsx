@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { X, HelpCircle, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,18 @@ export interface TaskModalData {
   progress: number; // Progress (%)
   startDate?: string;
   endDate?: string;
-  dailyReportLink?: string;
+}
+
+export interface TaskModalSaveData extends TaskModalData {
+  photos: File[];
+  progressReportId?: string;
+}
+
+export interface TaskModalSaveOutcome {
+  savedTaskId?: string;
+  progressReportId?: string;
+  uploadedPhotosCount?: number;
+  error?: string;
 }
 
 interface TaskModalProps {
@@ -28,7 +39,9 @@ interface TaskModalProps {
   projectStartDate?: string;
   defaultAssigneeName?: string | null;
   teamMembers?: Array<{ id: string; name: string; role?: string }>;
-  onSave: (data: TaskModalData) => Promise<void> | void;
+  onSave: (
+    data: TaskModalSaveData,
+  ) => Promise<TaskModalSaveOutcome | void> | TaskModalSaveOutcome | void;
   onDelete?: (id: string) => Promise<void> | void;
 }
 
@@ -53,6 +66,10 @@ const STATUS_OPTIONS = [
   { value: "DELAYED", label: "Terlambat" },
 ];
 
+function getPhotoSelectionKey(photo: File): string {
+  return `${photo.name}\u0000${photo.size}\u0000${photo.lastModified}\u0000${photo.type}`;
+}
+
 export default function TaskModal({
   isOpen,
   onClose,
@@ -62,46 +79,32 @@ export default function TaskModal({
   onSave,
   onDelete,
 }: TaskModalProps) {
-  const [formData, setFormData] = useState<TaskModalData>({
-    title: "",
-    location: "A. Persiapan",
-    status: "auto",
-    assigneeName: "",
-    hasConstraint: false,
-    needsCheck: false,
-    startWeek: 0,
-    durationWeeks: 1,
-    progress: 0,
-    startDate: "",
-    endDate: "",
-    dailyReportLink: "",
-  });
+  const [formData, setFormData] = useState<TaskModalData>(() => ({
+    title: initialData?.title ?? "",
+    location: initialData?.location ?? "A. Persiapan",
+    status: initialData?.status ?? "auto",
+    assigneeName: initialData?.assigneeName || defaultAssigneeName || "",
+    hasConstraint: initialData?.hasConstraint ?? false,
+    needsCheck: initialData?.needsCheck ?? false,
+    startWeek: initialData?.startWeek ?? 0,
+    durationWeeks: initialData?.durationWeeks ?? 1,
+    progress: initialData?.progress ?? 0,
+    startDate: initialData?.startDate ?? "",
+    endDate: initialData?.endDate ?? "",
+  }));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (initialData) {
-      setFormData({
-        ...initialData,
-        assigneeName: initialData.assigneeName || defaultAssigneeName || "",
-      });
-    } else {
-      setFormData({
-        title: "",
-        location: "A. Persiapan",
-        status: "auto",
-        assigneeName: defaultAssigneeName || "",
-        hasConstraint: false,
-        needsCheck: false,
-        startWeek: 0,
-        durationWeeks: 1,
-        progress: 0,
-        startDate: "",
-        endDate: "",
-        dailyReportLink: "",
-      });
-    }
-  }, [initialData, isOpen, defaultAssigneeName]);
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [photoSelectionNotice, setPhotoSelectionNotice] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [savedTaskId, setSavedTaskId] = useState<string | null>(
+    initialData?.id ?? null,
+  );
+  const [pendingProgressReportId, setPendingProgressReportId] = useState<
+    string | null
+  >(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const uploadedPhotoKeysRef = useRef(new Set<string>());
 
   if (!isOpen) return null;
 
@@ -109,9 +112,38 @@ export default function TaskModal({
     e.preventDefault();
     if (!formData.title.trim()) return;
     setIsSubmitting(true);
+    setSubmitError("");
     try {
-      await onSave(formData);
+      const result = await onSave({
+        ...formData,
+        id: formData.id || savedTaskId || undefined,
+        progressReportId: pendingProgressReportId ?? undefined,
+        photos: selectedPhotos,
+      });
+      if (result?.savedTaskId) setSavedTaskId(result.savedTaskId);
+      if (result?.progressReportId) {
+        setPendingProgressReportId(result.progressReportId);
+      }
+      if (result?.uploadedPhotosCount) {
+        selectedPhotos
+          .slice(0, result.uploadedPhotosCount)
+          .forEach((photo) =>
+            uploadedPhotoKeysRef.current.add(getPhotoSelectionKey(photo)),
+          );
+        setSelectedPhotos((current) =>
+          current.slice(result.uploadedPhotosCount),
+        );
+        setPhotoSelectionNotice("");
+      }
+      if (result?.error) {
+        setSubmitError(result.error);
+        return;
+      }
       onClose();
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Task gagal disimpan.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -131,6 +163,7 @@ export default function TaskModal({
               <span>Panduan</span>
             </span>
             <button
+              type="button"
               onClick={onClose}
               className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
@@ -353,22 +386,13 @@ export default function TaskModal({
               </div>
             </div>
 
-            {/* Tautkan ke laporan harian */}
+            {/* Laporan harian */}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
-                Tautkan ke laporan harian
+                Laporan harian
               </label>
-              <select
-                value={formData.dailyReportLink || ""}
-                onChange={(e) => setFormData({ ...formData, dailyReportLink: e.target.value })}
-                className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
-              >
-                <option value="">— Tidak tertaut —</option>
-                <option value="rep_1">9 Nov 2026 · Angga Okta Pratama</option>
-                <option value="rep_2">8 Nov 2026 · Angga Okta Pratama</option>
-              </select>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Sumber angka progress (opsional) — provenance, bukan tebakan otomatis.
+              <p className="rounded-lg border border-border/70 bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+                Progres task dan foto lampiran otomatis masuk ke laporan harian proyek hari ini.
               </p>
             </div>
 
@@ -377,15 +401,101 @@ export default function TaskModal({
               <label className="block text-xs font-medium text-foreground mb-1.5">
                 Lampiran (foto / bukti)
               </label>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                className="sr-only"
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files ?? []);
+                  if (files.length > 0) {
+                    const selectedKeys = new Set(
+                      [
+                        ...selectedPhotos.map(getPhotoSelectionKey),
+                        ...uploadedPhotoKeysRef.current,
+                      ],
+                    );
+                    const addedKeys = new Set<string>();
+                    const uniqueFiles = files.filter((file) => {
+                      const key = getPhotoSelectionKey(file);
+                      if (selectedKeys.has(key) || addedKeys.has(key)) return false;
+                      addedKeys.add(key);
+                      return true;
+                    });
+                    setSelectedPhotos((current) => {
+                      const currentKeys = new Set(current.map(getPhotoSelectionKey));
+                      return [
+                        ...current,
+                        ...uniqueFiles.filter((file) => {
+                          const key = getPhotoSelectionKey(file);
+                          if (currentKeys.has(key)) return false;
+                          currentKeys.add(key);
+                          return true;
+                        }),
+                      ];
+                    });
+                    setPhotoSelectionNotice(
+                      uniqueFiles.length < files.length
+                        ? "Foto duplikat diabaikan dan tidak akan diunggah ulang."
+                        : "",
+                    );
+                    setSubmitError("");
+                  }
+                  event.currentTarget.value = "";
+                }}
+              />
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="h-8 gap-1.5 text-xs rounded-lg"
+                disabled={isSubmitting}
+                onClick={() => photoInputRef.current?.click()}
               >
                 <Paperclip className="size-3.5" />
                 <span>Unggah lampiran</span>
               </Button>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Jumlah foto tidak dibatasi. JPG, PNG, atau WEBP; maksimal 100 MB per foto.
+              </p>
+              {photoSelectionNotice && (
+                <p className="mt-1 text-xs text-muted-foreground" role="status">
+                  {photoSelectionNotice}
+                </p>
+              )}
+              {selectedPhotos.length > 0 && (
+                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
+                  {selectedPhotos.map((photo, index) => (
+                    <li
+                      key={`${photo.name}-${photo.lastModified}-${index}`}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-muted-foreground">
+                        {photo.name}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Hapus ${photo.name}`}
+                        disabled={isSubmitting}
+                        onClick={() =>
+                          setSelectedPhotos((current) =>
+                            current.filter((_, photoIndex) => photoIndex !== index),
+                          )
+                        }
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {submitError && (
+                <p className="mt-2 text-xs text-destructive" role="alert">
+                  {submitError}
+                </p>
+              )}
             </div>
           </div>
 

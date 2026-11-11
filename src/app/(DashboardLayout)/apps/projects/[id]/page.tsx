@@ -4,6 +4,10 @@ import { auth } from "../../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import {
+  calculateWeightedProjectProgress,
+  clampProjectProgress,
+} from "@/lib/project-progress";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import ProjectDetailView from "@/app/components/apps/projects/ProjectDetailView";
 import type { ProjectWorkstationMasterData } from "@/app/components/apps/projects/ProjectWorkstationMaster";
@@ -78,6 +82,12 @@ export default async function ProjectDetailPage({
       },
       bastDocuments: {
         orderBy: { createdAt: "desc" },
+      },
+      materialPlans: {
+        orderBy: { createdAt: "asc" },
+      },
+      laborPlans: {
+        orderBy: { createdAt: "asc" },
       },
       tickets: {
         orderBy: { createdAt: "desc" },
@@ -164,6 +174,47 @@ export default async function ProjectDetailPage({
   const realizationMap = await getPaidProjectTicketRealization([project.id]);
   const realization = realizationMap.get(project.id);
 
+  const dateKey = (date: Date | string | null | undefined) =>
+    !date ? "" : typeof date === "string" ? date.slice(0, 10) : date.toISOString().slice(0, 10);
+  const workPointPhotosByDate = new Map<string, string[]>();
+  for (const point of project.workPoints) {
+    for (const progressReport of point.progressReports) {
+      const key = dateKey(progressReport.reportDate);
+      if (!key || progressReport.photos.length === 0) continue;
+      const photos = progressReport.photos.map(
+        (photo) => photo.fileUrl ?? photo.url,
+      );
+      workPointPhotosByDate.set(key, [
+        ...(workPointPhotosByDate.get(key) ?? []),
+        ...photos,
+      ]);
+    }
+  }
+
+  const getCumulativeProgressAtDate = (
+    reportDate: Date | string,
+    fallbackProgress: number | null,
+  ) => {
+    const reportDateKey = dateKey(reportDate);
+    const pointsAtDate = project.workPoints.filter(
+      (point) => dateKey(point.createdAt) <= reportDateKey,
+    );
+    const pointProgresses = pointsAtDate.map((point) => {
+      const latestReport = point.progressReports.find(
+        (progressReport) => dateKey(progressReport.reportDate) <= reportDateKey,
+      );
+      return {
+        progress: latestReport?.progress ?? 0,
+        proposedTotalWage: point.proposedTotalWage,
+      };
+    });
+    if (pointProgresses.length === 0) {
+      return clampProjectProgress(fallbackProgress ?? project.progress);
+    }
+
+    return calculateWeightedProjectProgress(pointProgresses);
+  };
+
   const formattedProject: ProjectWorkstationMasterData = {
     id: project.id,
     code: project.code,
@@ -177,7 +228,7 @@ export default async function ProjectDetailPage({
     fieldPicName: project.fieldPic?.name ?? null,
     fieldPicPhotoUrl: project.fieldPic?.profilePhotoUrl ?? null,
     status: project.status,
-    progress: project.progress,
+    progress: clampProjectProgress(project.progress),
     pagu: project.pagu ? decimalStringFromScaledInteger(project.pagu) : "0",
     landArea:
       project.landArea !== null
@@ -190,6 +241,27 @@ export default async function ProjectDetailPage({
       project.budget !== null
         ? decimalStringFromScaledInteger(project.budget)
         : null,
+    rapMaterialPlans: project.materialPlans.map((plan) => ({
+      id: plan.id,
+      materialName: plan.materialName,
+      unit: plan.unit,
+      plannedQuantity: plan.plannedQuantity,
+      actualQuantity: plan.actualQuantity,
+      unitPrice: decimalStringFromScaledInteger(plan.unitPrice),
+      totalPrice: decimalStringFromScaledInteger(plan.totalPrice),
+      scope: plan.scope,
+      notes: plan.notes,
+    })),
+    rapLaborPlans: project.laborPlans.map((plan) => ({
+      id: plan.id,
+      jobName: plan.jobName,
+      volume: plan.volume,
+      unit: plan.unit,
+      boronganRate: decimalStringFromScaledInteger(plan.boronganRate),
+      totalBorongan: decimalStringFromScaledInteger(plan.totalBorongan),
+      subkonName: plan.subkonName,
+      notes: plan.notes,
+    })),
     realized: realization ? realization.total.toString() : "0",
     startDate: project.startDate
       ? typeof project.startDate === "string"
@@ -201,22 +273,33 @@ export default async function ProjectDetailPage({
         ? (project.endDate as string).slice(0, 10)
         : project.endDate.toISOString().slice(0, 10)
       : null,
-    reports: project.dailyReports.map((report) => ({
-      id: report.id,
-      reportDate: report.reportDate
-        ? typeof report.reportDate === "string"
-          ? (report.reportDate as string).slice(0, 10)
-          : report.reportDate.toISOString().slice(0, 10)
-        : "",
-      weather: report.weather,
-      workersCount: report.workersCount,
-      progress: report.progress,
-      workPointId: report.workPointId,
-      dailyVolume: report.dailyVolume,
-      workSummary: report.workSummary,
-      notes: report.notes,
-      photoUrls: report.progressPhotos.map((photo) => photo.fileUrl ?? photo.url),
-    })),
+    reports: project.dailyReports.map((report) => {
+      const key = dateKey(report.reportDate);
+      const workPointPhotos = workPointPhotosByDate.get(key) ?? [];
+      return {
+        id: report.id,
+        reportDate: key,
+        weather: report.weather,
+        workersCount: report.workersCount,
+        progress: report.workPointId
+          ? getCumulativeProgressAtDate(report.reportDate, report.progress)
+          : report.progress === null
+            ? null
+            : clampProjectProgress(report.progress),
+        workPointId: report.workPointId,
+        dailyVolume: report.dailyVolume,
+        workSummary: report.workSummary,
+        notes: report.notes,
+        photoUrls: [
+          ...new Set([
+            ...report.progressPhotos.map(
+              (photo) => photo.fileUrl ?? photo.url,
+            ),
+            ...workPointPhotos,
+          ]),
+        ],
+      };
+    }),
     workPoints: project.workPoints.map((point) => ({
       id: point.id,
       title: point.title,

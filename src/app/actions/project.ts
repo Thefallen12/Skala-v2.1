@@ -11,6 +11,11 @@ import {
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { getJakartaDateKey } from "@/lib/habit-date";
+import {
+  calculateWeightedProjectProgress,
+  clampProjectProgress,
+} from "@/lib/project-progress";
 import { sendNotification } from "@/lib/notifications";
 import { PrivatePhotoValidationError } from "@/lib/private-photos";
 import {
@@ -114,6 +119,14 @@ const projectInputSchema = z
 export type ProjectFormInput = z.infer<typeof projectInputSchema>;
 export type ProjectMutationResult =
   | { success: true; message: string }
+  | { success: false; message: string };
+export type ProjectScheduleTaskSaveResult =
+  | {
+      success: true;
+      message: string;
+      workPointId: string;
+      progressReportId: string;
+    }
   | { success: false; message: string };
 
 const projectManagerRoles: UserRole[] = [
@@ -1329,7 +1342,10 @@ export async function addProjectProgress(
         throw new Error("Laporan pada tanggal ini sudah memiliki 5 foto.");
       }
 
-      let reportProgress = values.progress ?? project.progress;
+      let reportProgress = clampProjectProgress(
+        values.progress ?? project.progress,
+      );
+      let cumulativeProjectProgress = reportProgress;
       let dailyVolume: number | null = null;
       let workPointId: string | null = null;
       if (values.workPointId) {
@@ -1388,6 +1404,18 @@ export async function addProjectProgress(
             progress: reportProgress,
           },
         });
+        const updatedPoints = await transaction.projectWorkPoint.findMany({
+          where: { projectId },
+          select: { progress: true, proposedTotalWage: true },
+        });
+        cumulativeProjectProgress =
+          calculateWeightedProjectProgress(updatedPoints);
+        await transaction.project.update({
+          where: { id: projectId },
+          data: {
+            progress: cumulativeProjectProgress,
+          },
+        });
       } else {
         if (existingReport?.workPointId) {
           throw new Error("LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN");
@@ -1395,13 +1423,16 @@ export async function addProjectProgress(
         if (values.progress === undefined) {
           throw new Error("PROGRES_KUMULATIF_TIDAK_VALID");
         }
+        const newProjectProgress = clampProjectProgress(values.progress);
         const updatedProject = await transaction.project.updateMany({
-          where: { id: projectId, progress: { lte: values.progress } },
-          data: { progress: values.progress },
+          where: { id: projectId, progress: { lte: newProjectProgress } },
+          data: { progress: newProjectProgress },
         });
         if (updatedProject.count !== 1) {
           throw new Error("PROGRESS_CANNOT_DECREASE");
         }
+        reportProgress = newProjectProgress;
+        cumulativeProjectProgress = newProjectProgress;
       }
 
       const report = await transaction.dailyReport.upsert({
@@ -1416,7 +1447,7 @@ export async function addProjectProgress(
           reportDate,
           workPointId,
           dailyVolume,
-          progress: reportProgress,
+          progress: cumulativeProjectProgress,
           workSummary: values.workSummary || null,
           weather: values.weather,
           workersCount: values.workersCount,
@@ -1424,7 +1455,7 @@ export async function addProjectProgress(
         update: {
           workPointId,
           dailyVolume,
-          progress: reportProgress,
+          progress: cumulativeProjectProgress,
           workSummary: values.workSummary || null,
           weather: values.weather,
           workersCount: values.workersCount,
@@ -1838,26 +1869,8 @@ export async function recordProjectOpname(
         where: { projectId },
         select: { progress: true, proposedTotalWage: true },
       });
-
-      const totalWage = updatedPoints.reduce(
-        (acc, p) => acc + Number(p.proposedTotalWage),
-        0,
-      );
-
-      let overallProgress = 0;
-      if (totalWage > 0) {
-        overallProgress =
-          updatedPoints.reduce(
-            (acc, p) => acc + p.progress * (Number(p.proposedTotalWage) / totalWage),
-            0,
-          );
-      } else if (updatedPoints.length > 0) {
-        overallProgress =
-          updatedPoints.reduce((acc, p) => acc + p.progress, 0) /
-          updatedPoints.length;
-      }
-
-      const roundedOverallProgress = Math.round(overallProgress * 10) / 10;
+      const roundedOverallProgress =
+        calculateWeightedProjectProgress(updatedPoints);
       await tx.project.update({
         where: { id: projectId },
         data: {
@@ -1913,7 +1926,7 @@ export async function saveProjectScheduleTask(
     perluDicek?: boolean;
     notes?: string;
   },
-): Promise<ProjectMutationResult> {
+): Promise<ProjectScheduleTaskSaveResult> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengelola jadwal task." };
@@ -1925,7 +1938,12 @@ export async function saveProjectScheduleTask(
   try {
     const startDate = input.plannedStartDate ? new Date(input.plannedStartDate) : null;
     const endDate = input.targetDate ? new Date(input.targetDate) : null;
-    const progressVal = typeof input.progress === "number" ? Math.max(0, Math.min(100, input.progress)) : 0;
+    if (input.progress !== undefined && !Number.isFinite(input.progress)) {
+      return { success: false, message: "Progress harus berupa angka valid." };
+    }
+    const progressVal = clampProjectProgress(
+      typeof input.progress === "number" ? input.progress : 0,
+    );
 
     let targetWpId = input.id;
     let computedCompletedVolume: number | null = null;
@@ -1974,11 +1992,11 @@ export async function saveProjectScheduleTask(
     }
 
     // Rekam riwayat progres tanggal hari ini
-    const now = new Date();
-    const reportDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const reportDate = new Date(`${getJakartaDateKey()}T00:00:00.000Z`);
 
+    let progressReportId: string | null = null;
     if (targetWpId) {
-      await prisma.projectWorkPointProgress.create({
+      const progressReport = await prisma.projectWorkPointProgress.create({
         data: {
           workPointId: targetWpId,
           reportDate,
@@ -1986,6 +2004,7 @@ export async function saveProjectScheduleTask(
           workSummary: `Progres jadwal: ${progressVal}%`,
         },
       });
+      progressReportId = progressReport.id;
     }
 
     // Sinkronkan agregat progres proyek & Kurva S
@@ -2042,10 +2061,119 @@ export async function saveProjectScheduleTask(
 
     revalidatePath("/apps/projects/schedule");
     revalidatePath(`/apps/projects/${projectId}`);
-    return { success: true, message: "Task jadwal berhasil disimpan." };
+    if (!targetWpId || !progressReportId) {
+      return {
+        success: false,
+        message: "Riwayat progres task gagal disiapkan untuk lampiran.",
+      };
+    }
+    return {
+      success: true,
+      message: "Task jadwal berhasil disimpan.",
+      workPointId: targetWpId,
+      progressReportId,
+    };
   } catch (error) {
     console.error("Save schedule task error:", error);
     return { success: false, message: "Gagal menyimpan task jadwal." };
+  }
+}
+
+const MAX_SCHEDULE_PHOTO_BYTES = 100 * 1024 * 1024;
+
+export async function uploadProjectScheduleTaskPhoto(
+  input: FormData,
+): Promise<ProjectMutationResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengunggah foto." };
+  }
+  if (!(input instanceof FormData)) {
+    return { success: false, message: "Data unggahan tidak valid." };
+  }
+
+  const progressReportId = input.get("progressReportId");
+  const photo = input.get("photo");
+  if (
+    typeof progressReportId !== "string" ||
+    !progressReportId ||
+    progressReportId.length > 100 ||
+    !(photo instanceof File)
+  ) {
+    return { success: false, message: "Foto atau laporan task tidak valid." };
+  }
+
+  let storedPhoto: StoredProjectProgressPhoto | null = null;
+  try {
+    const report = await prisma.projectWorkPointProgress.findUnique({
+      where: { id: progressReportId },
+      select: {
+        id: true,
+        reportDate: true,
+        workPoint: { select: { projectId: true } },
+      },
+    });
+    if (!report) {
+      return { success: false, message: "Riwayat progres task tidak ditemukan." };
+    }
+    const dailyReport = await prisma.dailyReport.findUnique({
+      where: {
+        projectId_reportDate: {
+          projectId: report.workPoint.projectId,
+          reportDate: report.reportDate,
+        },
+      },
+      select: { id: true },
+    });
+    if (!dailyReport) {
+      return {
+        success: false,
+        message: "Laporan harian task tidak ditemukan. Simpan task kembali.",
+      };
+    }
+
+    const photoToStore = await saveProjectWorkPointPhoto(
+      photo,
+      MAX_SCHEDULE_PHOTO_BYTES,
+    );
+    storedPhoto = photoToStore;
+    await prisma.$transaction(async (transaction) => {
+      await transaction.projectWorkPointProgressPhoto.create({
+        data: {
+          progressReportId: report.id,
+          url: photoToStore.url,
+          fileUrl: photoToStore.fileUrl,
+          publicId: photoToStore.publicId,
+        },
+      });
+      await transaction.projectProgressPhoto.create({
+        data: {
+          dailyReportId: dailyReport.id,
+          url: photoToStore.url,
+          fileUrl: photoToStore.fileUrl,
+          publicId: photoToStore.publicId,
+        },
+      });
+    });
+    revalidatePath(`/apps/projects/${report.workPoint.projectId}`);
+    revalidatePath("/apps/projects/schedule");
+    return { success: true, message: "Foto task berhasil diunggah." };
+  } catch (error) {
+    if (storedPhoto) {
+      try {
+        await removeProjectProgressPhoto(storedPhoto);
+      } catch (cleanupError) {
+        console.error("Removing orphaned task photo failed:", cleanupError);
+      }
+    }
+    if (error instanceof PrivatePhotoValidationError) {
+      return { success: false, message: error.message };
+    }
+    console.error("Uploading project schedule task photo failed:", error);
+    return {
+      success: false,
+      message: "Foto task gagal diunggah. Silakan coba kembali.",
+    };
   }
 }
 
