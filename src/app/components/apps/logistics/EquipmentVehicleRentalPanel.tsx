@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useTransition, useMemo, type FormEvent } from "react";
+import {
+  useState,
+  useTransition,
+  useMemo,
+  useRef,
+  useEffect,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
+  ChevronDown,
   Clock,
   Coins,
   FileText,
@@ -42,7 +50,12 @@ import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { NativeDataTable } from "@/components/ui/native-data-table";
 
 type ProjectOption = { id: string; title: string; kelompokTani: string };
-type VendorOption = { id: string; name: string; phone?: string | null };
+type VendorOption = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  category?: string | null;
+};
 
 const periodTypeLabels: Record<RentalPeriodType, { label: string; unit: string; badgeClass: string }> = {
   DAILY: {
@@ -134,6 +147,41 @@ export default function EquipmentVehicleRentalPanel({
   const [formOperatorName, setFormOperatorName] = useState("");
   const [formWithFuel, setFormWithFuel] = useState(false);
   const [formNotes, setFormNotes] = useState("");
+  const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+  const vendorComboboxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        vendorComboboxRef.current &&
+        !vendorComboboxRef.current.contains(event.target as Node)
+      ) {
+        setVendorDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const filteredVendors = useMemo(() => {
+    if (!formVendorName.trim()) return vendors;
+    const query = formVendorName.toLowerCase();
+    return vendors.filter(
+      (v) =>
+        v.name.toLowerCase().includes(query) ||
+        (v.category && v.category.toLowerCase().includes(query)),
+    );
+  }, [vendors, formVendorName]);
+
+  const selectVendor = (v: VendorOption) => {
+    setFormVendorName(v.name);
+    if (v.phone) {
+      setFormVendorPhone(v.phone);
+    }
+    setVendorDropdownOpen(false);
+  };
 
   // Recalculate duration and total cost based on dates & period
   const handleDatesChange = (startStr: string, endStr: string, periodType: RentalPeriodType) => {
@@ -207,6 +255,7 @@ export default function EquipmentVehicleRentalPanel({
     setFormOperatorName("");
     setFormWithFuel(false);
     setFormNotes("");
+    setVendorDropdownOpen(false);
     setActionMessage(null);
     setModalOpen(true);
   };
@@ -232,6 +281,7 @@ export default function EquipmentVehicleRentalPanel({
     setFormOperatorName(item.operatorName ?? "");
     setFormWithFuel(item.withFuel);
     setFormNotes(item.notes ?? "");
+    setVendorDropdownOpen(false);
     setActionMessage(null);
     setModalOpen(true);
   };
@@ -841,21 +891,82 @@ export default function EquipmentVehicleRentalPanel({
                 className="mt-1 h-9 text-xs"
               />
             </div>
-            <div>
+            <div className="relative" ref={vendorComboboxRef}>
               <Label className="text-xs font-semibold">Vendor / Pemilik Sewa *</Label>
-              <Input
-                placeholder="Nama PT / Pemilik sewa"
-                value={formVendorName}
-                onChange={(e) => setFormVendorName(e.target.value)}
-                required
-                list="vendor-options"
-                className="mt-1 h-9 text-xs"
-              />
-              <datalist id="vendor-options">
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.name} />
-                ))}
-              </datalist>
+              <div className="relative mt-1">
+                <Input
+                  placeholder="Cari atau ketik nama vendor..."
+                  value={formVendorName}
+                  onChange={(e) => {
+                    setFormVendorName(e.target.value);
+                    setVendorDropdownOpen(true);
+                  }}
+                  onFocus={() => setVendorDropdownOpen(true)}
+                  required
+                  autoComplete="off"
+                  className="h-9 text-xs pr-8"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setVendorDropdownOpen((prev) => !prev)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                >
+                  <ChevronDown
+                    className={`size-3.5 transition-transform duration-200 ${
+                      vendorDropdownOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {vendorDropdownOpen && (
+                <div className="absolute left-0 top-full mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-2xl z-50 divide-y divide-border/40">
+                  {filteredVendors.length > 0 ? (
+                    filteredVendors.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectVendor(v);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold block truncate">
+                            {v.name}
+                          </span>
+                          {v.phone && (
+                            <span className="text-[10px] text-muted-foreground block truncate">
+                              📞 {v.phone}
+                            </span>
+                          )}
+                        </div>
+                        {v.category && (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-muted font-medium text-muted-foreground border">
+                            {v.category}
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-3 text-xs text-muted-foreground text-center">
+                      <p>Tidak ada di katalog vendor.</p>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setVendorDropdownOpen(false);
+                        }}
+                        className="mt-1 font-semibold text-primary underline text-xs"
+                      >
+                        Gunakan &quot;{formVendorName}&quot; (Ketik Bebas)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <Label className="text-xs font-semibold">Kontak Vendor (HP)</Label>
