@@ -788,22 +788,22 @@ export default function LogisticsHub({
                   Pencatatan sewa alat &amp; kendaraan (harian, mingguan, bulanan), log HM operasional alat berat, dan operasional armada.
                 </p>
               </div>
-              <TabsList className="bg-muted/70 p-1 rounded-lg border">
+              <TabsList className="h-10 bg-muted/70 p-1 rounded-lg border">
                 <TabsTrigger
                   value="rentals"
-                  className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className="h-8 text-xs font-semibold px-3 gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   🚜 Sewa Alat &amp; Kendaraan
                 </TabsTrigger>
                 <TabsTrigger
                   value="equipment-logs"
-                  className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className="h-8 text-xs font-semibold px-3 gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   ⏱️ Log Alat &amp; BBM
                 </TabsTrigger>
                 <TabsTrigger
                   value="vehicle-operations"
-                  className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  className="h-8 text-xs font-semibold px-3 gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   🚚 Operasional Kendaraan
                 </TabsTrigger>
@@ -834,6 +834,7 @@ export default function LogisticsHub({
                     <Button
                       type="button"
                       disabled={projects.length === 0}
+                      className="h-9 px-4 text-xs font-semibold"
                       onClick={() => {
                         setEquipmentMessage("");
                         setEquipmentSheetOpen(true);
@@ -844,6 +845,7 @@ export default function LogisticsHub({
                     <Button
                       type="button"
                       variant="outline"
+                      className="h-9 px-4 text-xs font-semibold"
                       onClick={() => {
                         setEquipmentMessage("");
                         setEquipmentMasterSheetOpen(true);

@@ -449,7 +449,7 @@ export default function EquipmentVehicleRentalPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   onClick={() => openCreateModal("EQUIPMENT")}
-                  className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-sm"
+                  className="h-9 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold gap-1.5 shadow-sm rounded-lg"
                   size="sm"
                 >
                   <Plus className="size-4" />
@@ -457,7 +457,7 @@ export default function EquipmentVehicleRentalPanel({
                 </Button>
                 <Button
                   onClick={() => openCreateModal("VEHICLE")}
-                  className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-sm"
+                  className="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold gap-1.5 shadow-sm rounded-lg"
                   size="sm"
                 >
                   <Plus className="size-4" />
@@ -481,15 +481,17 @@ export default function EquipmentVehicleRentalPanel({
             </div>
 
             {/* Type Filter */}
-            <div className="flex items-center rounded-lg border bg-background p-1 text-xs">
-              <span className="px-2 text-muted-foreground flex items-center gap-1 font-medium">
+            <div className="flex h-9 items-center rounded-lg border bg-background/80 p-1 text-xs">
+              <span className="px-2 text-muted-foreground flex items-center gap-1 font-medium whitespace-nowrap">
                 <Filter className="size-3.5" /> Kategori:
               </span>
               <button
                 type="button"
                 onClick={() => setTypeFilter("ALL")}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  typeFilter === "ALL" ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  typeFilter === "ALL"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 Semua
@@ -497,8 +499,10 @@ export default function EquipmentVehicleRentalPanel({
               <button
                 type="button"
                 onClick={() => setTypeFilter("EQUIPMENT")}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  typeFilter === "EQUIPMENT" ? "bg-amber-600 text-white font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  typeFilter === "EQUIPMENT"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 🚜 Alat
@@ -506,8 +510,10 @@ export default function EquipmentVehicleRentalPanel({
               <button
                 type="button"
                 onClick={() => setTypeFilter("VEHICLE")}
-                className={`px-2.5 py-1 rounded-md transition-colors ${
-                  typeFilter === "VEHICLE" ? "bg-blue-600 text-white font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  typeFilter === "VEHICLE"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 🚚 Kendaraan
@@ -515,13 +521,15 @@ export default function EquipmentVehicleRentalPanel({
             </div>
 
             {/* Period Filter */}
-            <div className="flex items-center rounded-lg border bg-background p-1 text-xs">
-              <span className="px-2 text-muted-foreground font-medium">Periode:</span>
+            <div className="flex h-9 items-center rounded-lg border bg-background/80 p-1 text-xs">
+              <span className="px-2 text-muted-foreground font-medium whitespace-nowrap">Periode:</span>
               <button
                 type="button"
                 onClick={() => setPeriodFilter("ALL")}
-                className={`px-2 py-1 rounded-md transition-colors ${
-                  periodFilter === "ALL" ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  periodFilter === "ALL"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 Semua
@@ -529,8 +537,10 @@ export default function EquipmentVehicleRentalPanel({
               <button
                 type="button"
                 onClick={() => setPeriodFilter("DAILY")}
-                className={`px-2 py-1 rounded-md transition-colors ${
-                  periodFilter === "DAILY" ? "bg-blue-600 text-white font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  periodFilter === "DAILY"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 Harian
@@ -538,8 +548,10 @@ export default function EquipmentVehicleRentalPanel({
               <button
                 type="button"
                 onClick={() => setPeriodFilter("WEEKLY")}
-                className={`px-2 py-1 rounded-md transition-colors ${
-                  periodFilter === "WEEKLY" ? "bg-purple-600 text-white font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  periodFilter === "WEEKLY"
+                    ? "bg-purple-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 Mingguan
@@ -547,8 +559,10 @@ export default function EquipmentVehicleRentalPanel({
               <button
                 type="button"
                 onClick={() => setPeriodFilter("MONTHLY")}
-                className={`px-2 py-1 rounded-md transition-colors ${
-                  periodFilter === "MONTHLY" ? "bg-emerald-600 text-white font-semibold" : "hover:bg-muted"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors ${
+                  periodFilter === "MONTHLY"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 Bulanan
@@ -778,22 +792,24 @@ export default function EquipmentVehicleRentalPanel({
           {/* Toggle Type & Period */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label className="text-xs font-semibold">Tipe Sewa *</Label>
-              <div className="mt-1.5 grid grid-cols-2 gap-2">
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">
+                Tipe Sewa *
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setFormType("EQUIPMENT");
                     if (!formCategory) setFormCategory("Alat Berat");
                   }}
-                  className={`flex items-center justify-center gap-2 p-2 rounded-lg border text-xs font-semibold transition-all ${
+                  className={`h-10 w-full flex items-center justify-center gap-1.5 px-3 rounded-lg border text-xs font-semibold whitespace-nowrap transition-all ${
                     formType === "EQUIPMENT"
-                      ? "border-amber-500 bg-amber-50 text-amber-900 shadow-sm ring-1 ring-amber-500"
-                      : "border-border hover:bg-muted"
+                      ? "border-amber-500 bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/40 shadow-sm"
+                      : "border-border/80 bg-background/50 hover:bg-muted text-muted-foreground"
                   }`}
                 >
-                  <Wrench className="size-4 text-amber-600" />
-                  Sewa Alat
+                  <Wrench className="size-3.5 shrink-0 text-amber-500" />
+                  <span>Sewa Alat</span>
                 </button>
                 <button
                   type="button"
@@ -801,28 +817,30 @@ export default function EquipmentVehicleRentalPanel({
                     setFormType("VEHICLE");
                     if (!formCategory) setFormCategory("Kendaraan Angkutan");
                   }}
-                  className={`flex items-center justify-center gap-2 p-2 rounded-lg border text-xs font-semibold transition-all ${
+                  className={`h-10 w-full flex items-center justify-center gap-1.5 px-3 rounded-lg border text-xs font-semibold whitespace-nowrap transition-all ${
                     formType === "VEHICLE"
-                      ? "border-blue-500 bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-500"
-                      : "border-border hover:bg-muted"
+                      ? "border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/40 shadow-sm"
+                      : "border-border/80 bg-background/50 hover:bg-muted text-muted-foreground"
                   }`}
                 >
-                  <Truck className="size-4 text-blue-600" />
-                  Sewa Kendaraan
+                  <Truck className="size-3.5 shrink-0 text-blue-500" />
+                  <span>Sewa Kendaraan</span>
                 </button>
               </div>
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Tipe Periode Sewa *</Label>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">
+                Tipe Periode Sewa *
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => handlePeriodTypeChange("DAILY")}
-                  className={`py-2 px-1 text-center rounded-lg border text-xs font-semibold transition-all ${
+                  className={`h-10 w-full flex items-center justify-center px-2 rounded-lg border text-xs font-semibold whitespace-nowrap transition-all ${
                     formPeriodType === "DAILY"
-                      ? "border-blue-500 bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-500"
-                      : "border-border hover:bg-muted"
+                      ? "border-blue-500 bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/40 shadow-sm"
+                      : "border-border/80 bg-background/50 hover:bg-muted text-muted-foreground"
                   }`}
                 >
                   Harian
@@ -830,10 +848,10 @@ export default function EquipmentVehicleRentalPanel({
                 <button
                   type="button"
                   onClick={() => handlePeriodTypeChange("WEEKLY")}
-                  className={`py-2 px-1 text-center rounded-lg border text-xs font-semibold transition-all ${
+                  className={`h-10 w-full flex items-center justify-center px-2 rounded-lg border text-xs font-semibold whitespace-nowrap transition-all ${
                     formPeriodType === "WEEKLY"
-                      ? "border-purple-500 bg-purple-50 text-purple-900 shadow-sm ring-1 ring-purple-500"
-                      : "border-border hover:bg-muted"
+                      ? "border-purple-500 bg-purple-500/15 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/40 shadow-sm"
+                      : "border-border/80 bg-background/50 hover:bg-muted text-muted-foreground"
                   }`}
                 >
                   Mingguan
@@ -841,10 +859,10 @@ export default function EquipmentVehicleRentalPanel({
                 <button
                   type="button"
                   onClick={() => handlePeriodTypeChange("MONTHLY")}
-                  className={`py-2 px-1 text-center rounded-lg border text-xs font-semibold transition-all ${
+                  className={`h-10 w-full flex items-center justify-center px-2 rounded-lg border text-xs font-semibold whitespace-nowrap transition-all ${
                     formPeriodType === "MONTHLY"
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-1 ring-emerald-500"
-                      : "border-border hover:bg-muted"
+                      ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/40 shadow-sm"
+                      : "border-border/80 bg-background/50 hover:bg-muted text-muted-foreground"
                   }`}
                 >
                   Bulanan
@@ -856,7 +874,7 @@ export default function EquipmentVehicleRentalPanel({
           {/* Unit Details */}
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="sm:col-span-2">
-              <Label className="text-xs font-semibold">
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">
                 Nama {formType === "EQUIPMENT" ? "Alat" : "Kendaraan"} *
               </Label>
               <Input
@@ -864,18 +882,18 @@ export default function EquipmentVehicleRentalPanel({
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 required
-                className="mt-1 h-9 text-xs"
+                className="h-9 text-xs"
               />
             </div>
             <div>
-              <Label className="text-xs font-semibold">
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">
                 {formType === "EQUIPMENT" ? "No. Seri / Kode" : "No. Polisi (Plat)"}
               </Label>
               <Input
                 placeholder={formType === "EQUIPMENT" ? "cth: EX-01" : "cth: BL 8234 AB"}
                 value={formCodeOrPlate}
                 onChange={(e) => setFormCodeOrPlate(e.target.value)}
-                className="mt-1 h-9 text-xs"
+                className="h-9 text-xs"
               />
             </div>
           </div>
@@ -883,17 +901,17 @@ export default function EquipmentVehicleRentalPanel({
           {/* Vendor & Category */}
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label className="text-xs font-semibold">Kategori Unit</Label>
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">Kategori Unit</Label>
               <Input
                 placeholder={formType === "EQUIPMENT" ? "cth: Alat Berat / Molen" : "cth: Pick Up / Dump Truck"}
                 value={formCategory}
                 onChange={(e) => setFormCategory(e.target.value)}
-                className="mt-1 h-9 text-xs"
+                className="h-9 text-xs"
               />
             </div>
             <div className="relative" ref={vendorComboboxRef}>
-              <Label className="text-xs font-semibold">Vendor / Pemilik Sewa *</Label>
-              <div className="relative mt-1">
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">Vendor / Pemilik Sewa *</Label>
+              <div className="relative">
                 <Input
                   placeholder="Cari atau ketik nama vendor..."
                   value={formVendorName}
@@ -969,12 +987,12 @@ export default function EquipmentVehicleRentalPanel({
               )}
             </div>
             <div>
-              <Label className="text-xs font-semibold">Kontak Vendor (HP)</Label>
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">Kontak Vendor (HP)</Label>
               <Input
                 placeholder="08123456789"
                 value={formVendorPhone}
                 onChange={(e) => setFormVendorPhone(e.target.value)}
-                className="mt-1 h-9 text-xs"
+                className="h-9 text-xs"
               />
             </div>
           </div>
@@ -982,11 +1000,11 @@ export default function EquipmentVehicleRentalPanel({
           {/* Project & Status */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label className="text-xs font-semibold">Proyek yang Menggunakan</Label>
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">Proyek yang Menggunakan</Label>
               <select
                 value={formProjectId}
                 onChange={(e) => setFormProjectId(e.target.value)}
-                className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-xs"
+                className="h-9 w-full rounded-md border bg-background px-3 text-xs"
               >
                 <option value="">— Tidak terikat proyek spesifik —</option>
                 {projects.map((p) => (
@@ -997,11 +1015,11 @@ export default function EquipmentVehicleRentalPanel({
               </select>
             </div>
             <div>
-              <Label className="text-xs font-semibold">Status Sewa</Label>
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">Status Sewa</Label>
               <select
                 value={formStatus}
                 onChange={(e) => setFormStatus(e.target.value as RentalStatus)}
-                className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-xs font-medium"
+                className="h-9 w-full rounded-md border bg-background px-3 text-xs font-medium"
               >
                 <option value="ACTIVE">Sedang Berjalan (Aktif)</option>
                 <option value="COMPLETED">Selesai</option>
@@ -1020,29 +1038,29 @@ export default function EquipmentVehicleRentalPanel({
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <Label className="text-xs font-semibold">Tanggal Mulai Sewa *</Label>
+                <Label className="text-xs font-semibold text-foreground block mb-1.5">Tanggal Mulai Sewa *</Label>
                 <Input
                   type="date"
                   value={formStartDate}
                   onChange={(e) => handleDatesChange(e.target.value, formEndDate, formPeriodType)}
                   required
-                  className="mt-1 h-9 text-xs bg-background"
+                  className="h-9 text-xs bg-background"
                 />
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Tanggal Selesai Sewa *</Label>
+                <Label className="text-xs font-semibold text-foreground block mb-1.5">Tanggal Selesai Sewa *</Label>
                 <Input
                   type="date"
                   value={formEndDate}
                   onChange={(e) => handleDatesChange(formStartDate, e.target.value, formPeriodType)}
                   required
-                  className="mt-1 h-9 text-xs bg-background"
+                  className="h-9 text-xs bg-background"
                 />
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">
+                <Label className="text-xs font-semibold text-foreground block mb-1.5">
                   Durasi ({periodTypeLabels[formPeriodType].unit}) *
                 </Label>
                 <Input
@@ -1052,7 +1070,7 @@ export default function EquipmentVehicleRentalPanel({
                   value={formDuration}
                   onChange={(e) => handleRateOrAddChange(formRate, formAdditionalCost, e.target.value)}
                   required
-                  className="mt-1 h-9 text-xs bg-background font-semibold text-center"
+                  className="h-9 text-xs bg-background font-semibold text-center"
                 />
               </div>
             </div>
@@ -1067,7 +1085,7 @@ export default function EquipmentVehicleRentalPanel({
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <Label className="text-xs font-semibold">
+                <Label className="text-xs font-semibold text-foreground block mb-1.5">
                   Tarif Sewa per {periodTypeLabels[formPeriodType].unit} (Rp) *
                 </Label>
                 <Input
@@ -1077,7 +1095,7 @@ export default function EquipmentVehicleRentalPanel({
                   value={formRate}
                   onChange={(e) => handleRateOrAddChange(e.target.value, formAdditionalCost, formDuration)}
                   required
-                  className="mt-1 h-9 text-xs bg-background font-medium"
+                  className="h-9 text-xs bg-background font-medium"
                 />
                 <span className="text-[10px] text-muted-foreground mt-0.5 block">
                   {formatCurrency(formRate)} / {periodTypeLabels[formPeriodType].unit.toLowerCase()}
@@ -1085,14 +1103,14 @@ export default function EquipmentVehicleRentalPanel({
               </div>
 
               <div>
-                <Label className="text-xs font-semibold">Biaya Tambahan / Mobilisasi (Rp)</Label>
+                <Label className="text-xs font-semibold text-foreground block mb-1.5">Biaya Tambahan / Mobilisasi (Rp)</Label>
                 <Input
                   type="number"
                   min="0"
                   step="any"
                   value={formAdditionalCost}
                   onChange={(e) => handleRateOrAddChange(formRate, e.target.value, formDuration)}
-                  className="mt-1 h-9 text-xs bg-background"
+                  className="h-9 text-xs bg-background"
                 />
                 <span className="text-[10px] text-muted-foreground mt-0.5 block">
                   {formatCurrency(formAdditionalCost)}
@@ -1100,7 +1118,7 @@ export default function EquipmentVehicleRentalPanel({
               </div>
 
               <div>
-                <Label className="text-xs font-semibold text-primary">Total Biaya Sewa (Rp) *</Label>
+                <Label className="text-xs font-semibold text-primary block mb-1.5">Total Biaya Sewa (Rp) *</Label>
                 <Input
                   type="number"
                   min="0"
@@ -1108,7 +1126,7 @@ export default function EquipmentVehicleRentalPanel({
                   value={formTotalCost}
                   onChange={(e) => setFormTotalCost(e.target.value)}
                   required
-                  className="mt-1 h-9 text-xs bg-background font-bold text-primary"
+                  className="h-9 text-xs bg-background font-bold text-primary"
                 />
                 <span className="text-[11px] font-bold text-emerald-600 mt-0.5 block">
                   {formatCurrency(formTotalCost)}
@@ -1135,7 +1153,7 @@ export default function EquipmentVehicleRentalPanel({
                   placeholder="Nama Operator / Supir"
                   value={formOperatorName}
                   onChange={(e) => setFormOperatorName(e.target.value)}
-                  className="h-8 text-xs mt-1"
+                  className="h-8 text-xs"
                 />
               )}
               <label className="flex items-center gap-2 text-xs cursor-pointer">
@@ -1150,13 +1168,13 @@ export default function EquipmentVehicleRentalPanel({
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Catatan / Keterangan Sewa</Label>
+              <Label className="text-xs font-semibold text-foreground block mb-1.5">Catatan / Keterangan Sewa</Label>
               <textarea
                 placeholder="Catatan kondisi alat, perjanjian sewa, mobilisasi..."
                 value={formNotes}
                 onChange={(e) => setFormNotes(e.target.value)}
                 rows={3}
-                className="mt-1 w-full rounded-md border bg-background p-2 text-xs resize-none"
+                className="w-full rounded-md border bg-background p-2 text-xs resize-none"
               />
             </div>
           </div>
@@ -1168,15 +1186,14 @@ export default function EquipmentVehicleRentalPanel({
               variant="outline"
               onClick={() => setModalOpen(false)}
               disabled={isPending}
-              size="sm"
+              className="h-9 px-4 text-xs font-semibold rounded-lg"
             >
               Batal
             </Button>
             <Button
               type="submit"
               disabled={isPending}
-              size="sm"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-5"
+              className="h-9 px-5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
             >
               {isPending ? "Menyimpan..." : editingItem ? "Simpan Perubahan" : "Simpan Catatan Sewa"}
             </Button>
