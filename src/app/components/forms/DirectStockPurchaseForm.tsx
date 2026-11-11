@@ -366,7 +366,7 @@ export default function DirectStockPurchaseForm({
             setVendorId(value);
             setVendorBankAccountId("");
           }}
-          disabled={isPending || Boolean(initialTicketId)}
+          disabled={isPending}
         >
           <SelectTrigger id="direct-stock-vendor">
             <SelectValue placeholder="Pilih vendor" />
@@ -486,7 +486,6 @@ export default function DirectStockPurchaseForm({
               disabled={
                 isPending ||
                 isSavingNewItem ||
-                Boolean(initialTicketId) ||
                 items.length >= 50
               }
             >
@@ -525,7 +524,7 @@ export default function DirectStockPurchaseForm({
                           type="button"
                           role="combobox"
                           aria-expanded={openStockPickerKey === line.key}
-                          disabled={isPending || Boolean(initialTicketId)}
+                          disabled={isPending}
                           className="flex h-10 w-full min-w-56 items-center justify-between gap-2 overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="min-w-0 flex-1 truncate text-left">
@@ -593,7 +592,7 @@ export default function DirectStockPurchaseForm({
                       onChange={(event) =>
                         updateLine(line.key, { quantity: event.target.value })
                       }
-                      disabled={isPending || Boolean(initialTicketId)}
+                      disabled={isPending}
                     />
                   </TableCell>
                   <TableCell>
@@ -619,7 +618,6 @@ export default function DirectStockPurchaseForm({
                       className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                       disabled={
                         isPending ||
-                        Boolean(initialTicketId) ||
                         items.length === 1
                       }
                       onClick={() =>

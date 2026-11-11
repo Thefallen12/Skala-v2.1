@@ -408,7 +408,7 @@ export default async function LogisticsPage({
               ]),
         ],
       },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      orderBy: { createdAt: "desc" },
       include: {
         requester: { select: { name: true } },
         project: { select: { title: true, kelompokTani: true } },

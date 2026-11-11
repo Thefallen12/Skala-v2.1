@@ -217,7 +217,10 @@ export default function TicketsApp({
           .includes(search);
 
       return matchesFilter && matchesType && matchesProject && matchesSearch;
-    });
+    }).sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }, [actionRequiredIds, filter, typeFilter, projectFilter, ticketSearch, tickets]);
 
   const selectTicketFilter = (nextFilter: string) => {

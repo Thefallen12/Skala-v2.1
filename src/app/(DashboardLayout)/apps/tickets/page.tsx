@@ -44,7 +44,7 @@ const Tickets = async ({
   const [tickets, projects, stockItems, vendors, movers] = await Promise.all([
     prisma.ticket.findMany({
       where,
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+      orderBy: { createdAt: "desc" },
       include: {
         requester: {
           select: {

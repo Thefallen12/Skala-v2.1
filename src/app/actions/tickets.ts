@@ -1130,7 +1130,7 @@ export async function createDirectStockPurchase(input: {
             ticketStockItemKey(linkedTicketItem.itemName, linkedTicketItem.unit) !==
               key ||
             (inputItem.ticketItemId &&
-              !new Prisma.Decimal(inputItem.quantity).eq(
+              new Prisma.Decimal(inputItem.quantity).gt(
                 linkedTicketItem.quantity,
               ))
           ) {
@@ -3327,8 +3327,13 @@ export async function processLogisticsMaterial(
   if (!session?.user?.id) {
     return actionFailure("Silakan masuk untuk memproses tiket.");
   }
-  if (session.user.role !== UserRole.LOGISTICS) {
-    return actionFailure("Hanya Logistik yang dapat memproses tiket material.");
+  if (
+    session.user.role !== UserRole.LOGISTICS &&
+    session.user.role !== UserRole.ADMINISTRATIONS &&
+    session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
+  ) {
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat memproses tiket material.");
   }
   if (actionType !== "READY_WAREHOUSE" && actionType !== "BUY_STORE") {
     return actionFailure("Pilihan proses Logistik tidak valid.");
@@ -3625,8 +3630,14 @@ export async function fulfillTicketItemsFromStock(
   vehicleId: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return actionFailure("Hanya Logistik yang dapat memenuhi tiket dari stok.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.LOGISTICS &&
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat memenuhi tiket dari stok.");
   }
   if (
     !isBoundedText(ticketId, 64) ||
@@ -3657,8 +3668,14 @@ export async function checkTicketItemsStock(
   ticketItemIds: string[],
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return actionFailure("Hanya Logistik yang dapat memeriksa saldo gudang.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.LOGISTICS &&
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat memeriksa saldo gudang.");
   }
   if (
     !isBoundedText(ticketId, 64) ||
@@ -3834,8 +3851,14 @@ export async function switchTicketItemsToPurchase(
   ticketItemIds: string[],
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return actionFailure("Hanya Logistik yang dapat mengalihkan sumber item.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.LOGISTICS &&
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat mengalihkan sumber item.");
   }
   if (
     !isBoundedText(ticketId, 64) ||

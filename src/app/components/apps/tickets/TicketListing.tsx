@@ -18,6 +18,8 @@ import {
   PackageCheck,
   PackageOpen,
   Printer,
+  RefreshCw,
+  ShoppingCart,
   Send,
   Truck,
 } from "lucide-react";
@@ -249,14 +251,20 @@ function workflowFor(
   ticket: TicketRow,
 ): "LOGISTICS" | "LOGISTICS_DO" | "EXPEDITION_RECEIPT" | "FINANCE" | "MOVER" | null {
   if (
-    role === UserRole.LOGISTICS &&
+    (role === UserRole.LOGISTICS ||
+      role === UserRole.ADMINISTRATIONS ||
+      role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
     ticket.status === TicketStatus.PROCESSED_LOGISTIC
   ) {
     return "LOGISTICS_DO";
   }
   if (
-    role === UserRole.LOGISTICS &&
+    (role === UserRole.LOGISTICS ||
+      role === UserRole.ADMINISTRATIONS ||
+      role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.type === TicketType.MATERIAL &&
     ticket.status === TicketStatus.IN_TRANSIT &&
     ticket.deliveryOrders?.some(
@@ -266,7 +274,10 @@ function workflowFor(
     return "EXPEDITION_RECEIPT";
   }
   if (
-    role === UserRole.LOGISTICS &&
+    (role === UserRole.LOGISTICS ||
+      role === UserRole.ADMINISTRATIONS ||
+      role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.type === TicketType.MATERIAL &&
     ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
     ticket.fulfillmentStatus === "COMPLETED" &&
@@ -408,7 +419,10 @@ export default function TicketListing({
   const somePendingItemsSelected =
     pendingTicketItemIds.some((id) => selectedItemIds.includes(id));
   const canSplitFulfillment =
-    role === UserRole.LOGISTICS &&
+    (role === UserRole.LOGISTICS ||
+      role === UserRole.ADMINISTRATIONS ||
+      role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR) &&
     selectedTicket?.type === TicketType.MATERIAL &&
     selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC;
 
@@ -800,7 +814,10 @@ export default function TicketListing({
                           );
                         }
                         if (
-                          role === UserRole.LOGISTICS &&
+                          (role === UserRole.LOGISTICS ||
+      role === UserRole.ADMINISTRATIONS ||
+      role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR) &&
                           ticket.type === TicketType.MATERIAL &&
                           ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
                           ticket.items.some(
@@ -1391,18 +1408,42 @@ export default function TicketListing({
                     )}
                   </div>
                   {canSplitFulfillment && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={
-                        selectedStockItems.length === 0 || fulfillmentPending
-                      }
-                      onClick={prepareWarehouseFulfillment}
-                      className="gap-1.5 text-xs"
-                    >
-                      <PackageOpen className="size-3.5" />
-                      Periksa &amp; Penuhi dari Stok ({selectedStockItems.length})
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={
+                          selectedStockItems.length === 0 || fulfillmentPending
+                        }
+                        onClick={prepareWarehouseFulfillment}
+                        className="gap-1.5 text-xs h-9"
+                      >
+                        <PackageOpen className="size-3.5" />
+                        Periksa &amp; Penuhi dari Stok ({selectedStockItems.length})
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={
+                          selectedStockItems.length === 0 || fulfillmentPending
+                        }
+                        onClick={() => {
+                          if (!selectedTicket || selectedStockItems.length === 0) return;
+                          const ticketId = selectedTicket.id;
+                          const itemIds = selectedStockItems.map((item) => item.id);
+                          setFulfillmentMessage("");
+                          setStockAvailability([]);
+                          setItemSelection({ ticketId, itemIds });
+                          setPurchaseMode("DIRECT_PURCHASE");
+                          setPoDialogOpen(true);
+                        }}
+                        className="gap-1.5 text-xs h-9"
+                      >
+                        <ShoppingCart className="size-3.5" />
+                        Pembelian Langsung / PO ({selectedStockItems.length})
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <div className="overflow-x-auto rounded-lg border border-border">
@@ -1640,7 +1681,7 @@ export default function TicketListing({
           setStockAvailability([]);
         }}
         title="Konfirmasi Pemenuhan dari Stok Gudang"
-        description="Status stok dihitung otomatis untuk barang yang dipilih. Buat Surat Jalan (DO) untuk barang ready dan teruskan barang yang kurang ke pengadaan PO."
+        description="Status stok dihitung otomatis untuk barang yang dipilih. Buat Surat Jalan (DO) untuk barang ready dan teruskan barang yang kurang ke pengadaan PO atau Pembelian Langsung."
         footer={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button
@@ -1651,6 +1692,40 @@ export default function TicketListing({
             >
               Batal
             </Button>
+            {stockAvailability.length === 0 && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={prepareWarehouseFulfillment}
+                  disabled={fulfillmentPending}
+                  className="gap-1.5"
+                >
+                  <RefreshCw className={`size-3.5 ${fulfillmentPending ? "animate-spin" : ""}`} />
+                  Coba Periksa Ulang
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!selectedTicket || selectedStockItems.length === 0) return;
+                    const ticketId = selectedTicket.id;
+                    const itemIds = selectedStockItems.map((item) => item.id);
+                    setFulfillmentMessage("");
+                    setDoDialogOpen(false);
+                    setStockAvailability([]);
+                    setItemSelection({ ticketId, itemIds });
+                    setPurchaseMode("DIRECT_PURCHASE");
+                    setPoDialogOpen(true);
+                  }}
+                  disabled={fulfillmentPending || selectedStockItems.length === 0}
+                  className="gap-1.5"
+                >
+                  <ShoppingCart className="size-3.5" />
+                  Alihkan ke Pengadaan / Pembelian Langsung ({selectedStockItems.length})
+                </Button>
+              </>
+            )}
             {needsOrderTicketItemIds.length > 0 && (
               <Button
                 type="button"

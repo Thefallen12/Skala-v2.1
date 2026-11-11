@@ -412,6 +412,9 @@ export default function LogisticsWorkspace({
             } ${ticket.items.map((item) => item.itemName).join(" ")}`
               .toLocaleLowerCase("id-ID")
               .includes(search.trim().toLocaleLowerCase("id-ID")))),
+      ).sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       ),
     [initialOpenSheet, periodTickets, search, statusFilter],
   );
