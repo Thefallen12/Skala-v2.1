@@ -20,6 +20,12 @@ import { prisma } from "@/lib/prisma";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import type {
+  RentalItemRow,
+  RentalPeriodType,
+  RentalStatus,
+  RentalType,
+} from "@/app/actions/rentals";
 
 export const metadata: Metadata = {
   title: "Logistik Lapangan",
@@ -382,6 +388,7 @@ export default async function LogisticsPage({
     directStockPurchases,
     vehicles,
     vehicleTripLogs,
+    equipmentRentals,
   ] = await Promise.all([
     prisma.ticket.findMany({
       where: {
@@ -747,6 +754,17 @@ export default async function LogisticsPage({
         createdBy: { select: { name: true } },
       },
     }),
+    prisma.equipmentRental.findMany({
+      orderBy: { startDate: "desc" },
+      include: {
+        project: {
+          select: {
+            title: true,
+            kelompokTani: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const ticketRows: TicketRow[] = tickets.map((ticket) => ({
@@ -1009,6 +1027,33 @@ export default async function LogisticsPage({
             vehicle.status === "MAINTENANCE"
               ? vehicle.status
               : "MAINTENANCE",
+        }))}
+        rentals={equipmentRentals.map((r) => ({
+          id: r.id,
+          type: r.type as RentalType,
+          name: r.name,
+          category: r.category,
+          codeOrPlate: r.codeOrPlate,
+          vendorName: r.vendorName,
+          vendorPhone: r.vendorPhone,
+          rentalPeriodType: r.rentalPeriodType as RentalPeriodType,
+          startDate: r.startDate.toISOString().slice(0, 10),
+          endDate: r.endDate.toISOString().slice(0, 10),
+          duration: r.duration,
+          ratePerPeriod: decimalStringFromScaledInteger(r.ratePerPeriod),
+          additionalCost: decimalStringFromScaledInteger(r.additionalCost),
+          totalCost: decimalStringFromScaledInteger(r.totalCost),
+          status: r.status as RentalStatus,
+          withOperator: r.withOperator,
+          operatorName: r.operatorName,
+          withFuel: r.withFuel,
+          projectId: r.projectId,
+          projectName: r.project
+            ? `${r.project.kelompokTani} · ${r.project.title}`
+            : null,
+          notes: r.notes,
+          createdByName: r.createdByName,
+          createdAt: r.createdAt.toISOString(),
         }))}
       />
     </>

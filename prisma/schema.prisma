@@ -651,6 +651,7 @@ model Project {
   invoices            Invoice[]
   cashflows           Cashflow[]
   equipmentLogs       EquipmentLog[]
+  equipmentRentals    EquipmentRental[]
   vehicleTripLogs     VehicleTripLog[]
   vehicleFuelRequests VehicleFuelRequest[]
   addendums           ProjectAddendum[]
@@ -1192,6 +1193,37 @@ model EquipmentLog {
   createdAt         DateTime         @default(now())
 
   @@index([projectId, date])
+}
+
+model EquipmentRental {
+  id               String   @id @default(cuid()) @map("_id")
+  type             String   // EQUIPMENT | VEHICLE
+  name             String   // Nama Alat atau Kendaraan
+  category         String?  // mis. Alat Berat, Mobil Pick Up, Dump Truck
+  codeOrPlate      String?  // Plat nomor / Kode Unit
+  vendorName       String   // Pemilik / Vendor Persewaan
+  vendorPhone      String?  // Nomor telepon / Kontak vendor
+  rentalPeriodType String   // DAILY | WEEKLY | MONTHLY
+  startDate        DateTime // Tanggal Mulai
+  endDate          DateTime // Tanggal Selesai
+  duration         Int      @default(1) // Jumlah hari / minggu / bulan
+  ratePerPeriod    BigInt   @default(0) // Tarif sewa per periode (scaled integer)
+  additionalCost   BigInt   @default(0) // Biaya mobilisasi / operator dll (scaled integer)
+  totalCost        BigInt   @default(0) // Total biaya sewa (scaled integer)
+  status           String   @default("ACTIVE") // ACTIVE | COMPLETED | EXTENDED | CANCELLED
+  withOperator     Boolean  @default(false)
+  operatorName     String?
+  withFuel         Boolean  @default(false)
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  notes            String?
+  createdById      String?
+  createdByName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([type, status])
+  @@index([projectId, startDate])
 }
 
 // Project approvals, handover, and document numbering.

@@ -19,6 +19,8 @@ import PurchaseOrderConfirmationQueue, {
 import PurchaseOrderInvoiceUpload from "@/app/components/apps/logistics/PurchaseOrderInvoiceUpload";
 import VehicleFleetPanel from "@/app/components/apps/logistics/VehicleFleetPanel";
 import VehicleOperationsPanel from "@/app/components/apps/logistics/VehicleOperationsPanel";
+import EquipmentVehicleRentalPanel from "@/app/components/apps/logistics/EquipmentVehicleRentalPanel";
+import type { RentalItemRow } from "@/app/actions/rentals";
 import { VendorFormDialog } from "@/app/components/forms/VendorFormDialog";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
@@ -208,6 +210,7 @@ export default function LogisticsHub({
   equipmentMasters,
   vehicleTripLogs,
   vehicles,
+  rentals = [],
   initialTab,
   initialOpenSheet,
   today,
@@ -227,6 +230,7 @@ export default function LogisticsHub({
   equipmentMasters: EquipmentMasterRow[];
   vehicleTripLogs: VehicleTripLogRow[];
   vehicles: VehicleSummary[];
+  rentals?: RentalItemRow[];
   initialTab?: string;
   initialOpenSheet?: string;
   today: string;
@@ -775,101 +779,151 @@ export default function LogisticsHub({
       </TabsContent>
 
       <TabsContent value="equipment">
-        <div className="space-y-5">
-        <Card>
-          <CardHeader>
-            <CardTitle>Log Alat Berat & BBM</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={projects.length === 0}
-                onClick={() => {
-                  setEquipmentMessage("");
-                  setEquipmentSheetOpen(true);
-                }}
-              >
-                Catat Log Alat & BBM
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setEquipmentMessage("");
-                  setEquipmentMasterSheetOpen(true);
-                }}
-              >
-                Daftarkan Master Alat
-              </Button>
+        <div className="space-y-6">
+          <Tabs defaultValue="rentals" className="space-y-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-primary">Operasional &amp; Sewa Alat / BBM</h2>
+                <p className="text-xs text-muted-foreground">
+                  Pencatatan sewa alat &amp; kendaraan (harian, mingguan, bulanan), log HM operasional alat berat, dan operasional armada.
+                </p>
+              </div>
+              <TabsList className="bg-muted/70 p-1 rounded-lg border">
+                <TabsTrigger
+                  value="rentals"
+                  className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  🚜 Sewa Alat &amp; Kendaraan
+                </TabsTrigger>
+                <TabsTrigger
+                  value="equipment-logs"
+                  className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  ⏱️ Log Alat &amp; BBM
+                </TabsTrigger>
+                <TabsTrigger
+                  value="vehicle-operations"
+                  className="text-xs font-semibold gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  🚚 Operasional Kendaraan
+                </TabsTrigger>
+              </TabsList>
             </div>
-            {equipmentMessage && (
-              <p className="text-sm" role="status">{equipmentMessage}</p>
-            )}
-            <div className="rounded-lg border p-4">
-              <h3 className="font-semibold text-primary">Master alat terdaftar</h3>
-              <ul className="mt-2 divide-y text-sm">
-                {equipmentMasters.map((equipment) => (
-                  <li className="flex flex-wrap justify-between gap-2 py-2" key={equipment.id}>
-                    <span>{equipment.code} · {equipment.name}</span>
-                    <span className="text-muted-foreground">
-                      HM {equipment.currentHM} · {equipment.status}
-                    </span>
-                  </li>
-                ))}
-                {equipmentMasters.length === 0 && (
-                  <li className="py-2 text-muted-foreground">Belum ada master alat.</li>
-                )}
-              </ul>
-            </div>
-            <NativeDataTable itemLabel="log alat">
-              <table className="app-data-table w-full min-w-[760px] text-sm">
-                <thead className="bg-[#102A4D] text-left text-white">
-                  <tr>
-                    <th className="p-3">Tanggal / Proyek</th>
-                    <th className="p-3">Alat / Operator</th>
-                    <th className="p-3">HM Awal–Akhir</th>
-                    <th className="p-3">Jam Efektif</th>
-                    <th className="p-3">BBM</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {equipmentLogs.map((log) => (
-                    <tr className="border-b" key={log.id}>
-                      <td className="p-3">
-                        {new Date(`${log.date}T00:00:00`).toLocaleDateString("id-ID")}
-                        <span className="block text-xs text-muted-foreground">{log.projectName}</span>
-                      </td>
-                      <td className="p-3">
-                        {log.equipmentName}
-                        <span className="block text-xs text-muted-foreground">{log.operatorName ?? "Operator tidak dicatat"}</span>
-                      </td>
-                      <td className="p-3">{log.hmStart} – {log.hmEnd}</td>
-                      <td className="p-3">{log.effectiveHours} jam</td>
-                      <td className="p-3">{log.fuelLiter} L</td>
-                    </tr>
-                  ))}
-                  {equipmentLogs.length === 0 && (
-                    <tr>
-                      <td className="p-5 text-center text-muted-foreground" colSpan={5}>
-                        Belum ada log alat berat.
-                      </td>
-                    </tr>
+
+            <TabsContent value="rentals">
+              <EquipmentVehicleRentalPanel
+                rentals={rentals}
+                projects={projects}
+                vendors={vendors}
+                canManage={
+                  role === UserRole.LOGISTICS ||
+                  role === UserRole.ADMINISTRATIONS ||
+                  role === UserRole.DIRECTOR ||
+                  role === UserRole.KOORDINATOR
+                }
+              />
+            </TabsContent>
+
+            <TabsContent value="equipment-logs">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Log Alat Berat & BBM</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      disabled={projects.length === 0}
+                      onClick={() => {
+                        setEquipmentMessage("");
+                        setEquipmentSheetOpen(true);
+                      }}
+                    >
+                      Catat Log Alat & BBM
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEquipmentMessage("");
+                        setEquipmentMasterSheetOpen(true);
+                      }}
+                    >
+                      Daftarkan Master Alat
+                    </Button>
+                  </div>
+                  {equipmentMessage && (
+                    <p className="text-sm" role="status">{equipmentMessage}</p>
                   )}
-                </tbody>
-              </table>
-            </NativeDataTable>
-          </CardContent>
-        </Card>
-        <VehicleOperationsPanel
-          vehicles={vehicles}
-          logs={vehicleTripLogs}
-          projects={projects}
-          deliveryOrders={deliveryOrders}
-          canManageVehicles={
-            role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS
-          }
-        />
+                  <div className="rounded-lg border p-4">
+                    <h3 className="font-semibold text-primary">Master alat terdaftar</h3>
+                    <ul className="mt-2 divide-y text-sm">
+                      {equipmentMasters.map((equipment) => (
+                        <li className="flex flex-wrap justify-between gap-2 py-2" key={equipment.id}>
+                          <span>{equipment.code} · {equipment.name}</span>
+                          <span className="text-muted-foreground">
+                            HM {equipment.currentHM} · {equipment.status}
+                          </span>
+                        </li>
+                      ))}
+                      {equipmentMasters.length === 0 && (
+                        <li className="py-2 text-muted-foreground">Belum ada master alat.</li>
+                      )}
+                    </ul>
+                  </div>
+                  <NativeDataTable itemLabel="log alat">
+                    <table className="app-data-table w-full min-w-[760px] text-sm">
+                      <thead className="bg-[#102A4D] text-left text-white">
+                        <tr>
+                          <th className="p-3">Tanggal / Proyek</th>
+                          <th className="p-3">Alat / Operator</th>
+                          <th className="p-3">HM Awal–Akhir</th>
+                          <th className="p-3">Jam Efektif</th>
+                          <th className="p-3">BBM</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {equipmentLogs.map((log) => (
+                          <tr className="border-b" key={log.id}>
+                            <td className="p-3">
+                              {new Date(`${log.date}T00:00:00`).toLocaleDateString("id-ID")}
+                              <span className="block text-xs text-muted-foreground">{log.projectName}</span>
+                            </td>
+                            <td className="p-3">
+                              {log.equipmentName}
+                              <span className="block text-xs text-muted-foreground">{log.operatorName ?? "Operator tidak dicatat"}</span>
+                            </td>
+                            <td className="p-3">{log.hmStart} – {log.hmEnd}</td>
+                            <td className="p-3">{log.effectiveHours} jam</td>
+                            <td className="p-3">{log.fuelLiter} L</td>
+                          </tr>
+                        ))}
+                        {equipmentLogs.length === 0 && (
+                          <tr>
+                            <td className="p-5 text-center text-muted-foreground" colSpan={5}>
+                              Belum ada log alat berat.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </NativeDataTable>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="vehicle-operations">
+              <VehicleOperationsPanel
+                vehicles={vehicles}
+                logs={vehicleTripLogs}
+                projects={projects}
+                deliveryOrders={deliveryOrders}
+                canManageVehicles={
+                  role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS
+                }
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </TabsContent>
 
