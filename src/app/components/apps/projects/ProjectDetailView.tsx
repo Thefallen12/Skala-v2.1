@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useMemo } from "react";
+import React, { useState, useTransition, useMemo, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +13,7 @@ import {
   CalendarDays,
   Camera,
   CheckCircle2,
+  Sparkles,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -504,6 +505,86 @@ export default function ProjectDetailView({
 
   const profitAmount = totalRabNumber - totalRapNumber;
   const profitPercent = totalRabNumber > 0 ? ((profitAmount / totalRabNumber) * 100).toFixed(1) : "0.0";
+
+  // Auto-compile materials from all RAB work points' "Isi analisa material"
+  const compiledMaterialsFromAnalysis = useMemo<MaterialPlanRow[]>(() => {
+    const list: MaterialPlanRow[] = [];
+    for (const group of rabGroups) {
+      for (const it of group.items) {
+        const parts = (it.volumeText || "1 m").trim().split(" ");
+        const volNum = parseFloat(parts[0]) || 1;
+        const unitStr = parts.slice(1).join(" ") || "m";
+        const analysis = itemAnalysesMap[it.id] || getStandardAnalysisForWorkItem(it.title, volNum, unitStr);
+
+        for (const mat of analysis) {
+          const plannedQty = Math.round((volNum * (mat.coefficient || 0) * (1 + (mat.wastePercent || 0) / 100)) * 100) / 100;
+          list.push({
+            id: `plan_${it.id}_${mat.id}`,
+            materialName: mat.materialName,
+            plannedQuantity: plannedQty,
+            actualQuantity: plannedQty,
+            quantity: plannedQty,
+            unit: mat.unit,
+            scope: it.id,
+            scopeTitle: `${it.code && it.code !== "•" ? it.code + " " : ""}${it.title}`,
+            fromAnalysis: true,
+            coefficient: mat.coefficient,
+            wastePercent: mat.wastePercent,
+          });
+        }
+      }
+    }
+    return list;
+  }, [rabGroups, itemAnalysesMap]);
+
+  // Load persisted material plan and item analyses from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const savedAnalyses = localStorage.getItem(`project_analyses_map_${project.id}`);
+      if (savedAnalyses) {
+        setItemAnalysesMap(JSON.parse(savedAnalyses));
+      }
+      const savedPlan = localStorage.getItem(`project_material_plan_${project.id}`);
+      if (savedPlan) {
+        setMaterialPlanList(JSON.parse(savedPlan));
+      }
+    } catch (e) {
+      console.error("Failed to load material plan from localStorage", e);
+    }
+  }, [project.id]);
+
+  // If materialPlanList is empty but compiledMaterialsFromAnalysis has items, auto-sync
+  useEffect(() => {
+    if (materialPlanList.length === 0 && compiledMaterialsFromAnalysis.length > 0) {
+      setMaterialPlanList(compiledMaterialsFromAnalysis);
+    }
+  }, [compiledMaterialsFromAnalysis, materialPlanList.length]);
+
+  const handleSaveMaterialPlan = (newMaterials: MaterialPlanRow[]) => {
+    setMaterialPlanList(newMaterials);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`project_material_plan_${project.id}`, JSON.stringify(newMaterials));
+      } catch (e) {
+        console.error("Failed to save material plan to localStorage", e);
+      }
+    }
+  };
+
+  const handleSaveAnalisaMaterial = (workPointId: string, updatedMaterials: MaterialAnalysisItem[]) => {
+    setItemAnalysesMap((prev) => {
+      const nextMap = { ...prev, [workPointId]: updatedMaterials };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`project_analyses_map_${project.id}`, JSON.stringify(nextMap));
+        } catch (e) {
+          console.error("Failed to save analyses map to localStorage", e);
+        }
+      }
+      return nextMap;
+    });
+  };
 
   const handlePrintRab = () => {
     window.print();
@@ -1307,23 +1388,74 @@ export default function ProjectDetailView({
                 ) : (
                   <div className="overflow-x-auto rounded-xl border border-border/80">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-muted/40 font-semibold text-muted-foreground">
-                        <tr className="border-b border-border">
-                          <th className="px-3.5 py-2.5">Material</th>
-                          <th className="px-3.5 py-2.5">Kebutuhan Rencana</th>
-                          <th className="px-3.5 py-2.5">Lingkup Pekerjaan</th>
+                      <thead className="bg-[#102A4D] text-white font-semibold">
+                        <tr>
+                          <th className="px-3.5 py-2.5">Material / Bahan</th>
+                          <th className="px-3.5 py-2.5">Lingkup Pekerjaan RAB</th>
+                          <th className="px-3.5 py-2.5 text-right">Rencana Analisa</th>
+                          <th className="px-3.5 py-2.5 text-right bg-[#143560] border-x border-white/20">Bahan Aktual</th>
+                          <th className="px-3.5 py-2.5 text-center">Satuan</th>
+                          <th className="px-3.5 py-2.5 text-center">Selisih</th>
                           <th className="px-3.5 py-2.5">Status Pemakaian</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
                         {materialPlanList.map((m, idx) => {
                           const scopeItem = project.workPoints.find((wp) => wp.id === m.scope);
+                          const planned = m.plannedQuantity ?? m.quantity ?? 0;
+                          const actual = m.actualQuantity ?? m.quantity ?? 0;
+                          const diff = actual - planned;
+                          const diffPercent = planned > 0 ? Math.round((diff / planned) * 100) : 0;
+
                           return (
                             <tr key={idx} className="hover:bg-muted/10">
-                              <td className="px-3.5 py-2.5 font-medium text-foreground">{m.materialName}</td>
-                              <td className="px-3.5 py-2.5 font-mono text-muted-foreground">{m.quantity} {m.unit}</td>
+                              <td className="px-3.5 py-2.5">
+                                <span className="font-semibold text-foreground block">{m.materialName}</span>
+                                {m.fromAnalysis && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-primary">
+                                    <Sparkles className="size-2.5" /> Dari Analisa RAB
+                                  </span>
+                                )}
+                              </td>
                               <td className="px-3.5 py-2.5 text-muted-foreground">
-                                {m.scope === "ALL" ? "Seluruh proyek" : (scopeItem?.title ?? m.scope)}
+                                {m.scope === "ALL" ? "Seluruh proyek" : (m.scopeTitle || scopeItem?.title || m.scope)}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-right font-mono">
+                                {m.fromAnalysis ? (
+                                  <div>
+                                    <span className="font-medium text-foreground">
+                                      {planned.toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                                    </span>
+                                    <span className="block text-[10px] text-muted-foreground">Otomatis RAB</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-right font-mono font-bold text-foreground bg-primary/5 border-x border-primary/20">
+                                {actual.toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-center font-mono font-medium text-foreground">
+                                {m.unit}
+                              </td>
+                              <td className="px-3.5 py-2.5 text-center">
+                                {m.fromAnalysis ? (
+                                  diff === 0 ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300">
+                                      <CheckCircle2 className="size-2.5" /> Sesuai
+                                    </span>
+                                  ) : diff > 0 ? (
+                                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
+                                      +{diff.toLocaleString("id-ID", { maximumFractionDigits: 1 })} (+{diffPercent}%)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300">
+                                      {diff.toLocaleString("id-ID", { maximumFractionDigits: 1 })} ({diffPercent}%)
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">Manual</span>
+                                )}
                               </td>
                               <td className="px-3.5 py-2.5">
                                 <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">
@@ -2092,8 +2224,9 @@ export default function ProjectDetailView({
         }))}
         stockItems={stockItems}
         initialMaterials={materialPlanList}
+        analysisMaterials={compiledMaterialsFromAnalysis}
         preselectedWorkPointId={selectedWorkPointForMaterial}
-        onSave={(newMaterials) => setMaterialPlanList(newMaterials)}
+        onSave={handleSaveMaterialPlan}
       />
 
       {/* Modal: Analisa Material Per Item (Vasco Image) */}
@@ -2106,10 +2239,7 @@ export default function ProjectDetailView({
         initialMaterials={selectedAnalisaItem?.analysis}
         onSave={(updatedMaterials) => {
           if (selectedAnalisaItem?.id) {
-            setItemAnalysesMap((prev) => ({
-              ...prev,
-              [selectedAnalisaItem.id!]: updatedMaterials,
-            }));
+            handleSaveAnalisaMaterial(selectedAnalisaItem.id, updatedMaterials);
           }
         }}
       />
