@@ -67,12 +67,13 @@ import {
 } from "@/app/actions/project";
 import EditRabModal, { type EditableRabItem } from "./EditRabModal";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
+import ProgressScheduleRows, { type ProgressScheduleItem } from "./ProgressScheduleRows";
 import MaterialPlanModal, { type MaterialPlanRow, type StockItemOption } from "./MaterialPlanModal";
 import AnalisaMaterialModal, { type MaterialAnalysisItem } from "./AnalisaMaterialModal";
 import { getStandardAnalysisForWorkItem } from "@/lib/drt-rab-parser";
 import UploadDocumentModal from "./UploadDocumentModal";
 import CoreTeamModal from "./CoreTeamModal";
-import { applyRabAsContract, applyRapAsBudget } from "@/app/actions/project";
+import { applyRabAsContract, applyRapAsBudget, recordProjectOpname } from "@/app/actions/project";
 import { ProjectPrintRabView, ProjectPrintProgressView } from "./ProjectPrintViews";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -217,7 +218,7 @@ export default function ProjectDetailView({
     getKanbanKeyFromProject(project.status, project.progress)
   );
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [scheduleViewMode, setScheduleViewMode] = useState<"papan" | "gantt">("papan");
+  const [scheduleViewMode, setScheduleViewMode] = useState<"papan" | "gantt">("gantt");
   const [taskDragOverColumn, setTaskDragOverColumn] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [localWorkPoints, setLocalWorkPoints] = useState(project.workPoints);
@@ -254,10 +255,17 @@ export default function ProjectDetailView({
     const task = localWorkPoints.find((wp) => wp.id === taskId);
     if (!task) return;
 
+    const currentProgress = task.progress ?? 0;
     let nextProgress = 0;
     if (targetCol === "belum_mulai") nextProgress = 0;
-    else if (targetCol === "berjalan") nextProgress = 50;
+    else if (targetCol === "berjalan")
+      nextProgress = currentProgress > 0 && currentProgress < 100 ? currentProgress : 50;
     else if (targetCol === "selesai") nextProgress = 100;
+    if (nextProgress === currentProgress) {
+      setDraggedTaskId(null);
+      setTaskDragOverColumn(null);
+      return;
+    }
 
     // Optimistic update
     setLocalWorkPoints((prev) =>
@@ -266,16 +274,21 @@ export default function ProjectDetailView({
     setDraggedTaskId(null);
     setTaskDragOverColumn(null);
 
-    const res = await saveProjectScheduleTask(project.id, {
-      id: task.id,
-      title: task.title,
-      location: task.location || "Umum",
-      progress: nextProgress,
-      plannedStartDate: task.plannedStartDate ? new Date(task.plannedStartDate).toISOString() : undefined,
-      targetDate: task.targetDate ? new Date(task.targetDate).toISOString() : undefined,
+    // Simpan sebagai opname harian agar tabel RAB & Kurva S ikut terkorelasi
+    const targetVolume = task.proposedVolume ? Math.max(0, Number(task.proposedVolume)) || 1 : 1;
+    const today = new Date();
+    const reportDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const res = await recordProjectOpname(project.id, {
+      reportDate,
+      isAdditional: false,
+      periodType: "DAILY",
+      notes: `Status ${task.title} dipindah lewat papan (${nextProgress}%)`,
+      items: [{ workPointId: task.id, volume: Math.round(targetVolume * (nextProgress / 100) * 1000) / 1000 }],
     });
     if (res.success) {
       router.refresh();
+    } else {
+      setLocalWorkPoints(project.workPoints);
     }
   };
 
@@ -524,6 +537,21 @@ export default function ProjectDetailView({
       opnameWorkPointItems: opnameList,
     };
   }, [project.workPoints, project.pagu, project.budget]);
+
+  const scheduleItems: ProgressScheduleItem[] = useMemo(
+    () =>
+      localWorkPoints.map((p) => ({
+        id: p.id,
+        title: p.title,
+        section: p.location || "Pekerjaan Utama",
+        plannedStartDate: p.plannedStartDate,
+        targetDate: p.targetDate,
+        targetVolume: p.proposedVolume ? Math.max(0, Number(p.proposedVolume)) || 1 : 1,
+        unit: p.proposedUnit || "paket",
+        progress: p.progress ?? 0,
+      })),
+    [localWorkPoints],
+  );
 
   const profitAmount = totalRabNumber - totalRapNumber;
   const profitPercent = totalRabNumber > 0 ? ((profitAmount / totalRabNumber) * 100).toFixed(1) : "0.0";
@@ -1622,7 +1650,7 @@ export default function ProjectDetailView({
                       {(report.workSummary || report.notes) && (
                         <div className="mt-3 space-y-1">
                           {report.workSummary && (
-                            <p className="text-xs font-medium text-foreground">
+                            <div className="text-xs font-medium text-foreground">
                               {report.workSummary.startsWith("Opname Mingguan") && (
                                 <Badge variant="outline" className="mr-2 border-sky-500/40 text-[10px] text-sky-500">Mingguan</Badge>
                               )}
@@ -1630,7 +1658,7 @@ export default function ProjectDetailView({
                                 <Badge variant="outline" className="mr-2 border-emerald-500/40 text-[10px] text-emerald-500">Harian</Badge>
                               )}
                               {report.workSummary}
-                            </p>
+                            </div>
                           )}
                           {report.notes && (
                             <p className="text-xs text-muted-foreground">Catatan: {report.notes}</p>
@@ -1850,7 +1878,7 @@ export default function ProjectDetailView({
                   Papan &amp; Jadwal Pekerjaan
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Geser kartu task untuk mengubah status pekerjaan secara instan.
+                  Geser kartu (Papan) atau slider progres (Jadwal). Setiap perubahan tersimpan sebagai opname harian dan langsung tercermin di Kurva S.
                 </CardDescription>
               </div>
 
@@ -1877,7 +1905,7 @@ export default function ProjectDetailView({
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    Gantt
+                    Jadwal &amp; Kurva S
                   </button>
                 </div>
 
@@ -2084,42 +2112,53 @@ export default function ProjectDetailView({
                   })}
                 </div>
               ) : (
-                /* Gantt View Breakdown */
-                <div className="overflow-x-auto rounded-xl border border-border/80">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/40 font-semibold text-muted-foreground">
-                        <th className="py-3 px-4 text-left w-2/5">Uraian Task</th>
-                        <th className="py-3 px-3 text-left w-1/5">Fase / Bagian</th>
-                        <th className="py-3 px-3 text-center w-24">Target Selesai</th>
-                        <th className="py-3 px-3 text-right w-24">Progres</th>
-                        <th className="py-3 px-4 text-left w-1/4">Timeline</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {localWorkPoints.map((t) => (
-                        <tr key={t.id} className="hover:bg-muted/10 transition">
-                          <td className="py-3 px-4 font-semibold text-foreground">
-                            {t.title}
-                          </td>
-                          <td className="py-3 px-3 text-muted-foreground">
-                            {t.location || "Umum"}
-                          </td>
-                          <td className="py-3 px-3 text-center text-muted-foreground whitespace-nowrap">
-                            {t.targetDate ? formatDateIndo(t.targetDate) : "—"}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold">
-                            {t.progress ?? 0}%
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="w-full">
-                              <Progress value={t.progress ?? 0} className="h-2" />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                /* Jadwal per item + Kurva S (terkorelasi) */
+                <div className="space-y-6">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
+                      <span className="text-xs font-medium text-muted-foreground">Progres aktual</span>
+                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                        {project.progress.toLocaleString("id-ID")}%
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
+                      <span className="text-xs font-medium text-muted-foreground">Rencana hari ini</span>
+                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                        {plannedToday.toLocaleString("id-ID")}%
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
+                      <span className="text-xs font-medium text-muted-foreground">Deviasi</span>
+                      <p className={`mt-1 text-2xl font-bold tracking-tight ${deviation < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                        {deviation > 0 ? "+" : ""}
+                        {deviation.toLocaleString("id-ID")}%
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-bold text-foreground">Kurva S</h3>
+                    <div className="rounded-xl border border-border/70 p-4">
+                      <Chart options={sCurveOptions} series={sCurveSeries} type="line" height={240} />
+                      <div className="mt-2 flex items-center justify-center gap-6 text-xs font-medium text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="size-2 rounded-full bg-orange-500" />
+                          <span>Aktual</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-block h-0.5 w-3.5 border-t-2 border-dashed border-muted-foreground" />
+                          <span>Rencana</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ProgressScheduleRows
+                    projectId={project.id}
+                    projectStartDate={project.startDate}
+                    projectEndDate={project.endDate}
+                    items={scheduleItems}
+                  />
                 </div>
               )}
             </CardContent>

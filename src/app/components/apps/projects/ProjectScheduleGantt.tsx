@@ -88,6 +88,62 @@ export default function ProjectScheduleGantt({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskModalData | null>(null);
 
+  // Handler slider realtime untuk mengubah progres task secara live
+  const handleSliderChange = (taskId: string, val: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(val)));
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, progress: clamped } : t)),
+    );
+  };
+
+  const handleSliderCommit = async (taskId: string, explicitVal?: number) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const finalProg = typeof explicitVal === "number" ? explicitVal : (task.progress || 0);
+
+    try {
+      await saveProjectScheduleTask(task.projectId || selectedProject.id, {
+        id: task.id,
+        title: task.title,
+        location: task.location,
+        progress: finalProg,
+        plannedStartDate: task.plannedStartDate || undefined,
+        targetDate: task.targetDate || undefined,
+      });
+      router.refresh();
+    } catch (err: any) {
+      console.error("Gagal menyimpan progres task:", err);
+    }
+  };
+
+  // Helper status badge task (Lebih cepat, Terlambat, Sesuai rencana, Selesai)
+  const getTaskBadge = (prog: number, startWeek: number, duration: number) => {
+    if (prog >= 100) {
+      return { label: "Selesai", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/40" };
+    }
+    const endWeek = startWeek + duration;
+    if (currentWeekIndex < startWeek && prog === 0) {
+      return null;
+    }
+    if (currentWeekIndex >= endWeek && prog < 100) {
+      return { label: "Terlambat", className: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300/40" };
+    }
+    const expected =
+      currentWeekIndex <= startWeek
+        ? 0
+        : currentWeekIndex >= endWeek
+          ? 100
+          : Math.round(((currentWeekIndex - startWeek) / Math.max(1, duration)) * 100);
+
+    if (prog >= expected + 5) {
+      return { label: "Lebih cepat", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/40" };
+    }
+    if (prog <= expected - 5) {
+      return { label: "Terlambat", className: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300/40" };
+    }
+    return null;
+  };
+
   // Drag and drop state for Kanban
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverTaskCol, setDragOverTaskCol] = useState<"todo" | "in_progress" | "done" | null>(null);
@@ -118,6 +174,7 @@ export default function ProjectScheduleGantt({
 
   const handleTaskColDrop = async (e: React.DragEvent, col: "todo" | "in_progress" | "done") => {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverTaskCol(null);
     const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
     setDraggedTaskId(null);
@@ -126,10 +183,14 @@ export default function ProjectScheduleGantt({
     const taskToMove = tasks.find((t) => t.id === taskId);
     if (!taskToMove) return;
 
-    let targetProgress = 0;
-    if (col === "todo") targetProgress = 0;
-    else if (col === "in_progress") targetProgress = 50;
-    else if (col === "done") targetProgress = 100;
+    let targetProgress = taskToMove.progress || 0;
+    if (col === "todo") {
+      targetProgress = 0;
+    } else if (col === "done") {
+      targetProgress = 100;
+    } else if (col === "in_progress") {
+      targetProgress = targetProgress > 0 && targetProgress < 100 ? targetProgress : 50;
+    }
 
     const prevTasks = [...tasks];
     setTasks((prev) =>
@@ -137,7 +198,7 @@ export default function ProjectScheduleGantt({
     );
 
     try {
-      await saveProjectScheduleTask(selectedProject.id, {
+      await saveProjectScheduleTask(taskToMove.projectId || selectedProject.id, {
         id: taskId,
         title: taskToMove.title,
         location: taskToMove.location,
@@ -145,6 +206,7 @@ export default function ProjectScheduleGantt({
         plannedStartDate: taskToMove.plannedStartDate || undefined,
         targetDate: taskToMove.targetDate || undefined,
       });
+      router.refresh();
     } catch (err: any) {
       setTasks(prevTasks);
       alert(err?.message || "Gagal memindahkan task.");
@@ -873,23 +935,50 @@ export default function ProjectScheduleGantt({
                                   >
                                     {t.title}
                                   </div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[11px] text-muted-foreground">
-                                      M{startWeek + 1}-M{Math.min(totalWeeks, endWeek)} · {duration}{" "}
-                                      mgg
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1 max-w-[140px]">
-                                    <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
-                                      <div
-                                        className="h-full bg-foreground"
-                                        style={{ width: `${prog}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-[10px] font-semibold text-muted-foreground">
-                                      {prog}%
-                                    </span>
-                                  </div>
+                                  {(() => {
+                                    const badge = getTaskBadge(prog, startWeek, duration);
+                                    return (
+                                      <>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className="text-[11px] text-muted-foreground">
+                                            M{startWeek + 1}-M{Math.min(totalWeeks, endWeek)} · {duration}{" "}
+                                            mgg
+                                          </span>
+                                          {badge && (
+                                            <span
+                                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold leading-none ${badge.className}`}
+                                            >
+                                              {badge.label}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* Slider Geser Progres Live */}
+                                        <div className="flex items-center gap-2 mt-1.5 max-w-[200px]">
+                                          <input
+                                            type="range"
+                                            min={0}
+                                            max={100}
+                                            step={1}
+                                            value={prog}
+                                            aria-label={`Progres ${t.title}`}
+                                            onChange={(e) => handleSliderChange(t.id, Number(e.target.value))}
+                                            onPointerUp={() => handleSliderCommit(t.id)}
+                                            onTouchEnd={() => handleSliderCommit(t.id)}
+                                            onKeyUp={(e) => {
+                                              if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
+                                                handleSliderCommit(t.id);
+                                              }
+                                            }}
+                                            className="h-1 flex-1 cursor-pointer accent-[#544e45] dark:accent-neutral-200 bg-muted rounded-lg appearance-none"
+                                          />
+                                          <span className="text-[11px] font-mono font-medium text-muted-foreground min-w-[34px] text-right">
+                                            {prog}%
+                                          </span>
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Right cell: 8 week columns with task bar */}
@@ -928,9 +1017,9 @@ export default function ProjectScheduleGantt({
                                       zIndex: 15,
                                     }}
                                   >
-                                    {/* Progress filled area */}
+                                    {/* Progress filled area (live mengikuti slider) */}
                                     <div
-                                      className="h-full bg-zinc-700 dark:bg-zinc-300 text-zinc-100 dark:text-zinc-900 text-[10px] font-semibold flex items-center pl-2 whitespace-nowrap transition-all"
+                                      className="h-full bg-[#544e45] dark:bg-stone-600 text-white text-[10px] font-semibold flex items-center pl-2 whitespace-nowrap transition-all duration-75"
                                       style={{ width: `${Math.max(prog, 0)}%` }}
                                     >
                                       {prog > 0 && `${prog}%`}

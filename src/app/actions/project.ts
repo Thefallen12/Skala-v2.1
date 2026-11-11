@@ -1924,7 +1924,22 @@ export async function saveProjectScheduleTask(
     const endDate = input.targetDate ? new Date(input.targetDate) : null;
     const progressVal = typeof input.progress === "number" ? Math.max(0, Math.min(100, input.progress)) : 0;
 
+    let targetWpId = input.id;
+    let computedCompletedVolume: number | null = null;
+
     if (input.id) {
+      const existingWp = await prisma.projectWorkPoint.findUnique({
+        where: { id: input.id },
+        select: { id: true, proposedVolume: true, proposedUnit: true, title: true },
+      });
+
+      if (existingWp) {
+        const targetVol = existingWp.proposedVolume
+          ? decimalNumberFromScaledInteger(existingWp.proposedVolume)
+          : 1;
+        computedCompletedVolume = Math.round(targetVol * (progressVal / 100) * 1000) / 1000;
+      }
+
       await prisma.projectWorkPoint.update({
         where: { id: input.id },
         data: {
@@ -1933,10 +1948,11 @@ export async function saveProjectScheduleTask(
           plannedStartDate: startDate,
           targetDate: endDate,
           progress: progressVal,
+          ...(computedCompletedVolume !== null ? { completedVolume: computedCompletedVolume } : {}),
         },
       });
     } else {
-      await prisma.projectWorkPoint.create({
+      const created = await prisma.projectWorkPoint.create({
         data: {
           projectId,
           title: input.title,
@@ -1944,14 +1960,82 @@ export async function saveProjectScheduleTask(
           plannedStartDate: startDate,
           targetDate: endDate,
           progress: progressVal,
-          proposedVolume: BigInt(100),
+          proposedVolume: BigInt(1000), // scaled decimal 1.000
           proposedUnit: "paket",
           proposedUnitPrice: BigInt(0),
           proposedTotalWage: BigInt(0),
           proposedById: session.user.id,
         },
       });
+      targetWpId = created.id;
     }
+
+    // Rekam riwayat progres tanggal hari ini
+    const now = new Date();
+    const reportDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (targetWpId) {
+      await prisma.projectWorkPointProgress.create({
+        data: {
+          workPointId: targetWpId,
+          reportDate,
+          progress: progressVal,
+          workSummary: `Progres jadwal: ${progressVal}%`,
+        },
+      });
+    }
+
+    // Sinkronkan agregat progres proyek & Kurva S
+    const updatedPoints = await prisma.projectWorkPoint.findMany({
+      where: { projectId },
+      select: { progress: true, proposedTotalWage: true },
+    });
+
+    const totalWage = updatedPoints.reduce(
+      (acc, p) => acc + Number(p.proposedTotalWage),
+      0,
+    );
+
+    let overallProgress = 0;
+    if (totalWage > 0) {
+      overallProgress = updatedPoints.reduce(
+        (acc, p) => acc + p.progress * (Number(p.proposedTotalWage) / totalWage),
+        0,
+      );
+    } else if (updatedPoints.length > 0) {
+      overallProgress =
+        updatedPoints.reduce((acc, p) => acc + p.progress, 0) /
+        updatedPoints.length;
+    }
+
+    const roundedOverallProgress = Math.round(overallProgress * 10) / 10;
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        progress: roundedOverallProgress,
+      },
+    });
+
+    const summaryText = `Laporan Progres Jadwal: Progres proyek mencapai ${roundedOverallProgress}%`;
+    await prisma.dailyReport.upsert({
+      where: {
+        projectId_reportDate: {
+          projectId,
+          reportDate,
+        },
+      },
+      create: {
+        projectId,
+        reportDate,
+        progress: roundedOverallProgress,
+        workSummary: summaryText,
+        notes: input.notes?.trim() || `Update task ${input.title} (${progressVal}%)`,
+      },
+      update: {
+        progress: roundedOverallProgress,
+        workSummary: summaryText,
+      },
+    });
 
     revalidatePath("/apps/projects/schedule");
     revalidatePath(`/apps/projects/${projectId}`);
