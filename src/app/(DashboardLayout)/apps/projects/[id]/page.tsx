@@ -83,6 +83,14 @@ export default async function ProjectDetailPage({
         include: {
           requester: { select: { name: true } },
           auditLogs: { orderBy: { createdAt: "asc" }, take: 1 },
+          items: {
+            select: {
+              itemName: true,
+              quantity: true,
+              unit: true,
+              estimatedCost: true,
+            },
+          },
         },
       },
     },
@@ -288,6 +296,10 @@ export default async function ProjectDetailPage({
       id: ticket.id,
       ticketNumber: ticket.ticketNumber,
       title: ticket.title,
+      type: ticket.type,
+      requestCategory: ticket.requestCategory,
+      fieldCategory: ticket.fieldCategory,
+      createdAt: ticket.createdAt.toISOString().slice(0, 10),
       status: ticket.status,
       amount:
         ticket.totalAmount !== null
@@ -297,6 +309,15 @@ export default async function ProjectDetailPage({
       paidAt:
         ticket.auditLogs[0]?.createdAt.toISOString().slice(0, 10) ?? null,
       requesterName: ticket.requester.name,
+      items: ticket.items.map((it) => ({
+        itemName: it.itemName,
+        quantity: it.quantity,
+        unit: it.unit,
+        estimatedCost:
+          it.estimatedCost !== null
+            ? decimalStringFromScaledInteger(it.estimatedCost)
+            : null,
+      })),
     })),
   };
 

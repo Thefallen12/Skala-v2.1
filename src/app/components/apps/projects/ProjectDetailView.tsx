@@ -77,6 +77,7 @@ import AnalisaMaterialModal, { type MaterialAnalysisItem } from "./AnalisaMateri
 import { getStandardAnalysisForWorkItem } from "@/lib/drt-rab-parser";
 import UploadDocumentModal from "./UploadDocumentModal";
 import CoreTeamModal from "./CoreTeamModal";
+import ProjectFundRecapTab from "./ProjectFundRecapTab";
 import { applyRabAsContract, applyRapAsBudget, recordProjectOpname } from "@/app/actions/project";
 import { ProjectPrintRabView, ProjectPrintProgressView } from "./ProjectPrintViews";
 
@@ -997,6 +998,9 @@ export default function ProjectDetailView({
           <TabsTrigger value="rab" className="rounded-lg px-4 py-2 text-xs font-semibold">
             RAB &amp; biaya
           </TabsTrigger>
+          <TabsTrigger value="rekap-dana" className="rounded-lg px-4 py-2 text-xs font-semibold">
+            Rekap dana
+          </TabsTrigger>
           <TabsTrigger value="tagihan" className="rounded-lg px-4 py-2 text-xs font-semibold">
             Tagihan
           </TabsTrigger>
@@ -1583,6 +1587,16 @@ export default function ProjectDetailView({
           )}
         </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ===================== TAB: REKAP DANA ===================== */}
+        <TabsContent value="rekap-dana" className="space-y-6">
+          <ProjectFundRecapTab
+            projectTitle={project.title}
+            projectCode={project.code}
+            contractValue={totalRabNumber}
+            tickets={project.wageTicketPayments}
+          />
         </TabsContent>
 
         {/* ===================== TAB 3: TAGIHAN ===================== */}

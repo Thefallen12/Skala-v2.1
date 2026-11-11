@@ -284,6 +284,16 @@ export type ProjectWorkstationMasterData = {
     paid: boolean;
     paidAt: string | null;
     requesterName: string;
+    type?: string | null;
+    requestCategory?: string | null;
+    fieldCategory?: string | null;
+    createdAt?: string | null;
+    items?: Array<{
+      itemName: string;
+      quantity: number;
+      unit: string;
+      estimatedCost?: string | number | null;
+    }>;
   }[];
   blueprints: {
     id: string;
