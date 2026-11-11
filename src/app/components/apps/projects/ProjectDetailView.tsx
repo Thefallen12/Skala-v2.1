@@ -245,9 +245,13 @@ export default function ProjectDetailView({
     }
   };
 
-  const handleTaskDrop = async (targetCol: "belum_mulai" | "berjalan" | "selesai") => {
-    if (!draggedTaskId) return;
-    const task = localWorkPoints.find((wp) => wp.id === draggedTaskId);
+  const handleTaskDrop = async (
+    targetCol: "belum_mulai" | "berjalan" | "selesai",
+    taskIdFromDrop?: string,
+  ) => {
+    const taskId = taskIdFromDrop || draggedTaskId;
+    if (!taskId) return;
+    const task = localWorkPoints.find((wp) => wp.id === taskId);
     if (!task) return;
 
     let nextProgress = 0;
@@ -257,7 +261,7 @@ export default function ProjectDetailView({
 
     // Optimistic update
     setLocalWorkPoints((prev) =>
-      prev.map((wp) => (wp.id === draggedTaskId ? { ...wp, progress: nextProgress } : wp))
+      prev.map((wp) => (wp.id === taskId ? { ...wp, progress: nextProgress } : wp))
     );
     setDraggedTaskId(null);
     setTaskDragOverColumn(null);
@@ -1913,14 +1917,21 @@ export default function ProjectDetailView({
                         key={col.key}
                         onDragOver={(e) => {
                           e.preventDefault();
-                          setTaskDragOverColumn(col.key);
+                          e.dataTransfer.dropEffect = "move";
+                          if (taskDragOverColumn !== col.key) {
+                            setTaskDragOverColumn(col.key);
+                          }
                         }}
-                        onDragLeave={() => setTaskDragOverColumn(null)}
+                        onDragLeave={(e) => {
+                          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                          setTaskDragOverColumn(null);
+                        }}
                         onDrop={(e) => {
                           e.preventDefault();
-                          handleTaskDrop(col.key);
+                          const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
+                          handleTaskDrop(col.key, taskId || undefined);
                         }}
-                        className={`flex flex-col rounded-xl border p-3 min-h-[360px] transition-all duration-150 ${
+                        className={`flex flex-col rounded-xl border p-3 min-h-[460px] h-full transition-all duration-150 ${
                           isOver
                             ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
                             : "border-border/70 bg-muted/20"
@@ -1937,7 +1948,7 @@ export default function ProjectDetailView({
                           </span>
                         </div>
 
-                        <div className="space-y-2.5 flex-1">
+                        <div className="space-y-2.5 flex-1 flex flex-col min-h-[360px]">
                           {colTasks.map((t) => {
                             const isDragging = draggedTaskId === t.id;
                             const titleParts = t.title.split(" ");
@@ -1948,7 +1959,11 @@ export default function ProjectDetailView({
                               <div
                                 key={t.id}
                                 draggable
-                                onDragStart={() => setDraggedTaskId(t.id)}
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData("text/plain", t.id);
+                                  e.dataTransfer.effectAllowed = "move";
+                                  setDraggedTaskId(t.id);
+                                }}
                                 onDragEnd={() => {
                                   setDraggedTaskId(null);
                                   setTaskDragOverColumn(null);
@@ -1997,13 +2012,33 @@ export default function ProjectDetailView({
 
                           {colTasks.length === 0 && (
                             <div
-                              className={`flex h-24 items-center justify-center rounded-lg border border-dashed text-center text-xs transition-colors ${
+                              className={`flex-1 min-h-[280px] flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all ${
                                 isOver
-                                  ? "border-primary bg-primary/10 text-primary font-semibold"
-                                  : "border-border/50 text-muted-foreground/60"
+                                  ? "border-primary bg-primary/15 text-primary font-bold shadow-inner scale-[1.01]"
+                                  : "border-border/60 bg-muted/10 text-muted-foreground/60"
                               }`}
                             >
-                              <span>{isOver ? "Lepas task di sini" : "Belum ada task"}</span>
+                              <div className="rounded-full bg-muted/40 p-3 mb-2">
+                                <Columns className="size-5 text-muted-foreground/60" />
+                              </div>
+                              <span className="text-xs font-semibold text-foreground">
+                                {isOver ? `Lepas di sini untuk memindahkan ke ${col.title}` : `Kolom ${col.title} Kosong`}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground mt-1 max-w-[180px]">
+                                Tarik kartu tugas ke seluruh area kolom ini
+                              </span>
+                            </div>
+                          )}
+
+                          {colTasks.length > 0 && (
+                            <div
+                              className={`flex-1 min-h-[60px] rounded-xl border-2 border-dashed transition-all flex items-center justify-center p-3 text-center ${
+                                isOver
+                                  ? "border-primary bg-primary/15 text-primary text-xs font-semibold"
+                                  : "border-transparent opacity-0 pointer-events-none"
+                              }`}
+                            >
+                              {isOver && <span>+ Lepas di sini untuk memindahkan ke {col.title}</span>}
                             </div>
                           )}
                         </div>
