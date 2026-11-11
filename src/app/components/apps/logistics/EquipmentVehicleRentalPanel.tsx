@@ -34,6 +34,10 @@ import {
   saveRental,
   deleteRental,
 } from "@/app/actions/rentals";
+import {
+  STANDARD_EQUIPMENT_CATALOG,
+  ALL_CATALOG_ITEMS,
+} from "@/lib/equipment-catalog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -871,14 +875,49 @@ export default function EquipmentVehicleRentalPanel({
             </div>
           </div>
 
-          {/* Unit Details */}
+          {/* Unit Details & Catalog Quick Selection */}
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="sm:col-span-2">
-              <Label className="text-xs font-semibold text-foreground block mb-1.5">
-                Nama {formType === "EQUIPMENT" ? "Alat" : "Kendaraan"} *
-              </Label>
+            <div className="sm:col-span-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-foreground">
+                  Nama {formType === "EQUIPMENT" ? "Alat" : "Kendaraan"} *
+                </Label>
+                <span className="text-[10px] text-muted-foreground">
+                  Pilih cepat katalog atau ketik bebas
+                </span>
+              </div>
+              <select
+                className="h-8 w-full rounded-md border border-dashed border-primary/50 bg-primary/5 px-2.5 text-xs font-medium text-foreground focus:border-primary focus:ring-1 focus:ring-primary transition-colors cursor-pointer"
+                defaultValue=""
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  if (!selectedId) return;
+                  const found = ALL_CATALOG_ITEMS.find((item) => item.id === selectedId);
+                  if (found) {
+                    setFormName(found.name);
+                    setFormCategory(found.category);
+                    setFormType(found.type);
+                  }
+                  e.target.value = "";
+                }}
+              >
+                <option value="">⚡ Pilih Cepat dari 6 Kategori Katalog Standar...</option>
+                {STANDARD_EQUIPMENT_CATALOG.map((group) => (
+                  <optgroup key={group.categoryNumber} label={`${group.categoryNumber}. ${group.categoryName}`}>
+                    {group.items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} {item.description ? `— ${item.description}` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
               <Input
-                placeholder={formType === "EQUIPMENT" ? "contoh: Excavator PC200 Komatsu" : "contoh: Dump Truck Hino 500 10 Roda"}
+                placeholder={
+                  formType === "EQUIPMENT"
+                    ? "contoh: Excavator Komatsu PC200"
+                    : "contoh: Dump Truck Hino 500 FM 260 JD"
+                }
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 required
@@ -902,12 +941,30 @@ export default function EquipmentVehicleRentalPanel({
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <Label className="text-xs font-semibold text-foreground block mb-1.5">Kategori Unit</Label>
-              <Input
-                placeholder={formType === "EQUIPMENT" ? "cth: Alat Berat / Molen" : "cth: Pick Up / Dump Truck"}
+              <select
                 value={formCategory}
                 onChange={(e) => setFormCategory(e.target.value)}
-                className="h-9 text-xs"
-              />
+                className="h-9 w-full rounded-md border bg-background px-2.5 text-xs font-medium text-foreground"
+              >
+                <option value="">Pilih Kategori...</option>
+                <option value="Alat Gali & Pemuat">1. Alat Gali & Pemuat</option>
+                <option value="Alat Pemadat">2. Alat Pemadat Tanah & Aspal</option>
+                <option value="Kendaraan Pengangkut">3. Kendaraan Pengangkut & Logistik</option>
+                <option value="Alat Pengecoran Beton">4. Alat Pengecoran & Beton</option>
+                <option value="Alat Angkat">5. Alat Angkat (Crane/Forklift)</option>
+                <option value="Daya & Utilitas">6. Daya & Utilitas Lapangan</option>
+                {formCategory &&
+                  ![
+                    "Alat Gali & Pemuat",
+                    "Alat Pemadat",
+                    "Kendaraan Pengangkut",
+                    "Alat Pengecoran Beton",
+                    "Alat Angkat",
+                    "Daya & Utilitas",
+                  ].includes(formCategory) && (
+                    <option value={formCategory}>{formCategory}</option>
+                  )}
+              </select>
             </div>
             <div className="relative" ref={vendorComboboxRef}>
               <Label className="text-xs font-semibold text-foreground block mb-1.5">Vendor / Pemilik Sewa *</Label>
