@@ -42,6 +42,7 @@ export type StockItemOption = {
   name: string;
   unit: string;
   category: string;
+  unitPrice?: string | number | null;
 };
 
 interface MaterialPlanModalProps {

@@ -7,6 +7,7 @@ import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import ProjectDetailView from "@/app/components/apps/projects/ProjectDetailView";
 import type { ProjectWorkstationMasterData } from "@/app/components/apps/projects/ProjectWorkstationMaster";
+import type { StockItemOption } from "@/app/components/apps/projects/MaterialPlanModal";
 
 export async function generateMetadata({
   params,
@@ -113,7 +114,7 @@ export default async function ProjectDetailPage({
     },
   });
 
-  const stockItems = await prisma.stockItem.findMany({
+  const rawStockItems = await prisma.stockItem.findMany({
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -121,8 +122,21 @@ export default async function ProjectDetailPage({
       name: true,
       unit: true,
       category: true,
+      unitPrice: true,
     },
   });
+
+  const stockItems: StockItemOption[] = rawStockItems.map((item) => ({
+    id: item.id,
+    sku: item.sku,
+    name: item.name,
+    unit: item.unit,
+    category: item.category,
+    unitPrice:
+      item.unitPrice !== null
+        ? decimalStringFromScaledInteger(item.unitPrice)
+        : "0",
+  }));
 
   const rawMilestones = await prisma.calendarEvent.findMany({
     where: {
@@ -331,40 +345,101 @@ export default async function ProjectDetailPage({
         : "",
       isApproved: bast.isApproved,
     })),
-    wageTicketPayments: project.tickets.map((ticket) => ({
-      id: ticket.id,
-      ticketNumber: ticket.ticketNumber,
-      title: ticket.title,
-      type: ticket.type,
-      requestCategory: ticket.requestCategory,
-      fieldCategory: ticket.fieldCategory,
-      createdAt: ticket.createdAt
-        ? typeof ticket.createdAt === "string"
-          ? (ticket.createdAt as string).slice(0, 10)
-          : ticket.createdAt.toISOString().slice(0, 10)
-        : "",
-      status: ticket.status,
-      amount:
-        ticket.totalAmount !== null
-          ? decimalStringFromScaledInteger(ticket.totalAmount)
+    wageTicketPayments: project.tickets.map((ticket) => {
+      let ticketTotal =
+        ticket.totalAmount !== null && Number(ticket.totalAmount) > 0
+          ? Number(decimalStringFromScaledInteger(ticket.totalAmount))
+          : 0;
+
+      const cleanStr = (s: string) =>
+        s
+          .toLowerCase()
+          .replace(/½/g, "1/2")
+          .replace(/[\/,\-_]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+
+      // Compute total from items * stock catalog unit price if ticket total is 0
+      if (ticketTotal === 0 && ticket.items && ticket.items.length > 0) {
+        let itemsSum = 0;
+        for (const it of ticket.items) {
+          const qty = Number(it.quantity || 0);
+          const estCost =
+            it.estimatedCost !== null
+              ? Number(decimalStringFromScaledInteger(it.estimatedCost))
+              : 0;
+          const targetClean = cleanStr(it.itemName);
+
+          const matchedStock = stockItems.find((s) => {
+            if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+            if (cleanStr(s.name) === targetClean) return true;
+            const sClean = cleanStr(s.name);
+            return sClean.includes(targetClean) || targetClean.includes(sClean);
+          });
+
+          const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+          const unitPrice = stockPrice > 0 ? stockPrice : estCost;
+          itemsSum += qty * unitPrice;
+        }
+        if (itemsSum > 0) {
+          ticketTotal = itemsSum;
+        }
+      }
+
+      return {
+        id: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        title: ticket.title,
+        type: ticket.type,
+        requestCategory: ticket.requestCategory,
+        fieldCategory: ticket.fieldCategory,
+        createdAt: ticket.createdAt
+          ? typeof ticket.createdAt === "string"
+            ? (ticket.createdAt as string).slice(0, 10)
+            : ticket.createdAt.toISOString().slice(0, 10)
+          : "",
+        status: ticket.status,
+        amount:
+          ticketTotal > 0
+            ? String(ticketTotal)
+            : ticket.totalAmount !== null
+              ? decimalStringFromScaledInteger(ticket.totalAmount)
+              : "0",
+        paid: ticket.transferReceiptUrl !== null,
+        paidAt: ticket.auditLogs[0]?.createdAt
+          ? typeof ticket.auditLogs[0].createdAt === "string"
+            ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
+            : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
           : null,
-      paid: ticket.transferReceiptUrl !== null,
-      paidAt: ticket.auditLogs[0]?.createdAt
-        ? typeof ticket.auditLogs[0].createdAt === "string"
-          ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
-          : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
-        : null,
-      requesterName: ticket.requester?.name ?? "Pemohon",
-      items: ticket.items.map((it) => ({
-        itemName: it.itemName,
-        quantity: it.quantity,
-        unit: it.unit,
-        estimatedCost:
-          it.estimatedCost !== null
-            ? decimalStringFromScaledInteger(it.estimatedCost)
-            : null,
-      })),
-    })),
+        requesterName: ticket.requester?.name ?? "Pemohon",
+        items: ticket.items.map((it) => {
+          const estCostNum =
+            it.estimatedCost !== null
+              ? Number(decimalStringFromScaledInteger(it.estimatedCost))
+              : 0;
+          let calculatedEstCost = estCostNum;
+          if (calculatedEstCost === 0) {
+            const targetClean = cleanStr(it.itemName);
+            const matchedStock = stockItems.find((s) => {
+              if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+              if (cleanStr(s.name) === targetClean) return true;
+              const sClean = cleanStr(s.name);
+              return sClean.includes(targetClean) || targetClean.includes(sClean);
+            });
+            const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+            if (stockPrice > 0) {
+              calculatedEstCost = stockPrice * Number(it.quantity || 0);
+            }
+          }
+          return {
+            itemName: it.itemName,
+            quantity: it.quantity,
+            unit: it.unit,
+            estimatedCost: calculatedEstCost > 0 ? String(calculatedEstCost) : null,
+          };
+        }),
+      };
+    }),
   };
 
   return (

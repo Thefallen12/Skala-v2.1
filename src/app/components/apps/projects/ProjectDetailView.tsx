@@ -1596,6 +1596,7 @@ export default function ProjectDetailView({
             projectCode={project.code}
             contractValue={totalRabNumber}
             tickets={project.wageTicketPayments}
+            stockItems={stockItems}
           />
         </TabsContent>
 

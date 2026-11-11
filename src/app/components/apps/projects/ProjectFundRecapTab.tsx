@@ -51,6 +51,11 @@ interface ProjectFundRecapTabProps {
   projectCode: string;
   contractValue: number;
   tickets: FundTicketItem[];
+  stockItems?: Array<{
+    name: string;
+    unitPrice?: string | number | null;
+    unit?: string;
+  }>;
 }
 
 function currency(val: number | string | null | undefined): string {
@@ -147,23 +152,57 @@ export default function ProjectFundRecapTab({
   projectCode,
   contractValue,
   tickets = [],
+  stockItems = [],
 }: ProjectFundRecapTabProps) {
   const [selectedCategory, setSelectedCategory] = useState<"ALL" | FundCategoryKey>("ALL");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"ALL" | "PAID" | "PENDING">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Process & Categorize all tickets
+  // Process & Categorize all tickets with material catalog pricing
   const classifiedTickets = useMemo(() => {
+    const cleanStr = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/½/g, "1/2")
+        .replace(/[\/,\-_]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
     return tickets.map((t) => {
       const cat = classifyTicketFundCategory(t);
-      const amountNum = Number(t.amount || 0);
+      let amountNum = Number(t.amount || 0);
+
+      // If ticket amount is 0 and it has items, calculate from items * catalog price
+      if (amountNum === 0 && t.items && t.items.length > 0) {
+        let itemsSum = 0;
+        for (const it of t.items) {
+          const qty = Number(it.quantity || 0);
+          const estCost = Number(it.estimatedCost || 0);
+          const targetClean = cleanStr(it.itemName);
+
+          const matchedStock = stockItems.find((s) => {
+            if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+            if (cleanStr(s.name) === targetClean) return true;
+            const sClean = cleanStr(s.name);
+            return sClean.includes(targetClean) || targetClean.includes(sClean);
+          });
+
+          const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+          const unitPrice = stockPrice > 0 ? stockPrice : estCost;
+          itemsSum += qty * unitPrice;
+        }
+        if (itemsSum > 0) {
+          amountNum = itemsSum;
+        }
+      }
+
       return {
         ...t,
         category: cat,
         amountNum,
       };
     });
-  }, [tickets]);
+  }, [tickets, stockItems]);
 
   // Aggregated Summary by Category
   const summary = useMemo(() => {
