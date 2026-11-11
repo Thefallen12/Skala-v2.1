@@ -60,17 +60,19 @@ export interface ScheduleMilestoneItem {
 }
 
 interface ProjectScheduleGanttProps {
-  projects: ScheduleProjectOption[];
+  projects?: ScheduleProjectOption[];
   selectedProject: ScheduleProjectOption;
   initialTasks: ScheduleTaskItem[];
   initialMilestones: ScheduleMilestoneItem[];
+  embedded?: boolean;
 }
 
 export default function ProjectScheduleGantt({
-  projects,
+  projects = [],
   selectedProject,
   initialTasks,
   initialMilestones,
+  embedded = false,
 }: ProjectScheduleGanttProps) {
   const router = useRouter();
 
@@ -366,8 +368,25 @@ export default function ProjectScheduleGantt({
     router.push(`/apps/projects/schedule?projectId=${projectId}`);
   };
 
-  const handleOpenAddTask = () => {
-    setEditingTask(null);
+  const handleOpenAddTask = (defaultStatus?: "TODO" | "IN_PROGRESS" | "DONE" | React.MouseEvent) => {
+    const effectiveStatus: "TODO" | "IN_PROGRESS" | "DONE" = typeof defaultStatus === "string" ? defaultStatus : "TODO";
+    let initialProg = 0;
+    if (effectiveStatus === "IN_PROGRESS") initialProg = 50;
+    else if (effectiveStatus === "DONE") initialProg = 100;
+
+    setEditingTask({
+      id: "",
+      title: "",
+      location: "A. Persiapan",
+      status: effectiveStatus,
+      hasConstraint: false,
+      needsCheck: false,
+      startWeek: currentWeekIndex,
+      durationWeeks: 2,
+      progress: initialProg,
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+    });
     setIsTaskModalOpen(true);
   };
 
@@ -524,7 +543,7 @@ export default function ProjectScheduleGantt({
   return (
     <div className="space-y-4 pb-12">
       {/* Onboarding Step 3 Banner (matching screenshot) */}
-      {showOnboardingBanner && (
+      {!embedded && showOnboardingBanner && (
         <div className="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <span className="text-[11px] font-semibold text-muted-foreground block">
@@ -546,6 +565,7 @@ export default function ProjectScheduleGantt({
       )}
 
       {/* Breadcrumb Navigation */}
+      {!embedded && (
       <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link href="/apps/projects" className="transition hover:text-foreground">
           Proyek
@@ -564,6 +584,7 @@ export default function ProjectScheduleGantt({
         <ChevronRight className="size-3.5" />
         <span className="font-semibold text-foreground">Jadwal proyek</span>
       </nav>
+      )}
 
       {/* Top Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1157,7 +1178,7 @@ export default function ProjectScheduleGantt({
                   </div>
                   <button
                     type="button"
-                    onClick={handleOpenAddTask}
+                    onClick={() => handleOpenAddTask("TODO")}
                     className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
                   >
                     <Plus className="size-3.5" />
@@ -1249,7 +1270,7 @@ export default function ProjectScheduleGantt({
                   </div>
                   <button
                     type="button"
-                    onClick={handleOpenAddTask}
+                    onClick={() => handleOpenAddTask("IN_PROGRESS")}
                     className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
                   >
                     <Plus className="size-3.5" />
@@ -1270,13 +1291,21 @@ export default function ProjectScheduleGantt({
                 >
                   <div>
                     <div className="flex items-center justify-between font-semibold text-xs text-foreground mb-3">
-                      <span className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
                         <CheckCircle2 className="size-3.5 text-emerald-500" />
                         <span>Selesai</span>
-                      </span>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
-                        {counts.done}
-                      </span>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                          {counts.done}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAddTask("DONE")}
+                        className="size-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition"
+                        title="Tambah task selesai"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
                     </div>
                     <div className="space-y-2">
                       {tasks
@@ -1335,7 +1364,7 @@ export default function ProjectScheduleGantt({
                   </div>
                   <button
                     type="button"
-                    onClick={handleOpenAddTask}
+                    onClick={() => handleOpenAddTask("DONE")}
                     className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/30 transition-colors mt-3"
                   >
                     <Plus className="size-3.5" />

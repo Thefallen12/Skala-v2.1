@@ -66,6 +66,7 @@ import {
   saveProjectScheduleTask,
 } from "@/app/actions/project";
 import EditRabModal, { type EditableRabItem } from "./EditRabModal";
+import ProjectScheduleGantt, { type ScheduleMilestoneItem } from "./ProjectScheduleGantt";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
 import ProgressScheduleRows, { type ProgressScheduleItem } from "./ProgressScheduleRows";
 import MaterialPlanModal, { type MaterialPlanRow, type StockItemOption } from "./MaterialPlanModal";
@@ -173,11 +174,13 @@ export default function ProjectDetailView({
   fieldTeamUsers = [],
   stockItems = [],
   currentUserRole,
+  initialMilestones = [],
 }: {
   project: ProjectWorkstationMasterData;
   fieldTeamUsers?: FieldTeamOption[];
   stockItems?: StockItemOption[];
   currentUserRole?: UserRole;
+  initialMilestones?: ScheduleMilestoneItem[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1869,300 +1872,31 @@ export default function ProjectDetailView({
           </Card>
         </TabsContent>
 
-        {/* ===================== TAB 7: PAPAN & JADWAL (KANBAN DETAIL) ===================== */}
+        {/* ===================== TAB 7: PAPAN & JADWAL (JADWAL PROYEK LENGKAP) ===================== */}
         <TabsContent value="papan" className="space-y-6">
-          <Card className="border-border/80 shadow-2xs">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
-              <div>
-                <CardTitle className="text-base font-bold text-foreground">
-                  Papan &amp; Jadwal Pekerjaan
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Geser kartu (Papan) atau slider progres (Jadwal). Setiap perubahan tersimpan sebagai opname harian dan langsung tercermin di Kurva S.
-                </CardDescription>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Switcher: Papan | Gantt */}
-                <div className="flex rounded-lg border border-border/70 bg-muted/30 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setScheduleViewMode("papan")}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                      scheduleViewMode === "papan"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Papan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScheduleViewMode("gantt")}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                      scheduleViewMode === "gantt"
-                        ? "bg-card text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Jadwal &amp; Kurva S
-                  </button>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditRabModalOpen(true)}
-                  className="h-8 gap-1.5 text-xs font-semibold rounded-lg"
-                >
-                  <Plus className="size-3.5" />
-                  <span>Tambah task</span>
-                </Button>
-
-                <Link
-                  href={`/apps/projects/schedule?projectId=${project.id}`}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted transition"
-                >
-                  <ExternalLink className="size-3.5 text-muted-foreground" />
-                  <span>Halaman Jadwal Penuh</span>
-                </Link>
-              </div>
-            </CardHeader>
-
-            <CardContent className="pt-6">
-              {localWorkPoints.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    Belum ada task pekerjaan. Isi RAB atau tambah task untuk mulai mengelola jadwal pekerjaan.
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setIsEditRabModalOpen(true)}
-                    className="mt-3 h-8 gap-1.5 text-xs bg-foreground text-background font-semibold"
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Isi RAB / Tambah task</span>
-                  </Button>
-                </div>
-              ) : scheduleViewMode === "papan" ? (
-                /* 3-Column Task Kanban Board */
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                  {(
-                    [
-                      {
-                        key: "belum_mulai" as const,
-                        title: "Belum mulai",
-                        match: (p: any) => (p.progress ?? 0) === 0,
-                        headerClass: "text-slate-600 dark:text-slate-400",
-                        badgeClass: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-                      },
-                      {
-                        key: "berjalan" as const,
-                        title: "Berjalan",
-                        match: (p: any) => (p.progress ?? 0) > 0 && (p.progress ?? 0) < 100,
-                        headerClass: "text-blue-600 dark:text-blue-400",
-                        badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-                      },
-                      {
-                        key: "selesai" as const,
-                        title: "Selesai",
-                        match: (p: any) => (p.progress ?? 0) >= 100,
-                        headerClass: "text-emerald-600 dark:text-emerald-400",
-                        badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-                      },
-                    ]
-                  ).map((col) => {
-                    const colTasks = localWorkPoints.filter(col.match);
-                    const isOver = taskDragOverColumn === col.key;
-
-                    return (
-                      <div
-                        key={col.key}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = "move";
-                          if (taskDragOverColumn !== col.key) {
-                            setTaskDragOverColumn(col.key);
-                          }
-                        }}
-                        onDragLeave={(e) => {
-                          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                          setTaskDragOverColumn(null);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
-                          handleTaskDrop(col.key, taskId || undefined);
-                        }}
-                        className={`flex flex-col rounded-xl border p-3 min-h-[460px] h-full transition-all duration-150 ${
-                          isOver
-                            ? "border-primary bg-primary/10 ring-2 ring-primary/40 shadow-inner"
-                            : "border-border/70 bg-muted/20"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between pb-3 border-b border-border/50 mb-3">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs font-bold ${col.headerClass}`}>
-                              {col.title}
-                            </span>
-                          </div>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${col.badgeClass}`}>
-                            {colTasks.length}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2.5 flex-1 flex flex-col min-h-[360px]">
-                          {colTasks.map((t) => {
-                            const isDragging = draggedTaskId === t.id;
-                            const titleParts = t.title.split(" ");
-                            const maybeCode = titleParts[0]?.includes(".") ? titleParts[0] : "";
-                            const cleanTitle = maybeCode ? titleParts.slice(1).join(" ") : t.title;
-
-                            return (
-                              <div
-                                key={t.id}
-                                draggable
-                                onDragStart={(e) => {
-                                  e.dataTransfer.setData("text/plain", t.id);
-                                  e.dataTransfer.effectAllowed = "move";
-                                  setDraggedTaskId(t.id);
-                                }}
-                                onDragEnd={() => {
-                                  setDraggedTaskId(null);
-                                  setTaskDragOverColumn(null);
-                                }}
-                                className={`rounded-lg border bg-card p-3 shadow-2xs transition group select-none cursor-grab active:cursor-grabbing ${
-                                  isDragging
-                                    ? "opacity-30 border-dashed border-primary scale-95"
-                                    : "border-border/80 hover:border-primary/50 hover:shadow-xs"
-                                }`}
-                              >
-                                {t.location && (
-                                  <span className="inline-block rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground mb-1.5 line-clamp-1">
-                                    {t.location}
-                                  </span>
-                                )}
-
-                                <p className="text-xs font-bold text-foreground line-clamp-2">
-                                  {maybeCode ? maybeCode + " " : ""}
-                                  {cleanTitle}
-                                </p>
-
-                                <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-                                  <span>
-                                    {t.proposedVolume
-                                      ? `${Number(t.proposedVolume)} ${t.proposedUnit || "paket"}`
-                                      : t.proposedUnit || "1 paket"}
-                                  </span>
-                                  {t.targetDate && (
-                                    <span className="flex items-center gap-1 text-[10px]">
-                                      <Calendar className="size-3" />
-                                      {formatDateIndo(t.targetDate)}
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="mt-2 space-y-1 pt-1 border-t border-border/40">
-                                  <div className="flex items-center justify-between text-[10px]">
-                                    <span className="text-muted-foreground">Progres</span>
-                                    <span className="font-bold">{t.progress ?? 0}%</span>
-                                  </div>
-                                  <Progress value={t.progress ?? 0} className="h-1.5" />
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {colTasks.length === 0 && (
-                            <div
-                              className={`flex-1 min-h-[280px] flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-all ${
-                                isOver
-                                  ? "border-primary bg-primary/15 text-primary font-bold shadow-inner scale-[1.01]"
-                                  : "border-border/60 bg-muted/10 text-muted-foreground/60"
-                              }`}
-                            >
-                              <div className="rounded-full bg-muted/40 p-3 mb-2">
-                                <Columns className="size-5 text-muted-foreground/60" />
-                              </div>
-                              <span className="text-xs font-semibold text-foreground">
-                                {isOver ? `Lepas di sini untuk memindahkan ke ${col.title}` : `Kolom ${col.title} Kosong`}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground mt-1 max-w-[180px]">
-                                Tarik kartu tugas ke seluruh area kolom ini
-                              </span>
-                            </div>
-                          )}
-
-                          {colTasks.length > 0 && (
-                            <div
-                              className={`flex-1 min-h-[60px] rounded-xl border-2 border-dashed transition-all flex items-center justify-center p-3 text-center ${
-                                isOver
-                                  ? "border-primary bg-primary/15 text-primary text-xs font-semibold"
-                                  : "border-transparent opacity-0 pointer-events-none"
-                              }`}
-                            >
-                              {isOver && <span>+ Lepas di sini untuk memindahkan ke {col.title}</span>}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                /* Jadwal per item + Kurva S (terkorelasi) */
-                <div className="space-y-6">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
-                      <span className="text-xs font-medium text-muted-foreground">Progres aktual</span>
-                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-                        {project.progress.toLocaleString("id-ID")}%
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
-                      <span className="text-xs font-medium text-muted-foreground">Rencana hari ini</span>
-                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-                        {plannedToday.toLocaleString("id-ID")}%
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
-                      <span className="text-xs font-medium text-muted-foreground">Deviasi</span>
-                      <p className={`mt-1 text-2xl font-bold tracking-tight ${deviation < 0 ? "text-rose-400" : "text-emerald-400"}`}>
-                        {deviation > 0 ? "+" : ""}
-                        {deviation.toLocaleString("id-ID")}%
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-bold text-foreground">Kurva S</h3>
-                    <div className="rounded-xl border border-border/70 p-4">
-                      <Chart options={sCurveOptions} series={sCurveSeries} type="line" height={240} />
-                      <div className="mt-2 flex items-center justify-center gap-6 text-xs font-medium text-muted-foreground">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="size-2 rounded-full bg-orange-500" />
-                          <span>Aktual</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="inline-block h-0.5 w-3.5 border-t-2 border-dashed border-muted-foreground" />
-                          <span>Rencana</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <ProgressScheduleRows
-                    projectId={project.id}
-                    projectStartDate={project.startDate}
-                    projectEndDate={project.endDate}
-                    items={scheduleItems}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ProjectScheduleGantt
+            selectedProject={{
+              id: project.id,
+              code: project.code,
+              title: project.title,
+              name: project.title,
+              startDate: project.startDate,
+              endDate: project.endDate,
+              progress: project.progress,
+            }}
+            initialTasks={project.workPoints.map((wp) => ({
+              id: wp.id,
+              title: wp.title,
+              location: wp.location || "A. Persiapan",
+              plannedStartDate: wp.plannedStartDate,
+              targetDate: wp.targetDate,
+              progress: wp.progress ?? 0,
+              projectId: project.id,
+              projectName: project.title,
+            }))}
+            initialMilestones={initialMilestones}
+            embedded={true}
+          />
         </TabsContent>
       </Tabs>
 

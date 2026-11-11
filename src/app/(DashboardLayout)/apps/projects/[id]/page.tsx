@@ -116,6 +116,25 @@ export default async function ProjectDetailPage({
     },
   });
 
+  const rawMilestones = await prisma.calendarEvent.findMany({
+    where: {
+      projectId: project.id,
+      type: "DEADLINE",
+    },
+    orderBy: { startsAt: "asc" },
+    select: {
+      id: true,
+      title: true,
+      startsAt: true,
+    },
+  });
+
+  const initialMilestones = rawMilestones.map((m) => ({
+    id: m.id,
+    title: m.title,
+    date: m.startsAt.toISOString(),
+  }));
+
   const realizationMap = await getPaidProjectTicketRealization([project.id]);
   const realization = realizationMap.get(project.id);
 
@@ -287,6 +306,7 @@ export default async function ProjectDetailPage({
       fieldTeamUsers={fieldTeamUsers}
       stockItems={stockItems}
       currentUserRole={session.user.role}
+      initialMilestones={initialMilestones}
     />
   );
 }
