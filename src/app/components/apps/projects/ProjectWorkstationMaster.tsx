@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/construction";
 import ProjectFormModal from "@/app/components/project/ProjectFormModal";
 import ImportProjectModal from "./ImportProjectModal";
+import { DinasProjectReportPage } from "./DinasProjectReportPage";
 import GISWorkspace from "@/app/components/apps/gis/GISWorkspace";
 import type {
   FieldSurveySummary,
@@ -109,6 +110,7 @@ import {
   ChartSpline,
   ChevronLeft,
   ChevronRight,
+  Landmark,
   MapPin,
   MapPinned,
   Search,
@@ -576,7 +578,7 @@ export default function ProjectWorkstationMaster({
   const [proposedUnitPrice, setProposedUnitPrice] = useState("");
   const [proposedTotalWage, setProposedTotalWage] = useState("");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [projectViewMode, setProjectViewMode] = useState<"tabel" | "papan">("tabel");
+  const [projectViewMode, setProjectViewMode] = useState<"tabel" | "papan" | "dinas">("tabel");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
@@ -1262,6 +1264,13 @@ export default function ProjectWorkstationMaster({
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Daftar proyek</h1>
             <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/apps/projects/reports/dinas"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition"
+              >
+                <Landmark className="size-3.5" />
+                <span>Laporan Dinas Terkait</span>
+              </Link>
               <Button
                 type="button"
                 variant="outline"
@@ -1351,67 +1360,84 @@ export default function ProjectWorkstationMaster({
                 >
                   Papan
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setProjectViewMode("dinas")}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                    projectViewMode === "dinas"
+                      ? "bg-primary text-primary-foreground shadow-2xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Laporan Dinas
+                </button>
               </div>
 
-              <div className="relative w-56">
-                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari proyek"
-                  className="h-8 pl-8 text-xs bg-muted/20 rounded-lg"
-                />
+              {projectViewMode !== "dinas" && (
+                <>
+                  <div className="relative w-56">
+                    <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Cari proyek"
+                      className="h-8 pl-8 text-xs bg-muted/20 rounded-lg"
+                    />
+                  </div>
+
+                  <Select
+                    value={projectStatusFilter}
+                    onValueChange={setStatusFilterUrl}
+                  >
+                    <SelectTrigger className="h-8 w-40 text-xs rounded-lg">
+                      <Filter className="size-3 mr-1 text-muted-foreground" />
+                      <SelectValue placeholder="Semua status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Status</SelectItem>
+                      <SelectItem value="RUNNING">Berjalan</SelectItem>
+                      <SelectItem value="PENDING_SETUP">Tender / Setup</SelectItem>
+                      <SelectItem value="HOLD">Ditunda</SelectItem>
+                      <SelectItem value="DONE">Selesai</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+            </div>
+
+            {projectViewMode !== "dinas" && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">{filteredProjects.length} proyek</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="h-8 gap-1 px-3 text-xs rounded-lg">
+                      <Download className="size-3.5 text-muted-foreground" />
+                      <span>Ekspor</span>
+                      <ChevronDown className="size-3 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href={getExportHref("xlsx")}>Ekspor ke Excel (.xlsx)</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href={getExportHref("csv")}>Ekspor ke CSV (.csv)</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="h-8 gap-1.5 px-3 text-xs rounded-lg"
+                >
+                  <Printer className="size-3.5 text-muted-foreground" />
+                  <span>Cetak</span>
+                </Button>
               </div>
-
-              <Select
-                value={projectStatusFilter}
-                onValueChange={setStatusFilterUrl}
-              >
-                <SelectTrigger className="h-8 w-40 text-xs rounded-lg">
-                  <Filter className="size-3 mr-1 text-muted-foreground" />
-                  <SelectValue placeholder="Semua status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Semua Status</SelectItem>
-                  <SelectItem value="RUNNING">Berjalan</SelectItem>
-                  <SelectItem value="PENDING_SETUP">Tender / Setup</SelectItem>
-                  <SelectItem value="HOLD">Ditunda</SelectItem>
-                  <SelectItem value="DONE">Selesai</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">{filteredProjects.length} proyek</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1 px-3 text-xs rounded-lg">
-                    <Download className="size-3.5 text-muted-foreground" />
-                    <span>Ekspor</span>
-                    <ChevronDown className="size-3 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={getExportHref("xlsx")}>Ekspor ke Excel (.xlsx)</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={getExportHref("csv")}>Ekspor ke CSV (.csv)</Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => window.print()}
-                className="h-8 gap-1.5 px-3 text-xs rounded-lg"
-              >
-                <Printer className="size-3.5 text-muted-foreground" />
-                <span>Cetak</span>
-              </Button>
-            </div>
+            )}
           </div>
 
           {/* TABEL VIEW (Image 5) */}
@@ -1707,6 +1733,13 @@ export default function ProjectWorkstationMaster({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* LAPORAN RESMI DINAS TERKAIT VIEW */}
+          {projectViewMode === "dinas" && (
+            <div className="pt-2">
+              <DinasProjectReportPage />
             </div>
           )}
         </div>
