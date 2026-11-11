@@ -20,6 +20,8 @@ const hasValidMongoUri =
     connectionString!.startsWith("mongodb+srv://"));
 
 let realPrisma: PrismaClient | null = null;
+let mongoConnectionFailed = false;
+let lastFailureTime = 0;
 
 if (hasValidMongoUri) {
   try {
@@ -513,6 +515,9 @@ export const prisma: PrismaClient = new Proxy(
 
       // Check if realPrisma has the property and try to execute safely
       if (realPrisma && prop in realPrisma) {
+        if (mongoConnectionFailed && Date.now() - lastFailureTime < 30000) {
+          return createModelHandler(prop);
+        }
         const originalModel = (realPrisma as any)[prop];
         if (typeof originalModel === "object" && originalModel !== null) {
           return new Proxy(originalModel, {
@@ -520,8 +525,16 @@ export const prisma: PrismaClient = new Proxy(
               const originalMethod = modelTarget[method];
               if (typeof originalMethod === "function") {
                 return async (...args: any[]) => {
+                  if (mongoConnectionFailed && Date.now() - lastFailureTime < 30000) {
+                    const mockHandler = createModelHandler(prop) as any;
+                    if (mockHandler && typeof mockHandler[method] === "function") {
+                      return mockHandler[method](...args);
+                    }
+                    return null;
+                  }
                   try {
                     const result = await originalMethod.apply(modelTarget, args);
+                    mongoConnectionFailed = false;
                     if (
                       result === null &&
                       prop === "user" &&
@@ -532,6 +545,15 @@ export const prisma: PrismaClient = new Proxy(
                     }
                     return result;
                   } catch (err: any) {
+                    if (
+                      err?.message?.includes("Server selection timeout") ||
+                      err?.message?.includes("fatal alert") ||
+                      err?.message?.includes("No available servers")
+                    ) {
+                      mongoConnectionFailed = true;
+                      lastFailureTime = Date.now();
+                      console.warn("[Prisma] MongoDB unreachable (IP not whitelisted or TLS error). Menggunakan in-memory fallback.");
+                    }
                     const mockHandler = createModelHandler(prop) as any;
                     if (mockHandler && typeof mockHandler[method] === "function") {
                       return mockHandler[method](...args);
