@@ -43,6 +43,8 @@ import DocumentPdfGenerator, {
 } from "@/app/components/apps/documents/DocumentPdfGenerator";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import VehicleTripLogTable from "@/app/components/apps/logistics/VehicleTripLogTable";
+import RentalBillingQueue from "@/app/components/apps/finance/RentalBillingQueue";
+import type { RentalItemRow } from "@/app/actions/rentals";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
@@ -364,6 +366,7 @@ export default function FinanceHub({
   financeQrDataUrl,
   coordinatorSignerName,
   directorSignerName,
+  rentals = [],
 }: {
   purchaseOrders: FinanceOrder[];
   documentSignoffTasks: DocumentSignoffTask[];
@@ -394,9 +397,10 @@ export default function FinanceHub({
   financeQrDataUrl?: string | null;
   coordinatorSignerName?: string;
   directorSignerName?: string;
+  rentals?: RentalItemRow[];
 }) {
   const router = useRouter();
-  const legacyOperationalTabs = ["subcontract", "fuel-logs", "fuel-requests"];
+  const legacyOperationalTabs = ["subcontract", "rentals", "fuel-logs", "fuel-requests"];
   const tabAliases: Record<string, string> = {
     "po-check": "check",
     payments: "payment",
@@ -1998,6 +2002,14 @@ export default function FinanceHub({
             className="space-y-4"
           >
             <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+              <TabsTrigger value="rentals">
+                🚜 Tagihan Sewa (
+                {
+                  rentals.filter((r) => r.paymentStatus === "PENDING_PAYMENT")
+                    .length
+                }
+                )
+              </TabsTrigger>
               <TabsTrigger value="subcontract">
                 Termin & Retensi ({termyns.length})
               </TabsTrigger>
@@ -2492,6 +2504,18 @@ export default function FinanceHub({
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="rentals">
+          <RentalBillingQueue
+            rentals={rentals}
+            financeAccounts={financeAccounts}
+            canManage={
+              role === UserRole.FINANCE ||
+              role === UserRole.ADMINISTRATIONS ||
+              role === UserRole.DIRECTOR ||
+              role === UserRole.DEPUTY_DIRECTOR
+            }
+          />
         </TabsContent>
           </Tabs>
         </TabsContent>

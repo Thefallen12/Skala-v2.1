@@ -25,6 +25,11 @@ import {
   UserCheck,
   Wrench,
   Search,
+  CheckCircle2,
+  CreditCard,
+  Send,
+  Building2,
+  ExternalLink,
 } from "lucide-react";
 import {
   type RentalItemRow,
@@ -33,6 +38,7 @@ import {
   type RentalStatus,
   saveRental,
   deleteRental,
+  submitRentalBilling,
 } from "@/app/actions/rentals";
 import {
   STANDARD_EQUIPMENT_CATALOG,
@@ -128,6 +134,40 @@ export default function EquipmentVehicleRentalPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [actionMessage, setActionMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [billingTargetRental, setBillingTargetRental] = useState<RentalItemRow | null>(null);
+  const [billingBankName, setBillingBankName] = useState("");
+  const [billingAccountNumber, setBillingAccountNumber] = useState("");
+  const [billingAccountName, setBillingAccountName] = useState("");
+  const [billingMessage, setBillingMessage] = useState<string | null>(null);
+
+  const openBillingModal = (rental: RentalItemRow) => {
+    setBillingTargetRental(rental);
+    setBillingBankName(rental.paymentBankName ?? "");
+    setBillingAccountNumber(rental.paymentAccountNumber ?? "");
+    setBillingAccountName(rental.paymentAccountName ?? "");
+    setBillingMessage(null);
+    setBillingModalOpen(true);
+  };
+
+  const handleConfirmBilling = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billingTargetRental) return;
+    setBillingMessage(null);
+    startTransition(async () => {
+      const res = await submitRentalBilling(billingTargetRental.id, {
+        paymentBankName: billingBankName.trim() || undefined,
+        paymentAccountNumber: billingAccountNumber.trim() || undefined,
+        paymentAccountName: billingAccountName.trim() || undefined,
+      });
+      if (res.success) {
+        setBillingModalOpen(false);
+        router.refresh();
+      } else {
+        setBillingMessage(res.message);
+      }
+    });
+  };
 
   // Form states
   const [formType, setFormType] = useState<RentalType>("EQUIPMENT");
@@ -599,15 +639,23 @@ export default function EquipmentVehicleRentalPanel({
                   <th className="p-3">Tanggal Sewa</th>
                   <th className="p-3 text-right">Biaya / Tarif</th>
                   <th className="p-3 text-right">Total Biaya</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Proyek & Catatan</th>
+                  <th className="p-3">Status Sewa</th>
+                  <th className="p-3">Tagihan Keuangan</th>
+                  <th className="p-3">Proyek</th>
                   {canManage && <th className="p-3 text-center w-24">Aksi</th>}
                 </tr>
               </thead>
               <tbody className="divide-y text-xs">
                 {filteredRentals.map((r) => {
-                  const periodMeta = periodTypeLabels[r.rentalPeriodType];
-                  const statusMeta = statusLabels[r.status];
+                  const periodMeta = periodTypeLabels[r.rentalPeriodType] ?? {
+                    label: r.rentalPeriodType || "Sewa",
+                    unit: "Hari",
+                    badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
+                  };
+                  const statusMeta = statusLabels[r.status] ?? {
+                    label: r.status || "Aktif",
+                    badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+                  };
                   return (
                     <tr key={r.id} className="hover:bg-muted/40 transition-colors">
                       {/* Unit Sewa */}
@@ -712,7 +760,59 @@ export default function EquipmentVehicleRentalPanel({
                         </span>
                       </td>
 
-                      {/* Proyek & Catatan */}
+                      {/* Tagihan Keuangan */}
+                      <td className="p-3">
+                        {r.paymentStatus === "PAID" ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300">
+                              <CheckCircle2 className="size-3" /> Lunas
+                            </span>
+                            {r.paidAt && (
+                              <span className="block text-[10px] text-muted-foreground">
+                                {new Date(r.paidAt).toLocaleDateString("id-ID")}
+                              </span>
+                            )}
+                            {r.proofOfPaymentUrl && (
+                              <a
+                                href={r.proofOfPaymentUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
+                              >
+                                <ExternalLink className="size-3" /> Bukti Bayar
+                              </a>
+                            )}
+                          </div>
+                        ) : r.paymentStatus === "PENDING_PAYMENT" ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
+                              <Clock className="size-3" /> Menunggu Keuangan
+                            </span>
+                            {r.billingSubmittedAt && (
+                              <span className="block text-[10px] text-muted-foreground">
+                                Diajukan {new Date(r.billingSubmittedAt).toLocaleDateString("id-ID")}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border">
+                              Belum Diajukan
+                            </span>
+                            {canManage && (
+                              <button
+                                type="button"
+                                onClick={() => openBillingModal(r)}
+                                className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                              >
+                                <Send className="size-3" /> Ajukan Tagihan
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Proyek */}
                       <td className="p-3">
                         <span className="font-medium text-xs text-foreground block max-w-[200px] truncate" title={r.projectName ?? "-"}>
                           {r.projectName ?? "Tanpa proyek"}
@@ -753,7 +853,7 @@ export default function EquipmentVehicleRentalPanel({
 
                 {filteredRentals.length === 0 && (
                   <tr>
-                    <td colSpan={canManage ? 9 : 8} className="py-12 text-center text-muted-foreground">
+                    <td colSpan={canManage ? 10 : 9} className="py-12 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center">
                         <FileText className="size-10 text-muted-foreground/40 mb-2" />
                         <p className="font-semibold text-sm">Belum ada data sewa alat / kendaraan</p>
@@ -1256,6 +1356,101 @@ export default function EquipmentVehicleRentalPanel({
             </Button>
           </div>
         </form>
+      </GlobalModal>
+
+      {/* Modal Ajukan Tagihan ke Keuangan */}
+      <GlobalModal
+        isOpen={billingModalOpen}
+        onClose={() => setBillingModalOpen(false)}
+        title="Ajukan Tagihan Sewa ke Bagian Keuangan"
+        description="Kirimkan tagihan sewa alat / kendaraan ke antrean pencairan Bagian Keuangan."
+        className="sm:max-w-lg"
+      >
+        {billingTargetRental && (
+          <form onSubmit={handleConfirmBilling} className="mt-4 space-y-4">
+            {billingMessage && (
+              <div className="p-3 rounded-lg text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200">
+                {billingMessage}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-xs text-muted-foreground">Unit Sewa:</span>
+                  <p className="text-sm font-bold text-primary">
+                    {billingTargetRental.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Vendor: <strong className="text-foreground">{billingTargetRental.vendorName}</strong>
+                    {billingTargetRental.projectName && ` · ${billingTargetRental.projectName}`}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-muted-foreground">Total Tagihan:</span>
+                  <div className="text-base font-bold text-emerald-600">
+                    {formatCurrency(billingTargetRental.totalCost)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border p-3.5 bg-muted/20">
+              <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                <Building2 className="size-3.5" /> Konfirmasi Rekening Tujuan Transfer (Vendor)
+              </span>
+              <div className="space-y-2.5">
+                <div>
+                  <Label className="text-xs font-semibold text-foreground block mb-1">Nama Bank Vendor</Label>
+                  <Input
+                    placeholder="mis. BCA / Mandiri / BRI / BSI"
+                    value={billingBankName}
+                    onChange={(e) => setBillingBankName(e.target.value)}
+                    className="h-9 text-xs bg-background"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold text-foreground block mb-1">Nomor Rekening</Label>
+                  <Input
+                    placeholder="Contoh: 1234567890"
+                    value={billingAccountNumber}
+                    onChange={(e) => setBillingAccountNumber(e.target.value)}
+                    className="h-9 text-xs bg-background font-mono"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold text-foreground block mb-1">Atas Nama Pemilik Rekening</Label>
+                  <Input
+                    placeholder="Nama pada buku rekening vendor"
+                    value={billingAccountName}
+                    onChange={(e) => setBillingAccountName(e.target.value)}
+                    className="h-9 text-xs bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setBillingModalOpen(false)}
+                disabled={isPending}
+                className="h-9 px-4 text-xs font-semibold rounded-lg"
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="h-9 px-5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5"
+              >
+                <Send className="size-3.5" />
+                {isPending ? "Mengajukan..." : "Kirim Tagihan ke Keuangan"}
+              </Button>
+            </div>
+          </form>
+        )}
       </GlobalModal>
     </div>
   );

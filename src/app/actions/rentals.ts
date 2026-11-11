@@ -6,9 +6,11 @@ import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
 import {
+  decimalNumberFromScaledInteger,
   decimalStringFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
+import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
 
 const allowedRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
@@ -23,6 +25,7 @@ const allowedRoles: UserRole[] = [
 export type RentalPeriodType = "DAILY" | "WEEKLY" | "MONTHLY";
 export type RentalType = "EQUIPMENT" | "VEHICLE";
 export type RentalStatus = "ACTIVE" | "COMPLETED" | "EXTENDED" | "CANCELLED";
+export type RentalPaymentStatus = "UNPAID" | "PENDING_PAYMENT" | "PAID";
 
 export type RentalItemRow = {
   id: string;
@@ -48,6 +51,18 @@ export type RentalItemRow = {
   notes: string | null;
   createdByName: string | null;
   createdAt: string;
+
+  // Finance & Billing
+  paymentStatus: RentalPaymentStatus;
+  billingSubmittedAt: string | null;
+  billingSubmittedByName: string | null;
+  paidAt: string | null;
+  paidByName: string | null;
+  proofOfPaymentUrl: string | null;
+  paymentBankName: string | null;
+  paymentAccountNumber: string | null;
+  paymentAccountName: string | null;
+  financeNotes: string | null;
 };
 
 const rentalInputSchema = z.object({
@@ -71,6 +86,9 @@ const rentalInputSchema = z.object({
   withFuel: z.boolean().default(false),
   projectId: z.string().trim().optional().nullable(),
   notes: z.string().trim().optional().nullable(),
+  paymentBankName: z.string().trim().optional().nullable(),
+  paymentAccountNumber: z.string().trim().optional().nullable(),
+  paymentAccountName: z.string().trim().optional().nullable(),
 });
 
 export type RentalInput = z.infer<typeof rentalInputSchema>;
@@ -84,6 +102,7 @@ export type RentalActionResult = {
 export async function getRentals(filters?: {
   type?: RentalType;
   status?: RentalStatus;
+  paymentStatus?: RentalPaymentStatus;
   projectId?: string;
 }): Promise<RentalItemRow[]> {
   const session = await auth();
@@ -92,6 +111,7 @@ export async function getRentals(filters?: {
   const where: Record<string, unknown> = {};
   if (filters?.type) where.type = filters.type;
   if (filters?.status) where.status = filters.status;
+  if (filters?.paymentStatus) where.paymentStatus = filters.paymentStatus;
   if (filters?.projectId) where.projectId = filters.projectId;
 
   const rentals = await prisma.equipmentRental.findMany({
@@ -134,6 +154,18 @@ export async function getRentals(filters?: {
     notes: r.notes,
     createdByName: r.createdByName,
     createdAt: r.createdAt.toISOString(),
+
+    // Finance & Billing
+    paymentStatus: (r.paymentStatus as RentalPaymentStatus) || "UNPAID",
+    billingSubmittedAt: r.billingSubmittedAt?.toISOString() ?? null,
+    billingSubmittedByName: r.billingSubmittedByName,
+    paidAt: r.paidAt?.toISOString() ?? null,
+    paidByName: r.paidByName,
+    proofOfPaymentUrl: r.proofOfPaymentUrl,
+    paymentBankName: r.paymentBankName,
+    paymentAccountNumber: r.paymentAccountNumber,
+    paymentAccountName: r.paymentAccountName,
+    financeNotes: r.financeNotes,
   }));
 }
 
@@ -208,10 +240,14 @@ export async function saveRental(
           withFuel: data.withFuel,
           projectId: data.projectId || null,
           notes: data.notes || null,
+          paymentBankName: data.paymentBankName || existing.paymentBankName,
+          paymentAccountNumber: data.paymentAccountNumber || existing.paymentAccountNumber,
+          paymentAccountName: data.paymentAccountName || existing.paymentAccountName,
         },
       });
 
       revalidatePath("/apps/logistics");
+      revalidatePath("/apps/finance");
       return {
         success: true,
         message: "Data sewa berhasil diperbarui.",
@@ -241,10 +277,15 @@ export async function saveRental(
           notes: data.notes || null,
           createdById: session.user.id,
           createdByName: session.user.name || null,
+          paymentBankName: data.paymentBankName || null,
+          paymentAccountNumber: data.paymentAccountNumber || null,
+          paymentAccountName: data.paymentAccountName || null,
+          paymentStatus: "UNPAID",
         },
       });
 
       revalidatePath("/apps/logistics");
+      revalidatePath("/apps/finance");
       return {
         success: true,
         message: "Pencatatan sewa berhasil disimpan.",
@@ -257,6 +298,149 @@ export async function saveRental(
       success: false,
       message:
         error instanceof Error ? error.message : "Gagal menyimpan data sewa.",
+    };
+  }
+}
+
+export async function submitRentalBilling(
+  rentalId: string,
+  bankDetails?: {
+    paymentBankName?: string;
+    paymentAccountNumber?: string;
+    paymentAccountName?: string;
+  },
+): Promise<RentalActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan login terlebih dahulu." };
+  }
+
+  const rental = await prisma.equipmentRental.findUnique({
+    where: { id: rentalId },
+  });
+  if (!rental) {
+    return { success: false, message: "Data sewa tidak ditemukan." };
+  }
+
+  await prisma.equipmentRental.update({
+    where: { id: rentalId },
+    data: {
+      paymentStatus: "PENDING_PAYMENT",
+      billingSubmittedAt: new Date(),
+      billingSubmittedById: session.user.id,
+      billingSubmittedByName: session.user.name || null,
+      paymentBankName: bankDetails?.paymentBankName || rental.paymentBankName || null,
+      paymentAccountNumber: bankDetails?.paymentAccountNumber || rental.paymentAccountNumber || null,
+      paymentAccountName: bankDetails?.paymentAccountName || rental.paymentAccountName || null,
+    },
+  });
+
+  revalidatePath("/apps/logistics");
+  revalidatePath("/apps/finance");
+  return {
+    success: true,
+    message: "Tagihan sewa berhasil diajukan ke Bagian Keuangan.",
+  };
+}
+
+export async function processRentalPayment(input: {
+  rentalId: string;
+  proofOfPaymentUrl: string;
+  paymentBankName?: string;
+  paymentAccountNumber?: string;
+  paymentAccountName?: string;
+  financeNotes?: string;
+  financeAccountId?: string;
+}): Promise<RentalActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan login terlebih dahulu." };
+  }
+
+  const financeRoles: UserRole[] = [
+    UserRole.FINANCE,
+    UserRole.ADMINISTRATIONS,
+    UserRole.DIRECTOR,
+    UserRole.DEPUTY_DIRECTOR,
+  ];
+
+  if (!financeRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak memiliki izin untuk memproses pembayaran.",
+    };
+  }
+
+  const rental = await prisma.equipmentRental.findUnique({
+    where: { id: input.rentalId },
+  });
+  if (!rental) {
+    return { success: false, message: "Data sewa tidak ditemukan." };
+  }
+
+  const totalAmount = decimalNumberFromScaledInteger(rental.totalCost);
+
+  try {
+    if (input.financeAccountId) {
+      await prisma.$transaction(async (tx) => {
+        await tx.equipmentRental.update({
+          where: { id: input.rentalId },
+          data: {
+            paymentStatus: "PAID",
+            paidAt: new Date(),
+            paidById: session.user.id,
+            paidByName: session.user.name || null,
+            proofOfPaymentUrl: input.proofOfPaymentUrl,
+            paymentBankName: input.paymentBankName || rental.paymentBankName,
+            paymentAccountNumber: input.paymentAccountNumber || rental.paymentAccountNumber,
+            paymentAccountName: input.paymentAccountName || rental.paymentAccountName,
+            financeNotes: input.financeNotes || null,
+          },
+        });
+
+        if (totalAmount > 0) {
+          await recordFinanceCashflowOutflow(tx, {
+            financeAccountId: input.financeAccountId!,
+            amount: totalAmount,
+            sourceDesc: `Pelunasan Sewa ${rental.type === "EQUIPMENT" ? "Alat" : "Kendaraan"} · ${rental.name} (${rental.vendorName})`,
+            projectId: rental.projectId,
+            paymentMethod: "TRANSFER",
+            proofUrl: input.proofOfPaymentUrl,
+            recordedBy: session.user.id,
+          });
+        }
+      });
+    } else {
+      await prisma.equipmentRental.update({
+        where: { id: input.rentalId },
+        data: {
+          paymentStatus: "PAID",
+          paidAt: new Date(),
+          paidById: session.user.id,
+          paidByName: session.user.name || null,
+          proofOfPaymentUrl: input.proofOfPaymentUrl,
+          paymentBankName: input.paymentBankName || rental.paymentBankName,
+          paymentAccountNumber: input.paymentAccountNumber || rental.paymentAccountNumber,
+          paymentAccountName: input.paymentAccountName || rental.paymentAccountName,
+          financeNotes: input.financeNotes || null,
+        },
+      });
+    }
+
+    revalidatePath("/apps/logistics");
+    revalidatePath("/apps/finance");
+    return {
+      success: true,
+      message: "Pembayaran tagihan sewa berhasil diproses dan dicatat lunas.",
+    };
+  } catch (error) {
+    console.error("Process rental payment error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Gagal memproses pembayaran sewa.",
     };
   }
 }
@@ -286,6 +470,7 @@ export async function deleteRental(id: string): Promise<RentalActionResult> {
       where: { id },
     });
     revalidatePath("/apps/logistics");
+    revalidatePath("/apps/finance");
     return { success: true, message: "Data sewa berhasil dihapus." };
   } catch (error) {
     console.error("Delete rental error:", error);

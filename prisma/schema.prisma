@@ -1219,10 +1219,26 @@ model EquipmentRental {
   notes            String?
   createdById      String?
   createdByName    String?
+
+  // Finance & Billing Connection
+  paymentStatus          String    @default("UNPAID") // UNPAID | PENDING_PAYMENT | PAID
+  billingSubmittedAt     DateTime?
+  billingSubmittedById   String?
+  billingSubmittedByName String?
+  paidAt                 DateTime?
+  paidById               String?
+  paidByName             String?
+  proofOfPaymentUrl      String?
+  paymentBankName        String?
+  paymentAccountNumber   String?
+  paymentAccountName     String?
+  financeNotes           String?
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([type, status])
+  @@index([paymentStatus, billingSubmittedAt])
   @@index([projectId, startDate])
 }
 

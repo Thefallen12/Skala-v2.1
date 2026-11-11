@@ -27,6 +27,13 @@ import {
   decimalStringFromScaledInteger,
 } from "@/lib/scaled-decimal";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
+import type {
+  RentalItemRow,
+  RentalPaymentStatus,
+  RentalPeriodType,
+  RentalStatus,
+  RentalType,
+} from "@/app/actions/rentals";
 
 export const metadata: Metadata = {
   title: "Finance Hub",
@@ -101,6 +108,7 @@ export default async function FinancePage({
     dashboardPaidFlows,
     dashboardOfficeExpenses,
     officeExpenseUsage,
+    equipmentRentals,
   ] = await Promise.all([
     prisma.purchaseOrder.findMany({
       where: {
@@ -823,6 +831,17 @@ export default async function FinancePage({
           },
         })
       : Promise.resolve([]),
+    prisma.equipmentRental.findMany({
+      orderBy: [{ billingSubmittedAt: "desc" }, { createdAt: "desc" }],
+      include: {
+        project: {
+          select: {
+            title: true,
+            kelompokTani: true,
+          },
+        },
+      },
+    }),
   ]);
 
   const fundUsageByUser = new Map<
@@ -1567,6 +1586,41 @@ export default async function FinancePage({
         documentTemplates={documentTemplates}
         initialTab={tab}
         initialOpenSheet={openSheet}
+        rentals={equipmentRentals.map((r) => ({
+          id: r.id,
+          type: r.type as RentalType,
+          name: r.name,
+          category: r.category,
+          codeOrPlate: r.codeOrPlate,
+          vendorName: r.vendorName,
+          vendorPhone: r.vendorPhone,
+          rentalPeriodType: r.rentalPeriodType as RentalPeriodType,
+          startDate: r.startDate.toISOString().slice(0, 10),
+          endDate: r.endDate.toISOString().slice(0, 10),
+          duration: r.duration,
+          ratePerPeriod: decimalStringFromScaledInteger(r.ratePerPeriod),
+          additionalCost: decimalStringFromScaledInteger(r.additionalCost),
+          totalCost: decimalStringFromScaledInteger(r.totalCost),
+          status: r.status as RentalStatus,
+          withOperator: r.withOperator,
+          operatorName: r.operatorName,
+          withFuel: r.withFuel,
+          projectId: r.projectId,
+          projectName: r.project ? `${r.project.kelompokTani} · ${r.project.title}` : null,
+          notes: r.notes,
+          createdByName: r.createdByName,
+          createdAt: r.createdAt.toISOString(),
+          paymentStatus: (r.paymentStatus as RentalPaymentStatus) || "UNPAID",
+          billingSubmittedAt: r.billingSubmittedAt?.toISOString() ?? null,
+          billingSubmittedByName: r.billingSubmittedByName,
+          paidAt: r.paidAt?.toISOString() ?? null,
+          paidByName: r.paidByName,
+          proofOfPaymentUrl: r.proofOfPaymentUrl,
+          paymentBankName: r.paymentBankName,
+          paymentAccountNumber: r.paymentAccountNumber,
+          paymentAccountName: r.paymentAccountName,
+          financeNotes: r.financeNotes,
+        }))}
       />
     </>
   );

@@ -22,6 +22,7 @@ import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import type {
   RentalItemRow,
+  RentalPaymentStatus,
   RentalPeriodType,
   RentalStatus,
   RentalType,
@@ -1054,6 +1055,16 @@ export default async function LogisticsPage({
           notes: r.notes,
           createdByName: r.createdByName,
           createdAt: r.createdAt.toISOString(),
+          paymentStatus: (r.paymentStatus as RentalPaymentStatus) || "UNPAID",
+          billingSubmittedAt: r.billingSubmittedAt?.toISOString() ?? null,
+          billingSubmittedByName: r.billingSubmittedByName,
+          paidAt: r.paidAt?.toISOString() ?? null,
+          paidByName: r.paidByName,
+          proofOfPaymentUrl: r.proofOfPaymentUrl,
+          paymentBankName: r.paymentBankName,
+          paymentAccountNumber: r.paymentAccountNumber,
+          paymentAccountName: r.paymentAccountName,
+          financeNotes: r.financeNotes,
         }))}
       />
     </>
