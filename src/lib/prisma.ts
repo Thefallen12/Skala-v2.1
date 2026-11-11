@@ -327,7 +327,14 @@ function createModelHandler(modelName: string) {
       else if (modelName === "financeAccount") list = store.financeAccounts;
       else if (modelName === "officeExpense") list = store.officeExpenses;
       else if (modelName === "cashflow") list = store.cashflows;
-      else if (modelName === "fieldSurvey") list = store.fieldSurveys;
+      else if (modelName === "fieldSurvey") {
+        list = store.fieldSurveys.map((s) => ({
+          ...s,
+          surveyor: store.users.find((u) => u.id === s.surveyorId) ?? { name: (s as any).responsibleName || "Tim Lapangan" },
+          features: (s as any).features ?? [],
+          createdAt: (s as any).createdAt ?? new Date(),
+        }));
+      }
       else if (modelName === "menuAccess") list = store.menuAccess;
       else if (modelName === "pageMaintenance") list = store.pageMaintenance;
       else if (modelName === "documentTemplate") list = store.documentTemplates;

@@ -272,7 +272,7 @@ export default async function ProjectsWorkstationPage({
     projectName: survey.projectName,
     locationName: survey.locationName,
     responsibleName: survey.responsibleName,
-    surveyorName: survey.surveyor.name,
+    surveyorName: survey.surveyor?.name ?? survey.responsibleName ?? "Tim Lapangan",
     surveyName: survey.surveyName,
     projectCode: survey.projectCode,
     objectCategory: survey.objectCategory,
@@ -284,9 +284,13 @@ export default async function ProjectsWorkstationPage({
     lengthM: survey.lengthM,
     perimeterM: survey.perimeterM,
     notes: survey.notes,
-    createdAt: survey.createdAt.toISOString(),
+    createdAt: survey.createdAt
+      ? typeof survey.createdAt === "string"
+        ? survey.createdAt
+        : survey.createdAt.toISOString()
+      : new Date().toISOString(),
     surveyType: survey.surveyType,
-    features: survey.features.map((feature) => ({
+    features: (survey.features || []).map((feature) => ({
       ...feature,
       geoJsonData: feature.geoJsonData as unknown as NonNullable<FieldSurveySummary["features"]>[number]["geoJsonData"],
     })),
