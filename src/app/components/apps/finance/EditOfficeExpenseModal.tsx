@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateOfficeExpense } from "@/app/actions/finance";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
@@ -11,7 +11,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRupiahInput, parseRupiahInput } from "@/lib/indonesian-currency";
+import { withLocalPhotoPreview } from "@/lib/photo-urls";
 import { Calendar, Eye, FileText, Image as ImageIcon, ReceiptText, Trash2, Wallet } from "lucide-react";
+
+type NewExpenseProofItem = {
+  id: string;
+  file: File;
+  name: string;
+  previewUrl: string;
+  isPdf: boolean;
+};
+
+function revokeProofItems(items: NewExpenseProofItem[]) {
+  for (const item of items) {
+    if (item.previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+  }
+}
 
 export type EditingOfficeExpense = {
   id: string;
@@ -42,11 +59,22 @@ export default function EditOfficeExpenseModal({
   const [amountInput, setAmountInput] = useState("");
   const [description, setDescription] = useState("");
   const [keepUrls, setKeepUrls] = useState<string[]>([]);
-  const [newProofFiles, setNewProofFiles] = useState<{ file: File; name: string }[]>([]);
+  const [newProofFiles, setNewProofFiles] = useState<NewExpenseProofItem[]>([]);
+  const newProofFilesRef = useRef<NewExpenseProofItem[]>([]);
   const [proofError, setProofError] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isPending, setIsPending] = useState(false);
+
+  useEffect(() => {
+    newProofFilesRef.current = newProofFiles;
+  }, [newProofFiles]);
+
+  useEffect(() => {
+    return () => {
+      revokeProofItems(newProofFilesRef.current);
+    };
+  }, []);
 
   const [prevSyncKey, setPrevSyncKey] = useState("");
   const syncKey =
@@ -64,12 +92,15 @@ export default function EditOfficeExpenseModal({
     setAmountInput(formatRupiahInput(String(expense.amount)));
     setDescription(expense.description || "");
     setKeepUrls(expense.proofUrls || []);
+    revokeProofItems(newProofFiles);
     setNewProofFiles([]);
     setProofError("");
     setMessage("");
     setIsError(false);
   } else if (!open && prevSyncKey !== "") {
     setPrevSyncKey("");
+    revokeProofItems(newProofFiles);
+    setNewProofFiles([]);
   }
 
   if (!expense) return null;
@@ -250,11 +281,16 @@ export default function EditOfficeExpenseModal({
                       </div>
                     </div>
                     <div className="h-20 w-full overflow-hidden rounded bg-muted flex items-center justify-center">
-                      {url.endsWith(".pdf") ? (
+                      {url.split(/[?#]/, 1)[0].toLowerCase().endsWith(".pdf") ? (
                         <FileText className="size-8 text-muted-foreground" />
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={url} alt={`Bukti ${idx + 1}`} className="h-full w-full object-cover" />
+                        <img
+                          key={url}
+                          src={withLocalPhotoPreview(url)}
+                          alt={`Bukti ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
                       )}
                     </div>
                   </div>
@@ -268,8 +304,8 @@ export default function EditOfficeExpenseModal({
             <div className="space-y-2 pt-2 border-t">
               <span className="text-xs font-medium text-emerald-600">Foto Baru Siap Diunggah:</span>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {newProofFiles.map((proof, idx) => (
-                  <div key={`${proof.name}-${idx}`} className="relative overflow-hidden rounded-lg border border-emerald-500/40 bg-emerald-50/20 p-2 flex flex-col justify-between">
+                {newProofFiles.map((proof) => (
+                  <div key={proof.id} className="relative overflow-hidden rounded-lg border border-emerald-500/40 bg-emerald-50/20 p-2 flex flex-col justify-between">
                     <div className="flex items-center justify-between pb-1">
                       <span className="text-xs truncate font-medium max-w-[120px]" title={proof.name}>
                         {proof.name}
@@ -278,13 +314,31 @@ export default function EditOfficeExpenseModal({
                         label="Batal Unggah"
                         tooltip="Batal Unggah"
                         icon={Trash2}
-                        onClick={() => setNewProofFiles((current) => current.filter((_, i) => i !== idx))}
+                        onClick={() => {
+                          if (proof.previewUrl.startsWith("blob:")) {
+                            URL.revokeObjectURL(proof.previewUrl);
+                          }
+                          setNewProofFiles((current) => current.filter((item) => item.id !== proof.id));
+                        }}
                         variant="ghost"
                         className="size-7 text-destructive"
                       />
                     </div>
-                    <div className="h-14 w-full flex items-center justify-center bg-muted/40 rounded text-xs text-muted-foreground">
-                      <ReceiptText className="size-6 text-emerald-600" />
+                    <div className="h-20 w-full overflow-hidden flex items-center justify-center bg-muted/40 rounded text-xs text-muted-foreground">
+                      {proof.isPdf ? (
+                        <div className="flex items-center gap-1.5 text-emerald-700">
+                          <ReceiptText className="size-5" />
+                          <span>PDF</span>
+                        </div>
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          key={proof.previewUrl}
+                          src={proof.previewUrl}
+                          alt={`Pratinjau ${proof.name}`}
+                          className="h-full w-full object-cover"
+                        />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -308,7 +362,19 @@ export default function EditOfficeExpenseModal({
                 const valid = files.filter(
                   (f) => f.size > 0 && f.size <= 5 * 1024 * 1024 && ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(f.type)
                 );
-                setNewProofFiles((prev) => [...prev, ...valid.map((file) => ({ file, name: file.name }))].slice(0, 5 - keepUrls.length));
+                const maxAdditional = Math.max(0, 5 - keepUrls.length - newProofFiles.length);
+                const added = valid.slice(0, maxAdditional).map((file) => ({
+                  id: crypto.randomUUID(),
+                  file,
+                  name: file.name,
+                  previewUrl: URL.createObjectURL(file),
+                  isPdf:
+                    file.type === "application/pdf" ||
+                    file.name.toLowerCase().endsWith(".pdf"),
+                }));
+                if (added.length > 0) {
+                  setNewProofFiles((prev) => [...prev, ...added]);
+                }
                 setProofError(valid.length !== files.length ? "Beberapa file dilewati karena bukan foto/PDF atau melebihi 5 MB." : "");
                 e.currentTarget.value = "";
               }}

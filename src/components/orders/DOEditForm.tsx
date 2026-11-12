@@ -32,6 +32,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import { withLocalPhotoPreview } from "@/lib/photo-urls";
 
 type DeliveryTicketOption = {
@@ -204,36 +205,70 @@ export default function DOEditForm({
       ? "Material tiba di gudang"
       : statusLabels[value];
 
-  const submit = form.handleSubmit(async (values) => {
-    setMessage("");
-    setIsSaving(true);
-    try {
-      const result = publicCode
-        ? await updateDeliveryOrder(
-            publicCode,
-            { ...values, vehicleId: values.vehicleId || undefined },
-            arrivalPhotoFile ?? undefined,
-          )
-        : await createDeliveryOrder({
-            ...values,
-            ticketId: values.ticketId || undefined,
-            vehicleId: values.vehicleId || undefined,
-          });
-      setIsError(!result.success);
-      setMessage(result.message);
-      if (result.success) {
-        if (publicCode) router.back();
-        else if (result.publicCode) router.replace(`/d/${result.publicCode}`);
-        else router.refresh();
+  const submit = form.handleSubmit(
+    async (values) => {
+      setMessage("");
+      setIsSaving(true);
+      try {
+        const isInternal =
+          values.deliveryMethod === DODeliveryMethod.INTERNAL_MOVER;
+        const payload = {
+          ...values,
+          ticketId: values.ticketId?.trim() || undefined,
+          vehicleId:
+            isInternal && values.vehicleId?.trim()
+              ? values.vehicleId.trim()
+              : undefined,
+          vehicleDocumentNumber:
+            values.vehicleDocumentNumber?.trim() || undefined,
+          driverIdentityNumber: values.driverIdentityNumber?.trim() || undefined,
+          driverName: values.driverName?.trim() || "",
+          vehiclePlate: values.vehiclePlate?.trim() || "",
+          driverPhone: values.driverPhone?.trim() || "",
+          receiverName: values.receiverName?.trim() || undefined,
+          items: values.items.map((item) => ({
+            ...item,
+            id: item.id?.trim() ? item.id.trim() : undefined,
+            itemName: item.itemName.trim(),
+            unit: item.unit.trim(),
+            qtyOrdered: Number(item.qtyOrdered),
+            qtyDelivered: Number(item.qtyDelivered),
+            remarks: item.remarks?.trim() || undefined,
+          })),
+        };
+        const result = publicCode
+          ? await updateDeliveryOrder(
+              publicCode,
+              payload,
+              arrivalPhotoFile ?? undefined,
+            )
+          : await createDeliveryOrder(payload);
+        setIsError(!result.success);
+        setMessage(result.message);
+        if (result.success) {
+          if (publicCode) router.back();
+          else if (result.publicCode) router.replace(`/d/${result.publicCode}`);
+          else router.refresh();
+        }
+      } catch (error) {
+        console.error("Delivery Order edit failed:", error);
+        setIsError(true);
+        setMessage("DO gagal disimpan. Periksa koneksi lalu coba kembali.");
+      } finally {
+        setIsSaving(false);
       }
-    } catch (error) {
-      console.error("Delivery Order edit failed:", error);
+    },
+    (errors) => {
+      console.warn("Delivery Order client validation failed:", errors);
       setIsError(true);
-      setMessage("DO gagal disimpan. Periksa koneksi lalu coba kembali.");
-    } finally {
-      setIsSaving(false);
-    }
-  });
+      const firstError = Object.values(errors)[0];
+      const errorMsg =
+        typeof firstError?.message === "string" && firstError.message
+          ? firstError.message
+          : "Mohon lengkapi seluruh data wajib sebelum menyimpan.";
+      setMessage(errorMsg);
+    },
+  );
 
   return (
     <form onSubmit={submit} className="order-editor-print-area space-y-6">
@@ -367,6 +402,10 @@ export default function DOEditForm({
                       value === DODeliveryMethod.EXPEDITION
                     ) {
                       field.onChange(value);
+                      if (value === DODeliveryMethod.EXPEDITION) {
+                        form.setValue("vehicleId", "");
+                        form.clearErrors("vehicleId");
+                      }
                     }
                   }}
                 >
@@ -453,7 +492,18 @@ export default function DOEditForm({
                 <Controller
                   control={form.control}
                   name="vehicleId"
-                  rules={{ required: "Pilih kendaraan master untuk DO internal." }}
+                  rules={{
+                    validate: (selectedId) => {
+                      if (
+                        form.getValues("deliveryMethod") ===
+                          DODeliveryMethod.INTERNAL_MOVER &&
+                        !selectedId?.trim()
+                      ) {
+                        return "Pilih kendaraan master untuk DO internal.";
+                      }
+                      return true;
+                    },
+                  }}
                   render={({ field }) => (
                     <Select
                       value={field.value || undefined}
@@ -519,21 +569,21 @@ export default function DOEditForm({
           {watchedForm.deliveryMethod === DODeliveryMethod.EXPEDITION && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="do-vehicle-document">No. STK</Label>
+                <Label htmlFor="do-vehicle-document">No. STNK / Dokumen Kendaraan (opsional)</Label>
                 <Input
                   id="do-vehicle-document"
                   maxLength={80}
-                  required
+                  placeholder="Contoh: No. STNK (opsional)"
                   {...form.register("vehicleDocumentNumber")}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="do-driver-nik">NIK driver (16 digit)</Label>
+                <Label htmlFor="do-driver-nik">NIK driver (16 digit, opsional)</Label>
                 <Input
                   id="do-driver-nik"
                   inputMode="numeric"
                   maxLength={16}
-                  required
+                  placeholder="Contoh: 1101010101010001 (opsional)"
                   {...form.register("driverIdentityNumber", {
                     onChange: (event) => {
                       event.target.value = event.target.value.replace(/\D/g, "").slice(0, 16);
@@ -542,12 +592,12 @@ export default function DOEditForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="do-driver-phone">Nomor HP driver</Label>
+                <Label htmlFor="do-driver-phone">Nomor HP driver (opsional)</Label>
                 <Input
                   id="do-driver-phone"
                   type="tel"
                   maxLength={32}
-                  required
+                  placeholder="Contoh: 081234567890 (opsional)"
                   {...form.register("driverPhone")}
                 />
               </div>
@@ -607,13 +657,22 @@ export default function DOEditForm({
                   />
                 )}
                 {arrivalPhotoFile && (
-                  <p className="text-sm text-muted-foreground">
-                    Foto dipilih: {arrivalPhotoFile.name}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm text-muted-foreground">
+                      Foto dipilih: {arrivalPhotoFile.name}
+                    </p>
+                    <InvoiceFilePreview
+                      file={arrivalPhotoFile}
+                      title="Pratinjau Foto Material Tiba"
+                      label="Pratinjau foto material tiba"
+                      tooltip="Pratinjau foto material tiba"
+                    />
+                  </div>
                 )}
                 {arrivalPhotoUrl && (
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,320px)_1fr] sm:items-start">
                     <Image
+                      key={arrivalPhotoUrl}
                       src={withLocalPhotoPreview(arrivalPhotoUrl)}
                       alt="Bukti foto material tiba di gudang"
                       width={640}

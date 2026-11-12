@@ -179,6 +179,8 @@ export default function ProjectWorkPointsModal({
         isOpen={open}
         onClose={() => {
           setProgressPointId(null);
+          setPhotos([]);
+          setPhotoPreviews([]);
           setMessage("");
           onOpenChange(false);
         }}
@@ -427,6 +429,8 @@ export default function ProjectWorkPointsModal({
                         disabled={isPending}
                         onClick={() => {
                           setMessage("");
+                          setPhotos([]);
+                          setPhotoPreviews([]);
                           setProgressPointId(
                             progressPointId === point.id ? null : point.id,
                           );
@@ -618,6 +622,7 @@ export default function ProjectWorkPointsModal({
             <div className="space-y-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
+                key={selectedPhoto}
                 src={withLocalPhotoPreview(selectedPhoto)}
                 alt={`Foto progres titik proyek ${project?.title}`}
                 className="max-h-[70vh] w-full rounded-md object-contain"

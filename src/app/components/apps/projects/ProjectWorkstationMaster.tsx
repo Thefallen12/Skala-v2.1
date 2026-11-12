@@ -126,6 +126,7 @@ import {
   Calendar,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { withLocalPhotoPreview } from "@/lib/photo-urls";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -2977,7 +2978,7 @@ export default function ProjectWorkstationMaster({
                           {report.photoUrls.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {report.photoUrls.map((url, index) => (
-                                <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer" className="text-sm underline">
+                                <a key={`${url}-${index}`} href={withLocalPhotoPreview(url)} target="_blank" rel="noreferrer" className="text-sm underline">
                                   Buka foto {index + 1}
                                 </a>
                               ))}

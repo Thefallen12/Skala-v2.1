@@ -90,6 +90,13 @@ import {
   TablePaginationControls,
   TableRow,
 } from "@/components/ui/table";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
+import {
+  photoDownloadHref,
+  photoDownloadLabel,
+  photoDownloadLinkProps,
+  withLocalPhotoPreview,
+} from "@/lib/photo-urls";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -187,6 +194,7 @@ function DirectPurchaseInvoiceAction({
   const [documentPhoto, setDocumentPhoto] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
+  const inputId = `direct-purchase-invoice-${purchase.id}`;
 
   const saveDocument = () => {
     if (!documentPhoto) {
@@ -238,9 +246,10 @@ function DirectPurchaseInvoiceAction({
 
   return (
     <div className="space-y-2">
-      <FormLabel className="relative block space-y-1">
+      <FormLabel htmlFor={inputId} className="relative block space-y-1">
         <span className="text-xs font-medium">Foto Invoice / BON Faktur</span>
         <input
+          id={inputId}
           ref={invoicePhotoInput}
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -254,16 +263,24 @@ function DirectPurchaseInvoiceAction({
           aria-label="Pilih foto Invoice atau BON Faktur"
         />
       </FormLabel>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => invoicePhotoInput.current?.click()}
-        disabled={isPending}
-      >
-        <Upload aria-hidden="true" />
-        {documentPhoto ? "Ganti Foto Invoice/Bon" : "Unggah Invoice/Bon"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => invoicePhotoInput.current?.click()}
+          disabled={isPending}
+        >
+          <Upload aria-hidden="true" />
+          {documentPhoto ? "Ganti Foto Invoice/Bon" : "Unggah Invoice/Bon"}
+        </Button>
+        <InvoiceFilePreview
+          file={documentPhoto}
+          title={`Pratinjau Invoice / BON · ${purchase.purchaseNumber}`}
+          label="Pratinjau invoice atau bon"
+          tooltip="Pratinjau Invoice / Bon"
+        />
+      </div>
       {documentPhoto && (
         <Button
           type="button"
@@ -286,6 +303,7 @@ function DirectPurchaseInvoiceAction({
 }
 
 type ReceivingPhoto = {
+  id: string;
   file: File;
   previewUrl: string;
 };
@@ -675,7 +693,7 @@ export default function LogisticsWorkspace({
 
       const previewUrl = URL.createObjectURL(file);
       receivingPreviewUrls.current.add(previewUrl);
-      newPhotos.push({ file, previewUrl });
+      newPhotos.push({ id: crypto.randomUUID(), file, previewUrl });
     }
 
     if (newPhotos.length > 0) {
@@ -1525,6 +1543,7 @@ export default function LogisticsWorkspace({
                           </>
                         )}
                         <DirectPurchaseInvoiceAction
+                          key={purchase.id}
                           purchase={purchase}
                           onPreview={(url, label) => {
                             setStockReceiptPreviewFailed(false);
@@ -1861,6 +1880,7 @@ export default function LogisticsWorkspace({
         >
             {receivingPurchase && (
               <form
+                key={receivingPurchase.id}
                 className="space-y-4"
                 onSubmit={submitStockPurchaseReceipt}
               >
@@ -1909,17 +1929,30 @@ export default function LogisticsWorkspace({
                     <div className="grid grid-cols-3 gap-2">
                       {receivingPhotos.map((photo, index) => (
                         <div
-                          key={photo.previewUrl}
+                          key={photo.id}
                           className="relative aspect-[4/3] overflow-hidden rounded-md border"
                         >
-                          <Image
-                            src={photo.previewUrl}
-                            alt={`Bukti penerimaan ${index + 1}`}
-                            fill
-                            unoptimized
-                            className="object-cover"
-                            sizes="(max-width: 640px) 30vw, 140px"
-                          />
+                          <button
+                            type="button"
+                            className="relative block size-full cursor-zoom-in"
+                            aria-label={`Pratinjau foto ${index + 1}`}
+                            onClick={() => {
+                              setStockReceiptPreviewFailed(false);
+                              setStockReceiptPreview({
+                                label: `Pratinjau foto ${index + 1} · ${photo.file.name}`,
+                                url: photo.previewUrl,
+                              });
+                            }}
+                          >
+                            <Image
+                              src={photo.previewUrl}
+                              alt={`Bukti penerimaan ${index + 1}`}
+                              fill
+                              unoptimized
+                              className="object-cover"
+                              sizes="(max-width: 640px) 30vw, 140px"
+                            />
+                          </button>
                           <ActionIconButton
                             label={`Hapus foto ${index + 1}`}
                             tooltip={`Hapus foto ${index + 1}`}
@@ -1933,9 +1966,7 @@ export default function LogisticsWorkspace({
                               );
                               setReceivingPhotos((current) =>
                                 current.filter(
-                                  (currentPhoto) =>
-                                    currentPhoto.previewUrl !==
-                                    photo.previewUrl,
+                                  (currentPhoto) => currentPhoto.id !== photo.id,
                                 ),
                               );
                             }}
@@ -1955,7 +1986,11 @@ export default function LogisticsWorkspace({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setReceivingPurchase(null)}
+                    onClick={() => {
+                      setReceivingPurchase(null);
+                      setReceivingPurchaseError("");
+                      clearReceivingPhotos();
+                    }}
                     disabled={receivingPurchaseSubmitting}
                   >
                     Batal
@@ -1984,13 +2019,49 @@ export default function LogisticsWorkspace({
             setStockReceiptPreviewFailed(false);
           }}
           title={stockReceiptPreview?.label ?? "Bukti penerimaan"}
-          description="Pratinjau foto bukti penerimaan barang."
+          description="Pratinjau dokumen/foto bukti penerimaan barang."
           className="sm:max-w-5xl"
+          footer={
+            stockReceiptPreview &&
+            !stockReceiptPreview.url.startsWith("blob:") ? (
+              <div className="flex w-full items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setStockReceiptPreview(null);
+                    setStockReceiptPreviewFailed(false);
+                  }}
+                >
+                  Tutup
+                </Button>
+                <Button asChild>
+                  <a
+                    href={photoDownloadHref(stockReceiptPreview.url)}
+                    {...photoDownloadLinkProps(stockReceiptPreview.url)}
+                  >
+                    <Download className="mr-1.5 size-4" aria-hidden="true" />
+                    {photoDownloadLabel(stockReceiptPreview.url)}
+                  </a>
+                </Button>
+              </div>
+            ) : undefined
+          }
         >
             {stockReceiptPreview && (
               <>
                 <div className="relative flex min-h-64 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 sm:min-h-[60vh]">
-                  {stockReceiptPreviewFailed ? (
+                  {stockReceiptPreview.url
+                    .split(/[?#]/, 1)[0]
+                    .toLowerCase()
+                    .endsWith(".pdf") ? (
+                    <iframe
+                      key={stockReceiptPreview.url}
+                      src={withLocalPhotoPreview(stockReceiptPreview.url)}
+                      title={`Pratinjau ${stockReceiptPreview.label}`}
+                      className="h-[65vh] w-full"
+                    />
+                  ) : stockReceiptPreviewFailed ? (
                     <p className="max-w-lg p-6 text-center text-sm text-muted-foreground" role="status">
                       Foto ini tidak dapat dimuat. Jika URL menggunakan rute
                       penyimpanan lokal lama, file sumbernya mungkin sudah tidak
@@ -2000,7 +2071,7 @@ export default function LogisticsWorkspace({
                   ) : (
                     <Image
                       key={stockReceiptPreview.url}
-                      src={stockReceiptPreview.url}
+                      src={withLocalPhotoPreview(stockReceiptPreview.url)}
                       alt={stockReceiptPreview.label}
                       fill
                       unoptimized

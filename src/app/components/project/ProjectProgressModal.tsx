@@ -42,11 +42,27 @@ export default function ProjectProgressModal({
   const [errorMessage, setErrorMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const [prevModalKey, setPrevModalKey] = useState("");
+  const modalKey = open ? (project?.id ?? "open") : "";
+
+  if (modalKey !== prevModalKey) {
+    setPrevModalKey(modalKey);
+    if (photos.length > 0) setPhotos([]);
+    if (photoPreviews.length > 0) setPhotoPreviews([]);
+    if (errorMessage) setErrorMessage("");
+  }
 
   useEffect(
     () => () => photoPreviews.forEach((url) => URL.revokeObjectURL(url)),
     [photoPreviews],
   );
+
+  const handleClose = () => {
+    setPhotos([]);
+    setPhotoPreviews([]);
+    setErrorMessage("");
+    onOpenChange(false);
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -88,10 +104,7 @@ export default function ProjectProgressModal({
   return (
     <GlobalModal
       isOpen={open}
-      onClose={() => {
-        setErrorMessage("");
-        onOpenChange(false);
-      }}
+      onClose={handleClose}
       title="Tambah Progres Proyek"
       description={`${project?.title ?? "Proyek"}. Progres yang disimpan menjadi nilai terkini proyek dan catatan harian pada tanggal yang dipilih.`}
       footer={
@@ -100,7 +113,7 @@ export default function ProjectProgressModal({
             type="button"
             variant="outline"
             disabled={isPending}
-            onClick={() => onOpenChange(false)}
+            onClick={handleClose}
           >
             Batal
           </Button>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 
 export default function ExpeditionArrivalModal({
   open,
@@ -84,16 +85,24 @@ export default function ExpeditionArrivalModal({
         </div>
       }
     >
-      <form id="expedition-arrival-form" className="space-y-4" onSubmit={submit}>
+      <form id="expedition-arrival-form" key={publicCode} className="space-y-4" onSubmit={submit}>
         <FormLabel className="block space-y-2 text-sm font-medium">
           Foto Bukti Material Tiba
-          <Input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            required
-            disabled={isPending}
-            onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              required
+              disabled={isPending}
+              onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+            />
+            <InvoiceFilePreview
+              file={photo}
+              title="Pratinjau Foto Material Tiba"
+              label="Pratinjau foto material tiba"
+              tooltip="Pratinjau foto material tiba"
+            />
+          </div>
         </FormLabel>
         <p className="text-xs text-muted-foreground">
           Format JPG, PNG, atau WEBP; maksimal 5 MB.

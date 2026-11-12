@@ -124,6 +124,7 @@ export default function ProjectProgressHistoryModal({
             <div className="space-y-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
+                key={selectedPhoto}
                 src={withLocalPhotoPreview(selectedPhoto)}
                 alt={`Foto progres proyek ${project?.title}`}
                 className="max-h-[70vh] w-full rounded-md object-contain"

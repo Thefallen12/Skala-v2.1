@@ -384,6 +384,15 @@ export default function TicketListing({
     label: string;
     url: string;
   } | null>(null);
+  const [receiptPreviewError, setReceiptPreviewError] = useState(false);
+  const openReceiptPreview = (receipt: { label: string; url: string }) => {
+    setReceiptPreviewError(false);
+    setSelectedReceipt(receipt);
+  };
+  const closeReceiptPreview = () => {
+    setReceiptPreviewError(false);
+    setSelectedReceipt(null);
+  };
   const [workflowTicket, setWorkflowTicket] = useState<TicketRow | null>(null);
   const [message, setMessage] = useState("");
   const [printMessage, setPrintMessage] = useState("");
@@ -1526,7 +1535,7 @@ export default function TicketListing({
                           variant="outline"
                           size="sm"
                           className="h-8 gap-1.5 text-xs"
-                          onClick={() => setSelectedReceipt({ label, url })}
+                          onClick={() => openReceiptPreview({ label, url })}
                         >
                           <Eye className="size-3.5" />
                           {label}
@@ -1540,27 +1549,91 @@ export default function TicketListing({
             {((selectedTicket.deliveryOrders?.length ?? 0) > 0 ||
               (selectedTicket.directStockPurchases?.length ?? 0) > 0) && (
               <div className="grid gap-3 sm:grid-cols-2">
-                {selectedTicket.deliveryOrders?.map((deliveryOrder) => (
-                  <div
-                    key={deliveryOrder.publicCode}
-                    className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-3.5"
-                  >
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Surat Jalan Gudang (DO)
-                      </p>
-                      <p className="mt-0.5 text-sm font-bold text-foreground">
-                        {deliveryOrder.doNumber}
-                      </p>
+                {selectedTicket.deliveryOrders?.map((deliveryOrder) => {
+                  const hasOrderPhotos =
+                    Boolean(deliveryOrder.arrivalPhotoUrl) ||
+                    Boolean(deliveryOrder.deliveryReceiptUrl) ||
+                    (deliveryOrder.receiptPhotos?.length ?? 0) > 0;
+                  return (
+                    <div
+                      key={deliveryOrder.publicCode}
+                      className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Surat Jalan Gudang (DO)
+                          </p>
+                          <p className="mt-0.5 text-sm font-bold text-foreground">
+                            {deliveryOrder.doNumber}
+                          </p>
+                        </div>
+                        <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
+                          <Link href={`/d/${deliveryOrder.publicCode}`}>
+                            <FileText className="size-3.5" />
+                            Buka / Cetak DO
+                          </Link>
+                        </Button>
+                      </div>
+                      {hasOrderPhotos && (
+                        <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+                          {deliveryOrder.arrivalPhotoUrl && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() =>
+                                openReceiptPreview({
+                                  label: `Foto Material Tiba · ${deliveryOrder.doNumber}`,
+                                  url: deliveryOrder.arrivalPhotoUrl!,
+                                })
+                              }
+                            >
+                              <Eye className="size-3" />
+                              Foto Tiba
+                            </Button>
+                          )}
+                          {deliveryOrder.deliveryReceiptUrl && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() =>
+                                openReceiptPreview({
+                                  label: `Bukti Penerimaan · ${deliveryOrder.doNumber}`,
+                                  url: deliveryOrder.deliveryReceiptUrl!,
+                                })
+                              }
+                            >
+                              <Eye className="size-3" />
+                              Bukti DO
+                            </Button>
+                          )}
+                          {deliveryOrder.receiptPhotos?.map((photo, photoIdx) => (
+                            <Button
+                              key={photo.id}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() =>
+                                openReceiptPreview({
+                                  label: `Foto Serah Terima #${photoIdx + 1} · ${deliveryOrder.doNumber}`,
+                                  url: photo.url,
+                                })
+                              }
+                            >
+                              <Eye className="size-3" />
+                              Serah Terima #{photoIdx + 1}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-                      <Link href={`/d/${deliveryOrder.publicCode}`}>
-                        <FileText className="size-3.5" />
-                        Buka / Cetak DO
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {selectedTicket.directStockPurchases?.map((purchase) => {
                   const stageLabel =
@@ -1573,45 +1646,92 @@ export default function TicketListing({
                           : purchase.isApprovedByDirector
                             ? "Menunggu Invoice/Bon Logistik"
                             : "Menunggu Persetujuan Direktur";
+                  const purchasePhotoUrls =
+                    purchase.receivedPhotos && purchase.receivedPhotos.length > 0
+                      ? purchase.receivedPhotos
+                      : purchase.arrivalPhotoUrl
+                        ? [purchase.arrivalPhotoUrl]
+                        : [];
                   return (
                     <div
                       key={purchase.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                      className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
                     >
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Pembelian Langsung Toko
-                        </p>
-                        <p className="mt-0.5 text-sm font-bold text-foreground">
-                          {purchase.purchaseNumber} · {purchase.vendorName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(purchase.totalAmount)} · {stageLabel}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant={
-                            purchase.status === "RECEIVED"
-                              ? "lightSuccess"
-                              : "lightWarning"
-                          }
-                        >
-                          {stageLabel}
-                        </Badge>
-                        {purchase.status === "PENDING_RECEIPT" && (
-                          <Button
-                            asChild
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-xs"
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Pembelian Langsung Toko
+                          </p>
+                          <p className="mt-0.5 text-sm font-bold text-foreground">
+                            {purchase.purchaseNumber} · {purchase.vendorName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(purchase.totalAmount)} · {stageLabel}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={
+                              purchase.status === "RECEIVED"
+                                ? "lightSuccess"
+                                : "lightWarning"
+                            }
                           >
-                            <Link href="/apps/logistics?tab=stock">
-                              Kelola di Stok
-                            </Link>
-                          </Button>
-                        )}
+                            {stageLabel}
+                          </Badge>
+                          {purchase.status === "PENDING_RECEIPT" && (
+                            <Button
+                              asChild
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs"
+                            >
+                              <Link href="/apps/logistics?tab=stock">
+                                Kelola di Stok
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
                       </div>
+                      {(purchase.vendorInvoiceUrl || purchasePhotoUrls.length > 0) && (
+                        <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+                          {purchase.vendorInvoiceUrl && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() =>
+                                openReceiptPreview({
+                                  label: `Invoice/Bon · ${purchase.purchaseNumber}`,
+                                  url: purchase.vendorInvoiceUrl!,
+                                })
+                              }
+                            >
+                              <Eye className="size-3" />
+                              Invoice/Bon
+                            </Button>
+                          )}
+                          {purchasePhotoUrls.map((photoUrl, photoIdx) => (
+                            <Button
+                              key={`${purchase.id}-photo-${photoIdx}`}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2 text-xs"
+                              onClick={() =>
+                                openReceiptPreview({
+                                  label: `Foto Tiba #${photoIdx + 1} · ${purchase.purchaseNumber}`,
+                                  url: photoUrl,
+                                })
+                              }
+                            >
+                              <Eye className="size-3" />
+                              Foto Tiba #{photoIdx + 1}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1865,21 +1985,19 @@ export default function TicketListing({
                           <td className="py-2">
                             {payment.proofOfTransferUrl ? (
                               <Button
-                                asChild
+                                type="button"
                                 variant="outline"
                                 size="sm"
                                 className="h-7 gap-1 px-2 text-xs"
+                                onClick={() =>
+                                  openReceiptPreview({
+                                    label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
+                                    url: payment.proofOfTransferUrl!,
+                                  })
+                                }
                               >
-                                <a
-                                  href={withLocalPhotoPreview(
-                                    payment.proofOfTransferUrl,
-                                  )}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  <ExternalLink className="size-3" />
-                                  Bukti
-                                </a>
+                                <Eye className="size-3" />
+                                Bukti
                               </Button>
                             ) : (
                               "—"
@@ -2310,7 +2428,7 @@ export default function TicketListing({
       {/* Modal Pratinjau Bukti Dokumen */}
       <GlobalModal
         isOpen={selectedReceipt !== null}
-        onClose={() => setSelectedReceipt(null)}
+        onClose={closeReceiptPreview}
         title={selectedReceipt?.label ?? "Pratinjau Bukti Dokumen"}
         description="Pratinjau dokumen/foto bukti terunggah. Klik tombol Unduh di bawah untuk menyimpan salinan file."
         className="max-w-4xl"
@@ -2320,7 +2438,7 @@ export default function TicketListing({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setSelectedReceipt(null)}
+                onClick={closeReceiptPreview}
               >
                 Tutup
               </Button>
@@ -2342,14 +2460,27 @@ export default function TicketListing({
       >
         {selectedReceipt && (
           <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-            {/\.(jpe?g|png|webp)$/i.test(selectedReceipt.url.split("?")[0]) ? (
+            {/\.(jpe?g|png|webp)$/i.test(
+              selectedReceipt.url.split(/[?#]/, 1)[0],
+            ) && receiptPreviewError ? (
+              <p className="p-8 text-sm text-muted-foreground" role="status">
+                Foto tidak dapat dimuat. File mungkin sudah tidak tersedia di
+                penyimpanan.
+              </p>
+            ) : /\.(jpe?g|png|webp)$/i.test(
+              selectedReceipt.url.split(/[?#]/, 1)[0],
+            ) ? (
               <img
                 key={selectedReceipt.url}
                 src={withLocalPhotoPreview(selectedReceipt.url)}
                 alt={selectedReceipt.label}
                 className="max-h-[65vh] max-w-full object-contain"
+                onError={() => setReceiptPreviewError(true)}
               />
-            ) : selectedReceipt.url.toLowerCase().endsWith(".pdf") ? (
+            ) : selectedReceipt.url
+                .split(/[?#]/, 1)[0]
+                .toLowerCase()
+                .endsWith(".pdf") ? (
               <iframe
                 key={selectedReceipt.url}
                 src={withLocalPhotoPreview(selectedReceipt.url)}

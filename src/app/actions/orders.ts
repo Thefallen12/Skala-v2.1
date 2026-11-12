@@ -213,24 +213,28 @@ async function findMatchingStockCodes(
 function isDeliveryOrderItem(value: unknown): value is DeliveryOrderItemInput {
   if (typeof value !== "object" || value === null) return false;
   const item = value as Record<string, unknown>;
+  const rawId = item.id;
+  const hasId = typeof rawId === "string" && rawId.trim().length > 0;
+  const qtyOrdered =
+    typeof item.qtyOrdered === "number"
+      ? item.qtyOrdered
+      : Number(item.qtyOrdered);
+  const qtyDelivered =
+    typeof item.qtyDelivered === "number"
+      ? item.qtyDelivered
+      : Number(item.qtyDelivered);
   return (
-    (item.id === undefined ||
-      (typeof item.id === "string" &&
-        item.id.length > 0 &&
-        item.id.length <= 64)) &&
+    (!hasId || (typeof rawId === "string" && rawId.trim().length <= 64)) &&
     (item.itemCode === undefined ||
       item.itemCode === null ||
       isText(item.itemCode, 100, true)) &&
     isText(item.itemName, 180) &&
-    typeof item.qtyOrdered === "number" &&
-    Number.isFinite(item.qtyOrdered) &&
-    item.qtyOrdered > 0 &&
-    item.qtyOrdered <= 1_000_000_000 &&
-    typeof item.qtyDelivered === "number" &&
-    Number.isFinite(item.qtyDelivered) &&
-    item.qtyDelivered >= 0 &&
-    item.qtyDelivered <= item.qtyOrdered &&
-    new Prisma.Decimal(item.qtyDelivered.toString()).decimalPlaces() <= 3 &&
+    Number.isFinite(qtyOrdered) &&
+    qtyOrdered > 0 &&
+    qtyOrdered <= 1_000_000_000 &&
+    Number.isFinite(qtyDelivered) &&
+    qtyDelivered >= 0 &&
+    qtyDelivered <= qtyOrdered &&
     isText(item.unit, 40) &&
     (item.remarks === undefined ||
       item.remarks === null ||
@@ -326,8 +330,10 @@ function canEditDeliveryOrders(role: UserRole): boolean {
   return (
     canEditPurchaseOrders(role) ||
     role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
     role === UserRole.FIELD_TEAM ||
-    role === UserRole.KOORDINATOR
+    role === UserRole.KOORDINATOR ||
+    role === UserRole.MOVER
   );
 }
 
@@ -359,24 +365,24 @@ export async function createPurchaseOrder(
     const created = await prisma.$transaction(async (transaction) => {
       const vendor = input.vendorId
         ? await transaction.vendor.findFirst({
-            where: { id: input.vendorId, isApproved: true },
-            select: {
-              id: true,
-              name: true,
-              bankName: true,
-              bankAccount: true,
-              bankHolder: true,
-              bankAccounts: {
-                select: {
-                  id: true,
-                  bankName: true,
-                  bankAccount: true,
-                  bankHolder: true,
-                  isPrimary: true,
-                },
+          where: { id: input.vendorId, isApproved: true },
+          select: {
+            id: true,
+            name: true,
+            bankName: true,
+            bankAccount: true,
+            bankHolder: true,
+            bankAccounts: {
+              select: {
+                id: true,
+                bankName: true,
+                bankAccount: true,
+                bankHolder: true,
+                isPrimary: true,
               },
             },
-          })
+          },
+        })
         : null;
       if (input.vendorId && !vendor) {
         throw new Error("Vendor tidak ditemukan atau belum disetujui.");
@@ -390,9 +396,9 @@ export async function createPurchaseOrder(
       ];
       const selectedStockItems = selectedStockIds.length
         ? await transaction.stockItem.findMany({
-            where: { id: { in: selectedStockIds } },
-            select: { id: true, sku: true, name: true, unit: true },
-          })
+          where: { id: { in: selectedStockIds } },
+          select: { id: true, sku: true, name: true, unit: true },
+        })
         : [];
       if (selectedStockItems.length !== selectedStockIds.length) {
         throw new Error("Salah satu barang katalog tidak ditemukan.");
@@ -419,10 +425,10 @@ export async function createPurchaseOrder(
       });
       const vendorBankAccount = vendor
         ? resolveVendorBankAccount(
-            vendor.bankAccounts,
-            vendor,
-            input.vendorBankAccountId,
-          )
+          vendor.bankAccounts,
+          vendor,
+          input.vendorBankAccountId,
+        )
         : null;
       if (vendor && input.vendorBankAccountId && !vendorBankAccount) {
         throw new Error("Rekening yang dipilih tidak terdaftar pada vendor ini.");
@@ -473,8 +479,8 @@ export async function createPurchaseOrder(
               itemCode: item.stockItemId
                 ? (selectedStockById.get(item.stockItemId)?.sku ?? null)
                 : (stockCodeByNameAndUnit.get(
-                    stockItemKey(item.itemName, item.unit),
-                  ) ?? null),
+                  stockItemKey(item.itemName, item.unit),
+                ) ?? null),
               stockItemId: item.stockItemId ?? null,
               itemName: item.itemName.trim(),
               unit: item.unit.trim(),
@@ -551,9 +557,9 @@ export async function updatePurchaseOrder(
       ];
       const stockItems = stockItemIds.length
         ? await transaction.stockItem.findMany({
-            where: { id: { in: stockItemIds } },
-            select: { id: true, sku: true },
-          })
+          where: { id: { in: stockItemIds } },
+          select: { id: true, sku: true },
+        })
         : [];
       const stockCodeById = new Map(
         stockItems.map((item) => [item.id, item.sku]),
@@ -591,8 +597,8 @@ export async function updatePurchaseOrder(
               itemCode: item.stockItemId
                 ? (stockCodeById.get(item.stockItemId) ?? null)
                 : (stockCodeByNameAndUnit.get(
-                    stockItemKey(item.itemName, item.unit),
-                  ) ?? null),
+                  stockItemKey(item.itemName, item.unit),
+                ) ?? null),
               itemName: item.itemName.trim(),
               unit: item.unit.trim(),
               totalPrice: item.quantity * item.unitPrice,
@@ -1112,10 +1118,10 @@ export async function submitPurchaseOrderInvoice(
           bankAccount:
             order.paymentMethod === POPaymentMethod.TRANSFER
               ? formatVendorBankAccount({
-                  bankName: order.paymentBankName,
-                  bankAccount: order.paymentAccountNumber,
-                  bankHolder: order.paymentAccountName,
-                })
+                bankName: order.paymentBankName,
+                bankAccount: order.paymentAccountNumber,
+                bankHolder: order.paymentAccountName,
+              })
               : null,
           documentUrl: parsed.data.documentUrl,
           subTotal,
@@ -1284,8 +1290,8 @@ export async function receiveStandalonePurchaseOrder(
         order.invoices[0]?.grandTotal ??
         Math.round(
           order.items.reduce((total, item) => total + item.totalPrice, 0) *
-            (order.includeTax ? 1.11 : 1) *
-            100,
+          (order.includeTax ? 1.11 : 1) *
+          100,
         ) / 100;
       const paymentTotal = await transaction.paymentTransaction.aggregate({
         where: { poId: order.id, status: PaymentStatus.PAID },
@@ -1434,44 +1440,63 @@ export async function createDeliveryOrder(
   }
   const deliveryMethod =
     input?.deliveryMethod ?? DODeliveryMethod.INTERNAL_MOVER;
+  const isExpedition = deliveryMethod === DODeliveryMethod.EXPEDITION;
+  const vehicleId = isExpedition
+    ? undefined
+    : (input.vehicleId?.trim() || undefined);
+  const driverIdentityNumber = input.driverIdentityNumber?.trim() || undefined;
+  const vehicleDocumentNumber =
+    input.vehicleDocumentNumber?.trim() || undefined;
+  const vehiclePlate = input.vehiclePlate?.trim() || "";
+  const driverName = input.driverName?.trim() || "";
+  const driverPhone = input.driverPhone?.trim() || "";
+
   if (
     deliveryMethod === DODeliveryMethod.INTERNAL_MOVER &&
     session.user.role !== UserRole.LOGISTICS
   ) {
     return fail("Hanya Logistik yang dapat menetapkan kendaraan master pada DO internal.");
   }
+  if (!input) {
+    return fail("Data Delivery Order tidak valid.");
+  }
+  if (input.ticketId !== undefined && !isText(input.ticketId, 64)) {
+    return fail("ID tiket referensi tidak valid.");
+  }
+  if (!Object.values(DOStatus).includes(input.status)) {
+    return fail("Status Delivery Order tidak valid.");
+  }
+  if (input.poPublicCode !== undefined && !validPublicCode(input.poPublicCode)) {
+    return fail("Kode Purchase Order referensi tidak valid.");
+  }
   if (
-    !input ||
-    !isText(input.ticketId ?? "", 64) ||
-    !Object.values(DOStatus).includes(input.status) ||
-    (input.ticketId !== undefined && !isText(input.ticketId, 64)) ||
-    (input.poPublicCode !== undefined &&
-      !validPublicCode(input.poPublicCode)) ||
-    !isText(input.driverName ?? "", 180, true) ||
-    !isText(input.vehiclePlate ?? "", 40, true) ||
-    !isText(input.vehicleDocumentNumber ?? "", 80, true) ||
-    !isText(input.driverIdentityNumber ?? "", 32, true) ||
-    !isText(input.driverPhone ?? "", 32, true) ||
-    (input.deliveryMethod !== undefined &&
-      !Object.values(DODeliveryMethod).includes(input.deliveryMethod)) ||
-    (input.vehicleId !== undefined &&
-      !isText(input.vehicleId, 64)) ||
-    (input.vehicleId !== undefined &&
-      input.deliveryMethod === DODeliveryMethod.EXPEDITION) ||
-    (deliveryMethod === DODeliveryMethod.INTERNAL_MOVER &&
-      !isText(input.vehicleId ?? "", 64)) ||
-    (deliveryMethod === DODeliveryMethod.INTERNAL_MOVER &&
-      input.status !== DOStatus.PENDING) ||
-    (input.deliveryMethod === DODeliveryMethod.EXPEDITION &&
-      (!isText(input.vehicleDocumentNumber ?? "", 80) ||
-        !isText(input.driverName ?? "", 180) ||
-        !/^[A-Za-z0-9./ -]{3,40}$/.test(input.vehiclePlate ?? "") ||
-        !/^\d{16}$/.test(input.driverIdentityNumber ?? "") ||
-        !/^[+()\d\s.-]{8,32}$/.test(input.driverPhone ?? ""))) ||
-    !isText(input.receiverName ?? "", 180, true) ||
-    !isValidItems(input.items, isDeliveryOrderItem)
+    input.deliveryMethod !== undefined &&
+    !Object.values(DODeliveryMethod).includes(input.deliveryMethod)
   ) {
-    return fail("Data Delivery Order tidak valid. Periksa nomor dan item pengiriman.");
+    return fail("Metode pengiriman tidak valid.");
+  }
+  if (!isExpedition && !isText(vehicleId ?? "", 64)) {
+    return fail("Pilih kendaraan master untuk DO internal.");
+  }
+  if (!isExpedition && input.status !== DOStatus.PENDING) {
+    return fail("Status DO internal baru harus Menunggu.");
+  }
+  if (isExpedition) {
+    if (!isText(driverName, 180)) {
+      return fail("Nama driver / mover ekspedisi wajib diisi.");
+    }
+    if (!/^[A-Za-z0-9./ -]{3,40}$/.test(vehiclePlate)) {
+      return fail("Plat nomor kendaraan ekspedisi tidak valid (minimal 3 karakter).");
+    }
+    if (Boolean(driverIdentityNumber) && !/^\d{8,20}$/.test(driverIdentityNumber!)) {
+      return fail("NIK driver harus berupa 8-20 digit angka jika diisi.");
+    }
+    if (Boolean(driverPhone) && !/^[+()\d\s.-]{6,32}$/.test(driverPhone)) {
+      return fail("Nomor HP driver tidak valid jika diisi.");
+    }
+  }
+  if (!isValidItems(input.items, isDeliveryOrderItem)) {
+    return fail("Item pengiriman tidak valid. Periksa jumlah barang yang dikirim.");
   }
   try {
     const created = await prisma.$transaction(async (transaction) => {
@@ -1480,30 +1505,30 @@ export async function createDeliveryOrder(
       }
       const ticket = input.ticketId
         ? await transaction.ticket.findUnique({
-            where: { id: input.ticketId },
-            select: {
-              id: true,
-              type: true,
-              requestCategory: true,
-              relatedPoIds: true,
-              status: true,
-              isApprovedByDirector: true,
-              projectId: true,
-              ticketNumber: true,
-              moverAssignee: { select: { name: true } },
-              items: {
-                select: {
-                  id: true,
-                  itemName: true,
-                  quantity: true,
-                  unit: true,
-                  categoryHint: true,
-                  status: true,
-                },
-                orderBy: { id: "asc" },
+          where: { id: input.ticketId },
+          select: {
+            id: true,
+            type: true,
+            requestCategory: true,
+            relatedPoIds: true,
+            status: true,
+            isApprovedByDirector: true,
+            projectId: true,
+            ticketNumber: true,
+            moverAssignee: { select: { name: true } },
+            items: {
+              select: {
+                id: true,
+                itemName: true,
+                quantity: true,
+                unit: true,
+                categoryHint: true,
+                status: true,
               },
+              orderBy: { id: "asc" },
             },
-          })
+          },
+        })
         : null;
       if (
         input.ticketId &&
@@ -1536,6 +1561,7 @@ export async function createDeliveryOrder(
         ticket &&
         ticket.status !== TicketStatus.PROCESSED_LOGISTIC &&
         ticket.status !== TicketStatus.ASSIGNED_TO_MOVER &&
+        ticket.status !== TicketStatus.IN_TRANSIT &&
         ticket.status !== TicketStatus.WAITING_FINANCE_PAYMENT &&
         ticket.status !== TicketStatus.COMPLETED
       ) {
@@ -1543,9 +1569,9 @@ export async function createDeliveryOrder(
       }
       const purchaseOrder = input.poPublicCode
         ? await transaction.purchaseOrder.findUnique({
-            where: { publicCode: input.poPublicCode },
-            select: { id: true, ticketId: true, status: true },
-          })
+          where: { publicCode: input.poPublicCode },
+          select: { id: true, ticketId: true, status: true },
+        })
         : null;
       if (input.poPublicCode && !purchaseOrder) {
         throw new Error("Purchase Order yang dirujuk tidak ditemukan.");
@@ -1582,21 +1608,21 @@ export async function createDeliveryOrder(
       const selectedVehicle =
         deliveryMethod === DODeliveryMethod.INTERNAL_MOVER
           ? await transaction.vehicle.findFirst({
-              where: {
-                id: input.vehicleId,
-                status: "AVAILABLE",
-                odometerInitialized: true,
-                deliveryOrders: {
-                  none: {
-                    status: { in: [DOStatus.PENDING, DOStatus.IN_TRANSIT] },
-                  },
+            where: {
+              id: input.vehicleId,
+              status: "AVAILABLE",
+              odometerInitialized: true,
+              deliveryOrders: {
+                none: {
+                  status: { in: [DOStatus.PENDING, DOStatus.IN_TRANSIT] },
                 },
               },
-              select: {
-                id: true,
-                plateNumber: true,
-              },
-            })
+            },
+            select: {
+              id: true,
+              plateNumber: true,
+            },
+          })
           : null;
       if (deliveryMethod === DODeliveryMethod.INTERNAL_MOVER && !selectedVehicle) {
         throw new Error(
@@ -1607,32 +1633,32 @@ export async function createDeliveryOrder(
       const doNumber = await nextDocumentNumber(transaction, "DO");
       const warehouseItems = ticket
         ? ticket.items.flatMap((ticketItem, index) => {
-            const orderItem = input.items[index];
-            return ticketItem.categoryHint === TicketCategoryHint.WAREHOUSE &&
-              ticketItem.status === FulfillmentStatus.PENDING &&
-              orderItem.qtyDelivered > 0
-              ? [
-                  {
-                    itemName: ticketItem.itemName,
-                    unit: ticketItem.unit,
-                    quantity: new Prisma.Decimal(
-                      orderItem.qtyDelivered.toString(),
-                    ),
-                  },
-                ]
-              : [];
-          })
+          const orderItem = input.items[index];
+          return ticketItem.categoryHint === TicketCategoryHint.WAREHOUSE &&
+            ticketItem.status === FulfillmentStatus.PENDING &&
+            orderItem.qtyDelivered > 0
+            ? [
+              {
+                itemName: ticketItem.itemName,
+                unit: ticketItem.unit,
+                quantity: new Prisma.Decimal(
+                  orderItem.qtyDelivered.toString(),
+                ),
+              },
+            ]
+            : [];
+        })
         : [];
       const stockItems = warehouseItems.length
         ? await transaction.stockItem.findMany({
-            select: {
-              id: true,
-              name: true,
-              unit: true,
-              stockQuantity: true,
-              unitPrice: true,
-            },
-          })
+          select: {
+            id: true,
+            name: true,
+            unit: true,
+            stockQuantity: true,
+            unitPrice: true,
+          },
+        })
         : [];
       const normalize = (value: string) =>
         value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
@@ -1846,36 +1872,57 @@ export async function updateDeliveryOrder(
   if (!session?.user || !canEditDeliveryOrders(session.user.role)) {
     return fail("Anda tidak memiliki akses untuk mengubah Delivery Order.");
   }
-  if (
-    !validPublicCode(publicCode) ||
-    !input ||
-    !isText(input.doNumber, 80) ||
-    !Object.values(DOStatus).includes(input.status) ||
-    !isText(input.driverName ?? "", 180, true) ||
-    !isText(input.vehiclePlate ?? "", 40, true) ||
-    !isText(input.vehicleDocumentNumber ?? "", 80, true) ||
-    !isText(input.driverIdentityNumber ?? "", 32, true) ||
-    !isText(input.driverPhone ?? "", 32, true) ||
-    (input.deliveryMethod !== undefined &&
-      !Object.values(DODeliveryMethod).includes(input.deliveryMethod)) ||
-    (input.vehicleId !== undefined &&
-      !isText(input.vehicleId, 64)) ||
-    (input.vehicleId !== undefined &&
-      input.deliveryMethod === DODeliveryMethod.EXPEDITION) ||
-    (input.deliveryMethod === DODeliveryMethod.EXPEDITION &&
-      (!isText(input.vehicleDocumentNumber ?? "", 80) ||
-        !isText(input.driverName ?? "", 180) ||
-        !/^[A-Za-z0-9./ -]{3,40}$/.test(input.vehiclePlate ?? "") ||
-        !/^\d{16}$/.test(input.driverIdentityNumber ?? "") ||
-        !/^[+()\d\s.-]{8,32}$/.test(input.driverPhone ?? ""))) ||
-    !isText(input.receiverName ?? "", 180, true) ||
-    !isValidItems(input.items, isDeliveryOrderItem)
-  ) {
-    return fail("Data Delivery Order tidak valid. Periksa nomor dan item pengiriman.");
+  const deliveryMethod =
+    input?.deliveryMethod ?? DODeliveryMethod.INTERNAL_MOVER;
+  const isExpedition = deliveryMethod === DODeliveryMethod.EXPEDITION;
+  const vehicleId = isExpedition
+    ? undefined
+    : (input.vehicleId?.trim() || undefined);
+  const driverIdentityNumber = input.driverIdentityNumber?.trim() || undefined;
+  const vehicleDocumentNumber =
+    input.vehicleDocumentNumber?.trim() || undefined;
+  const vehiclePlate = input.vehiclePlate?.trim() || "";
+  const driverName = input.driverName?.trim() || "";
+  const driverPhone = input.driverPhone?.trim() || "";
+
+  if (!validPublicCode(publicCode)) {
+    return fail("Kode Delivery Order tidak valid.");
+  }
+  if (!input) {
+    return fail("Data Delivery Order tidak valid.");
   }
   const normalizedDoNumber = input.doNumber?.trim();
-  if (!normalizedDoNumber) {
-    return fail("Nomor Delivery Order wajib diisi.");
+  if (!normalizedDoNumber || !isText(normalizedDoNumber, 80)) {
+    return fail("Nomor Delivery Order wajib diisi (maksimal 80 karakter).");
+  }
+  if (!Object.values(DOStatus).includes(input.status)) {
+    return fail("Status Delivery Order tidak valid.");
+  }
+  if (
+    input.deliveryMethod !== undefined &&
+    !Object.values(DODeliveryMethod).includes(input.deliveryMethod)
+  ) {
+    return fail("Metode pengiriman tidak valid.");
+  }
+  if (!isExpedition && input.vehicleId !== undefined && !isText(vehicleId ?? "", 64)) {
+    return fail("Pilih kendaraan master untuk DO internal.");
+  }
+  if (isExpedition) {
+    if (!isText(driverName, 180)) {
+      return fail("Nama driver / mover ekspedisi wajib diisi.");
+    }
+    if (!/^[A-Za-z0-9./ -]{3,40}$/.test(vehiclePlate)) {
+      return fail("Plat nomor kendaraan ekspedisi tidak valid (minimal 3 karakter).");
+    }
+    if (Boolean(driverIdentityNumber) && !/^\d{8,20}$/.test(driverIdentityNumber!)) {
+      return fail("NIK driver harus berupa 8-20 digit angka jika diisi.");
+    }
+    if (Boolean(driverPhone) && !/^[+()\d\s.-]{6,32}$/.test(driverPhone)) {
+      return fail("Nomor HP driver tidak valid jika diisi.");
+    }
+  }
+  if (!isValidItems(input.items, isDeliveryOrderItem)) {
+    return fail("Item pengiriman tidak valid. Periksa jumlah barang yang dikirim.");
   }
 
   let savedArrivalPhotoUrl: string | null = null;
@@ -2070,13 +2117,13 @@ export async function updateDeliveryOrder(
         normalizedDoNumber !== currentOrder.doNumber ||
         nextDriverName !== currentOrder.driverName ||
         (input.vehicleDocumentNumber?.trim() || null) !==
-          currentOrder.vehicleDocumentNumber ||
+        currentOrder.vehicleDocumentNumber ||
         nextVehiclePlate !== currentOrder.vehiclePlate ||
         (assignedVehicle
           ? assignedVehicle.plateNumber !== currentOrder.vehiclePlateNumber
           : false) ||
         (input.driverIdentityNumber?.trim() || null) !==
-          currentOrder.driverIdentityNumber ||
+        currentOrder.driverIdentityNumber ||
         (input.driverPhone?.trim() || null) !== currentOrder.driverPhone ||
         nextReceiverName !== currentOrder.receiverName ||
         input.items.length !== currentOrder.items.length ||
@@ -2176,7 +2223,7 @@ export async function updateDeliveryOrder(
             if (
               oldItem &&
               itemKey(item.itemName, item.unit) !==
-                itemKey(oldItem.itemName, oldItem.unit)
+              itemKey(oldItem.itemName, oldItem.unit)
             ) {
               throw new Error(
                 "Nama dan satuan barang yang stoknya sudah dipotong tidak dapat diubah pada DO.",
@@ -2207,11 +2254,11 @@ export async function updateDeliveryOrder(
               (quantity, movement) =>
                 movement.type === StockMovementType.OUT
                   ? quantity.plus(
-                      decimalFromScaledInteger(movement.quantity),
-                    )
+                    decimalFromScaledInteger(movement.quantity),
+                  )
                   : quantity.minus(
-                      decimalFromScaledInteger(movement.quantity),
-                    ),
+                    decimalFromScaledInteger(movement.quantity),
+                  ),
               new Prisma.Decimal(0),
             );
           if (netIssued.lessThan(0)) {
@@ -2232,19 +2279,19 @@ export async function updateDeliveryOrder(
               ...(isRestock
                 ? {}
                 : {
-                    stockQuantity: {
-                      gte: scaledIntegerFromDecimal(adjustedQuantity),
-                    },
-                  }),
+                  stockQuantity: {
+                    gte: scaledIntegerFromDecimal(adjustedQuantity),
+                  },
+                }),
             },
             data: {
               stockQuantity: isRestock
                 ? {
-                    increment: scaledIntegerFromDecimal(adjustedQuantity),
-                  }
+                  increment: scaledIntegerFromDecimal(adjustedQuantity),
+                }
                 : {
-                    decrement: scaledIntegerFromDecimal(adjustedQuantity),
-                  },
+                  decrement: scaledIntegerFromDecimal(adjustedQuantity),
+                },
             },
           });
           if (updated.count !== 1) {
@@ -2291,10 +2338,10 @@ export async function updateDeliveryOrder(
           vehiclePlate: input.vehiclePlate?.trim() || null,
           ...(assignedVehicle
             ? {
-                vehicleId: assignedVehicle.id,
-                vehiclePlateNumber: assignedVehicle.plateNumber,
-                vehiclePlate: assignedVehicle.plateNumber,
-              }
+              vehicleId: assignedVehicle.id,
+              vehiclePlateNumber: assignedVehicle.plateNumber,
+              vehiclePlate: assignedVehicle.plateNumber,
+            }
             : {}),
           driverIdentityNumber: input.driverIdentityNumber?.trim() || null,
           driverPhone: input.driverPhone?.trim() || null,
@@ -2305,11 +2352,11 @@ export async function updateDeliveryOrder(
             : input.receiverName?.trim() || null,
           ...(isExpeditionArrival && !existingOrder.receivedAt
             ? {
-                receivedAt,
-                receivedById: session.user.id,
-                arrivalPhotoUrl:
-                  savedArrivalPhotoUrl ?? existingOrder.arrivalPhotoUrl,
-              }
+              receivedAt,
+              receivedById: session.user.id,
+              arrivalPhotoUrl:
+                savedArrivalPhotoUrl ?? existingOrder.arrivalPhotoUrl,
+            }
             : {}),
           ...(currentOrder.deliveryMethod === DODeliveryMethod.EXPEDITION
             ? { status: input.status }
@@ -2350,7 +2397,7 @@ export async function updateDeliveryOrder(
       }
       if (
         existingOrder.deliveryMethod ===
-          DODeliveryMethod.EXPEDITION &&
+        DODeliveryMethod.EXPEDITION &&
         input.status === DOStatus.DELIVERED &&
         existingOrder.ticket
       ) {
@@ -2597,7 +2644,7 @@ export async function submitMoverDeliveryProofs(
         file.size > 5 * 1024 * 1024,
     ) ||
     files.reduce((total, file) => total + file.size, 0) >
-      MAX_MOVER_PROOF_TOTAL_BYTES ||
+    MAX_MOVER_PROOF_TOTAL_BYTES ||
     (!completeDelivery && files.length === 0)
   ) {
     return fail(
@@ -2773,12 +2820,12 @@ export async function submitMoverDeliveryProofs(
             : {}),
           ...(completeDelivery
             ? {
-                status: DOStatus.DELIVERED,
-                receivedAt: new Date(),
-                departureKilometer: scaledIntegerFromDecimal(
-                  kilometerStart!.toString(),
-                ),
-              }
+              status: DOStatus.DELIVERED,
+              receivedAt: new Date(),
+              departureKilometer: scaledIntegerFromDecimal(
+                kilometerStart!.toString(),
+              ),
+            }
             : {}),
         },
       });

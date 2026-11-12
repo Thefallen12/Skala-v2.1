@@ -11,7 +11,17 @@ type LocalPreview = {
   url: string;
 };
 
-export default function InvoiceFilePreview({ file }: { file: File | null }) {
+export default function InvoiceFilePreview({
+  file,
+  title = "Pratinjau Invoice / Bon",
+  label = "Pratinjau invoice atau bon",
+  tooltip = "Pratinjau invoice / bon",
+}: {
+  file: File | null;
+  title?: string;
+  label?: string;
+  tooltip?: string;
+}) {
   const [preview, setPreview] = useState<LocalPreview | null>(null);
   const previewRef = useRef<LocalPreview | null>(null);
 
@@ -45,8 +55,8 @@ export default function InvoiceFilePreview({ file }: { file: File | null }) {
     <>
       <div className="flex shrink-0 flex-col items-center gap-1">
         <ActionIconButton
-          label="Pratinjau invoice atau bon"
-          tooltip="Pratinjau invoice / bon"
+          label={label}
+          tooltip={tooltip}
           icon={Eye}
           onClick={() => {
             if (previewRef.current) {
@@ -67,7 +77,7 @@ export default function InvoiceFilePreview({ file }: { file: File | null }) {
       <GlobalModal
         isOpen={isCurrentPreview}
         onClose={closePreview}
-        title="Pratinjau Invoice / Bon"
+        title={title}
         description={file.name}
         className="sm:max-w-5xl"
         bodyClassName="flex min-h-[50vh] items-center justify-center"
@@ -77,12 +87,14 @@ export default function InvoiceFilePreview({ file }: { file: File | null }) {
         {isCurrentPreview && preview ? (
           isPdf ? (
             <iframe
+              key={preview.url}
               title={`Pratinjau ${file.name}`}
               src={preview.url}
               className="h-[70vh] w-full rounded-lg border bg-background"
             />
           ) : isImage ? (
             <Image
+              key={preview.url}
               src={preview.url}
               alt={`Pratinjau ${file.name}`}
               width={1600}

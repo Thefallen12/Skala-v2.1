@@ -3452,6 +3452,7 @@ export default function FinanceHub({
                   </p>
                 ) : isImageReceipt(receiptPreview.url) ? (
                   <Image
+                    key={receiptPreview.url}
                     src={paymentReceiptHref(receiptPreview.url)}
                     alt={receiptPreview.label}
                     width={1200}
@@ -3468,6 +3469,7 @@ export default function FinanceHub({
                   />
                 ) : isPdfReceipt(receiptPreview.url) ? (
                   <iframe
+                    key={receiptPreview.url}
                     src={paymentReceiptHref(receiptPreview.url)}
                     title={`Pratinjau ${receiptPreview.label}`}
                     className="h-[65vh] w-full"

@@ -4732,16 +4732,17 @@ async function createWarehouseDeliveryOrder(
       if (
         hasPaidPurchaseOrder &&
         (!externalDelivery ||
-          externalDelivery.vehicleDocumentNumber.trim().length < 1 ||
           externalDelivery.vehicleDocumentNumber.trim().length > 80 ||
           !/^[A-Za-z0-9./ -]{3,40}$/.test(externalDelivery.vehiclePlate.trim()) ||
           externalDelivery.driverName.trim().length < 2 ||
           externalDelivery.driverName.trim().length > 180 ||
-          !/^\d{16}$/.test(externalDelivery.driverIdentityNumber.trim()) ||
-          !/^[+()\d\s.-]{8,32}$/.test(externalDelivery.driverPhone.trim()))
+          (Boolean(externalDelivery.driverIdentityNumber.trim()) &&
+            !/^\d{8,20}$/.test(externalDelivery.driverIdentityNumber.trim())) ||
+          (Boolean(externalDelivery.driverPhone.trim()) &&
+            !/^[+()\d\s.-]{6,32}$/.test(externalDelivery.driverPhone.trim())))
       ) {
         throw new Error(
-          "Lengkapi No. STK, plat nomor, nama driver, NIK 16 digit, dan nomor HP ekspedisi.",
+          "Lengkapi plat nomor dan nama driver ekspedisi dengan benar.",
         );
       }
       const selectedVehicle =

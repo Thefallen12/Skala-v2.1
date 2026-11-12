@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 
 export default function MoverActionModal({
   open,
@@ -77,16 +78,24 @@ export default function MoverActionModal({
         </div>
       }
     >
-      <form id="mover-action-form" className="space-y-4" onSubmit={submit}>
+      <form id="mover-action-form" key={ticketId} className="space-y-4" onSubmit={submit}>
         <FormLabel className="block space-y-2 text-sm font-medium">
           Unggah Foto Barang Tiba / Bukti DO
-          <Input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
-            required
-            disabled={isPending}
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              required
+              disabled={isPending}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+            <InvoiceFilePreview
+              file={file}
+              title="Pratinjau Foto Serah Terima"
+              label="Pratinjau foto serah terima"
+              tooltip="Pratinjau foto serah terima"
+            />
+          </div>
         </FormLabel>
         {message && (
           <p className="text-sm text-muted-foreground" role="status">

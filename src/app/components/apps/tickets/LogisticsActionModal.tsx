@@ -146,14 +146,15 @@ export default function LogisticsActionModal({
     if (
       actionType === "READY_WAREHOUSE" &&
       purchaseOrderPaid &&
-      (!externalDelivery.vehicleDocumentNumber.trim() ||
-        !/^[A-Za-z0-9./ -]{3,40}$/.test(externalDelivery.vehiclePlate.trim()) ||
+      (!/^[A-Za-z0-9./ -]{3,40}$/.test(externalDelivery.vehiclePlate.trim()) ||
         externalDelivery.driverName.trim().length < 2 ||
-        !/^\d{16}$/.test(externalDelivery.driverIdentityNumber.trim()) ||
-        !/^[+()\d\s.-]{8,32}$/.test(externalDelivery.driverPhone.trim()))
+        (Boolean(externalDelivery.driverIdentityNumber.trim()) &&
+          !/^\d{8,20}$/.test(externalDelivery.driverIdentityNumber.trim())) ||
+        (Boolean(externalDelivery.driverPhone.trim()) &&
+          !/^[+()\d\s.-]{6,32}$/.test(externalDelivery.driverPhone.trim())))
     ) {
       setMessage(
-        "Lengkapi No. STK, plat nomor, nama driver, NIK 16 digit, dan nomor HP ekspedisi.",
+        "Lengkapi plat nomor dan nama driver ekspedisi dengan benar.",
       );
       return;
     }
@@ -323,18 +324,18 @@ export default function LogisticsActionModal({
           {actionType === "READY_WAREHOUSE" && purchaseOrderPaid && (
             <section className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="external-vehicle-document">No. STK</Label>
+                <Label htmlFor="external-vehicle-document">No. STNK / STK (opsional)</Label>
                 <Input
                   id="external-vehicle-document"
                   value={externalDelivery.vehicleDocumentNumber}
                   maxLength={80}
+                  placeholder="Contoh: No. STNK (opsional)"
                   onChange={(event) =>
                     setExternalDelivery((current) => ({
                       ...current,
                       vehicleDocumentNumber: event.target.value,
                     }))
                   }
-                  required
                 />
               </div>
               <div className="space-y-2">
@@ -368,35 +369,35 @@ export default function LogisticsActionModal({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="external-driver-nik">NIK driver (16 digit)</Label>
+                <Label htmlFor="external-driver-nik">NIK driver (16 digit, opsional)</Label>
                 <Input
                   id="external-driver-nik"
                   inputMode="numeric"
                   value={externalDelivery.driverIdentityNumber}
                   maxLength={16}
+                  placeholder="Contoh: 1101010101010001 (opsional)"
                   onChange={(event) =>
                     setExternalDelivery((current) => ({
                       ...current,
                       driverIdentityNumber: event.target.value.replace(/\D/g, ""),
                     }))
                   }
-                  required
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="external-driver-phone">Nomor HP driver</Label>
+                <Label htmlFor="external-driver-phone">Nomor HP driver (opsional)</Label>
                 <Input
                   id="external-driver-phone"
                   type="tel"
                   value={externalDelivery.driverPhone}
                   maxLength={32}
+                  placeholder="Contoh: 081234567890 (opsional)"
                   onChange={(event) =>
                     setExternalDelivery((current) => ({
                       ...current,
                       driverPhone: event.target.value,
                     }))
                   }
-                  required
                 />
               </div>
             </section>

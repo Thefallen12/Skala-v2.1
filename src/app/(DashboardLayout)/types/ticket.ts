@@ -114,6 +114,8 @@ export type TicketRow = {
     status: "PENDING_RECEIPT" | "RECEIVED";
     isApprovedByDirector: boolean;
     vendorInvoiceUrl?: string | null;
+    arrivalPhotoUrl?: string | null;
+    receivedPhotos?: string[];
     receivedAt?: string | null;
     hasFinanceProof?: boolean;
     createdAt: string;
@@ -129,6 +131,9 @@ export type TicketRow = {
     publicCode: string;
     doNumber: string;
     status: DOStatus;
+    arrivalPhotoUrl?: string | null;
+    deliveryReceiptUrl?: string | null;
+    receiptPhotos?: { id: string; url: string }[];
     createdAt: string;
   }[];
 };

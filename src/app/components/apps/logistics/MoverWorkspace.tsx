@@ -32,7 +32,7 @@ import {
   VEHICLE_FUEL_PRICE_PER_LITER,
 } from "@/lib/vehicle-fuel";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
-import { photoDownloadHref } from "@/lib/photo-urls";
+import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -657,6 +657,7 @@ export default function MoverWorkspace({
                         </div>
 
                         <form
+                          key={order.publicCode}
                           className="space-y-3"
                           onSubmit={(event) => submitDeliveryProof(event, order.publicCode)}
                         >
@@ -741,7 +742,7 @@ export default function MoverWorkspace({
                           {order.receiptPhotoUrls.map((url, idx) => (
                             <a
                               key={`${url}-${idx}`}
-                              href={photoDownloadHref(url)}
+                              href={withLocalPhotoPreview(url)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted"

@@ -39,8 +39,13 @@ function canEditDeliveryOrder(role: UserRole): boolean {
   return (
     canManageUsers(role) ||
     canEditPurchaseOrder(role) ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.LOGISTICS ||
     role === UserRole.FIELD_TEAM ||
-    role === UserRole.KOORDINATOR
+    role === UserRole.KOORDINATOR ||
+    role === UserRole.MOVER ||
+    role === UserRole.FINANCE
   );
 }
 

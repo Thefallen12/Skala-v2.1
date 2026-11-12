@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import {
   Select,
   SelectContent,
@@ -1469,6 +1470,12 @@ export default function CreateTicketModal({
                         >
                           {watchedDeliveryReceiptFile.name}
                         </span>
+                        <InvoiceFilePreview
+                          file={watchedDeliveryReceiptFile}
+                          title="Pratinjau Resi Pengiriman"
+                          label="Pratinjau resi pengiriman"
+                          tooltip="Pratinjau resi pengiriman"
+                        />
                         <Button
                           type="button"
                           size="sm"
@@ -1645,22 +1652,30 @@ export default function CreateTicketModal({
                             key={`${file.name}-${file.lastModified}-${file.size}`}
                             className="flex items-center justify-between gap-2 rounded-md border bg-background p-2 text-xs"
                           >
-                            <span className="min-w-0 truncate">{file.name}</span>
-                            <button
-                              type="button"
-                              className="shrink-0 py-1 text-destructive"
-                              onClick={() => {
-                                const next = receiptFiles.filter(
-                                  (_, fileIndex) => fileIndex !== index,
-                                );
-                                setReceiptFiles(next);
-                                form.setValue("receiptFiles", next, {
-                                  shouldValidate: true,
-                                });
-                              }}
-                            >
-                              Hapus bukti
-                            </button>
+                            <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              <InvoiceFilePreview
+                                file={file}
+                                title={`Pratinjau ${file.name}`}
+                                label={`Pratinjau ${file.name}`}
+                                tooltip="Pratinjau struk / nota"
+                              />
+                              <button
+                                type="button"
+                                className="shrink-0 py-1 text-destructive"
+                                onClick={() => {
+                                  const next = receiptFiles.filter(
+                                    (_, fileIndex) => fileIndex !== index,
+                                  );
+                                  setReceiptFiles(next);
+                                  form.setValue("receiptFiles", next, {
+                                    shouldValidate: true,
+                                  });
+                                }}
+                              >
+                                Hapus bukti
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

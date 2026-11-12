@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { submitPaymentRecord } from "@/app/actions/tickets";
 import { listFinanceAccountsForPayments } from "@/app/actions/finance-cashflow";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
@@ -201,7 +202,7 @@ export default function FinanceActionModal({
         </div>
       }
     >
-        <form id="finance-action-form" className="space-y-4" onSubmit={submit}>
+        <form id="finance-action-form" key={ticket.id} className="space-y-4" onSubmit={submit}>
           <section className="space-y-2 rounded-md border p-4 text-sm">
             <p className="font-semibold">
               {ticket.ticketNumber} · {ticket.title}
@@ -333,13 +334,21 @@ export default function FinanceActionModal({
             {isCashPayment
               ? "Upload Bukti Penyerahan Dana"
               : "Upload Bukti Transfer / Pengiriman Dana"}
-            <Input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              required
-              disabled={isPending}
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                required
+                disabled={isPending}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+              <InvoiceFilePreview
+                file={file}
+                title="Pratinjau Bukti Pembayaran"
+                label="Pratinjau bukti pembayaran"
+                tooltip="Pratinjau bukti pembayaran"
+              />
+            </div>
           </FormLabel>
           {message && (
             <p className="text-sm text-muted-foreground" role="status">

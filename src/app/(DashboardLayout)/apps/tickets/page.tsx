@@ -136,6 +136,8 @@ const Tickets = async ({
             status: true,
             isApprovedByDirector: true,
             vendorInvoiceUrl: true,
+            arrivalPhotoUrl: true,
+            receivedPhotos: true,
             receivedAt: true,
             createdAt: true,
             items: {
@@ -179,6 +181,15 @@ const Tickets = async ({
             publicCode: true,
             doNumber: true,
             status: true,
+            arrivalPhotoUrl: true,
+            deliveryReceiptUrl: true,
+            receiptPhotos: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                url: true,
+              },
+            },
             createdAt: true,
           },
         },

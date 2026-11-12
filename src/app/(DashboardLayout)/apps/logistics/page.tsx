@@ -527,6 +527,15 @@ export default async function LogisticsPage({
             publicCode: true,
             doNumber: true,
             status: true,
+            arrivalPhotoUrl: true,
+            deliveryReceiptUrl: true,
+            receiptPhotos: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                url: true,
+              },
+            },
             createdAt: true,
           },
         },
