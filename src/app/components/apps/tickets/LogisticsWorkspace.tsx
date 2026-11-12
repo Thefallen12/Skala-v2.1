@@ -45,7 +45,7 @@ import type {
   TicketProjectOption,
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
-import { TicketStatus } from "@prisma/client";
+import { TicketRequestCategory, TicketStatus } from "@prisma/client";
 import {
   MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS,
 } from "@/lib/direct-stock-purchase-photo-config";
@@ -238,9 +238,9 @@ function DirectPurchaseInvoiceAction({
 
   return (
     <div className="space-y-2">
-      <FormLabel className="block space-y-1">
+      <FormLabel className="relative block space-y-1">
         <span className="text-xs font-medium">Foto Invoice / BON Faktur</span>
-        <Input
+        <input
           ref={invoicePhotoInput}
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -294,6 +294,14 @@ type PurchaseTicketOption = {
   id: string;
   ticketNumber: string;
   title: string;
+  items?: {
+    ticketItemId: string;
+    stockItemId?: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    estimatedCost?: string | null;
+  }[];
 };
 
 type LogisticsVendor = {
@@ -1212,7 +1220,7 @@ export default function LogisticsWorkspace({
           </CardBox>
         </div>
 
-        <CardBox className="overflow-hidden p-0">
+        <CardBox className="gap-0 overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div>
               <h3 className="font-semibold">Katalog Material</h3>
@@ -1259,7 +1267,7 @@ export default function LogisticsWorkspace({
             </div>
           </div>
           {stockItems.length ? (
-            <div className="overflow-x-auto">
+            <div className="space-y-4 p-5">
               <Table pagination={false}>
                 <TableHeader>
                   <TableRow>
@@ -1396,7 +1404,7 @@ export default function LogisticsWorkspace({
                   {!visibleStockItems.length && (
                     <TableRow>
                       <TableCell
-                        colSpan={canCreatePurchaseOrder ? 10 : 8}
+                        colSpan={canCreatePurchaseOrder ? 9 : 8}
                         className="py-10 text-center text-sm text-muted-foreground"
                       >
                         Tidak ada barang yang cocok dengan pencarian atau filter.
@@ -1405,6 +1413,13 @@ export default function LogisticsWorkspace({
                   )}
                 </TableBody>
               </Table>
+              <TablePaginationControls
+                count={visibleStockItems.length}
+                pageSize={stockPageSize}
+                page={currentStockPage}
+                itemLabel="barang"
+                onPageChange={setStockPage}
+              />
             </div>
           ) : (
             <p className="p-8 text-center text-sm text-muted-foreground">
@@ -1412,25 +1427,16 @@ export default function LogisticsWorkspace({
               <code>npm run db:seed:inventory</code> untuk memuat lima barang contoh.
             </p>
           )}
-          {stockItems.length > 0 && (
-            <TablePaginationControls
-              count={visibleStockItems.length}
-              pageSize={stockPageSize}
-              page={currentStockPage}
-              itemLabel="barang"
-              onPageChange={setStockPage}
-            />
-          )}
         </CardBox>
 
-        <CardBox className="overflow-hidden p-0">
+        <CardBox className="gap-0 overflow-hidden p-0">
           <div className="border-b border-border px-5 py-4">
             <h3 className="font-semibold">Pembelian Langsung</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               Stok diperbarui hanya setelah Logistik mencatat penerimaan dan foto bukti.
             </p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="p-5">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1540,22 +1546,26 @@ export default function LogisticsWorkspace({
                       ) : (
                         "—"
                       )}
-                      {receiptPhotos.map((photo, index) => (
-                        <ActionIconButton
-                          key={`${purchase.id}-${photo}`}
-                          type="button"
-                          label={`Lihat foto penerimaan ${index + 1} pembelian ${purchase.purchaseNumber}`}
-                          tooltip={`Lihat foto penerimaan ${index + 1}`}
-                          icon={Eye}
-                          onClick={() => {
-                            setStockReceiptPreviewFailed(false);
-                            setStockReceiptPreview({
-                              url: photo,
-                              label: `${purchase.purchaseNumber} · Foto penerimaan ${index + 1}`,
-                            });
-                          }}
-                        />
-                      ))}
+                      {receiptPhotos.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {receiptPhotos.map((photo, index) => (
+                            <ActionIconButton
+                              key={`${purchase.id}-${photo}`}
+                              type="button"
+                              label={`Lihat foto penerimaan ${index + 1} pembelian ${purchase.purchaseNumber}`}
+                              tooltip={`Lihat foto penerimaan ${index + 1}`}
+                              icon={Eye}
+                              onClick={() => {
+                                setStockReceiptPreviewFailed(false);
+                                setStockReceiptPreview({
+                                  url: photo,
+                                  label: `${purchase.purchaseNumber} · Foto penerimaan ${index + 1}`,
+                                });
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </TableCell>
                     {canCreatePurchaseOrder && (
                       <TableCell>
@@ -2027,6 +2037,7 @@ export default function LogisticsWorkspace({
               stockItems={stockItems}
               requesterRole={role}
               triggerLabel="Order Baru"
+              defaultRequestCategory={TicketRequestCategory.MATERIAL}
             />
           )}
         </div>

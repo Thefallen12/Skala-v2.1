@@ -36,7 +36,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getVendorBankAccounts } from "@/lib/vendor-bank-accounts";
-import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { Switch } from "@/components/ui/switch";
 import {
   DialogFooter,
@@ -59,18 +58,20 @@ type PurchaseStockItem = {
   unitPrice: string;
 };
 
-type PurchaseTicket = {
-  id: string;
-  ticketNumber: string;
-  title: string;
-};
-
 type InitialPurchaseItem = {
   ticketItemId: string;
   stockItemId?: string | null;
   itemName: string;
   quantity: number;
   unit: string;
+  estimatedCost?: string | null;
+};
+
+type PurchaseTicket = {
+  id: string;
+  ticketNumber: string;
+  title: string;
+  items?: InitialPurchaseItem[];
 };
 
 type PurchaseLine = {
@@ -79,7 +80,55 @@ type PurchaseLine = {
   quantity: string;
   unitPrice: string;
   ticketItemId?: string;
+  sourceLabel?: string;
+  itemName?: string;
+  unit?: string;
+  maxQuantity?: number;
 };
+
+function positivePriceString(raw?: string | null): string {
+  if (!raw) return "";
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) && numeric > 0 ? String(raw) : "";
+}
+
+function buildPurchaseLinesFromTicketItems(
+  ticketItems: InitialPurchaseItem[],
+  catalog: PurchaseStockItem[],
+  startKey = 0,
+): PurchaseLine[] {
+  if (ticketItems.length === 0) {
+    return [{ key: startKey, stockItemId: "", quantity: "", unitPrice: "" }];
+  }
+  return ticketItems.map((item, index) => {
+    const linkedStock = item.stockItemId
+      ? catalog.find((stockItem) => stockItem.id === item.stockItemId)
+      : undefined;
+    const matches = catalog.filter(
+      (stockItem) =>
+        stockItem.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") ===
+          item.itemName.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") &&
+        stockItem.unit.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") ===
+          item.unit.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID"),
+    );
+    const stockItem =
+      linkedStock ?? (matches.length === 1 ? matches[0] : undefined);
+    const resolvedUnitPrice =
+      positivePriceString(stockItem?.unitPrice) ||
+      positivePriceString(item.estimatedCost);
+    return {
+      key: startKey + index,
+      stockItemId: stockItem?.id ?? "",
+      quantity: String(item.quantity),
+      unitPrice: resolvedUnitPrice,
+      ticketItemId: item.ticketItemId,
+      sourceLabel: `${item.itemName} (${item.quantity} ${item.unit})`,
+      itemName: item.itemName,
+      unit: item.unit,
+      maxQuantity: item.quantity,
+    };
+  });
+}
 
 const currency = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -106,39 +155,17 @@ export default function DirectStockPurchaseForm({
 }) {
   const router = useRouter();
   const nextRowKey = useRef(initialTicketItems.length || 1);
-  const [items, setItems] = useState<PurchaseLine[]>(() => {
-    if (initialTicketItems.length === 0) {
-      return [{ key: 0, stockItemId: "", quantity: "", unitPrice: "" }];
-    }
-    return initialTicketItems.map((item, index) => {
-      const linkedStock = item.stockItemId
-        ? stockItems.find((stockItem) => stockItem.id === item.stockItemId)
-        : undefined;
-      const matches = stockItems.filter(
-        (stockItem) =>
-          stockItem.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") ===
-            item.itemName.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") &&
-          stockItem.unit.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") ===
-            item.unit.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID"),
-      );
-      const stockItem =
-        linkedStock ?? (matches.length === 1 ? matches[0] : undefined);
-      return {
-        key: index,
-        stockItemId: stockItem?.id ?? "",
-        quantity: String(item.quantity),
-        unitPrice: stockItem?.unitPrice ?? "",
-        ticketItemId: item.ticketItemId,
-      };
-    });
-  });
   const [catalogItems, setCatalogItems] = useState(stockItems);
+  const [items, setItems] = useState<PurchaseLine[]>(() =>
+    buildPurchaseLinesFromTicketItems(initialTicketItems, stockItems, 0),
+  );
   const [vendorId, setVendorId] = useState("");
   const [vendorBankAccountId, setVendorBankAccountId] = useState("");
   const [availableVendors, setAvailableVendors] = useState(vendors);
   const [openStockPickerKey, setOpenStockPickerKey] = useState<number | null>(null);
   const [ticketId, setTicketId] = useState(initialTicketId ?? "");
   const [newItemDialogOpen, setNewItemDialogOpen] = useState(false);
+  const [newItemTargetKey, setNewItemTargetKey] = useState<number | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("pcs");
   const [newItemMessage, setNewItemMessage] = useState("");
@@ -202,6 +229,16 @@ export default function DirectStockPurchaseForm({
     );
   };
 
+  const openNewItemModal = (targetLine?: PurchaseLine) => {
+    const fallbackLine =
+      targetLine ?? items.find((line) => !line.stockItemId);
+    setNewItemTargetKey(fallbackLine?.key ?? null);
+    setNewItemName(fallbackLine?.itemName ?? "");
+    setNewItemUnit(fallbackLine?.unit ?? "pcs");
+    setNewItemMessage("");
+    setNewItemDialogOpen(true);
+  };
+
   const addCatalogItem = () => {
     const name = newItemName.trim();
     const unit = newItemUnit.trim();
@@ -234,13 +271,24 @@ export default function DirectStockPurchaseForm({
               ),
         );
         setItems((current) => {
-          const emptyLine = current.find((line) => !line.stockItemId);
-          if (emptyLine) {
+          const targetLine =
+            (newItemTargetKey !== null
+              ? current.find((line) => line.key === newItemTargetKey)
+              : undefined) ?? current.find((line) => !line.stockItemId);
+          if (targetLine) {
+            const catalogPrice = positivePriceString(stockItem.unitPrice);
             return current.map((line) =>
-              line.key === emptyLine.key
-                ? { ...line, stockItemId: stockItem.id, unitPrice: stockItem.unitPrice }
+              line.key === targetLine.key
+                ? {
+                    ...line,
+                    stockItemId: stockItem.id,
+                    unitPrice: catalogPrice || line.unitPrice,
+                  }
                 : line,
             );
+          }
+          if (ticketId) {
+            return current;
           }
           return [
             ...current,
@@ -248,10 +296,11 @@ export default function DirectStockPurchaseForm({
               key: nextRowKey.current++,
               stockItemId: stockItem.id,
               quantity: "",
-              unitPrice: stockItem.unitPrice,
+              unitPrice: positivePriceString(stockItem.unitPrice),
             },
           ];
         });
+        setNewItemTargetKey(null);
         setNewItemDialogOpen(false);
       } catch (error) {
         console.error("Direct purchase stock catalog item creation failed:", error);
@@ -274,15 +323,14 @@ export default function DirectStockPurchaseForm({
     }
     const formattedItems = activeLines.map((line) => {
       const rawQty = (line.quantity ?? "").toString().trim().replace(",", ".");
-      let numPrice = parseRupiahInput(line.unitPrice);
-      if (!Number.isFinite(numPrice) || numPrice <= 0) {
-        numPrice = Number(
-          (line.unitPrice ?? "").toString().trim().replace(",", "."),
-        );
-      }
+      const rawPrice = (line.unitPrice ?? "").toString().trim().replace(",", ".");
+      const numQty = Number(rawQty);
+      const numPrice = Number(rawPrice);
       return {
         stockItemId: line.stockItemId,
         quantity: rawQty,
+        numQty,
+        maxQuantity: line.maxQuantity,
         unitPrice:
           Number.isFinite(numPrice) && numPrice > 0
             ? numPrice.toFixed(2)
@@ -294,24 +342,35 @@ export default function DirectStockPurchaseForm({
       formattedItems.some(
         (line) =>
           !line.stockItemId ||
-          !Number.isFinite(Number(line.quantity)) ||
-          Number(line.quantity) <= 0 ||
+          !Number.isFinite(line.numQty) ||
+          line.numQty <= 0 ||
+          (line.maxQuantity !== undefined && line.numQty > line.maxQuantity) ||
           !Number.isFinite(Number(line.unitPrice)) ||
           Number(line.unitPrice) <= 0,
       )
     ) {
-      setMessage("Pilih barang dari katalog, lalu isi jumlah dan harga satuan dengan benar.");
+      setMessage(
+        "Pilih barang dari katalog, isi jumlah (tidak melebihi kebutuhan tiket), dan harga satuan dengan benar.",
+      );
       return;
     }
 
     setMessage("");
+    const payloadItems = formattedItems.map(
+      ({ stockItemId, quantity, unitPrice, ticketItemId }) => ({
+        stockItemId,
+        quantity,
+        unitPrice,
+        ticketItemId,
+      }),
+    );
     startTransition(async () => {
       try {
         const result = await createDirectStockPurchase({
           vendorId: vendor.id,
           vendorBankAccountId: selectedBankAccount?.id,
           ...(ticketId ? { ticketId } : {}),
-          items: formattedItems,
+          items: payloadItems,
           reference,
           notes,
           includeTax,
@@ -438,7 +497,23 @@ export default function DirectStockPurchaseForm({
         </Label>
         <Select
           value={ticketId || "none"}
-          onValueChange={(value) => setTicketId(value === "none" ? "" : value)}
+          onValueChange={(value) => {
+            const nextTicketId = value === "none" ? "" : value;
+            setTicketId(nextTicketId);
+            if (!initialTicketId) {
+              const selectedTicket = tickets.find((t) => t.id === nextTicketId);
+              const nextTicketItems = selectedTicket?.items ?? [];
+              const startKey = nextRowKey.current;
+              nextRowKey.current += Math.max(1, nextTicketItems.length);
+              setItems(
+                buildPurchaseLinesFromTicketItems(
+                  nextTicketItems,
+                  catalogItems,
+                  startKey,
+                ),
+              );
+            }
+          }}
           disabled={isPending || Boolean(initialTicketId)}
         >
           <SelectTrigger id="direct-stock-ticket">
@@ -471,7 +546,7 @@ export default function DirectStockPurchaseForm({
               disabled={
                 isPending ||
                 isSavingNewItem ||
-                Boolean(initialTicketId) ||
+                Boolean(initialTicketId || ticketId) ||
                 catalogItems.length === 0 ||
                 items.length >= 50
               }
@@ -482,16 +557,13 @@ export default function DirectStockPurchaseForm({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                setNewItemName("");
-                setNewItemUnit("pcs");
-                setNewItemMessage("");
-                setNewItemDialogOpen(true);
-              }}
+              onClick={() => openNewItemModal()}
               disabled={
                 isPending ||
                 isSavingNewItem ||
-                items.length >= 50
+                items.length >= 50 ||
+                (Boolean(initialTicketId || ticketId) &&
+                  !items.some((line) => !line.stockItemId))
               }
             >
               Tambah Jenis Barang
@@ -559,9 +631,12 @@ export default function DirectStockPurchaseForm({
                                 key={stockItem.id}
                                 value={`${stockItem.name} ${stockItem.sku} ${stockItem.unit}`}
                                 onSelect={() => {
+                                  const nextCatalogPrice = positivePriceString(
+                                    stockItem.unitPrice,
+                                  );
                                   updateLine(line.key, {
                                     stockItemId: stockItem.id,
-                                    unitPrice: stockItem.unitPrice,
+                                    unitPrice: nextCatalogPrice || line.unitPrice,
                                   });
                                   setOpenStockPickerKey(null);
                                 }}
@@ -585,12 +660,28 @@ export default function DirectStockPurchaseForm({
                         </Command>
                       </PopoverContent>
                     </Popover>
+                    {line.sourceLabel && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        <span>Item tiket asal: {line.sourceLabel}</span>
+                        {!line.stockItemId && (
+                          <button
+                            type="button"
+                            onClick={() => openNewItemModal(line)}
+                            disabled={isPending || isSavingNewItem}
+                            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
+                          >
+                            + Buat SKU
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Input
                       aria-label={`Jumlah barang ${index + 1}`}
                       type="number"
                       min="0.001"
+                      max={line.maxQuantity}
                       step="any"
                       inputMode="decimal"
                       value={line.quantity}
@@ -599,6 +690,11 @@ export default function DirectStockPurchaseForm({
                       }
                       disabled={isPending}
                     />
+                    {line.maxQuantity !== undefined && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Maks: {line.maxQuantity} {line.unit}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Input
@@ -712,7 +808,10 @@ export default function DirectStockPurchaseForm({
       </div>
       <GlobalModal
         isOpen={newItemDialogOpen}
-        onClose={() => setNewItemDialogOpen(false)}
+        onClose={() => {
+          setNewItemTargetKey(null);
+          setNewItemDialogOpen(false);
+        }}
         title="Tambah Jenis Barang"
         description="Barang akan masuk katalog dengan stok awal nol dan otomatis dipilih untuk pembelian ini."
       >

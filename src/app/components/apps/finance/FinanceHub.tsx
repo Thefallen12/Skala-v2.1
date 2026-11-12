@@ -98,6 +98,7 @@ import {
   POPaymentMethod,
   PaymentType,
   TicketRequestCategory,
+  TicketType,
   UserRole,
 } from "@prisma/client";
 import {
@@ -160,6 +161,9 @@ type FinanceTicket = {
   id: string;
   ticketNumber: string;
   title: string;
+  type: TicketType;
+  hasApprovedPo?: boolean;
+  poNumber?: string | null;
   totalAmount: string | null;
   purchaseReceiptUrl: string | null;
   receiptUrls: string[];
@@ -556,28 +560,41 @@ export default function FinanceHub({
       ? "DIBAYAR SEBAGIAN"
       : "BELUM DIBAYAR";
   const paymentRows: FinancePaymentRow[] = [
-    ...tickets.map((ticket) => ({
-      id: ticket.id,
-      kind: "ticket" as const,
-      reference: ticket.ticketNumber,
-      title: ticket.title,
-      grandTotal: Number(ticket.totalAmount ?? 0),
-      paidAmount: ticket.paymentTransactions.reduce(
+    ...tickets.map((ticket) => {
+      const grandTotal = Number(ticket.totalAmount ?? 0);
+      const paidTicketAmount = ticket.paymentTransactions.reduce(
         (total, payment) => total + payment.amount,
         0,
-      ),
-      isFirstPayment: ticket.paymentTransactions.length === 0,
-      transferDestination:
-        ticket.transferDestination ??
-        (ticket.vendorBankName && ticket.vendorAccountNumber
-          ? `Ditransfer ke: ${ticket.vendorBankName}, ${ticket.vendorAccountNumber}, a.n. ${ticket.vendorAccountName ?? ""}`
-          : ""),
-      isInternalFunding: internalFundingCategories.some(
-        (category) => category === ticket.requestCategory,
-      ),
-      requesterName: ticket.requesterName,
-      receiptUrls: ticket.receiptUrls,
-    })),
+      );
+      const needsInvoice =
+        (ticket.type === TicketType.MATERIAL || Boolean(ticket.hasApprovedPo)) &&
+        !ticket.purchaseReceiptUrl;
+      return {
+        id: ticket.id,
+        kind: "ticket" as const,
+        reference: ticket.poNumber
+          ? `${ticket.ticketNumber} (${ticket.poNumber})`
+          : ticket.ticketNumber,
+        title: ticket.title,
+        grandTotal,
+        paidAmount: paidTicketAmount,
+        isFirstPayment: ticket.paymentTransactions.length === 0,
+        transferDestination:
+          ticket.transferDestination ??
+          (ticket.vendorBankName && ticket.vendorAccountNumber
+            ? `Ditransfer ke: ${ticket.vendorBankName}, ${ticket.vendorAccountNumber}, a.n. ${ticket.vendorAccountName ?? ""}`
+            : ""),
+        isInternalFunding: internalFundingCategories.some(
+          (category) => category === ticket.requestCategory,
+        ),
+        requesterName: ticket.requesterName,
+        receiptUrls: ticket.receiptUrls,
+        hasInvoice: !needsInvoice,
+        needsNominalInput:
+          !(Number.isFinite(grandTotal) && grandTotal > 0) &&
+          paidTicketAmount === 0,
+      };
+    }),
     ...standalonePayments.map((order) => ({
       id: order.publicCode,
       kind: "standalone-po" as const,
@@ -599,6 +616,8 @@ export default function FinanceHub({
         order.paymentBankName && order.paymentAccountNumber
           ? `Ditransfer ke: ${order.paymentBankName}, ${order.paymentAccountNumber}, a.n. ${order.paymentAccountName ?? order.vendorName}`
           : "",
+      hasInvoice: Boolean(order.vendorInvoiceUrl),
+      needsNominalInput: false,
     })),
     ...directPurchases.map((purchase) => ({
       id: purchase.id,
@@ -615,14 +634,20 @@ export default function FinanceHub({
         purchase.paymentBankName && purchase.paymentAccountNumber
           ? `Ditransfer ke: ${purchase.paymentBankName}, ${purchase.paymentAccountNumber}, a.n. ${purchase.paymentAccountName ?? purchase.vendorName}`
           : "",
+      hasInvoice: Boolean(purchase.vendorInvoiceUrl),
+      needsNominalInput: false,
     })),
-  ].filter((row) => Number.isFinite(row.grandTotal) && row.grandTotal > 0);
-  const pendingPaymentCount = paymentRows.filter(
-    (row) => row.grandTotal - row.paidAmount > 0.005,
-  ).length;
-  const pendingPaymentRows = paymentRows.filter(
-    (row) => row.grandTotal - row.paidAmount > 0.005,
+  ].filter(
+    (row) =>
+      (Number.isFinite(row.grandTotal) && row.grandTotal > 0) ||
+      Boolean(row.needsNominalInput),
   );
+  const pendingPaymentRows = paymentRows.filter(
+    (row) =>
+      Boolean(row.needsNominalInput) ||
+      row.grandTotal - row.paidAmount > 0.005,
+  );
+  const pendingPaymentCount = pendingPaymentRows.length;
   const normalizedReviewSearch = reviewSearch.trim().toLocaleLowerCase("id-ID");
   const filteredReviewOrders = normalizedReviewSearch
     ? purchaseOrders.filter((order) =>
@@ -863,7 +888,7 @@ export default function FinanceHub({
       return;
     }
     const amount =
-      currentPaymentType === PaymentType.FULL_PAYMENT
+      currentPaymentType === PaymentType.FULL_PAYMENT && paymentTotal > 0
         ? undefined
         : parseRupiahInput(paymentAmount);
     setMessage("");
@@ -1786,6 +1811,8 @@ export default function FinanceHub({
                         Math.round((row.grandTotal - row.paidAmount) * 100) /
                         100;
                       const outstanding = Math.max(0, balance);
+                      const waitingInvoice = row.hasInvoice === false;
+                      const needsNominal = Boolean(row.needsNominalInput);
                       return (
                         <TableRow
                           key={`${row.kind}:${row.id}`}
@@ -1815,52 +1842,88 @@ export default function FinanceHub({
                             )}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {currency(row.grandTotal)}
+                            {needsNominal ? (
+                              <span className="italic text-muted-foreground">
+                                Belum ditetapkan
+                              </span>
+                            ) : (
+                              currency(row.grandTotal)
+                            )}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
                             {currency(row.paidAmount)}
                           </TableCell>
                           <TableCell className="text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
-                            {currency(outstanding)}
+                            {needsNominal ? (
+                              <span className="font-normal italic text-muted-foreground">
+                                Belum ditetapkan
+                              </span>
+                            ) : (
+                              currency(outstanding)
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge
                               variant={
-                                balance <= 0
-                                  ? "success"
-                                  : row.paidAmount > 0
-                                    ? "warning"
-                                    : "error"
+                                waitingInvoice || needsNominal
+                                  ? "warning"
+                                  : balance <= 0
+                                    ? "success"
+                                    : row.paidAmount > 0
+                                      ? "warning"
+                                      : "error"
                               }
                             >
-                              {balance <= 0
-                                ? "LUNAS"
-                                : row.paidAmount > 0
-                                  ? "DIBAYAR SEBAGIAN"
-                                  : "BELUM DIBAYAR"}
+                              {waitingInvoice
+                                ? "MENUNGGU INVOICE LOGISTIK"
+                                : needsNominal
+                                  ? "BELUM ADA NOMINAL"
+                                  : balance <= 0
+                                    ? "LUNAS"
+                                    : row.paidAmount > 0
+                                      ? "DIBAYAR SEBAGIAN"
+                                      : "BELUM DIBAYAR"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            {outstanding > 0 && role === UserRole.FINANCE ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-8 gap-1.5 text-xs"
-                                disabled={isPending}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setPaymentModalSelection({
-                                    kind: row.kind,
-                                    id: row.id,
-                                  });
-                                }}
-                              >
-                                <Wallet
-                                  className="size-3.5"
-                                  aria-hidden="true"
-                                />
-                                Bayar Tagihan
-                              </Button>
+                            {(outstanding > 0 || needsNominal) &&
+                            role === UserRole.FINANCE ? (
+                              waitingInvoice ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs"
+                                  disabled={isPending}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openPaymentHistory(row);
+                                  }}
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Menunggu Invoice
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs"
+                                  disabled={isPending}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setPaymentModalSelection({
+                                      kind: row.kind,
+                                      id: row.id,
+                                    });
+                                  }}
+                                >
+                                  <Wallet
+                                    className="size-3.5"
+                                    aria-hidden="true"
+                                  />
+                                  Bayar Tagihan
+                                </Button>
+                              )
                             ) : (
                               <Button
                                 type="button"
@@ -2690,7 +2753,16 @@ export default function FinanceHub({
                 </Button>
               </div>
             )}
-            {activeStandaloneOrder && role === UserRole.FINANCE && !isPaymentSettled && (
+            {activeStandaloneOrder && !activeStandaloneOrder.vendorInvoiceUrl && (
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                Menunggu Logistik mengunggah invoice/bon vendor untuk PO ini.
+                Pembayaran dapat diproses setelah dokumen diunggah.
+              </p>
+            )}
+            {activeStandaloneOrder &&
+              Boolean(activeStandaloneOrder.vendorInvoiceUrl) &&
+              role === UserRole.FINANCE &&
+              !isPaymentSettled && (
               <form className="space-y-3" onSubmit={submitPayment}>
                 <section className="space-y-2 rounded-lg border p-3 text-sm">
                   <p>
@@ -2885,6 +2957,12 @@ export default function FinanceHub({
                     </Button>
                   </div>
                 )}
+                {!activeDirectPurchase.vendorInvoiceUrl && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                    Menunggu Logistik mengunggah invoice/bon faktur untuk
+                    pembelian langsung ini sebelum pembayaran dapat diproses.
+                  </p>
+                )}
                 {role === UserRole.FINANCE &&
                   activeDirectPurchase.vendorInvoiceUrl &&
                   remainingAmount > 0 && (
@@ -2980,7 +3058,8 @@ export default function FinanceHub({
                         receiptUrl.length === 0 ||
                         financeAccounts.length === 0 ||
                         isPending ||
-                        (currentPaymentType !== PaymentType.FULL_PAYMENT &&
+                        ((currentPaymentType !== PaymentType.FULL_PAYMENT ||
+                          paymentTotal <= 0) &&
                           parseRupiahInput(paymentAmount) <= 0)
                       }
                     >
@@ -3112,7 +3191,20 @@ export default function FinanceHub({
                   documentNumber={activeTicket.ticketNumber}
                   templates={documentTemplates}
                 />
-                {role === UserRole.FINANCE && (
+                {(activeTicket.type === TicketType.MATERIAL ||
+                  Boolean(activeTicket.hasApprovedPo)) &&
+                  !activeTicket.purchaseReceiptUrl && (
+                    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                      Menunggu Logistik mengunggah invoice/bon pembelian untuk
+                      tiket ini sebelum pembayaran dapat diproses.
+                    </p>
+                  )}
+                {role === UserRole.FINANCE &&
+                  !(
+                    (activeTicket.type === TicketType.MATERIAL ||
+                      Boolean(activeTicket.hasApprovedPo)) &&
+                    !activeTicket.purchaseReceiptUrl
+                  ) && (
                   <form className="space-y-3" onSubmit={submitPayment}>
                     <section className="space-y-2 rounded-lg border p-3 text-sm">
                       <Label>Jenis pembayaran</Label>
@@ -3152,7 +3244,8 @@ export default function FinanceHub({
                         <RupiahAmountInput
                           id="ticket-payment-amount"
                           value={
-                            currentPaymentType === PaymentType.FULL_PAYMENT
+                            currentPaymentType === PaymentType.FULL_PAYMENT &&
+                            paymentTotal > 0
                               ? formatRupiahNumber(remainingAmount)
                               : paymentAmount
                           }
@@ -3160,7 +3253,8 @@ export default function FinanceHub({
                           required
                           disabled={
                             isPending ||
-                            currentPaymentType === PaymentType.FULL_PAYMENT
+                            (currentPaymentType === PaymentType.FULL_PAYMENT &&
+                              paymentTotal > 0)
                           }
                         />
                       </div>
@@ -3230,7 +3324,8 @@ export default function FinanceHub({
                         receiptUrl.length === 0 ||
                         financeAccounts.length === 0 ||
                         isPending ||
-                        (currentPaymentType !== PaymentType.FULL_PAYMENT &&
+                        ((currentPaymentType !== PaymentType.FULL_PAYMENT ||
+                          paymentTotal <= 0) &&
                           parseRupiahInput(paymentAmount) <= 0)
                       }
                     >

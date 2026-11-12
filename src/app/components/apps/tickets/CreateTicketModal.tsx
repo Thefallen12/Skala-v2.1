@@ -572,6 +572,7 @@ export default function CreateTicketModal({
   movers = [],
   triggerLabel = "Tambah Tiket Baru",
   defaultOpen = false,
+  defaultRequestCategory,
   initialWageRequest,
 }: {
   projects: TicketProjectOption[];
@@ -585,6 +586,7 @@ export default function CreateTicketModal({
   movers?: Array<{ id: string; name: string }>;
   triggerLabel?: string;
   defaultOpen?: boolean;
+  defaultRequestCategory?: TicketRequestCategory;
   initialWageRequest?: {
     projectId: string;
     projectTitle: string;
@@ -616,7 +618,7 @@ export default function CreateTicketModal({
       moverAssigneeId: "",
       requestCategory: initialWageRequest
         ? TicketRequestCategory.FIELD
-        : TicketRequestCategory.OPS,
+        : defaultRequestCategory ?? TicketRequestCategory.OPS,
       fieldCategory: initialWageRequest
         ? TicketFieldCategory.LABOR
         : undefined,

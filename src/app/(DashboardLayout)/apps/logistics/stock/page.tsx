@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import BreadcrumbComp from "../../../layout/shared/breadcrumb/BreadcrumbComp";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
 import {
+  DirectStockPurchaseStatus,
+  FulfillmentStatus,
   PaymentStatus,
   TicketStatus,
   TicketType,
@@ -114,10 +116,39 @@ export default async function LogisticsStockPage({
     prisma.ticket.findMany({
       where: {
         type: TicketType.MATERIAL,
-        status: { not: TicketStatus.REJECTED },
+        status: TicketStatus.PROCESSED_LOGISTIC,
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true, ticketNumber: true, title: true },
+      select: {
+        id: true,
+        ticketNumber: true,
+        title: true,
+        directStockPurchases: {
+          where: { status: DirectStockPurchaseStatus.PENDING_RECEIPT },
+          select: {
+            items: {
+              select: {
+                stockItemId: true,
+                itemName: true,
+                unit: true,
+              },
+            },
+          },
+        },
+        items: {
+          where: { status: FulfillmentStatus.PENDING },
+          select: {
+            id: true,
+            stockItemId: true,
+            itemName: true,
+            quantity: true,
+            unit: true,
+            estimatedCost: true,
+            poItemId: true,
+            doItemId: true,
+          },
+        },
+      },
     }),
   ]);
 
@@ -137,7 +168,53 @@ export default async function LogisticsStockPage({
         role={session.user.role}
         mode="stock"
         initialAction={initialAction}
-        purchaseTickets={purchaseTickets}
+        purchaseTickets={purchaseTickets
+          .map((ticket) => {
+            const activeStockIds = new Set(
+              ticket.directStockPurchases.flatMap((purchase) =>
+                purchase.items
+                  .map((purchaseItem) => purchaseItem.stockItemId)
+                  .filter((id): id is string => Boolean(id))
+              )
+            );
+            const activeNameUnits = new Set(
+              ticket.directStockPurchases.flatMap((purchase) =>
+                purchase.items.map(
+                  (purchaseItem) =>
+                    `${purchaseItem.itemName.trim().toLowerCase()}::${purchaseItem.unit.trim().toLowerCase()}`
+                )
+              )
+            );
+            const eligibleItems = ticket.items
+              .filter((item) => {
+                if (item.poItemId || item.doItemId) {
+                  return false;
+                }
+                if (item.stockItemId && activeStockIds.has(item.stockItemId)) {
+                  return false;
+                }
+                const key = `${item.itemName.trim().toLowerCase()}::${item.unit.trim().toLowerCase()}`;
+                return !activeNameUnits.has(key);
+              })
+              .map((item) => ({
+                ticketItemId: item.id,
+                stockItemId: item.stockItemId,
+                itemName: item.itemName,
+                quantity: item.quantity,
+                unit: item.unit,
+                estimatedCost:
+                  item.estimatedCost !== null
+                    ? decimalStringFromScaledInteger(item.estimatedCost)
+                    : null,
+              }));
+            return {
+              id: ticket.id,
+              ticketNumber: ticket.ticketNumber,
+              title: ticket.title,
+              items: eligibleItems,
+            };
+          })
+          .filter((ticket) => ticket.items.length > 0)}
         vendors={vendors}
         stockItems={stockItems.map((item) => ({
           ...item,

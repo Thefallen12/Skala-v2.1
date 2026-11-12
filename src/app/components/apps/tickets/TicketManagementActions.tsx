@@ -169,6 +169,7 @@ export default function TicketManagementActions({
           label="Edit tiket"
           tooltip="Edit tiket"
           icon={Pencil}
+          className="h-8 w-8"
           disabled={isPending}
           onClick={openEditor}
         />
@@ -179,7 +180,7 @@ export default function TicketManagementActions({
           label="Hapus tiket"
           tooltip="Hapus tiket"
           icon={Trash2}
-          className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+          className="h-8 w-8 border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
           disabled={isPending}
           onClick={handleDelete}
         />

@@ -38,6 +38,14 @@ type PurchaseTicket = {
   id: string;
   ticketNumber: string;
   title: string;
+  items?: {
+    ticketItemId: string;
+    stockItemId?: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    estimatedCost?: string | null;
+  }[];
 };
 
 export default function CreatePurchaseModal({

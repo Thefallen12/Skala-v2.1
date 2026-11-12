@@ -15,7 +15,6 @@ import {
   ExternalLink,
   Eye,
   FileText,
-  PackageCheck,
   PackageOpen,
   Paperclip,
   Printer,
@@ -23,6 +22,7 @@ import {
   ShoppingCart,
   Send,
   Truck,
+  UploadCloud,
 } from "lucide-react";
 import {
   checkTicketItemsStock,
@@ -345,9 +345,13 @@ export default function TicketListing({
   hideSearch?: boolean;
   initialOpenSheet?: string;
 }) {
-  const [selectedTicket, setSelectedTicket] = useState<TicketRow | null>(
+  const [selectedTicketState, setSelectedTicket] = useState<TicketRow | null>(
     () => tickets.find((ticket) => ticket.id === initialOpenSheet) ?? null,
   );
+  const selectedTicket = selectedTicketState
+    ? (tickets.find((ticket) => ticket.id === selectedTicketState.id) ??
+      selectedTicketState)
+    : null;
   const [itemSelection, setItemSelection] = useState<{
     ticketId: string;
     itemIds: string[];
@@ -760,8 +764,8 @@ export default function TicketListing({
               <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Nilai Estimasi
               </TableHead>
-              <TableHead className="sticky right-0 z-10 border-l border-border/50 bg-card/95 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
-                Aksi Cepat
+              <TableHead className="sticky right-0 z-10 w-[116px] border-l border-border/50 bg-card/95 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                Aksi
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -899,10 +903,10 @@ export default function TicketListing({
                     {formatCurrency(ticket.totalAmount)}
                   </TableCell>
                   <TableCell
-                    className="sticky right-0 z-10 border-l border-border/50 bg-card/95 align-top text-right backdrop-blur-sm"
+                    className="sticky right-0 z-10 w-[116px] border-l border-border/50 bg-card/95 align-top backdrop-blur-sm"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div className="flex flex-nowrap items-center justify-end gap-1.5">
+                    <div className="flex flex-nowrap items-center justify-center gap-1.5">
                       {(() => {
                         const action = actionFor(role, ticket);
                         const workflow = workflowFor(role, ticket);
@@ -917,40 +921,76 @@ export default function TicketListing({
                                   submitTicket(currentTicket.id),
                               }
                             : null);
+                        const primaryDo = ticket.deliveryOrders?.[0];
+                        const showDoPrint =
+                          (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+                            ticket.status === TicketStatus.IN_TRANSIT) &&
+                          Boolean(primaryDo);
+
                         if (workflow) {
                           const labels = {
                             LOGISTICS: ticket.deliveryOrders?.length
                               ? "Lanjutkan DO"
                               : "Proses Logistik",
                             LOGISTICS_DO: "Terbitkan DO",
-                            EXPEDITION_RECEIPT: "Terima Barang",
+                            EXPEDITION_RECEIPT: "Upload Bukti Tiba & Selesaikan (Tahap 4/4)",
                             FINANCE: "Bayar / Selesaikan",
-                            MOVER: "Konfirmasi Tiba",
+                            MOVER: "Konfirmasi Tiba (Ruang Kerja Mover)",
                           };
                           const icons = {
                             LOGISTICS: PackageOpen,
                             LOGISTICS_DO: Truck,
-                            EXPEDITION_RECEIPT: PackageCheck,
+                            EXPEDITION_RECEIPT: UploadCloud,
                             FINANCE: CircleDollarSign,
                             MOVER: Truck,
                           };
                           const WorkflowIcon = icons[workflow];
                           return (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-8 gap-1.5 px-2.5 text-xs font-semibold"
-                              onClick={() => {
-                                if (workflow === "LOGISTICS_DO") {
-                                  router.push(`/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticket.id)}`);
-                                  return;
+                            <>
+                              {showDoPrint && primaryDo && (
+                                <Button
+                                  asChild
+                                  type="button"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
+                                >
+                                  <Link
+                                    href={`/d/${primaryDo.publicCode}`}
+                                    title="Cetak Surat Jalan (DO)"
+                                    aria-label="Cetak DO"
+                                  >
+                                    <Printer className="size-4" />
+                                  </Link>
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant={
+                                  workflow === "EXPEDITION_RECEIPT"
+                                    ? "outline"
+                                    : "default"
                                 }
-                                setWorkflowTicket(ticket);
-                              }}
-                            >
-                              <WorkflowIcon className="size-3.5" />
-                              {labels[workflow]}
-                            </Button>
+                                title={labels[workflow]}
+                                aria-label={labels[workflow]}
+                                className={
+                                  workflow === "EXPEDITION_RECEIPT"
+                                    ? "h-8 w-8 shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                                    : "h-8 w-8 shrink-0"
+                                }
+                                onClick={() => {
+                                  if (workflow === "LOGISTICS_DO") {
+                                    router.push(
+                                      `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticket.id)}`,
+                                    );
+                                    return;
+                                  }
+                                  setWorkflowTicket(ticket);
+                                }}
+                              >
+                                <WorkflowIcon className="size-4" />
+                              </Button>
+                            </>
                           );
                         }
                         if (
@@ -965,34 +1005,36 @@ export default function TicketListing({
                           const hasPendingItems = ticket.items.some(
                             (item) => item.status === FulfillmentStatus.PENDING,
                           );
+                          const itemLabel = hasPendingItems
+                            ? "Proses & Alokasi Item Gudang"
+                            : "Kelola Item & Pengadaan";
                           return (
                             <Button
                               type="button"
-                              size="sm"
-                              className="h-8 gap-1.5 px-2.5 text-xs font-semibold"
+                              size="icon"
+                              title={itemLabel}
+                              aria-label={itemLabel}
+                              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
                               onClick={() => openTicketSheet(ticket)}
                             >
-                              <ClipboardList className="size-3.5" />
-                              {hasPendingItems ? "Proses Item" : "Kelola Item"}
+                              <ClipboardList className="size-4" />
                             </Button>
                           );
                         }
-                        if (
-                          (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
-                            ticket.status === TicketStatus.IN_TRANSIT) &&
-                          ticket.deliveryOrders?.[0]
-                        ) {
+                        if (showDoPrint && primaryDo) {
                           return (
                             <Button
                               asChild
                               type="button"
-                              variant="secondary"
-                              size="sm"
-                              className="h-8 gap-1.5 px-2.5 text-xs font-semibold"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
                             >
-                              <Link href={`/d/${ticket.deliveryOrders[0].publicCode}`}>
-                                <Printer className="size-3.5" />
-                                Cetak DO
+                              <Link
+                                href={`/d/${primaryDo.publicCode}`}
+                                title="Cetak Surat Jalan (DO)"
+                                aria-label="Cetak DO"
+                              >
+                                <Printer className="size-4" />
                               </Link>
                             </Button>
                           );
@@ -1000,31 +1042,31 @@ export default function TicketListing({
                         return visibleAction ? (
                           <Button
                             type="button"
-                            size="sm"
-                            className="h-8 gap-1.5 px-2.5 text-xs font-semibold"
+                            size="icon"
+                            title={visibleAction.label}
+                            aria-label={visibleAction.label}
+                            className="h-8 w-8 shrink-0"
                             disabled={isPending && busyId === ticket.id}
                             onClick={() => runAction(ticket, visibleAction)}
                           >
                             {visibleAction.label === "Setujui" ? (
-                              <Check className="size-3.5" />
+                              <Check className="size-4" />
                             ) : (
-                              <Send className="size-3.5" />
+                              <Send className="size-4" />
                             )}
-                            {isPending && busyId === ticket.id
-                              ? "Memproses..."
-                              : visibleAction.label}
                           </Button>
                         ) : null;
                       })()}
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        className="h-8 gap-1 px-2.5 text-xs font-medium"
+                        size="icon"
+                        title="Lihat Rincian & Lampiran Foto"
+                        aria-label="Detail Tiket"
+                        className="h-8 w-8 shrink-0 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
                         onClick={() => openTicketSheet(ticket)}
                       >
-                        <Eye className="size-3.5" />
-                        Detail
+                        <Eye className="size-4" />
                       </Button>
                       <TicketManagementActions ticket={ticket} role={role} />
                     </div>
@@ -1520,37 +1562,59 @@ export default function TicketListing({
                   </div>
                 ))}
 
-                {selectedTicket.directStockPurchases?.map((purchase) => (
-                  <div
-                    key={purchase.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
-                  >
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Pembelian Langsung Toko
-                      </p>
-                      <p className="mt-0.5 text-sm font-bold text-foreground">
-                        {purchase.purchaseNumber} · {purchase.vendorName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(purchase.totalAmount)}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        purchase.status === "RECEIVED"
-                          ? "lightSuccess"
-                          : "lightWarning"
-                      }
+                {selectedTicket.directStockPurchases?.map((purchase) => {
+                  const stageLabel =
+                    purchase.status === "RECEIVED"
+                      ? "Diterima · Siap Di-DO"
+                      : purchase.hasFinanceProof
+                        ? "Siap Diterima Logistik"
+                        : purchase.vendorInvoiceUrl
+                          ? "Menunggu Pembayaran Finance"
+                          : purchase.isApprovedByDirector
+                            ? "Menunggu Invoice/Bon Logistik"
+                            : "Menunggu Persetujuan Direktur";
+                  return (
+                    <div
+                      key={purchase.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
                     >
-                      {purchase.status === "RECEIVED"
-                        ? "Diterima"
-                        : purchase.isApprovedByDirector
-                          ? "Dalam Proses"
-                          : "Menunggu Direktur"}
-                    </Badge>
-                  </div>
-                ))}
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Pembelian Langsung Toko
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-foreground">
+                          {purchase.purchaseNumber} · {purchase.vendorName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCurrency(purchase.totalAmount)} · {stageLabel}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          variant={
+                            purchase.status === "RECEIVED"
+                              ? "lightSuccess"
+                              : "lightWarning"
+                          }
+                        >
+                          {stageLabel}
+                        </Badge>
+                        {purchase.status === "PENDING_RECEIPT" && (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                          >
+                            <Link href="/apps/logistics?tab=stock">
+                              Kelola di Stok
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1644,67 +1708,97 @@ export default function TicketListing({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedTicket.items.map((item) => (
-                        <TableRow key={item.id}>
-                          {canSplitFulfillment && (
-                            <TableCell>
-                              <Checkbox
-                                checked={selectedItemIds.includes(item.id)}
-                                disabled={
-                                  item.status !== FulfillmentStatus.PENDING
-                                }
-                                aria-label={`Pilih ${item.itemName}`}
-                                onCheckedChange={(checked) =>
-                                  setItemSelection({
-                                    ticketId: selectedTicket.id,
-                                    itemIds:
-                                      checked === true
-                                        ? [...selectedItemIds, item.id]
-                                        : selectedItemIds.filter(
-                                            (id) => id !== item.id,
-                                          ),
-                                  })
-                                }
-                              />
+                      {selectedTicket.items.map((item) => {
+                        const activeDirectPurchase =
+                          item.status === FulfillmentStatus.PENDING
+                            ? selectedTicket.directStockPurchases?.find(
+                                (purchase) =>
+                                  purchase.status === "PENDING_RECEIPT" &&
+                                  (purchase.items ?? []).some((purchaseItem) => {
+                                    if (
+                                      item.stockItemId &&
+                                      purchaseItem.stockItemId
+                                    ) {
+                                      return (
+                                        purchaseItem.stockItemId ===
+                                        item.stockItemId
+                                      );
+                                    }
+                                    return (
+                                      purchaseItem.itemName
+                                        .trim()
+                                        .toLowerCase() ===
+                                        item.itemName.trim().toLowerCase() &&
+                                      purchaseItem.unit.trim().toLowerCase() ===
+                                        item.unit.trim().toLowerCase()
+                                    );
+                                  }),
+                              )
+                            : undefined;
+                        return (
+                          <TableRow key={item.id}>
+                            {canSplitFulfillment && (
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedItemIds.includes(item.id)}
+                                  disabled={
+                                    item.status !== FulfillmentStatus.PENDING
+                                  }
+                                  aria-label={`Pilih ${item.itemName}`}
+                                  onCheckedChange={(checked) =>
+                                    setItemSelection({
+                                      ticketId: selectedTicket.id,
+                                      itemIds:
+                                        checked === true
+                                          ? [...selectedItemIds, item.id]
+                                          : selectedItemIds.filter(
+                                              (id) => id !== item.id,
+                                            ),
+                                    })
+                                  }
+                                />
+                              </TableCell>
+                            )}
+                            <TableCell className="font-medium">
+                              {item.itemName}
                             </TableCell>
-                          )}
-                          <TableCell className="font-medium">
-                            {item.itemName}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {item.quantity} {item.unit}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap tabular-nums">
-                            {formatCurrency(item.estimatedCost)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {item.categoryHint === "WAREHOUSE"
-                                ? "Stok Gudang"
-                                : "Pembelian"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-xs">
-                            {item.expectedDeliveryDate ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.status === FulfillmentStatus.PENDING
-                                  ? "lightWarning"
-                                  : "lightSuccess"
-                              }
-                            >
-                              {item.status === FulfillmentStatus.PENDING
-                                ? "Menunggu"
-                                : item.status ===
-                                    FulfillmentStatus.PROCESSED_TO_DO
-                                  ? "Dipenuhi via DO"
-                                  : "Diproses via PO"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            <TableCell className="whitespace-nowrap">
+                              {item.quantity} {item.unit}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap tabular-nums">
+                              {formatCurrency(item.estimatedCost)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {item.categoryHint === "WAREHOUSE"
+                                  ? "Stok Gudang"
+                                  : "Pembelian"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-xs">
+                              {item.expectedDeliveryDate ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  item.status === FulfillmentStatus.PENDING
+                                    ? "lightWarning"
+                                    : "lightSuccess"
+                                }
+                              >
+                                {item.status === FulfillmentStatus.PENDING
+                                  ? activeDirectPurchase
+                                    ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
+                                    : "Menunggu"
+                                  : item.status ===
+                                      FulfillmentStatus.PROCESSED_TO_DO
+                                    ? "Dipenuhi via DO"
+                                    : "Diproses via PO"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1886,6 +1980,13 @@ export default function TicketListing({
                   Alihkan ke Pengadaan / Pembelian Langsung ({selectedStockItems.length})
                 </Button>
               </>
+            )}
+            {stockAvailability.some((a) => Boolean(a.pendingPurchaseNumber)) && (
+              <Button asChild type="button" variant="outline">
+                <Link href="/apps/logistics?tab=stock">
+                  Kelola di Stok Gudang
+                </Link>
+              </Button>
             )}
             {needsOrderTicketItemIds.length > 0 && (
               <Button
@@ -2188,6 +2289,7 @@ export default function TicketListing({
                 itemName: item.itemName,
                 quantity: item.quantity,
                 unit: item.unit,
+                estimatedCost: item.estimatedCost,
               }))}
               onCancel={() => setPoDialogOpen(false)}
               onCreated={() => {

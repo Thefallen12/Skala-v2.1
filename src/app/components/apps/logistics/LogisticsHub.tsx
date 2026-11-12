@@ -33,7 +33,13 @@ import type {
   TicketProjectOption,
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
-import { POPaymentMethod, POStatus, UserRole } from "@prisma/client";
+import {
+  POPaymentMethod,
+  POStatus,
+  TicketStatus,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -450,11 +456,62 @@ export default function LogisticsHub({
           mode="stock"
           stockItems={stockItems}
           stockPurchases={stockPurchases}
-          purchaseTickets={tickets.map(({ id, ticketNumber, title }) => ({
-            id,
-            ticketNumber,
-            title,
-          }))}
+          purchaseTickets={tickets
+            .filter(
+              (ticket) =>
+                ticket.type === TicketType.MATERIAL &&
+                ticket.status === TicketStatus.PROCESSED_LOGISTIC
+            )
+            .map(({ id, ticketNumber, title, items, directStockPurchases }) => {
+              const activePurchases = (directStockPurchases ?? []).filter(
+                (purchase) => purchase.status === "PENDING_RECEIPT"
+              );
+              const activeStockIds = new Set(
+                activePurchases.flatMap((purchase) =>
+                  (purchase.items ?? [])
+                    .map((purchaseItem) => purchaseItem.stockItemId)
+                    .filter((stockId): stockId is string => Boolean(stockId))
+                )
+              );
+              const activeNameUnits = new Set(
+                activePurchases.flatMap((purchase) =>
+                  (purchase.items ?? []).map(
+                    (purchaseItem) =>
+                      `${purchaseItem.itemName.trim().toLowerCase()}::${purchaseItem.unit.trim().toLowerCase()}`
+                  )
+                )
+              );
+              const eligibleItems = items
+                .filter((item) => {
+                  if (
+                    item.status !== "PENDING" ||
+                    item.poItemId ||
+                    item.doItemId
+                  ) {
+                    return false;
+                  }
+                  if (item.stockItemId && activeStockIds.has(item.stockItemId)) {
+                    return false;
+                  }
+                  const key = `${item.itemName.trim().toLowerCase()}::${item.unit.trim().toLowerCase()}`;
+                  return !activeNameUnits.has(key);
+                })
+                .map((item) => ({
+                  ticketItemId: item.id,
+                  stockItemId: item.stockItemId,
+                  itemName: item.itemName,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  estimatedCost: item.estimatedCost,
+                }));
+              return {
+                id,
+                ticketNumber,
+                title,
+                items: eligibleItems,
+              };
+            })
+            .filter((ticket) => ticket.items.length > 0)}
         />
       </TabsContent>
 

@@ -507,7 +507,13 @@ export default async function LogisticsPage({
               select: { proofOfTransferUrl: true },
             },
             items: {
-              select: { id: true, itemName: true, quantity: true, unit: true },
+              select: {
+                id: true,
+                stockItemId: true,
+                itemName: true,
+                quantity: true,
+                unit: true,
+              },
             },
             receivedBy: { select: { name: true } },
             ticket: {
@@ -871,6 +877,10 @@ export default async function LogisticsPage({
     directStockPurchases: ticket.directStockPurchases.map((purchase) => ({
       ...purchase,
       totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
+      receivedAt: purchase.receivedAt?.toISOString() ?? null,
+      hasFinanceProof: purchase.paymentTransactions.some((p) =>
+        Boolean(p.proofOfTransferUrl)
+      ),
       createdAt: purchase.createdAt.toISOString(),
       vendorInvoiceUploadedAt:
         purchase.vendorInvoiceUploadedAt?.toISOString() ?? null,

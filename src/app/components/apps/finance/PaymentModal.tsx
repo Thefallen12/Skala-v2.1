@@ -36,6 +36,8 @@ export type PaymentModalTarget = {
   isInternalFunding?: boolean;
   requesterName?: string;
   receiptUrls?: string[];
+  hasInvoice?: boolean;
+  needsNominalInput?: boolean;
 };
 
 const currency = (amount: number) =>
@@ -92,13 +94,15 @@ export default function PaymentModal({
   const [isMessageError, setIsMessageError] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [requiresReload, setRequiresReload] = useState(false);
+  const needsNominalInput = Boolean(target?.needsNominalInput && paidAmount === 0);
   const remainingBalance = target
     ? Math.round((target.grandTotal - paidAmount) * 100) / 100
     : 0;
   const remainingAmount = Math.max(0, remainingBalance);
-  const isSettled = remainingBalance <= 0;
-  const paymentStatus =
-    isSettled
+  const isSettled = !needsNominalInput && remainingBalance <= 0;
+  const paymentStatus = needsNominalInput
+    ? "BELUM ADA NOMINAL"
+    : isSettled
       ? "LUNAS"
       : paidAmount > 0
         ? "DIBAYAR SEBAGIAN"
@@ -126,7 +130,19 @@ export default function PaymentModal({
       return;
     }
     const transferAmount = parseRupiahInput(amount);
-    if (
+    if (needsNominalInput) {
+      if (
+        ((!target.isInternalFunding ||
+          paymentMethod === POPaymentMethod.TRANSFER) &&
+          !destination.trim()) ||
+        !Number.isFinite(transferAmount) ||
+        transferAmount <= 0
+      ) {
+        setMessage("Nominal pembayaran dan tujuan transfer wajib diisi dengan benar.");
+        setIsMessageError(true);
+        return;
+      }
+    } else if (
       ((!target.isInternalFunding ||
         paymentMethod === POPaymentMethod.TRANSFER) &&
         !destination.trim()) ||
@@ -169,14 +185,15 @@ export default function PaymentModal({
         return;
       }
 
+      const effectiveTotal = needsNominalInput ? transferAmount : target.grandTotal;
       const updatedPaid = Math.min(
-        target.grandTotal,
+        effectiveTotal,
         Math.round((paidAmount + transferAmount) * 100) / 100,
       );
       setPaidAmount(updatedPaid);
       const updatedRemaining = Math.max(
         0,
-        Math.round((target.grandTotal - updatedPaid) * 100) / 100,
+        Math.round((effectiveTotal - updatedPaid) * 100) / 100,
       );
       setAmount(formatRupiahNumber(updatedRemaining));
       setPaymentType(PaymentType.FULL_PAYMENT);
@@ -323,7 +340,9 @@ export default function PaymentModal({
             <section className="grid gap-2 rounded-lg border p-4 text-sm sm:grid-cols-3">
               <div>
                 Tagihan
-                <strong className="mt-1 block">{currency(target.grandTotal)}</strong>
+                <strong className="mt-1 block">
+                  {needsNominalInput ? "Belum ditetapkan" : currency(target.grandTotal)}
+                </strong>
               </div>
               <div>
                 Total Terbayar
@@ -331,15 +350,19 @@ export default function PaymentModal({
               </div>
               <div>
                 Sisa Hutang
-                <strong className="mt-1 block">{currency(remainingAmount)}</strong>
+                <strong className="mt-1 block">
+                  {needsNominalInput ? "Belum ditetapkan" : currency(remainingAmount)}
+                </strong>
                 <Badge
                   className="mt-1"
                   variant={
-                    isSettled
-                      ? "success"
-                      : paidAmount > 0
-                        ? "warning"
-                        : "error"
+                    needsNominalInput
+                      ? "warning"
+                      : isSettled
+                        ? "success"
+                        : paidAmount > 0
+                          ? "warning"
+                          : "error"
                   }
                 >
                   {paymentStatus}
@@ -362,8 +385,9 @@ export default function PaymentModal({
                       required
                       disabled={
                         isPending ||
-                        target.isInternalFunding ||
-                        paymentType === PaymentType.FULL_PAYMENT
+                        (!needsNominalInput &&
+                          (target.isInternalFunding ||
+                            paymentType === PaymentType.FULL_PAYMENT))
                       }
                     />
                   </div>

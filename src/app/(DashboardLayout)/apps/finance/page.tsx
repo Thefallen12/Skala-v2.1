@@ -171,24 +171,7 @@ export default async function FinancePage({
     prisma.purchaseOrder.findMany({
       where: {
         status: POStatus.APPROVED,
-        AND: [
-          {
-            OR: [{ ticketId: null }, { ticketId: { isSet: false } }],
-          },
-          {
-            OR: [
-              { vendorInvoiceUrl: { not: null } },
-              {
-                invoices: {
-                  some: {
-                    documentUrl: { not: null },
-                    status: { in: ["UNPAID", "PARTIAL"] },
-                  },
-                },
-              },
-            ],
-          },
-        ],
+        OR: [{ ticketId: null }, { ticketId: { isSet: false } }],
       },
       orderBy: { approvedAt: "asc" },
       select: {
@@ -254,7 +237,6 @@ export default async function FinancePage({
     prisma.directStockPurchase.findMany({
       where: {
         isApprovedByDirector: true,
-        vendorInvoiceUrl: { not: null },
       },
       orderBy: { approvedAt: "asc" },
       select: {
@@ -316,6 +298,7 @@ export default async function FinancePage({
             OR: [
               { type: { not: TicketType.MATERIAL } },
               { purchaseReceiptUrl: { not: null } },
+              { purchaseOrders: { some: { status: POStatus.APPROVED } } },
             ],
           },
           ...(session.user.role === UserRole.FINANCE ||
@@ -336,6 +319,7 @@ export default async function FinancePage({
         id: true,
         ticketNumber: true,
         title: true,
+        type: true,
         totalAmount: true,
         requestedAmount: true,
         purchaseReceiptUrl: true,
@@ -363,6 +347,7 @@ export default async function FinancePage({
           orderBy: { createdAt: "desc" },
           take: 1,
           select: {
+            poNumber: true,
             vendorName: true,
             includeTax: true,
             paymentBankName: true,
@@ -1448,6 +1433,9 @@ export default async function FinancePage({
             id: ticket.id,
             ticketNumber: ticket.ticketNumber,
             title: ticket.title,
+            type: ticket.type,
+            hasApprovedPo: ticket.purchaseOrders.length > 0,
+            poNumber: ticket.purchaseOrders[0]?.poNumber ?? null,
             totalAmount:
               (ticket.purchaseOrders[0]
                 ? Math.round(

@@ -57,7 +57,12 @@ export const Login = () => {
           if (!result?.ok || result.error) {
             return {
               type: 'credentials-error' as const,
-              errorCode: typeof result?.error === 'string' ? result.error : result?.code,
+              errorCode:
+                typeof result?.code === 'string' && result.code && result.code !== 'credentials'
+                  ? result.code
+                  : typeof result?.error === 'string'
+                    ? result.error
+                    : undefined,
             }
           }
           return { type: 'success' as const }
@@ -72,7 +77,7 @@ export const Login = () => {
         } else if (outcome.errorCode && outcome.errorCode !== 'CredentialsSignin') {
           setError(`Kendala autentikasi server (${outcome.errorCode}). Silakan refresh halaman atau coba kembali.`)
         } else {
-          setError('Email atau kata sandi tidak sesuai. Silakan periksa kembali (default sistem: password123).')
+          setError('Email atau kata sandi tidak sesuai. Periksa kembali email dan kata sandi Anda (akun demo @skalaprioritas.com: password123).')
         }
         return
       }

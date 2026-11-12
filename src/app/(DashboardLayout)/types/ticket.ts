@@ -113,7 +113,17 @@ export type TicketRow = {
     totalAmount: string;
     status: "PENDING_RECEIPT" | "RECEIVED";
     isApprovedByDirector: boolean;
+    vendorInvoiceUrl?: string | null;
+    receivedAt?: string | null;
+    hasFinanceProof?: boolean;
     createdAt: string;
+    items?: {
+      id: string;
+      stockItemId?: string | null;
+      itemName: string;
+      quantity: string;
+      unit: string;
+    }[];
   }[];
   deliveryOrders?: {
     publicCode: string;
