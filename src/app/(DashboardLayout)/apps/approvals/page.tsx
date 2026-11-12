@@ -54,6 +54,7 @@ export default async function ApprovalsPage({
     addendums,
     bastDocuments,
     vendors,
+    pendingDrawings,
   ] = await Promise.all([
     prisma.purchaseOrder.findMany({
       where: {
@@ -397,6 +398,21 @@ export default async function ApprovalsPage({
         rating: true,
       },
     }),
+    prisma.drawingDocument.findMany({
+      where: { status: "REVIEW" },
+      orderBy: { updatedAt: "asc" },
+      select: {
+        id: true,
+        drawingCode: true,
+        title: true,
+        category: true,
+        version: true,
+        fileUrl: true,
+        updatedAt: true,
+        project: { select: { id: true, title: true, kelompokTani: true } },
+        uploadedBy: { select: { name: true } },
+      },
+    }),
   ]);
 
   const approvalHistory = [
@@ -670,6 +686,23 @@ export default async function ApprovalsPage({
             bast.maintenanceEndsAt?.toISOString().slice(0, 10) ?? null,
           notes: bast.notes,
           projectName: `${bast.project.kelompokTani} · ${bast.project.title}`,
+        }))}
+        pendingDrawings={pendingDrawings.map((drawing) => ({
+          id: drawing.id,
+          drawingCode: drawing.drawingCode,
+          title: drawing.title,
+          category: drawing.category,
+          version: drawing.version,
+          fileUrl: drawing.fileUrl,
+          updatedAt:
+            typeof drawing.updatedAt === "string"
+              ? drawing.updatedAt
+              : drawing.updatedAt.toISOString(),
+          projectId: drawing.project?.id ?? null,
+          projectName: drawing.project
+            ? `${drawing.project.kelompokTani} · ${drawing.project.title}`
+            : null,
+          uploadedByName: drawing.uploadedBy?.name ?? "Drafter",
         }))}
       />
     </>

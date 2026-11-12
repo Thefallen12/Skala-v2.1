@@ -20,6 +20,10 @@ import { prisma } from "@/lib/prisma";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import {
+  createStockPriceLookup,
+  resolveTicketTotalAmount,
+} from "@/lib/resolve-ticket-total-amount";
 import type {
   RentalItemRow,
   RentalPaymentStatus,
@@ -354,14 +358,24 @@ export default async function LogisticsPage({
           requesterId: session.user.id,
         },
         {
-          status: {
-            in: [
-              TicketStatus.PROCESSED_LOGISTIC,
-              TicketStatus.ASSIGNED_TO_MOVER,
-              TicketStatus.IN_TRANSIT,
-              TicketStatus.COMPLETED,
-            ],
-          },
+          AND: [
+            {
+              status: {
+                in: [
+                  TicketStatus.PROCESSED_LOGISTIC,
+                  TicketStatus.ASSIGNED_TO_MOVER,
+                  TicketStatus.IN_TRANSIT,
+                  TicketStatus.COMPLETED,
+                ],
+              },
+            },
+            {
+              OR: [
+                { type: TicketType.MATERIAL },
+                { requestCategory: TicketRequestCategory.SHIPPING_COST },
+              ],
+            },
+          ],
         },
         {
           status: TicketStatus.WAITING_FINANCE_PAYMENT,
@@ -415,6 +429,7 @@ export default async function LogisticsPage({
         items: {
           select: {
             id: true,
+            stockItemId: true,
             itemName: true,
             quantity: true,
             unit: true,
@@ -457,6 +472,18 @@ export default async function LogisticsPage({
             status: true,
             createdAt: true,
             paidAt: true,
+            includeTax: true,
+            items: {
+              orderBy: { id: "asc" },
+              select: {
+                itemCode: true,
+                itemName: true,
+                quantity: true,
+                unit: true,
+                unitPrice: true,
+                totalPrice: true,
+              },
+            },
           },
         },
         directStockPurchases: {
@@ -771,6 +798,8 @@ export default async function LogisticsPage({
     }),
   ]);
 
+  const stockPriceLookup = createStockPriceLookup(stockItems);
+
   const ticketRows: TicketRow[] = tickets.map((ticket) => ({
     id: ticket.id,
     ticketNumber: ticket.ticketNumber,
@@ -791,10 +820,7 @@ export default async function LogisticsPage({
         audit.userId === ticket.requesterId &&
         (audit.action === "UPDATED" || audit.action === "REQUESTER_EDITED"),
     ),
-    totalAmount:
-      ticket.totalAmount !== null
-        ? decimalStringFromScaledInteger(ticket.totalAmount)
-        : null,
+    totalAmount: resolveTicketTotalAmount(ticket, stockPriceLookup),
     attachmentUrl: ticket.attachmentUrl,
     receiptUrls: ticket.receiptUrls,
     paymentProofUrl: ticket.paymentProofUrl,

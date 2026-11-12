@@ -6,6 +6,7 @@ import SidebarContent, { type ChildItem } from "./sidebaritems";
 import { Icon } from "@iconify/react";
 import FullLogo from "../shared/logo/FullLogo";
 import type { SidebarCounts } from "../header/useNotificationFeed";
+import { ANDROID_APK } from "@/lib/apk-config";
 
 interface SidebarProps {
   onClose?: () => void;
@@ -233,13 +234,14 @@ const SidebarLayout = ({
             <div className="border-t border-border/70 px-2 pt-3">
               <a
                 href={androidDownloadUrl}
-                download={androidDownloadUrl.startsWith("/") ? "Skala-Prioritas.apk" : undefined}
-                target="_blank"
-                rel="noreferrer"
-                className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+                download={ANDROID_APK.fileName}
+                className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
               >
                 <Icon icon="tabler:download" height={16} width={16} />
-                Unduh Aplikasi Android (APK v2.1)
+                <span>Unduh Aplikasi Android</span>
+                <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold">
+                  {ANDROID_APK.label}
+                </span>
               </a>
             </div>
           )}

@@ -35,3 +35,11 @@ export type DrawingProjectOption = {
   name: string;
   code: string;
 };
+
+export type DrawingProjectSurveySummary = {
+  projectId: string;
+  locationName: string;
+  areaSqm: number | null;
+  surveyorName: string;
+  createdAt: string;
+};

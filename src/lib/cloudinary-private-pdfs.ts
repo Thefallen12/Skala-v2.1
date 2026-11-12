@@ -1,6 +1,6 @@
 import "@/lib/sanitize-env";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
@@ -108,7 +108,7 @@ export async function uploadCloudinaryPrivatePdf(
     const relativeDir = path.posix.join("uploads", safeFolder);
     const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
     await mkdir(absDir, { recursive: true });
-    await writeFile(path.join(absDir, fileName), bytes);
+    await writeFile(path.join(absDir, fileName), bytes, { flag: "wx" });
     return `/${relativeDir}/${fileName}`;
   }
 
@@ -119,6 +119,7 @@ export async function uploadCloudinaryPrivatePdf(
         access_mode: "authenticated",
         folder: TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER,
         public_id: randomUUID(),
+        overwrite: false,
         resource_type: "raw",
         type: "authenticated",
       },
@@ -146,8 +147,18 @@ export async function uploadCloudinaryPrivatePdf(
 }
 
 export function isCloudinaryPrivateTicketReceiptPdf(url: string): boolean {
-  if (url.startsWith(`/uploads/${TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER}/`) && url.endsWith(".pdf")) {
-    return true;
+  const prefix = `/uploads/${TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER}/`;
+  if (url.startsWith("/uploads/")) {
+    try {
+      const parsed = new URL(url, "http://localhost");
+      if (!parsed.pathname.startsWith(prefix) || parsed.search || parsed.hash) {
+        return false;
+      }
+      const fileName = decodeURIComponent(parsed.pathname.slice(prefix.length));
+      return /^[A-Za-z0-9_-]+\.pdf$/i.test(fileName);
+    } catch {
+      return false;
+    }
   }
   return parsePrivatePdfUrl(url) !== null;
 }
@@ -175,6 +186,21 @@ export function createCloudinaryPrivatePdfDownloadUrl(
 
 export async function removeCloudinaryPrivatePdf(url: string): Promise<boolean> {
   if (url.startsWith("/uploads/")) {
+    const prefix = `/uploads/${TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER}/`;
+    if (!url.startsWith(prefix)) return false;
+    const pathname = new URL(url, "http://localhost").pathname;
+    const fileName = decodeURIComponent(pathname.slice(prefix.length));
+    if (!/^[A-Za-z0-9_-]+\.pdf$/i.test(fileName)) return false;
+
+    const uploadsDirectory = path.resolve(
+      process.cwd(),
+      "public",
+      "uploads",
+      ...TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER.split("/"),
+    );
+    const localPath = path.resolve(uploadsDirectory, fileName);
+    if (!localPath.startsWith(`${uploadsDirectory}${path.sep}`)) return false;
+    await rm(/* turbopackIgnore: true */ localPath, { force: true });
     return true;
   }
   const asset = parsePrivatePdfUrl(url);

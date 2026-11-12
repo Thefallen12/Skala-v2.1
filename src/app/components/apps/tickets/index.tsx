@@ -31,7 +31,13 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import type { PurchaseVendorOption } from "@/app/components/forms/CreateVendorInline";
-import { TicketStatus, TicketType, UserRole } from "@prisma/client";
+import {
+  DOStatus,
+  TicketRequestCategory,
+  TicketStatus,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import {
   formatTicketCurrency,
   getTicketMonthlyStatistics,
@@ -63,25 +69,55 @@ const TicketRequestDistributionChart = dynamic(
   },
 );
 
+function isMaterialOrLogisticsTicket(ticket: TicketRow): boolean {
+  return (
+    ticket.type === TicketType.MATERIAL ||
+    ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+  );
+}
+
 function requiresRoleAction(role: TicketPageRole, ticket: TicketRow): boolean {
+  const hasLogisticsWorkflowAction =
+    (ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
+      ticket.status === TicketStatus.PROCESSED_LOGISTIC) ||
+    (ticket.type === TicketType.MATERIAL &&
+      ((ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
+        (ticket.items.some((item) => item.status === "PENDING") ||
+          (ticket.fulfillmentStatus === "COMPLETED" &&
+            Boolean(ticket.purchaseOrders?.some((po) => po.paidAt)) &&
+            (ticket.deliveryOrders?.length ?? 0) === 0))) ||
+        (ticket.status === TicketStatus.IN_TRANSIT &&
+          Boolean(
+            ticket.deliveryOrders?.some(
+              (deliveryOrder) => deliveryOrder.status === DOStatus.IN_TRANSIT,
+            ),
+          ))));
+
   switch (role) {
     case UserRole.DIRECTOR:
-      return ticket.status === TicketStatus.PENDING_DIRECTOR;
+      return (
+        ticket.status === TicketStatus.PENDING_DIRECTOR ||
+        hasLogisticsWorkflowAction
+      );
+    case UserRole.DEPUTY_DIRECTOR:
+      return (
+        ticket.status === TicketStatus.PENDING_DIRECTOR ||
+        hasLogisticsWorkflowAction
+      );
     case UserRole.FINANCE:
       return (
         ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
-        ticket.status === TicketStatus.PROCESSED_FINANCE ||
-        ticket.status === TicketStatus.PROCESSED_LOGISTIC
+        ticket.status === TicketStatus.PROCESSED_FINANCE
       );
     case UserRole.LOGISTICS:
       return (
-        ticket.type === TicketType.MATERIAL &&
+        isMaterialOrLogisticsTicket(ticket) &&
         (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
           ticket.status === TicketStatus.IN_TRANSIT)
       );
     case UserRole.MOVER:
       return (
-        ticket.type === TicketType.MATERIAL &&
+        isMaterialOrLogisticsTicket(ticket) &&
         ticket.status === TicketStatus.ASSIGNED_TO_MOVER
       );
     case UserRole.ADMINISTRATIONS:
@@ -207,13 +243,23 @@ export default function TicketsApp({
           : ticket.status === filter);
 
       const matchesType =
-        typeFilter === "ALL" || ticket.type === typeFilter;
+        typeFilter === "ALL" ||
+        (typeFilter === TicketType.MATERIAL
+          ? isMaterialOrLogisticsTicket(ticket)
+          : typeFilter === TicketType.COST
+            ? ticket.type === TicketType.COST &&
+              ticket.requestCategory !== TicketRequestCategory.SHIPPING_COST
+            : ticket.type === typeFilter);
 
       const matchesProject =
         projectFilter === "ALL" ||
-        (ticket.project &&
-          `${ticket.project.kelompokTani} - ${ticket.project.title}` ===
-            projectFilter);
+        (projectFilter === "__NO_PROJECT__"
+          ? ticket.project === null
+          : Boolean(
+              ticket.project &&
+                `${ticket.project.kelompokTani} - ${ticket.project.title}` ===
+                  projectFilter,
+            ));
 
       const matchesSearch =
         !search ||
@@ -222,10 +268,18 @@ export default function TicketsApp({
           .includes(search);
 
       return matchesFilter && matchesType && matchesProject && matchesSearch;
-    }).sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
+    }).sort((a, b) => {
+      const aTerminal =
+        a.status === TicketStatus.COMPLETED ||
+        a.status === TicketStatus.REJECTED;
+      const bTerminal =
+        b.status === TicketStatus.COMPLETED ||
+        b.status === TicketStatus.REJECTED;
+      if (aTerminal !== bTerminal) return aTerminal ? 1 : -1;
+      return (
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
   }, [actionRequiredIds, filter, typeFilter, projectFilter, ticketSearch, tickets]);
 
   const selectTicketFilter = (nextFilter: string) => {
@@ -405,7 +459,12 @@ export default function TicketsApp({
               >
                 <Package className="size-3.5" />
                 Material &amp; Gudang (
-                {countableTickets.filter((t) => t.type === TicketType.MATERIAL).length})
+                {
+                  countableTickets.filter((t) =>
+                    isMaterialOrLogisticsTicket(t),
+                  ).length
+                }
+                )
               </button>
               <button
                 type="button"
@@ -418,7 +477,14 @@ export default function TicketsApp({
               >
                 <Wallet className="size-3.5" />
                 Biaya &amp; Upah (
-                {countableTickets.filter((t) => t.type === TicketType.COST).length})
+                {
+                  countableTickets.filter(
+                    (t) =>
+                      t.type === TicketType.COST &&
+                      t.requestCategory !== TicketRequestCategory.SHIPPING_COST,
+                  ).length
+                }
+                )
               </button>
               <button
                 type="button"
@@ -445,6 +511,9 @@ export default function TicketsApp({
                   className="h-8 rounded-lg border border-border bg-background pl-8 pr-7 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
                 >
                   <option value="ALL">Semua Proyek ({projects.length})</option>
+                  <option value="__NO_PROJECT__">
+                    Kantor Pusat / Tanpa Proyek
+                  </option>
                   {projects.map((p) => {
                     const label = `${p.kelompokTani} - ${p.title}`;
                     return (

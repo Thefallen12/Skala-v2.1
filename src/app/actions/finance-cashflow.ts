@@ -146,6 +146,10 @@ function parseTransactionDate(dateStr?: string | null): Date {
 }
 
 export async function uploadCashflowProof(file: File): Promise<string> {
+  const session = await auth();
+  if (!session?.user?.id || !isFinanceOperator(session.user.role)) {
+    throw new Error("Akses Keuangan diperlukan untuk mengunggah bukti transaksi.");
+  }
   if (file.type === "application/pdf") {
     const url = await saveTicketReceipt(file);
     if (!isFinanceCashflowProofUrl(url)) {
@@ -167,6 +171,10 @@ export async function uploadCashflowProof(file: File): Promise<string> {
 }
 
 export async function removeUploadedCashflowProof(url: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id || !isFinanceOperator(session.user.role)) {
+    throw new Error("Akses Keuangan diperlukan untuk menghapus bukti transaksi.");
+  }
   try {
     if (isCloudinaryPrivateTicketReceiptPdf(url)) {
       await removeTicketReceipt(url);

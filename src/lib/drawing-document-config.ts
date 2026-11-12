@@ -2,6 +2,11 @@ export const DRAWING_DOCUMENT_CLOUDINARY_FOLDER =
   "skala-prioritas/drawings";
 
 export const DRAWING_CATEGORIES = [
+  "DED Awal",
+  "Shop Drawing (MC-0)",
+  "CCO / Addendum",
+  "As-Built (MC-100)",
+  "Peta Situasi",
   "Arsitektur",
   "Struktur",
   "MEP",

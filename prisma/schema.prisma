@@ -995,6 +995,7 @@ model StockItem {
   directPurchaseItems DirectStockPurchaseItem[]
   movements           StockMovement[]
   purchaseOrderItems  POItem[]
+  ticketItems         TicketItem[]
   projectMaterialPlans ProjectMaterialPlan[]
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
@@ -1903,6 +1904,8 @@ model TicketItem {
   id                   String             @id @default(cuid()) @map("_id")
   ticketId             String
   ticket               Ticket             @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  stockItemId          String?
+  stockItem            StockItem?         @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
   itemName             String
   quantity             Float
   unit                 String
@@ -1916,6 +1919,7 @@ model TicketItem {
   doItem               DOItem?            @relation(fields: [doItemId], references: [id], onDelete: SetNull)
 
   @@index([ticketId, status])
+  @@index([stockItemId])
   @@index([poItemId])
   @@index([doItemId])
 }

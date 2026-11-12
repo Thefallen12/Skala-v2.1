@@ -20,7 +20,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  ExternalLink,
+  MapPin,
   Plus,
+  Trash2,
 } from "lucide-react";
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +35,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import {
   createWorkspaceTask,
+  deleteWorkspaceEvent,
   type WorkspaceActionResult,
 } from "@/app/actions/habit-workspace";
 import {
@@ -140,9 +144,24 @@ const eventBorderColors: Record<CalendarItem["kind"], string> = {
   other: "#7c3aed",
 };
 
+function getCalendarRecordId(item: CalendarItem) {
+  return item.id.startsWith("event-") ? item.id.slice("event-".length) : null;
+}
+
+function isProjectScheduleItem(item: CalendarItem) {
+  return Boolean(
+    item.projectId &&
+      (item.id === `${item.projectId}-mulai` ||
+        item.id === `${item.projectId}-target`),
+  );
+}
+
 function itemHref(item: CalendarItem, activeDate = item.date) {
   if (item.kind === "task" && item.projectId) {
     return `/apps/habits?tab=tasks&date=${activeDate}&projectId=${item.projectId}`;
+  }
+  if (isProjectScheduleItem(item) && item.projectId) {
+    return `/apps/projects/${item.projectId}`;
   }
   return `/apps/habits?tab=calendar&date=${activeDate}`;
 }
@@ -294,6 +313,10 @@ export default function HabitCalendar({
   const [taskMessage, setTaskMessage] =
     useState<WorkspaceActionResult | null>(null);
   const [isSavingTask, startSavingTask] = useTransition();
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [eventMessage, setEventMessage] =
+    useState<WorkspaceActionResult | null>(null);
+  const [isDeletingEvent, startDeletingEvent] = useTransition();
   const items = useMemo<CalendarItem[]>(() => {
     const projectItems: CalendarItem[] = projects.flatMap((project) => {
       const itemsForProject: CalendarItem[] = [];
@@ -445,10 +468,18 @@ export default function HabitCalendar({
   );
   const getItemsForDay = (dateKey: string) =>
     visibleItems.filter((item) => item.date <= dateKey && item.endDate >= dateKey);
+  const upcomingAnchor = selectedDate > today ? selectedDate : today;
   const upcomingItems = visibleItems
-    .filter((item) => item.endDate >= selectedDate)
+    .filter((item) => item.endDate >= upcomingAnchor)
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 8);
+  const selectedEvent = useMemo(
+    () =>
+      selectedEventId
+        ? items.find((item) => item.id === `event-${selectedEventId}`) ?? null
+        : null,
+    [items, selectedEventId],
+  );
 
   const navigate = (date: Date, nextView = view) => {
     router.push(
@@ -505,26 +536,72 @@ export default function HabitCalendar({
     });
   };
 
+  const handleDeleteEvent = (eventId: string) => {
+    setEventMessage(null);
+    startDeletingEvent(async () => {
+      try {
+        const result = await deleteWorkspaceEvent(eventId);
+        if (!result.success) {
+          setEventMessage(result);
+          return;
+        }
+        setSelectedEventId(null);
+        router.refresh();
+      } catch {
+        setEventMessage({
+          success: false,
+          message: "Agenda gagal dihapus. Silakan coba kembali.",
+        });
+      }
+    });
+  };
+
   const renderItem = (
     item: CalendarItem,
     compact = false,
     activeDate = item.date,
-  ) => (
-    <Link
-      key={item.id}
-      href={itemHref(item, activeDate)}
-      scroll={false}
-      title={`${item.title}${item.projectName ? ` · ${item.projectName}` : ""}`}
-      className={`block truncate rounded px-1.5 py-1 text-left text-[10px] font-medium leading-tight text-white hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${item.color} ${
-        compact ? "" : "sm:text-[11px]"
-      }`}
-    >
-      {!compact && item.time && (
-        <span className="mr-1 opacity-80">{item.time}</span>
-      )}
-      {item.title}
-    </Link>
-  );
+  ) => {
+    const className = `block w-full truncate rounded px-1.5 py-1 text-left text-[10px] font-medium leading-tight text-white hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${item.color} ${
+      compact ? "" : "sm:text-[11px]"
+    }`;
+    const title = `${item.title}${item.projectName ? ` · ${item.projectName}` : ""}`;
+    const content = (
+      <>
+        {!compact && item.time && (
+          <span className="mr-1 opacity-80">{item.time}</span>
+        )}
+        {item.title}
+      </>
+    );
+    const recordId = getCalendarRecordId(item);
+    if (recordId) {
+      return (
+        <button
+          key={item.id}
+          type="button"
+          title={title}
+          onClick={() => {
+            setEventMessage(null);
+            setSelectedEventId(recordId);
+          }}
+          className={className}
+        >
+          {content}
+        </button>
+      );
+    }
+    return (
+      <Link
+        key={item.id}
+        href={itemHref(item, activeDate)}
+        scroll={false}
+        title={title}
+        className={className}
+      >
+        {content}
+      </Link>
+    );
+  };
   const timeGrid = (
     <div className="max-h-[70vh] min-h-[420px] overflow-auto">
       <div
@@ -689,28 +766,54 @@ export default function HabitCalendar({
                 })}
                 {timedItems.map(({ item, position }, index) => {
                   const isSplit = timedItems.length > 1;
+                  const recordId = getCalendarRecordId(item);
+                  const sharedClassName = `absolute z-10 overflow-hidden rounded px-1.5 py-1 text-left text-[9px] font-semibold leading-tight text-white shadow-sm hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:text-[10px] ${item.color}`;
+                  const sharedStyle = {
+                    top: position.top,
+                    height: position.height,
+                    left: isSplit && index % 2 ? "calc(50% + 1px)" : 3,
+                    right: isSplit
+                      ? index % 2
+                        ? 3
+                        : "calc(50% + 1px)"
+                      : 3,
+                  };
+                  const sharedTitle = `${item.title}${item.projectName ? ` · ${item.projectName}` : ""}`;
+                  const inner = (
+                    <>
+                      <span className="block opacity-90">
+                        {itemTime(item, dateKey)}
+                      </span>
+                      <span className="line-clamp-2 block">{item.title}</span>
+                    </>
+                  );
+                  if (recordId) {
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        title={sharedTitle}
+                        onClick={() => {
+                          setEventMessage(null);
+                          setSelectedEventId(recordId);
+                        }}
+                        className={sharedClassName}
+                        style={sharedStyle}
+                      >
+                        {inner}
+                      </button>
+                    );
+                  }
                   return (
                     <Link
                       key={item.id}
                       href={itemHref(item, dateKey)}
                       scroll={false}
-                      title={`${item.title}${item.projectName ? ` · ${item.projectName}` : ""}`}
-                      className={`absolute z-10 overflow-hidden rounded px-1.5 py-1 text-left text-[9px] font-semibold leading-tight text-white shadow-sm hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:text-[10px] ${item.color}`}
-                      style={{
-                        top: position.top,
-                        height: position.height,
-                        left: isSplit && index % 2 ? "calc(50% + 1px)" : 3,
-                        right: isSplit
-                          ? index % 2
-                            ? 3
-                            : "calc(50% + 1px)"
-                          : 3,
-                      }}
+                      title={sharedTitle}
+                      className={sharedClassName}
+                      style={sharedStyle}
                     >
-                      <span className="block opacity-90">
-                        {itemTime(item, dateKey)}
-                      </span>
-                      <span className="line-clamp-2 block">{item.title}</span>
+                      {inner}
                     </Link>
                   );
                 })}
@@ -893,39 +996,61 @@ export default function HabitCalendar({
             <h3 className="text-xs font-semibold">Agenda mendatang</h3>
             {upcomingItems.length ? (
               <div className="max-h-[330px] space-y-2 overflow-y-auto pr-1">
-                {upcomingItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded border border-border border-l-2 p-2"
-                    style={{
-                      borderLeftColor: eventBorderColors[item.kind],
-                    }}
-                  >
-                    <Link
-                      href={itemHref(item)}
-                      scroll={false}
-                      className="line-clamp-2 text-[11px] font-semibold hover:text-primary"
+                {upcomingItems.map((item) => {
+                  const recordId = getCalendarRecordId(item);
+                  const isProjectItem = isProjectScheduleItem(item);
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded border border-border border-l-2 p-2"
+                      style={{
+                        borderLeftColor: eventBorderColors[item.kind],
+                      }}
                     >
-                      {item.title}
-                    </Link>
-                    <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <CalendarDays className="size-3" aria-hidden="true" />
-                      {format(dateFromKey(item.date), "d MMM yyyy", { locale: id })}
-                      {item.time && (
-                        <>
-                          <Clock3 className="ml-1 size-3" aria-hidden="true" />
-                          {itemTime(item)}
-                        </>
+                      {recordId ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEventMessage(null);
+                            setSelectedEventId(recordId);
+                          }}
+                          className="line-clamp-2 text-left text-[11px] font-semibold hover:text-primary"
+                        >
+                          {item.title}
+                        </button>
+                      ) : (
+                        <Link
+                          href={itemHref(item)}
+                          scroll={false}
+                          className="line-clamp-2 text-[11px] font-semibold hover:text-primary"
+                        >
+                          {item.title}
+                        </Link>
                       )}
-                    </p>
-                    {item.projectName && (
-                      <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                        {item.projectName}
+                      <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <CalendarDays className="size-3 shrink-0" aria-hidden="true" />
+                        <span>
+                          {format(dateFromKey(item.date), "d MMM yyyy", {
+                            locale: id,
+                          })}
+                          {item.endDate > item.date
+                            ? ` – ${format(dateFromKey(item.endDate), "d MMM yyyy", { locale: id })}`
+                            : null}
+                        </span>
+                        {item.time && (
+                          <>
+                            <Clock3 className="ml-1 size-3 shrink-0" aria-hidden="true" />
+                            {itemTime(item)}
+                          </>
+                        )}
                       </p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-medium">
-                      {item.kind === "task" && item.projectId ? (
-                        <>
+                      {item.projectName && (
+                        <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                          {item.projectName}
+                        </p>
+                      )}
+                      <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[9px] font-medium">
+                        {item.kind === "task" && item.projectId ? (
                           <Link
                             href={itemHref(item)}
                             scroll={false}
@@ -933,23 +1058,37 @@ export default function HabitCalendar({
                           >
                             Tugas harian
                           </Link>
-                        </>
-                      ) : item.kind === "project" || item.kind === "deadline" ? (
-                        <span className="text-muted-foreground">
-                          Kalender proyek
-                        </span>
-                      ) : (
-                        <Link
-                          href={itemHref(item)}
-                          scroll={false}
-                          className="text-primary hover:underline"
-                        >
-                          Buka jadwal
-                        </Link>
-                      )}
+                        ) : isProjectItem && item.projectId ? (
+                          <Link
+                            href={itemHref(item)}
+                            className="text-primary hover:underline"
+                          >
+                            Buka proyek
+                          </Link>
+                        ) : recordId ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEventMessage(null);
+                              setSelectedEventId(recordId);
+                            }}
+                            className="text-primary hover:underline"
+                          >
+                            Lihat detail agenda
+                          </button>
+                        ) : (
+                          <Link
+                            href={itemHref(item)}
+                            scroll={false}
+                            className="text-primary hover:underline"
+                          >
+                            Buka jadwal
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="text-[11px] text-muted-foreground">
@@ -1325,6 +1464,105 @@ export default function HabitCalendar({
             </div>
           </form>
         </div>
+      </GlobalModal>
+      <GlobalModal
+        isOpen={selectedEvent !== null}
+        onClose={() => {
+          if (isDeletingEvent) return;
+          setSelectedEventId(null);
+          setEventMessage(null);
+        }}
+        title={selectedEvent?.title ?? "Detail Agenda"}
+        description={
+          selectedEvent
+            ? `${format(dateFromKey(selectedEvent.date), "EEEE, d MMMM yyyy", { locale: id })}${selectedEvent.endDate > selectedEvent.date ? ` – ${format(dateFromKey(selectedEvent.endDate), "EEEE, d MMMM yyyy", { locale: id })}` : ""} · ${selectedEvent.allDay ? "Sepanjang hari" : itemTime(selectedEvent)}`
+            : undefined
+        }
+        className="sm:max-w-md"
+        footer={
+          selectedEvent ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSelectedEventId(null);
+                  setEventMessage(null);
+                }}
+                disabled={isDeletingEvent}
+              >
+                Tutup
+              </Button>
+              {getCalendarRecordId(selectedEvent) && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={isDeletingEvent}
+                  onClick={() => {
+                    const recordId = getCalendarRecordId(selectedEvent);
+                    if (recordId) handleDeleteEvent(recordId);
+                  }}
+                >
+                  <Trash2 className="mr-1.5 size-3.5" aria-hidden="true" />
+                  {isDeletingEvent ? "Menghapus..." : "Hapus Agenda"}
+                </Button>
+              )}
+            </>
+          ) : null
+        }
+      >
+        {selectedEvent && (
+          <div className="space-y-3 text-sm">
+            {eventMessage && (
+              <p
+                role={eventMessage.success ? "status" : "alert"}
+                className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                  eventMessage.success
+                    ? "border-success/30 bg-success/10 text-success"
+                    : "border-destructive/30 bg-destructive/10 text-destructive"
+                }`}
+              >
+                {eventMessage.message}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className={`${selectedEvent.color} text-white`}>
+                {categories.find((c) => c.kind === selectedEvent.kind)?.label ??
+                  "Agenda"}
+              </Badge>
+              {selectedEvent.projectId && selectedEvent.projectName && (
+                <Link
+                  href={`/apps/projects/${selectedEvent.projectId}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs font-medium text-primary hover:bg-muted"
+                >
+                  {selectedEvent.projectCode
+                    ? `${selectedEvent.projectCode} · `
+                    : ""}
+                  {selectedEvent.projectName}
+                  <ExternalLink className="size-3" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+            {selectedEvent.location && (
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
+                <span>{selectedEvent.location}</span>
+              </p>
+            )}
+            {selectedEvent.meetingUrl &&
+              /^https?:\/\//i.test(selectedEvent.meetingUrl) && (
+                <a
+                  href={selectedEvent.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                  Buka tautan rapat
+                </a>
+              )}
+          </div>
+        )}
       </GlobalModal>
     </div>
   );

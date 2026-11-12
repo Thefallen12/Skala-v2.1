@@ -87,7 +87,7 @@ const isInternalFundingCategory = (
   internalFundingCategories.some((value) => value === category);
 
 const fieldCategoryLabels: Record<TicketFieldCategory, string> = {
-  HAULING: "Biaya Langsir",
+  HAULING: "Upah Langsir",
   LABOR: "Upah Tukang",
   DIRECT_STORE: "Belanja Langsung Ketoko",
 };
@@ -871,17 +871,21 @@ export default function CreateTicketModal({
         ? (values.surveyConsumptionAmount ?? 0) +
           (values.surveyFuelAmount ?? 0)
         : values.operationalAmount;
+    const shortDetail = (values.requestPaymentDescription?.trim() ?? "").replace(/\s+/g, " ");
+    const conciseTitle = `${categoryLabel}: ${
+      shortDetail.length > 50 ? `${shortDetail.slice(0, 47).trimEnd()}...` : shortDetail
+    }`;
     const title = isOperationalFunding
       ? `Operasional: ${operationalRequestLabel}`
       : isAPHRequest
         ? "Permintaan APH"
       : isInternalFunding
-        ? `${categoryLabel}: ${values.requestPaymentDescription?.trim()}`.slice(0, 160)
+        ? conciseTitle
       : isShippingCostRequest
-        ? `${categoryLabel}: ${values.relatedDocumentNumbers.trim()}`.slice(0, 160)
+        ? `${categoryLabel}: ${values.relatedDocumentNumbers.trim()}`.slice(0, 80)
       : requiresRecipientPayment
-      ? `${subCategoryLabel}: ${values.recipientName?.trim()}`.slice(0, 160)
-      : `${categoryLabel}: ${firstItemName}`.slice(0, 160);
+      ? `${subCategoryLabel}: ${values.recipientName?.trim()}`.slice(0, 80)
+      : `${categoryLabel}: ${firstItemName}`.slice(0, 80);
     const description = [
       `Jenis permintaan: ${categoryLabel}`,
       isAPHRequest
@@ -1162,7 +1166,7 @@ export default function CreateTicketModal({
                         requestCategory === TicketRequestCategory.WAREHOUSE ||
                         requestCategory === TicketRequestCategory.FIELD
                           ? "Pilih proyek"
-                          : "Tidak terkait proyek"}
+                          : "Kantor Pusat / Overhead Umum"}
                       </SelectItem>
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
@@ -1693,16 +1697,11 @@ export default function CreateTicketModal({
                         <SelectItem value="none">
                           Pilih kebutuhan lapangan
                         </SelectItem>
-                        {fieldCategories
-                          .filter(
-                            (category) =>
-                              category === TicketFieldCategory.LABOR,
-                          )
-                          .map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {fieldCategoryLabels[category]}
-                            </SelectItem>
-                          ))}
+                        {fieldCategories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {fieldCategoryLabels[category]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}

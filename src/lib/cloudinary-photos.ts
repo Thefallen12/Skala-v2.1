@@ -1,6 +1,6 @@
 import "@/lib/sanitize-env";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
@@ -97,7 +97,11 @@ export async function uploadCloudinaryPhoto(
     const relativeDir = path.posix.join("uploads", safeFolder);
     const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
     await mkdir(absDir, { recursive: true });
-    await writeFile(path.join(/*turbopackIgnore: true*/ absDir, fileName), bytes);
+    await writeFile(
+      path.join(/*turbopackIgnore: true*/ absDir, fileName),
+      bytes,
+      { flag: "wx" },
+    );
     const localUrl = `/${relativeDir}/${fileName}`;
     return {
       secureUrl: localUrl,
@@ -135,9 +139,34 @@ export async function uploadCloudinaryPhoto(
 
 export function getCloudinaryPublicId(url: string): string | null {
   if (url.startsWith("/uploads/")) {
-    return url
-      .replace(/^\/uploads\//, "")
-      .replace(/\.[^.]+$/, "");
+    try {
+      const parsed = new URL(url, "http://localhost");
+      if (!parsed.pathname.startsWith("/uploads/") || parsed.search || parsed.hash) {
+        return null;
+      }
+      const segments = parsed.pathname
+        .slice("/uploads/".length)
+        .split("/")
+        .map((segment) => decodeURIComponent(segment));
+      const fileName = segments.at(-1) ?? "";
+      if (
+        segments.length < 2 ||
+        segments.some(
+          (segment) =>
+            !segment ||
+            segment === "." ||
+            segment === ".." ||
+            segment.includes("/") ||
+            segment.includes("\\"),
+        ) ||
+        !/\.(?:jpe?g|png|webp)$/i.test(fileName)
+      ) {
+        return null;
+      }
+      return segments.join("/").replace(/\.[^.]+$/, "");
+    } catch {
+      return null;
+    }
   }
   try {
     const parsed = new URL(url);
@@ -159,7 +188,39 @@ export function getCloudinaryPublicId(url: string): string | null {
 
 export async function removeCloudinaryPhoto(url: string): Promise<boolean> {
   if (url.startsWith("/uploads/")) {
-    return true;
+    try {
+      const pathname = new URL(url, "http://localhost").pathname;
+      const segments = pathname
+        .slice("/uploads/".length)
+        .split("/")
+        .map((segment) => decodeURIComponent(segment));
+      const fileName = segments.at(-1) ?? "";
+      if (
+        !pathname.startsWith("/uploads/") ||
+        segments.length < 2 ||
+        segments.some(
+          (segment) =>
+            !segment ||
+            segment === "." ||
+            segment === ".." ||
+            segment.includes("/") ||
+            segment.includes("\\"),
+        ) ||
+        !/\.(?:jpe?g|png|webp)$/i.test(fileName)
+      ) {
+        return false;
+      }
+
+      const uploadsDirectory = path.resolve(process.cwd(), "public", "uploads");
+      const localPath = path.resolve(uploadsDirectory, ...segments);
+      if (!localPath.startsWith(`${uploadsDirectory}${path.sep}`)) {
+        return false;
+      }
+      await rm(/*turbopackIgnore: true*/ localPath, { force: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
   const publicId = getCloudinaryPublicId(url);
   if (!publicId) return false;

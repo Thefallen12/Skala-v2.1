@@ -244,6 +244,7 @@ function resolveProjectRelation(projObj: any) {
     dailyReports: [],
     workPoints: [],
     blueprints: store.drawings.filter((d) => d.projectId === projObj.id),
+    drawingDocuments: [],
     subkonContracts: [],
     bastDocuments: [],
     tickets: store.tickets.filter((t) => t.projectId === projObj.id),

@@ -153,7 +153,7 @@ const requestCategoryLabels: Record<TicketRequestCategory, string> = {
 };
 
 const fieldCategoryLabels: Record<TicketFieldCategory, string> = {
-  HAULING: "Biaya Langsir",
+  HAULING: "Upah Langsir",
   LABOR: "Upah Tukang",
   DIRECT_STORE: "Belanja Langsung ke Toko",
 };

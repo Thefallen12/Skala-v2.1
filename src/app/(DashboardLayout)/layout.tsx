@@ -12,6 +12,7 @@ import {
   shiftDateKey,
 } from "@/lib/habit-date";
 import DashboardLayoutClient from "./DashboardLayoutClient";
+import { ANDROID_APK } from "@/lib/apk-config";
 
 const ticketActionLabels: Record<string, string> = {
   APPROVED_BY_DIR: "Tiket disetujui direktur",
@@ -204,7 +205,7 @@ export default async function Layout({
       userName={session.user.name ?? "Pengguna"}
       userRole={session.user.role}
       notifications={notifications}
-      androidDownloadUrl={process.env.LINK_DOWNLOAD_ANDROID?.trim() || "/Skala-Prioritas.apk"}
+      androidDownloadUrl={ANDROID_APK.href}
     >
       {children}
     </DashboardLayoutClient>

@@ -2,7 +2,8 @@
 
 import { FormLabel } from '@/components/ui/label'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Download, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck, Smartphone } from 'lucide-react'
+import { ANDROID_APK } from '@/lib/apk-config'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -77,7 +78,7 @@ export const Login = () => {
       }
 
       // Hard navigation to ensure all server session cookies and fresh layout load cleanly
-      window.location.href = '/'
+      window.location.assign('/')
     } catch (err) {
       console.error('Sign-in exception:', err)
       setIsAuthenticating(false)
@@ -299,8 +300,33 @@ export const Login = () => {
               </Button>
             </form>
 
-            <div className='mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-400'>
-              Autentikasi Aman · PT Skala Prioritas Engineering
+            <div className='mt-6 space-y-3 border-t border-slate-100 pt-4'>
+              <a
+                href={ANDROID_APK.href}
+                download={ANDROID_APK.fileName}
+                className='flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/5'
+              >
+                <span className='flex items-center gap-2.5'>
+                  <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary'>
+                    <Smartphone className='h-4 w-4' />
+                  </span>
+                  <span>
+                    <span className='block text-xs font-semibold text-slate-800'>
+                      Unduh Aplikasi Android
+                    </span>
+                    <span className='block text-[11px] text-slate-500'>
+                      Unduh langsung file APK resmi ({ANDROID_APK.label})
+                    </span>
+                  </span>
+                </span>
+                <span className='inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary'>
+                  <Download className='h-3 w-3' />
+                  {ANDROID_APK.label}
+                </span>
+              </a>
+              <div className='text-center text-xs text-slate-400'>
+                Autentikasi Aman · PT Skala Prioritas Engineering
+              </div>
             </div>
           </div>
         </div>

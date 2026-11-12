@@ -290,6 +290,7 @@ export default async function HabitsPage({
         initialTab={initialTab}
         today={today}
         selectedDate={selectedDate}
+        calendarRange={{ start: calendarStartKey, end: calendarEndKey }}
         calendarView={calendarView}
         taskView={taskView}
         currentUserId={session.user.id}

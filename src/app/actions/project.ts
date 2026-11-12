@@ -134,6 +134,12 @@ const projectManagerRoles: UserRole[] = [
   UserRole.DIRECTOR,
 ];
 
+const rapEditorRoles: UserRole[] = [
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.LOGISTICS,
+];
+
 const projectAccessRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
@@ -2216,13 +2222,26 @@ export async function saveProjectMilestone(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk menambah milestone." };
   }
+  if (!projectAccessRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan menambah milestone." };
+  }
   if (!projectId || !title.trim() || !dateStr) {
     return { success: false, message: "Data milestone tidak lengkap." };
   }
+  const startsAt = new Date(dateStr);
+  if (Number.isNaN(startsAt.getTime())) {
+    return { success: false, message: "Tanggal milestone tidak valid." };
+  }
 
   try {
+    const existingProject = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!existingProject) {
+      return { success: false, message: "Proyek tidak ditemukan." };
+    }
     const id = `ms_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const startsAt = new Date(dateStr);
 
     await prisma.calendarEvent.create({
       data: {
@@ -2318,11 +2337,21 @@ export async function applyRabAsContract(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk terlebih dahulu." };
   }
+  if (!projectManagerRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan mengubah nilai kontrak proyek." };
+  }
   if (!projectId) {
     return { success: false, message: "ID Proyek tidak valid." };
   }
 
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan." };
+    }
     const points = await prisma.projectWorkPoint.findMany({
       where: { projectId },
       select: { proposedTotalWage: true },
@@ -2350,11 +2379,24 @@ export async function applyRapAsBudget(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk terlebih dahulu." };
   }
+  if (!projectManagerRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan mengubah budget proyek." };
+  }
   if (!projectId) {
     return { success: false, message: "ID Proyek tidak valid." };
   }
+  if (!Number.isFinite(rapAmount) || rapAmount < 0) {
+    return { success: false, message: "Nominal RAP tidak valid." };
+  }
 
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan." };
+    }
     await prisma.project.update({
       where: { id: projectId },
       data: { budget: scaledIntegerFromDecimal(rapAmount) },
@@ -2371,7 +2413,7 @@ export async function applyRapAsBudget(
 /**
  * Auto-populate daftar bahan yang di-upload dari RAB (analisa standar atau Excel)
  */
-export async function populateProjectRabMaterialsFromWorkPoints(projectId: string) {
+async function populateProjectRabMaterialsFromWorkPoints(projectId: string) {
   try {
     const points = await prisma.projectWorkPoint.findMany({
       where: { projectId },
@@ -2425,6 +2467,23 @@ export async function getProjectRap(projectId: string) {
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk terlebih dahulu." };
   }
+  if (
+    !projectAccessRoles.includes(session.user.role) &&
+    session.user.role !== UserRole.LOGISTICS
+  ) {
+    return { success: false, message: "Role Anda tidak diizinkan mengakses data RAP proyek." };
+  }
+  if (!projectId) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, isDeleted: false },
+    select: { pagu: true, budget: true, title: true },
+  });
+  if (!project) {
+    return { success: false, message: "Proyek tidak ditemukan." };
+  }
 
   // Ambil atau populate bahan RAB
   let rabMaterials = await prisma.projectRabMaterial.findMany({
@@ -2462,11 +2521,6 @@ export async function getProjectRap(projectId: string) {
       proposedUnitPrice: true,
       proposedTotalWage: true,
     },
-  });
-
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { pagu: true, budget: true, title: true },
   });
 
   return {
@@ -2548,11 +2602,21 @@ export async function saveProjectRap(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk terlebih dahulu." };
   }
+  if (!rapEditorRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan menyimpan RAP proyek." };
+  }
   if (!projectId) {
     return { success: false, message: "ID Proyek tidak valid." };
   }
 
   try {
+    const existingProject = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!existingProject) {
+      return { success: false, message: "Proyek tidak ditemukan." };
+    }
     let totalMaterial = 0;
     let totalLabor = 0;
     const linkedStockItemIds = [
@@ -2607,13 +2671,17 @@ export async function saveProjectRap(
 
       for (const l of input.laborPlans) {
         if (!l.jobName?.trim()) continue;
-        const vol = Math.max(0, l.volume || 1);
-        const submittedRate = Math.max(0, l.boronganRate || 0);
+        const parsedVol = Number(l.volume);
+        const vol = Number.isFinite(parsedVol) ? Math.max(0, parsedVol) : 0;
+        const parsedRate = Number(l.boronganRate);
+        const submittedRate = Number.isFinite(parsedRate) ? Math.max(0, parsedRate) : 0;
+        const parsedTotal = Number(l.totalBorongan);
+        const fallbackTotal = Number.isFinite(parsedTotal) ? Math.max(0, parsedTotal) : 0;
         const rate =
           submittedRate > 0
             ? submittedRate
-            : vol > 0 && l.totalBorongan > 0
-              ? l.totalBorongan / vol
+            : vol > 0 && fallbackTotal > 0
+              ? fallbackTotal / vol
               : 0;
         const lineTotal = Math.round(vol * rate);
         totalLabor += lineTotal;
@@ -2665,11 +2733,24 @@ export async function deleteProjectMilestone(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk menghapus milestone." };
   }
+  if (!projectAccessRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan menghapus milestone." };
+  }
+  if (!milestoneId) {
+    return { success: false, message: "Milestone tidak valid." };
+  }
 
   try {
-    await prisma.calendarEvent.delete({
-      where: { id: milestoneId },
+    const deleted = await prisma.calendarEvent.deleteMany({
+      where: {
+        id: milestoneId,
+        description: "MILESTONE",
+        projectId: { not: null },
+      },
     });
+    if (deleted.count === 0) {
+      return { success: false, message: "Milestone tidak ditemukan." };
+    }
 
     revalidatePath("/apps/projects/schedule");
     return { success: true, message: "Milestone berhasil dihapus." };
@@ -2688,6 +2769,9 @@ export async function importDrtRabProject(input: {
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengimpor RAB." };
   }
+  if (!projectManagerRoles.includes(session.user.role)) {
+    return { success: false, message: "Role Anda tidak diizinkan mengimpor RAB proyek." };
+  }
 
   try {
     const buffer = Buffer.from(input.fileBase64, "base64");
@@ -2704,8 +2788,8 @@ export async function importDrtRabProject(input: {
 
     if (projectId) {
       // Update existing project with parsed RAB items
-      const existing = await prisma.project.findUnique({
-        where: { id: projectId },
+      const existing = await prisma.project.findFirst({
+        where: { id: projectId, isDeleted: false },
         select: { id: true, pagu: true, kelompokTani: true },
       });
 
@@ -2844,6 +2928,32 @@ export async function parseDrtRabFileAction(input: {
   fileBase64: string;
   fileName: string;
 }) {
+  const session = await auth();
+  if (!session?.user?.id || !projectManagerRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Akses manajer proyek atau Direktur diperlukan untuk memproses file RAB.",
+      metadata: {
+        code: "",
+        title: "",
+        poktanName: "",
+        desa: "",
+        kecamatan: "",
+        kabupaten: "",
+        provinsi: "",
+        address: "",
+        activityName: "",
+        satuanKerja: "",
+        year: "",
+        landAreaHa: 0,
+        totalBudget: 0,
+      },
+      workItems: [],
+      materials: [],
+      laborRates: [],
+      divisions: [],
+    };
+  }
   try {
     const buffer = Buffer.from(input.fileBase64, "base64");
     return await parseDrtRabWorkbook(buffer);

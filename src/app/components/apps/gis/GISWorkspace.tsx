@@ -146,6 +146,7 @@ export default function GISWorkspace({
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   const [detailSurveyId, setDetailSurveyId] = useState<string | null>(null);
   const [showAllProjects, setShowAllProjects] = useState(true);
+  const [surveySearch, setSurveySearch] = useState("");
   const reportFrameRef = useRef<HTMLIFrameElement>(null);
   const reportViewerRef = useRef<HTMLDivElement>(null);
   const [reportFitScale, setReportFitScale] = useState(1);
@@ -225,6 +226,15 @@ export default function GISWorkspace({
           }),
       ),
     [projects, surveys],
+  );
+  const displayedGlobalPolygons = useMemo(
+    () =>
+      showAllProjects
+        ? globalPolygons
+        : globalPolygons.filter(
+            (polygon) => polygon.projectId === activeProjectId,
+          ),
+    [activeProjectId, globalPolygons, showAllProjects],
   );
   const measurements = useMemo(
     () => measureSurveyGeoJSON(combinedData),
@@ -405,10 +415,14 @@ export default function GISWorkspace({
     setImportMessage("");
     try {
       const data = await readSpatialUpload(file);
+      const importedStats = measureSurveyGeoJSON(data);
+      const areaHa = importedStats.areaSqm / 10_000;
       updateImportedData(data);
       setDrawnData(emptyCollection());
       setImportMessage(
-        `${formatNumber(data.features.length)} fitur berhasil diimpor.`,
+        areaHa > 0
+          ? `${formatNumber(data.features.length)} fitur (${areaHa.toFixed(2)} Ha) berhasil diimpor.`
+          : `${formatNumber(data.features.length)} fitur berhasil diimpor.`,
       );
     } catch (error) {
       console.error("Importing survey geometry failed:", error);
@@ -594,20 +608,68 @@ export default function GISWorkspace({
             activeView === "details" ? "lg:col-start-2" : ""
           }`}
         >
-          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2">
             <span className="text-xs font-extrabold uppercase tracking-wide text-foreground">
-              Peta Interaktif Sebaran Polygon (Semua Proyek)
+              Peta Interaktif Sebaran Polygon (
+              {showAllProjects ? "Semua Proyek" : "Proyek Aktif"})
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-[10px]"
-              onClick={() => setShowAllProjects((value) => !value)}
-            >
-              {showAllProjects ? "Filter Project" : "Lihat Semua Project"}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Pilih proyek aktif pada peta"
+                value={activeProjectId}
+                onChange={(event) => changeProject(event.target.value)}
+                className="h-7 max-w-[230px] rounded-md border border-input bg-background px-2 text-[11px] font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                {projects.length === 0 ? (
+                  <option value="">Belum ada proyek</option>
+                ) : (
+                  projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.code} — {project.title}
+                    </option>
+                  ))
+                )}
+              </select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px]"
+                onClick={() => setShowAllProjects((value) => !value)}
+              >
+                {showAllProjects ? "Filter Project" : "Lihat Semua Project"}
+              </Button>
+            </div>
           </div>
+          {activeView === "map" && importMessage && (
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground shadow-sm"
+            >
+              <span>{importMessage}</span>
+              <div className="flex items-center gap-2">
+                {importedData && importedData.features.length > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-[11px]"
+                    onClick={() => changeView("details")}
+                  >
+                    Simpan ke Detail Survei
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-[11px]"
+                  onClick={() => setImportMessage("")}
+                >
+                  Tutup
+                </Button>
+              </div>
+            </div>
+          )}
           <Card className="h-[500px] min-h-0 w-full max-w-full overflow-hidden p-1.5 shadow-sm">
             <ProjectMapLoader
               importedData={importedData}
@@ -630,13 +692,7 @@ export default function GISWorkspace({
               onFeatureSelected={() => {
                 changeView("details");
               }}
-              globalPolygons={
-                showAllProjects
-                  ? globalPolygons
-                  : globalPolygons.filter(
-                      (polygon) => polygon.projectId === activeProjectId,
-                    )
-              }
+              globalPolygons={displayedGlobalPolygons}
             />
           </Card>
           <Card className={`${activeView === "map" ? "hidden" : ""} border-slate-800 bg-slate-900/50 p-4 text-slate-300`}>
@@ -743,17 +799,33 @@ export default function GISWorkspace({
             </div>
             {(() => {
               const activeProject = projects.find((project) => project.id === activeProjectId);
-              const activeSurvey = surveys.find((survey) => survey.projectId === activeProjectId) ?? surveys[0];
+              const activeSurvey = surveys.find((survey) => survey.projectId === activeProjectId) ?? null;
+              const resolvedLocation =
+                activeSurvey?.locationName ?? activeProject?.location ?? "—";
+              const resolvedArea = activeSurvey?.areaSqm
+                ? `${(activeSurvey.areaSqm / 10000).toFixed(2)} Ha`
+                : measurements.areaSqm > 0
+                  ? `${(measurements.areaSqm / 10000).toFixed(2)} Ha (draft)`
+                  : activeProject?.landArea
+                    ? `${activeProject.landArea} Ha`
+                    : "—";
+              const resolvedSurveyor =
+                activeSurvey?.surveyorName ?? activeProject?.fieldPicName ?? "—";
+              const resolvedNotes =
+                activeSurvey?.notes ??
+                (activeSurvey
+                  ? "Belum ada keterangan."
+                  : "Belum ada data survei lapangan.");
               return (
                 <>
                   <div className="grid grid-cols-[90px_10px_1fr] gap-y-3 text-xs">
-                    <span className="font-semibold text-muted-foreground">Project ID</span><span>:</span><span>{activeProject?.code ?? "—"}</span>
+                    <span className="font-semibold text-muted-foreground">Project ID</span><span>:</span><span>{activeProject?.code ?? activeSurvey?.projectCode ?? "—"}</span>
                     <span className="font-semibold text-muted-foreground">Nama Project</span><span>:</span><span>{activeProject?.title ?? activeSurvey?.projectName ?? "—"}</span>
-                    <span className="font-semibold text-muted-foreground">Lokasi</span><span>:</span><span>{activeSurvey?.locationName ?? "—"}</span>
-                    <span className="font-semibold text-muted-foreground">Luas</span><span>:</span><span>{activeSurvey?.areaSqm ? `${(activeSurvey.areaSqm / 10000).toFixed(2)} Ha` : "—"}</span>
+                    <span className="font-semibold text-muted-foreground">Lokasi</span><span>:</span><span>{resolvedLocation}</span>
+                    <span className="font-semibold text-muted-foreground">Luas</span><span>:</span><span>{resolvedArea}</span>
                     <span className="font-semibold text-muted-foreground">Tanggal Survei</span><span>:</span><span>{activeSurvey?.createdAt ? new Date(activeSurvey.createdAt).toLocaleDateString("id-ID") : "—"}</span>
-                    <span className="font-semibold text-muted-foreground">Surveyor</span><span>:</span><span>{activeSurvey?.surveyorName ?? "—"}</span>
-                    <span className="font-semibold text-muted-foreground">Keterangan</span><span>:</span><span>{activeSurvey?.notes ?? "Belum ada keterangan."}</span>
+                    <span className="font-semibold text-muted-foreground">Surveyor</span><span>:</span><span>{resolvedSurveyor}</span>
+                    <span className="font-semibold text-muted-foreground">Keterangan</span><span>:</span><span>{resolvedNotes}</span>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-3">
                     <ActionIconButton
@@ -763,13 +835,16 @@ export default function GISWorkspace({
                       icon={Pencil}
                       onClick={() => changeView("details")}
                     />
-                    {reportSurveyId && (
+                    {activeSurvey && (
                       <ActionIconButton
                         type="button"
                         label="Tampilkan PDF laporan survei"
                         tooltip="Tampilkan PDF"
                         icon={FileText}
-                        onClick={() => setReportPreviewOpen(true)}
+                        onClick={() => {
+                          setReportSurveyId(activeSurvey.id);
+                          setReportPreviewOpen(true);
+                        }}
                       />
                     )}
                   </div>
@@ -810,11 +885,16 @@ export default function GISWorkspace({
       </section>
       {activeView === "map" && (
         <Card className="overflow-hidden border-border bg-card shadow-sm">
-          <div className="flex items-center justify-between border-b border-border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-4">
             <h2 className="text-sm font-extrabold uppercase tracking-wide text-foreground">
               Tabel Data Hasil Survei Lapangan
             </h2>
-            <Input className="h-8 max-w-[220px] text-xs" placeholder="Cari data survei..." />
+            <Input
+              className="h-8 max-w-[260px] text-xs"
+              placeholder="Cari project, lokasi, atau surveyor..."
+              value={surveySearch}
+              onChange={(event) => setSurveySearch(event.target.value)}
+            />
           </div>
           <NativeDataTable itemLabel="survei">
             <table className="app-data-table min-w-[900px] text-left text-xs">
@@ -826,37 +906,192 @@ export default function GISWorkspace({
                 </tr>
               </thead>
               <tbody>
-                {surveys.map((survey) => {
-                  const project = projects.find((item) => item.id === survey.projectId);
-                  const running = ["RUNNING", "ON_PROGRESS", "ACTIVE"].includes(project?.status ?? "");
-                  return (
-                    <tr key={survey.id} className={`border-t border-border ${survey.projectId === activeProjectId ? "bg-orange-500/5" : "hover:bg-muted/30"}`}>
-                      <td className="px-3 py-3">{surveys.indexOf(survey) + 1}</td>
-                      <td className="px-3 py-3 font-semibold">{project?.code ?? survey.projectCode ?? "—"}</td>
-                      <td className="px-3 py-3">{project?.title ?? survey.projectName}</td>
-                      <td className="px-3 py-3">{survey.locationName}<span className="block text-[10px] text-muted-foreground">{survey.objectCategory ?? "Polygon"}</span></td>
-                      <td className="px-3 py-3">{survey.areaSqm ? (survey.areaSqm / 10000).toFixed(2) : "—"}</td>
-                      <td className="px-3 py-3 whitespace-nowrap">{new Date(survey.createdAt).toLocaleDateString("id-ID")}</td>
-                      <td className="px-3 py-3">{survey.surveyorName}</td>
-                      <td className="px-3 py-3"><span className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-bold ${running ? "bg-emerald-500/15 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}><span className={`size-2 rounded-full ${running ? "bg-emerald-500" : "bg-amber-500"}`} />{running ? "Aktif" : "Pilih Adat"}</span></td>
-                      <td className="px-3 py-3">
-                        <ActionIconButton
-                          type="button"
-                          label={`Lihat detail survei ${project?.code ?? survey.projectCode ?? ""}`}
-                          tooltip="Lihat Detail"
-                          icon={Eye}
-                          onClick={() => {
-                            if (isSurveyDetailsUnderMaintenance) {
-                              changeView("details");
-                              return;
-                            }
-                            setDetailSurveyId(survey.id);
-                          }}
-                        />
-                      </td>
-                    </tr>
+                {(() => {
+                  const keyword = surveySearch.trim().toLowerCase();
+                  const surveyedProjectIds = new Set(
+                    surveys.map((survey) => survey.projectId).filter(Boolean),
                   );
-                })}
+                  type SurveyTableRow =
+                    | {
+                        kind: "survey";
+                        key: string;
+                        survey: FieldSurveySummary;
+                        project: SurveyProjectOption | undefined;
+                      }
+                    | {
+                        kind: "project";
+                        key: string;
+                        project: SurveyProjectOption;
+                      };
+                  const combinedRows: SurveyTableRow[] = [
+                    ...surveys.map((survey) => ({
+                      kind: "survey" as const,
+                      key: `survey-${survey.id}`,
+                      survey,
+                      project: projects.find((item) => item.id === survey.projectId),
+                    })),
+                    ...projects
+                      .filter((project) => !surveyedProjectIds.has(project.id))
+                      .map((project) => ({
+                        kind: "project" as const,
+                        key: `project-${project.id}`,
+                        project,
+                      })),
+                  ];
+                  const filteredRows = combinedRows.filter((row) => {
+                    if (!keyword) return true;
+                    if (row.kind === "survey") {
+                      const code = row.project?.code ?? row.survey.projectCode ?? "";
+                      const title = row.project?.title ?? row.survey.projectName;
+                      const location = row.survey.locationName;
+                      const surveyor = row.survey.surveyorName;
+                      return [code, title, location, surveyor]
+                        .join(" ")
+                        .toLowerCase()
+                        .includes(keyword);
+                    }
+                    return [
+                      row.project.code,
+                      row.project.title,
+                      row.project.location ?? "",
+                      row.project.fieldPicName ?? "",
+                      "belum survei",
+                    ]
+                      .join(" ")
+                      .toLowerCase()
+                      .includes(keyword);
+                  });
+
+                  if (filteredRows.length === 0) {
+                    return (
+                      <tr className="border-t border-border">
+                        <td
+                          colSpan={9}
+                          className="px-3 py-6 text-center text-xs text-muted-foreground"
+                        >
+                          Tidak ada data proyek atau survei yang cocok dengan pencarian.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filteredRows.map((row, index) => {
+                    if (row.kind === "survey") {
+                      const { survey, project } = row;
+                      const running = ["RUNNING", "ON_PROGRESS", "ACTIVE"].includes(
+                        project?.status ?? "",
+                      );
+                      return (
+                        <tr
+                          key={row.key}
+                          className={`border-t border-border ${
+                            survey.projectId === activeProjectId
+                              ? "bg-orange-500/5"
+                              : "hover:bg-muted/30"
+                          }`}
+                        >
+                          <td className="px-3 py-3">{index + 1}</td>
+                          <td className="px-3 py-3 font-semibold">
+                            {project?.code ?? survey.projectCode ?? "—"}
+                          </td>
+                          <td className="px-3 py-3">
+                            {project?.title ?? survey.projectName}
+                          </td>
+                          <td className="px-3 py-3">
+                            {survey.locationName}
+                            <span className="block text-[10px] text-muted-foreground">
+                              {survey.objectCategory ?? "Polygon"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            {survey.areaSqm ? (survey.areaSqm / 10000).toFixed(2) : "—"}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {new Date(survey.createdAt).toLocaleDateString("id-ID")}
+                          </td>
+                          <td className="px-3 py-3">{survey.surveyorName}</td>
+                          <td className="px-3 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-[10px] font-bold ${
+                                running
+                                  ? "bg-emerald-500/15 text-emerald-500"
+                                  : "bg-amber-500/15 text-amber-500"
+                              }`}
+                            >
+                              <span
+                                className={`size-2 rounded-full ${
+                                  running ? "bg-emerald-500" : "bg-amber-500"
+                                }`}
+                              />
+                              {running ? "Aktif" : "Menunggu Setup"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <ActionIconButton
+                              type="button"
+                              label={`Lihat detail survei ${project?.code ?? survey.projectCode ?? ""}`}
+                              tooltip="Lihat Detail"
+                              icon={Eye}
+                              onClick={() => {
+                                if (survey.projectId) changeProject(survey.projectId);
+                                if (isSurveyDetailsUnderMaintenance) {
+                                  changeView("details");
+                                  return;
+                                }
+                                setDetailSurveyId(survey.id);
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const { project } = row;
+                    return (
+                      <tr
+                        key={row.key}
+                        className={`border-t border-border ${
+                          project.id === activeProjectId
+                            ? "bg-orange-500/5"
+                            : "hover:bg-muted/30"
+                        }`}
+                      >
+                        <td className="px-3 py-3">{index + 1}</td>
+                        <td className="px-3 py-3 font-semibold">{project.code}</td>
+                        <td className="px-3 py-3">{project.title}</td>
+                        <td className="px-3 py-3">
+                          {project.location ?? "—"}
+                          <span className="block text-[10px] text-muted-foreground">
+                            Belum ada data spasial
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">{project.landArea ?? "—"}</td>
+                        <td className="px-3 py-3 whitespace-nowrap">—</td>
+                        <td className="px-3 py-3">
+                          {project.fieldPicName ?? "—"}
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground">
+                            <span className="size-2 rounded-full bg-muted-foreground/60" />
+                            Belum Survei
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <ActionIconButton
+                            type="button"
+                            label={`Input survei proyek ${project.code}`}
+                            tooltip="Input Survei"
+                            icon={FileUp}
+                            onClick={() => {
+                              changeProject(project.id);
+                              changeView("details");
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </NativeDataTable>

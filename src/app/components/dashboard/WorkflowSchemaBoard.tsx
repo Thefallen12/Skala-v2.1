@@ -93,7 +93,7 @@ export function WorkflowSchemaBoard({
       step: "04",
       title: "Otorisasi & Persetujuan Direksi",
       subtitle: "Verifikasi Tiket, Purchase Order, SPK & BAST",
-      metricLabel: "Antrean Otorisasi",
+      metricLabel: "Antrean Direksi",
       metricValue: `${counts.pendingApprovalsCount} Menunggu`,
       statusText:
         counts.pendingApprovalsCount > 0

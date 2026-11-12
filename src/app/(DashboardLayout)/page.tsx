@@ -117,12 +117,14 @@ export default async function DashboardPage() {
       where: { id: session.user.id },
       select: { name: true, role: true, profilePhotoUrl: true },
     }),
-    prisma.project.count(),
+    prisma.project.count({ where: { isDeleted: false } }),
     prisma.project.groupBy({
       by: ["status"],
+      where: { isDeleted: false },
       _count: { _all: true },
     }),
     prisma.project.findMany({
+      where: { isDeleted: false },
       orderBy: { updatedAt: "desc" },
       take: 10,
       select: {
@@ -152,23 +154,70 @@ export default async function DashboardPage() {
         ],
       },
     }),
-    prisma.ticket.findMany({
-      where: getTicketPageVisibilityWhere(session.user.role, session.user.id),
-      orderBy: { createdAt: "desc" },
-      take: 6,
-      select: {
-        id: true,
-        ticketNumber: true,
-        title: true,
-        status: true,
-        type: true,
-        createdAt: true,
-        totalAmount: true,
-        priority: true,
-        requester: { select: { name: true } },
-        project: { select: { name: true } },
-      },
-    }),
+    Promise.all([
+      prisma.ticket.findMany({
+        where: {
+          AND: [
+            getTicketPageVisibilityWhere(session.user.role, session.user.id),
+            {
+              status: {
+                notIn: [
+                  TicketStatus.DRAFT,
+                  TicketStatus.COMPLETED,
+                  TicketStatus.REJECTED,
+                ],
+              },
+            },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          ticketNumber: true,
+          title: true,
+          status: true,
+          type: true,
+          createdAt: true,
+          totalAmount: true,
+          priority: true,
+          requester: { select: { name: true } },
+          project: { select: { name: true } },
+        },
+      }),
+      prisma.ticket.findMany({
+        where: {
+          AND: [
+            getTicketPageVisibilityWhere(session.user.role, session.user.id),
+            {
+              status: {
+                in: [
+                  TicketStatus.DRAFT,
+                  TicketStatus.COMPLETED,
+                  TicketStatus.REJECTED,
+                ],
+              },
+            },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          ticketNumber: true,
+          title: true,
+          status: true,
+          type: true,
+          createdAt: true,
+          totalAmount: true,
+          priority: true,
+          requester: { select: { name: true } },
+          project: { select: { name: true } },
+        },
+      }),
+    ]).then(([activeList, closedList]) =>
+      [...activeList, ...closedList].slice(0, 6),
+    ),
     prisma.workTask.groupBy({
       by: ["status"],
       where: {
@@ -197,7 +246,10 @@ export default async function DashboardPage() {
       _sum: { durationMinutes: true },
     }),
     prisma.project.findMany({
-      where: { createdAt: { gte: yearStart, lt: nextYearStart } },
+      where: {
+        isDeleted: false,
+        createdAt: { gte: yearStart, lt: nextYearStart },
+      },
       select: { createdAt: true },
     }),
     prisma.ticket.findMany({

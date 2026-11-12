@@ -91,6 +91,19 @@ export default function OfficeExpenseModal({
     },
   });
 
+  const [prevOpen, setPrevOpen] = useState(false);
+
+  if (open && !prevOpen) {
+    setPrevOpen(true);
+    setProofs([]);
+    setProofError("");
+    setMessage("");
+    setIsError(false);
+    setAmountInput("");
+  } else if (!open && prevOpen) {
+    setPrevOpen(false);
+  }
+
   useEffect(() => {
     if (open) {
       form.reset({
@@ -102,11 +115,6 @@ export default function OfficeExpenseModal({
         transactionDate: getTodayDateStr(),
         description: "",
       });
-      setProofs([]);
-      setProofError("");
-      setMessage("");
-      setIsError(false);
-      setAmountInput("");
     }
   }, [open, recipients, accounts, form]);
 

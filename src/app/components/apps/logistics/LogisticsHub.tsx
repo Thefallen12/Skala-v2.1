@@ -241,7 +241,14 @@ export default function LogisticsHub({
   today: string;
   invoiceDate: string;
 }) {
-  const allowedTabs = ["tickets", "stock", "documents", "equipment", "vehicles"];
+  const allowedTabs = [
+    "tickets",
+    "stock",
+    "documents",
+    "equipment",
+    "vehicles",
+    "vendors",
+  ];
   const resolvedTab = allowedTabs.includes(initialTab ?? "")
     ? initialTab!
     : "tickets";
@@ -376,7 +383,7 @@ export default function LogisticsHub({
       onValueChange={setActiveTab}
       className="space-y-5"
     >
-      <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 sm:grid-cols-3 xl:grid-cols-6">
+      <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 md:grid-cols-3 lg:grid-cols-6">
         <TabsTrigger
           value="tickets"
           className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"

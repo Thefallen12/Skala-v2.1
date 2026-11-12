@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approvePurchaseOrder } from "@/app/actions/orders";
@@ -10,6 +11,7 @@ import {
   approveSubkonContract,
   approveSubkonTermyn,
 } from "@/app/actions/construction";
+import { reviewDrawingDocument } from "@/app/actions/drawings";
 import { approveProjectWorkPointWage } from "@/app/actions/project";
 import {
   approveDirectStockPurchaseByDirector,
@@ -454,6 +456,19 @@ function ApprovalQueueTable({
   );
 }
 
+type ApprovalPendingDrawing = {
+  id: string;
+  drawingCode: string;
+  title: string;
+  category: string;
+  version: number;
+  fileUrl: string | null;
+  updatedAt: string;
+  projectId: string | null;
+  projectName: string | null;
+  uploadedByName: string;
+};
+
 export default function ExecutiveApprovalHub({
   purchaseOrders,
   tickets,
@@ -464,6 +479,7 @@ export default function ExecutiveApprovalHub({
   contracts,
   addendums,
   bastDocuments,
+  pendingDrawings = [],
   role,
   currentUserId,
   initialTab,
@@ -478,6 +494,7 @@ export default function ExecutiveApprovalHub({
   contracts: ApprovalContract[];
   addendums: ApprovalAddendum[];
   bastDocuments: ApprovalBast[];
+  pendingDrawings?: ApprovalPendingDrawing[];
   role: UserRole;
   currentUserId: string;
   initialTab?: string;
@@ -1025,9 +1042,10 @@ export default function ExecutiveApprovalHub({
             </div>
             <p className="mt-1.5 text-xl font-bold text-foreground">
               {tickets.length} Tiket · {wageRows.length} Proyek
+              {pendingDrawings.length > 0 ? ` · ${pendingDrawings.length} DED` : ""}
             </p>
             <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Upah kerja, termin, SPK, CCO &amp; BAST
+              Upah kerja, termin, SPK, CCO, BAST &amp; DED
             </p>
           </div>
         </div>
@@ -1178,7 +1196,7 @@ export default function ExecutiveApprovalHub({
                 : "bg-primary/15 text-primary"
             }`}
           >
-            {filteredWageRows.length}
+            {filteredWageRows.length + pendingDrawings.length}
           </span>
         </button>
 
@@ -1374,7 +1392,87 @@ export default function ExecutiveApprovalHub({
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
+            {pendingDrawings.length > 0 && (
+              <div className="space-y-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-foreground">
+                      Antrean Gambar Kerja / DED ({pendingDrawings.length})
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground">
+                      Dokumen teknis yang diunggah drafter dan menunggu persetujuan direksi.
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                    <Link href="/apps/drafter">Buka Workspace Drafter</Link>
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {pendingDrawings.map((drawing) => (
+                    <div
+                      key={drawing.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-xs"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground">
+                          <span className="font-mono">{drawing.drawingCode}</span> ·{" "}
+                          {drawing.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {drawing.projectName ?? "Tanpa proyek"} · {drawing.category} · Rev{" "}
+                          {drawing.version} · Oleh {drawing.uploadedByName}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {drawing.fileUrl && (
+                          <Button asChild size="sm" variant="outline" className="h-7 text-[11px]">
+                            <a href={drawing.fileUrl} target="_blank" rel="noreferrer">
+                              <ExternalLink className="size-3" />
+                              Buka File
+                            </a>
+                          </Button>
+                        )}
+                        <Button asChild size="sm" variant="outline" className="h-7 text-[11px]">
+                          <Link
+                            href={
+                              drawing.projectId
+                                ? `/apps/drafter?projectId=${encodeURIComponent(drawing.projectId)}`
+                                : "/apps/drafter"
+                            }
+                          >
+                            Tinjau / Revisi
+                          </Link>
+                        </Button>
+                        {isExecutive(role) && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="success"
+                            className="h-7 text-[11px]"
+                            disabled={isPending}
+                            onClick={() => {
+                              startTransition(async () => {
+                                const res = await reviewDrawingDocument(
+                                  drawing.id,
+                                  "APPROVED",
+                                  "Disetujui melalui Otorisasi Direksi.",
+                                );
+                                setMessage(res.message);
+                                if (res.success) router.refresh();
+                              });
+                            }}
+                          >
+                            <CheckCircle2 className="size-3" />
+                            Setujui
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <ApprovalQueueTable
               rows={filteredWageRows}
               emptyText="Tidak ada usulan upah, termin, atau dokumen konstruksi yang menunggu persetujuan."

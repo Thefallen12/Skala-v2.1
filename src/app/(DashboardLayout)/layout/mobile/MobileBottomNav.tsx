@@ -76,7 +76,7 @@ export function MobileBottomNav({ userRole }: { userRole: UserRole }) {
   return (
     <nav
       aria-label="Navigasi Bawah Mobile"
-      className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t border-border bg-background/95 px-1 backdrop-blur-lg xl:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t border-border bg-background/95 px-1 backdrop-blur-lg md:hidden"
     >
       {items.map((item) => {
         const Icon = item.icon;

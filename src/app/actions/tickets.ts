@@ -218,6 +218,9 @@ export type TicketActionResult = {
     itemName: string;
     quantity: number;
     unit: string;
+    stockItemId: string | null;
+    stockItemSku: string | null;
+    hasCatalogLink: boolean;
     availableQuantity: string;
     ready: boolean;
     pendingPurchaseNumber?: string;
@@ -271,7 +274,13 @@ type WarehouseReservation = {
 };
 
 function evaluateWarehouseStock(
-  ticketItems: { id: string; itemName: string; quantity: number; unit: string }[],
+  ticketItems: {
+    id: string;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    stockItemId: string | null;
+  }[],
   stockItems: {
     id: string;
     sku: string;
@@ -295,16 +304,25 @@ function evaluateWarehouseStock(
   const itemCodesByTicketItemId = new Map<string, string>();
 
   for (const ticketItem of ticketItems) {
-    const matches = stockItems.filter(
-      (stockItem) =>
-        normalize(stockItem.name) === normalize(ticketItem.itemName) &&
-        normalize(stockItem.unit) === normalize(ticketItem.unit),
-    );
+    const linkedStockItem = ticketItem.stockItemId
+      ? stockItems.find((stockItem) => stockItem.id === ticketItem.stockItemId)
+      : undefined;
+    const matches = ticketItem.stockItemId
+      ? linkedStockItem
+        ? [linkedStockItem]
+        : []
+      : stockItems.filter(
+          (stockItem) =>
+            normalize(stockItem.name) === normalize(ticketItem.itemName) &&
+            normalize(stockItem.unit) === normalize(ticketItem.unit),
+        );
     if (matches.length === 0) {
       return {
         available: false,
         fallbackRequired: true,
-        message: `Barang "${ticketItem.itemName}" (${ticketItem.unit}) belum terdaftar di katalog stok gudang.`,
+        message: ticketItem.stockItemId
+          ? `SKU yang ditautkan ke barang "${ticketItem.itemName}" tidak ditemukan di katalog stok gudang. Tautkan ulang barang ke SKU yang benar.`
+          : `Barang "${ticketItem.itemName}" (${ticketItem.unit}) belum terdaftar di katalog stok gudang.`,
       };
     }
     if (matches.length > 1) {
@@ -347,9 +365,16 @@ function evaluateWarehouseStock(
 }
 
 function evaluateWarehouseItemAvailability(
-  ticketItems: { id: string; itemName: string; quantity: number; unit: string }[],
+  ticketItems: {
+    id: string;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    stockItemId: string | null;
+  }[],
   stockItems: {
     id: string;
+    sku: string;
     name: string;
     unit: string;
     stockQuantity: bigint;
@@ -364,11 +389,18 @@ function evaluateWarehouseItemAvailability(
   >();
 
   for (const ticketItem of ticketItems) {
-    const matches = stockItems.filter(
-      (stockItem) =>
-        normalize(stockItem.name) === normalize(ticketItem.itemName) &&
-        normalize(stockItem.unit) === normalize(ticketItem.unit),
-    );
+    const linkedStockItem = ticketItem.stockItemId
+      ? stockItems.find((stockItem) => stockItem.id === ticketItem.stockItemId)
+      : undefined;
+    const matches = ticketItem.stockItemId
+      ? linkedStockItem
+        ? [linkedStockItem]
+        : []
+      : stockItems.filter(
+          (stockItem) =>
+            normalize(stockItem.name) === normalize(ticketItem.itemName) &&
+            normalize(stockItem.unit) === normalize(ticketItem.unit),
+        );
     if (matches.length > 1) {
       return {
         success: false as const,
@@ -380,7 +412,9 @@ function evaluateWarehouseItemAvailability(
       stockItem,
       message: stockItem
         ? undefined
-        : `Barang "${ticketItem.itemName}" (${ticketItem.unit}) belum terdaftar di katalog stok.`,
+        : ticketItem.stockItemId
+          ? `SKU yang ditautkan ke barang "${ticketItem.itemName}" tidak ditemukan di katalog stok. Tautkan ulang ke SKU yang benar.`
+          : `Barang "${ticketItem.itemName}" (${ticketItem.unit}) belum terdaftar di katalog stok.`,
     });
     if (stockItem) {
       requiredByStockId.set(
@@ -408,6 +442,9 @@ function evaluateWarehouseItemAvailability(
         itemName: ticketItem.itemName,
         quantity: ticketItem.quantity,
         unit: ticketItem.unit,
+        stockItemId: match.stockItem?.id ?? null,
+        stockItemSku: match.stockItem?.sku ?? null,
+        hasCatalogLink: Boolean(ticketItem.stockItemId),
         availableQuantity: availableQuantity.toString(),
         ready,
         message:
@@ -1041,6 +1078,7 @@ export async function createDirectStockPurchase(input: {
                   itemName: true,
                   quantity: true,
                   unit: true,
+                  stockItemId: true,
                   status: true,
                 },
               },
@@ -1090,12 +1128,17 @@ export async function createDirectStockPurchase(input: {
           },
           select: {
             purchaseNumber: true,
-            items: { select: { itemName: true, unit: true } },
+            items: { select: { stockItemId: true, itemName: true, unit: true } },
           },
         });
         const activePurchaseByItem = new Map<string, string>();
+        const activePurchaseByStockItemId = new Map<string, string>();
         for (const purchase of activePurchases) {
           for (const item of purchase.items) {
+            activePurchaseByStockItemId.set(
+              item.stockItemId,
+              purchase.purchaseNumber,
+            );
             activePurchaseByItem.set(
               ticketStockItemKey(item.itemName, item.unit),
               purchase.purchaseNumber,
@@ -1105,7 +1148,9 @@ export async function createDirectStockPurchase(input: {
         for (const [index, item] of items.entries()) {
           const inputItem = parsedItems[index];
           const key = ticketStockItemKey(item.itemName, item.unit);
-          const activePurchaseNumber = activePurchaseByItem.get(key);
+          const activePurchaseNumber =
+            activePurchaseByStockItemId.get(item.stockItem.id) ??
+            activePurchaseByItem.get(key);
           if (activePurchaseNumber) {
             throw new Error(
               `Item tiket ${item.itemName} (${item.unit}) masih ada dalam pesanan ${activePurchaseNumber}. Selesaikan penerimaan pesanan tersebut sebelum memesan ulang.`,
@@ -1113,7 +1158,10 @@ export async function createDirectStockPurchase(input: {
           }
           const matchingTicketItems = ticket.items.filter(
             (ticketItem) =>
-              ticketStockItemKey(ticketItem.itemName, ticketItem.unit) === key,
+              (ticketItem.stockItemId
+                ? ticketItem.stockItemId === item.stockItem.id
+                : ticketStockItemKey(ticketItem.itemName, ticketItem.unit) ===
+                  key),
           );
           const linkedTicketItem = inputItem.ticketItemId
             ? ticketItemsById.get(inputItem.ticketItemId)
@@ -1127,8 +1175,12 @@ export async function createDirectStockPurchase(input: {
           if (
             !linkedTicketItem ||
             linkedTicketItem.status !== FulfillmentStatus.PENDING ||
-            ticketStockItemKey(linkedTicketItem.itemName, linkedTicketItem.unit) !==
-              key ||
+            (linkedTicketItem.stockItemId
+              ? linkedTicketItem.stockItemId !== item.stockItem.id
+              : ticketStockItemKey(
+                  linkedTicketItem.itemName,
+                  linkedTicketItem.unit,
+                ) !== key) ||
             (inputItem.ticketItemId &&
               new Prisma.Decimal(inputItem.quantity).gt(
                 linkedTicketItem.quantity,
@@ -2029,16 +2081,18 @@ export async function createTicket(
       "Permintaan belanja kantor hanya dapat dibuat oleh Admin, Drafter, atau Keuangan.",
     );
   }
-  const canRequestLabor =
+  const canRequestFieldCost =
     session.user.role === UserRole.DIRECTOR ||
     session.user.role === UserRole.KOORDINATOR ||
     session.user.role === UserRole.FIELD_TEAM;
   if (
     isFieldRequest &&
-    (!canRequestLabor || input.fieldCategory !== TicketFieldCategory.LABOR)
+    (!canRequestFieldCost ||
+      (input.fieldCategory !== TicketFieldCategory.LABOR &&
+        input.fieldCategory !== TicketFieldCategory.HAULING))
   ) {
     return actionFailure(
-      "Upah Tukang hanya dapat diajukan oleh Direktur, Koordinator Lapangan, atau Tim Lapangan.",
+      "Upah Tukang dan Upah Langsir hanya dapat diajukan oleh Direktur, Koordinator Lapangan, atau Tim Lapangan.",
     );
   }
   if (
@@ -2047,7 +2101,7 @@ export async function createTicket(
       (isInternalFundingRequest && !isFieldTeamInternalFundingRequest))
   ) {
     return actionFailure(
-      "Tim Lapangan hanya dapat mengajukan material dari Gudang, Upah Tukang, Operasional, Reimbursement, atau Kasbon.",
+      "Tim Lapangan hanya dapat mengajukan material dari Gudang, Upah Tukang, Upah Langsir, Operasional, Reimbursement, atau Kasbon.",
     );
   }
   if (
@@ -2665,6 +2719,7 @@ export async function createTicket(
           items: {
             create: items.map((item) => ({
               id: randomUUID(),
+              stockItemId: item.stockItemId ?? null,
               itemName: item.itemName,
               quantity: item.quantity,
               unit: item.unit,
@@ -3704,6 +3759,7 @@ export async function checkTicketItemsStock(
               itemName: true,
               quantity: true,
               unit: true,
+              stockItemId: true,
               status: true,
               categoryHint: true,
             },
@@ -3730,6 +3786,7 @@ export async function checkTicketItemsStock(
       const stockItems = await transaction.stockItem.findMany({
         select: {
           id: true,
+          sku: true,
           name: true,
           unit: true,
           stockQuantity: true,
@@ -3748,12 +3805,17 @@ export async function checkTicketItemsStock(
         },
         select: {
           purchaseNumber: true,
-          items: { select: { itemName: true, unit: true } },
+          items: { select: { stockItemId: true, itemName: true, unit: true } },
         },
       });
       const activePurchaseByItem = new Map<string, string>();
+      const activePurchaseByStockItemId = new Map<string, string>();
       for (const purchase of activePurchases) {
         for (const item of purchase.items) {
+          activePurchaseByStockItemId.set(
+            item.stockItemId,
+            purchase.purchaseNumber,
+          );
           activePurchaseByItem.set(
             ticketStockItemKey(item.itemName, item.unit),
             purchase.purchaseNumber,
@@ -3761,9 +3823,13 @@ export async function checkTicketItemsStock(
         }
       }
       const items = availability.items.map((item) => {
-        const pendingPurchaseNumber = activePurchaseByItem.get(
-          ticketStockItemKey(item.itemName, item.unit),
-        );
+        const pendingPurchaseNumber =
+          (item.stockItemId
+            ? activePurchaseByStockItemId.get(item.stockItemId)
+            : undefined) ??
+          activePurchaseByItem.get(
+            ticketStockItemKey(item.itemName, item.unit),
+          );
         return {
           ...item,
           ready: pendingPurchaseNumber ? false : item.ready,
@@ -3846,6 +3912,103 @@ export async function checkTicketItemsStock(
   }
 }
 
+export async function mapTicketItemToStock(
+  ticketId: string,
+  ticketItemId: string,
+  stockItemId: string,
+): Promise<TicketActionResult> {
+  const session = await auth();
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.LOGISTICS &&
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return actionFailure("Hanya Logistik, Administrasi, atau Direktur yang dapat menautkan barang ke SKU.");
+  }
+  if (
+    !isBoundedText(ticketId, 64) ||
+    !isBoundedText(ticketItemId, 64) ||
+    !isBoundedText(stockItemId, 64)
+  ) {
+    return actionFailure("Pilih tiket, item, dan SKU yang valid.");
+  }
+
+  try {
+    const mappedSku = await prisma.$transaction(async (transaction) => {
+      await lockTicketFulfillment(transaction, ticketId);
+      const ticket = await transaction.ticket.findUnique({
+        where: { id: ticketId },
+        select: {
+          type: true,
+          status: true,
+          items: {
+            where: { id: ticketItemId },
+            select: {
+              id: true,
+              status: true,
+              poItemId: true,
+              doItemId: true,
+            },
+          },
+        },
+      });
+      if (
+        !ticket ||
+        ticket.type !== TicketType.MATERIAL ||
+        ticket.status !== TicketStatus.PROCESSED_LOGISTIC
+      ) {
+        throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
+      }
+      const ticketItem = ticket.items[0];
+      if (
+        !ticketItem ||
+        ticketItem.status !== FulfillmentStatus.PENDING ||
+        ticketItem.poItemId ||
+        ticketItem.doItemId
+      ) {
+        throw new Error("Item tiket sudah diproses atau tidak dapat dipetakan.");
+      }
+      const stockItem = await transaction.stockItem.findUnique({
+        where: { id: stockItemId },
+        select: { id: true, sku: true },
+      });
+      if (!stockItem) {
+        throw new Error("SKU yang dipilih tidak ditemukan di katalog stok.");
+      }
+      await transaction.ticketItem.update({
+        where: { id: ticketItem.id },
+        data: { stockItemId: stockItem.id },
+      });
+      await transaction.ticketAuditLog.create({
+        data: {
+          id: randomUUID(),
+          ticketId,
+          userId: session.user.id,
+          action: "LOGISTICS_TICKET_ITEM_SKU_MAPPED",
+          notes: `Item tiket ${ticketItem.id} ditautkan ke SKU ${stockItem.sku}.`,
+        },
+      });
+      return stockItem.sku;
+    });
+
+    revalidatePath("/apps/tickets");
+    revalidatePath("/apps/logistics");
+    return {
+      success: true,
+      message: `Item berhasil ditautkan ke SKU ${mappedSku}. Periksa ulang status stok.`,
+    };
+  } catch (error) {
+    console.error("Ticket item SKU mapping failed:", error);
+    return actionFailure(
+      error instanceof Error
+        ? error.message
+        : "Item tiket gagal ditautkan ke SKU.",
+    );
+  }
+}
+
 export async function switchTicketItemsToPurchase(
   ticketId: string,
   ticketItemIds: string[],
@@ -3887,6 +4050,7 @@ export async function switchTicketItemsToPurchase(
               itemName: true,
               quantity: true,
               unit: true,
+              stockItemId: true,
               status: true,
               categoryHint: true,
             },
@@ -3918,6 +4082,7 @@ export async function switchTicketItemsToPurchase(
       const stockItems = await transaction.stockItem.findMany({
         select: {
           id: true,
+          sku: true,
           name: true,
           unit: true,
           stockQuantity: true,
@@ -4073,6 +4238,7 @@ export async function createLogisticsPurchaseOrderForTicket(
               itemName: true,
               quantity: true,
               unit: true,
+              stockItemId: true,
               status: true,
               categoryHint: true,
             },
@@ -4135,9 +4301,11 @@ export async function createLogisticsPurchaseOrderForTicket(
           return (
             !ticketItem ||
             ticketItem.status !== FulfillmentStatus.PENDING ||
-            ticketItem.itemName !== inputItem.itemName.trim() ||
-            ticketItem.quantity !== inputItem.quantity ||
-            ticketItem.unit !== inputItem.unit.trim()
+            (ticketItem.stockItemId
+              ? ticketItem.stockItemId !== inputItem.stockItemId
+              : ticketItem.itemName !== inputItem.itemName.trim() ||
+                ticketItem.unit !== inputItem.unit.trim()) ||
+            ticketItem.quantity !== inputItem.quantity
           );
         })
       ) {
@@ -4153,12 +4321,17 @@ export async function createLogisticsPurchaseOrderForTicket(
           },
           select: {
             purchaseNumber: true,
-            items: { select: { itemName: true, unit: true } },
+            items: { select: { stockItemId: true, itemName: true, unit: true } },
           },
         });
       const activeDirectPurchaseByItem = new Map<string, string>();
+      const activeDirectPurchaseByStockItemId = new Map<string, string>();
       for (const purchase of activeDirectPurchases) {
         for (const item of purchase.items) {
+          activeDirectPurchaseByStockItemId.set(
+            item.stockItemId,
+            purchase.purchaseNumber,
+          );
           activeDirectPurchaseByItem.set(
             ticketStockItemKey(item.itemName, item.unit),
             purchase.purchaseNumber,
@@ -4166,9 +4339,11 @@ export async function createLogisticsPurchaseOrderForTicket(
         }
       }
       for (const item of items) {
-        const purchaseNumber = activeDirectPurchaseByItem.get(
-          ticketStockItemKey(item.itemName, item.unit),
-        );
+        const purchaseNumber =
+          activeDirectPurchaseByStockItemId.get(item.stockItemId) ??
+          activeDirectPurchaseByItem.get(
+            ticketStockItemKey(item.itemName, item.unit),
+          );
         if (purchaseNumber) {
           throw new Error(
             `Item tiket ${item.itemName} (${item.unit}) masih ada dalam pesanan langsung ${purchaseNumber}. Selesaikan penerimaan pesanan tersebut sebelum membuat PO.`,
@@ -4187,8 +4362,9 @@ export async function createLogisticsPurchaseOrderForTicket(
       if (
         items.some((item) => {
           const stockItem = selectedStockById.get(item.stockItemId);
+          if (!stockItem) return true;
+          if (item.ticketItemId) return false;
           return (
-            !stockItem ||
             normalizeCatalogValue(stockItem.name) !==
               normalizeCatalogValue(item.itemName) ||
             normalizeCatalogValue(stockItem.unit) !==
@@ -4262,6 +4438,7 @@ export async function createLogisticsPurchaseOrderForTicket(
           where: { id: item.ticketItemId },
           data: {
             status: FulfillmentStatus.PROCESSED_TO_PO,
+            stockItemId: item.stockItemId,
             poItemId: item.id,
           },
         });
@@ -4355,6 +4532,7 @@ async function createWarehouseDeliveryOrder(
               itemName: true,
               quantity: true,
               unit: true,
+              stockItemId: true,
               status: true,
               categoryHint: true,
               poItem: { select: { itemCode: true } },

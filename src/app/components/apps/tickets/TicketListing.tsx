@@ -17,6 +17,7 @@ import {
   FileText,
   PackageCheck,
   PackageOpen,
+  Paperclip,
   Printer,
   RefreshCw,
   ShoppingCart,
@@ -27,6 +28,7 @@ import {
   checkTicketItemsStock,
   approveByDirector,
   fulfillTicketItemsFromStock,
+  mapTicketItemToStock,
   submitTicket,
   type TicketActionResult,
 } from "@/app/actions/tickets";
@@ -199,6 +201,7 @@ const auditActionLabels: Record<string, string> = {
   REJECTED_BY_DIR: "Ditolak Direktur",
   REVISION_REQUESTED_BY_DIR: "Diminta revisi oleh Direktur",
   LOGISTICS_READY_WAREHOUSE: "Stok gudang siap; ditugaskan ke Mover",
+  LOGISTICS_TICKET_ITEM_SKU_MAPPED: "Item tiket ditautkan ke SKU stok",
   LOGISTICS_SWITCHED_TO_PURCHASE: "Dialihkan ke pengadaan baru",
   LOGISTICS_BUY_STORE: "Dibeli di toko; diteruskan ke Keuangan",
   LOGISTICS_PO_CREATED: "PO dibuat; menunggu persetujuan",
@@ -427,6 +430,9 @@ export default function TicketListing({
     selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC;
 
   const openTicketSheet = (ticket: TicketRow) => {
+    setSelectedReceipt(null);
+    setDoDialogOpen(false);
+    setPoDialogOpen(false);
     setItemSelection(null);
     setFulfillmentMessage("");
     setStockAvailability([]);
@@ -435,9 +441,13 @@ export default function TicketListing({
   };
 
   const closeTicketSheet = () => {
+    setSelectedReceipt(null);
+    setDoDialogOpen(false);
+    setPoDialogOpen(false);
     setSelectedTicket(null);
     setItemSelection(null);
     setFulfillmentMessage("");
+    setStockAvailability([]);
     if (initialOpenSheet) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("openSheet");
@@ -518,6 +528,83 @@ export default function TicketListing({
       console.error("Ticket stock availability check failed:", error);
       setFulfillmentMessage("Saldo gudang gagal diperiksa. Silakan coba kembali.");
       setDoDialogOpen(true);
+    } finally {
+      setFulfillmentPending(false);
+    }
+  };
+
+  const mapTicketItemToSku = async (
+    ticketItemId: string,
+    stockItemId: string,
+  ) => {
+    if (!selectedTicket || !stockItemId) return;
+    const ticketId = selectedTicket.id;
+    const ticketItemIds = stockAvailability.map(
+      (availability) => availability.ticketItemId,
+    );
+    if (ticketItemIds.length === 0) return;
+
+    setFulfillmentPending(true);
+    setFulfillmentMessage("");
+    try {
+      const mappingResult = await mapTicketItemToStock(
+        ticketId,
+        ticketItemId,
+        stockItemId,
+      );
+      if (!mappingResult.success) {
+        setFulfillmentMessage(mappingResult.message);
+        return;
+      }
+
+      const stockCheck = await checkTicketItemsStock(ticketId, ticketItemIds);
+      if (!stockCheck.success) {
+        setFulfillmentMessage(stockCheck.message);
+        return;
+      }
+      setStockAvailability(stockCheck.stockAvailability ?? []);
+      setItemSelection((current) => {
+        const mappedReady =
+          stockCheck.readyItemIds?.includes(ticketItemId) ?? false;
+        const previousIds =
+          current?.ticketId === ticketId
+            ? current.itemIds.filter((id) =>
+                stockCheck.readyItemIds?.includes(id),
+              )
+            : stockCheck.readyItemIds ?? [];
+        const nextIds = mappedReady
+          ? [...new Set([...previousIds, ticketItemId])]
+          : previousIds;
+        return {
+          ticketId,
+          itemIds: nextIds,
+        };
+      });
+      router.refresh();
+      setMoverOptions(stockCheck.movers ?? []);
+      setVehicleOptions(stockCheck.vehicles ?? []);
+      setSelectedVehicleId(
+        stockCheck.vehicles?.some(
+          (vehicle) => vehicle.id === selectedVehicleId,
+        )
+          ? selectedVehicleId
+          : stockCheck.vehicles?.[0]?.id ?? "",
+      );
+      setSelectedMoverId(
+        stockCheck.movers?.some((mover) => mover.id === selectedMoverId)
+          ? selectedMoverId
+          : stockCheck.movers?.some(
+                (mover) => mover.id === stockCheck.moverAssigneeId,
+              )
+            ? stockCheck.moverAssigneeId ?? ""
+            : "",
+      );
+      setFulfillmentMessage(mappingResult.message);
+    } catch (error) {
+      console.error("Ticket item SKU mapping failed:", error);
+      setFulfillmentMessage(
+        "Item tiket gagal ditautkan ke SKU. Muat ulang tiket lalu coba kembali.",
+      );
     } finally {
       setFulfillmentPending(false);
     }
@@ -655,13 +742,27 @@ export default function TicketListing({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
-              <TableHead className="w-40">No. Tiket &amp; Tanggal</TableHead>
-              <TableHead className="min-w-60">Rincian Permintaan &amp; Proyek</TableHead>
-              <TableHead>Pemohon</TableHead>
-              <TableHead>Prioritas</TableHead>
-              <TableHead className="min-w-48">Status &amp; Tahap Alur</TableHead>
-              <TableHead className="text-right">Nilai Estimasi</TableHead>
-              <TableHead className="text-right">Aksi Cepat</TableHead>
+              <TableHead className="w-40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                No. Tiket &amp; Tanggal
+              </TableHead>
+              <TableHead className="min-w-60 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Rincian Permintaan &amp; Proyek
+              </TableHead>
+              <TableHead className="hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
+                Pemohon
+              </TableHead>
+              <TableHead className="hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
+                Prioritas
+              </TableHead>
+              <TableHead className="min-w-44 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Status &amp; Tahap Alur
+              </TableHead>
+              <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Nilai Estimasi
+              </TableHead>
+              <TableHead className="sticky right-0 z-10 border-l border-border/50 bg-card/95 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                Aksi Cepat
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -675,6 +776,14 @@ export default function TicketListing({
                     : ticket.priority === "MEDIUM"
                       ? "border-sky-500/35 bg-sky-500/15 text-sky-400"
                       : "border-border bg-muted text-muted-foreground";
+              const hasAttachment =
+                (ticket.receiptUrls?.length ?? 0) > 0 ||
+                Boolean(
+                  ticket.attachmentUrl ||
+                    ticket.purchaseReceiptUrl ||
+                    ticket.transferReceiptUrl ||
+                    ticket.deliveryReceiptUrl,
+                );
               return (
                 <TableRow
                   key={ticket.id}
@@ -690,46 +799,77 @@ export default function TicketListing({
                   }}
                 >
                   <TableCell className="min-w-36 whitespace-nowrap align-top">
-                    <span className="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-bold text-foreground">
+                    <span className="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-medium text-amber-500">
                       {ticket.ticketNumber}
                     </span>
-                    <span className="mt-1 block text-[11px] text-muted-foreground">
+                    <span className="mt-1 block text-xs font-normal text-muted-foreground">
                       {format(new Date(ticket.createdAt), "d MMM yyyy, HH:mm", {
                         locale: id,
                       })}
                     </span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 lg:hidden">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {ticket.requester.name}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
+                      >
+                        {priorityLabels[ticket.priority]}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="min-w-60 align-top">
-                    <p className="font-semibold text-foreground">{ticket.title}</p>
+                  <TableCell className="max-w-[240px] whitespace-normal break-words align-top sm:max-w-[300px] lg:max-w-[360px]">
+                    <p
+                      className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground"
+                      title={ticket.title}
+                    >
+                      {ticket.title}
+                    </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline" className="text-[11px]">
+                      <Badge
+                        variant="outline"
+                        className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                          ticket.type === TicketType.MATERIAL
+                            ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+                            : ""
+                        }`}
+                      >
                         {typeLabels[ticket.type]}
                       </Badge>
-                      {ticket.project && (
-                        <span className="inline-flex items-center rounded-md bg-muted/70 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {ticket.project.kelompokTani} — {ticket.project.title}
+                      <span className="inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
+                        {ticket.project
+                          ? `${ticket.project.kelompokTani} — ${ticket.project.title}`
+                          : "Kantor Pusat / Overhead"}
+                      </span>
+                      {hasAttachment && (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-500">
+                          <Paperclip className="size-3" />
+                          Ada Nota / Bukti
                         </span>
                       )}
                       {ticket.items.length > 0 && (
-                        <span className="text-[11px] font-medium text-muted-foreground">
-                          · {ticket.items.length} item
+                        <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {ticket.items.length} Item
                         </span>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="align-top text-sm font-medium">
+                  <TableCell className="hidden align-top text-xs font-medium lg:table-cell">
                     {ticket.requester.name}
                   </TableCell>
-                  <TableCell className="align-top">
+                  <TableCell className="hidden align-top lg:table-cell">
                     <span
-                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-bold ${priorityBadgeClass}`}
+                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
                     >
                       {priorityLabels[ticket.priority]}
                     </span>
                   </TableCell>
                   <TableCell className="align-top">
                     <div className="space-y-1.5">
-                      <Badge variant={statusVariants[ticket.status]}>
+                      <Badge
+                        variant={statusVariants[ticket.status]}
+                        className="rounded-md px-2 py-0.5 text-[11px] font-medium"
+                      >
                         {statusLabels[ticket.status]}
                       </Badge>
                       {ticket.status !== TicketStatus.REJECTED && (
@@ -755,11 +895,11 @@ export default function TicketListing({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="whitespace-nowrap align-top text-right font-bold tabular-nums">
+                  <TableCell className="whitespace-nowrap align-top text-right text-sm font-bold tabular-nums">
                     {formatCurrency(ticket.totalAmount)}
                   </TableCell>
                   <TableCell
-                    className="align-top text-right"
+                    className="sticky right-0 z-10 border-l border-border/50 bg-card/95 align-top text-right backdrop-blur-sm"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <div className="flex flex-nowrap items-center justify-end gap-1.5">
@@ -815,15 +955,16 @@ export default function TicketListing({
                         }
                         if (
                           (role === UserRole.LOGISTICS ||
-      role === UserRole.ADMINISTRATIONS ||
-      role === UserRole.DIRECTOR ||
-      role === UserRole.DEPUTY_DIRECTOR) &&
+                            role === UserRole.ADMINISTRATIONS ||
+                            role === UserRole.DIRECTOR ||
+                            role === UserRole.DEPUTY_DIRECTOR) &&
                           ticket.type === TicketType.MATERIAL &&
                           ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
-                          ticket.items.some(
-                            (item) => item.status === FulfillmentStatus.PENDING,
-                          )
+                          ticket.items.length > 0
                         ) {
+                          const hasPendingItems = ticket.items.some(
+                            (item) => item.status === FulfillmentStatus.PENDING,
+                          );
                           return (
                             <Button
                               type="button"
@@ -832,7 +973,27 @@ export default function TicketListing({
                               onClick={() => openTicketSheet(ticket)}
                             >
                               <ClipboardList className="size-3.5" />
-                              Proses Item
+                              {hasPendingItems ? "Proses Item" : "Kelola Item"}
+                            </Button>
+                          );
+                        }
+                        if (
+                          (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+                            ticket.status === TicketStatus.IN_TRANSIT) &&
+                          ticket.deliveryOrders?.[0]
+                        ) {
+                          return (
+                            <Button
+                              asChild
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="h-8 gap-1.5 px-2.5 text-xs font-semibold"
+                            >
+                              <Link href={`/d/${ticket.deliveryOrders[0].publicCode}`}>
+                                <Printer className="size-3.5" />
+                                Cetak DO
+                              </Link>
                             </Button>
                           );
                         }
@@ -1292,7 +1453,7 @@ export default function TicketListing({
                     )}
                     {selectedTicket.receiptUrls.map((url, index) => (
                       <Button
-                        key={url}
+                        key={`${selectedTicket.id}-receipt-${index}-${url}`}
                         type="button"
                         variant="outline"
                         size="sm"
@@ -1318,7 +1479,7 @@ export default function TicketListing({
                       )
                       .map(([label, url]) => (
                         <Button
-                          key={url}
+                          key={`${selectedTicket.id}-${label}-${url}`}
                           type="button"
                           variant="outline"
                           size="sm"
@@ -1813,6 +1974,40 @@ export default function TicketListing({
                             {availability.message}
                           </span>
                         )}
+                        {availability?.stockItemSku && (
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            SKU gudang: {availability.stockItemSku}
+                          </span>
+                        )}
+                        {availability && !availability.pendingPurchaseNumber && (
+                          <label className="mt-2 block max-w-xs space-y-1 text-xs text-muted-foreground">
+                            <span>Tautkan ke SKU katalog stok</span>
+                            <select
+                              value={availability.stockItemId ?? ""}
+                              onChange={(event) =>
+                                void mapTicketItemToSku(
+                                  item.id,
+                                  event.target.value,
+                                )
+                              }
+                              disabled={
+                                fulfillmentPending || stockItems.length === 0
+                              }
+                              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                            >
+                              <option value="">Pilih SKU</option>
+                              {stockItems.map((stockItem) => (
+                                <option
+                                  key={stockItem.id}
+                                  value={stockItem.id}
+                                >
+                                  {stockItem.sku} — {stockItem.name} ·{" "}
+                                  {stockItem.unit}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -1954,6 +2149,7 @@ export default function TicketListing({
               ticketId={selectedTicket.id}
               ticketItems={selectedTicketItems.map((item) => ({
                 ticketItemId: item.id,
+                stockItemId: item.stockItemId,
                 itemName: item.itemName,
                 quantity: item.quantity,
                 unit: item.unit,
@@ -1988,6 +2184,7 @@ export default function TicketListing({
               initialTicketId={selectedTicket.id}
               initialTicketItems={selectedTicketItems.map((item) => ({
                 ticketItemId: item.id,
+                stockItemId: item.stockItemId,
                 itemName: item.itemName,
                 quantity: item.quantity,
                 unit: item.unit,
@@ -2045,12 +2242,14 @@ export default function TicketListing({
           <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
             {/\.(jpe?g|png|webp)$/i.test(selectedReceipt.url.split("?")[0]) ? (
               <img
+                key={selectedReceipt.url}
                 src={withLocalPhotoPreview(selectedReceipt.url)}
                 alt={selectedReceipt.label}
                 className="max-h-[65vh] max-w-full object-contain"
               />
             ) : selectedReceipt.url.toLowerCase().endsWith(".pdf") ? (
               <iframe
+                key={selectedReceipt.url}
                 src={withLocalPhotoPreview(selectedReceipt.url)}
                 title={`Pratinjau ${selectedReceipt.label}`}
                 className="h-[65vh] w-full"

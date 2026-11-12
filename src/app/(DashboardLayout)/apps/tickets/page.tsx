@@ -7,6 +7,10 @@ import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import {
+  createStockPriceLookup,
+  resolveTicketTotalAmount,
+} from "@/lib/resolve-ticket-total-amount";
 import type { TicketRow } from "../../types/ticket";
 import { redirect } from "next/navigation";
 export const metadata: Metadata = {
@@ -58,6 +62,7 @@ const Tickets = async ({
         items: {
           select: {
             id: true,
+            stockItemId: true,
             itemName: true,
             quantity: true,
             unit: true,
@@ -224,6 +229,8 @@ const Tickets = async ({
     session.user.role === UserRole.ADMINISTRATIONS;
   const canViewTicketPaymentDetails = (requesterId: string) =>
     canViewPaymentDetails || requesterId === session.user.id;
+  const stockPriceLookup = createStockPriceLookup(stockItems);
+
   const ticketRows: TicketRow[] = tickets.map((ticket) => ({
     id: ticket.id,
     ticketNumber: ticket.ticketNumber,
@@ -244,15 +251,7 @@ const Tickets = async ({
         audit.userId === ticket.requesterId &&
         (audit.action === "UPDATED" || audit.action === "REQUESTER_EDITED"),
     ),
-    totalAmount:
-      ticket.purchaseOrders[0]?.items.reduce(
-        (sum, item) => sum + item.totalPrice,
-        0,
-      ).toString() ??
-      (ticket.totalAmount !== null
-        ? decimalStringFromScaledInteger(ticket.totalAmount)
-        : null) ??
-      null,
+    totalAmount: resolveTicketTotalAmount(ticket, stockPriceLookup),
     attachmentUrl: ticket.attachmentUrl,
     receiptUrls: ticket.receiptUrls,
     paymentProofUrl: ticket.paymentProofUrl,

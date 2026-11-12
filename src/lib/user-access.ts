@@ -24,6 +24,7 @@ export const drawingAccessRoles: UserRole[] = [
 export const drawingUploadRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
   UserRole.DRAFTER,
 ];
 

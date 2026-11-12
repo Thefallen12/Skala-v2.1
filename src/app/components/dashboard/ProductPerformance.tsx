@@ -120,22 +120,22 @@ export const ProductPerformance = ({
       <Table className="table-fixed" pageSize={10}>
         <TableHeader>
           <TableRow>
-            <TableHead className="hidden w-[22%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
+            <TableHead className="hidden w-[16%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
               Kode
             </TableHead>
-            <TableHead className="w-[36%] text-xs font-semibold uppercase tracking-wide xl:w-[29%]">
+            <TableHead className="w-[36%] text-xs font-semibold uppercase tracking-wide xl:w-[28%]">
               Proyek
             </TableHead>
-            <TableHead className="w-[25%] text-xs font-semibold uppercase tracking-wide xl:w-[20%]">
+            <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide xl:w-[16%]">
               Status
             </TableHead>
-            <TableHead className="w-[39%] text-xs font-semibold uppercase tracking-wide xl:w-[19%]">
+            <TableHead className="w-[28%] text-xs font-semibold uppercase tracking-wide xl:w-[16%]">
               Progres
             </TableHead>
-            <TableHead className="hidden w-[12%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
+            <TableHead className="hidden w-[14%] text-xs font-semibold uppercase tracking-wide xl:table-cell">
               Anggaran
             </TableHead>
-            <TableHead className="w-[14%] text-right text-xs font-semibold uppercase tracking-wide">
+            <TableHead className="w-[14%] text-right text-xs font-semibold uppercase tracking-wide xl:w-[10%]">
               Aksi
             </TableHead>
           </TableRow>

@@ -55,6 +55,7 @@ export type TicketRow = {
   project: { title: string; kelompokTani: string } | null;
   items: {
     id: string;
+    stockItemId: string | null;
     itemName: string;
     quantity: number;
     unit: string;

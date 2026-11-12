@@ -92,8 +92,7 @@ export function ProjectProgressChart({
     dataLabels: {
       enabled: true,
       offsetX: 5,
-      formatter: (value) =>
-        Number(value) === 0 ? "" : `${Math.round(Number(value))}%`,
+      formatter: (value) => `${Math.round(Number(value))}%`,
       style: {
         colors: [isDark ? "#e2e8f0" : "#334155"],
         fontSize: "11px",

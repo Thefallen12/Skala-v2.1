@@ -102,6 +102,16 @@ async function removeDrawingFile(url: string): Promise<void> {
   }
 }
 
+function revalidateDrawingRoutes(projectId?: string | null) {
+  revalidatePath("/apps/drafter");
+  revalidatePath("/");
+  revalidatePath("/apps/projects");
+  revalidatePath("/apps/approvals");
+  if (projectId) {
+    revalidatePath(`/apps/projects/${projectId}`);
+  }
+}
+
 async function getActiveActor(roles: readonly UserRole[]) {
   const session = await auth();
   if (!session?.user?.id || !roles.includes(session.user.role)) return null;
@@ -209,7 +219,7 @@ export async function createDrawingDocument(input: unknown): Promise<DrawingActi
     return { success: false, message: "Gambar kerja gagal disimpan." };
   }
 
-  revalidatePath("/apps/drafter");
+  revalidateDrawingRoutes(projectId);
   return { success: true, message: "Gambar kerja berhasil diunggah untuk ditinjau." };
 }
 
@@ -233,15 +243,16 @@ export async function uploadDrawingRevision(
   }
 
   let fileUrl = "";
+  let projectId: string | null = null;
   try {
     fileUrl = await uploadDrawingFile(file);
     if (!isDrawingFileUrl(fileUrl)) {
       throw new Error("Cloudinary mengembalikan URL gambar kerja yang tidak valid.");
     }
-    await prisma.$transaction(async (transaction) => {
+    projectId = await prisma.$transaction(async (transaction) => {
       const current = await transaction.drawingDocument.findUnique({
         where: { id: drawingId },
-        select: { id: true, version: true },
+        select: { id: true, version: true, projectId: true },
       });
       if (!current) throw new Error("DRAWING_NOT_FOUND");
 
@@ -265,6 +276,7 @@ export async function uploadDrawingRevision(
           createdById: actor.id,
         },
       });
+      return current.projectId;
     });
   } catch (error) {
     if (fileUrl) {
@@ -281,7 +293,7 @@ export async function uploadDrawingRevision(
     return { success: false, message: "Revisi gagal disimpan." };
   }
 
-  revalidatePath("/apps/drafter");
+  revalidateDrawingRoutes(projectId);
   return { success: true, message: "Revisi berhasil diunggah dan masuk antrean review." };
 }
 
@@ -305,11 +317,12 @@ export async function reviewDrawingDocument(
     return { success: false, message: "Status atau catatan review tidak valid." };
   }
 
+  let projectId: string | null = null;
   try {
-    await prisma.$transaction(async (transaction) => {
+    projectId = await prisma.$transaction(async (transaction) => {
       const current = await transaction.drawingDocument.findUnique({
         where: { id: drawingId },
-        select: { id: true, version: true, status: true },
+        select: { id: true, version: true, status: true, projectId: true },
       });
       if (!current) throw new Error("DRAWING_NOT_FOUND");
       if (current.status !== "REVIEW") throw new Error("DRAWING_NOT_IN_REVIEW");
@@ -327,6 +340,7 @@ export async function reviewDrawingDocument(
           createdById: actor.id,
         },
       });
+      return current.projectId;
     });
   } catch (error) {
     if (error instanceof Error && error.message === "DRAWING_NOT_FOUND") {
@@ -345,7 +359,7 @@ export async function reviewDrawingDocument(
     return { success: false, message: "Review gambar kerja gagal disimpan." };
   }
 
-  revalidatePath("/apps/drafter");
+  revalidateDrawingRoutes(projectId);
   return {
     success: true,
     message:

@@ -109,7 +109,7 @@ export default async function ProjectSchedulePage({
     },
   });
 
-  let tasks: ScheduleTaskItem[] = rawWorkPoints.map((wp) => ({
+  const tasks: ScheduleTaskItem[] = rawWorkPoints.map((wp) => ({
     id: wp.id,
     title: wp.title,
     location: wp.location || "A. Persiapan",
@@ -119,51 +119,6 @@ export default async function ProjectSchedulePage({
     projectId: wp.projectId,
     projectName: wp.project?.title || "Proyek",
   }));
-
-  if (tasks.length === 0) {
-    tasks = [
-      {
-        id: "demo_1",
-        title: "Pembersihan dan bongkaran",
-        location: "A. Persiapan",
-        plannedStartDate: "2026-10-27T00:00:00Z",
-        targetDate: "2026-11-02T00:00:00Z",
-        progress: 100,
-        projectId: selectedProject.id,
-        projectName: selectedProject.title,
-      },
-      {
-        id: "demo_2",
-        title: "Pasang keramik 60×60",
-        location: "B. Lantai",
-        plannedStartDate: "2026-11-03T00:00:00Z",
-        targetDate: "2026-11-20T00:00:00Z",
-        progress: 40,
-        projectId: selectedProject.id,
-        projectName: selectedProject.title,
-      },
-      {
-        id: "demo_3",
-        title: "Cat dinding 2 lapis",
-        location: "C. Dinding",
-        plannedStartDate: "2026-11-18T00:00:00Z",
-        targetDate: "2026-12-05T00:00:00Z",
-        progress: 0,
-        projectId: selectedProject.id,
-        projectName: selectedProject.title,
-      },
-      {
-        id: "demo_4",
-        title: "Titik lampu dan stopkontak",
-        location: "D. Listrik",
-        plannedStartDate: "2026-11-30T00:00:00Z",
-        targetDate: "2026-12-20T00:00:00Z",
-        progress: 0,
-        projectId: selectedProject.id,
-        projectName: selectedProject.title,
-      },
-    ];
-  }
 
   // Fetch milestones from DB
   const rawMilestones = await prisma.calendarEvent.findMany({
@@ -189,6 +144,7 @@ export default async function ProjectSchedulePage({
 
   return (
     <ProjectScheduleGantt
+      key={selectedProject.id}
       projects={projects}
       selectedProject={selectedProject}
       initialTasks={tasks}

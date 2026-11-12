@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useRef, useTransition } from "react";
 import {
   X,
   Plus,
@@ -97,16 +97,32 @@ export default function RapManagementModal({
   const [rabMaterials, setRabMaterials] = useState<RabMaterialOption[]>([]);
   const [materialPlans, setMaterialPlans] = useState<MaterialPlanItem[]>([]);
   const [laborPlans, setLaborPlans] = useState<LaborPlanItem[]>([]);
+  const [prevLoadKey, setPrevLoadKey] = useState("");
+  const stockItemsRef = useRef(stockItems);
 
-  // Load data on open
   useEffect(() => {
-    if (!isOpen || !projectId) return;
+    stockItemsRef.current = stockItems;
+  }, [stockItems]);
+
+  const loadKey = isOpen && projectId ? `${projectId}:${isOpen}` : "";
+  if (loadKey && loadKey !== prevLoadKey) {
+    setPrevLoadKey(loadKey);
     setIsLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
+  } else if (!loadKey && prevLoadKey !== "") {
+    setPrevLoadKey("");
+  }
+
+  // Load data on open or project change
+  useEffect(() => {
+    if (!isOpen || !projectId) return;
+    let cancelled = false;
 
     getProjectRap(projectId)
       .then((res) => {
+        if (cancelled) return;
+        const currentStockItems = stockItemsRef.current;
         if (res && res.success) {
           setRabMaterials(res.rabMaterials || []);
           if (res.materialPlans && res.materialPlans.length > 0) {
@@ -115,7 +131,7 @@ export default function RapManagementModal({
                 ...material,
                 stockItemId:
                   material.stockItemId ||
-                  findMatchingStockItem(stockItems, material.materialName, material.unit)?.id,
+                  findMatchingStockItem(currentStockItems, material.materialName, material.unit)?.id,
               })),
             );
           } else if (res.rabMaterials && res.rabMaterials.length > 0) {
@@ -128,9 +144,11 @@ export default function RapManagementModal({
                 actualQuantity: m.quantity || 0,
                 unitPrice: m.rabPrice ? Math.round(m.rabPrice * 0.85) : 0, // Estimasi awal RAP 85% harga RAB
                 totalPrice: 0,
-                stockItemId: findMatchingStockItem(stockItems, m.name, m.unit)?.id,
+                stockItemId: findMatchingStockItem(currentStockItems, m.name, m.unit)?.id,
               }))
             );
+          } else {
+            setMaterialPlans([]);
           }
 
           if (res.laborPlans && res.laborPlans.length > 0) {
@@ -167,17 +185,28 @@ export default function RapManagementModal({
                 notes: wp.location || "",
               };
             }));
+          } else {
+            setLaborPlans([]);
           }
+        } else {
+          setErrorMsg(res?.message || "Gagal memuat data RAP dari server.");
         }
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error("Failed to load RAP data:", err);
         setErrorMsg("Gagal memuat data RAP dari server.");
       })
       .finally(() => {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       });
-  }, [isOpen, projectId, stockItems]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, projectId]);
 
   // Calculations
   const totalMaterialCost = materialPlans.reduce(

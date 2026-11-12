@@ -242,14 +242,20 @@ export default function ProjectDetailView({
   const [taskDragOverColumn, setTaskDragOverColumn] = useState<string | null>(null);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [localWorkPoints, setLocalWorkPoints] = useState(project.workPoints);
+  const [prevWorkPoints, setPrevWorkPoints] = useState(project.workPoints);
+  const derivedKanbanKey = getKanbanKeyFromProject(project.status, project.progress);
+  const [prevDerivedKanbanKey, setPrevDerivedKanbanKey] = useState(derivedKanbanKey);
+  const [mountNowMs] = useState(() => Date.now());
 
-  React.useEffect(() => {
+  if (prevWorkPoints !== project.workPoints) {
+    setPrevWorkPoints(project.workPoints);
     setLocalWorkPoints(project.workPoints);
-  }, [project.workPoints]);
+  }
 
-  React.useEffect(() => {
-    setCurrentKanbanKey(getKanbanKeyFromProject(project.status, project.progress));
-  }, [project.status, project.progress]);
+  if (prevDerivedKanbanKey !== derivedKanbanKey) {
+    setPrevDerivedKanbanKey(derivedKanbanKey);
+    setCurrentKanbanKey(derivedKanbanKey);
+  }
 
   const handleStageChange = async (newKey: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda") => {
     setCurrentKanbanKey(newKey);
@@ -328,9 +334,9 @@ export default function ProjectDetailView({
 
   // S-Curve & Progress calculations
   const { plannedToday, deviation, healthStatus, healthBadgeColor, sCurveSeries, sCurveOptions } = useMemo(() => {
-    const startMs = project.startDate ? new Date(project.startDate).getTime() : Date.now() - 14 * 86400000;
+    const startMs = project.startDate ? new Date(project.startDate).getTime() : mountNowMs - 14 * 86400000;
     const endMs = project.endDate ? new Date(project.endDate).getTime() : startMs + 60 * 86400000;
-    const nowMs = Date.now();
+    const nowMs = mountNowMs;
     const duration = Math.max(endMs - startMs, 7 * 86400000);
 
     let planToday = 0;
@@ -634,26 +640,29 @@ export default function ProjectDetailView({
   // Load persisted material plan and item analyses from localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const savedAnalyses = localStorage.getItem(`project_analyses_map_${project.id}`);
-      if (savedAnalyses) {
-        setItemAnalysesMap(JSON.parse(savedAnalyses));
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const savedAnalyses = localStorage.getItem(`project_analyses_map_${project.id}`);
+        if (savedAnalyses) {
+          setItemAnalysesMap(JSON.parse(savedAnalyses));
+        }
+        const savedPlan = localStorage.getItem(`project_material_plan_${project.id}`);
+        if (savedPlan) {
+          setMaterialPlanList(JSON.parse(savedPlan));
+        }
+      } catch (e) {
+        console.error("Failed to load material plan from localStorage", e);
       }
-      const savedPlan = localStorage.getItem(`project_material_plan_${project.id}`);
-      if (savedPlan) {
-        setMaterialPlanList(JSON.parse(savedPlan));
-      }
-    } catch (e) {
-      console.error("Failed to load material plan from localStorage", e);
-    }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [project.id]);
 
-  // If materialPlanList is empty but compiledMaterialsFromAnalysis has items, auto-sync
-  useEffect(() => {
-    if (materialPlanList.length === 0 && compiledMaterialsFromAnalysis.length > 0) {
-      setMaterialPlanList(compiledMaterialsFromAnalysis);
-    }
-  }, [compiledMaterialsFromAnalysis, materialPlanList.length]);
+  const effectiveMaterialPlanList =
+    materialPlanList.length > 0 ? materialPlanList : compiledMaterialsFromAnalysis;
 
   const handleSaveMaterialPlan = (newMaterials: MaterialPlanRow[]) => {
     setMaterialPlanList(newMaterials);
@@ -1567,7 +1576,7 @@ export default function ProjectDetailView({
                   </div>
                 </div>
 
-                {materialPlanList.length === 0 ? (
+                {effectiveMaterialPlanList.length === 0 ? (
                   <p className="py-2 text-xs text-muted-foreground">Belum ada rencana material.</p>
                 ) : (
                   <div
@@ -1588,7 +1597,7 @@ export default function ProjectDetailView({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
-                        {materialPlanList.map((m, idx) => {
+                        {effectiveMaterialPlanList.map((m, idx) => {
                           const scopeItem = project.workPoints.find((wp) => wp.id === m.scope);
                           const planned = m.plannedQuantity ?? m.quantity ?? 0;
                           const actual = m.actualQuantity ?? m.quantity ?? 0;
@@ -2060,15 +2069,28 @@ export default function ProjectDetailView({
                   Kontrak, gambar kerja, izin dan berita acara. Unggah dan bagikan ke klien atau tim lapangan.
                 </CardDescription>
               </div>
-              <ProjectActionButton
-                type="button"
-                label="Unggah dokumen"
-                icon={<Paperclip className="size-3.5 text-muted-foreground" />}
-                variant="outline"
-                size="sm"
-                onClick={() => setIsUploadDocModalOpen(true)}
-                className="ml-auto h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
-              />
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 rounded-lg px-3 text-xs font-semibold"
+                >
+                  <Link href={`/apps/drafter?projectId=${encodeURIComponent(project.id)}`}>
+                    <FileText className="size-3.5 text-muted-foreground" />
+                    Buka Gambar Kerja (DED)
+                  </Link>
+                </Button>
+                <ProjectActionButton
+                  type="button"
+                  label="Unggah dokumen"
+                  icon={<Paperclip className="size-3.5 text-muted-foreground" />}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsUploadDocModalOpen(true)}
+                  className="h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
+                />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Contract Strip */}
@@ -2370,7 +2392,7 @@ export default function ProjectDetailView({
             title: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ").slice(1).join(" ") : p.title,
           }))}
           stockItems={stockItems}
-          initialMaterials={materialPlanList}
+          initialMaterials={effectiveMaterialPlanList}
           analysisMaterials={compiledMaterialsFromAnalysis}
           preselectedWorkPointId={selectedWorkPointForMaterial}
           onSave={handleSaveMaterialPlan}

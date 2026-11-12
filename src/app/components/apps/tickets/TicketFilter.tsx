@@ -114,17 +114,17 @@ export default function TicketFilter({
                 </span>
               </div>
               <div className="mt-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-extrabold tracking-tight text-foreground tabular-nums">
+                <div className="flex min-h-8 items-baseline gap-2">
+                  <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums sm:text-2xl">
                     {count}
                   </span>
                   {highlight && (
-                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-500">
+                    <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-500">
                       Prioritas
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                   {subtitle}
                 </p>
               </div>
@@ -143,10 +143,12 @@ export default function TicketFilter({
           </span>
         </div>
         <div className="mt-2">
-          <p className="truncate text-lg font-extrabold tracking-tight text-foreground tabular-nums sm:text-xl">
-            {formatTicketCurrency(getTotalTicketValueInCents(countableTickets))}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <div className="flex min-h-8 items-baseline">
+            <p className="truncate text-xl font-extrabold tracking-tight text-foreground tabular-nums sm:text-2xl">
+              {formatTicketCurrency(getTotalTicketValueInCents(countableTickets))}
+            </p>
+          </div>
+          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
             Akumulasi tiket yang tidak ditolak
           </p>
         </div>

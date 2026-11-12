@@ -48,22 +48,29 @@ export default function EditOfficeExpenseModal({
   const [isError, setIsError] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
-  useEffect(() => {
-    if (expense && open) {
-      const d = new Date(expense.createdAt);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      setTransactionDate(`${yyyy}-${mm}-${dd}`);
-      setAmountInput(formatRupiahInput(String(expense.amount)));
-      setDescription(expense.description || "");
-      setKeepUrls(expense.proofUrls || []);
-      setNewProofFiles([]);
-      setProofError("");
-      setMessage("");
-      setIsError(false);
-    }
-  }, [expense, open]);
+  const [prevSyncKey, setPrevSyncKey] = useState("");
+  const syncKey =
+    open && expense
+      ? `${expense.id}:${expense.amount}:${expense.description ?? ""}:${expense.createdAt}:${(expense.proofUrls ?? []).join(",")}`
+      : "";
+
+  if (syncKey && syncKey !== prevSyncKey && expense) {
+    setPrevSyncKey(syncKey);
+    const d = new Date(expense.createdAt);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    setTransactionDate(`${yyyy}-${mm}-${dd}`);
+    setAmountInput(formatRupiahInput(String(expense.amount)));
+    setDescription(expense.description || "");
+    setKeepUrls(expense.proofUrls || []);
+    setNewProofFiles([]);
+    setProofError("");
+    setMessage("");
+    setIsError(false);
+  } else if (!open && prevSyncKey !== "") {
+    setPrevSyncKey("");
+  }
 
   if (!expense) return null;
 

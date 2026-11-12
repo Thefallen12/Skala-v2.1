@@ -24,7 +24,12 @@ export async function GET(
   const { fileName } = await params;
   const photoUrl = `/api/logistics/direct-stock-purchase-photo/${fileName}`;
   const purchase = await prisma.directStockPurchase.findFirst({
-    where: { arrivalPhotoUrl: photoUrl },
+    where: {
+      OR: [
+        { arrivalPhotoUrl: photoUrl },
+        { receivedPhotos: { has: photoUrl } },
+      ],
+    },
     select: { id: true },
   });
   if (!purchase) {

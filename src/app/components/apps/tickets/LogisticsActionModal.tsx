@@ -458,6 +458,7 @@ export default function LogisticsActionModal({
               }
               ticketItems={ticket.items.map((item) => ({
                 ticketItemId: item.id,
+                stockItemId: item.stockItemId,
                 itemName: item.itemName,
                 quantity: item.quantity,
                 unit: item.unit,

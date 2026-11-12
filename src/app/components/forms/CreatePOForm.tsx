@@ -65,6 +65,7 @@ import {
 
 type CreatePOItem = {
   ticketItemId?: string;
+  stockItemId?: string | null;
   itemName: string;
   quantity: number;
   unit: string;
@@ -74,6 +75,7 @@ type CreatePOItem = {
 type FormItem = {
   ticketItemId?: string;
   stockItemId: string;
+  lockedStockItem?: boolean;
   itemName: string;
   quantity: string;
   unit: string;
@@ -118,6 +120,9 @@ export default function CreatePOForm({
   const [items, setItems] = useState<FormItem[]>(() =>
     ticketItems?.length
       ? ticketItems.map((item) => {
+          const linkedStock = item.stockItemId
+            ? stockItems.find((stockItem) => stockItem.id === item.stockItemId)
+            : undefined;
           const matches = stockItems.filter(
             (stockItem) =>
               normalizeCatalogValue(stockItem.name) ===
@@ -125,10 +130,12 @@ export default function CreatePOForm({
               normalizeCatalogValue(stockItem.unit) ===
                 normalizeCatalogValue(item.unit),
           );
-          const stockItem = matches.length === 1 ? matches[0] : undefined;
+          const stockItem =
+            linkedStock ?? (matches.length === 1 ? matches[0] : undefined);
           return {
             ticketItemId: item.ticketItemId,
             stockItemId: stockItem?.id ?? "",
+            lockedStockItem: Boolean(ticketId && item.ticketItemId && linkedStock),
             itemName: item.itemName,
             quantity: String(item.quantity),
             unit: item.unit,
@@ -666,7 +673,7 @@ export default function CreatePOForm({
                           disabled={
                             isPending ||
                             isSavingNewItem ||
-                            Boolean(ticketId && item.ticketItemId)
+                            Boolean(ticketId && item.lockedStockItem)
                           }
                           className="flex h-10 w-full min-w-0 max-w-full items-center justify-between gap-2 overflow-hidden rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50"
                         >

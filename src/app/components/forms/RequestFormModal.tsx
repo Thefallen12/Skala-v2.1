@@ -406,9 +406,9 @@ export default function RequestFormModal({
             </p>
             {documents.length > 0 ? (
               <ul className="space-y-1">
-                {documents.map((document) => (
+                {documents.map((document, index) => (
                   <li
-                    key={`${document.file.name}-${document.file.lastModified}-${document.file.size}`}
+                    key={`${document.file.name}-${document.file.lastModified}-${document.file.size}-${index}`}
                     className="flex items-center justify-between gap-2 rounded border border-slate-700 px-2 py-1.5 text-xs text-slate-300"
                   >
                     <span className="flex min-w-0 items-center gap-2">

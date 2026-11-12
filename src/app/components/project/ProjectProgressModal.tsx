@@ -236,7 +236,7 @@ export default function ProjectProgressModal({
               <div className="flex flex-wrap gap-3">
                 {photos.map((photo, index) => (
                   <div
-                    key={`${photo.name}-${photo.lastModified}`}
+                    key={`${photo.name}-${photo.lastModified}-${index}`}
                     className="w-24 space-y-1"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}

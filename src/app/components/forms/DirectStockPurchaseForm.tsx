@@ -67,6 +67,7 @@ type PurchaseTicket = {
 
 type InitialPurchaseItem = {
   ticketItemId: string;
+  stockItemId?: string | null;
   itemName: string;
   quantity: number;
   unit: string;
@@ -110,6 +111,9 @@ export default function DirectStockPurchaseForm({
       return [{ key: 0, stockItemId: "", quantity: "", unitPrice: "" }];
     }
     return initialTicketItems.map((item, index) => {
+      const linkedStock = item.stockItemId
+        ? stockItems.find((stockItem) => stockItem.id === item.stockItemId)
+        : undefined;
       const matches = stockItems.filter(
         (stockItem) =>
           stockItem.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") ===
@@ -117,7 +121,8 @@ export default function DirectStockPurchaseForm({
           stockItem.unit.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID") ===
             item.unit.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID"),
       );
-      const stockItem = matches.length === 1 ? matches[0] : undefined;
+      const stockItem =
+        linkedStock ?? (matches.length === 1 ? matches[0] : undefined);
       return {
         key: index,
         stockItemId: stockItem?.id ?? "",

@@ -174,8 +174,15 @@ function googleApiErrorMessage(result: unknown): string | null {
   return result.error.message;
 }
 
-function MapViewport({ data }: { data: SurveyGeoJSON | null }) {
+function MapViewport({
+  data,
+  signature,
+}: {
+  data: SurveyGeoJSON | null;
+  signature: string;
+}) {
   const map = useMap();
+  const lastFittedSignatureRef = useRef<string>("");
 
   useEffect(() => {
     const container = map.getContainer();
@@ -186,10 +193,17 @@ function MapViewport({ data }: { data: SurveyGeoJSON | null }) {
   }, [map]);
 
   useEffect(() => {
-    if (!data?.features.length) return;
+    if (!data?.features.length) {
+      lastFittedSignatureRef.current = "";
+      return;
+    }
+    if (lastFittedSignatureRef.current === signature) return;
     const bounds = L.geoJSON(data).getBounds();
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 17 });
-  }, [data, map]);
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 17 });
+      lastFittedSignatureRef.current = signature;
+    }
+  }, [data, map, signature]);
 
   return null;
 }
@@ -329,7 +343,7 @@ function MapCoordinates() {
   }, [map]);
 
   return (
-    <div className="pointer-events-none absolute bottom-7 right-2 z-[1000] rounded border border-border bg-card/90 px-2 py-1 font-mono text-[9px] text-card-foreground shadow">
+    <div className="pointer-events-none absolute bottom-12 right-2 z-[1000] rounded border border-border bg-card/90 px-2 py-1 font-mono text-[9px] text-card-foreground shadow">
       Lat/Lng: {coordinates}
     </div>
   );
@@ -575,6 +589,23 @@ export default function ProjectMap({
     ? `Google Maps · ${googleCopyright}`
     : "Google Maps";
   const visibleGlobalPolygons = globalPolygons;
+  const viewportData = useMemo<SurveyGeoJSON | null>(() => {
+    if (importedData?.features.length) return importedData;
+    if (visibleGlobalPolygons.length === 0) return null;
+    return {
+      type: "FeatureCollection",
+      features: visibleGlobalPolygons.map((polygon) => polygon.feature),
+    };
+  }, [importedData, visibleGlobalPolygons]);
+  const viewportSignature = useMemo(() => {
+    if (importedData?.features.length) {
+      return `import:${importedDataVersion}:${importedData.features.length}`;
+    }
+    if (visibleGlobalPolygons.length === 0) return "";
+    return `global:${visibleGlobalPolygons
+      .map((polygon) => `${polygon.projectId}:${polygon.surveyName}`)
+      .join("|")}`;
+  }, [importedData, importedDataVersion, visibleGlobalPolygons]);
 
   return (
     <div
@@ -589,7 +620,7 @@ export default function ProjectMap({
         zoom={12}
         maxZoom={24}
         zoomControl={false}
-        scrollWheelZoom
+        scrollWheelZoom={false}
         className="h-full min-h-[420px] w-full"
       >
         {basemap === "streets" && (
@@ -786,7 +817,7 @@ export default function ProjectMap({
         />
         <ZoomControl position="bottomleft" />
         <ScaleControl position="bottomright" metric imperial={false} />
-        <MapViewport data={importedData} />
+        <MapViewport data={viewportData} signature={viewportSignature} />
         <MapCoordinates />
       </MapContainer>
 
@@ -920,9 +951,11 @@ export default function ProjectMap({
         </div>
       </div>
 
-      <div className="absolute bottom-3 left-3 z-[1000] rounded-md border border-border bg-card/90 px-2.5 py-1.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
-        {drawnData.features.length + (importedData?.features.length ?? 0)} fitur
-        {" · "}WGS84
+      <div className="pointer-events-none absolute bottom-3 left-14 z-[1000] rounded-md border border-border bg-card/90 px-2.5 py-1.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+        {drawnData.features.length +
+          (importedData?.features.length ?? 0) +
+          visibleGlobalPolygons.length}{" "}
+        fitur · WGS84
       </div>
       {basemap === "google-satellite" && !googleMapError && !googleSession && (
         <div className="absolute bottom-3 left-1/2 z-[1001] -translate-x-1/2 rounded-md border border-border bg-card/95 px-3 py-2 text-xs text-card-foreground shadow-md">

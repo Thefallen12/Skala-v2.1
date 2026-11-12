@@ -80,23 +80,33 @@ export default function AnalisaMaterialModal({
     ];
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      if (initialMaterials && initialMaterials.length > 0) {
-        setMaterials(initialMaterials);
-      } else {
-        setMaterials([
-          {
-            id: "1",
-            materialName: availableMaterials[0]?.name || "Pekerja",
-            unit: availableMaterials[0]?.unit || "OH",
-            coefficient: 1,
-            wastePercent: 0,
-          },
-        ]);
-      }
+  const [prevOpen, setPrevOpen] = useState(isOpen);
+  const [prevItemTitle, setPrevItemTitle] = useState(itemTitle);
+  const [prevInitialMaterials, setPrevInitialMaterials] = useState(initialMaterials);
+
+  if (
+    isOpen &&
+    (!prevOpen || prevItemTitle !== itemTitle || prevInitialMaterials !== initialMaterials)
+  ) {
+    setPrevOpen(true);
+    setPrevItemTitle(itemTitle);
+    setPrevInitialMaterials(initialMaterials);
+    if (initialMaterials && initialMaterials.length > 0) {
+      setMaterials(initialMaterials);
+    } else {
+      setMaterials([
+        {
+          id: "1",
+          materialName: availableMaterials[0]?.name || "Pekerja",
+          unit: availableMaterials[0]?.unit || "OH",
+          coefficient: 1,
+          wastePercent: 0,
+        },
+      ]);
     }
-  }, [initialMaterials, itemTitle, isOpen, availableMaterials]);
+  } else if (!isOpen && prevOpen) {
+    setPrevOpen(false);
+  }
 
   const [templateName, setTemplateName] = useState("");
   const [savedTemplate, setSavedTemplate] = useState(false);

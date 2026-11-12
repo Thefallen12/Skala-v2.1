@@ -154,7 +154,7 @@ export default function DashboardLayoutClient({
               androidDownloadUrl={androidDownloadUrl}
             />
           </div>
-          <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-16 md:pt-0'>
+          <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-[68px] md:pt-0'>
             <Header
               canManageUsers={canManageUsers}
               canAccessLogistics={canAccessLogistics}
@@ -174,7 +174,7 @@ export default function DashboardLayoutClient({
               notificationLoadFailed={Boolean(error)}
               refreshNotifications={mutate}
             />
-            <div className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3.5 pb-20 pt-4 sm:px-6 sm:pb-24 sm:pt-6 xl:pb-8'>
+            <div className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3.5 pb-24 pt-4 sm:px-6 sm:pt-6 md:pb-8'>
               {pageUnderMaintenance ? (
                 <UnderProductionState
                   className='mx-auto w-full max-w-[1200px]'

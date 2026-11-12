@@ -1083,7 +1083,7 @@ export default function LogisticsWorkspace({
           </p>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
               label: "Total Barang",
@@ -1118,16 +1118,16 @@ export default function LogisticsWorkspace({
               color: "text-info",
             },
           ].map(({ label, value, note, Icon, background, color }) => (
-            <CardBox key={label} className="p-4">
+            <CardBox key={label} className="p-3.5">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="mt-2 text-2xl font-semibold">{value}</p>
+                  <p className="mt-1.5 text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{note}</p>
                 </div>
-                <span className={`rounded-md p-2 ${background} ${color}`}>
+                <span className={`shrink-0 rounded-md p-2 ${background} ${color}`}>
                   <Icon className="size-5" aria-hidden="true" />
                 </span>
               </div>
@@ -1542,7 +1542,7 @@ export default function LogisticsWorkspace({
                       )}
                       {receiptPhotos.map((photo, index) => (
                         <ActionIconButton
-                          key={photo}
+                          key={`${purchase.id}-${photo}`}
                           type="button"
                           label={`Lihat foto penerimaan ${index + 1} pembelian ${purchase.purchaseNumber}`}
                           tooltip={`Lihat foto penerimaan ${index + 1}`}
@@ -1989,6 +1989,7 @@ export default function LogisticsWorkspace({
                     </p>
                   ) : (
                     <Image
+                      key={stockReceiptPreview.url}
                       src={stockReceiptPreview.url}
                       alt={stockReceiptPreview.label}
                       fill
@@ -2007,7 +2008,7 @@ export default function LogisticsWorkspace({
   }
 
   return (
-    <div className="my-6 space-y-6">
+    <div className="my-4 space-y-5 pb-12">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold">Manajemen Logistik</h2>
@@ -2031,7 +2032,7 @@ export default function LogisticsWorkspace({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map(({ label, value, note, filter, Icon, color, background }) => (
           <button
             key={label}
@@ -2043,16 +2044,16 @@ export default function LogisticsWorkspace({
               setSearch("");
             }}
           >
-            <CardBox className="h-full p-4 transition-colors hover:bg-muted/40">
+            <CardBox className="h-full p-3.5 transition-colors hover:bg-muted/40">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="mt-2 text-2xl font-semibold">{value}</p>
+                  <p className="mt-1.5 text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{note}</p>
                 </div>
-                <span className={`rounded-md p-2 ${background} ${color}`}>
+                <span className={`shrink-0 rounded-md p-2 ${background} ${color}`}>
                   <Icon className="size-5" aria-hidden="true" />
                 </span>
               </div>

@@ -119,6 +119,7 @@ export default function HabitsCommandHub({
   initialTab,
   today,
   selectedDate,
+  calendarRange,
   calendarView,
   taskView,
   currentUserId,
@@ -142,6 +143,7 @@ export default function HabitsCommandHub({
   initialTab: TabValue;
   today: string;
   selectedDate: string;
+  calendarRange: { start: string; end: string };
   calendarView: "day" | "week" | "month";
   taskView: "day" | "week" | "month";
   currentUserId: string;
@@ -252,8 +254,37 @@ export default function HabitsCommandHub({
     return `${Math.floor(mins / 60)}j ${mins % 60}m`;
   }, [weeklyEntries]);
 
+  const calendarAgendaCount = useMemo(() => {
+    const projectScheduleCount = projects.reduce((count, project) => {
+      let matches = 0;
+      const startKey = project.startDate?.slice(0, 10);
+      const endKey = project.endDate?.slice(0, 10);
+      if (
+        startKey &&
+        startKey >= calendarRange.start &&
+        startKey < calendarRange.end
+      ) {
+        matches += 1;
+      }
+      if (
+        endKey &&
+        endKey >= calendarRange.start &&
+        endKey < calendarRange.end
+      ) {
+        matches += 1;
+      }
+      return count + matches;
+    }, 0);
+    return calendarRecords.length + projectScheduleCount;
+  }, [
+    calendarRange.end,
+    calendarRange.start,
+    calendarRecords.length,
+    projects,
+  ]);
+
   const tabBadges: Record<TabValue, string> = {
-    calendar: `${calendarRecords.length} agenda`,
+    calendar: `${calendarAgendaCount} agenda`,
     tasks: `${tasks.length} tugas`,
     habits: `${todayHabitsCompleted}/${habits.length} selesai`,
     timesheet: weeklyHoursTotal,

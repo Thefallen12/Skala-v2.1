@@ -153,6 +153,19 @@ export default async function ProjectsWorkstationPage({
           drafter: { select: { name: true } },
         },
       },
+      drawingDocuments: {
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          drawingCode: true,
+          title: true,
+          category: true,
+          version: true,
+          fileUrl: true,
+          status: true,
+          uploadedBy: { select: { name: true } },
+        },
+      },
       subkonContracts: {
         orderBy: { createdAt: "desc" },
         select: {
@@ -216,6 +229,12 @@ export default async function ProjectsWorkstationPage({
     title: project.title || project.name,
     vendor: project.vendor ?? "",
     status: project.status,
+    location: project.location,
+    fieldPicName: project.fieldPic?.name ?? null,
+    landArea:
+      project.landArea !== null
+        ? decimalStringFromScaledInteger(project.landArea)
+        : null,
   }));
   const projectIds = projects.map((project) => project.id);
   const savedSurveys = await prisma.fieldSurvey.findMany({
@@ -432,17 +451,37 @@ export default async function ProjectsWorkstationPage({
           })),
       ],
     })),
-    blueprints: isFieldRole ? [] : project.blueprints.map((blueprint) => ({
-      id: blueprint.id,
-      publicCode: blueprint.publicCode,
-      drawingNumber: blueprint.drawingNumber,
-      title: blueprint.title,
-      category: blueprint.category,
-      revision: blueprint.revision,
-      fileUrl: blueprint.fileUrl,
-      status: blueprint.status,
-      drafterName: blueprint.drafter?.name ?? "Drafter",
-    })),
+    blueprints: [
+      ...project.blueprints
+        .filter(
+          (blueprint) =>
+            !isFieldRole || blueprint.status === "APPROVED_FOR_CONSTRUCTION",
+        )
+        .map((blueprint) => ({
+          id: blueprint.id,
+          publicCode: blueprint.publicCode,
+          drawingNumber: blueprint.drawingNumber,
+          title: blueprint.title,
+          category: blueprint.category,
+          revision: blueprint.revision,
+          fileUrl: blueprint.fileUrl,
+          status: blueprint.status,
+          drafterName: blueprint.drafter?.name ?? "Drafter",
+        })),
+      ...(project.drawingDocuments ?? [])
+        .filter((doc) => !isFieldRole || doc.status === "APPROVED")
+        .map((doc) => ({
+          id: doc.id,
+          publicCode: doc.drawingCode,
+          drawingNumber: doc.drawingCode,
+          title: doc.title,
+          category: doc.category,
+          revision: `Rev ${doc.version ?? 0}`,
+          fileUrl: doc.fileUrl || "/documents/sample.pdf",
+          status: doc.status || "REVIEW",
+          drafterName: doc.uploadedBy?.name ?? "Drafter",
+        })),
+    ],
     subkonContracts: isFieldRole ? [] : project.subkonContracts.map((contract) => ({
       id: contract.id,
       publicCode: contract.publicCode,
@@ -513,7 +552,14 @@ export default async function ProjectsWorkstationPage({
           : surveyProjects.some((project) => project.id === requestedProjectId)
           ? requestedProjectId ?? null
           : section === "surveys"
-            ? surveyProjects[0]?.id ?? ""
+            ? surveyProjects.find((project) =>
+                surveys.some((survey) => survey.projectId === project.id),
+              )?.id ??
+              surveyProjects.find((project) =>
+                ["RUNNING", "ON_PROGRESS", "ACTIVE"].includes(project.status),
+              )?.id ??
+              surveyProjects[0]?.id ??
+              ""
             : null
       }
     />

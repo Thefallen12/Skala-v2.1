@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { recordProjectOpname } from "@/app/actions/project";
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
+const emptySubscribe = () => () => {};
+
+function buildProgressMap(items: ProgressScheduleItem[]): Record<string, number> {
+  const next: Record<string, number> = {};
+  for (const it of items) next[it.id] = Math.round(it.progress ?? 0);
+  return next;
+}
 
 export type ProgressScheduleItem = {
   id: string;
@@ -59,22 +66,29 @@ export default function ProgressScheduleRows({
   const [isPending, startTransition] = useTransition();
   const [savingId, setSavingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [nowMs, setNowMs] = useState<number | null>(null);
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+  const [mountNowMs] = useState(() => Date.now());
+  const nowMs = isClient ? mountNowMs : null;
 
   // Nilai slider lokal (persen) per item; disinkronkan ulang saat data server berubah
-  const [values, setValues] = useState<Record<string, number>>({});
-  const committedRef = useRef<Record<string, number>>({});
+  const [values, setValues] = useState<Record<string, number>>(() =>
+    buildProgressMap(items),
+  );
+  const [committedValues, setCommittedValues] = useState<Record<string, number>>(
+    () => buildProgressMap(items),
+  );
+  const [prevItems, setPrevItems] = useState(items);
 
-  useEffect(() => {
-    setNowMs(Date.now());
-  }, []);
-
-  useEffect(() => {
-    const next: Record<string, number> = {};
-    for (const it of items) next[it.id] = Math.round(it.progress ?? 0);
-    committedRef.current = next;
+  if (prevItems !== items) {
+    setPrevItems(items);
+    const next = buildProgressMap(items);
     setValues(next);
-  }, [items]);
+    setCommittedValues(next);
+  }
 
   const { rangeStart, rangeEnd, weeks } = useMemo(() => {
     const dates: number[] = [];
@@ -85,7 +99,7 @@ export default function ProgressScheduleRows({
       if (it.targetDate) dates.push(new Date(it.targetDate).getTime());
     }
     const valid = dates.filter((d) => Number.isFinite(d));
-    const base = valid.length ? Math.min(...valid) : Date.now();
+    const base = valid.length ? Math.min(...valid) : mountNowMs;
     const start = new Date(base);
     start.setHours(0, 0, 0, 0);
     const startMs = start.getTime();
@@ -96,7 +110,7 @@ export default function ProgressScheduleRows({
       rangeEnd: startMs + weekCount * WEEK_MS,
       weeks: Array.from({ length: weekCount }, (_, i) => i + 1),
     };
-  }, [items, projectStartDate, projectEndDate]);
+  }, [items, projectStartDate, projectEndDate, mountNowMs]);
 
   const span = rangeEnd - rangeStart;
   const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - rangeStart) / span) * 100));
@@ -104,7 +118,7 @@ export default function ProgressScheduleRows({
 
   const commit = (item: ProgressScheduleItem) => {
     const value = values[item.id] ?? 0;
-    if (committedRef.current[item.id] === value) return;
+    if (committedValues[item.id] === value) return;
 
     const volume = Math.round(item.targetVolume * (value / 100) * 1000) / 1000;
     setSavingId(item.id);
@@ -119,11 +133,11 @@ export default function ProgressScheduleRows({
       });
       setSavingId(null);
       if (res.success) {
-        committedRef.current = { ...committedRef.current, [item.id]: value };
+        setCommittedValues((prev) => ({ ...prev, [item.id]: value }));
         setMessage({ ok: true, text: `${item.title}: progres ${value}% tersimpan sebagai opname harian.` });
         router.refresh();
       } else {
-        setValues((prev) => ({ ...prev, [item.id]: committedRef.current[item.id] ?? 0 }));
+        setValues((prev) => ({ ...prev, [item.id]: committedValues[item.id] ?? 0 }));
         setMessage({ ok: false, text: res.message || "Gagal menyimpan progres." });
       }
     });

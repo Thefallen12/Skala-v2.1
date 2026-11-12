@@ -84,7 +84,10 @@ export async function GET(
     }),
     prisma.paymentTransaction.findFirst({
       where: {
-        proofOfTransferUrl: receiptUrl,
+        OR: [
+          { proofOfTransferUrl: receiptUrl },
+          { additionalProofUrls: { has: receiptUrl } },
+        ],
         status: PaymentStatus.PAID,
       },
       select: {

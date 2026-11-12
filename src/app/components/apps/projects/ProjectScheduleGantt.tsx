@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  HelpCircle,
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -89,12 +88,21 @@ export default function ProjectScheduleGantt({
 
   // State
   const [tasks, setTasks] = useState<ScheduleTaskItem[]>(initialTasks);
+  const [prevInitialTasks, setPrevInitialTasks] = useState(initialTasks);
+  if (initialTasks !== prevInitialTasks) {
+    setPrevInitialTasks(initialTasks);
+    setTasks(initialTasks);
+  }
   const [milestones, setMilestones] = useState<ScheduleMilestoneItem[]>(initialMilestones);
+  const [prevInitialMilestones, setPrevInitialMilestones] = useState(initialMilestones);
+  if (initialMilestones !== prevInitialMilestones) {
+    setPrevInitialMilestones(initialMilestones);
+    setMilestones(initialMilestones);
+  }
   const [viewMode, setViewMode] = useState<"gantt" | "papan">("gantt");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [showOnboardingBanner, setShowOnboardingBanner] = useState(true);
   const [isPrintScheduleView, setIsPrintScheduleView] = useState(false);
 
   // Modals state
@@ -230,6 +238,7 @@ export default function ProjectScheduleGantt({
   // New milestone state
   const [msTitle, setMsTitle] = useState("");
   const [msDate, setMsDate] = useState("");
+  const [msError, setMsError] = useState<string | null>(null);
   const [isAddingMs, setIsAddingMs] = useState(false);
 
   // Baseline state (in-memory snapshot or toggled)
@@ -237,60 +246,93 @@ export default function ProjectScheduleGantt({
   const [baselineUpdatedMsg, setBaselineUpdatedMsg] = useState(false);
 
   // Calculate project baseline dates and weeks
-  const projectStart = useMemo(() => {
-    if (selectedProject.startDate) return new Date(selectedProject.startDate);
-    return new Date("2026-10-27T00:00:00Z");
-  }, [selectedProject.startDate]);
+  const [nowMs] = useState(() => Date.now());
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const parsedProjectStartMs = selectedProject.startDate
+    ? Date.parse(selectedProject.startDate)
+    : Number.NaN;
+  const parsedProjectEndMs = selectedProject.endDate
+    ? Date.parse(selectedProject.endDate)
+    : Number.NaN;
 
-  // Total weeks (default 8, or dynamically computed)
-  const totalWeeks = 8;
+  const { timelineStartMs, totalWeeks } = useMemo(() => {
+    const taskStartTimes = tasks
+      .map((t) => (t.plannedStartDate ? Date.parse(t.plannedStartDate) : Number.NaN))
+      .filter((ms) => Number.isFinite(ms));
+    const taskEndTimes = tasks
+      .map((t) => (t.targetDate ? Date.parse(t.targetDate) : Number.NaN))
+      .filter((ms) => Number.isFinite(ms));
+
+    const earliestTaskStart =
+      taskStartTimes.length > 0 ? Math.min(...taskStartTimes) : null;
+    const latestTaskEnd =
+      taskEndTimes.length > 0 ? Math.max(...taskEndTimes) : null;
+
+    let startMs = Number.isFinite(parsedProjectStartMs)
+      ? parsedProjectStartMs
+      : earliestTaskStart ?? nowMs;
+
+    if (selectedProject.id === "all" && earliestTaskStart !== null) {
+      startMs = earliestTaskStart;
+    } else if (
+      earliestTaskStart !== null &&
+      (earliestTaskStart < startMs ||
+        earliestTaskStart - startMs > 4 * WEEK_MS)
+    ) {
+      startMs = earliestTaskStart;
+    }
+
+    const maxEndMs = Math.max(
+      Number.isFinite(parsedProjectEndMs) ? parsedProjectEndMs : startMs,
+      latestTaskEnd ?? startMs,
+    );
+    const computedWeeks = Math.ceil((maxEndMs - startMs) / WEEK_MS);
+    const weeks = Math.max(8, Math.min(52, computedWeeks > 0 ? computedWeeks : 8));
+    return { timelineStartMs: startMs, totalWeeks: weeks };
+  }, [WEEK_MS, nowMs, parsedProjectEndMs, parsedProjectStartMs, selectedProject.id, tasks]);
+
+  const projectStartMs = timelineStartMs;
+
   const weekList = useMemo(() => {
     return Array.from({ length: totalWeeks }, (_, i) => `M${i + 1}`);
   }, [totalWeeks]);
 
   // Current week calculation (Hari ini)
-  const currentWeekIndex = useMemo(() => {
-    const now = new Date();
-    const diffTime = now.getTime() - projectStart.getTime();
-    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(0, Math.min(totalWeeks - 1, diffWeeks > 0 ? diffWeeks : 1));
-  }, [projectStart, totalWeeks]);
+  const rawDiffWeeks = Math.floor((nowMs - timelineStartMs) / WEEK_MS);
+  const todayInRange = rawDiffWeeks >= 0 && rawDiffWeeks < totalWeeks;
+  const currentWeekIndex = Math.max(0, Math.min(totalWeeks - 1, rawDiffWeeks));
 
   // Helper to convert task dates to startWeek and duration
   const getTaskWeekInfo = (task: ScheduleTaskItem) => {
     if (!task.plannedStartDate) {
-      // Default fallback distribution based on task order / phase
-      const titleLower = task.title.toLowerCase();
-      if (titleLower.includes("pembersihan") || titleLower.includes("persiapan")) {
-        return { startWeek: 0, duration: 1 };
-      }
-      if (titleLower.includes("lantai") || titleLower.includes("keramik")) {
-        return { startWeek: 1, duration: 3 };
-      }
-      if (titleLower.includes("dinding") || titleLower.includes("cat")) {
-        return { startWeek: 3, duration: 3 };
-      }
-      if (titleLower.includes("listrik") || titleLower.includes("lampu")) {
-        return { startWeek: 4, duration: 3 };
-      }
-      return { startWeek: 0, duration: 2 };
+      return { startWeek: 0, duration: 1 };
     }
 
-    const tStart = new Date(task.plannedStartDate);
-    const diffStart = Math.floor(
-      (tStart.getTime() - projectStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
-    );
-    const startWeek = Math.max(0, diffStart);
+    const tStartMs = Date.parse(task.plannedStartDate);
+    if (!Number.isFinite(tStartMs)) {
+      return { startWeek: 0, duration: 1 };
+    }
+    const diffStart = Math.floor((tStartMs - timelineStartMs) / WEEK_MS);
+    const startWeek = Math.max(0, Math.min(totalWeeks - 1, diffStart));
 
     let duration = 1;
     if (task.targetDate) {
-      const tEnd = new Date(task.targetDate);
-      const diffEnd = Math.ceil(
-        (tEnd.getTime() - tStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
-      );
-      duration = Math.max(1, diffEnd);
+      const tEndMs = Date.parse(task.targetDate);
+      if (Number.isFinite(tEndMs) && tEndMs > tStartMs) {
+        duration = Math.max(1, Math.ceil((tEndMs - tStartMs) / WEEK_MS));
+      }
     }
     return { startWeek, duration };
+  };
+
+  const isTaskDelayed = (task: ScheduleTaskItem) => {
+    if ((task.progress || 0) >= 100) return false;
+    if (task.targetDate) {
+      const endMs = Date.parse(task.targetDate);
+      if (Number.isFinite(endMs) && endMs < nowMs) return true;
+    }
+    const { startWeek, duration } = getTaskWeekInfo(task);
+    return todayInRange && currentWeekIndex >= startWeek + duration;
   };
 
   // Group tasks by phase (location)
@@ -317,6 +359,8 @@ export default function ProjectScheduleGantt({
       list = list.filter((t) => Boolean(t.hasConstraint));
     } else if (statusFilter === "needs_check") {
       list = list.filter((t) => Boolean(t.needsCheck));
+    } else if (statusFilter === "delayed") {
+      list = list.filter((t) => isTaskDelayed(t));
     }
 
     // Filter by phase
@@ -335,10 +379,10 @@ export default function ProjectScheduleGantt({
 
   // Overall schedule completion calculation
   const scheduleCompletion = useMemo(() => {
-    if (tasks.length === 0) return 0;
+    if (tasks.length === 0) return Math.round(selectedProject.progress || 0);
     const totalProg = tasks.reduce((sum, t) => sum + (t.progress || 0), 0);
     return Math.round(totalProg / tasks.length);
-  }, [tasks]);
+  }, [selectedProject.progress, tasks]);
 
   // Status counts for filter chips
   const counts = useMemo(() => {
@@ -347,6 +391,7 @@ export default function ProjectScheduleGantt({
     let done = 0;
     let constraint = 0;
     let needsCheck = 0;
+    let delayed = 0;
     for (const t of tasks) {
       const p = t.progress || 0;
       if (p === 0) notStarted++;
@@ -354,6 +399,7 @@ export default function ProjectScheduleGantt({
       else inProgress++;
       if (t.hasConstraint) constraint++;
       if (t.needsCheck) needsCheck++;
+      if (isTaskDelayed(t)) delayed++;
     }
     return {
       all: tasks.length,
@@ -362,7 +408,7 @@ export default function ProjectScheduleGantt({
       done,
       constraint,
       needsCheck,
-      delayed: 0,
+      delayed,
     };
   }, [tasks]);
 
@@ -381,6 +427,7 @@ export default function ProjectScheduleGantt({
   };
 
   const handleOpenAddTask = (defaultStatus?: "TODO" | "IN_PROGRESS" | "DONE" | React.MouseEvent) => {
+    if (selectedProject.id === "all") return;
     const effectiveStatus: "TODO" | "IN_PROGRESS" | "DONE" = typeof defaultStatus === "string" ? defaultStatus : "TODO";
     let initialProg = 0;
     if (effectiveStatus === "IN_PROGRESS") initialProg = 50;
@@ -430,7 +477,7 @@ export default function ProjectScheduleGantt({
       let sDate = data.startDate;
       let eDate = data.endDate;
       if (!sDate) {
-        const d1 = new Date(projectStart);
+        const d1 = new Date(projectStartMs);
         d1.setDate(d1.getDate() + data.startWeek * 7);
         sDate = d1.toISOString().split("T")[0];
       }
@@ -540,22 +587,24 @@ export default function ProjectScheduleGantt({
 
   const handleAddMilestone = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedProject.id === "all") {
+      setMsError("Pilih proyek spesifik untuk menambahkan milestone.");
+      return;
+    }
     if (!msTitle.trim() || !msDate) return;
+    setMsError(null);
     setIsAddingMs(true);
     try {
       const res = await saveProjectMilestone(selectedProject.id, msTitle, msDate);
       if (res.success) {
-        setMilestones((prev) => [
-          ...prev,
-          {
-            id: `ms_${Date.now()}`,
-            title: msTitle.trim(),
-            date: msDate,
-          },
-        ]);
         setMsTitle("");
         setMsDate("");
+        router.refresh();
+      } else {
+        setMsError(res.message);
       }
+    } catch {
+      setMsError("Gagal menyimpan milestone.");
     } finally {
       setIsAddingMs(false);
     }
@@ -626,29 +675,7 @@ export default function ProjectScheduleGantt({
   }
 
   return (
-    <div className="space-y-4 pb-12">
-      {/* Onboarding Step 3 Banner (matching screenshot) */}
-      {!embedded && showOnboardingBanner && (
-        <div className="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <span className="text-[11px] font-semibold text-muted-foreground block">
-              Langkah 3 dari 3
-            </span>
-            <h3 className="text-sm font-bold text-foreground">Lihat jadwal (Gantt)</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama.
-            </p>
-          </div>
-          <ProjectActionButton
-            type="button"
-            label="Selesai"
-            icon={<CheckCircle2 className="size-3.5" />}
-            onClick={() => setShowOnboardingBanner(false)}
-            className="ml-auto h-8 px-4 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium shrink-0 rounded-lg"
-          />
-        </div>
-      )}
-
+    <div className="space-y-4 pb-20 sm:pb-12">
       {/* Breadcrumb Navigation */}
       {!embedded && (
       <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -730,8 +757,14 @@ export default function ProjectScheduleGantt({
             icon={<Plus className="size-3.5" />}
             variant="default"
             size="sm"
+            disabled={selectedProject.id === "all"}
+            title={
+              selectedProject.id === "all"
+                ? "Pilih proyek spesifik terlebih dahulu"
+                : "Tambah task baru"
+            }
             onClick={handleOpenAddTask}
-            className="h-8 gap-1.5 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium"
+            className="h-8 gap-1.5 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium disabled:opacity-50"
           />
         </div>
       </div>
@@ -766,7 +799,7 @@ export default function ProjectScheduleGantt({
               <span className="font-bold text-base text-foreground">{tasks.length}</span> task
             </div>
           ) : (
-            <div className="flex items-center gap-6 self-start md:self-center">
+            <div className="flex flex-wrap items-center gap-6 self-start md:self-center">
               <div>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
                   Task
@@ -781,10 +814,19 @@ export default function ProjectScheduleGantt({
                 <span className="text-lg font-bold text-foreground">{totalWeeks} mgg</span>
               </div>
 
-              <div className="w-32">
+              <div>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+                  Progres proyek
+                </span>
+                <span className="text-lg font-bold text-foreground">
+                  {Math.round(selectedProject.progress || 0)}%
+                </span>
+              </div>
+
+              <div className="w-36">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Jadwal selesai
+                    {tasks.length > 0 ? "Progres task" : "Jadwal selesai"}
                   </span>
                   <span className="font-semibold text-foreground">{scheduleCompletion}%</span>
                 </div>
@@ -974,217 +1016,228 @@ export default function ProjectScheduleGantt({
             <div>
               {/* Gantt Table Container */}
               <div className="overflow-x-auto">
-                <div className="min-w-[760px]">
-                  {/* Table Header: Task Col + Weeks M1..M8 */}
-                  <div className="grid grid-cols-12 border-b border-border/80 bg-muted/20 text-xs font-semibold text-muted-foreground">
-                    <div className="col-span-4 p-3 pl-4">Task</div>
-                    <div className="col-span-8 grid grid-cols-8 relative">
-                      {weekList.map((week, idx) => (
+                <div
+                  style={{ minWidth: `${280 + totalWeeks * 56}px` }}
+                >
+                  {/* Table Header: Sticky Task Col + Weeks M1..Mn */}
+                  <div className="flex border-b border-border/80 bg-muted/20 text-xs font-semibold text-muted-foreground">
+                    <div className="sticky left-0 z-30 flex w-[260px] shrink-0 items-end border-r border-border/70 bg-card px-4 py-3 sm:w-[300px]">
+                      Task
+                    </div>
+                    <div
+                      className="relative grid flex-1 pt-5"
+                      style={{
+                        gridTemplateColumns: `repeat(${totalWeeks}, minmax(52px, 1fr))`,
+                      }}
+                    >
+                      {weekList.map((week) => (
                         <div
                           key={week}
-                          className="p-3 text-center border-l border-border/50 text-[11px] font-medium"
+                          className="border-l border-border/50 px-2 py-2.5 text-center text-[11px] font-medium first:border-l-0"
                         >
                           {week}
                         </div>
                       ))}
 
-                      {/* Current week vertical line badge */}
-                      <div
-                        className="absolute -top-1 bottom-0 z-20 pointer-events-none flex flex-col items-center"
-                        style={{
-                          left: `${((currentWeekIndex + 0.5) / totalWeeks) * 100}%`,
-                          transform: "translateX(-50%)",
-                        }}
-                      >
-                        <span className="rounded-full bg-destructive px-1.5 py-0.2 text-[9px] font-semibold text-white tracking-wider shadow-xs">
-                          Hari ini
-                        </span>
-                      </div>
+                      {/* Current week badge positioned cleanly above M1..Mn */}
+                      {todayInRange && (
+                        <div
+                          className="pointer-events-none absolute top-0.5 bottom-0 z-20 flex flex-col items-center"
+                          style={{
+                            left: `${((currentWeekIndex + 0.5) / totalWeeks) * 100}%`,
+                            transform: "translateX(-50%)",
+                          }}
+                        >
+                          <span className="whitespace-nowrap rounded-full bg-destructive px-1.5 py-0.5 text-[9px] font-semibold leading-none tracking-wider text-white shadow-xs">
+                            Hari ini
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Gantt Rows by Phase */}
                   <div className="relative">
-                    {/* Continuous Red line for Hari Ini */}
-                    <div
-                      className="absolute top-0 bottom-0 z-10 w-0.5 bg-destructive/80 pointer-events-none"
-                      style={{
-                        left: `calc(33.333% + (66.666% * ${(currentWeekIndex + 0.5) / totalWeeks}))`,
-                      }}
-                    />
-
                     {Object.keys(groupedTasks).length === 0 ? (
                       <div className="p-8 text-center text-xs text-muted-foreground">
-                        Tidak ada task yang sesuai filter.
+                        {tasks.length === 0
+                          ? selectedProject.id === "all"
+                            ? "Belum ada item jadwal (titik kerja) di seluruh proyek."
+                            : "Belum ada task jadwal pada proyek ini. Klik 'Tambah task' untuk mulai menyusun jadwal."
+                          : "Tidak ada task yang sesuai filter."}
                       </div>
                     ) : (
-                      Object.entries(groupedTasks).map(([phaseName, phaseTasks], pIdx) => (
-                        <div key={phaseName} className="border-b border-border/50 last:border-b-0">
-                          {/* Phase Header Tag */}
-                          <div className="p-2.5 pl-4 bg-muted/10 flex items-center">
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground">
-                              {phaseName}
-                              <span className="text-[10px] opacity-70">{phaseTasks.length}</span>
-                            </span>
+                      <div className="relative">
+                        {/* Continuous Red line for Hari Ini aligned over week columns */}
+                        {todayInRange && (
+                          <div className="pointer-events-none absolute inset-y-0 left-[260px] right-0 z-10 sm:left-[300px]">
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-destructive/80"
+                              style={{
+                                left: `${((currentWeekIndex + 0.5) / totalWeeks) * 100}%`,
+                                transform: "translateX(-50%)",
+                              }}
+                            />
                           </div>
-
-                          {/* Task rows under this phase */}
-                          {phaseTasks.map((t) => {
-                            const { startWeek, duration } = getTaskWeekInfo(t);
-                            const endWeek = startWeek + duration;
-                            const leftPercent = (startWeek / totalWeeks) * 100;
-                            const widthPercent = (duration / totalWeeks) * 100;
-                            const prog = t.progress || 0;
-
-                            return (
-                              <div
-                                key={t.id}
-                                className="grid grid-cols-12 items-center hover:bg-muted/15 transition-colors py-2 border-t border-border/30"
-                              >
-                                {/* Left cell: Task details */}
-                                <div className="col-span-4 pl-4 pr-3">
-                                  <div
-                                    onClick={() => handleOpenEditTask(t)}
-                                    className="font-medium text-xs text-foreground cursor-pointer hover:underline line-clamp-1"
-                                  >
-                                    {t.title}
-                                  </div>
-                                  {(() => {
-                                    const badge = getTaskBadge(prog, startWeek, duration);
-                                    return (
-                                      <>
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <span className="text-[11px] text-muted-foreground">
-                                            M{startWeek + 1}-M{Math.min(totalWeeks, endWeek)} · {duration}{" "}
-                                            mgg
-                                          </span>
-                                          {badge && (
-                                            <span
-                                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold leading-none ${badge.className}`}
-                                            >
-                                              {badge.label}
-                                            </span>
-                                          )}
-                                        </div>
-
-                                        {/* Slider Geser Progres Live */}
-                                        <div className="flex items-center gap-2 mt-1.5 max-w-[200px]">
-                                          <input
-                                            type="range"
-                                            min={0}
-                                            max={100}
-                                            step={1}
-                                            value={prog}
-                                            aria-label={`Progres ${t.title}`}
-                                            onChange={(e) => handleSliderChange(t.id, Number(e.target.value))}
-                                            onPointerUp={() => handleSliderCommit(t.id)}
-                                            onTouchEnd={() => handleSliderCommit(t.id)}
-                                            onKeyUp={(e) => {
-                                              if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
-                                                handleSliderCommit(t.id);
-                                              }
-                                            }}
-                                            className="h-1 flex-1 cursor-pointer accent-[#544e45] dark:accent-neutral-200 bg-muted rounded-lg appearance-none"
-                                          />
-                                          <span className="text-[11px] font-mono font-medium text-muted-foreground min-w-[34px] text-right">
-                                            {prog}%
-                                          </span>
-                                        </div>
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-
-                                {/* Right cell: 8 week columns with task bar */}
-                                <div className="col-span-8 relative h-10 flex items-center">
-                                  {/* Grid background lines */}
-                                  <div className="absolute inset-0 grid grid-cols-8 pointer-events-none">
-                                    {weekList.map((w) => (
-                                      <div
-                                        key={w}
-                                        className="border-l border-border/30 h-full"
-                                      />
-                                    ))}
-                                  </div>
-
-                                  {/* Baseline dashed outline if toggled */}
-                                  {showBaseline && (
-                                    <div
-                                      className="absolute h-6 rounded-md border border-dashed border-muted-foreground/40 pointer-events-none"
-                                      style={{
-                                        left: `${leftPercent}%`,
-                                        width: `${widthPercent}%`,
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                      }}
-                                    />
-                                  )}
-
-                                  {/* Timeline Task Bar */}
-                                  <div
-                                    onClick={() => handleOpenEditTask(t)}
-                                    title={`${t.title} (${prog}%)`}
-                                    className="absolute h-6 rounded-md overflow-hidden bg-muted/60 border border-border/60 cursor-pointer shadow-xs hover:ring-2 hover:ring-primary/40 transition-all flex items-center"
-                                    style={{
-                                      left: `${leftPercent}%`,
-                                      width: `${widthPercent}%`,
-                                      zIndex: 15,
-                                    }}
-                                  >
-                                    {/* Progress filled area (live mengikuti slider) */}
-                                    <div
-                                      className="h-full bg-[#544e45] dark:bg-stone-600 text-white text-[10px] font-semibold flex items-center pl-2 whitespace-nowrap transition-all duration-75"
-                                      style={{ width: `${Math.max(prog, 0)}%` }}
-                                    >
-                                      {prog > 0 && `${prog}%`}
-                                    </div>
-                                    {prog === 0 && (
-                                      <span className="text-[10px] font-medium text-muted-foreground pl-2">
-                                        0%
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
+                        )}
+                        {Object.entries(groupedTasks).map(([phaseName, phaseTasks]) => (
+                          <div key={phaseName} className="border-b border-border/50 last:border-b-0">
+                            {/* Phase Header Tag */}
+                            <div className="flex bg-muted/10">
+                              <div className="sticky left-0 z-20 flex w-[260px] shrink-0 items-center border-r border-border/70 bg-card/95 p-2.5 pl-4 backdrop-blur-xs sm:w-[300px]">
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                  {phaseName}
+                                  <span className="text-[10px] opacity-70">{phaseTasks.length}</span>
+                                </span>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ))
+                              <div className="flex-1" />
+                            </div>
+
+                            {/* Task rows under this phase */}
+                            {phaseTasks.map((t) => {
+                              const { startWeek, duration } = getTaskWeekInfo(t);
+                              const endWeek = startWeek + duration;
+                              const barEnd = Math.min(totalWeeks, endWeek);
+                              const visibleDuration = Math.max(1, barEnd - startWeek);
+                              const leftPercent = (startWeek / totalWeeks) * 100;
+                              const widthPercent = (visibleDuration / totalWeeks) * 100;
+                              const prog = t.progress || 0;
+                              const badge = getTaskBadge(prog, startWeek, duration);
+
+                              return (
+                                <div
+                                  key={t.id}
+                                  className="flex items-stretch border-t border-border/30 transition-colors hover:bg-muted/15"
+                                >
+                                  {/* Left sticky cell: Task details */}
+                                  <div className="sticky left-0 z-20 w-[260px] shrink-0 border-r border-border/70 bg-card py-2 pl-4 pr-3 sm:w-[300px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditTask(t)}
+                                      className="line-clamp-1 text-left text-xs font-medium text-foreground hover:underline"
+                                    >
+                                      {t.title}
+                                    </button>
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <span className="text-[11px] text-muted-foreground">
+                                        M{startWeek + 1}–M{endWeek} · {duration} mgg
+                                      </span>
+                                      {badge && (
+                                        <span
+                                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none ${badge.className}`}
+                                        >
+                                          {badge.label}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Slider Geser Progres Live */}
+                                    <div className="mt-1.5 flex max-w-[200px] items-center gap-2">
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={100}
+                                        step={1}
+                                        value={prog}
+                                        aria-label={`Progres ${t.title}`}
+                                        onChange={(e) => handleSliderChange(t.id, Number(e.target.value))}
+                                        onPointerUp={() => handleSliderCommit(t.id)}
+                                        onTouchEnd={() => handleSliderCommit(t.id)}
+                                        onKeyUp={(e) => {
+                                          if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
+                                            handleSliderCommit(t.id);
+                                          }
+                                        }}
+                                        className="h-1 flex-1 cursor-pointer appearance-none rounded-lg bg-muted accent-[#544e45] dark:accent-neutral-200"
+                                      />
+                                      <span className="min-w-[34px] text-right font-mono text-[11px] font-medium text-muted-foreground">
+                                        {prog}%
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Right cell: Dynamic week columns with task bar */}
+                                  <div className="relative flex flex-1 items-center py-2">
+                                    {/* Grid background lines */}
+                                    <div
+                                      className="pointer-events-none absolute inset-0 grid"
+                                      style={{
+                                        gridTemplateColumns: `repeat(${totalWeeks}, minmax(52px, 1fr))`,
+                                      }}
+                                    >
+                                      {weekList.map((w) => (
+                                        <div
+                                          key={w}
+                                          className="h-full border-l border-border/30 first:border-l-0"
+                                        />
+                                      ))}
+                                    </div>
+
+                                    {/* Baseline dashed outline if toggled */}
+                                    {showBaseline && (
+                                      <div
+                                        className="pointer-events-none absolute top-1/2 h-6 -translate-y-1/2 rounded-md border border-dashed border-muted-foreground/40"
+                                        style={{
+                                          left: `${leftPercent}%`,
+                                          width: `${widthPercent}%`,
+                                        }}
+                                      />
+                                    )}
+
+                                    {/* Timeline Task Bar */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditTask(t)}
+                                      title={`${t.title} (${prog}%) · M${startWeek + 1}–M${endWeek}`}
+                                      className="relative z-15 flex h-6 cursor-pointer items-center overflow-hidden rounded-md border border-border/60 bg-muted/60 shadow-xs transition-all hover:ring-2 hover:ring-primary/40"
+                                      style={{
+                                        marginLeft: `${leftPercent}%`,
+                                        width: `${widthPercent}%`,
+                                      }}
+                                    >
+                                      <div
+                                        className="flex h-full items-center whitespace-nowrap bg-[#544e45] pl-2 text-[10px] font-semibold text-white transition-all duration-75 dark:bg-stone-600"
+                                        style={{ width: `${Math.max(prog, 0)}%` }}
+                                      >
+                                        {prog > 0 && `${prog}%`}
+                                      </div>
+                                      {prog === 0 && (
+                                        <span className="pl-2 text-[10px] font-medium text-muted-foreground">
+                                          0%
+                                        </span>
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
 
               {/* Gantt Footer Legend */}
-              <div className="flex flex-wrap items-center justify-between border-t border-border/80 bg-muted/10 p-3 px-4 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/80 bg-muted/10 px-4 py-3 text-xs">
                 <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
-                  <span className="font-semibold text-foreground">Fase:</span>
+                  {allPhases.length > 0 && (
+                    <>
+                      <span className="font-semibold text-foreground">Fase:</span>
+                      {allPhases.map((phase) => (
+                        <span key={phase} className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground/80">
+                          {phase}
+                        </span>
+                      ))}
+                    </>
+                  )}
                   <span className="flex items-center gap-1">
-                    <span className="size-2 rounded-full bg-zinc-800 dark:bg-zinc-200" />
-                    <span>Persiapan</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="size-2 rounded-full bg-slate-500" />
-                    <span>Struktur</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="size-2 rounded-full bg-amber-600" />
-                    <span>Arsitektur</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="size-2 rounded-full bg-teal-600" />
-                    <span>MEP</span>
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="size-2 rounded-full bg-indigo-600" />
-                    <span>Serah Terima</span>
-                  </span>
-                  <span className="flex items-center gap-1 ml-2">
-                    <span className="w-3 h-2 rounded-xs border border-dashed border-muted-foreground" />
+                    <span className="h-2 w-3 rounded-xs border border-dashed border-muted-foreground" />
                     <span>Baseline</span>
                   </span>
                   <span className="flex items-center gap-1 text-destructive">
-                    <span className="w-0.5 h-3 bg-destructive" />
+                    <span className="h-3 w-0.5 bg-destructive" />
                     <span>Hari ini</span>
                   </span>
                 </div>
@@ -1479,11 +1532,17 @@ export default function ProjectScheduleGantt({
 
           {/* Add Milestone Form */}
           <form onSubmit={handleAddMilestone} className="space-y-2">
+            {msError && (
+              <p role="alert" className="text-[11px] font-medium text-destructive">
+                {msError}
+              </p>
+            )}
             <Input
               type="text"
               placeholder="Nama milestone"
               value={msTitle}
               onChange={(e) => setMsTitle(e.target.value)}
+              disabled={selectedProject.id === "all" || isAddingMs}
               className="h-8 text-xs"
               required
             />
@@ -1492,19 +1551,25 @@ export default function ProjectScheduleGantt({
                 type="date"
                 value={msDate}
                 onChange={(e) => setMsDate(e.target.value)}
+                disabled={selectedProject.id === "all" || isAddingMs}
                 className="h-8 text-xs flex-1"
                 required
               />
               <Button
                 type="submit"
                 variant="default"
-                size="icon"
-                disabled={isAddingMs}
-                aria-label="Tambah milestone"
-                title="Tambah milestone"
-                className="size-11 shrink-0 bg-foreground text-background hover:bg-foreground/90 sm:size-8"
+                size="sm"
+                disabled={isAddingMs || selectedProject.id === "all"}
+                aria-label="Simpan milestone"
+                title={
+                  selectedProject.id === "all"
+                    ? "Pilih proyek spesifik untuk menambah milestone"
+                    : "Simpan milestone"
+                }
+                className="h-11 shrink-0 gap-1 bg-foreground px-3 text-xs text-background hover:bg-foreground/90 sm:h-8"
               >
-                <Plus className="size-4" />
+                <Plus className="size-3.5" />
+                <span>Simpan</span>
               </Button>
             </div>
           </form>

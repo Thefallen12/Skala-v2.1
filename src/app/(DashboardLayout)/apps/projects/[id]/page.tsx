@@ -380,28 +380,40 @@ export default async function ProjectDetailPage({
       ],
     })),
     blueprints: [
-      ...project.blueprints.map((blueprint) => ({
-        id: blueprint.id,
-        publicCode: blueprint.publicCode,
-        drawingNumber: blueprint.drawingNumber,
-        title: blueprint.title,
-        category: blueprint.category,
-        revision: blueprint.revision,
-        fileUrl: blueprint.fileUrl,
-        status: blueprint.status,
-        drafterName: blueprint.drafter?.name ?? "Drafter",
-      })),
-      ...project.drawingDocuments.map((doc) => ({
-        id: doc.id,
-        publicCode: doc.drawingCode,
-        drawingNumber: doc.drawingCode,
-        title: doc.title,
-        category: doc.category,
-        revision: String(doc.version ?? 0),
-        fileUrl: doc.fileUrl || "/documents/sample.pdf",
-        status: doc.status || "APPROVED",
-        drafterName: doc.uploadedBy?.name ?? "Tim Dokumen",
-      })),
+      ...project.blueprints
+        .filter(
+          (blueprint) =>
+            session.user.role !== UserRole.FIELD_TEAM ||
+            blueprint.status === "APPROVED_FOR_CONSTRUCTION",
+        )
+        .map((blueprint) => ({
+          id: blueprint.id,
+          publicCode: blueprint.publicCode,
+          drawingNumber: blueprint.drawingNumber,
+          title: blueprint.title,
+          category: blueprint.category,
+          revision: blueprint.revision,
+          fileUrl: blueprint.fileUrl,
+          status: blueprint.status,
+          drafterName: blueprint.drafter?.name ?? "Drafter",
+        })),
+      ...(project.drawingDocuments ?? [])
+        .filter(
+          (doc) =>
+            session.user.role !== UserRole.FIELD_TEAM ||
+            doc.status === "APPROVED",
+        )
+        .map((doc) => ({
+          id: doc.id,
+          publicCode: doc.drawingCode,
+          drawingNumber: doc.drawingCode,
+          title: doc.title,
+          category: doc.category,
+          revision: `Rev ${doc.version ?? 0}`,
+          fileUrl: doc.fileUrl || "/documents/sample.pdf",
+          status: doc.status || "APPROVED",
+          drafterName: doc.uploadedBy?.name ?? "Tim Dokumen",
+        })),
     ],
     subkonContracts: project.subkonContracts.map((contract) => ({
       id: contract.id,

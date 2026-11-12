@@ -177,8 +177,10 @@ export default function EquipmentVehicleRentalPanel({
   const [formVendorName, setFormVendorName] = useState("");
   const [formVendorPhone, setFormVendorPhone] = useState("");
   const [formPeriodType, setFormPeriodType] = useState<RentalPeriodType>("MONTHLY");
-  const [formStartDate, setFormStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [formEndDate, setFormEndDate] = useState(
+  const [formStartDate, setFormStartDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [formEndDate, setFormEndDate] = useState(() =>
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
   );
   const [formDuration, setFormDuration] = useState("1");

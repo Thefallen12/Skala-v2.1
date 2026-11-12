@@ -96,13 +96,15 @@ function SearchableMaterialInput({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState(value);
+  const [prevValue, setPrevValue] = useState(value);
   const [highlightIndex, setHighlightIndex] = useState<number>(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  if (prevValue !== value) {
+    setPrevValue(value);
     setQuery(value);
-  }, [value]);
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -349,15 +351,35 @@ export default function MaterialPlanModal({
   const [filterMode, setFilterMode] = useState<"ALL" | "ANALYSIS" | "CUSTOM">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [showGuide, setShowGuide] = useState(false);
+  const [prevSyncDeps, setPrevSyncDeps] = useState<{
+    open: boolean;
+    initialMaterials: MaterialPlanRow[];
+    analysisMaterials: MaterialPlanRow[];
+    preselectedWorkPointId?: string;
+  }>({
+    open,
+    initialMaterials,
+    analysisMaterials,
+    preselectedWorkPointId,
+  });
 
-  // Sync state whenever modal opens or analysisMaterials change
-  useEffect(() => {
-    if (open) {
-      setMaterials(mergePlanLists(initialMaterials, analysisMaterials, preselectedWorkPointId));
-    }
-  }, [open, initialMaterials, analysisMaterials, preselectedWorkPointId]);
-
-  if (!open) return null;
+  if (
+    open &&
+    (!prevSyncDeps.open ||
+      prevSyncDeps.initialMaterials !== initialMaterials ||
+      prevSyncDeps.analysisMaterials !== analysisMaterials ||
+      prevSyncDeps.preselectedWorkPointId !== preselectedWorkPointId)
+  ) {
+    setPrevSyncDeps({
+      open,
+      initialMaterials,
+      analysisMaterials,
+      preselectedWorkPointId,
+    });
+    setMaterials(mergePlanLists(initialMaterials, analysisMaterials, preselectedWorkPointId));
+  } else if (!open && prevSyncDeps.open) {
+    setPrevSyncDeps((prev) => ({ ...prev, open: false }));
+  }
 
   function mergePlanLists(
     savedList: MaterialPlanRow[],
@@ -511,6 +533,8 @@ export default function MaterialPlanModal({
 
   const analysisCount = materials.filter((m) => m.fromAnalysis).length;
   const customCount = materials.filter((m) => !m.fromAnalysis).length;
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">

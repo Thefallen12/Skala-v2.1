@@ -91,6 +91,7 @@ import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import {
   Archive,
+  ArrowUpDown,
   BriefcaseBusiness,
   Camera,
   CheckCircle2,
@@ -110,7 +111,6 @@ import {
   ChartSpline,
   ChevronLeft,
   ChevronRight,
-  Landmark,
   MapPin,
   MapPinned,
   Search,
@@ -548,6 +548,43 @@ function getSCurveSeries(project: ProjectWorkstationMasterData, nowMs: number) {
   ];
 }
 
+type ProjectSortField =
+  | "default"
+  | "title"
+  | "status"
+  | "progress"
+  | "endDate"
+  | "attention"
+  | "pagu";
+
+function statusSortRank(status: string) {
+  if (status === "RUNNING" || status === "ON_PROGRESS" || status === "ACTIVE") {
+    return 0;
+  }
+  if (status === "TERHAMBAT" || status === "ON_HOLD") return 1;
+  if (status === "PENDING_SETUP" || status === "PENDING" || status === "PLANNED") {
+    return 2;
+  }
+  if (status === "DONE" || status === "COMPLETED") return 3;
+  return 4;
+}
+
+function getPlannedProgress(
+  startDate: string | null,
+  endDate: string | null,
+  nowMs: number,
+): number | null {
+  if (!startDate || !endDate) return null;
+  const startMs = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  const endMs = new Date(`${endDate}T23:59:59.999Z`).getTime();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
+    return null;
+  }
+  if (nowMs <= startMs) return 0;
+  if (nowMs >= endMs) return 100;
+  return Math.round(((nowMs - startMs) / (endMs - startMs)) * 100);
+}
+
 export default function ProjectWorkstationMaster({
   projects,
   fieldTeamUsers,
@@ -599,6 +636,8 @@ export default function ProjectWorkstationMaster({
   >(null);
   const [search, setSearch] = useState("");
   const [projectPage, setProjectPage] = useState(1);
+  const [sortField, setSortField] = useState<ProjectSortField>("default");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [proposedUnitPrice, setProposedUnitPrice] = useState("");
   const [proposedTotalWage, setProposedTotalWage] = useState("");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -753,7 +792,7 @@ export default function ProjectWorkstationMaster({
 
   const overdueRunningCount = runningProjects.filter((p) => {
     if (!p.endDate) return false;
-    return new Date(p.endDate) < new Date() && p.progress < 100;
+    return new Date(p.endDate).getTime() < currentTimeMs && p.progress < 100;
   }).length;
   const isFieldTeam =
     currentUserRole === UserRole.FIELD_TEAM ||
@@ -809,12 +848,81 @@ export default function ProjectWorkstationMaster({
       ].some((value) => value.toLocaleLowerCase("id-ID").includes(query))
     );
   });
+  const getAttentionRank = (project: ProjectWorkstationMasterData) => {
+    const isOverdue =
+      Boolean(project.endDate) &&
+      new Date(project.endDate!).getTime() < currentTimeMs &&
+      project.progress < 100;
+    if (isOverdue) return 2;
+    const plannedProgress = getPlannedProgress(
+      project.startDate,
+      project.endDate,
+      currentTimeMs,
+    );
+    const hasDeviation =
+      plannedProgress !== null &&
+      project.progress < 100 &&
+      Math.round(plannedProgress - project.progress) >= 10;
+    return hasDeviation ? 1 : 0;
+  };
+  const sortedProjects = [...filteredProjects].sort((left, right) => {
+    if (sortField === "default") {
+      return (
+        statusSortRank(left.status) - statusSortRank(right.status) ||
+        left.title.localeCompare(right.title, "id-ID")
+      );
+    }
+    const direction = sortDir === "asc" ? 1 : -1;
+    let comparison = 0;
+    switch (sortField) {
+      case "title":
+        comparison = left.title.localeCompare(right.title, "id-ID");
+        break;
+      case "status":
+        comparison =
+          statusSortRank(left.status) - statusSortRank(right.status) ||
+          left.title.localeCompare(right.title, "id-ID");
+        break;
+      case "progress":
+        comparison = left.progress - right.progress;
+        break;
+      case "endDate": {
+        const leftDate = left.endDate ?? "9999-12-31";
+        const rightDate = right.endDate ?? "9999-12-31";
+        comparison = leftDate.localeCompare(rightDate);
+        break;
+      }
+      case "attention":
+        comparison = getAttentionRank(left) - getAttentionRank(right);
+        break;
+      case "pagu":
+        comparison =
+          (parseFloat(left.pagu) || 0) - (parseFloat(right.pagu) || 0);
+        break;
+    }
+    return (
+      comparison * direction || left.title.localeCompare(right.title, "id-ID")
+    );
+  });
+  const toggleSort = (field: Exclude<ProjectSortField, "default">) => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir(
+        field === "progress" || field === "pagu" || field === "attention"
+          ? "desc"
+          : "asc",
+      );
+    }
+    setProjectPage(1);
+  };
   const projectPageCount = Math.max(
     1,
-    Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE),
+    Math.ceil(sortedProjects.length / PROJECTS_PER_PAGE),
   );
   const currentProjectPage = Math.min(projectPage, projectPageCount);
-  const visibleProjects = filteredProjects.slice(
+  const visibleProjects = sortedProjects.slice(
     (currentProjectPage - 1) * PROJECTS_PER_PAGE,
     currentProjectPage * PROJECTS_PER_PAGE,
   );
@@ -890,11 +998,26 @@ export default function ProjectWorkstationMaster({
 
   const assignFieldPic = (projectId: string, fieldPicId: string) => {
     setNotice("");
+    const selectedPic = fieldTeamUsers.find((user) => user.id === fieldPicId);
     startTransition(async () => {
       try {
         const result = await assignProjectFieldPic(projectId, fieldPicId);
         setNotice(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          setProjectList((prev) =>
+            prev.map((project) =>
+              project.id === projectId
+                ? {
+                    ...project,
+                    fieldPicId: fieldPicId || null,
+                    fieldPicName: selectedPic?.name ?? null,
+                    fieldPicPhotoUrl: selectedPic?.profilePhotoUrl ?? null,
+                  }
+                : project,
+            ),
+          );
+          router.refresh();
+        }
       } catch (error) {
         console.error("Assigning project PIC from workstation failed:", error);
         setNotice("Penunjukan PIC gagal disimpan. Silakan coba kembali.");
@@ -1270,34 +1393,64 @@ export default function ProjectWorkstationMaster({
 
       {activeSection === "projects" && (
         <div className="space-y-6">
-          {/* Onboarding Banner: Langkah 3 dari 3 (Vasco) */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
             <div>
-              <span className="text-[11px] font-semibold text-muted-foreground">Langkah 3 dari 3</span>
-              <h3 className="text-sm font-bold text-foreground">Lihat jadwal (Gantt)</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama.
-              </p>
+              {pendingSetupProjectCount > 0 ? (
+                <>
+                  <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+                    Tahap 01 · Persiapan Proyek
+                  </span>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {pendingSetupProjectCount} proyek menunggu penunjukan PIC atau persetujuan upah
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Pilih PIC lapangan langsung di tabel proyek atau buka detail proyek untuk menetapkan titik kerja &amp; jadwal Gantt.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="text-[11px] font-semibold text-muted-foreground">
+                    Penjadwalan Lapangan
+                  </span>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Jadwal Pekerjaan &amp; Kurva S (Gantt)
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Pantau linimasa titik kerja, target selesai, dan progres aktual seluruh proyek berjalan.
+                  </p>
+                </>
+              )}
             </div>
-            <Link
-              href="/apps/projects/schedule"
-              className="inline-flex h-8 items-center rounded-lg bg-foreground px-4 text-xs font-semibold text-background hover:bg-foreground/90 transition"
-            >
-              Buka jadwal
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {pendingSetupProjectCount > 0 &&
+                projectStatusFilter !== "PENDING_SETUP" && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStatusFilterUrl("PENDING_SETUP")}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Tampilkan Menunggu Setup ({pendingSetupProjectCount})
+                  </Button>
+                )}
+              <Link
+                href={
+                  selectedProjectIds.length === 1
+                    ? `/apps/projects/schedule?projectId=${encodeURIComponent(selectedProjectIds[0])}`
+                    : "/apps/projects/schedule"
+                }
+                className="inline-flex h-8 items-center rounded-lg bg-foreground px-4 text-xs font-semibold text-background hover:bg-foreground/90 transition"
+              >
+                Buka jadwal
+              </Link>
+            </div>
           </div>
 
           {/* Page Header */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Daftar proyek</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/apps/projects/reports/dinas"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 text-xs font-semibold text-primary hover:bg-primary/20 transition"
-              >
-                <Landmark className="size-3.5" />
-                <span>Laporan Dinas Terkait</span>
-              </Link>
               <Button
                 type="button"
                 variant="outline"
@@ -1308,16 +1461,14 @@ export default function ProjectWorkstationMaster({
                 <Upload className="size-3.5" />
                 <span>Impor proyek</span>
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => alert("Fitur Template Proyek Vasco siap digunakan.")}
-                className="h-8 gap-1.5 px-3 text-xs rounded-lg"
+              <a
+                href="/api/projects/template-excel"
+                download="template-proyek.xlsx"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input bg-background px-3 text-xs font-medium text-foreground shadow-xs transition hover:bg-accent hover:text-accent-foreground"
               >
                 <LayoutTemplate className="size-3.5" />
                 <span>Template proyek</span>
-              </Button>
+              </a>
               {isProjectManager && (
                 <Button
                   type="button"
@@ -1332,20 +1483,11 @@ export default function ProjectWorkstationMaster({
             </div>
           </div>
 
-          {/* 3 KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Operational KPI Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
               <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <span>Proyek berjalan</span>
-                <ChevronRight className="size-3" />
-              </div>
-              <p className="mt-1 text-2xl font-extrabold text-foreground">{runningProjects.length}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">dari {projects.length} proyek</p>
-            </div>
-
-            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
-              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <span>Nilai kontrak berjalan</span>
+                <span>Nilai kontrak berjalan ({runningProjects.length} proyek)</span>
                 <ChevronRight className="size-3" />
               </div>
               <p className="mt-1 text-2xl font-extrabold text-foreground">{currency(totalContractRunning)}</p>
@@ -1357,7 +1499,7 @@ export default function ProjectWorkstationMaster({
                 <ChevronRight className="size-3" />
               </div>
               <p className="mt-1 text-2xl font-extrabold text-foreground">{overdueRunningCount}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">proyek berjalan</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">proyek berjalan melewati batas waktu</p>
             </div>
           </div>
 
@@ -1402,11 +1544,14 @@ export default function ProjectWorkstationMaster({
 
               {projectViewMode !== "dinas" && (
                 <>
-                  <div className="relative w-56">
+                  <div className="relative w-full sm:w-56">
                     <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setProjectPage(1);
+                      }}
                       placeholder="Cari proyek"
                       className="h-8 pl-8 text-xs bg-muted/20 rounded-lg"
                     />
@@ -1467,57 +1612,128 @@ export default function ProjectWorkstationMaster({
             )}
           </div>
 
-          {/* TABEL VIEW (Image 5) */}
+          {/* TABEL VIEW */}
           {projectViewMode === "tabel" && (
             <div className="space-y-4">
               <div className="overflow-x-auto rounded-xl border border-border/80">
-                <table className="w-full min-w-[850px] text-left text-xs">
+                <table className="w-full text-left text-xs">
                   <thead className="bg-muted/40 font-semibold text-muted-foreground">
                     <tr className="border-b border-border">
-                      <th className="w-10 px-3.5 py-3">
+                      <th className="w-10 px-3 py-3">
                         <input
                           type="checkbox"
+                          aria-label="Pilih semua proyek"
                           className="size-4 rounded border-border"
                           checked={
                             selectedProjectIds.length > 0 &&
-                            selectedProjectIds.length === filteredProjects.length
+                            selectedProjectIds.length === sortedProjects.length
                           }
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedProjectIds(filteredProjects.map((p) => p.id));
+                              setSelectedProjectIds(sortedProjects.map((p) => p.id));
                             } else {
                               setSelectedProjectIds([]);
                             }
                           }}
                         />
                       </th>
-                      <th className="px-3.5 py-3 font-semibold">Proyek ⇅</th>
-                      <th className="w-32 px-3.5 py-3 font-semibold">Status ⇅</th>
-                      <th className="w-44 px-3.5 py-3 font-semibold">Progres ⇅</th>
-                      <th className="w-40 px-3.5 py-3 font-semibold">Target selesai ⇅</th>
-                      <th className="px-3.5 py-3 font-semibold">Perlu perhatian ⇅</th>
-                      <th className="w-36 px-3.5 py-3 font-semibold">Nilai kontrak ⇅</th>
-                      <th className="w-24 px-3.5 py-3 text-right font-semibold">Aksi</th>
+                      <th className="min-w-[200px] px-3 py-3 font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("title")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Proyek</span>
+                          <ArrowUpDown className={`size-3 ${sortField === "title" ? "text-primary" : "opacity-60"}`} />
+                        </button>
+                      </th>
+                      <th className="w-32 px-3 py-3 font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("status")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Status</span>
+                          <ArrowUpDown className={`size-3 ${sortField === "status" ? "text-primary" : "opacity-60"}`} />
+                        </button>
+                      </th>
+                      <th className="w-40 px-3 py-3 font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("progress")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Progres</span>
+                          <ArrowUpDown className={`size-3 ${sortField === "progress" ? "text-primary" : "opacity-60"}`} />
+                        </button>
+                      </th>
+                      <th className="hidden w-36 px-3 py-3 font-semibold md:table-cell">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("endDate")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Target selesai</span>
+                          <ArrowUpDown className={`size-3 ${sortField === "endDate" ? "text-primary" : "opacity-60"}`} />
+                        </button>
+                      </th>
+                      <th className="hidden px-3 py-3 font-semibold lg:table-cell">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("attention")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Perlu perhatian</span>
+                          <ArrowUpDown className={`size-3 ${sortField === "attention" ? "text-primary" : "opacity-60"}`} />
+                        </button>
+                      </th>
+                      <th className="hidden w-36 px-3 py-3 font-semibold sm:table-cell">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("pagu")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Nilai kontrak</span>
+                          <ArrowUpDown className={`size-3 ${sortField === "pagu" ? "text-primary" : "opacity-60"}`} />
+                        </button>
+                      </th>
+                      <th className="w-28 px-3 py-3 text-right font-semibold">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {visibleProjects.map((project) => {
                       const isSelected = selectedProjectIds.includes(project.id);
                       const isOverdue =
-                        project.endDate &&
-                        new Date(project.endDate) < new Date() &&
+                        Boolean(project.endDate) &&
+                        new Date(project.endDate!).getTime() < currentTimeMs &&
                         project.progress < 100;
-                      const hasDeviation = project.progress < 10 && project.startDate;
+                      const plannedProgress = getPlannedProgress(
+                        project.startDate,
+                        project.endDate,
+                        currentTimeMs,
+                      );
+                      const progressGap =
+                        plannedProgress !== null
+                          ? Math.round(plannedProgress - project.progress)
+                          : 0;
+                      const hasDeviation =
+                        project.progress < 100 && progressGap >= 10;
+                      const isPendingSetup = [
+                        "PENDING_SETUP",
+                        "PENDING",
+                        "PLANNED",
+                      ].includes(project.status);
 
                       return (
                         <tr
                           key={project.id}
                           className="hover:bg-muted/15 transition group"
                         >
-                          <td className="px-3.5 py-3">
+                          <td className="px-3 py-3 align-top">
                             <input
                               type="checkbox"
-                              className="size-4 rounded border-border"
+                              aria-label={`Pilih ${project.title}`}
+                              className="mt-0.5 size-4 rounded border-border"
                               checked={isSelected}
                               onChange={(e) => {
                                 if (e.target.checked) {
@@ -1530,18 +1746,42 @@ export default function ProjectWorkstationMaster({
                               }}
                             />
                           </td>
-                          <td className="px-3.5 py-3">
+                          <td className="max-w-[280px] px-3 py-3 align-top">
                             <Link
                               href={`/apps/projects/${project.id}`}
-                              className="font-bold text-foreground hover:text-primary transition hover:underline"
+                              className="block font-bold text-foreground hover:text-primary transition hover:underline"
                             >
                               {project.title}
                             </Link>
-                            <span className="block font-mono text-[10px] text-muted-foreground">
+                            <span className="mt-0.5 block break-all font-mono text-[10px] text-muted-foreground">
                               {project.code}
                             </span>
+                            {isProjectManager && fieldTeamUsers.length > 0 ? (
+                              <div className="mt-1.5">
+                                <select
+                                  aria-label={`Pilih PIC lapangan untuk ${project.title}`}
+                                  value={project.fieldPicId ?? ""}
+                                  disabled={isPending}
+                                  onChange={(e) =>
+                                    assignFieldPic(project.id, e.target.value)
+                                  }
+                                  className="h-7 max-w-full rounded-md border border-border/80 bg-background px-2 text-[11px] font-medium text-foreground focus:border-primary focus:outline-none"
+                                >
+                                  <option value="">Pilih PIC lapangan...</option>
+                                  {fieldTeamUsers.map((member) => (
+                                    <option key={member.id} value={member.id}>
+                                      PIC: {member.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <span className="mt-1 block text-[11px] text-muted-foreground">
+                                PIC: {project.fieldPicName ?? "Belum ditunjuk"}
+                              </span>
+                            )}
                           </td>
-                          <td className="px-3.5 py-3">
+                          <td className="px-3 py-3 align-top">
                             <Badge
                               variant="outline"
                               className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium border-0 ${
@@ -1549,26 +1789,30 @@ export default function ProjectWorkstationMaster({
                                   ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                                   : project.status === "TERHAMBAT" || (project.status as string) === "ON_HOLD"
                                   ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                                  : isPendingSetup
+                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                                   : "bg-sky-500/15 text-sky-600 dark:text-sky-400"
                               }`}
                             >
                               {statusLabels[project.status] || "Berjalan"}
                             </Badge>
                           </td>
-                          <td className="px-3.5 py-3">
+                          <td className="px-3 py-3 align-top">
                             <div className="flex items-center gap-2">
                               <Progress value={project.progress} className="h-1.5 flex-1 min-w-16" />
                               <span className="w-8 text-right font-mono text-[11px] text-foreground font-semibold">
                                 {project.progress.toFixed(0)}%
                               </span>
                             </div>
-                            {project.startDate && project.progress === 0 && (
-                              <span className="block text-[10px] text-muted-foreground">
-                                rencana 32%
-                              </span>
-                            )}
+                            {plannedProgress !== null &&
+                              project.progress < 100 &&
+                              plannedProgress > 0 && (
+                                <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                                  rencana {plannedProgress}%
+                                </span>
+                              )}
                           </td>
-                          <td className="px-3.5 py-3 text-muted-foreground whitespace-nowrap">
+                          <td className="hidden px-3 py-3 align-top text-muted-foreground whitespace-nowrap md:table-cell">
                             {project.endDate ? (
                               <div>
                                 <p className="font-medium text-foreground">{formatProjectDate(project.endDate)}</p>
@@ -1582,7 +1826,7 @@ export default function ProjectWorkstationMaster({
                               "—"
                             )}
                           </td>
-                          <td className="px-3.5 py-3">
+                          <td className="hidden px-3 py-3 align-top lg:table-cell">
                             {isOverdue ? (
                               <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
                                 Terlambat dari jadwal
@@ -1592,30 +1836,44 @@ export default function ProjectWorkstationMaster({
                                 <p className="font-semibold text-amber-600 dark:text-amber-400">
                                   Progres tertinggal
                                 </p>
-                                <p className="text-[10px]">32 poin dari rencana</p>
+                                <p className="text-[10px]">{progressGap} poin dari rencana</p>
                               </div>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
                           </td>
-                          <td className="px-3.5 py-3 font-mono font-semibold text-foreground whitespace-nowrap">
+                          <td className="hidden px-3 py-3 align-top font-mono font-semibold text-foreground whitespace-nowrap sm:table-cell">
                             {Number(project.pagu) > 0 ? currency(project.pagu) : "—"}
                           </td>
-                          <td className="px-3.5 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                title="Catat progres / opname"
-                                onClick={() => openProjectModal(project, "titik")}
-                                className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                <CheckCircle2 className="size-3.5" />
-                              </button>
+                          <td className="px-3 py-3 text-right align-top">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {isPendingSetup ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openProjectModal(project, "titik")}
+                                  className="h-7 px-2.5 text-[11px] font-semibold"
+                                >
+                                  Setup
+                                </Button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  title="Catat progres / opname"
+                                  aria-label={`Catat progres ${project.title}`}
+                                  onClick={() => openProjectModal(project, "titik")}
+                                  className="grid size-7 place-items-center rounded-lg border border-border/70 text-foreground/80 hover:bg-muted hover:text-primary"
+                                >
+                                  <CheckCircle2 className="size-3.5" />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 title="Edit proyek"
+                                aria-label={`Edit ${project.title}`}
                                 onClick={() => editProject(project)}
-                                className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                                className="grid size-7 place-items-center rounded-lg border border-border/70 text-foreground/80 hover:bg-muted hover:text-primary"
                               >
                                 <Pencil className="size-3.5" />
                               </button>
@@ -1625,7 +1883,7 @@ export default function ProjectWorkstationMaster({
                       );
                     })}
 
-                    {filteredProjects.length === 0 && (
+                    {sortedProjects.length === 0 && (
                       <tr>
                         <td colSpan={8} className="py-12 text-center text-muted-foreground">
                           {projects.length
@@ -1639,7 +1897,7 @@ export default function ProjectWorkstationMaster({
               </div>
 
               <TablePaginationControls
-                count={filteredProjects.length}
+                count={sortedProjects.length}
                 pageSize={PROJECTS_PER_PAGE}
                 page={currentProjectPage}
                 itemLabel="proyek"
@@ -2797,6 +3055,11 @@ export default function ProjectWorkstationMaster({
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/apps/drafter?projectId=${encodeURIComponent(activeProject.id)}`}>
+                            Buka Workspace Drafter (DED)
+                          </Link>
+                        </Button>
                         <Select
                           value={blueprintCategory}
                           onValueChange={setBlueprintCategory}

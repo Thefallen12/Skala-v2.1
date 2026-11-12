@@ -2,7 +2,7 @@ import "@/lib/sanitize-env";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
@@ -78,7 +78,11 @@ export async function uploadCloudinaryRawFile(
     const relativeDir = path.posix.join("uploads", safeFolder);
     const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
     await mkdir(absDir, { recursive: true });
-    await writeFile(path.join(/*turbopackIgnore: true*/ absDir, fileName), bytes);
+    await writeFile(
+      path.join(/*turbopackIgnore: true*/ absDir, fileName),
+      bytes,
+      { flag: "wx" },
+    );
     return `/${relativeDir}/${fileName}`;
   }
 
@@ -86,7 +90,7 @@ export async function uploadCloudinaryRawFile(
   const publicId = `${randomUUID()}.${extension}`;
   return new Promise((resolveUpload, rejectUpload) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, public_id: publicId, resource_type: "raw" },
+      { folder, public_id: publicId, overwrite: false, resource_type: "raw" },
       (error, response) => {
         if (error) {
           rejectUpload(error);
@@ -104,8 +108,48 @@ export async function uploadCloudinaryRawFile(
 }
 
 export async function removeCloudinaryRawFile(url: string): Promise<boolean> {
+  const allowedFolders = [
+    DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
+    PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
+    REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
+  ];
   if (url.startsWith("/uploads/")) {
-    return true;
+    try {
+      const pathname = new URL(url, "http://localhost").pathname;
+      if (!pathname.startsWith("/uploads/")) {
+        return false;
+      }
+      const segments = pathname
+        .slice("/uploads/".length)
+        .split("/")
+        .map((segment) => decodeURIComponent(segment));
+      const fileName = segments.at(-1) ?? "";
+      const relativeFolder = segments.slice(0, -1).join("/");
+      if (
+        segments.length < 2 ||
+        segments.some(
+          (segment) =>
+            !segment ||
+            segment === "." ||
+            segment === ".." ||
+            segment.includes("/") ||
+            segment.includes("\\"),
+        ) ||
+        !allowedFolders.includes(relativeFolder) ||
+        !/^[A-Za-z0-9_.-]+\.[A-Za-z0-9]+$/.test(fileName)
+      ) {
+        return false;
+      }
+      const uploadsDirectory = path.resolve(process.cwd(), "public", "uploads");
+      const localPath = path.resolve(uploadsDirectory, ...segments);
+      if (!localPath.startsWith(`${uploadsDirectory}${path.sep}`)) {
+        return false;
+      }
+      await rm(/*turbopackIgnore: true*/ localPath, { force: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
   let parsed: URL;
   try {
@@ -135,11 +179,6 @@ export async function removeCloudinaryRawFile(url: string): Promise<boolean> {
     .filter((segment) => !/^v\d+$/.test(segment))
     .join("/")
     .replace(/\.[^.]+$/, "");
-  const allowedFolders = [
-    DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
-    PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
-    REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
-  ];
   if (!allowedFolders.some((folder) => publicId.startsWith(`${folder}/`))) {
     return false;
   }

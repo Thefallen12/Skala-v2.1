@@ -50,6 +50,9 @@ export type SurveyProjectOption = {
   title: string;
   vendor: string;
   status: ProjectStatus;
+  location?: string | null;
+  fieldPicName?: string | null;
+  landArea?: string | null;
 };
 
 export type FieldSurveyFeatureSummary = {

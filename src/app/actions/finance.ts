@@ -89,10 +89,21 @@ export async function updateOfficeExpense(
       : existing.createdAt;
 
     await prisma.$transaction(async (tx) => {
-      if (diff !== 0) {
+      if (diff > 0) {
+        const deducted = await tx.financeAccount.updateMany({
+          where: {
+            id: existing.accountId,
+            balance: { gte: diff },
+          },
+          data: { balance: { decrement: diff } },
+        });
+        if (deducted.count !== 1) {
+          throw new Error("INSUFFICIENT_BALANCE");
+        }
+      } else if (diff < 0) {
         await tx.financeAccount.update({
           where: { id: existing.accountId },
-          data: { balance: { decrement: diff } },
+          data: { balance: { increment: -diff } },
         });
       }
 
@@ -132,6 +143,12 @@ export async function updateOfficeExpense(
         await removeUploadedCashflowProof(url);
       }),
     );
+    if (error instanceof Error && error.message === "INSUFFICIENT_BALANCE") {
+      return {
+        success: false,
+        message: "Saldo akun tidak mencukupi untuk penambahan nominal.",
+      };
+    }
     console.error("Updating office expense failed:", error);
     return {
       success: false,
