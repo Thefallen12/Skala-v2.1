@@ -159,7 +159,7 @@ export default function ProjectFundRecapTab({
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"ALL" | "PAID" | "PENDING">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Process & Categorize all tickets with material catalog pricing
+  // Rejected tickets are omitted before any project-fund calculation.
   const classifiedTickets = useMemo(() => {
     const cleanStr = (s: string) =>
       s
@@ -169,40 +169,41 @@ export default function ProjectFundRecapTab({
         .replace(/\s+/g, " ")
         .trim();
 
-    return tickets.map((t) => {
-      const cat = classifyTicketFundCategory(t);
-      let amountNum = Number(t.amount || 0);
+    return tickets
+      .filter((ticket) => ticket.status !== "REJECTED")
+      .map((t) => {
+        const cat = classifyTicketFundCategory(t);
+        let amountNum = Number(t.amount || 0);
 
-      // If ticket amount is 0 and it has items, calculate from items * catalog price
-      if (amountNum === 0 && t.items && t.items.length > 0) {
-        let itemsSum = 0;
-        for (const it of t.items) {
-          const qty = Number(it.quantity || 0);
-          const estCost = Number(it.estimatedCost || 0);
-          const targetClean = cleanStr(it.itemName);
+        if (amountNum === 0 && t.items && t.items.length > 0) {
+          let itemsSum = 0;
+          for (const it of t.items) {
+            const qty = Number(it.quantity || 0);
+            const estCost = Number(it.estimatedCost || 0);
+            const targetClean = cleanStr(it.itemName);
 
-          const matchedStock = stockItems.find((s) => {
-            if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
-            if (cleanStr(s.name) === targetClean) return true;
-            const sClean = cleanStr(s.name);
-            return sClean.includes(targetClean) || targetClean.includes(sClean);
-          });
+            const matchedStock = stockItems.find((s) => {
+              if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+              if (cleanStr(s.name) === targetClean) return true;
+              const sClean = cleanStr(s.name);
+              return sClean.includes(targetClean) || targetClean.includes(sClean);
+            });
 
-          const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
-          const unitPrice = stockPrice > 0 ? stockPrice : estCost;
-          itemsSum += qty * unitPrice;
+            const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+            const unitPrice = stockPrice > 0 ? stockPrice : estCost;
+            itemsSum += qty * unitPrice;
+          }
+          if (itemsSum > 0) {
+            amountNum = itemsSum;
+          }
         }
-        if (itemsSum > 0) {
-          amountNum = itemsSum;
-        }
-      }
 
-      return {
-        ...t,
-        category: cat,
-        amountNum,
-      };
-    });
+        return {
+          ...t,
+          category: cat,
+          amountNum,
+        };
+      });
   }, [tickets, stockItems]);
 
   // Aggregated Summary by Category
@@ -225,8 +226,6 @@ export default function ProjectFundRecapTab({
     let grandPaid = 0;
 
     for (const t of classifiedTickets) {
-      if (t.status === "REJECTED") continue;
-
       res[t.category.key].requested += t.amountNum;
       if (t.paid) {
         res[t.category.key].paid += t.amountNum;
@@ -244,7 +243,7 @@ export default function ProjectFundRecapTab({
       grandRequested,
       grandPaid,
       remainingContract: Math.max(0, contractValue - grandRequested),
-      totalTicketsCount: classifiedTickets.filter((t) => t.status !== "REJECTED").length,
+      totalTicketsCount: classifiedTickets.length,
     };
   }, [classifiedTickets, contractValue]);
 
@@ -532,7 +531,7 @@ export default function ProjectFundRecapTab({
           <div>
             <CardTitle className="text-base font-bold">Rincian Pengajuan Dana Berdasarkan Tiket</CardTitle>
             <CardDescription className="text-xs">
-              Daftar seluruh tiket material, upah tukang, dan operasional yang diajukan untuk proyek ini.
+              Daftar tiket yang diperhitungkan. Tiket ditolak tidak masuk rekap ini.
             </CardDescription>
           </div>
 

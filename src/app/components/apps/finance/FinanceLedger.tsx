@@ -48,8 +48,23 @@ export type FinanceCashflowRow = {
   paymentMethod: "TRANSFER" | "CASH" | "DEPOSIT" | null;
   senderName: string | null;
   transferGroupId: string | null;
-  proofUrl: string;
+  proofUrl: string | null;
   createdAt: string;
+  paymentTransactionId: string | null;
+  paymentTransaction: {
+    proofOfTransferUrl: string | null;
+    ticket: { ticketNumber: string; title: string } | null;
+    po: {
+      poNumber: string;
+      vendorName: string;
+      ticket: { ticketNumber: string; title: string } | null;
+    } | null;
+    directStockPurchase: {
+      purchaseNumber: string;
+      vendorName: string;
+      ticket: { ticketNumber: string; title: string } | null;
+    } | null;
+  } | null;
   account: { id: string; accountName: string };
   project: { kelompokTani: string } | null;
   recorder: { name: string };
@@ -134,6 +149,7 @@ type UnifiedLedgerRow = {
   methodAndCounterparty: string;
   amount: number;
   proofUrl: string | null;
+  paymentTransactionId: string | null;
 };
 
 export default function FinanceLedger({
@@ -157,7 +173,11 @@ export default function FinanceLedger({
   onFundModeChange: (mode: "incoming" | "outgoing" | "transfer" | null) => void;
   typeFilter: "IN" | "OUT" | null;
   onTypeFilterChange: (filter: "IN" | "OUT" | null) => void;
-  onPreviewProof: (url: string, label: string) => void;
+  onPreviewProof: (
+    url: string,
+    label: string,
+    paymentTransactionId?: string | null,
+  ) => void;
 }) {
   const router = useRouter();
   const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -186,13 +206,26 @@ export default function FinanceLedger({
         : isIn
           ? "Dana Masuk"
           : "Kas Keluar";
+      const payment = cf.paymentTransaction;
+      const paymentTicket =
+        payment?.ticket ??
+        payment?.po?.ticket ??
+        payment?.directStockPurchase?.ticket;
+      const description = paymentTicket
+        ? `Pembayaran ${paymentTicket.ticketNumber} · ${paymentTicket.title}`
+        : payment?.po
+          ? `Pembayaran ${payment.po.poNumber} · ${payment.po.vendorName}`
+          : payment?.directStockPurchase
+            ? `Pembayaran ${payment.directStockPurchase.purchaseNumber} · ${payment.directStockPurchase.vendorName}`
+            : cf.sourceDesc;
+      const proofUrl = payment?.proofOfTransferUrl ?? cf.proofUrl;
 
       return {
         id: `cf-${cf.id}`,
         createdAt: cf.createdAt,
         direction: cf.type,
         badgeLabel,
-        description: cf.sourceDesc,
+        description,
         subDescription: [
           cf.project?.kelompokTani ? `Proyek: ${cf.project.kelompokTani}` : null,
           `Oleh ${cf.recorder.name}`,
@@ -208,7 +241,8 @@ export default function FinanceLedger({
           .filter(Boolean)
           .join(" · "),
         amount: cf.amount,
-        proofUrl: cf.proofUrl ? withLocalPhotoPreview(cf.proofUrl) : null,
+        proofUrl: proofUrl ? withLocalPhotoPreview(proofUrl) : null,
+        paymentTransactionId: cf.paymentTransactionId,
       };
     });
 
@@ -224,6 +258,7 @@ export default function FinanceLedger({
       methodAndCounterparty: paymentTypeLabel(hp.paymentType),
       amount: hp.amount,
       proofUrl: hp.proofUrl ? withLocalPhotoPreview(hp.proofUrl) : null,
+      paymentTransactionId: hp.id,
     }));
 
     return [...cfRows, ...histRows].sort(
@@ -294,7 +329,11 @@ export default function FinanceLedger({
     });
   };
 
-  const renderProofAction = (proofUrl: string | null, label: string) => {
+  const renderProofAction = (
+    proofUrl: string | null,
+    label: string,
+    paymentTransactionId: string | null,
+  ) => {
     if (!proofUrl) {
       return <span className="text-xs text-muted-foreground">—</span>;
     }
@@ -304,7 +343,7 @@ export default function FinanceLedger({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => onPreviewProof(proofUrl, label)}
+          onClick={() => onPreviewProof(proofUrl, label, paymentTransactionId)}
           className="h-7 gap-1.5 px-2.5 text-xs"
         >
           <Eye className="size-3.5" />
@@ -593,7 +632,11 @@ export default function FinanceLedger({
                     {row.subDescription && <p>{row.subDescription}</p>}
                   </div>
                   <div className="pt-1">
-                    {renderProofAction(row.proofUrl, row.description)}
+                    {renderProofAction(
+                      row.proofUrl,
+                      row.description,
+                      row.paymentTransactionId,
+                    )}
                   </div>
                 </div>
               );
@@ -674,7 +717,11 @@ export default function FinanceLedger({
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {renderProofAction(row.proofUrl, row.description)}
+                        {renderProofAction(
+                          row.proofUrl,
+                          row.description,
+                          row.paymentTransactionId,
+                        )}
                       </TableCell>
                     </TableRow>
                   );

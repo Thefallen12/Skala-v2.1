@@ -35,6 +35,7 @@ import { TicketStatus, TicketType, UserRole } from "@prisma/client";
 import {
   formatTicketCurrency,
   getTicketMonthlyStatistics,
+  getCountableTickets,
   getTotalTicketValueInCents,
 } from "./ticket-statistics";
 
@@ -152,12 +153,16 @@ export default function TicketsApp({
     () => new Set(actionRequired.map((ticket) => ticket.id)),
     [actionRequired],
   );
+  const countableTickets = useMemo(
+    () => getCountableTickets(tickets),
+    [tickets],
+  );
   const monthlyStatistics = useMemo(
     () => getTicketMonthlyStatistics(tickets, 12),
     [tickets],
   );
   const formattedTotal = formatTicketCurrency(
-    getTotalTicketValueInCents(tickets),
+    getTotalTicketValueInCents(countableTickets),
   );
 
   // Stage counts for 4-Step Schema Banner
@@ -387,7 +392,7 @@ export default function TicketsApp({
                     : "border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                Semua Jenis ({tickets.length})
+                Semua Jenis ({countableTickets.length})
               </button>
               <button
                 type="button"
@@ -400,7 +405,7 @@ export default function TicketsApp({
               >
                 <Package className="size-3.5" />
                 Material &amp; Gudang (
-                {tickets.filter((t) => t.type === TicketType.MATERIAL).length})
+                {countableTickets.filter((t) => t.type === TicketType.MATERIAL).length})
               </button>
               <button
                 type="button"
@@ -413,7 +418,7 @@ export default function TicketsApp({
               >
                 <Wallet className="size-3.5" />
                 Biaya &amp; Upah (
-                {tickets.filter((t) => t.type === TicketType.COST).length})
+                {countableTickets.filter((t) => t.type === TicketType.COST).length})
               </button>
               <button
                 type="button"
@@ -426,7 +431,7 @@ export default function TicketsApp({
               >
                 <Wrench className="size-3.5" />
                 Operasional (
-                {tickets.filter((t) => t.type === TicketType.OPERATIONAL).length})
+                {countableTickets.filter((t) => t.type === TicketType.OPERATIONAL).length})
               </button>
             </div>
 

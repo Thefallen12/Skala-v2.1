@@ -235,6 +235,7 @@ export type ProjectWorkstationMasterData = {
   budget: string | null;
   rapMaterialPlans?: {
     id: string;
+    stockItemId: string | null;
     materialName: string;
     unit: string;
     plannedQuantity: number;

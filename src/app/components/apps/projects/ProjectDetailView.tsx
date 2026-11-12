@@ -479,8 +479,11 @@ export default function ProjectDetailView({
     0,
   );
   const savedRapLaborTotal = savedRapLaborPlans.reduce((sum, plan) => {
-    const total = Number(plan.totalBorongan);
-    return sum + (total > 0 ? total : Math.round(plan.volume * Number(plan.boronganRate)));
+    const savedRate = Number(plan.boronganRate);
+    const savedTotal = Number(plan.totalBorongan);
+    const unitPrice =
+      savedRate > 0 ? savedRate : plan.volume > 0 ? savedTotal / plan.volume : 0;
+    return sum + Math.round(plan.volume * unitPrice);
   }, 0);
   const hasSavedRapPlans =
     savedRapMaterials.length > 0 || savedRapLaborPlans.length > 0;
@@ -1713,6 +1716,19 @@ export default function ProjectDetailView({
                           <td className="px-3.5 py-3 text-muted-foreground">Bahan</td>
                           <td className="px-3.5 py-3">
                             <span className="block font-semibold text-foreground">{material.materialName}</span>
+                            {material.stockItemId && (() => {
+                              const linkedStockItem = stockItems.find(
+                                (item) => item.id === material.stockItemId,
+                              );
+                              return (
+                                <span className="block text-[11px] text-muted-foreground">
+                                  Stok: {linkedStockItem?.name ?? "Barang tidak tersedia"}
+                                  {linkedStockItem
+                                    ? ` · ${Number(linkedStockItem.stockQuantity || 0).toLocaleString("id-ID")} ${linkedStockItem.unit}`
+                                    : ""}
+                                </span>
+                              );
+                            })()}
                             <span className="block text-[11px] text-muted-foreground">{scopeTitle}</span>
                             {material.notes && (
                               <span className="block text-[11px] text-muted-foreground">{material.notes}</span>
@@ -1736,29 +1752,39 @@ export default function ProjectDetailView({
                         </tr>
                       );
                     })}
-                    {savedRapLaborPlans.map((labor) => (
-                      <tr key={labor.id} className="hover:bg-muted/10">
-                        <td className="px-3.5 py-3 text-muted-foreground">Jasa</td>
-                        <td className="px-3.5 py-3">
-                          <span className="block font-semibold text-foreground">{labor.jobName}</span>
-                          {labor.subkonName && (
-                            <span className="block text-[11px] text-muted-foreground">{labor.subkonName}</span>
-                          )}
-                          {labor.notes && (
-                            <span className="block text-[11px] text-muted-foreground">{labor.notes}</span>
-                          )}
-                        </td>
-                        <td className="px-3.5 py-3 text-right font-mono">
-                          {labor.volume.toLocaleString("id-ID", { maximumFractionDigits: 3 })} {labor.unit}
-                        </td>
-                        <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">
-                          {currency(labor.boronganRate)}
-                        </td>
-                        <td className="px-3.5 py-3 text-right font-mono font-semibold whitespace-nowrap">
-                          {currency(labor.totalBorongan)}
-                        </td>
-                      </tr>
-                    ))}
+                    {savedRapLaborPlans.map((labor) => {
+                      const unitPrice =
+                        Number(labor.boronganRate) > 0
+                          ? Number(labor.boronganRate)
+                          : labor.volume > 0
+                            ? Number(labor.totalBorongan) / labor.volume
+                            : 0;
+                      const lineTotal = Math.round(labor.volume * unitPrice);
+
+                      return (
+                        <tr key={labor.id} className="hover:bg-muted/10">
+                          <td className="px-3.5 py-3 text-muted-foreground">Jasa</td>
+                          <td className="px-3.5 py-3">
+                            <span className="block font-semibold text-foreground">{labor.jobName}</span>
+                            {labor.subkonName && (
+                              <span className="block text-[11px] text-muted-foreground">{labor.subkonName}</span>
+                            )}
+                            {labor.notes && (
+                              <span className="block text-[11px] text-muted-foreground">{labor.notes}</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-3 text-right font-mono">
+                            {labor.volume.toLocaleString("id-ID", { maximumFractionDigits: 3 })} {labor.unit}
+                          </td>
+                          <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">
+                            {currency(unitPrice)}
+                          </td>
+                          <td className="px-3.5 py-3 text-right font-mono font-semibold whitespace-nowrap">
+                            {currency(lineTotal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                   <tfoot className="border-t-2 border-border bg-muted/30 font-semibold">
                     <tr>
@@ -2373,6 +2399,7 @@ export default function ProjectDetailView({
         projectId={project.id}
         projectTitle={project.title}
         paguRab={totalRabNumber}
+        stockItems={stockItems}
         onSuccess={() => router.refresh()}
       />
 

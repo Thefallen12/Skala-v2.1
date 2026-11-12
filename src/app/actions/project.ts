@@ -2480,6 +2480,7 @@ export async function getProjectRap(projectId: string) {
     })),
     materialPlans: materialPlans.map((m) => ({
       id: m.id,
+      stockItemId: m.stockItemId,
       materialName: m.materialName,
       unit: m.unit,
       plannedQuantity: m.plannedQuantity,
@@ -2521,6 +2522,7 @@ export async function saveProjectRap(
   input: {
     materialPlans: Array<{
       id?: string;
+      stockItemId?: string;
       materialName: string;
       unit: string;
       plannedQuantity?: number;
@@ -2553,6 +2555,25 @@ export async function saveProjectRap(
   try {
     let totalMaterial = 0;
     let totalLabor = 0;
+    const linkedStockItemIds = [
+      ...new Set(
+        input.materialPlans.flatMap((material) =>
+          material.stockItemId ? [material.stockItemId] : [],
+        ),
+      ),
+    ];
+    if (linkedStockItemIds.length > 0) {
+      const existingStockItems = await prisma.stockItem.findMany({
+        where: { id: { in: linkedStockItemIds } },
+        select: { id: true },
+      });
+      if (existingStockItems.length !== linkedStockItemIds.length) {
+        return {
+          success: false,
+          message: "Barang stok tidak ditemukan. Pilih ulang barang stok sebelum menyimpan RAP.",
+        };
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       // 1. Simpan Bahan RAP
@@ -2568,6 +2589,7 @@ export async function saveProjectRap(
         await tx.projectMaterialPlan.create({
           data: {
             projectId,
+            stockItemId: m.stockItemId || null,
             materialName: m.materialName.trim(),
             unit: m.unit || "unit",
             plannedQuantity: m.plannedQuantity || 0,
@@ -2586,8 +2608,14 @@ export async function saveProjectRap(
       for (const l of input.laborPlans) {
         if (!l.jobName?.trim()) continue;
         const vol = Math.max(0, l.volume || 1);
-        const rate = Math.max(0, l.boronganRate || 0);
-        const lineTotal = l.totalBorongan > 0 ? l.totalBorongan : Math.round(vol * rate);
+        const submittedRate = Math.max(0, l.boronganRate || 0);
+        const rate =
+          submittedRate > 0
+            ? submittedRate
+            : vol > 0 && l.totalBorongan > 0
+              ? l.totalBorongan / vol
+              : 0;
+        const lineTotal = Math.round(vol * rate);
         totalLabor += lineTotal;
 
         await tx.projectLaborPlan.create({

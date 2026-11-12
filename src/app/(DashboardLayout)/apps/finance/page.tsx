@@ -162,6 +162,7 @@ export default async function FinancePage({
             status: true,
             proofOfTransferUrl: true,
             additionalProofUrls: true,
+            proofEditDisabledUrls: true,
             paidAt: true,
           },
         },
@@ -244,6 +245,7 @@ export default async function FinancePage({
             status: true,
             proofOfTransferUrl: true,
             additionalProofUrls: true,
+            proofEditDisabledUrls: true,
             paidAt: true,
           },
         },
@@ -285,6 +287,7 @@ export default async function FinancePage({
             status: true,
             proofOfTransferUrl: true,
             additionalProofUrls: true,
+            proofEditDisabledUrls: true,
             paidAt: true,
           },
         },
@@ -377,6 +380,7 @@ export default async function FinancePage({
                 status: true,
                 proofOfTransferUrl: true,
                 additionalProofUrls: true,
+                proofEditDisabledUrls: true,
                 paidAt: true,
               },
             },
@@ -394,6 +398,7 @@ export default async function FinancePage({
             status: true,
             proofOfTransferUrl: true,
             additionalProofUrls: true,
+            proofEditDisabledUrls: true,
             paidAt: true,
           },
         },
@@ -555,6 +560,37 @@ export default async function FinancePage({
         transferGroupId: true,
         proofUrl: true,
         createdAt: true,
+        paymentTransactionId: true,
+        paymentTransaction: {
+          select: {
+            proofOfTransferUrl: true,
+            ticket: {
+              select: { ticketNumber: true, title: true },
+            },
+            po: {
+              select: {
+                poNumber: true,
+                vendorName: true,
+                ticket: {
+                  select: canViewAPH
+                    ? { ticketNumber: true, title: true }
+                    : undefined,
+                },
+              },
+            },
+            directStockPurchase: {
+              select: {
+                purchaseNumber: true,
+                vendorName: true,
+                ticket: {
+                  select: canViewAPH
+                    ? { ticketNumber: true, title: true }
+                    : undefined,
+                },
+              },
+            },
+          },
+        },
         account: { select: { id: true, accountName: true } },
         project: { select: { kelompokTani: true } },
         recorder: { select: { name: true } },

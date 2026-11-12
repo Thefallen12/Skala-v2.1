@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import {
   TicketFieldCategory,
+  TicketStatus,
   TicketType,
   UserRole,
 } from "@prisma/client";
@@ -23,6 +24,7 @@ export async function getPaidProjectTicketRealization(
   const tickets = await prisma.ticket.findMany({
     where: {
       projectId: { in: projectIds },
+      status: { not: TicketStatus.REJECTED },
       requester: {
         is: {
           role: { in: [UserRole.FIELD_TEAM, UserRole.KOORDINATOR] },

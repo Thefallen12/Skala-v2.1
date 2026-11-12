@@ -4958,6 +4958,7 @@ export async function processFinancePayment(
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
           additionalProofUrls: receiptUrls.slice(1),
+          proofEditDisabledUrls: receiptUrls,
           paidAt: now,
         },
         select: { id: true },
@@ -5308,6 +5309,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
           additionalProofUrls: receiptUrls.slice(1),
+          proofEditDisabledUrls: receiptUrls,
           paidAt: now,
         },
         select: { id: true },
@@ -5538,6 +5540,7 @@ export async function processFinanceDirectStockPurchasePayment(
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
           additionalProofUrls: receiptUrls.slice(1),
+          proofEditDisabledUrls: receiptUrls,
           paidAt: now,
         },
         select: { id: true },
@@ -5713,6 +5716,8 @@ export async function submitPaymentRecord(input: {
 
 export async function replaceFinancePaymentProof(
   paymentTransactionId: string,
+  existingProofUrl: string,
+  proofIndex: number,
   file: File,
 ): Promise<TicketActionResult> {
   const session = await auth();
@@ -5722,44 +5727,109 @@ export async function replaceFinancePaymentProof(
   if (
     !isBoundedText(paymentTransactionId, 191) ||
     !paymentTransactionId.trim() ||
+    !isFinancePaymentProofUrl(existingProofUrl) ||
+    !Number.isInteger(proofIndex) ||
+    proofIndex < 0 ||
+    proofIndex > 4 ||
     !(file instanceof File) ||
     file.size < 1 ||
     file.size > 5 * 1024 * 1024
   ) {
     return actionFailure("Pilih file bukti (PDF/JPG/PNG/WEBP) maksimal 5 MB.");
   }
+  const isReplacingPhoto = /\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(
+    existingProofUrl,
+  );
+  const isPhotoFile = ["image/jpeg", "image/png", "image/webp"].includes(
+    file.type,
+  );
+  if (
+    (isReplacingPhoto && !isPhotoFile) ||
+    (!isReplacingPhoto &&
+      !isPhotoFile &&
+      file.type !== "application/pdf")
+  ) {
+    return actionFailure(
+      isReplacingPhoto
+        ? "Foto pengganti harus berformat JPG, PNG, atau WEBP."
+        : "File pengganti harus PDF, JPG, PNG, atau WEBP.",
+    );
+  }
 
   let uploadedProofUrl: string | null = null;
   try {
-    uploadedProofUrl = await storeFinancePaymentProof(file);
-    if (!isFinancePaymentProofUrl(uploadedProofUrl)) {
+    const storedProofUrl = await storeFinancePaymentProof(file);
+    uploadedProofUrl = storedProofUrl;
+    if (!isFinancePaymentProofUrl(storedProofUrl)) {
       throw new Error("Cloudinary mengembalikan URL bukti yang tidak valid.");
     }
 
-    const updated = await prisma.paymentTransaction.updateMany({
-      where: {
-        id: paymentTransactionId.trim(),
-        status: PaymentStatus.PAID,
-        proofOfTransferUrl: { startsWith: "/api/tickets/receipts/" },
-      },
-      data: { proofOfTransferUrl: uploadedProofUrl },
+    const updated = await prisma.$transaction(async (transaction) => {
+      const currentPayment = await transaction.paymentTransaction.findFirst({
+        where: {
+          id: paymentTransactionId.trim(),
+          status: PaymentStatus.PAID,
+        },
+        select: {
+          proofOfTransferUrl: true,
+          additionalProofUrls: true,
+          proofEditDisabledUrls: true,
+        },
+      });
+      if (!currentPayment) {
+        return false;
+      }
+
+      if (
+        (proofIndex === 0
+          ? currentPayment.proofOfTransferUrl !== existingProofUrl
+          : currentPayment.additionalProofUrls[proofIndex - 1] !==
+            existingProofUrl) ||
+        currentPayment.proofEditDisabledUrls.includes(existingProofUrl)
+      ) {
+        return false;
+      }
+
+      const nextAdditionalProofUrls = currentPayment.additionalProofUrls.slice();
+      if (proofIndex > 0) {
+        nextAdditionalProofUrls[proofIndex - 1] = storedProofUrl;
+      }
+      await transaction.paymentTransaction.update({
+        where: { id: paymentTransactionId.trim() },
+        data: {
+          proofOfTransferUrl:
+            proofIndex === 0
+              ? storedProofUrl
+              : currentPayment.proofOfTransferUrl ?? undefined,
+          additionalProofUrls: nextAdditionalProofUrls,
+          proofEditDisabledUrls: [
+            ...currentPayment.proofEditDisabledUrls,
+            storedProofUrl,
+          ],
+        },
+      });
+
+      if (proofIndex === 0) {
+        await transaction.cashflow.updateMany({
+          where: { paymentTransactionId: paymentTransactionId.trim() },
+          data: { proofUrl: storedProofUrl },
+        });
+        await transaction.orderConfirmation.updateMany({
+          where: { paymentTransactionId: paymentTransactionId.trim() },
+          data: { proofOfTransferUrl: storedProofUrl },
+        });
+      }
+      return true;
     });
-    if (updated.count !== 1) {
-      await removeTicketReceipt(uploadedProofUrl);
+    if (!updated) {
+      await removeFinancePaymentProofs([uploadedProofUrl]);
       return actionFailure(
         "Transaksi tidak ditemukan atau bukti transfernya sudah diperbarui.",
       );
     }
   } catch (error) {
     if (uploadedProofUrl) {
-      try {
-        await removeTicketReceipt(uploadedProofUrl);
-      } catch (cleanupError) {
-        console.error(
-          "Failed to remove an unreferenced replacement payment proof:",
-          cleanupError,
-        );
-      }
+      await removeFinancePaymentProofs([uploadedProofUrl]);
     }
     console.error("Finance payment proof replacement failed:", error);
     if (

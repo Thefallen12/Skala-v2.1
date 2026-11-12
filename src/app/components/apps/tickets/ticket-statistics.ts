@@ -1,5 +1,5 @@
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
-import { TicketRequestCategory, TicketType } from "@prisma/client";
+import { TicketRequestCategory, TicketStatus, TicketType } from "@prisma/client";
 
 export type TicketStatisticsMonth = {
   key: string;
@@ -21,8 +21,13 @@ export function categoryForTicket(ticket: TicketRow): TicketRequestCategory {
   return TicketRequestCategory.OFFICE;
 }
 
+export function getCountableTickets(tickets: readonly TicketRow[]): TicketRow[] {
+  return tickets.filter((ticket) => ticket.status !== TicketStatus.REJECTED);
+}
+
 export function getTotalTicketValueInCents(tickets: TicketRow[]): bigint {
   return tickets.reduce((sum, ticket) => {
+    if (ticket.status === TicketStatus.REJECTED) return sum;
     const amount = ticket.totalAmount;
     if (!amount || !/^\d+(\.\d{1,2})?$/.test(amount)) return sum;
     const [whole, fraction = ""] = amount.split(".");
@@ -64,6 +69,7 @@ export function getTicketMonthlyStatistics(
   const monthByKey = new Map(months.map((month) => [month.key, month]));
 
   for (const ticket of tickets) {
+    if (ticket.status === TicketStatus.REJECTED) continue;
     if (category !== "ALL" && categoryForTicket(ticket) !== category) continue;
     const createdAt = new Date(ticket.createdAt);
     if (Number.isNaN(createdAt.getTime())) continue;

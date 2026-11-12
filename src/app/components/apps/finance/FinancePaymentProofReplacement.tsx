@@ -8,12 +8,18 @@ import { Input } from "@/components/ui/input";
 
 export default function FinancePaymentProofReplacement({
   paymentTransactionId,
+  existingProofUrl,
+  proofIndex,
   label,
   onSaved,
+  buttonLabel = "Edit",
 }: {
   paymentTransactionId: string;
+  existingProofUrl?: string;
+  proofIndex?: number;
   label: string;
   onSaved: () => void;
+  buttonLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -24,7 +30,11 @@ export default function FinancePaymentProofReplacement({
   const submitReplacement = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!proofFile) {
-      setMessage("Pilih foto pengganti sebelum menyimpan.");
+      setMessage("Pilih foto asli yang akan menggantikan bukti ini.");
+      return;
+    }
+    if (!existingProofUrl || proofIndex === undefined) {
+      setMessage("Bukti ini tidak dapat diedit dari tampilan ini.");
       return;
     }
 
@@ -34,6 +44,8 @@ export default function FinancePaymentProofReplacement({
       try {
         const result = await replaceFinancePaymentProof(
           paymentTransactionId,
+          existingProofUrl,
+          proofIndex,
           selectedFile,
         );
         if (!result.success) {
@@ -57,13 +69,14 @@ export default function FinancePaymentProofReplacement({
         type="button"
         size="sm"
         variant="outline"
+        disabled={isPending}
         onClick={(event) => {
           event.stopPropagation();
           setMessage("");
           setOpen(true);
         }}
       >
-        Unggah Ulang
+        {buttonLabel}
       </Button>
       <GlobalModal
         isOpen={open}
@@ -74,8 +87,12 @@ export default function FinancePaymentProofReplacement({
           setMessage("");
           if (fileInputRef.current) fileInputRef.current.value = "";
         }}
-        title="Unggah Ulang Bukti Transfer"
-        description={`Pilih file pengganti untuk ${label}. Foto diunggah ke Cloudinary, sedangkan PDF disimpan sebagai aset privat Cloudinary.`}
+        title={buttonLabel === "Edit" ? "Edit Foto Bukti" : "Unggah Ulang Bukti"}
+        description={
+          buttonLabel === "Edit"
+            ? `Pilih foto asli untuk menggantikan ${label}. Foto pengganti akan disimpan sebagai bukti baru.`
+            : `Pilih file pengganti untuk ${label}. PDF disimpan sebagai aset privat.`
+        }
         className="sm:max-w-xl"
         footer={
           <>
@@ -110,7 +127,11 @@ export default function FinancePaymentProofReplacement({
             <Input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
+              accept={
+                buttonLabel === "Edit"
+                  ? "image/jpeg,image/png,image/webp"
+                  : "image/jpeg,image/png,image/webp,application/pdf"
+              }
               onChange={(event) => {
                 setProofFile(event.target.files?.[0] ?? null);
                 setMessage("");
@@ -118,7 +139,9 @@ export default function FinancePaymentProofReplacement({
               disabled={isPending}
             />
             <p className="text-xs text-muted-foreground">
-              PDF, JPG, PNG, atau WEBP; maksimal 5 MB.
+              {buttonLabel === "Edit"
+                ? "JPG, PNG, atau WEBP; maksimal 5 MB."
+                : "PDF, JPG, PNG, atau WEBP; maksimal 5 MB."}
             </p>
             {proofFile && (
               <p className="text-sm text-muted-foreground" role="status">

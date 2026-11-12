@@ -427,6 +427,7 @@ export default function LogisticsWorkspace({
     const amounts = days.map(() => 0);
     const dayIndex = new Map(days.map((day, index) => [day, index]));
     for (const ticket of periodTickets) {
+      if (ticket.status === TicketStatus.REJECTED) continue;
       const index = dayIndex.get(getJakartaDateKey(new Date(ticket.createdAt)));
       if (index === undefined) continue;
       orders[index] += 1;
@@ -461,7 +462,10 @@ export default function LogisticsWorkspace({
       ticket.status === TicketStatus.IN_TRANSIT,
   ).length;
   const totalValue = tickets.reduce(
-    (sum, ticket) => sum + Number(ticket.totalAmount ?? 0),
+    (sum, ticket) =>
+      ticket.status === TicketStatus.REJECTED
+        ? sum
+        : sum + Number(ticket.totalAmount ?? 0),
     0,
   );
 

@@ -21,10 +21,10 @@ export async function generateMetadata({
   const { id } = await params;
   const project = await prisma.project.findFirst({
     where: { OR: [{ id }, { code: id }], isDeleted: false },
-    select: { title: true, code: true },
+    select: { title: true, name: true },
   });
   return {
-    title: project ? `${project.title} (${project.code})` : "Detail Proyek",
+    title: `Detail | ${project?.title || project?.name || "Proyek"}`,
   };
 }
 
@@ -132,6 +132,7 @@ export default async function ProjectDetailPage({
       name: true,
       unit: true,
       category: true,
+      stockQuantity: true,
       unitPrice: true,
     },
   });
@@ -142,6 +143,7 @@ export default async function ProjectDetailPage({
     name: item.name,
     unit: item.unit,
     category: item.category,
+    stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
     unitPrice:
       item.unitPrice !== null
         ? decimalStringFromScaledInteger(item.unitPrice)
@@ -243,6 +245,7 @@ export default async function ProjectDetailPage({
         : null,
     rapMaterialPlans: project.materialPlans.map((plan) => ({
       id: plan.id,
+      stockItemId: plan.stockItemId,
       materialName: plan.materialName,
       unit: plan.unit,
       plannedQuantity: plan.plannedQuantity,

@@ -42,6 +42,7 @@ export type StockItemOption = {
   name: string;
   unit: string;
   category: string;
+  stockQuantity?: string | number | null;
   unitPrice?: string | number | null;
 };
 

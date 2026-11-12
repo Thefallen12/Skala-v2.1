@@ -108,7 +108,12 @@ export async function uploadCloudinaryPhoto(
   configureCloudinary();
   return new Promise((resolveUpload, rejectUpload) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: "image" },
+      {
+        folder,
+        public_id: randomUUID(),
+        overwrite: false,
+        resource_type: "image",
+      },
       (error, response) => {
         if (error) {
           rejectUpload(error);

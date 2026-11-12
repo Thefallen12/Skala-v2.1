@@ -201,7 +201,10 @@ export default async function DashboardPage() {
       select: { createdAt: true },
     }),
     prisma.ticket.findMany({
-      where: { createdAt: { gte: yearStart, lt: nextYearStart } },
+      where: {
+        createdAt: { gte: yearStart, lt: nextYearStart },
+        status: { not: TicketStatus.REJECTED },
+      },
       select: { createdAt: true },
     }),
     prisma.drawingDocument.count(),

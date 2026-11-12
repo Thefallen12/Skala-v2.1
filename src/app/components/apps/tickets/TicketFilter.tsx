@@ -5,6 +5,7 @@ import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import { TicketStatus } from "@prisma/client";
 import {
   formatTicketCurrency,
+  getCountableTickets,
   getTotalTicketValueInCents,
 } from "./ticket-statistics";
 
@@ -19,14 +20,15 @@ export default function TicketFilter({
   setFilter: (filter: string) => void;
   actionRequiredCount: number;
 }) {
-  const activeCount = tickets.filter(
+  const countableTickets = getCountableTickets(tickets);
+  const activeCount = countableTickets.filter(
     (ticket) =>
       ticket.status !== TicketStatus.DRAFT &&
       ticket.status !== TicketStatus.COMPLETED &&
       ticket.status !== TicketStatus.REJECTED,
   ).length;
 
-  const completedCount = tickets.filter(
+  const completedCount = countableTickets.filter(
     (ticket) => ticket.status === TicketStatus.COMPLETED,
   ).length;
 
@@ -34,8 +36,8 @@ export default function TicketFilter({
     {
       filter: "ALL",
       title: "Semua Tiket",
-      subtitle: "Total seluruh pengajuan",
-      count: tickets.length,
+      subtitle: "Total pengajuan yang tidak ditolak",
+      count: countableTickets.length,
       icon: ClipboardList,
       iconStyle: "bg-primary/15 text-primary border-primary/25",
       activeRing: "border-primary bg-primary/5 ring-2 ring-primary/25",
@@ -142,10 +144,10 @@ export default function TicketFilter({
         </div>
         <div className="mt-2">
           <p className="truncate text-lg font-extrabold tracking-tight text-foreground tabular-nums sm:text-xl">
-            {formatTicketCurrency(getTotalTicketValueInCents(tickets))}
+            {formatTicketCurrency(getTotalTicketValueInCents(countableTickets))}
           </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Akumulasi seluruh tiket terdaftar
+            Akumulasi tiket yang tidak ditolak
           </p>
         </div>
       </div>

@@ -2,10 +2,12 @@
 
 import Chart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
-import { TicketRequestCategory } from "@prisma/client";
+import { TicketRequestCategory, TicketStatus } from "@prisma/client";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
-import { categoryForTicket } from "./ticket-statistics";
-import { TicketStatus } from "@prisma/client";
+import {
+  categoryForTicket,
+  getCountableTickets,
+} from "./ticket-statistics";
 
 const statusLabels: Partial<Record<TicketStatus, string>> = {
   PENDING_DIRECTOR: "Menunggu Persetujuan Direktur",
@@ -73,9 +75,10 @@ export default function TicketRequestDistributionChart({
   tickets: TicketRow[];
   compact?: boolean;
 }) {
+  const countableTickets = getCountableTickets(tickets);
   const counts = categories.map(
     (category) =>
-      tickets.filter((ticket) => categoryForTicket(ticket) === category.value)
+      countableTickets.filter((ticket) => categoryForTicket(ticket) === category.value)
         .length,
   );
   const populatedCategories = categories
@@ -116,7 +119,7 @@ export default function TicketRequestDistributionChart({
             total: {
               show: true,
               label: "Total tiket",
-              formatter: () => `${tickets.length}`,
+              formatter: () => `${countableTickets.length}`,
             },
           },
         },
@@ -129,7 +132,7 @@ export default function TicketRequestDistributionChart({
 
   return (
     <div>
-      {tickets.length > 0 ? (
+      {countableTickets.length > 0 ? (
         <>
           <Chart
             options={options}
@@ -180,7 +183,7 @@ export default function TicketRequestDistributionChart({
         </>
       ) : (
         <div className="flex h-[220px] items-center justify-center text-center text-sm text-muted-foreground">
-          Belum ada data jenis permintaan.
+          Tidak ada tiket yang dapat dihitung; tiket ditolak dikecualikan.
         </div>
       )}
     </div>

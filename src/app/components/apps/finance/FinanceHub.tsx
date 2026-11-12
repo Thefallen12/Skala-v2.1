@@ -152,6 +152,7 @@ type PaymentTransaction = {
   status: string;
   proofOfTransferUrl: string | null;
   additionalProofUrls: string[];
+  proofEditDisabledUrls: string[];
   paidAt: string | null;
 };
 
@@ -208,6 +209,7 @@ type FinanceHistoryTransaction = {
   transferDestination: string;
   proofOfTransferUrl: string | null;
   additionalProofUrls: string[];
+  proofEditDisabledUrls: string[];
   paidAt: string | null;
 };
 
@@ -1010,6 +1012,8 @@ export default function FinanceHub({
     paymentTransactionId: string,
     url: string | null,
     label: string,
+    proofIndex: number,
+    canEdit: boolean,
   ) => {
     if (!url) {
       return <span className="text-muted-foreground">Tidak ada bukti</span>;
@@ -1026,9 +1030,11 @@ export default function FinanceHub({
               <FileText className="size-4 shrink-0" aria-hidden="true" />
               Foto bukti tidak dapat dimuat
             </span>
-            {url.startsWith("/api/tickets/receipts/") && (
+            {canEdit && (
               <FinancePaymentProofReplacement
                 paymentTransactionId={paymentTransactionId}
+                existingProofUrl={url}
+                proofIndex={proofIndex}
                 label={label}
                 onSaved={() => router.refresh()}
               />
@@ -1038,19 +1044,30 @@ export default function FinanceHub({
       }
 
       return (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1.5 px-2.5 text-xs"
-          onClick={(event) => {
-            event.stopPropagation();
-            setReceiptPreview({ label, url });
-          }}
-        >
-          <Eye className="size-3.5" aria-hidden="true" />
-          Lihat Bukti
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-xs"
+            onClick={(event) => {
+              event.stopPropagation();
+              setReceiptPreview({ label, url });
+            }}
+          >
+            <Eye className="size-3.5" aria-hidden="true" />
+            Lihat Bukti
+          </Button>
+          {canEdit && (
+            <FinancePaymentProofReplacement
+              paymentTransactionId={paymentTransactionId}
+              existingProofUrl={url}
+              proofIndex={proofIndex}
+              label={label}
+              onSaved={() => router.refresh()}
+            />
+          )}
+        </div>
       );
     }
 
@@ -1072,11 +1089,14 @@ export default function FinanceHub({
             Buka Dokumen
           </a>
         </Button>
-        {url.startsWith("/api/tickets/receipts/") && (
+        {url.startsWith("/api/tickets/receipts/") && canEdit && (
           <FinancePaymentProofReplacement
             paymentTransactionId={paymentTransactionId}
+            existingProofUrl={url}
+            proofIndex={proofIndex}
             label={label}
             onSaved={() => router.refresh()}
+            buttonLabel="Unggah Ulang"
           />
         )}
       </div>
@@ -1087,22 +1107,28 @@ export default function FinanceHub({
     paymentTransactionId: string,
     url: string | null,
     additionalUrls: string[],
+    editDisabledUrls: string[],
     label: string,
   ) => {
-    const urls = [url, ...additionalUrls].filter(
-      (proofUrl): proofUrl is string => Boolean(proofUrl),
-    );
+    const urls = [url, ...additionalUrls]
+      .map((proofUrl, index) => ({ proofUrl, index }))
+      .filter(
+        (proof): proof is { proofUrl: string; index: number } =>
+          Boolean(proof.proofUrl),
+      );
     if (urls.length === 0) {
       return <span className="text-muted-foreground">Tidak ada bukti</span>;
     }
     return (
       <div className="flex flex-wrap items-center gap-2">
-        {urls.map((proofUrl, index) => (
+        {urls.map(({ proofUrl, index }) => (
           <div key={`${proofUrl}-${index}`}>
             {renderSinglePaymentProof(
               paymentTransactionId,
               proofUrl,
               urls.length > 1 ? `${label} ${index + 1}` : label,
+              index,
+              role === UserRole.FINANCE && !editDisabledUrls.includes(proofUrl),
             )}
           </div>
         ))}
@@ -1963,6 +1989,7 @@ export default function FinanceHub({
                             payment.id,
                             payment.proofOfTransferUrl,
                             payment.additionalProofUrls ?? [],
+                            payment.proofEditDisabledUrls ?? [],
                             `Bukti transfer ${payment.reference}`,
                           )}
                         </TableCell>
@@ -3255,6 +3282,7 @@ export default function FinanceHub({
                               payment.id,
                               payment.proofOfTransferUrl,
                               payment.additionalProofUrls ?? [],
+                              payment.proofEditDisabledUrls ?? [],
                               `Bukti transfer ${payment.transferDestination}`,
                             )}
                           </td>

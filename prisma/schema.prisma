@@ -838,6 +838,8 @@ model ProjectMaterialPlan {
   id              String   @id @default(cuid()) @map("_id")
   projectId       String
   project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stockItemId     String?
+  stockItem       StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
   workPointId     String?
   materialName    String
   unit            String
@@ -993,6 +995,7 @@ model StockItem {
   directPurchaseItems DirectStockPurchaseItem[]
   movements           StockMovement[]
   purchaseOrderItems  POItem[]
+  projectMaterialPlans ProjectMaterialPlan[]
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -1503,6 +1506,7 @@ model PaymentTransaction {
   processedBy             User?                @relation("PaymentTransactionProcessor", fields: [processedById], references: [id], onDelete: SetNull)
   proofOfTransferUrl      String?
   additionalProofUrls     String[]             @default([])
+  proofEditDisabledUrls   String[]             @default([])
   paidAt                  DateTime?
   confirmationOrderNumber String?              @unique
   vendorSentAt            DateTime?

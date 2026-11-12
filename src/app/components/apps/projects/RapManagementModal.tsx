@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getProjectRap, saveProjectRap } from "@/app/actions/project";
+import type { StockItemOption } from "./MaterialPlanModal";
 
 export interface RabMaterialOption {
   id: string;
@@ -30,6 +31,7 @@ export interface RabMaterialOption {
 
 export interface MaterialPlanItem {
   id?: string;
+  stockItemId?: string;
   materialName: string;
   unit: string;
   plannedQuantity: number;
@@ -58,7 +60,22 @@ interface RapManagementModalProps {
   projectId: string;
   projectTitle: string;
   paguRab: number;
+  stockItems?: StockItemOption[];
   onSuccess?: () => void;
+}
+
+function findMatchingStockItem(
+  stockItems: StockItemOption[],
+  materialName: string,
+  unit: string,
+) {
+  const normalizedName = materialName.trim().toLocaleLowerCase();
+  const normalizedUnit = unit.trim().toLocaleLowerCase();
+  return stockItems.find(
+    (item) =>
+      item.name.trim().toLocaleLowerCase() === normalizedName &&
+      item.unit.trim().toLocaleLowerCase() === normalizedUnit,
+  );
 }
 
 export default function RapManagementModal({
@@ -67,6 +84,7 @@ export default function RapManagementModal({
   projectId,
   projectTitle,
   paguRab,
+  stockItems = [],
   onSuccess,
 }: RapManagementModalProps) {
   const [activeTab, setActiveTab] = useState<"materials" | "labor">("materials");
@@ -92,7 +110,14 @@ export default function RapManagementModal({
         if (res && res.success) {
           setRabMaterials(res.rabMaterials || []);
           if (res.materialPlans && res.materialPlans.length > 0) {
-            setMaterialPlans(res.materialPlans);
+            setMaterialPlans(
+              res.materialPlans.map((material) => ({
+                ...material,
+                stockItemId:
+                  material.stockItemId ||
+                  findMatchingStockItem(stockItems, material.materialName, material.unit)?.id,
+              })),
+            );
           } else if (res.rabMaterials && res.rabMaterials.length > 0) {
             // Auto populate from rab materials if empty
             setMaterialPlans(
@@ -103,26 +128,45 @@ export default function RapManagementModal({
                 actualQuantity: m.quantity || 0,
                 unitPrice: m.rabPrice ? Math.round(m.rabPrice * 0.85) : 0, // Estimasi awal RAP 85% harga RAB
                 totalPrice: 0,
+                stockItemId: findMatchingStockItem(stockItems, m.name, m.unit)?.id,
               }))
             );
           }
 
           if (res.laborPlans && res.laborPlans.length > 0) {
-            setLaborPlans(res.laborPlans);
+            setLaborPlans(
+              res.laborPlans.map((labor) => {
+                const volume = Math.max(0, Number(labor.volume) || 0);
+                const savedRate = Math.max(0, Number(labor.boronganRate) || 0);
+                const savedTotal = Math.max(0, Number(labor.totalBorongan) || 0);
+                const rate =
+                  savedRate > 0 ? savedRate : volume > 0 ? savedTotal / volume : 0;
+
+                return {
+                  ...labor,
+                  boronganRate: rate,
+                  totalBorongan: Math.round(volume * rate),
+                };
+              }),
+            );
           } else if (res.workPoints && res.workPoints.length > 0) {
             // Auto populate labor items from work points
-            setLaborPlans(
-              res.workPoints.map((wp) => ({
+            setLaborPlans(res.workPoints.map((wp) => {
+              const volume = Math.max(0, Number(wp.volume) || 0);
+              const estimatedTotal = Math.round(wp.totalRab * 0.3);
+              const boronganRate = volume > 0 ? estimatedTotal / volume : 0;
+
+              return {
                 workPointId: wp.id,
                 jobName: wp.title,
-                volume: wp.volume,
+                volume,
                 unit: wp.unit,
-                boronganRate: 0,
-                totalBorongan: Math.round(wp.totalRab * 0.3), // Estimasi porsi upah borongan 30% dari nilai pekerjaan
+                boronganRate,
+                totalBorongan: Math.round(volume * boronganRate),
                 subkonName: "Mandor Lapangan",
                 notes: wp.location || "",
-              }))
-            );
+              };
+            }));
           }
         }
       })
@@ -133,7 +177,7 @@ export default function RapManagementModal({
       .finally(() => {
         setIsLoading(false);
       });
-  }, [isOpen, projectId]);
+  }, [isOpen, projectId, stockItems]);
 
   // Calculations
   const totalMaterialCost = materialPlans.reduce(
@@ -141,10 +185,10 @@ export default function RapManagementModal({
     0
   );
 
-  const totalLaborCost = laborPlans.reduce((sum, l) => {
-    const total = l.totalBorongan > 0 ? l.totalBorongan : Math.round((l.volume || 1) * (l.boronganRate || 0));
-    return sum + total;
-  }, 0);
+  const totalLaborCost = laborPlans.reduce(
+    (sum, labor) => sum + Math.round(Math.max(0, labor.volume) * Math.max(0, labor.boronganRate)),
+    0,
+  );
 
   const totalRap = totalMaterialCost + totalLaborCost;
   const profitAmount = paguRab - totalRap;
@@ -161,6 +205,9 @@ export default function RapManagementModal({
         plannedQuantity: firstRabMat?.quantity || 0,
         actualQuantity: firstRabMat?.quantity || 1,
         unitPrice: firstRabMat?.rabPrice ? Math.round(firstRabMat.rabPrice * 0.85) : 0,
+        stockItemId: firstRabMat
+          ? findMatchingStockItem(stockItems, firstRabMat.name, firstRabMat.unit)?.id
+          : undefined,
       },
     ]);
   };
@@ -177,8 +224,19 @@ export default function RapManagementModal({
           plannedQuantity: selected?.quantity ?? item.plannedQuantity,
           actualQuantity: selected?.quantity ?? item.actualQuantity,
           unitPrice: selected?.rabPrice ? Math.round(selected.rabPrice * 0.85) : item.unitPrice,
+          stockItemId: selected
+            ? findMatchingStockItem(stockItems, selected.name, selected.unit)?.id
+            : undefined,
         };
       })
+    );
+  };
+
+  const handleSelectStockItem = (index: number, stockItemId: string) => {
+    setMaterialPlans((prev) =>
+      prev.map((item, idx) =>
+        idx === index ? { ...item, stockItemId: stockItemId || undefined } : item,
+      ),
     );
   };
 
@@ -201,6 +259,7 @@ export default function RapManagementModal({
         plannedQuantity: m.quantity || 0,
         actualQuantity: m.quantity || 0,
         unitPrice: m.rabPrice ? Math.round(m.rabPrice * 0.85) : 0,
+        stockItemId: findMatchingStockItem(stockItems, m.name, m.unit)?.id,
       }))
     );
   };
@@ -212,9 +271,15 @@ export default function RapManagementModal({
         if (idx !== index) return item;
         const updated = { ...item, [field]: value };
         if (field === "volume" || field === "boronganRate") {
-          const v = field === "volume" ? Number(value) : item.volume;
-          const r = field === "boronganRate" ? Number(value) : item.boronganRate;
-          updated.totalBorongan = Math.round(v * r);
+          const volume = field === "volume" ? Math.max(0, Number(value) || 0) : item.volume;
+          const rate = field === "boronganRate" ? Math.max(0, Number(value) || 0) : item.boronganRate;
+          updated.volume = volume;
+          updated.boronganRate = rate;
+          updated.totalBorongan = Math.round(volume * rate);
+        } else if (field === "totalBorongan") {
+          const total = Math.max(0, Number(value) || 0);
+          updated.totalBorongan = total;
+          updated.boronganRate = item.volume > 0 ? total / item.volume : 0;
         }
         return updated;
       })
@@ -248,6 +313,7 @@ export default function RapManagementModal({
       const res = await saveProjectRap(projectId, {
         materialPlans: materialPlans.map((m) => ({
           materialName: m.materialName,
+          stockItemId: m.stockItemId,
           unit: m.unit,
           plannedQuantity: m.plannedQuantity,
           actualQuantity: m.actualQuantity,
@@ -406,15 +472,17 @@ export default function RapManagementModal({
                 <FileSpreadsheet className="size-4 shrink-0 text-primary" />
                 <span>
                   <strong>Dropdown Menu Bahan</strong> mengambil langsung dari daftar bahan yang di-upload pada RAB
-                  proyek ini ({rabMaterials.length} bahan terdeteksi). Anda hanya perlu menentukan kuantitas aktual dan harga satuan beli RAP.
+                  proyek ini ({rabMaterials.length} bahan terdeteksi). Hubungkan ke barang stok untuk melihat stok
+                  tersedia; penyimpanan RAP tidak mengubah jumlah stok.
                 </span>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-border/80">
-                <table className="w-full min-w-[780px] text-left text-xs">
+                <table className="w-full min-w-[1080px] text-left text-xs">
                   <thead className="border-b border-border bg-muted/40 font-semibold text-muted-foreground">
                     <tr>
                       <th className="px-3.5 py-2.5 w-72">Bahan (Dari Upload RAB)</th>
+                      <th className="px-3 py-2.5 w-56">Barang Stok</th>
                       <th className="px-3 py-2.5 text-right w-24">Vol RAB</th>
                       <th className="px-3 py-2.5 text-right w-28">Bahan Aktual</th>
                       <th className="px-3 py-2.5 w-20">Satuan</th>
@@ -426,7 +494,7 @@ export default function RapManagementModal({
                   <tbody className="divide-y divide-border/60">
                     {materialPlans.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-10 text-center text-muted-foreground">
+                        <td colSpan={8} className="py-10 text-center text-muted-foreground">
                           Belum ada bahan RAP. Klik <strong>Tambah Bahan</strong> atau{" "}
                           <strong>Sinkron Bahan RAB</strong> untuk memulai.
                         </td>
@@ -455,6 +523,45 @@ export default function RapManagementModal({
                                   <option value={mat.materialName}>{mat.materialName}</option>
                                 )}
                               </select>
+                            </td>
+
+                            <td className="px-3 py-2">
+                              <select
+                                value={mat.stockItemId || ""}
+                                onChange={(e) => handleSelectStockItem(idx, e.target.value)}
+                                className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+                                aria-label={`Hubungkan ${mat.materialName} ke barang stok`}
+                              >
+                                <option value="">
+                                  {stockItems.length > 0 ? "Pilih barang stok" : "Tidak ada barang stok"}
+                                </option>
+                                {stockItems.map((stockItem) => (
+                                  <option key={stockItem.id} value={stockItem.id}>
+                                    {stockItem.name} · {stockItem.sku}
+                                  </option>
+                                ))}
+                                {mat.stockItemId && !stockItems.some((item) => item.id === mat.stockItemId) && (
+                                  <option value={mat.stockItemId}>Barang stok tidak ditemukan</option>
+                                )}
+                              </select>
+                              {(() => {
+                                const linkedStockItem = stockItems.find(
+                                  (item) => item.id === mat.stockItemId,
+                                );
+                                return linkedStockItem ? (
+                                  <span className="mt-1 block text-[10px] text-muted-foreground">
+                                    Stok:{" "}
+                                    {Number(linkedStockItem.stockQuantity || 0).toLocaleString("id-ID", {
+                                      maximumFractionDigits: 3,
+                                    })}{" "}
+                                    {linkedStockItem.unit}
+                                  </span>
+                                ) : (
+                                  <span className="mt-1 block text-[10px] text-muted-foreground">
+                                    Belum terhubung
+                                  </span>
+                                );
+                              })()}
                             </td>
 
                             {/* Volume Kebutuhan RAB */}
@@ -527,18 +634,19 @@ export default function RapManagementModal({
                 <Hammer className="size-4 shrink-0" />
                 <span>
                   <strong>Skema Jasa Borongan:</strong> Tenaga kerja dan tukang diborongkan per item pekerjaan atau
-                  per mandor subkon. Masukkan nilai borongan jasa yang disepakati untuk tiap pekerjaan.
+                  per mandor subkon. Masukkan harga satuan; total dihitung otomatis dari volume × harga satuan.
                 </span>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-border/80">
-                <table className="w-full min-w-[780px] text-left text-xs">
+                <table className="w-full min-w-[1020px] text-left text-xs">
                   <thead className="border-b border-border bg-muted/40 font-semibold text-muted-foreground">
                     <tr>
                       <th className="px-3.5 py-2.5 w-64">Uraian Pekerjaan Borongan</th>
                       <th className="px-3 py-2.5 text-right w-24">Volume</th>
                       <th className="px-3 py-2.5 w-20">Satuan</th>
-                      <th className="px-3 py-2.5 text-right w-40">Nilai Borongan Jasa (Rp)</th>
+                      <th className="px-3 py-2.5 text-right w-40">Harga Satuan (Rp)</th>
+                      <th className="px-3 py-2.5 text-right w-40">Total Borongan (Rp)</th>
                       <th className="px-3 py-2.5 w-52">Mandor / Subkon Borongan</th>
                       <th className="px-3 py-2.5 text-center w-12"></th>
                     </tr>
@@ -546,7 +654,7 @@ export default function RapManagementModal({
                   <tbody className="divide-y divide-border/60">
                     {laborPlans.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-10 text-center text-muted-foreground">
+                        <td colSpan={7} className="py-10 text-center text-muted-foreground">
                           Belum ada item jasa borongan. Klik <strong>Tambah Borongan</strong> untuk menambahkan.
                         </td>
                       </tr>
@@ -589,19 +697,24 @@ export default function RapManagementModal({
                             />
                           </td>
 
-                          {/* Total Borongan Jasa (Rp) */}
+                          {/* Harga Satuan Jasa (Rp) */}
                           <td className="px-3 py-2 text-right">
                             <Input
                               type="number"
                               min="0"
-                              step="1000"
-                              value={labor.totalBorongan || ""}
+                              step="100"
+                              value={labor.boronganRate || ""}
                               onChange={(e) =>
-                                handleUpdateLabor(idx, "totalBorongan", parseFloat(e.target.value) || 0)
+                                handleUpdateLabor(idx, "boronganRate", parseFloat(e.target.value) || 0)
                               }
-                              placeholder="Rp 0"
+                              placeholder="0"
                               className="h-8 text-right text-xs font-mono font-bold text-amber-600 dark:text-amber-400"
                             />
+                          </td>
+
+                          {/* Total Borongan Jasa (Rp) */}
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-foreground whitespace-nowrap">
+                            Rp {Math.round(labor.volume * labor.boronganRate).toLocaleString("id-ID")}
                           </td>
 
                           {/* Mandor / Subkon */}

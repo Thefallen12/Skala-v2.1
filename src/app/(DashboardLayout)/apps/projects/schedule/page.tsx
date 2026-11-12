@@ -8,15 +8,38 @@ import ProjectScheduleGantt, {
   ScheduleMilestoneItem,
 } from "@/app/components/apps/projects/ProjectScheduleGantt";
 
-export const metadata: Metadata = {
-  title: "Jadwal Proyek (Gantt) | Vasco",
+type ProjectSchedulePageProps = {
+  searchParams?: Promise<{ projectId?: string }>;
 };
+
+export async function generateMetadata({
+  searchParams,
+}: ProjectSchedulePageProps): Promise<Metadata> {
+  const projectId = searchParams ? (await searchParams).projectId : undefined;
+
+  if (projectId === "all") {
+    return { title: "Project | Semua proyek" };
+  }
+
+  const project = await prisma.project.findFirst({
+    where: {
+      isDeleted: false,
+      ...(projectId
+        ? { OR: [{ id: projectId }, { code: projectId }] }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    select: { title: true, name: true },
+  });
+
+  return {
+    title: `Project | ${project?.title || project?.name || "Jadwal Proyek (Gantt)"}`,
+  };
+}
 
 export default async function ProjectSchedulePage({
   searchParams,
-}: {
-  searchParams?: Promise<{ projectId?: string }>;
-}) {
+}: ProjectSchedulePageProps) {
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
 
