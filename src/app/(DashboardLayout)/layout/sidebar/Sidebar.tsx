@@ -255,13 +255,27 @@ const SidebarLayout = ({
             <span className="size-2 rounded-full bg-emerald-500" />
             Sistem Operasional Aktif
           </span>
-          <Link
-            href="/apps/settings"
-            onClick={onClose}
-            className="font-semibold text-primary hover:underline"
-          >
-            Bantuan
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event("skala:check-update"));
+                }
+                onClose?.();
+              }}
+              className="font-semibold text-foreground/80 transition hover:text-primary"
+            >
+              Cek Update
+            </button>
+            <Link
+              href="/apps/settings"
+              onClick={onClose}
+              className="font-semibold text-primary hover:underline"
+            >
+              Bantuan
+            </Link>
+          </div>
         </div>
       </div>
     </aside>

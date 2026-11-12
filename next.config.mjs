@@ -23,6 +23,9 @@ const deploymentId = deploymentIdSource
 const nextConfig = {
     output: "standalone",
     deploymentId: deploymentId || undefined,
+    env: {
+        NEXT_PUBLIC_APP_BUILD_ID: deploymentId || "2.1.2",
+    },
     reactStrictMode: false,
     serverExternalPackages: ["@prisma/client", "puppeteer-core", "@sparticuz/chromium"],
     images: {

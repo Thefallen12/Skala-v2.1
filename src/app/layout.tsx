@@ -4,6 +4,7 @@ import { DM_Sans } from "next/font/google";
 import "./css/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import ServiceWorkerRegister from "@/app/components/service-worker/ServiceWorkerRegister";
+import InAppUpdateManager from "@/app/components/pwa/InAppUpdateManager";
 import PageTransition from "@/app/components/layout/PageTransition";
 
 const dmSans = DM_Sans({
@@ -51,6 +52,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ServiceWorkerRegister />
+          <InAppUpdateManager />
           <PageTransition>{children}</PageTransition>
         </ThemeProvider>
       </body>
