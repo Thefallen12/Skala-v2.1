@@ -38,6 +38,7 @@ import {
   getWeekDateKeys,
   shiftDateKey,
 } from "@/lib/habit-date";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 
 type HabitItem = {
   id: string;
@@ -189,6 +190,8 @@ export default function HabitDashboard({
             ),
       );
       setMessage({ success: true, message: result.message });
+      requestNotificationFeedRefresh();
+      router.refresh();
     } catch (error) {
       console.error("Habit completion request failed:", error);
       setMessage({
@@ -209,6 +212,7 @@ export default function HabitDashboard({
       setMessage(result);
       if (result.success) {
         setDeleteTarget(null);
+        requestNotificationFeedRefresh();
         router.refresh();
       }
     } catch (error) {

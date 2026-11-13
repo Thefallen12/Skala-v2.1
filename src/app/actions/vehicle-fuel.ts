@@ -14,6 +14,7 @@ import {
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
 import { sendNotification } from "@/lib/notifications";
+import { getFinancePaymentProofMimeType } from "@/lib/finance-payment-proof-file";
 import { removeTicketReceipt, saveTicketReceipt } from "@/lib/ticket-receipts";
 import {
   VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
@@ -43,11 +44,13 @@ function isBoundedText(value: unknown, maxLength: number): value is string {
 }
 
 function isPhoto(value: unknown): value is File {
+  const mime = value instanceof File ? getFinancePaymentProofMimeType(value) : null;
   return (
     value instanceof File &&
     value.size > 0 &&
     value.size <= 5 * 1024 * 1024 &&
-    ["image/jpeg", "image/png", "image/webp"].includes(value.type)
+    mime !== null &&
+    mime !== "application/pdf"
   );
 }
 
@@ -56,12 +59,7 @@ function isTransferProof(value: unknown): value is File {
     value instanceof File &&
     value.size > 0 &&
     value.size <= 5 * 1024 * 1024 &&
-    [
-      "application/pdf",
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ].includes(value.type)
+    getFinancePaymentProofMimeType(value) !== null
   );
 }
 

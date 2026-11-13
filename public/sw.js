@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skala-prioritas-static-v4';
+const CACHE_NAME = 'skala-prioritas-static-v5';
 const PUBLIC_ASSET_PATTERN = /\.(?:avif|css|eot|gif|ico|jpe?g|js|mjs|png|svg|ttf|webp|woff2?)$/i;
 
 self.addEventListener('install', (event) => {
@@ -44,11 +44,19 @@ self.addEventListener('push', (event) => {
       ? data.url
       : '/apps/tickets';
 
+  const tag =
+    typeof data.tag === 'string' && data.tag
+      ? data.tag
+      : `skala-msg-${Date.now()}`;
+
   event.waitUntil(
     self.registration.showNotification(title, {
       body: typeof data.body === 'string' ? data.body : '',
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      vibrate: [180, 90, 180],
+      tag,
+      renotify: true,
       data: { url },
     }),
   );

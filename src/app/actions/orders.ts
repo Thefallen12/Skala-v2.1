@@ -892,7 +892,7 @@ export async function approvePurchaseOrder(
             ? `PO #${order.poNumber} disetujui. Pembayaran dapat diproses setelah invoice diunggah Logistik.`
             : `PO #${order.poNumber} disetujui. Silakan proses pembayaran dan Surat Jalan.`,
           actionUrl: order.ticketId
-            ? `/apps/finance?tab=payments`
+            ? `/apps/finance?tab=payments&openSheet=${encodeURIComponent(order.ticketId)}`
             : `/apps/finance?tab=payments&openSheet=${encodeURIComponent(publicCode)}`,
           type: NotificationType.SUCCESS,
           database: transaction,
@@ -1526,7 +1526,9 @@ export async function createDeliveryOrder(
             isApprovedByDirector: true,
             projectId: true,
             ticketNumber: true,
-            moverAssignee: { select: { name: true } },
+            title: true,
+            requesterId: true,
+            moverAssignee: { select: { id: true, name: true } },
             purchaseOrders: {
               where: {
                 status: POStatus.APPROVED,
@@ -2009,6 +2011,37 @@ export async function createDeliveryOrder(
             action: "LOGISTICS_DO_CREATED",
             notes: `Delivery Order ${doNumber} berhasil diterbitkan oleh Logistik untuk pengiriman barang.`,
           },
+        });
+        if (!isExpedition) {
+          await sendNotification({
+            ...(ticket.moverAssignee?.id
+              ? { userId: ticket.moverAssignee.id }
+              : { roleTarget: UserRole.MOVER }),
+            title: "Tugas Pengiriman DO Baru",
+            message: `${ticket.ticketNumber} · DO ${doNumber} (${ticket.title}) siap Anda kirim ke lokasi.`,
+            actionUrl: "/apps/logistics",
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
+        }
+        if (ticket.requesterId !== session.user.id) {
+          await sendNotification({
+            userId: ticket.requesterId,
+            title: "DO Pengiriman Diterbitkan",
+            message: `${ticket.ticketNumber} · DO ${doNumber} telah diterbitkan (${isExpedition ? "ekspedisi" : ticket.moverAssignee ? `Mover: ${ticket.moverAssignee.name}` : "Mover internal"}).`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticket.id)}`,
+            type: NotificationType.INFO,
+            database: transaction,
+          });
+        }
+      } else if (!isExpedition) {
+        await sendNotification({
+          roleTarget: UserRole.MOVER,
+          title: "Tugas Pengiriman DO Baru",
+          message: `DO ${doNumber} telah diterbitkan Logistik dan siap dikirim oleh Mover.`,
+          actionUrl: "/apps/logistics",
+          type: NotificationType.APPROVAL,
+          database: transaction,
         });
       }
       return { code, doNumber, alreadyExists: false };
@@ -2911,6 +2944,8 @@ export async function submitMoverDeliveryProofs(
             select: {
               id: true,
               ticketNumber: true,
+              title: true,
+              requesterId: true,
               moverAssigneeId: true,
               projectId: true,
             },
@@ -3096,6 +3131,24 @@ export async function submitMoverDeliveryProofs(
               : `Mover menambahkan ${receiptUrls.length} foto bukti untuk DO ${order.doNumber}.`,
           },
         });
+        if (completeDelivery) {
+          await sendNotification({
+            userId: order.ticket.requesterId,
+            title: "Pengiriman Material Selesai",
+            message: `${order.ticket.ticketNumber} · ${order.ticket.title} telah selesai dikirim oleh Mover (DO ${order.doNumber}).`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(order.ticket.id)}`,
+            type: NotificationType.SUCCESS,
+            database: transaction,
+          });
+          await sendNotification({
+            roleTarget: UserRole.LOGISTICS,
+            title: "Pengiriman DO Mover Selesai",
+            message: `DO ${order.doNumber} untuk tiket ${order.ticket.ticketNumber} telah selesai dikirim dengan bukti terlampir.`,
+            actionUrl: `/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(order.ticket.id)}`,
+            type: NotificationType.SUCCESS,
+            database: transaction,
+          });
+        }
       }
       return {
         doNumber: order.doNumber,
@@ -3255,7 +3308,7 @@ export async function receiveExpeditionDeliveryOrder(
         userId: deliveryOrder.ticket.requesterId,
         title: "Material Tiba di Gudang",
         message: `Material pada DO ${deliveryOrder.doNumber} untuk tiket ${deliveryOrder.ticket.ticketNumber} telah diterima Logistik.`,
-        actionUrl: `/apps/logistics`,
+        actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(deliveryOrder.ticket.id)}`,
         type: NotificationType.SUCCESS,
         database: transaction,
       });

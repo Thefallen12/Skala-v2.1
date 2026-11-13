@@ -181,7 +181,24 @@ function formatActivityTime(date: string) {
   }).format(new Date(date));
 }
 
-export default function UserProfile({ profile }: { profile: UserProfileData }) {
+const VALID_USER_PROFILE_TABS = new Set([
+  "account",
+  "security",
+  "billing",
+  "notifications",
+  "connections",
+]);
+
+export default function UserProfile({
+  profile,
+  initialTab = "account",
+}: {
+  profile: UserProfileData;
+  initialTab?: string;
+}) {
+  const defaultTab = VALID_USER_PROFILE_TABS.has(initialTab)
+    ? initialTab
+    : "account";
   const [projectQuery, setProjectQuery] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [profileMessage, setProfileMessage] =
@@ -330,7 +347,7 @@ export default function UserProfile({ profile }: { profile: UserProfileData }) {
         </div>
       </CardBox>
 
-      <Tabs defaultValue="account" className="min-w-0 space-y-4">
+      <Tabs defaultValue={defaultTab} className="min-w-0 space-y-4">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-muted p-1 sm:grid-cols-5">
           <TabsTrigger value="account" className="text-xs">Akun</TabsTrigger>
           <TabsTrigger value="security" className="text-xs">Keamanan</TabsTrigger>

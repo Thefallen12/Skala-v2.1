@@ -5,6 +5,11 @@ import { replaceFinancePaymentProof } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
+import {
+  FINANCE_PROOF_ACCEPT_ALL,
+  FINANCE_PROOF_ACCEPT_IMAGES,
+  prepareFinanceProofFile,
+} from "@/lib/finance-proof-client";
 
 export default function FinancePaymentProofReplacement({
   paymentTransactionId,
@@ -23,6 +28,7 @@ export default function FinancePaymentProofReplacement({
 }) {
   const [open, setOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,9 +118,13 @@ export default function FinancePaymentProofReplacement({
             <Button
               type="submit"
               form="finance-proof-replacement-form"
-              disabled={isPending || !proofFile}
+              disabled={isPending || isPreparing || !proofFile}
             >
-              {isPending ? "Mengunggah dan menyimpan..." : "Simpan Bukti"}
+              {isPending
+                ? "Mengunggah dan menyimpan..."
+                : isPreparing
+                  ? "Memproses file..."
+                  : "Simpan Bukti"}
             </Button>
           </>
         }
@@ -129,19 +139,41 @@ export default function FinancePaymentProofReplacement({
               type="file"
               accept={
                 buttonLabel === "Edit"
-                  ? "image/jpeg,image/png,image/webp"
-                  : "image/jpeg,image/png,image/webp,application/pdf"
+                  ? FINANCE_PROOF_ACCEPT_IMAGES
+                  : FINANCE_PROOF_ACCEPT_ALL
               }
-              onChange={(event) => {
-                setProofFile(event.target.files?.[0] ?? null);
+              onChange={async (event) => {
+                const input = event.currentTarget;
+                const rawFile = input.files?.[0] ?? null;
+                if (!rawFile) {
+                  setProofFile(null);
+                  return;
+                }
+                setIsPreparing(true);
                 setMessage("");
+                try {
+                  const prepared = await prepareFinanceProofFile(rawFile, {
+                    allowPdf: buttonLabel !== "Edit",
+                  });
+                  setProofFile(prepared);
+                } catch (err) {
+                  setProofFile(null);
+                  input.value = "";
+                  setMessage(
+                    err instanceof Error
+                      ? err.message
+                      : "File bukti tidak valid.",
+                  );
+                } finally {
+                  setIsPreparing(false);
+                }
               }}
-              disabled={isPending}
+              disabled={isPending || isPreparing}
             />
             <p className="text-xs text-muted-foreground">
               {buttonLabel === "Edit"
-                ? "JPG, PNG, atau WEBP; maksimal 5 MB."
-                : "PDF, JPG, PNG, atau WEBP; maksimal 5 MB."}
+                ? "JPG, PNG, WEBP, atau foto iPhone (HEIC); maksimal 5 MB."
+                : "PDF, JPG, PNG, WEBP, atau foto iPhone (HEIC); maksimal 5 MB."}
             </p>
             {proofFile && (
               <p className="text-sm text-muted-foreground" role="status">

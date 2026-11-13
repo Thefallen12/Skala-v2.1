@@ -5,6 +5,11 @@ import Image from "next/image";
 import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { reviewPurchaseOrder } from "@/app/actions/orders";
 import {
+  FINANCE_PROOF_ACCEPT_ALL,
+  prepareFinanceProofFile,
+} from "@/lib/finance-proof-client";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import {
   completeVehicleFuelRequestReview,
   processVehicleFuelRequest,
 } from "@/app/actions/vehicle-fuel";
@@ -546,6 +551,7 @@ export default function FinanceHub({
   const [paymentAmount, setPaymentAmount] = useState("");
   const [termynReceipts, setTermynReceipts] = useState<Record<string, File>>({});
   const [retentionReceipts, setRetentionReceipts] = useState<Record<string, File>>({});
+  const [fuelTransferProofs, setFuelTransferProofs] = useState<Record<string, File>>({});
   const [fuelDisbursementMethods, setFuelDisbursementMethods] = useState<
     Record<string, POPaymentMethod>
   >({});
@@ -872,7 +878,10 @@ export default function FinanceHub({
       try {
         const result = await reviewPurchaseOrder(publicCode);
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("Finance PO review failed:", error);
         setMessage("Pemeriksaan PO gagal. Silakan coba kembali.");
@@ -895,16 +904,19 @@ export default function FinanceHub({
       data.get("disbursementMethod") === POPaymentMethod.TRANSFER
         ? POPaymentMethod.TRANSFER
         : POPaymentMethod.CASH;
-    const transferProof = data.get("transferProof");
+    const rawFormProof = data.get("transferProof");
+    const transferProof =
+      fuelTransferProofs[requestId] ??
+      (rawFormProof instanceof File && rawFormProof.size > 0
+        ? rawFormProof
+        : undefined);
     const financeAccountId = String(data.get("financeAccountId") ?? "");
     const input = {
       disbursementMethod,
       transferDestination: String(data.get("transferDestination") ?? ""),
       financeAccountId,
       financeNote: String(data.get("financeNote") ?? ""),
-      ...(transferProof instanceof File && transferProof.size > 0
-        ? { transferProof }
-        : {}),
+      ...(transferProof ? { transferProof } : {}),
     };
     if (
       approve &&
@@ -931,7 +943,15 @@ export default function FinanceHub({
           approve ? input : { financeNote: input.financeNote },
         );
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          setFuelTransferProofs((current) => {
+            const next = { ...current };
+            delete next[requestId];
+            return next;
+          });
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("Finance fuel request decision failed:", error);
         setMessage("Request BBM gagal diproses. Silakan coba kembali.");
@@ -954,7 +974,10 @@ export default function FinanceHub({
           financeNote,
         );
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("Finance fuel reconciliation failed:", error);
         setMessage("Rekonsiliasi BBM gagal ditutup. Silakan coba kembali.");
@@ -1020,6 +1043,7 @@ export default function FinanceHub({
           setReceiptUrl([]);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {
@@ -1062,6 +1086,38 @@ export default function FinanceHub({
     });
   };
 
+  const handleSingleOperationalProofChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    key: string,
+    setter: React.Dispatch<React.SetStateAction<Record<string, File>>>,
+  ) => {
+    const input = event.currentTarget;
+    const rawFile = input.files?.[0];
+    if (!rawFile) {
+      setter((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    try {
+      const prepared = await prepareFinanceProofFile(rawFile);
+      setter((current) => ({ ...current, [key]: prepared }));
+      setMessage("");
+    } catch (error) {
+      input.value = "";
+      setter((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      setMessage(
+        error instanceof Error ? error.message : "File bukti tidak valid.",
+      );
+    }
+  };
+
   const submitTermynPayment = (
     event: FormEvent<HTMLFormElement>,
     termynId: string,
@@ -1093,6 +1149,7 @@ export default function FinanceHub({
             delete next[termynId];
             return next;
           });
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {
@@ -2274,20 +2331,17 @@ export default function FinanceHub({
                         disabled={isPending}
                       />
                       <FormLabel className="space-y-1 text-sm">
-                        Bukti pembayaran (PDF/JPG/PNG/WEBP, maks. 5 MB)
+                        Bukti pembayaran (PDF/JPG/PNG/WEBP/HEIC, maks. 5 MB)
                         <Input
                           type="file"
-                          accept="application/pdf,image/jpeg,image/png,image/webp"
-                          required
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) {
-                              setTermynReceipts((current) => ({
-                                ...current,
-                                [termyn.id]: file,
-                              }));
-                            }
-                          }}
+                          accept={FINANCE_PROOF_ACCEPT_ALL}
+                          onChange={(event) =>
+                            void handleSingleOperationalProofChange(
+                              event,
+                              termyn.id,
+                              setTermynReceipts,
+                            )
+                          }
                         />
                       </FormLabel>
                       <Button
@@ -2334,20 +2388,17 @@ export default function FinanceHub({
                         disabled={isPending}
                       />
                       <FormLabel className="space-y-1 text-sm">
-                        Bukti transfer retensi
+                        Bukti transfer retensi (PDF/JPG/PNG/WEBP/HEIC, maks. 5 MB)
                         <Input
                           type="file"
-                          accept="application/pdf,image/jpeg,image/png,image/webp"
-                          required
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) {
-                              setRetentionReceipts((current) => ({
-                                ...current,
-                                [contract.id]: file,
-                              }));
-                            }
-                          }}
+                          accept={FINANCE_PROOF_ACCEPT_ALL}
+                          onChange={(event) =>
+                            void handleSingleOperationalProofChange(
+                              event,
+                              contract.id,
+                              setRetentionReceipts,
+                            )
+                          }
                         />
                       </FormLabel>
                       <Button
@@ -2620,12 +2671,18 @@ export default function FinanceHub({
                           <Input
                             name="transferProof"
                             type="file"
-                            accept="image/jpeg,image/png,image/webp,application/pdf"
-                            required
+                            accept={FINANCE_PROOF_ACCEPT_ALL}
                             disabled={isPending}
+                            onChange={(event) =>
+                              void handleSingleOperationalProofChange(
+                                event,
+                                request.id,
+                                setFuelTransferProofs,
+                              )
+                            }
                           />
                           <span className="text-xs text-muted-foreground">
-                            PDF/JPG/PNG/WEBP, maksimal 5 MB.
+                            PDF/JPG/PNG/WEBP/HEIC, maksimal 5 MB.
                           </span>
                         </FormLabel>
                       )}

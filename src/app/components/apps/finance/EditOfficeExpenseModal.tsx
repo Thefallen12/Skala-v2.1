@@ -12,6 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRupiahInput, parseRupiahInput } from "@/lib/indonesian-currency";
 import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  FINANCE_PROOF_ACCEPT_ALL,
+  prepareFinanceProofFiles,
+} from "@/lib/finance-proof-client";
 import { Calendar, Eye, FileText, Image as ImageIcon, ReceiptText, Trash2, Wallet } from "lucide-react";
 
 type NewExpenseProofItem = {
@@ -62,6 +66,7 @@ export default function EditOfficeExpenseModal({
   const [newProofFiles, setNewProofFiles] = useState<NewExpenseProofItem[]>([]);
   const newProofFilesRef = useRef<NewExpenseProofItem[]>([]);
   const [proofError, setProofError] = useState("");
+  const [isPreparingProof, setIsPreparingProof] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -178,10 +183,14 @@ export default function EditOfficeExpenseModal({
           <Button
             type="button"
             onClick={handleSave}
-            disabled={isPending}
+            disabled={isPending || isPreparingProof}
             className="bg-orange-600 text-white hover:bg-orange-700 font-semibold"
           >
-            {isPending ? "Menyimpan Perubahan..." : "Simpan Perubahan"}
+            {isPending
+              ? "Menyimpan Perubahan..."
+              : isPreparingProof
+                ? "Memproses Foto..."
+                : "Simpan Perubahan"}
           </Button>
         </>
       }
@@ -349,36 +358,56 @@ export default function EditOfficeExpenseModal({
           {/* File input to add new/replacement photos */}
           <div className="space-y-1.5 pt-2">
             <Label htmlFor="edit-expense-file-input" className="text-xs font-medium">
-              Tambah / Ganti Foto Bukti (JPG, PNG, WEBP, PDF - Maks 5 MB)
+              Tambah / Ganti Foto Bukti (PDF, JPG, PNG, WEBP, HEIC - Maks 5 MB)
             </Label>
             <Input
               id="edit-expense-file-input"
               type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
+              accept={FINANCE_PROOF_ACCEPT_ALL}
               multiple
-              disabled={isPending || keepUrls.length + newProofFiles.length >= 5}
-              onChange={(e) => {
-                const files = Array.from(e.currentTarget.files ?? []);
-                const valid = files.filter(
-                  (f) => f.size > 0 && f.size <= 5 * 1024 * 1024 && ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(f.type)
-                );
-                const maxAdditional = Math.max(0, 5 - keepUrls.length - newProofFiles.length);
-                const added = valid.slice(0, maxAdditional).map((file) => ({
-                  id: crypto.randomUUID(),
-                  file,
-                  name: file.name,
-                  previewUrl: URL.createObjectURL(file),
-                  isPdf:
-                    file.type === "application/pdf" ||
-                    file.name.toLowerCase().endsWith(".pdf"),
-                }));
-                if (added.length > 0) {
-                  setNewProofFiles((prev) => [...prev, ...added]);
+              disabled={
+                isPending ||
+                isPreparingProof ||
+                keepUrls.length + newProofFiles.length >= 5
+              }
+              onChange={async (e) => {
+                const input = e.currentTarget;
+                const files = Array.from(input.files ?? []);
+                if (files.length === 0) return;
+
+                setIsPreparingProof(true);
+                setProofError("");
+                try {
+                  const { prepared, error: prepError } =
+                    await prepareFinanceProofFiles(files);
+                  const maxAdditional = Math.max(
+                    0,
+                    5 - keepUrls.length - newProofFiles.length,
+                  );
+                  const added = prepared.slice(0, maxAdditional).map((file) => ({
+                    id: crypto.randomUUID(),
+                    file,
+                    name: file.name,
+                    previewUrl: URL.createObjectURL(file),
+                    isPdf:
+                      file.type === "application/pdf" ||
+                      file.name.toLowerCase().endsWith(".pdf"),
+                  }));
+                  if (added.length > 0) {
+                    setNewProofFiles((prev) => [...prev, ...added]);
+                  }
+                  setProofError(prepError);
+                } finally {
+                  setIsPreparingProof(false);
+                  input.value = "";
                 }
-                setProofError(valid.length !== files.length ? "Beberapa file dilewati karena bukan foto/PDF atau melebihi 5 MB." : "");
-                e.currentTarget.value = "";
               }}
             />
+            {isPreparingProof && (
+              <p className="text-xs text-muted-foreground" role="status">
+                Memproses file bukti agar siap diunggah...
+              </p>
+            )}
           </div>
 
           {proofError && (

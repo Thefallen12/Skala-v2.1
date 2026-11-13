@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import {
   startMoverDeliveryOrder,
   submitMoverDeliveryProofs,
@@ -244,6 +245,7 @@ export default function MoverWorkspace({
         setIsError(!result.success);
         if (result.success) {
           form.reset();
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {
@@ -296,6 +298,7 @@ export default function MoverWorkspace({
         setIsError(!result.success);
         if (result.success) {
           form.reset();
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {
@@ -331,6 +334,7 @@ export default function MoverWorkspace({
         setIsError(!result.success);
         if (result.success) {
           form.reset();
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {

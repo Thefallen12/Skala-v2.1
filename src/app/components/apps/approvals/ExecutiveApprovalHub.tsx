@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { approvePurchaseOrder } from "@/app/actions/orders";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import {
   approveBAST,
   approveProjectAddendum,
@@ -635,6 +636,7 @@ export default function ExecutiveApprovalHub({
           setSelection(null);
           setTicketDecision(null);
           setTicketDecisionReason("");
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {

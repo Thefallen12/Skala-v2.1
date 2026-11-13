@@ -5,10 +5,13 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import {
+  getFinancePaymentProofMimeType,
+  hasPdfSignature,
+} from "@/lib/finance-payment-proof-file";
 import { TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER } from "@/lib/ticket-receipt-pdf-config";
 
 const PDF_MIME_TYPE = "application/pdf";
-const PDF_SIGNATURE = "%PDF-";
 
 type CloudinaryPrivatePdf = {
   publicId: string;
@@ -90,12 +93,12 @@ export async function uploadCloudinaryPrivatePdf(
       `Ukuran PDF harus lebih dari 0 dan maksimal ${Math.floor(maxBytes / (1024 * 1024))} MB.`,
     );
   }
-  if (file.type !== PDF_MIME_TYPE) {
+  if (getFinancePaymentProofMimeType(file) !== PDF_MIME_TYPE) {
     throw new CloudinaryPrivatePdfValidationError("Format file harus PDF.");
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  if (new TextDecoder().decode(bytes.subarray(0, PDF_SIGNATURE.length)) !== PDF_SIGNATURE) {
+  if (!hasPdfSignature(bytes)) {
     throw new CloudinaryPrivatePdfValidationError(
       "Isi file tidak sesuai dengan format PDF.",
     );

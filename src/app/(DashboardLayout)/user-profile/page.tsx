@@ -16,9 +16,30 @@ export const metadata: Metadata = {
   title: "Profil Saya",
 };
 
-export default async function UserProfilePage() {
+const ALLOWED_PROFILE_TABS = new Set([
+  "account",
+  "security",
+  "billing",
+  "notifications",
+  "connections",
+]);
+
+export default async function UserProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
+  const normalizedTab =
+    tab && ALLOWED_PROFILE_TABS.has(tab) ? tab : "account";
   const session = await auth();
-  if (!session?.user?.id) redirect("/auth/login");
+  if (!session?.user?.id) {
+    const callback =
+      tab && ALLOWED_PROFILE_TABS.has(tab)
+        ? `/user-profile?tab=${encodeURIComponent(tab)}`
+        : "/user-profile";
+    redirect(`/auth/login?callbackUrl=${encodeURIComponent(callback)}`);
+  }
 
   const userId = session.user.id;
   const taskScope = {
@@ -140,6 +161,8 @@ export default async function UserProfilePage() {
         items={[{ to: "/", title: "Home" }, { title: "Profil Saya" }]}
       />
       <UserProfile
+        key={normalizedTab}
+        initialTab={normalizedTab}
         profile={{
           id: user.id,
           name: user.name,

@@ -32,6 +32,7 @@ import {
   DRAWING_CATEGORIES,
   DRAWING_FILE_EXTENSIONS,
 } from "@/lib/drawing-document-config";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import type {
   DrawingProjectOption,
   DrawingProjectSurveySummary,
@@ -281,6 +282,7 @@ export default function DrawingWorkspace({
       setRevisionNotes("");
       setReviewNotes("");
       setUploadError("");
+      requestNotificationFeedRefresh();
       router.refresh();
     }
   };

@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@prisma/client";
+import { NotificationType, UserRole } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { sendNotification } from "@/lib/notifications";
 import {
   DRAWING_CATEGORIES,
   DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
@@ -29,6 +30,12 @@ export type DrawingActionResult = {
   success: boolean;
   message: string;
 };
+
+function drafterActionUrl(projectId: string | null): string {
+  return projectId
+    ? `/apps/drafter?projectId=${encodeURIComponent(projectId)}`
+    : "/apps/drafter";
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -171,27 +178,37 @@ export async function createDrawingDocument(input: unknown): Promise<DrawingActi
     if (!isDrawingFileUrl(fileUrl)) {
       throw new Error("Cloudinary mengembalikan URL gambar kerja yang tidak valid.");
     }
-    await prisma.drawingDocument.create({
-      data: {
-        drawingCode,
-        projectId,
-        title,
-        category,
-        status: "REVIEW",
-        version: 0,
-        fileUrl,
-        thumbnailUrl: isDrawingImageUrl(fileUrl) ? fileUrl : null,
-        uploadedById: actor.id,
-        logs: {
-          create: {
-            action: "UPLOADED",
-            notes: "Dokumen gambar kerja pertama diunggah untuk ditinjau.",
-            version: 0,
-            fileUrl,
-            createdById: actor.id,
+    await prisma.$transaction(async (transaction) => {
+      await transaction.drawingDocument.create({
+        data: {
+          drawingCode,
+          projectId,
+          title,
+          category,
+          status: "REVIEW",
+          version: 0,
+          fileUrl,
+          thumbnailUrl: isDrawingImageUrl(fileUrl) ? fileUrl : null,
+          uploadedById: actor.id,
+          logs: {
+            create: {
+              action: "UPLOADED",
+              notes: "Dokumen gambar kerja pertama diunggah untuk ditinjau.",
+              version: 0,
+              fileUrl,
+              createdById: actor.id,
+            },
           },
         },
-      },
+      });
+      await sendNotification({
+        roleTarget: drawingReviewRoles,
+        title: "Gambar Kerja Baru Menunggu Review",
+        message: `${drawingCode} · ${title} (${category}) diunggah dan menunggu persetujuan.`,
+        actionUrl: drafterActionUrl(projectId),
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
     });
   } catch (error) {
     if (fileUrl) {
@@ -252,7 +269,13 @@ export async function uploadDrawingRevision(
     projectId = await prisma.$transaction(async (transaction) => {
       const current = await transaction.drawingDocument.findUnique({
         where: { id: drawingId },
-        select: { id: true, version: true, projectId: true },
+        select: {
+          id: true,
+          version: true,
+          projectId: true,
+          drawingCode: true,
+          title: true,
+        },
       });
       if (!current) throw new Error("DRAWING_NOT_FOUND");
 
@@ -275,6 +298,14 @@ export async function uploadDrawingRevision(
           fileUrl,
           createdById: actor.id,
         },
+      });
+      await sendNotification({
+        roleTarget: drawingReviewRoles,
+        title: "Revisi Gambar Kerja Siap Ditinjau",
+        message: `${current.drawingCode} · ${current.title} (Rev. ${updated.version}) telah diunggah untuk ditinjau.`,
+        actionUrl: drafterActionUrl(current.projectId),
+        type: NotificationType.APPROVAL,
+        database: transaction,
       });
       return current.projectId;
     });
@@ -322,7 +353,16 @@ export async function reviewDrawingDocument(
     projectId = await prisma.$transaction(async (transaction) => {
       const current = await transaction.drawingDocument.findUnique({
         where: { id: drawingId },
-        select: { id: true, version: true, status: true, projectId: true },
+        select: {
+          id: true,
+          version: true,
+          status: true,
+          projectId: true,
+          drawingCode: true,
+          title: true,
+          uploadedById: true,
+          project: { select: { fieldPicId: true } },
+        },
       });
       if (!current) throw new Error("DRAWING_NOT_FOUND");
       if (current.status !== "REVIEW") throw new Error("DRAWING_NOT_IN_REVIEW");
@@ -340,6 +380,40 @@ export async function reviewDrawingDocument(
           createdById: actor.id,
         },
       });
+      if (current.uploadedById !== actor.id) {
+        await sendNotification({
+          userId: current.uploadedById,
+          title:
+            status === "APPROVED"
+              ? "Gambar Kerja Disetujui"
+              : "Gambar Kerja Perlu Revisi",
+          message:
+            status === "APPROVED"
+              ? `${current.drawingCode} · ${current.title} (Rev. ${current.version}) telah disetujui.`
+              : `${current.drawingCode} · ${current.title} (Rev. ${current.version}) memerlukan revisi. Catatan: ${notes.trim()}`,
+          actionUrl: drafterActionUrl(current.projectId),
+          type:
+            status === "APPROVED"
+              ? NotificationType.SUCCESS
+              : NotificationType.WARNING,
+          database: transaction,
+        });
+      }
+      if (
+        status === "APPROVED" &&
+        current.project?.fieldPicId &&
+        current.project.fieldPicId !== actor.id &&
+        current.project.fieldPicId !== current.uploadedById
+      ) {
+        await sendNotification({
+          userId: current.project.fieldPicId,
+          title: "Gambar Kerja Disetujui untuk Proyek",
+          message: `${current.drawingCode} · ${current.title} (Rev. ${current.version}) telah disetujui dan siap digunakan di lapangan.`,
+          actionUrl: drafterActionUrl(current.projectId),
+          type: NotificationType.SUCCESS,
+          database: transaction,
+        });
+      }
       return current.projectId;
     });
   } catch (error) {

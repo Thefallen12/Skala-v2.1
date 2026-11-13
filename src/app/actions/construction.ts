@@ -143,6 +143,18 @@ export async function createBlueprint(
           status: BlueprintStatus.FOR_APPROVAL,
         },
       });
+      await sendNotification({
+        roleTarget: [
+          UserRole.DIRECTOR,
+          UserRole.DEPUTY_DIRECTOR,
+          UserRole.KOORDINATOR,
+        ],
+        title: "Gambar Kerja Baru Menunggu Review",
+        message: `${parsed.data.drawingNumber} · ${parsed.data.title} (Rev. ${parsed.data.revision}) diunggah untuk ditinjau.`,
+        actionUrl: `/apps/drafter?projectId=${encodeURIComponent(projectId)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
       return publicCode;
     });
     revalidateConstruction();
@@ -183,15 +195,47 @@ export async function reviewBlueprint(
   ) {
     return failure("Data review gambar kerja tidak valid.");
   }
-  const result = await prisma.blueprint.updateMany({
-    where: { publicCode, status: BlueprintStatus.FOR_APPROVAL },
-    data: {
-      status: decision,
-      reviewerId: session.user.id,
-      reviewedAt: new Date(),
+  const existing = await prisma.blueprint.findUnique({
+    where: { publicCode },
+    select: {
+      drafterId: true,
+      drawingNumber: true,
+      title: true,
+      projectId: true,
     },
   });
-  if (result.count !== 1) {
+  if (!existing) {
+    return failure("Gambar tidak ditemukan atau status review telah berubah.");
+  }
+  const updatedCount = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.blueprint.updateMany({
+      where: { publicCode, status: BlueprintStatus.FOR_APPROVAL },
+      data: {
+        status: decision,
+        reviewerId: session.user.id,
+        reviewedAt: new Date(),
+      },
+    });
+    if (result.count !== 1) return 0;
+    if (existing.drafterId !== session.user.id) {
+      await sendNotification({
+        userId: existing.drafterId,
+        title:
+          decision === BlueprintStatus.APPROVED_FOR_CONSTRUCTION
+            ? "Gambar Kerja Disetujui"
+            : "Gambar Kerja Ditolak",
+        message: `${existing.drawingNumber} · ${existing.title} ${decision === BlueprintStatus.APPROVED_FOR_CONSTRUCTION ? "telah disetujui untuk konstruksi" : "ditolak saat peninjauan"}.`,
+        actionUrl: `/apps/drafter?projectId=${encodeURIComponent(existing.projectId)}`,
+        type:
+          decision === BlueprintStatus.APPROVED_FOR_CONSTRUCTION
+            ? NotificationType.SUCCESS
+            : NotificationType.WARNING,
+        database: transaction,
+      });
+    }
+    return result.count;
+  });
+  if (updatedCount !== 1) {
     return failure("Gambar tidak ditemukan atau status review telah berubah.");
   }
   revalidateConstruction();
@@ -399,6 +443,14 @@ export async function createSubkonContract(
           createdById: session.user.id,
         },
       });
+      await sendNotification({
+        roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+        title: "Draf SPK Menunggu Persetujuan",
+        message: `${contractNumber} (${parsed.data.subkonName}) menunggu persetujuan Direksi.`,
+        actionUrl: `/apps/approvals?tab=wages&openSheet=${encodeURIComponent(code)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
       return code;
     });
     revalidateConstruction();
@@ -423,7 +475,13 @@ export async function approveSubkonContract(
   }
   const current = await prisma.subkonContract.findUnique({
     where: { publicCode },
-    select: { status: true, createdById: true },
+    select: {
+      status: true,
+      createdById: true,
+      contractNumber: true,
+      subkonName: true,
+      projectId: true,
+    },
   });
   if (
     decision === "ACTIVE" &&
@@ -432,15 +490,34 @@ export async function approveSubkonContract(
   ) {
     return failure("Pembuat SPK tidak dapat menyetujui SPK yang sama.");
   }
-  const result = await prisma.subkonContract.updateMany({
-    where: { publicCode, status: SPKStatus.PENDING_APPROVAL },
-    data: {
-      status: decision === "ACTIVE" ? SPKStatus.ACTIVE : SPKStatus.REJECTED,
-      approvedById: session.user.id,
-      approvedAt: new Date(),
-    },
+  const updatedCount = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.subkonContract.updateMany({
+      where: { publicCode, status: SPKStatus.PENDING_APPROVAL },
+      data: {
+        status: decision === "ACTIVE" ? SPKStatus.ACTIVE : SPKStatus.REJECTED,
+        approvedById: session.user.id,
+        approvedAt: new Date(),
+      },
+    });
+    if (result.count !== 1) return 0;
+    if (current && current.createdById !== session.user.id) {
+      await sendNotification({
+        userId: current.createdById,
+        title: decision === "ACTIVE" ? "SPK Disetujui" : "SPK Ditolak",
+        message: `SPK ${current.contractNumber} (${current.subkonName}) telah ${decision === "ACTIVE" ? "disetujui Direksi dan berstatus Aktif" : "ditolak Direksi"}.`,
+        actionUrl: `/apps/projects?projectId=${encodeURIComponent(current.projectId)}`,
+        type:
+          decision === "ACTIVE"
+            ? NotificationType.SUCCESS
+            : NotificationType.WARNING,
+        database: transaction,
+      });
+    }
+    return result.count;
   });
-  if (result.count !== 1) return failure("SPK tidak ditemukan atau telah diproses.");
+  if (updatedCount !== 1) {
+    return failure("SPK tidak ditemukan atau telah diproses.");
+  }
   revalidateConstruction();
   return { success: true, message: decision === "ACTIVE" ? "SPK disetujui." : "SPK ditolak." };
 }
@@ -554,6 +631,14 @@ export async function submitSubkonTermyn(
           },
         },
       });
+      await sendNotification({
+        roleTarget: UserRole.KOORDINATOR,
+        title: "Klaim Termin Subkon Baru",
+        message: `Termin ${termynNumber} · ${contract.contractNumber} (${contract.subkonName}) menunggu verifikasi lapangan Koordinator.`,
+        actionUrl: `/apps/projects?projectId=${encodeURIComponent(contract.projectId)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
     });
   } catch (error) {
     console.error("Subcontract termyn submission failed:", error);
@@ -583,6 +668,10 @@ async function transitionSubkonTermyn(
     | "approvedAt"
     | "paidAt",
   paymentProofUrl?: string,
+  onSuccess?: (
+    transaction: Prisma.TransactionClient,
+    termynId: string,
+  ) => Promise<void>,
 ): Promise<ConstructionActionResult> {
   const session = await auth();
   if (!session?.user?.id) return failure("Silakan masuk untuk memproses termin.");
@@ -590,16 +679,23 @@ async function transitionSubkonTermyn(
     return failure("Role Anda tidak diizinkan memproses termin.");
   }
   if (!validId(id)) return failure("Data termin tidak valid.");
-  const result = await prisma.subkonTermyn.updateMany({
-    where: { id, status: expectedStatus },
-    data: {
-      status: nextStatus,
-      [actorField]: session.user.id,
-      [timestampField]: new Date(),
-      ...(paymentProofUrl ? { paymentProofUrl } : {}),
-    },
+  const updatedCount = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.subkonTermyn.updateMany({
+      where: { id, status: expectedStatus },
+      data: {
+        status: nextStatus,
+        [actorField]: session.user.id,
+        [timestampField]: new Date(),
+        ...(paymentProofUrl ? { paymentProofUrl } : {}),
+      },
+    });
+    if (result.count !== 1) return 0;
+    if (onSuccess) {
+      await onSuccess(transaction, id);
+    }
+    return result.count;
   });
-  if (result.count !== 1) return failure("Termin tidak ditemukan atau statusnya telah berubah.");
+  if (updatedCount !== 1) return failure("Termin tidak ditemukan atau statusnya telah berubah.");
   revalidateConstruction();
   return { success: true, message: "Status termin berhasil diperbarui." };
 }
@@ -612,6 +708,25 @@ export async function verifySubkonTermynField(id: string) {
     [UserRole.KOORDINATOR, UserRole.DIRECTOR, UserRole.ADMINISTRATIONS],
     "fieldVerifiedById",
     "fieldVerifiedAt",
+    undefined,
+    async (transaction, termynId) => {
+      const termyn = await transaction.subkonTermyn.findUnique({
+        where: { id: termynId },
+        select: {
+          termynNumber: true,
+          subkonContract: { select: { contractNumber: true, subkonName: true } },
+        },
+      });
+      if (!termyn) return;
+      await sendNotification({
+        roleTarget: UserRole.FINANCE,
+        title: "Termin Subkon Terverifikasi Lapangan",
+        message: `Termin ${termyn.termynNumber} · SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) siap diperiksa Keuangan.`,
+        actionUrl: "/apps/finance?tab=subcontract",
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
+    },
   );
 }
 
@@ -623,6 +738,26 @@ export async function reviewSubkonTermynFinance(id: string) {
     [UserRole.FINANCE, UserRole.ADMINISTRATIONS],
     "financeReviewedById",
     "financeReviewedAt",
+    undefined,
+    async (transaction, termynId) => {
+      const termyn = await transaction.subkonTermyn.findUnique({
+        where: { id: termynId },
+        select: {
+          termynNumber: true,
+          netAmount: true,
+          subkonContract: { select: { contractNumber: true, subkonName: true } },
+        },
+      });
+      if (!termyn) return;
+      await sendNotification({
+        roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+        title: "Termin Subkon Menunggu Persetujuan",
+        message: `Termin ${termyn.termynNumber} · SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) senilai Rp${decimalFromScaledInteger(termyn.netAmount).toNumber().toLocaleString("id-ID")} telah diperiksa Keuangan.`,
+        actionUrl: `/apps/approvals?tab=wages&openSheet=${encodeURIComponent(termynId)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
+    },
   );
 }
 
@@ -736,6 +871,7 @@ export async function paySubkonTermyn(
           grossAmount: true,
           retentionAmount: true,
           netAmount: true,
+          createdById: true,
           invoice: { select: { id: true } },
           subkonContract: {
             select: {
@@ -743,6 +879,7 @@ export async function paySubkonTermyn(
               contractNumber: true,
               subkonName: true,
               workScope: true,
+              project: { select: { fieldPicId: true } },
             },
           },
         },
@@ -788,6 +925,22 @@ export async function paySubkonTermyn(
           },
         });
       }
+      const recipients = new Set(
+        [
+          termyn.createdById,
+          termyn.subkonContract.project.fieldPicId,
+        ].filter((userId): userId is string => Boolean(userId)),
+      );
+      for (const userId of recipients) {
+        await sendNotification({
+          userId,
+          title: "Pembayaran Termin Subkon Selesai",
+          message: `Termin ${termyn.termynNumber} · SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) sebesar Rp${decimalFromScaledInteger(termyn.netAmount).toNumber().toLocaleString("id-ID")} telah dibayar Keuangan.`,
+          actionUrl: `/apps/projects?projectId=${encodeURIComponent(termyn.subkonContract.projectId)}`,
+          type: NotificationType.SUCCESS,
+          database: transaction,
+        });
+      }
     });
   } catch (error) {
     try {
@@ -829,13 +982,24 @@ export async function createProjectAddendum(
     return failure("CCO harus mengubah pagu atau waktu proyek.");
   }
   try {
-    await prisma.projectAddendum.create({
-      data: {
-        ...parsed.data,
-        budgetChange: scaledIntegerFromDecimal(parsed.data.budgetChange),
-        status: ProjectAddendumStatus.PENDING_APPROVAL,
-        createdById: session.user.id,
-      },
+    await prisma.$transaction(async (transaction) => {
+      const created = await transaction.projectAddendum.create({
+        data: {
+          ...parsed.data,
+          budgetChange: scaledIntegerFromDecimal(parsed.data.budgetChange),
+          status: ProjectAddendumStatus.PENDING_APPROVAL,
+          createdById: session.user.id,
+        },
+        select: { id: true },
+      });
+      await sendNotification({
+        roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+        title: "CCO / Addendum Menunggu Persetujuan",
+        message: `CCO ${parsed.data.addendumNumber} menunggu persetujuan Direksi.`,
+        actionUrl: `/apps/approvals?tab=wages&openSheet=${encodeURIComponent(created.id)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
+      });
     });
   } catch (error) {
     console.error("Project addendum creation failed:", error);
@@ -863,6 +1027,8 @@ export async function approveProjectAddendum(
         where: { id, status: ProjectAddendumStatus.PENDING_APPROVAL },
         select: {
           projectId: true,
+          addendumNumber: true,
+          createdById: true,
           budgetChange: true,
           timeExtension: true,
         },
@@ -905,6 +1071,22 @@ export async function approveProjectAddendum(
                 }
               : {}),
           },
+        });
+      }
+      if (addendum.createdById !== session.user.id) {
+        await sendNotification({
+          userId: addendum.createdById,
+          title:
+            decision === "APPROVED"
+              ? "CCO / Addendum Disetujui"
+              : "CCO / Addendum Ditolak",
+          message: `CCO ${addendum.addendumNumber} telah ${decision === "APPROVED" ? "disetujui Direksi dan pagu/waktu proyek diperbarui" : "ditolak Direksi"}.`,
+          actionUrl: `/apps/projects?projectId=${encodeURIComponent(addendum.projectId)}`,
+          type:
+            decision === "APPROVED"
+              ? NotificationType.SUCCESS
+              : NotificationType.WARNING,
+          database: transaction,
         });
       }
     });
@@ -998,10 +1180,11 @@ export async function createBAST(
         create: { kind: sequenceKind, year, value: 1 },
         select: { value: true },
       });
-      await transaction.bASTDocument.create({
+      const bastNumber = `SPE-${String(sequence.value).padStart(3, "0")}/${sequenceKind}/${year}`;
+      const bast = await transaction.bASTDocument.create({
         data: {
           publicCode: code,
-          bastNumber: `SPE-${String(sequence.value).padStart(3, "0")}/${sequenceKind}/${year}`,
+          bastNumber,
           projectId: parsed.data.projectId,
           type: parsed.data.type,
           date: new Date(`${parsed.data.date}T00:00:00.000Z`),
@@ -1010,6 +1193,15 @@ export async function createBAST(
             : null,
           notes: parsed.data.notes || null,
         },
+        select: { id: true },
+      });
+      await sendNotification({
+        roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+        title: `Draf BAST ${parsed.data.type} Menunggu Persetujuan`,
+        message: `${bastNumber} siap disahkan oleh Direksi.`,
+        actionUrl: `/apps/approvals?tab=wages&openSheet=${encodeURIComponent(bast.id)}`,
+        type: NotificationType.APPROVAL,
+        database: transaction,
       });
       return code;
     });
@@ -1033,9 +1225,13 @@ export async function approveBAST(
   const bast = await prisma.bASTDocument.findUnique({
     where: { id },
     select: {
+      bastNumber: true,
+      projectId: true,
       type: true,
       project: {
         select: {
+          name: true,
+          fieldPicId: true,
           progress: true,
           bastDocuments: {
             where: { type: BASTType.PHO, isApproved: true },
@@ -1063,15 +1259,40 @@ export async function approveBAST(
   ) {
     return failure("Masa pemeliharaan atau pencairan retensi belum selesai.");
   }
-  const result = await prisma.bASTDocument.updateMany({
-    where: { id, isApproved: false },
-    data: {
-      isApproved: true,
-      approvedById: session.user.id,
-      approvedAt: new Date(),
-    },
+  const updatedCount = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.bASTDocument.updateMany({
+      where: { id, isApproved: false },
+      data: {
+        isApproved: true,
+        approvedById: session.user.id,
+        approvedAt: new Date(),
+      },
+    });
+    if (result.count !== 1) return 0;
+    await sendNotification({
+      roleTarget: UserRole.FINANCE,
+      title: `BAST ${bast.type} Disetujui`,
+      message: `${bast.bastNumber} · ${bast.project.name} telah disetujui Direksi.`,
+      actionUrl: "/apps/finance?tab=subcontract",
+      type: NotificationType.SUCCESS,
+      database: transaction,
+    });
+    if (
+      bast.project.fieldPicId &&
+      bast.project.fieldPicId !== session.user.id
+    ) {
+      await sendNotification({
+        userId: bast.project.fieldPicId,
+        title: `BAST ${bast.type} Proyek Disetujui`,
+        message: `${bast.bastNumber} · ${bast.project.name} telah disahkan Direksi.`,
+        actionUrl: `/apps/projects?projectId=${encodeURIComponent(bast.projectId)}`,
+        type: NotificationType.SUCCESS,
+        database: transaction,
+      });
+    }
+    return result.count;
   });
-  if (result.count !== 1) return failure("BAST tidak ditemukan atau sudah disetujui.");
+  if (updatedCount !== 1) return failure("BAST tidak ditemukan atau sudah disetujui.");
   revalidateConstruction();
   return { success: true, message: "BAST berhasil disetujui." };
 }
@@ -1095,10 +1316,12 @@ export async function releaseSubkonRetention(
       contractNumber: true,
       subkonName: true,
       projectId: true,
+      createdById: true,
       retentionReleasedAt: true,
       termyns: { select: { status: true, retentionAmount: true } },
       project: {
         select: {
+          fieldPicId: true,
           bastDocuments: {
             where: { type: BASTType.PHO, isApproved: true },
             select: { maintenanceEndsAt: true },
@@ -1160,6 +1383,21 @@ export async function releaseSubkonRetention(
         proofUrl,
         recordedBy: session.user.id,
       });
+      const recipients = new Set(
+        [contract.createdById, contract.project.fieldPicId].filter(
+          (userId): userId is string => Boolean(userId),
+        ),
+      );
+      for (const userId of recipients) {
+        await sendNotification({
+          userId,
+          title: "Retensi Subkon Dicairkan",
+          message: `Retensi SPK ${contract.contractNumber} (${contract.subkonName}) sebesar Rp${totalRetention.toNumber().toLocaleString("id-ID")} telah dicairkan Keuangan.`,
+          actionUrl: `/apps/projects?projectId=${encodeURIComponent(contract.projectId)}`,
+          type: NotificationType.SUCCESS,
+          database: transaction,
+        });
+      }
     });
   } catch (error) {
     try {

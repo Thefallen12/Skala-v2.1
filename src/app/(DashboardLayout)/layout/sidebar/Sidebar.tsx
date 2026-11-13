@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import FullLogo from "../shared/logo/FullLogo";
 import type { SidebarCounts } from "../header/useNotificationFeed";
 import { ANDROID_APK } from "@/lib/apk-config";
+import { handleApkLinkClick } from "@/lib/apk-update-client";
 
 interface SidebarProps {
   onClose?: () => void;
@@ -235,6 +236,11 @@ const SidebarLayout = ({
               <a
                 href={androidDownloadUrl}
                 download={ANDROID_APK.fileName}
+                onClick={(event) => {
+                  if (handleApkLinkClick(event, androidDownloadUrl)) {
+                    onClose?.();
+                  }
+                }}
                 className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
               >
                 <Icon icon="tabler:download" height={16} width={16} />

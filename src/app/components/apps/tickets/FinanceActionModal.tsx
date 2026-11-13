@@ -19,6 +19,10 @@ import {
   formatRupiahNumber,
   parseRupiahInput,
 } from "@/lib/indonesian-currency";
+import {
+  FINANCE_PROOF_ACCEPT_ALL,
+  prepareFinanceProofFile,
+} from "@/lib/finance-proof-client";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 
 type FinanceAccountOption = {
@@ -63,6 +67,7 @@ export default function FinanceActionModal({
   onSuccess: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [isPreparingFile, setIsPreparingFile] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>(
     PaymentType.FULL_PAYMENT,
   );
@@ -187,6 +192,7 @@ export default function FinanceActionModal({
             disabled={
               !file ||
               isPending ||
+              isPreparingFile ||
               accountsLoading ||
               accounts.length === 0 ||
               (currentPaymentType !== PaymentType.FULL_PAYMENT &&
@@ -195,9 +201,11 @@ export default function FinanceActionModal({
           >
             {isPending
               ? "Menyimpan..."
-              : currentPaymentType === PaymentType.FULL_PAYMENT
-                ? "Selesaikan Pembayaran"
-                : "Catat Pembayaran DP"}
+              : isPreparingFile
+                ? "Memproses File..."
+                : currentPaymentType === PaymentType.FULL_PAYMENT
+                  ? "Selesaikan Pembayaran"
+                  : "Catat Pembayaran DP"}
           </Button>
         </div>
       }
@@ -337,10 +345,32 @@ export default function FinanceActionModal({
             <div className="flex items-center gap-2">
               <Input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                required
-                disabled={isPending}
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                accept={FINANCE_PROOF_ACCEPT_ALL}
+                disabled={isPending || isPreparingFile}
+                onChange={async (event) => {
+                  const input = event.currentTarget;
+                  const rawFile = input.files?.[0] ?? null;
+                  if (!rawFile) {
+                    setFile(null);
+                    return;
+                  }
+                  setIsPreparingFile(true);
+                  setMessage("");
+                  try {
+                    const prepared = await prepareFinanceProofFile(rawFile);
+                    setFile(prepared);
+                  } catch (err) {
+                    setFile(null);
+                    input.value = "";
+                    setMessage(
+                      err instanceof Error
+                        ? err.message
+                        : "File bukti tidak valid.",
+                    );
+                  } finally {
+                    setIsPreparingFile(false);
+                  }
+                }}
               />
               <InvoiceFilePreview
                 file={file}

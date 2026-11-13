@@ -50,6 +50,7 @@ import {
   MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS,
 } from "@/lib/direct-stock-purchase-photo-config";
 import { getJakartaDateKey, shiftDateKey } from "@/lib/habit-date";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import {
   deleteLogisticsStockItem,
   importLogisticsStockCsv,
@@ -211,6 +212,7 @@ function DirectPurchaseInvoiceAction({
         setMessage(result.message);
         if (result.success) {
           setDocumentPhoto(null);
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {
@@ -731,6 +733,7 @@ export default function LogisticsWorkspace({
       setStockNotice(result.message);
       setReceivingPurchase(null);
       clearReceivingPhotos();
+      requestNotificationFeedRefresh();
       router.refresh();
     } catch (error) {
       console.error("Receiving direct stock purchase failed:", error);

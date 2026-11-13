@@ -9,6 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import {
   Calendar,
   ChevronDown,
@@ -162,6 +163,7 @@ export default function EquipmentVehicleRentalPanel({
       });
       if (res.success) {
         setBillingModalOpen(false);
+        requestNotificationFeedRefresh();
         router.refresh();
       } else {
         setBillingMessage(res.message);

@@ -1,9 +1,9 @@
 export const ANDROID_APK = {
-  version: "2.1.2",
-  versionCode: 5,
+  version: "2.1.4",
+  versionCode: 7,
   href: "/Skala-Prioritas.apk",
-  fileName: "Skala-Prioritas-v2.1.2.apk",
-  label: "APK v2.1.2",
+  fileName: "Skala-Prioritas-v2.1.4.apk",
+  label: "APK v2.1.4",
   releaseNotes:
-    "Menambahkan sistem pembaruan langsung di dalam aplikasi (In-App Patch & APK Self-Updater) tanpa perlu unduh manual dari browser.",
+    "Memperbaiki sistem pembaruan dalam aplikasi (in-app updater), penanganan redirect unduhan APK, serta kelanjutan instalasi otomatis setelah izin sumber tidak dikenal diaktifkan.",
 } as const;

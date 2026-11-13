@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@prisma/client";
+import { NotificationType, UserRole } from "@prisma/client";
 import { auth } from "../../../auth";
 import { generateAvailablePublicCode } from "@/lib/documents/random-code";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
+import { sendNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 export type TransactionDocumentKind = "INVOICE" | "KO" | "DO";
@@ -60,6 +61,7 @@ export async function updateTransactionDocumentSignature(
         const document = await transaction.invoice.findUnique({
           where: { id },
           select: {
+            invoiceNumber: true,
             publicCode: true,
             signedAt: true,
             acknowledgedAt: true,
@@ -80,6 +82,14 @@ export async function updateTransactionDocumentSignature(
             },
           });
           if (result.count !== 1) throw new Error("Invoice baru saja ditandatangani.");
+          await sendNotification({
+            roleTarget: UserRole.DIRECTOR,
+            title: "Invoice Menunggu Pengesahan Direktur",
+            message: `Invoice ${document.invoiceNumber ?? id} telah ditandatangani Keuangan dan siap diketahui Direktur.`,
+            actionUrl: "/apps/finance",
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
         } else {
           if (!document.signedAt) {
             throw new Error("Invoice harus ditandatangani Keuangan terlebih dahulu.");
@@ -103,6 +113,7 @@ export async function updateTransactionDocumentSignature(
         const document = await transaction.orderConfirmation.findUnique({
           where: { id },
           select: {
+            koNumber: true,
             publicCode: true,
             signedAt: true,
             acknowledgedAt: true,
@@ -123,6 +134,14 @@ export async function updateTransactionDocumentSignature(
             },
           });
           if (result.count !== 1) throw new Error("KO baru saja ditandatangani.");
+          await sendNotification({
+            roleTarget: UserRole.FINANCE,
+            title: "KO Menunggu Konfirmasi Keuangan",
+            message: `KO ${document.koNumber} telah ditandatangani Logistik dan siap diketahui Keuangan.`,
+            actionUrl: "/apps/finance",
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
         } else {
           if (!document.signedAt) {
             throw new Error("KO harus ditandatangani Logistik terlebih dahulu.");
@@ -144,6 +163,7 @@ export async function updateTransactionDocumentSignature(
         const document = await transaction.deliveryOrder.findUnique({
           where: { id },
           select: {
+            doNumber: true,
             publicCode: true,
             signedAt: true,
             acknowledgedAt: true,
@@ -161,6 +181,14 @@ export async function updateTransactionDocumentSignature(
             },
           });
           if (result.count !== 1) throw new Error("DO baru saja ditandatangani.");
+          await sendNotification({
+            roleTarget: UserRole.KOORDINATOR,
+            title: "DO Menunggu Konfirmasi Koordinator Lapangan",
+            message: `DO ${document.doNumber} telah ditandatangani Logistik dan siap dikonfirmasi Koordinator.`,
+            actionUrl: "/apps/logistics",
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
         } else {
           if (!document.signedAt) {
             throw new Error("DO harus ditandatangani Logistik terlebih dahulu.");

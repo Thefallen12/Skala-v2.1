@@ -531,6 +531,7 @@ export default async function ProjectsWorkstationPage({
 
   return (
     <ProjectWorkstationMaster
+      key={section === "surveys" ? "surveys" : (requestedProjectId ?? "list")}
       projects={projectRows}
       fieldTeamUsers={fieldTeamUsers}
       currentUserId={session.user.id}

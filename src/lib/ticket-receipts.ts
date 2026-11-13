@@ -9,6 +9,7 @@ import {
   removeCloudinaryPrivatePdf,
   uploadCloudinaryPrivatePdf,
 } from "@/lib/cloudinary-private-pdfs";
+import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import {
   readPrivatePhoto,
   removePrivatePhoto,
@@ -44,14 +45,15 @@ export async function saveTicketReceipt(file: File): Promise<string> {
   if (!(file instanceof File) || file.size < 1 || file.size > MAX_RECEIPT_BYTES) {
     throw new Error("Ukuran file bukti harus lebih dari 0 dan maksimal 5 MB.");
   }
-  if (!isReceiptMimeType(file.type)) {
+  const normalizedFile = normalizeFinancePaymentProofFile(file);
+  if (!normalizedFile || !isReceiptMimeType(normalizedFile.type)) {
     throw new Error("Format file bukti harus PDF, JPG, PNG, atau WEBP.");
   }
 
-  if (file.type !== "application/pdf") {
+  if (normalizedFile.type !== "application/pdf") {
     try {
       const photo = await uploadCloudinaryPhoto(
-        file,
+        normalizedFile,
         TICKET_RECEIPT_PHOTO_CLOUDINARY_FOLDER,
         MAX_RECEIPT_BYTES,
       );
@@ -64,7 +66,7 @@ export async function saveTicketReceipt(file: File): Promise<string> {
     }
   }
 
-  return uploadCloudinaryPrivatePdf(file, MAX_RECEIPT_BYTES);
+  return uploadCloudinaryPrivatePdf(normalizedFile, MAX_RECEIPT_BYTES);
 }
 
 export async function removeTicketReceipt(url: string): Promise<void> {

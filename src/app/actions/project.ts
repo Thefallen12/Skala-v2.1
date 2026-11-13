@@ -191,13 +191,13 @@ async function activateProjectIfReady(projectId: string) {
     });
     if (updated.count !== 1) return false;
 
-    await transaction.notification.create({
-      data: {
-        userId: project.fieldPicId,
-        title: "Proyek Aktif",
-        message: `Proyek ${project.name} resmi berjalan. Silakan mulai mengisi laporan harian dan progres.`,
-        actionUrl: `/apps/projects?projectId=${encodeURIComponent(project.id)}`,
-      },
+    await sendNotification({
+      userId: project.fieldPicId,
+      title: "Proyek Aktif",
+      message: `Proyek ${project.name} resmi berjalan. Silakan mulai mengisi laporan harian dan progres.`,
+      actionUrl: `/apps/projects?projectId=${encodeURIComponent(project.id)}`,
+      type: NotificationType.INFO,
+      database: transaction,
     });
     return true;
   });
@@ -1055,10 +1055,16 @@ export async function approveProjectWorkPointWage(
     return { success: false, message: "Alasan perubahan upah tidak valid." };
   }
   try {
-    const projectId = await prisma.$transaction(async (transaction) => {
+    const updated = await prisma.$transaction(async (transaction) => {
       const workPoint = await transaction.projectWorkPoint.findUnique({
         where: { id: workPointId },
-        select: { projectId: true, approvedTotalWage: true, proposedTotalWage: true },
+        select: {
+          projectId: true,
+          title: true,
+          proposedById: true,
+          approvedTotalWage: true,
+          proposedTotalWage: true,
+        },
       });
       if (!workPoint) throw new Error("Titik pekerjaan tidak ditemukan.");
       if (workPoint.approvedTotalWage) {
@@ -1092,9 +1098,27 @@ export async function approveProjectWorkPointWage(
           reason: reason.trim() || "Persetujuan awal atas nilai usulan.",
         },
       });
-      return workPoint.projectId;
+      return {
+        projectId: workPoint.projectId,
+        title: workPoint.title,
+        proposedById: workPoint.proposedById,
+        formattedWage: newWage.toNumber().toLocaleString("id-ID"),
+      };
     });
-    const activated = await activateProjectIfReady(projectId);
+    const activated = await activateProjectIfReady(updated.projectId);
+    if (
+      !activated &&
+      updated.proposedById &&
+      updated.proposedById !== session.user.id
+    ) {
+      await sendNotification({
+        userId: updated.proposedById,
+        title: "Upah Titik Kerja Disetujui",
+        message: `Usulan upah titik "${updated.title}" disetujui sebesar Rp${updated.formattedWage}.`,
+        actionUrl: `/apps/projects?projectId=${encodeURIComponent(updated.projectId)}`,
+        type: NotificationType.SUCCESS,
+      });
+    }
     revalidatePath("/apps/project");
     revalidatePath("/apps/projects");
     revalidatePath("/apps/approvals");

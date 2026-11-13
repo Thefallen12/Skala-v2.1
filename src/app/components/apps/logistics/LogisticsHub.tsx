@@ -13,6 +13,7 @@ import {
   reviewPurchaseOrder,
   approvePurchaseOrder,
 } from "@/app/actions/orders";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
 import DocumentSignoffQueue, {
   type DocumentSignoffTask,
@@ -295,7 +296,10 @@ export default function LogisticsHub({
         const result = await reviewPurchaseOrder(publicCode);
         setPurchaseOrderMessage(result.message);
         setPurchaseOrderMessageIsError(!result.success);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("PO finance review failed:", error);
         setPurchaseOrderMessage("Pemeriksaan PO gagal. Silakan coba kembali.");
@@ -312,7 +316,10 @@ export default function LogisticsHub({
         const result = await approvePurchaseOrder(publicCode);
         setPurchaseOrderMessage(result.message);
         setPurchaseOrderMessageIsError(!result.success);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("PO approval failed:", error);
         setPurchaseOrderMessage("Persetujuan PO gagal. Silakan coba kembali.");

@@ -1,15 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, Download, RefreshCw, ShieldAlert, Smartphone, Sparkles, X } from "lucide-react";
-
-interface NativeAppInfo {
-  platform: "android";
-  packageName: string;
-  versionName: string;
-  versionCode: number;
-  canRequestPackageInstalls: boolean;
-}
+import { CheckCircle2, Download, ExternalLink, RefreshCw, ShieldAlert, Smartphone, Sparkles, X } from "lucide-react";
+import { ANDROID_APK } from "@/lib/apk-config";
+import {
+  type NativeAppInfo,
+  isAndroidWrapperUserAgent,
+  resolveExternalApkDownloadUrl,
+  triggerBrowserApkDownload,
+} from "@/lib/apk-update-client";
 
 interface AppVersionPayload {
   webBuildId: string;
@@ -32,44 +31,27 @@ interface NativeProgressDetail {
   message: string;
 }
 
-interface SkalaNativeUpdaterBridge {
-  getAppInfo: () => string;
-  clearWebCache: () => void;
-  startApkUpdate: (apkUrl: string) => void;
-}
-
-declare global {
-  interface Window {
-    SkalaNativeUpdater?: SkalaNativeUpdaterBridge;
-    __SKALA_NATIVE_APP__?: NativeAppInfo;
-  }
-}
-
 const CLIENT_BUILD_ID = process.env.NEXT_PUBLIC_APP_BUILD_ID?.trim() || "";
 const LEGACY_APK_DISMISS_KEY = "skala_dismissed_legacy_apk_version";
 const AUTO_CHECK_INTERVAL_MS = 180_000;
 const MIN_CHECK_COOLDOWN_MS = 25_000;
+const NATIVE_UPDATER_RESPONSE_TIMEOUT_MS = 6_000;
 
 function readNativeAppInfo(): NativeAppInfo | null {
   if (typeof window === "undefined") return null;
-  if (window.__SKALA_NATIVE_APP__) {
-    return window.__SKALA_NATIVE_APP__;
-  }
   if (window.SkalaNativeUpdater) {
     try {
       const parsed = JSON.parse(window.SkalaNativeUpdater.getAppInfo()) as NativeAppInfo;
       window.__SKALA_NATIVE_APP__ = parsed;
       return parsed;
     } catch {
-      return null;
+      // Fallback ke snapshot __SKALA_NATIVE_APP__ bila getAppInfo gagal
     }
   }
+  if (window.__SKALA_NATIVE_APP__) {
+    return window.__SKALA_NATIVE_APP__;
+  }
   return null;
-}
-
-function isAndroidWrapperUserAgent(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /SkalaApp\//i.test(navigator.userAgent);
 }
 
 function formatMegabytes(bytes: number): string {
@@ -92,6 +74,14 @@ export default function InAppUpdateManager() {
 
   const lastCheckedAtRef = useRef(0);
   const upToDateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updaterWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearUpdaterWatchdog = useCallback(() => {
+    if (updaterWatchdogRef.current) {
+      clearTimeout(updaterWatchdogRef.current);
+      updaterWatchdogRef.current = null;
+    }
+  }, []);
 
   const refreshNativeMetadata = useCallback(() => {
     const info = readNativeAppInfo();
@@ -113,7 +103,7 @@ export default function InAppUpdateManager() {
       lastCheckedAtRef.current = now;
 
       try {
-        const response = await fetch("/api/app-version", {
+        const response = await fetch(`/api/app-version?t=${Date.now()}`, {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
         });
@@ -162,6 +152,60 @@ export default function InAppUpdateManager() {
     [refreshNativeMetadata],
   );
 
+  const startApkDownloadWithUrl = useCallback(
+    (downloadUrl: string, fileName: string) => {
+      if (window.SkalaNativeUpdater?.startApkUpdate) {
+        clearUpdaterWatchdog();
+        setDismissed(false);
+        setNativeProgress({
+          status: "downloading",
+          percent: 0,
+          downloadedBytes: 0,
+          totalBytes: 0,
+          message: "Menghubungkan ke server pembaruan...",
+        });
+        updaterWatchdogRef.current = setTimeout(() => {
+          setNativeProgress((prev) =>
+            prev?.status === "downloading" && prev.percent === 0
+              ? {
+                  status: "error",
+                  percent: 0,
+                  downloadedBytes: 0,
+                  totalBytes: 0,
+                  message:
+                    "Pembaruan dalam aplikasi tidak merespons. Silakan unduh melalui browser perangkat.",
+                }
+              : prev,
+          );
+        }, NATIVE_UPDATER_RESPONSE_TIMEOUT_MS);
+
+        try {
+          window.SkalaNativeUpdater.startApkUpdate(downloadUrl);
+        } catch {
+          clearUpdaterWatchdog();
+          setNativeProgress({
+            status: "error",
+            percent: 0,
+            downloadedBytes: 0,
+            totalBytes: 0,
+            message:
+              "Gagal memanggil modul pembaruan APK. Silakan unduh melalui browser.",
+          });
+        }
+        return;
+      }
+
+      if (isAndroidWrapperUserAgent()) {
+        // Pada APK versi lama tanpa bridge native updater, arahkan ke domain alternatif agar Capacitor membuka browser/downloader sistem.
+        window.location.assign(resolveExternalApkDownloadUrl(downloadUrl));
+        return;
+      }
+
+      triggerBrowserApkDownload(downloadUrl, fileName);
+    },
+    [clearUpdaterWatchdog],
+  );
+
   useEffect(() => {
     const handleNativeReady = () => {
       refreshNativeMetadata();
@@ -171,8 +215,12 @@ export default function InAppUpdateManager() {
     const handleProgressEvent = (event: Event) => {
       const custom = event as CustomEvent<NativeProgressDetail>;
       if (custom.detail) {
+        clearUpdaterWatchdog();
         setDismissed(false);
         setNativeProgress(custom.detail);
+        if (custom.detail.status === "permission_required" || custom.detail.status === "installing") {
+          refreshNativeMetadata();
+        }
       }
     };
 
@@ -181,8 +229,20 @@ export default function InAppUpdateManager() {
       void checkForUpdates(true);
     };
 
+    const handleStartApkEvent = (event: Event) => {
+      const custom = event as CustomEvent<{ downloadUrl?: string }>;
+      const targetUrl =
+        custom.detail?.downloadUrl ||
+        serverVersion?.apk.downloadUrl ||
+        ANDROID_APK.href;
+      const targetFileName =
+        serverVersion?.apk.fileName || ANDROID_APK.fileName;
+      startApkDownloadWithUrl(targetUrl, targetFileName);
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        refreshNativeMetadata();
         void checkForUpdates(false);
       }
     };
@@ -190,6 +250,7 @@ export default function InAppUpdateManager() {
     window.addEventListener("skala:native-ready", handleNativeReady);
     window.addEventListener("skala:apk-update-progress", handleProgressEvent);
     window.addEventListener("skala:check-update", handleManualCheck);
+    window.addEventListener("skala:start-apk-update", handleStartApkEvent);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const startupTimer = setTimeout(() => {
@@ -203,13 +264,21 @@ export default function InAppUpdateManager() {
     return () => {
       clearTimeout(startupTimer);
       clearInterval(interval);
+      clearUpdaterWatchdog();
       if (upToDateTimerRef.current) clearTimeout(upToDateTimerRef.current);
       window.removeEventListener("skala:native-ready", handleNativeReady);
       window.removeEventListener("skala:apk-update-progress", handleProgressEvent);
       window.removeEventListener("skala:check-update", handleManualCheck);
+      window.removeEventListener("skala:start-apk-update", handleStartApkEvent);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [checkForUpdates, refreshNativeMetadata]);
+  }, [
+    checkForUpdates,
+    clearUpdaterWatchdog,
+    refreshNativeMetadata,
+    serverVersion,
+    startApkDownloadWithUrl,
+  ]);
 
   const applyWebPatch = async () => {
     if (applyingWebPatch) return;
@@ -237,27 +306,19 @@ export default function InAppUpdateManager() {
   };
 
   const triggerNativeApkUpdate = () => {
-    if (!serverVersion) return;
+    const targetUrl = serverVersion?.apk.downloadUrl || ANDROID_APK.href;
+    const targetFileName = serverVersion?.apk.fileName || ANDROID_APK.fileName;
+    startApkDownloadWithUrl(targetUrl, targetFileName);
+  };
 
-    if (window.SkalaNativeUpdater) {
-      setNativeProgress({
-        status: "downloading",
-        percent: 0,
-        downloadedBytes: 0,
-        totalBytes: 0,
-        message: "Menghubungkan ke server pembaruan...",
-      });
-      window.SkalaNativeUpdater.startApkUpdate(serverVersion.apk.downloadUrl);
+  const openExternalApkFallback = () => {
+    const targetUrl = serverVersion?.apk.downloadUrl || ANDROID_APK.href;
+    const targetFileName = serverVersion?.apk.fileName || ANDROID_APK.fileName;
+    if (isAndroidWrapperUserAgent()) {
+      window.location.assign(resolveExternalApkDownloadUrl(targetUrl));
       return;
     }
-
-    // Fallback untuk APK lama (sebelum v2.1.2) agar sekali unduh langsung punya In-App Updater
-    const anchor = document.createElement("a");
-    anchor.href = serverVersion.apk.downloadUrl;
-    anchor.download = serverVersion.apk.fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    triggerBrowserApkDownload(targetUrl, targetFileName);
   };
 
   const handleDismiss = () => {
@@ -286,6 +347,7 @@ export default function InAppUpdateManager() {
 
   const isNativeDownloading = nativeProgress?.status === "downloading";
   const isPermissionRequired = nativeProgress?.status === "permission_required";
+  const isNativeInstalling = nativeProgress?.status === "installing";
   const isNativeError = nativeProgress?.status === "error";
 
   return (
@@ -399,7 +461,46 @@ export default function InAppUpdateManager() {
           </button>
         )}
 
-        {apkUpdateAvailable && (
+        {isPermissionRequired && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.SkalaNativeUpdater?.openInstallUnknownAppsSettings) {
+                window.SkalaNativeUpdater.openInstallUnknownAppsSettings();
+              } else {
+                openExternalApkFallback();
+              }
+            }}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            <span>Aktifkan Izin Instalasi</span>
+          </button>
+        )}
+
+        {isNativeInstalling && window.SkalaNativeUpdater?.retryPendingInstall && (
+          <button
+            type="button"
+            onClick={() => window.SkalaNativeUpdater?.retryPendingInstall?.()}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Buka Pemasang APK</span>
+          </button>
+        )}
+
+        {(isNativeError || isPermissionRequired) && (
+          <button
+            type="button"
+            onClick={openExternalApkFallback}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground shadow-sm transition hover:bg-muted"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span>Unduh via Browser</span>
+          </button>
+        )}
+
+        {(apkUpdateAvailable || isNativeError) && (
           <button
             type="button"
             disabled={isNativeDownloading}
@@ -413,8 +514,8 @@ export default function InAppUpdateManager() {
                 : isNativeError
                   ? "Coba Update Lagi"
                   : nativeInfo
-                    ? `Update In-App (${serverVersion?.apk.label})`
-                    : `Unduh ${serverVersion?.apk.label}`}
+                    ? `Update In-App (${serverVersion?.apk.label ?? ANDROID_APK.label})`
+                    : `Unduh ${serverVersion?.apk.label ?? ANDROID_APK.label}`}
             </span>
           </button>
         )}

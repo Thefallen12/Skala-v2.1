@@ -4,6 +4,7 @@ import { FormLabel } from '@/components/ui/label'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowRight, Download, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck, Smartphone } from 'lucide-react'
 import { ANDROID_APK } from '@/lib/apk-config'
+import { handleApkLinkClick } from '@/lib/apk-update-client'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -31,7 +32,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
 }
 
-export const Login = () => {
+export const Login = ({ callbackUrl }: { callbackUrl?: string }) => {
+  const destination = callbackUrl || '/'
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
@@ -52,7 +54,7 @@ export const Login = () => {
             identifier: identifier.trim().toLowerCase(),
             password,
             redirect: false,
-            redirectTo: '/',
+            redirectTo: destination,
           })
           if (!result?.ok || result.error) {
             return {
@@ -83,7 +85,7 @@ export const Login = () => {
       }
 
       // Hard navigation to ensure all server session cookies and fresh layout load cleanly
-      window.location.assign('/')
+      window.location.assign(destination)
     } catch (err) {
       console.error('Sign-in exception:', err)
       setIsAuthenticating(false)
@@ -309,6 +311,7 @@ export const Login = () => {
               <a
                 href={ANDROID_APK.href}
                 download={ANDROID_APK.fileName}
+                onClick={(event) => handleApkLinkClick(event, ANDROID_APK.href)}
                 className='flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-left transition hover:border-primary/40 hover:bg-primary/5'
               >
                 <span className='flex items-center gap-2.5'>

@@ -4,9 +4,11 @@ import { useId, useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
+import {
+  FINANCE_PROOF_ACCEPT_ALL,
+  prepareFinanceProofFiles,
+} from "@/lib/finance-proof-client";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_FILES = 5;
 
 type SingleFileProps = {
@@ -44,6 +46,7 @@ export default function FinancePaymentProofUpload(
     else props.onChange(files[0] ?? null);
   };
   const [error, setError] = useState("");
+  const [isPreparing, setIsPreparing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const helpId = useId();
 
@@ -58,54 +61,57 @@ export default function FinancePaymentProofUpload(
       <Input
         ref={inputRef}
         type="file"
-        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+        accept={FINANCE_PROOF_ACCEPT_ALL}
         multiple={multiple}
-        disabled={disabled}
-        required={!multiple && selectedFiles.length === 0}
+        disabled={disabled || isPreparing}
         aria-describedby={helpId}
-        onChange={(event) => {
-          const newFiles = Array.from(event.target.files ?? []);
-          if (multiple) event.target.value = "";
+        onChange={async (event) => {
+          const input = event.currentTarget;
+          const newFiles = Array.from(input.files ?? []);
           if (newFiles.length === 0) return;
 
-          let invalidType = false;
-          const validFiles = newFiles.flatMap((file) => {
-            const normalizedFile = normalizeFinancePaymentProofFile(file);
-            if (normalizedFile) return [normalizedFile];
-            invalidType = true;
-            return [];
-          });
-          const invalidSize = validFiles.some(
-            (file) => file.size < 1 || file.size > MAX_FILE_SIZE,
-          );
-          const sizeValidFiles = validFiles.filter(
-            (file) => file.size >= 1 && file.size <= MAX_FILE_SIZE,
-          );
-          if (!multiple && sizeValidFiles.length === 0) {
-            event.target.value = "";
-          }
-          const availableSlots = multiple
-            ? Math.max(0, MAX_FILES - selectedFiles.length)
-            : 1;
-          const acceptedFiles = sizeValidFiles.slice(0, availableSlots);
-          const exceedsLimit =
-            multiple && sizeValidFiles.length > availableSlots;
-          onChange(
-            multiple
-              ? [...selectedFiles, ...acceptedFiles]
-              : acceptedFiles,
-          );
-          setError(
-            invalidType
-              ? "Format file harus PDF, JPG, PNG, atau WEBP."
-              : invalidSize
-                ? "Ukuran setiap file harus lebih dari 0 dan maksimal 5 MB."
+          setIsPreparing(true);
+          setError("");
+          try {
+            const { prepared, error: prepError } = await prepareFinanceProofFiles(
+              newFiles,
+            );
+            const availableSlots = multiple
+              ? Math.max(0, MAX_FILES - selectedFiles.length)
+              : 1;
+            const acceptedFiles = prepared.slice(0, availableSlots);
+            const exceedsLimit = multiple && prepared.length > availableSlots;
+
+            if (multiple || acceptedFiles.length > 0) {
+              onChange(
+                multiple
+                  ? [...selectedFiles, ...acceptedFiles]
+                  : acceptedFiles,
+              );
+            } else {
+              onChange([]);
+            }
+
+            setError(
+              prepError
+                ? prepError
                 : exceedsLimit
                   ? `Maksimal ${MAX_FILES} file bukti pembayaran.`
                   : "",
-          );
+            );
+          } finally {
+            setIsPreparing(false);
+            if (multiple || inputRef.current?.files?.length) {
+              input.value = "";
+            }
+          }
         }}
       />
+      {isPreparing && (
+        <p className="text-xs text-muted-foreground" role="status">
+          Memproses file bukti agar kompatibel dan berukuran aman...
+        </p>
+      )}
       {selectedFiles.length > 0 && (
         <ul className="space-y-1 text-sm" aria-label="File bukti pembayaran">
           {selectedFiles.map((file, index) => (
@@ -132,8 +138,8 @@ export default function FinancePaymentProofUpload(
       )}
       <p id={helpId} className="text-xs text-muted-foreground">
         {multiple
-          ? `Pilih hingga ${MAX_FILES} file PDF, JPG, PNG, atau WEBP; maksimal 5 MB per file.`
-          : "PDF, JPG, PNG, atau WEBP; maksimal 5 MB."}
+          ? `Pilih hingga ${MAX_FILES} file PDF, JPG, PNG, WEBP, atau foto iPhone (HEIC); maksimal 5 MB per file (foto besar dikompres otomatis).`
+          : "PDF, JPG, PNG, WEBP, atau foto iPhone (HEIC); maksimal 5 MB."}
       </p>
       {error && (
         <p className="text-sm text-destructive" role="alert">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import SimpleBar from "simplebar-react";
 import "simplebar-react/dist/simplebar.min.css";
@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { DashboardNotification } from "./Notifications";
 import type { NotificationFeed } from "./useNotificationFeed";
+import {
+  cancelNativeNotification,
+  openDevicePermissionsDialog,
+} from "@/lib/native-bridge";
 
 const formatTime = (value: string) =>
   new Intl.DateTimeFormat("id-ID", {
@@ -36,12 +40,16 @@ export default function NotificationBell({
   refreshNotifications: () => Promise<unknown>;
 }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const items = feed?.notifications ?? [];
+  const taskReminders = feed ? feed.taskReminders : fallbackNotifications;
   const unreadCount = feed?.unreadCount ?? 0;
 
   const openNotification = async (id: string, actionUrl: string | null) => {
     setMessage("");
+    setOpen(false);
+    cancelNativeNotification(id);
     try {
       const response = await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
         method: "PATCH",
@@ -67,7 +75,7 @@ export default function NotificationBell({
 
   return (
     <div className="relative px-1 sm:px-3">
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -83,9 +91,22 @@ export default function NotificationBell({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[min(24rem,calc(100vw-1.5rem))] p-0 rounded-xl shadow-xl">
-          <div className="flex items-center justify-between border-b px-4 py-3 bg-muted/40">
+          <div className="flex items-center justify-between gap-2 border-b px-4 py-3 bg-muted/40">
             <h2 className="font-semibold text-sm">Notifikasi</h2>
-            <Badge variant="secondary" className="text-xs">{unreadCount} baru</Badge>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  openDevicePermissionsDialog();
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium text-foreground transition hover:bg-accent"
+              >
+                <ShieldCheck className="size-3 text-emerald-600" aria-hidden="true" />
+                <span>Izin &amp; Suara</span>
+              </button>
+              <Badge variant="secondary" className="text-xs">{unreadCount} baru</Badge>
+            </div>
           </div>
           {loadFailed && (
             <p className="px-4 py-2 text-xs text-destructive" role="alert">
@@ -121,8 +142,13 @@ export default function NotificationBell({
                   )}
                 </DropdownMenuItem>
             ))}
-            {fallbackNotifications.map((item) => (
-                <DropdownMenuItem key={item.id} asChild className="items-start px-4 py-3">
+            {taskReminders.map((item) => (
+                <DropdownMenuItem
+                  key={item.id}
+                  asChild
+                  onSelect={() => setOpen(false)}
+                  className="items-start px-4 py-3"
+                >
                   <Link href={item.href} className="flex w-full gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{item.title}</p>
@@ -134,7 +160,7 @@ export default function NotificationBell({
                   </Link>
                 </DropdownMenuItem>
             ))}
-            {!items.length && !fallbackNotifications.length && (
+            {!items.length && !taskReminders.length && (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                 Belum ada notifikasi.
               </p>
@@ -146,7 +172,10 @@ export default function NotificationBell({
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => router.push("/apps/tickets")}
+              onClick={() => {
+                setOpen(false);
+                router.push("/apps/tickets");
+              }}
             >
               <CheckCheck aria-hidden="true" />
               Lihat aktivitas

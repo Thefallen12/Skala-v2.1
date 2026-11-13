@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
+import {
+  markLocationPermissionHint,
+  openDevicePermissionsDialog,
+} from "@/lib/native-bridge";
 
 type LocationState =
   | { status: "loading" }
@@ -13,7 +17,7 @@ type LocationState =
       isVillage: boolean;
       placeError: string | null;
     }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; permissionDenied: boolean };
 
 const toDms = (value: number, positive: string, negative: string) => {
   const absolute = Math.abs(value);
@@ -35,17 +39,21 @@ const CurrentLocation = ({
     status: "loading",
   });
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      const timer = window.setTimeout(
-        () => setLocation({ status: "error", message: "GPS tidak didukung" }),
-        0,
+  const fetchCurrentLocation = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      Promise.resolve().then(() =>
+        setLocation({
+          status: "error",
+          message: "GPS tidak didukung",
+          permissionDenied: false,
+        }),
       );
-      return () => window.clearTimeout(timer);
+      return;
     }
 
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        markLocationPermissionHint("granted");
         const { latitude, longitude } = coords;
         setLocation({
           status: "ready",
@@ -101,17 +109,40 @@ const CurrentLocation = ({
           });
       },
       (error) => {
-        const message =
-          error.code === error.PERMISSION_DENIED
-            ? "Izin lokasi ditolak"
-            : error.code === error.TIMEOUT
-              ? "Lokasi belum ditemukan"
-              : "Lokasi tidak tersedia";
-        setLocation({ status: "error", message });
+        const denied = error.code === error.PERMISSION_DENIED;
+        if (denied) markLocationPermissionHint("denied");
+        const message = denied
+          ? "Izin lokasi ditolak"
+          : error.code === error.TIMEOUT
+            ? "Lokasi belum ditemukan"
+            : "Lokasi tidak tersedia";
+        setLocation({ status: "error", message, permissionDenied: denied });
       },
       { enableHighAccuracy: false, maximumAge: 300_000, timeout: 12_000 },
     );
   }, []);
+
+  useEffect(() => {
+    const initTimer = window.setTimeout(() => {
+      fetchCurrentLocation();
+    }, 0);
+
+    const handlePermissionUpdate = () => {
+      fetchCurrentLocation();
+    };
+
+    window.addEventListener("skala:permissions-changed", handlePermissionUpdate);
+    window.addEventListener("skala:native-ready", handlePermissionUpdate);
+
+    return () => {
+      window.clearTimeout(initTimer);
+      window.removeEventListener(
+        "skala:permissions-changed",
+        handlePermissionUpdate,
+      );
+      window.removeEventListener("skala:native-ready", handlePermissionUpdate);
+    };
+  }, [fetchCurrentLocation]);
 
   const placeName =
     location.status === "ready"
@@ -130,15 +161,14 @@ const CurrentLocation = ({
   const accessibleLabel = `Lokasi terkini: ${placeName}${coordinates ? `, ${coordinates}` : ""}`;
 
   if (variant === "badge") {
-    return (
-      <div
-        className="inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-border bg-muted px-2 py-1 text-left text-xs font-medium text-foreground sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
-        aria-label={accessibleLabel}
-        aria-live="polite"
-      >
+    const content = (
+      <>
         <MapPin className="size-3.5 shrink-0 text-secondary" aria-hidden="true" />
         <div className="grid min-w-0 flex-1">
-          <span className="line-clamp-2 max-w-full text-[10px] leading-tight sm:line-clamp-none sm:max-w-[13rem] sm:truncate sm:text-xs" title={placeName}>
+          <span
+            className="line-clamp-2 max-w-full text-[10px] leading-tight sm:line-clamp-none sm:max-w-[13rem] sm:truncate sm:text-xs"
+            title={placeName}
+          >
             {placeName}
           </span>
           {coordinateParts.length === 2 && (
@@ -148,7 +178,46 @@ const CurrentLocation = ({
             </span>
           )}
         </div>
+      </>
+    );
+
+    if (location.status === "error") {
+      return (
+        <button
+          type="button"
+          onClick={openDevicePermissionsDialog}
+          title="Ketuk untuk mengatur izin lokasi"
+          aria-label={`${accessibleLabel}. Ketuk untuk mengatur izin lokasi.`}
+          className="inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-left text-xs font-medium text-amber-700 transition hover:bg-amber-500/20 dark:text-amber-300 sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
+        >
+          {content}
+        </button>
+      );
+    }
+
+    return (
+      <div
+        className="inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-border bg-muted px-2 py-1 text-left text-xs font-medium text-foreground sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
+        aria-label={accessibleLabel}
+        aria-live="polite"
+      >
+        {content}
       </div>
+    );
+  }
+
+  if (location.status === "error") {
+    return (
+      <button
+        type="button"
+        onClick={openDevicePermissionsDialog}
+        className="mt-1 flex min-w-0 flex-col items-end leading-tight text-right underline decoration-dotted underline-offset-2"
+        aria-label={`${accessibleLabel}. Ketuk untuk mengatur izin lokasi.`}
+      >
+        <span className="max-w-full truncate text-[9px] font-semibold text-amber-600 dark:text-amber-400 sm:text-xs">
+          {placeName} · Izinkan
+        </span>
+      </button>
     );
   }
 

@@ -11,6 +11,7 @@ import { GlobalModal } from "@/components/ui/global-modal";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import { photoDownloadHref } from "@/lib/photo-urls";
 import { printUrlInFrame } from "@/lib/print-url";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 
 export type PurchaseOrderConfirmationRow = {
   id: string;
@@ -62,7 +63,10 @@ export default function PurchaseOrderConfirmationQueue({
       try {
         const result = await markPurchaseOrderConfirmationSent(row.id);
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("KO vendor handoff failed:", error);
         setMessage("Status pengiriman KO gagal disimpan. Silakan coba kembali.");

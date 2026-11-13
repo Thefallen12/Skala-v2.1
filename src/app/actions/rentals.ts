@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { UserRole } from "@prisma/client";
+import { NotificationType, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { sendNotification } from "@/lib/notifications";
 import {
   decimalNumberFromScaledInteger,
   decimalStringFromScaledInteger,
@@ -322,17 +323,27 @@ export async function submitRentalBilling(
     return { success: false, message: "Data sewa tidak ditemukan." };
   }
 
-  await prisma.equipmentRental.update({
-    where: { id: rentalId },
-    data: {
-      paymentStatus: "PENDING_PAYMENT",
-      billingSubmittedAt: new Date(),
-      billingSubmittedById: session.user.id,
-      billingSubmittedByName: session.user.name || null,
-      paymentBankName: bankDetails?.paymentBankName || rental.paymentBankName || null,
-      paymentAccountNumber: bankDetails?.paymentAccountNumber || rental.paymentAccountNumber || null,
-      paymentAccountName: bankDetails?.paymentAccountName || rental.paymentAccountName || null,
-    },
+  await prisma.$transaction(async (transaction) => {
+    await transaction.equipmentRental.update({
+      where: { id: rentalId },
+      data: {
+        paymentStatus: "PENDING_PAYMENT",
+        billingSubmittedAt: new Date(),
+        billingSubmittedById: session.user.id,
+        billingSubmittedByName: session.user.name || null,
+        paymentBankName: bankDetails?.paymentBankName || rental.paymentBankName || null,
+        paymentAccountNumber: bankDetails?.paymentAccountNumber || rental.paymentAccountNumber || null,
+        paymentAccountName: bankDetails?.paymentAccountName || rental.paymentAccountName || null,
+      },
+    });
+    await sendNotification({
+      roleTarget: UserRole.FINANCE,
+      title: "Tagihan Sewa Menunggu Pembayaran",
+      message: `Tagihan sewa ${rental.type === "EQUIPMENT" ? "alat" : "kendaraan"} ${rental.name} (${rental.vendorName}) senilai Rp${decimalNumberFromScaledInteger(rental.totalCost).toLocaleString("id-ID")} menunggu pembayaran Keuangan.`,
+      actionUrl: "/apps/finance?tab=rentals",
+      type: NotificationType.APPROVAL,
+      database: transaction,
+    });
   });
 
   revalidatePath("/apps/logistics");
@@ -381,37 +392,8 @@ export async function processRentalPayment(input: {
   const totalAmount = decimalNumberFromScaledInteger(rental.totalCost);
 
   try {
-    if (input.financeAccountId) {
-      await prisma.$transaction(async (tx) => {
-        await tx.equipmentRental.update({
-          where: { id: input.rentalId },
-          data: {
-            paymentStatus: "PAID",
-            paidAt: new Date(),
-            paidById: session.user.id,
-            paidByName: session.user.name || null,
-            proofOfPaymentUrl: input.proofOfPaymentUrl,
-            paymentBankName: input.paymentBankName || rental.paymentBankName,
-            paymentAccountNumber: input.paymentAccountNumber || rental.paymentAccountNumber,
-            paymentAccountName: input.paymentAccountName || rental.paymentAccountName,
-            financeNotes: input.financeNotes || null,
-          },
-        });
-
-        if (totalAmount > 0) {
-          await recordFinanceCashflowOutflow(tx, {
-            financeAccountId: input.financeAccountId!,
-            amount: totalAmount,
-            sourceDesc: `Pelunasan Sewa ${rental.type === "EQUIPMENT" ? "Alat" : "Kendaraan"} · ${rental.name} (${rental.vendorName})`,
-            projectId: rental.projectId,
-            paymentMethod: "TRANSFER",
-            proofUrl: input.proofOfPaymentUrl,
-            recordedBy: session.user.id,
-          });
-        }
-      });
-    } else {
-      await prisma.equipmentRental.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.equipmentRental.update({
         where: { id: input.rentalId },
         data: {
           paymentStatus: "PAID",
@@ -425,7 +407,42 @@ export async function processRentalPayment(input: {
           financeNotes: input.financeNotes || null,
         },
       });
-    }
+
+      if (input.financeAccountId && totalAmount > 0) {
+        await recordFinanceCashflowOutflow(tx, {
+          financeAccountId: input.financeAccountId,
+          amount: totalAmount,
+          sourceDesc: `Pelunasan Sewa ${rental.type === "EQUIPMENT" ? "Alat" : "Kendaraan"} · ${rental.name} (${rental.vendorName})`,
+          projectId: rental.projectId,
+          paymentMethod: "TRANSFER",
+          proofUrl: input.proofOfPaymentUrl,
+          recordedBy: session.user.id,
+        });
+      }
+
+      if (
+        rental.billingSubmittedById &&
+        rental.billingSubmittedById !== session.user.id
+      ) {
+        await sendNotification({
+          userId: rental.billingSubmittedById,
+          title: "Pembayaran Sewa Selesai",
+          message: `Tagihan sewa ${rental.type === "EQUIPMENT" ? "alat" : "kendaraan"} ${rental.name} (${rental.vendorName}) sebesar Rp${totalAmount.toLocaleString("id-ID")} telah dibayar lunas Keuangan.`,
+          actionUrl: "/apps/logistics?tab=equipment",
+          type: NotificationType.SUCCESS,
+          database: tx,
+        });
+      } else if (!rental.billingSubmittedById) {
+        await sendNotification({
+          roleTarget: UserRole.LOGISTICS,
+          title: "Pembayaran Sewa Selesai",
+          message: `Tagihan sewa ${rental.type === "EQUIPMENT" ? "alat" : "kendaraan"} ${rental.name} (${rental.vendorName}) sebesar Rp${totalAmount.toLocaleString("id-ID")} telah dibayar lunas Keuangan.`,
+          actionUrl: "/apps/logistics?tab=equipment",
+          type: NotificationType.SUCCESS,
+          database: tx,
+        });
+      }
+    });
 
     revalidatePath("/apps/logistics");
     revalidatePath("/apps/finance");

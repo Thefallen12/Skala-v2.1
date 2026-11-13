@@ -1,32 +1,22 @@
 "use client";
 
 import useSWR from "swr";
-import type { NotificationType } from "@prisma/client";
+import type {
+  BellTaskReminder,
+  NotificationFeed,
+  NotificationFeedItem,
+  SidebarCounts,
+} from "@/lib/notification-types";
 
-export type NotificationFeedItem = {
-  id: string;
-  title: string;
-  message: string;
-  type: NotificationType;
-  isRead: boolean;
-  actionUrl: string | null;
-  createdAt: string;
-};
-
-export type NotificationFeed = {
-  unreadCount: number;
-  notifications: NotificationFeedItem[];
-  sidebarCounts: SidebarCounts;
-};
-
-export type SidebarCounts = {
-  executive: number;
-  logistics: number;
-  finance: number;
+export type {
+  BellTaskReminder,
+  NotificationFeed,
+  NotificationFeedItem,
+  SidebarCounts,
 };
 
 const fetcher = async (url: string): Promise<NotificationFeed> => {
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Notification polling failed with status ${response.status}.`);
   }
@@ -37,6 +27,10 @@ export function useNotificationFeed() {
   return useSWR<NotificationFeed>(
     "/api/notifications/unread-count",
     fetcher,
-    { refreshInterval: 15_000, revalidateOnFocus: true },
+    {
+      refreshInterval: 10_000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+    },
   );
 }

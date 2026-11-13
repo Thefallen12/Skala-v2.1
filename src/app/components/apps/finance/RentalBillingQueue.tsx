@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import {
   Calendar,
   CheckCircle2,
@@ -147,6 +148,7 @@ export default function RentalBillingQueue({
 
       if (res.success) {
         setPaymentModalOpen(false);
+        requestNotificationFeedRefresh();
         router.refresh();
       } else {
         setActionMessage({ text: res.message, error: true });

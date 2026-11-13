@@ -27,7 +27,7 @@ const nextConfig = {
         NEXT_PUBLIC_APP_BUILD_ID: deploymentId || "2.1.2",
     },
     reactStrictMode: false,
-    serverExternalPackages: ["@prisma/client", "puppeteer-core", "@sparticuz/chromium"],
+    serverExternalPackages: ["@prisma/client", "puppeteer-core", "@sparticuz/chromium", "nodemailer"],
     images: {
         unoptimized: true,
         remotePatterns: [

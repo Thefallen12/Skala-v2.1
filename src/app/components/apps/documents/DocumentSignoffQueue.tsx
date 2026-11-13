@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExternalLink, FileCheck2, PenLine } from "lucide-react";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 
 export type DocumentSignoffTask = {
   id: string;
@@ -46,7 +47,10 @@ export default function DocumentSignoffQueue({
           task.action,
         );
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("Document sign-off action failed:", error);
         setMessage("Konfirmasi dokumen gagal disimpan. Silakan coba kembali.");

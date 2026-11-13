@@ -5,15 +5,16 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import {
+  detectImageMimeFromBytes,
+  getFinancePaymentProofMimeType,
+} from "@/lib/finance-payment-proof-file";
 
-const photoMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
-type PhotoMimeType = (typeof photoMimeTypes)[number];
-
-const extByMime: Record<PhotoMimeType, string> = {
+const extByMime = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-};
+} as const;
 
 export class CloudinaryPhotoValidationError extends Error {
   constructor(message: string) {
@@ -27,28 +28,6 @@ export class CloudinaryConfigurationError extends Error {
     super(message);
     this.name = "CloudinaryConfigurationError";
   }
-}
-
-function hasValidSignature(bytes: Uint8Array, mimeType: PhotoMimeType): boolean {
-  if (mimeType === "image/jpeg") {
-    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-  if (mimeType === "image/png") {
-    return (
-      bytes[0] === 0x89 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x4e &&
-      bytes[3] === 0x47 &&
-      bytes[4] === 0x0d &&
-      bytes[5] === 0x0a &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0x0a
-    );
-  }
-  return (
-    new TextDecoder().decode(bytes.subarray(0, 4)) === "RIFF" &&
-    new TextDecoder().decode(bytes.subarray(8, 12)) === "WEBP"
-  );
 }
 
 function configureCloudinary(): void {
@@ -76,14 +55,17 @@ export async function uploadCloudinaryPhoto(
       `Ukuran foto harus lebih dari 0 dan maksimal ${Math.floor(maxBytes / (1024 * 1024))} MB.`,
     );
   }
-  if (!photoMimeTypes.includes(file.type as PhotoMimeType)) {
+  const declaredMime = getFinancePaymentProofMimeType(file);
+  if (!declaredMime || declaredMime === "application/pdf") {
     throw new CloudinaryPhotoValidationError(
       "Format foto harus JPG, PNG, atau WEBP.",
     );
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  if (!hasValidSignature(bytes, file.type as PhotoMimeType)) {
+  // Detect actual image signature so Safari files whose filename/MIME says JPG but bytes are PNG/WEBP still upload cleanly.
+  const actualMime = detectImageMimeFromBytes(bytes);
+  if (!actualMime) {
     throw new CloudinaryPhotoValidationError(
       "Isi file tidak sesuai dengan format foto yang dipilih.",
     );
@@ -92,7 +74,7 @@ export async function uploadCloudinaryPhoto(
   const credentials = getCloudinaryCredentials();
   if (!credentials) {
     const safeFolder = folder.replace(/[^a-zA-Z0-9/_-]/g, "");
-    const ext = extByMime[file.type as PhotoMimeType] ?? "jpg";
+    const ext = extByMime[actualMime] ?? "jpg";
     const fileName = `${randomUUID()}.${ext}`;
     const relativeDir = path.posix.join("uploads", safeFolder);
     const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));

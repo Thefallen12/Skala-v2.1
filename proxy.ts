@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authForProxy } from "./auth";
 import { UserRole } from "./src/generated/prisma/enums";
-import { getRoleHomePath } from "./src/lib/role-home";
+import { getRoleHomePath, sanitizeCallbackUrl } from "./src/lib/role-home";
 import { drawingAccessRoles } from "./src/lib/user-access";
 
 const projectRoles = [
@@ -90,18 +90,39 @@ export default authForProxy((request) => {
 
   if (pathname === "/login" || pathname === "/auth/login") {
     if (user?.role) {
+      const callbackUrl = sanitizeCallbackUrl(
+        request.nextUrl.searchParams.get("callbackUrl"),
+      );
+      const callbackPath = callbackUrl
+        ? new URL(callbackUrl, request.url).pathname
+        : null;
+      const allowedCallbackRoles = callbackPath ? rolesForPath(callbackPath) : null;
+      const canUseCallback =
+        callbackUrl !== null &&
+        (!allowedCallbackRoles || allowedCallbackRoles.includes(user.role));
       return NextResponse.redirect(
-        new URL(getRoleHomePath(user.role), request.url),
+        new URL(
+          canUseCallback ? callbackUrl : getRoleHomePath(user.role),
+          request.url,
+        ),
       );
     }
     if (pathname === "/login") {
-      return NextResponse.redirect(new URL("/auth/login", request.url));
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.search = request.nextUrl.search;
+      return NextResponse.redirect(loginUrl);
     }
     return NextResponse.next();
   }
 
   if (!user?.id || !user.role) {
-    return NextResponse.redirect(new URL("/auth/login", request.url));
+    const loginUrl = new URL("/auth/login", request.url);
+    const requestedTarget = `${pathname}${request.nextUrl.search}`;
+    const safeCallback = sanitizeCallbackUrl(requestedTarget);
+    if (safeCallback && safeCallback !== "/") {
+      loginUrl.searchParams.set("callbackUrl", safeCallback);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   const allowedRoles = rolesForPath(pathname);

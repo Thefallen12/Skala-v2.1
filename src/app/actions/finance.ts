@@ -5,6 +5,7 @@ import { auth } from "../../../auth";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
+import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import {
   removeUploadedCashflowProof,
   uploadCashflowProof,
@@ -57,19 +58,25 @@ export async function updateOfficeExpense(
     };
   }
 
+  const normalizedNewProofFiles: File[] = [];
+  if (Array.isArray(input.newProofFiles)) {
+    for (const file of input.newProofFiles) {
+      const normalized =
+        file instanceof File ? normalizeFinancePaymentProofFile(file) : null;
+      if (!normalized || normalized.size < 1 || normalized.size > 5 * 1024 * 1024) {
+        return {
+          success: false,
+          message: "Setiap file bukti baru harus PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
+        };
+      }
+      normalizedNewProofFiles.push(normalized);
+    }
+  }
+
   const uploadedProofUrls: string[] = [];
   try {
-    if (Array.isArray(input.newProofFiles) && input.newProofFiles.length > 0) {
-      for (const file of input.newProofFiles) {
-        if (
-          file instanceof File &&
-          file.size > 0 &&
-          file.size <= 5 * 1024 * 1024 &&
-          ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)
-        ) {
-          uploadedProofUrls.push(await uploadCashflowProof(file));
-        }
-      }
+    for (const file of normalizedNewProofFiles) {
+      uploadedProofUrls.push(await uploadCashflowProof(file));
     }
 
     const keepUrls = input.keepProofUrls
@@ -214,6 +221,11 @@ export async function recordOfficeExpense(
   if (!session?.user || !isFinanceOperator(session.user.role)) {
     return { success: false, message: "Hanya Keuangan yang dapat mencatat pengeluaran internal." };
   }
+  const normalizedProofFiles = Array.isArray(input?.proofFiles)
+    ? input.proofFiles.map((file) =>
+        file instanceof File ? normalizeFinancePaymentProofFile(file) : null,
+      )
+    : [];
   if (
     !input ||
     !expenseTypes.includes(input.expenseType) ||
@@ -229,17 +241,11 @@ export async function recordOfficeExpense(
     input.proofFiles.length > 5 ||
     input.proofFiles.length <
       (input.expenseType === "REIMBURSEMENT" ? 2 : 1) ||
-    input.proofFiles.some(
+    normalizedProofFiles.some(
       (file) =>
-        !(file instanceof File) ||
+        !file ||
         file.size < 1 ||
-        file.size > 5 * 1024 * 1024 ||
-        ![
-          "application/pdf",
-          "image/jpeg",
-          "image/png",
-          "image/webp",
-        ].includes(file.type),
+        file.size > 5 * 1024 * 1024,
     )
   ) {
     return {
@@ -270,8 +276,10 @@ export async function recordOfficeExpense(
 
   const uploadedProofUrls: string[] = [];
   try {
-    for (const file of input.proofFiles) {
-      uploadedProofUrls.push(await uploadCashflowProof(file));
+    for (const file of normalizedProofFiles) {
+      if (file) {
+        uploadedProofUrls.push(await uploadCashflowProof(file));
+      }
     }
     if (uploadedProofUrls.some((url) => !isFinanceCashflowProofUrl(url))) {
       throw new OfficeExpenseError("URL bukti transaksi tidak valid.");

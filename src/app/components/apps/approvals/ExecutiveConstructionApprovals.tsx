@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UserRole } from "@prisma/client";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 
 type ContractRow = {
   publicCode: string;
@@ -80,6 +81,7 @@ export default function ExecutiveConstructionApprovals({
       try {
         const result = await action();
         setMessage(result.message);
+        if (result.success) requestNotificationFeedRefresh();
       } catch (error) {
         console.error("Executive construction approval failed:", error);
         setMessage("Aksi gagal diproses. Silakan coba kembali.");
@@ -98,7 +100,10 @@ export default function ExecutiveConstructionApprovals({
       try {
         const result = await action(data);
         setMessage(result.message);
-        if (result.success) form.reset();
+        if (result.success) {
+          form.reset();
+          requestNotificationFeedRefresh();
+        }
       } catch (error) {
         console.error("Executive construction form failed:", error);
         setMessage("Data gagal disimpan. Silakan coba kembali.");

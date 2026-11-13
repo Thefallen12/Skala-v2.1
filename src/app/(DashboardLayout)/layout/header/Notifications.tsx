@@ -12,15 +12,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import type { BellTaskReminder } from '@/lib/notification-types'
 
-export type DashboardNotification = {
-  id: string
-  title: string
-  description: string
-  time: string
-  href: string
-  category: 'habit' | 'task' | 'ticket'
-}
+export type DashboardNotification = BellTaskReminder
 
 const Notifications = ({
   notifications,

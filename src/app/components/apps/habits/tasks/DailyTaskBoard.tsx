@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { WorkTaskStatus } from "@prisma/client";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import {
   createTimesheetEntry,
   createWorkspaceTask,
@@ -443,7 +444,10 @@ export default function DailyTaskBoard({
     startTransition(async () => {
       const result = await updateWorkspaceTaskStatus(taskId, status);
       setMessage(result);
-      if (result.success) router.refresh();
+      if (result.success) {
+        requestNotificationFeedRefresh();
+        router.refresh();
+      }
     });
   };
 

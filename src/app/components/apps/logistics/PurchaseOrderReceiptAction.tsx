@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PackageCheck } from "lucide-react";
 import { receiveStandalonePurchaseOrder } from "@/app/actions/orders";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 
@@ -23,6 +24,7 @@ export default function PurchaseOrderReceiptAction({
       setMessage(result.message);
       if (result.success) {
         setIsOpen(false);
+        requestNotificationFeedRefresh();
         router.refresh();
       }
     });

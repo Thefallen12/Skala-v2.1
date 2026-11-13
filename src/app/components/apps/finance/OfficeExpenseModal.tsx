@@ -19,6 +19,10 @@ import { Input } from "@/components/ui/input";
 import { FormLabel, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
+import {
+  FINANCE_PROOF_ACCEPT_ALL,
+  prepareFinanceProofFiles,
+} from "@/lib/finance-proof-client";
 import { FileText, ReceiptText, Trash2, Wallet } from "lucide-react";
 
 const getTodayDateStr = () => {
@@ -73,6 +77,7 @@ export default function OfficeExpenseModal({
   const router = useRouter();
   const [proofs, setProofs] = useState<OfficeExpenseProof[]>([]);
   const [proofError, setProofError] = useState("");
+  const [isPreparingProof, setIsPreparingProof] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -221,10 +226,19 @@ export default function OfficeExpenseModal({
                 },
               )();
             }}
-            disabled={isPending || recipients.length === 0 || accounts.length === 0}
+            disabled={
+              isPending ||
+              isPreparingProof ||
+              recipients.length === 0 ||
+              accounts.length === 0
+            }
             className="bg-orange-600 text-white hover:bg-orange-700 font-semibold"
           >
-            {isPending ? "Menyimpan..." : "Simpan Pengeluaran"}
+            {isPending
+              ? "Menyimpan..."
+              : isPreparingProof
+                ? "Memproses Foto..."
+                : "Simpan Pengeluaran"}
           </Button>
         </>
       }
@@ -384,38 +398,44 @@ export default function OfficeExpenseModal({
             <Input
               id={`${formId}-proofs`}
               type="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp"
+              accept={FINANCE_PROOF_ACCEPT_ALL}
               multiple
-              disabled={isPending || proofs.length >= 5}
-              onChange={(event) => {
-                const selectedFiles = Array.from(event.currentTarget.files ?? []);
-                const validFiles = selectedFiles.filter(
-                  (file) =>
-                    file.size > 0 &&
-                    file.size <= 5 * 1024 * 1024 &&
-                    [
-                      "application/pdf",
-                      "image/jpeg",
-                      "image/png",
-                      "image/webp",
-                    ].includes(file.type),
-                );
-                setProofs((current) =>
-                  [
-                    ...current,
-                    ...validFiles.map((file) => ({ file, name: file.name })),
-                  ].slice(0, 5),
-                );
-                setProofError(
-                  validFiles.length !== selectedFiles.length
-                    ? "Pilih PDF, JPG, PNG, atau WEBP berukuran maksimal 5 MB."
-                    : "",
-                );
-                event.currentTarget.value = "";
+              disabled={isPending || isPreparingProof || proofs.length >= 5}
+              onChange={async (event) => {
+                const input = event.currentTarget;
+                const selectedFiles = Array.from(input.files ?? []);
+                if (selectedFiles.length === 0) return;
+
+                setIsPreparingProof(true);
+                setProofError("");
+                try {
+                  const { prepared, error: prepError } =
+                    await prepareFinanceProofFiles(selectedFiles);
+                  if (prepared.length > 0) {
+                    setProofs((current) =>
+                      [
+                        ...current,
+                        ...prepared.map((file) => ({
+                          file,
+                          name: file.name,
+                        })),
+                      ].slice(0, 5),
+                    );
+                  }
+                  setProofError(prepError);
+                } finally {
+                  setIsPreparingProof(false);
+                  input.value = "";
+                }
               }}
             />
+            {isPreparingProof && (
+              <p className="text-xs text-muted-foreground" role="status">
+                Memproses dan mengompres file bukti...
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              File tetap lokal sampai tombol Simpan Pengeluaran ditekan. PDF, JPG, PNG, WEBP · Maks. 5 MB/file · Maks. 5 file.
+              File tetap lokal sampai tombol Simpan Pengeluaran ditekan. PDF, JPG, PNG, WEBP, atau foto iPhone (HEIC) · Maks. 5 MB/file · Maks. 5 file.
             </p>
             <p className="text-xs text-muted-foreground">
               {expenseType === "REIMBURSEMENT"

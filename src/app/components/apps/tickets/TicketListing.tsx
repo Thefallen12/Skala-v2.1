@@ -238,7 +238,7 @@ function actionFor(
   ticket: TicketRow,
 ): DirectAction | null {
   if (
-    role === UserRole.DIRECTOR &&
+    (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.status === TicketStatus.PENDING_DIRECTOR
   ) {
     return {

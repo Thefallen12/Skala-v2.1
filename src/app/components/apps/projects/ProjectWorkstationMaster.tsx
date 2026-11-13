@@ -87,6 +87,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import {
@@ -611,15 +612,20 @@ export default function ProjectWorkstationMaster({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeModalTab, setActiveModalTab] = useState<string>("pagu");
-  const [showPicChart, setShowPicChart] = useState(false);
-  const [selectedReportWorkPointId, setSelectedReportWorkPointId] =
-    useState("");
   const sectionParam = searchParams.get("section");
   const viewParam = searchParams.get("view");
   const projectParam = searchParams.get("projectId");
   const statusParam = searchParams.get("status");
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
+    if (sectionParam === "surveys" || !projectParam) return null;
+    return projects.some((project) => project.id === projectParam)
+      ? projectParam
+      : null;
+  });
+  const [activeModalTab, setActiveModalTab] = useState<string>("pagu");
+  const [showPicChart, setShowPicChart] = useState(false);
+  const [selectedReportWorkPointId, setSelectedReportWorkPointId] =
+    useState("");
   const projectStatusFilter =
     statusParam && ["RUNNING", "PENDING_SETUP", "HOLD", "DONE"].includes(statusParam)
       ? statusParam
@@ -1122,6 +1128,7 @@ export default function ProjectWorkstationMaster({
         setNotice(result.message);
         if (result.success) {
           form.reset();
+          requestNotificationFeedRefresh();
           router.refresh();
         }
       } catch (error) {
@@ -1139,7 +1146,10 @@ export default function ProjectWorkstationMaster({
       try {
         const result = await action();
         setNotice(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          requestNotificationFeedRefresh();
+          router.refresh();
+        }
       } catch (error) {
         console.error("Project workstation action failed:", error);
         setNotice("Aksi proyek gagal diproses. Silakan coba kembali.");
@@ -2098,6 +2108,16 @@ export default function ProjectWorkstationMaster({
           setActiveProjectId(null);
           setSelectedReportWorkPointId("");
           setNotice("");
+          if (searchParams.get("projectId") && activeSection !== "surveys") {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete("projectId");
+            const nextQuery = params.toString();
+            window.history.replaceState(
+              null,
+              "",
+              nextQuery ? `/apps/projects?${nextQuery}` : "/apps/projects",
+            );
+          }
         }}
         title={activeProject?.title ?? "Detail Proyek"}
         description={

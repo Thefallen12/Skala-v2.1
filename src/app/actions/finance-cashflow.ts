@@ -22,6 +22,10 @@ import {
   isFinanceCashflowProofUrl,
   type CashflowPaymentMethod,
 } from "@/lib/finance-cashflow";
+import {
+  getFinancePaymentProofMimeType,
+  normalizeFinancePaymentProofFile,
+} from "@/lib/finance-payment-proof-file";
 import { FINANCE_CASHFLOW_CLOUDINARY_FOLDER } from "@/lib/finance-cashflow-config";
 
 export type FinanceActionResult = {
@@ -111,9 +115,7 @@ function isValidFinanceProofFile(file: unknown): file is File {
     file instanceof File &&
     file.size > 0 &&
     file.size <= 5 * 1024 * 1024 &&
-    ["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(
-      file.type,
-    )
+    getFinancePaymentProofMimeType(file) !== null
   );
 }
 
@@ -150,8 +152,14 @@ export async function uploadCashflowProof(file: File): Promise<string> {
   if (!session?.user?.id || !isFinanceOperator(session.user.role)) {
     throw new Error("Akses Keuangan diperlukan untuk mengunggah bukti transaksi.");
   }
-  if (file.type === "application/pdf") {
-    const url = await saveTicketReceipt(file);
+  const normalizedFile = normalizeFinancePaymentProofFile(file);
+  if (!normalizedFile) {
+    throw new CloudinaryPhotoValidationError(
+      "Format file bukti harus PDF, JPG, PNG, atau WEBP.",
+    );
+  }
+  if (normalizedFile.type === "application/pdf") {
+    const url = await saveTicketReceipt(normalizedFile);
     if (!isFinanceCashflowProofUrl(url)) {
       await removeTicketReceipt(url);
       throw new Error("URL PDF bukti transaksi tidak valid.");
@@ -160,7 +168,7 @@ export async function uploadCashflowProof(file: File): Promise<string> {
   }
 
   const uploaded = await uploadCloudinaryPhoto(
-    file,
+    normalizedFile,
     FINANCE_CASHFLOW_CLOUDINARY_FOLDER,
   );
   if (!isFinanceCashflowProofUrl(uploaded.secureUrl)) {

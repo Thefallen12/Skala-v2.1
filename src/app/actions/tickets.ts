@@ -713,19 +713,27 @@ export async function createLogisticsPurchaseOrder(input: {
               estimatedCost: scaledIntegerFromDecimal(item.estimatedCost),
             })),
           },
-          auditLogs: {
-            create: {
-              id: randomUUID(),
-              userId: session.user.id,
-              action: "PURCHASE_ORDER_SUBMITTED",
-              notes: project
-                ? "PO material proyek diajukan kepada Direktur; setelah disetujui, Logistik memproses pembelian dan meneruskan bukti ke Keuangan."
-                : "PO material untuk persediaan gudang diajukan kepada Direktur; tidak terikat pada proyek tertentu.",
+              auditLogs: {
+                create: {
+                  id: randomUUID(),
+                  userId: session.user.id,
+                  action: "PURCHASE_ORDER_SUBMITTED",
+                  notes: project
+                    ? "PO material proyek diajukan kepada Direktur; setelah disetujui, Logistik memproses pembelian dan meneruskan bukti ke Keuangan."
+                    : "PO material untuk persediaan gudang diajukan kepada Direktur; tidak terikat pada proyek tertentu.",
+                },
+              },
             },
-          },
-        },
-      });
-      return generatedNumber;
+          });
+          await sendNotification({
+            roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+            title: "PO Material Menunggu Persetujuan",
+            message: `${generatedNumber} · ${input.title.trim()} menunggu persetujuan Direktur.`,
+            actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(ticketId)}`,
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
+          return generatedNumber;
         }, { maxWait: 30000, timeout: 60000 }),
       ),
     );
@@ -740,6 +748,7 @@ export async function createLogisticsPurchaseOrder(input: {
   revalidatePath("/apps/logistics");
   revalidatePath("/apps/logistics/stock");
   revalidatePath("/apps/tickets");
+  revalidatePath("/apps/approvals");
   return {
     success: true,
     message: `PO ${ticketNumber} berhasil diajukan kepada Direktur.`,
@@ -2801,21 +2810,42 @@ export async function createTicket(
               userId: session.user.id,
               action: "CREATED",
               notes: isInternalFundingRequest
-                ? "Pengajuan reimbursement/kasbon diajukan untuk persetujuan Direktur."
-                : "Draft tiket dibuat.",
+                ? session.user.role === UserRole.DIRECTOR
+                  ? "Pengajuan reimbursement/kasbon dibuat Direktur dan diteruskan langsung ke Keuangan."
+                  : "Pengajuan reimbursement/kasbon diajukan untuk persetujuan Direktur."
+                : isShippingCostRequest
+                  ? session.user.role === UserRole.DIRECTOR
+                    ? "Pengajuan biaya pengiriman dibuat Direktur dan diteruskan langsung ke Keuangan."
+                    : "Pengajuan biaya pengiriman diajukan untuk persetujuan Direktur."
+                  : "Draft tiket dibuat.",
             },
           },
         },
       });
-      if (isInternalFundingRequest) {
-        await sendNotification({
-          roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
-          title: "Pengajuan Internal Menunggu Persetujuan",
-          message: `${ticketNumber} · ${input.title.trim()} menunggu persetujuan Direktur.`,
-          actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(createdTicketId)}`,
-          type: NotificationType.APPROVAL,
-          database: transaction,
-        });
+      if (isInternalFundingRequest || isShippingCostRequest) {
+        if (session.user.role === UserRole.DIRECTOR) {
+          await sendNotification({
+            roleTarget: UserRole.FINANCE,
+            title: isShippingCostRequest
+              ? "Biaya Pengiriman Menunggu Pembayaran"
+              : "Pengajuan Internal Menunggu Pembayaran",
+            message: `${ticketNumber} · ${input.title.trim()} telah disetujui Direktur dan menunggu pembayaran Keuangan.`,
+            actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(createdTicketId)}`,
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
+        } else {
+          await sendNotification({
+            roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+            title: isShippingCostRequest
+              ? "Biaya Pengiriman Menunggu Persetujuan"
+              : "Pengajuan Internal Menunggu Persetujuan",
+            message: `${ticketNumber} · ${input.title.trim()} menunggu persetujuan Direktur.`,
+            actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(createdTicketId)}`,
+            type: NotificationType.APPROVAL,
+            database: transaction,
+          });
+        }
       }
         }, { maxWait: 30000, timeout: 60000 });
       }),
@@ -2864,12 +2894,16 @@ export async function createTicket(
 
   revalidatePath("/apps/tickets");
   revalidatePath("/apps/project");
+  revalidatePath("/apps/approvals");
+  revalidatePath("/apps/finance");
   return {
     success: true,
     message:
       isInternalFundingRequest || isShippingCostRequest
         ? session.user.role === UserRole.DIRECTOR
-          ? "Pengajuan pengiriman berhasil dibuat dan siap diproses Keuangan."
+          ? isShippingCostRequest
+            ? "Pengajuan pengiriman berhasil dibuat dan siap diproses Keuangan."
+            : "Pengajuan internal berhasil dibuat dan siap diproses Keuangan."
           : "Pengajuan berhasil dikirim ke Direktur untuk persetujuan."
         : "Draft tiket berhasil dibuat.",
   };
@@ -3263,7 +3297,7 @@ export async function submitTicket(
                 roleTarget: UserRole.FINANCE,
                 title: "Permintaan APH Menunggu Pembayaran",
                 message: `${ticket.ticketNumber} · ${ticket.title} menunggu pembayaran Keuangan.`,
-                actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+                actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(ticketId)}`,
                 type: NotificationType.APPROVAL,
               },
             ]
@@ -3310,7 +3344,13 @@ export async function approveByDirector(
 
   const ticket = await prisma.ticket.findUnique({
     where: { id: ticketId },
-    select: { type: true, requestCategory: true },
+    select: {
+      type: true,
+      requestCategory: true,
+      ticketNumber: true,
+      title: true,
+      requesterId: true,
+    },
   });
   if (!ticket) {
     return actionFailure("Tiket tidak ditemukan.");
@@ -3328,6 +3368,12 @@ export async function approveByDirector(
     type === TicketType.MATERIAL
       ? TicketStatus.PROCESSED_LOGISTIC
       : TicketStatus.WAITING_FINANCE_PAYMENT;
+  const approverLabel =
+    session.user.role === UserRole.DEPUTY_DIRECTOR
+      ? "Wakil Direktur"
+      : "Direktur";
+  const nextStageLabel =
+    nextStatus === TicketStatus.PROCESSED_LOGISTIC ? "Logistik" : "Keuangan";
 
   return transitionTicket({
     ticketId,
@@ -3335,8 +3381,39 @@ export async function approveByDirector(
     nextStatus,
     allowedRoles: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
     action: "APPROVED_BY_DIR",
-    notes: `Disetujui ${session.user.role === UserRole.DEPUTY_DIRECTOR ? "Wakil Direktur" : "Direktur"}; diteruskan ke ${nextStatus === TicketStatus.PROCESSED_LOGISTIC ? "Logistik" : "Keuangan"}.`,
+    notes: `Disetujui ${approverLabel}; diteruskan ke ${nextStageLabel}.`,
     directorApproval: true,
+    notifications: [
+      nextStatus === TicketStatus.PROCESSED_LOGISTIC
+        ? {
+            roleTarget: UserRole.LOGISTICS,
+            title: "Tiket Material Disetujui - Proses Logistik",
+            message: `${ticket.ticketNumber} · ${ticket.title} telah disetujui ${approverLabel} dan siap diproses Logistik.`,
+            actionUrl: `/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(ticketId)}`,
+            type: NotificationType.APPROVAL,
+          }
+        : {
+            roleTarget: UserRole.FINANCE,
+            title:
+              ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+                ? "Biaya Pengiriman Disetujui - Siap Dibayar"
+                : "Tiket Disetujui - Menunggu Pembayaran",
+            message: `${ticket.ticketNumber} · ${ticket.title} telah disetujui ${approverLabel} dan menunggu pembayaran Keuangan.`,
+            actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(ticketId)}`,
+            type: NotificationType.APPROVAL,
+          },
+      ...(ticket.requesterId !== session.user.id
+        ? [
+            {
+              userId: ticket.requesterId,
+              title: "Tiket Disetujui Direksi",
+              message: `${ticket.ticketNumber} · ${ticket.title} disetujui ${approverLabel} dan diteruskan ke ${nextStageLabel}.`,
+              actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+              type: NotificationType.SUCCESS,
+            },
+          ]
+        : []),
+    ],
   });
 }
 
@@ -4586,6 +4663,7 @@ async function createWarehouseDeliveryOrder(
           status: true,
           isApprovedByDirector: true,
           projectId: true,
+          requesterId: true,
           requester: { select: { name: true } },
           moverAssignee: { select: { id: true, name: true } },
           purchaseOrders: {
@@ -4924,6 +5002,26 @@ async function createWarehouseDeliveryOrder(
             : `DO ${deliveryOrder.doNumber} diterbitkan; stok gudang dicadangkan dan tiket ditugaskan kepada ${selectedMover!.name}.`,
         },
       });
+      if (!hasPaidPurchaseOrder && selectedMover) {
+        await sendNotification({
+          userId: selectedMover.id,
+          title: "Tugas Pengiriman DO Baru",
+          message: `${ticket.ticketNumber} · DO ${deliveryOrder.doNumber} (${ticket.title}) siap Anda kirim ke lokasi.`,
+          actionUrl: "/apps/logistics",
+          type: NotificationType.APPROVAL,
+          database: transaction,
+        });
+      }
+      if (ticket.requesterId !== logisticsUserId) {
+        await sendNotification({
+          userId: ticket.requesterId,
+          title: "DO Pengiriman Diterbitkan",
+          message: `${ticket.ticketNumber} · DO ${deliveryOrder.doNumber} telah diterbitkan (${hasPaidPurchaseOrder ? "ekspedisi" : `Mover: ${selectedMover!.name}`}).`,
+          actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+          type: NotificationType.INFO,
+          database: transaction,
+        });
+      }
       return {
         ...deliveryOrder,
         message: hasPaidPurchaseOrder
@@ -5046,6 +5144,7 @@ export async function processFinancePayment(
           totalAmount: true,
           projectId: true,
           purchaseReceiptUrl: true,
+          requesterId: true,
           requester: { select: { role: true } },
           purchaseOrders: {
             where: { status: POStatus.APPROVED },
@@ -5327,12 +5426,15 @@ export async function processFinancePayment(
 
       const isShippingCostRequest =
         ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
+      let completedByFinance = false;
 
       if (isFullyPaid) {
         const shouldAdvanceTicketStatus =
           ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
           (ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
             Boolean(order || isShippingCostRequest));
+        completedByFinance =
+          shouldAdvanceTicketStatus && !order && !isShippingCostRequest;
         await transaction.ticket.update({
           where: { id: ticketId },
           data: {
@@ -5416,6 +5518,40 @@ export async function processFinancePayment(
           type: NotificationType.SUCCESS,
           database: transaction,
         });
+      }
+      if (completedByFinance) {
+        await sendNotification({
+          userId: ticket.requesterId,
+          title: "Tiket Selesai - Pembayaran Diproses",
+          message: `${ticket.ticketNumber} · ${ticket.title} telah dibayar Keuangan (Rp${amount.toLocaleString("id-ID")}) dengan bukti pembayaran terlampir.`,
+          actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+          type: NotificationType.SUCCESS,
+          database: transaction,
+        });
+      } else if (ticket.requesterId !== session.user.id) {
+        if (isFullyPaid) {
+          await sendNotification({
+            userId: ticket.requesterId,
+            title: isShippingCostRequest
+              ? "Biaya Pengiriman Dibayar"
+              : order
+                ? "Pembayaran PO Tiket Lunas"
+                : "Pembayaran Tiket Lunas",
+            message: `${ticket.ticketNumber} · ${ticket.title} telah dilunasi Keuangan (Rp${amount.toLocaleString("id-ID")}).`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+            type: NotificationType.SUCCESS,
+            database: transaction,
+          });
+        } else {
+          await sendNotification({
+            userId: ticket.requesterId,
+            title: "Pembayaran Sebagian Tiket Dicatat",
+            message: `${ticket.ticketNumber} · ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : "Pembayaran termin"} Rp${amount.toLocaleString("id-ID")} telah diproses Keuangan (sisa Rp${newRemaining.toLocaleString("id-ID")}).`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+            type: NotificationType.INFO,
+            database: transaction,
+          });
+        }
       }
     });
   } catch (error) {
@@ -5902,6 +6038,15 @@ export async function processFinanceDirectStockPurchasePayment(
           type: NotificationType.SUCCESS,
           database: transaction,
         });
+      } else if (isFullyPaid && (paymentHistory._sum.amount ?? 0) > 0) {
+        await sendNotification({
+          roleTarget: UserRole.LOGISTICS,
+          title: "Pembelian Langsung Lunas",
+          message: `Pelunasan pembelian langsung ${purchase.purchaseNumber} (Rp${amount.toLocaleString("id-ID")}) telah dicatat Keuangan.`,
+          actionUrl: "/apps/logistics?tab=stock",
+          type: NotificationType.SUCCESS,
+          database: transaction,
+        });
       }
     });
   } catch (error) {
@@ -6041,6 +6186,8 @@ export async function replaceFinancePaymentProof(
   if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
     return actionFailure("Hanya Keuangan yang dapat mengganti bukti transfer.");
   }
+  const normalizedFile =
+    file instanceof File ? normalizeFinancePaymentProofFile(file) : null;
   if (
     !isBoundedText(paymentTransactionId, 191) ||
     !paymentTransactionId.trim() ||
@@ -6048,9 +6195,9 @@ export async function replaceFinancePaymentProof(
     !Number.isInteger(proofIndex) ||
     proofIndex < 0 ||
     proofIndex > 4 ||
-    !(file instanceof File) ||
-    file.size < 1 ||
-    file.size > 5 * 1024 * 1024
+    !normalizedFile ||
+    normalizedFile.size < 1 ||
+    normalizedFile.size > 5 * 1024 * 1024
   ) {
     return actionFailure("Pilih file bukti (PDF/JPG/PNG/WEBP) maksimal 5 MB.");
   }
@@ -6058,13 +6205,13 @@ export async function replaceFinancePaymentProof(
     existingProofUrl,
   );
   const isPhotoFile = ["image/jpeg", "image/png", "image/webp"].includes(
-    file.type,
+    normalizedFile.type,
   );
   if (
     (isReplacingPhoto && !isPhotoFile) ||
     (!isReplacingPhoto &&
       !isPhotoFile &&
-      file.type !== "application/pdf")
+      normalizedFile.type !== "application/pdf")
   ) {
     return actionFailure(
       isReplacingPhoto
@@ -6075,7 +6222,7 @@ export async function replaceFinancePaymentProof(
 
   let uploadedProofUrl: string | null = null;
   try {
-    const storedProofUrl = await storeFinancePaymentProof(file);
+    const storedProofUrl = await storeFinancePaymentProof(normalizedFile);
     uploadedProofUrl = storedProofUrl;
     if (!isFinancePaymentProofUrl(storedProofUrl)) {
       throw new Error("Cloudinary mengembalikan URL bukti yang tidak valid.");
