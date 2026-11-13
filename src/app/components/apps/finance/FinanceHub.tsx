@@ -186,6 +186,7 @@ type FinanceDirectPurchase = {
   id: string;
   purchaseNumber: string;
   vendorName: string;
+  paymentMethod: POPaymentMethod;
   totalAmount: string;
   paymentBankName: string | null;
   paymentAccountNumber: string | null;
@@ -503,6 +504,8 @@ export default function FinanceHub({
   const [fuelDisbursementMethods, setFuelDisbursementMethods] = useState<
     Record<string, POPaymentMethod>
   >({});
+  const [directPurchasePaymentMethods, setDirectPurchasePaymentMethods] =
+    useState<Record<string, POPaymentMethod>>({});
   const [isPending, startTransition] = useTransition();
   const activeOrder =
     selection?.kind === "po"
@@ -630,10 +633,14 @@ export default function FinanceHub({
         0,
       ),
       isFirstPayment: purchase.paymentTransactions.length === 0,
+      defaultPaymentMethod: purchase.paymentMethod,
+      allowPaymentMethodSelection: true,
       transferDestination:
         purchase.paymentBankName && purchase.paymentAccountNumber
           ? `Ditransfer ke: ${purchase.paymentBankName}, ${purchase.paymentAccountNumber}, a.n. ${purchase.paymentAccountName ?? purchase.vendorName}`
-          : "",
+          : purchase.paymentMethod === POPaymentMethod.CASH
+            ? "Pembayaran tunai pembelian langsung"
+            : "",
       hasInvoice: Boolean(purchase.vendorInvoiceUrl),
       needsNominalInput: false,
     })),
@@ -883,6 +890,12 @@ export default function FinanceHub({
     const financeAccountId = String(
       formData.get("financeAccountId") ?? "",
     );
+    const rawPaymentMethod = formData.get("paymentMethod");
+    const directPaymentMethod =
+      rawPaymentMethod === POPaymentMethod.CASH ||
+      rawPaymentMethod === POPaymentMethod.TRANSFER
+        ? rawPaymentMethod
+        : undefined;
     if (!financeAccountId) {
       setMessage("Pilih buku kas/bank sumber pembayaran terlebih dahulu.");
       return;
@@ -912,6 +925,7 @@ export default function FinanceHub({
           financeAccountId,
           paymentType: currentPaymentType,
           amount,
+          ...(directPaymentMethod ? { paymentMethod: directPaymentMethod } : {}),
         });
         setMessage(result.message);
         if (result.success) {
@@ -3019,8 +3033,37 @@ export default function FinanceHub({
                       </div>
                     </section>
                     <div className="space-y-2">
+                      <Label htmlFor="direct-purchase-payment-method">
+                        Metode Pembayaran
+                      </Label>
+                      <select
+                        key={`${activeDirectPurchase.id}:method`}
+                        id="direct-purchase-payment-method"
+                        name="paymentMethod"
+                        value={
+                          directPurchasePaymentMethods[
+                            activeDirectPurchase.id
+                          ] ?? activeDirectPurchase.paymentMethod
+                        }
+                        onChange={(event) =>
+                          setDirectPurchasePaymentMethods((current) => ({
+                            ...current,
+                            [activeDirectPurchase.id]:
+                              event.target.value === POPaymentMethod.CASH
+                                ? POPaymentMethod.CASH
+                                : POPaymentMethod.TRANSFER,
+                          }))
+                        }
+                        disabled={isPending}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                      >
+                        <option value={POPaymentMethod.TRANSFER}>Transfer</option>
+                        <option value={POPaymentMethod.CASH}>Cash / Tunai</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="direct-purchase-transfer-destination">
-                        Tujuan Transfer (Bank, No Rekening, Atas Nama)
+                        Tujuan Transfer / Keterangan Pembayaran
                       </Label>
                       <Input
                         key={activeDirectPurchase.id}
@@ -3030,11 +3073,18 @@ export default function FinanceHub({
                           activeDirectPurchase.paymentBankName &&
                           activeDirectPurchase.paymentAccountNumber
                             ? `Ditransfer ke: ${activeDirectPurchase.paymentBankName}, ${activeDirectPurchase.paymentAccountNumber}, a.n. ${activeDirectPurchase.paymentAccountName ?? activeDirectPurchase.vendorName}`
-                            : ""
+                            : activeDirectPurchase.paymentMethod === POPaymentMethod.CASH
+                              ? "Pembayaran tunai pembelian langsung"
+                              : ""
                         }
-                        placeholder="Bank, nomor rekening, atas nama penerima"
+                        placeholder="Bank, nomor rekening, a.n. penerima (atau keterangan tunai)"
                         maxLength={300}
-                        required
+                        required={
+                          (directPurchasePaymentMethods[
+                            activeDirectPurchase.id
+                          ] ?? activeDirectPurchase.paymentMethod) ===
+                          POPaymentMethod.TRANSFER
+                        }
                         disabled={isPending}
                       />
                     </div>

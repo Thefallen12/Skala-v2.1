@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import {
+  DirectStockPurchaseStatus,
   DOStatus,
   DODeliveryMethod,
   FulfillmentStatus,
@@ -12,7 +13,6 @@ import {
   POPaymentMethod,
   POStatus,
   StockMovementType,
-  TicketCategoryHint,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -34,7 +34,10 @@ import { createBrandedQrDataUrl } from "@/lib/documents/qr-code";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
 import { lockTicketDeliveryOrderCreation } from "@/lib/documents/lock-ticket-delivery-order";
 import {
+  buildActiveDirectPurchaseLookup,
+  findActiveDirectPurchaseNumber,
   lockTicketFulfillment,
+  normalizeTicketStockValue,
   syncTicketStatus,
 } from "@/lib/ticket-utils";
 import { sendNotification } from "@/lib/notifications";
@@ -493,7 +496,7 @@ export async function createPurchaseOrder(
         roleTarget: UserRole.FINANCE,
         title: "PO Menunggu Verifikasi",
         message: `PO #${poNumber} Butuh Pemeriksaan (Checked By).`,
-        actionUrl: `/apps/finance?tab=po-check&openSheet=${encodeURIComponent(code)}`,
+        actionUrl: `/apps/finance?tab=check&openSheet=${encodeURIComponent(code)}`,
         type: NotificationType.APPROVAL,
         database: transaction,
       });
@@ -830,7 +833,7 @@ export async function approvePurchaseOrder(
 ): Promise<OrderActionResult> {
   const session = await auth();
   if (!session?.user || !canApprovePurchaseOrders(session.user.role)) {
-    return fail("Hanya Direktur atau Wakil Direktur yang dapat menyetujui PO.");
+    return fail("Hanya Direktur, Wakil Direktur, atau Administrasi yang dapat menyetujui PO.");
   }
   if (!validPublicCode(publicCode)) {
     return fail("Kode Purchase Order tidak valid.");
@@ -1481,6 +1484,13 @@ export async function createDeliveryOrder(
   if (!isExpedition && input.status !== DOStatus.PENDING) {
     return fail("Status DO internal baru harus Menunggu.");
   }
+  if (
+    isExpedition &&
+    input.status !== DOStatus.PENDING &&
+    input.status !== DOStatus.IN_TRANSIT
+  ) {
+    return fail("Status DO ekspedisi baru harus Menunggu atau Dalam Pengiriman.");
+  }
   if (isExpedition) {
     if (!isText(driverName, 180)) {
       return fail("Nama driver / mover ekspedisi wajib diisi.");
@@ -1502,6 +1512,7 @@ export async function createDeliveryOrder(
     const created = await prisma.$transaction(async (transaction) => {
       if (input.ticketId) {
         await lockTicketDeliveryOrderCreation(transaction);
+        await lockTicketFulfillment(transaction, input.ticketId);
       }
       const ticket = input.ticketId
         ? await transaction.ticket.findUnique({
@@ -1516,14 +1527,53 @@ export async function createDeliveryOrder(
             projectId: true,
             ticketNumber: true,
             moverAssignee: { select: { name: true } },
+            purchaseOrders: {
+              where: {
+                status: POStatus.APPROVED,
+                paidAt: { not: null },
+              },
+              orderBy: { paidAt: "desc" },
+              select: {
+                id: true,
+                poNumber: true,
+                paidAt: true,
+              },
+            },
+            directStockPurchases: {
+              where: { status: DirectStockPurchaseStatus.PENDING_RECEIPT },
+              select: {
+                purchaseNumber: true,
+                items: {
+                  select: {
+                    stockItemId: true,
+                    itemName: true,
+                    unit: true,
+                  },
+                },
+              },
+            },
             items: {
               select: {
                 id: true,
+                stockItemId: true,
                 itemName: true,
                 quantity: true,
                 unit: true,
                 categoryHint: true,
                 status: true,
+                doItemId: true,
+                poItem: {
+                  select: {
+                    stockItemId: true,
+                    po: {
+                      select: {
+                        id: true,
+                        status: true,
+                        paidAt: true,
+                      },
+                    },
+                  },
+                },
               },
               orderBy: { id: "asc" },
             },
@@ -1543,13 +1593,23 @@ export async function createDeliveryOrder(
           "Tiket harus memiliki persetujuan eksekutif sebelum DO diterbitkan.",
         );
       }
+      const eligibleTicketItems = ticket
+        ? ticket.items.filter(
+          (item) =>
+            item.doItemId === null &&
+            item.status !== FulfillmentStatus.PROCESSED_TO_DO,
+        )
+        : [];
       if (ticket) {
         const existingOrder = await transaction.deliveryOrder.findFirst({
           where: { ticketId: ticket.id },
           orderBy: { createdAt: "desc" },
           select: { publicCode: true, doNumber: true },
         });
-        if (existingOrder) {
+        if (
+          existingOrder &&
+          (ticket.items.length === 0 || eligibleTicketItems.length === 0)
+        ) {
           return {
             code: existingOrder.publicCode,
             doNumber: existingOrder.doNumber,
@@ -1557,15 +1617,19 @@ export async function createDeliveryOrder(
           };
         }
       }
+      if (ticket && ticket.items.length > 0 && eligibleTicketItems.length === 0) {
+        throw new Error("Semua item tiket sudah memiliki Delivery Order.");
+      }
       if (
         ticket &&
         ticket.status !== TicketStatus.PROCESSED_LOGISTIC &&
+        ticket.status !== TicketStatus.PROCESSED_FINANCE &&
         ticket.status !== TicketStatus.ASSIGNED_TO_MOVER &&
-        ticket.status !== TicketStatus.IN_TRANSIT &&
-        ticket.status !== TicketStatus.WAITING_FINANCE_PAYMENT &&
-        ticket.status !== TicketStatus.COMPLETED
+        ticket.status !== TicketStatus.IN_TRANSIT
       ) {
-        throw new Error("Tiket belum disetujui untuk diproses sebagai DO.");
+        throw new Error(
+          "Tiket belum siap atau sudah selesai untuk diterbitkan DO.",
+        );
       }
       const purchaseOrder = input.poPublicCode
         ? await transaction.purchaseOrder.findUnique({
@@ -1589,21 +1653,6 @@ export async function createDeliveryOrder(
         throw new Error(
           "Purchase Order harus berasal dari tiket yang sama dengan DO.",
         );
-      }
-      if (
-        ticket &&
-        ticket.requestCategory !== TicketRequestCategory.SHIPPING_COST &&
-        (ticket.items.length !== input.items.length ||
-          ticket.items.some((ticketItem, index) => {
-            const orderItem = input.items[index];
-            return (
-              orderItem.itemName.trim() !== ticketItem.itemName ||
-              orderItem.qtyOrdered !== ticketItem.quantity ||
-              orderItem.unit.trim() !== ticketItem.unit
-            );
-          }))
-      ) {
-        throw new Error("Item DO harus sesuai dengan item pada tiket referensi.");
       }
       const selectedVehicle =
         deliveryMethod === DODeliveryMethod.INTERNAL_MOVER
@@ -1629,26 +1678,156 @@ export async function createDeliveryOrder(
           "Kendaraan tidak tersedia atau KM awal belum diinisialisasi.",
         );
       }
+      const normalize = normalizeTicketStockValue;
+      const remainingEligibleTicketItems = [...eligibleTicketItems];
+      const matchedItems = input.items.map((orderItem, index) => {
+        if (!ticket) {
+          return {
+            orderItem,
+            id: randomUUID(),
+            ticketItem: null,
+          };
+        }
+        let matchIdx = -1;
+        if (
+          remainingEligibleTicketItems.length === input.items.length &&
+          eligibleTicketItems[index] &&
+          remainingEligibleTicketItems.includes(eligibleTicketItems[index]) &&
+          normalize(eligibleTicketItems[index].itemName) ===
+          normalize(orderItem.itemName)
+        ) {
+          matchIdx = remainingEligibleTicketItems.indexOf(
+            eligibleTicketItems[index],
+          );
+        }
+        if (matchIdx === -1) {
+          matchIdx = remainingEligibleTicketItems.findIndex(
+            (candidate) =>
+              normalize(candidate.itemName) === normalize(orderItem.itemName) &&
+              normalize(candidate.unit) === normalize(orderItem.unit),
+          );
+        }
+        if (matchIdx === -1) {
+          matchIdx = remainingEligibleTicketItems.findIndex(
+            (candidate) =>
+              normalize(candidate.itemName) === normalize(orderItem.itemName),
+          );
+        }
+        const ticketItem =
+          matchIdx >= 0
+            ? remainingEligibleTicketItems.splice(matchIdx, 1)[0]
+            : null;
+        return {
+          orderItem,
+          id: randomUUID(),
+          ticketItem,
+        };
+      });
+
+      if (
+        ticket &&
+        ticket.requestCategory !== TicketRequestCategory.SHIPPING_COST &&
+        ticket.items.length > 0
+      ) {
+        const processedItems = ticket.items.filter(
+          (item) =>
+            item.doItemId !== null ||
+            item.status === FulfillmentStatus.PROCESSED_TO_DO,
+        );
+        for (const { orderItem, ticketItem } of matchedItems) {
+          if (!ticketItem) {
+            const alreadyProcessed = processedItems.some(
+              (candidate) =>
+                normalize(candidate.itemName) === normalize(orderItem.itemName) &&
+                normalize(candidate.unit) === normalize(orderItem.unit),
+            );
+            throw new Error(
+              alreadyProcessed
+                ? `Item "${orderItem.itemName.trim()}" sudah pernah diproses ke Delivery Order lain.`
+                : "Item DO harus sesuai dengan item yang belum diproses pada tiket referensi.",
+            );
+          }
+          if (
+            orderItem.itemName.trim() !== ticketItem.itemName ||
+            orderItem.qtyOrdered !== ticketItem.quantity ||
+            orderItem.unit.trim() !== ticketItem.unit
+          ) {
+            throw new Error(
+              "Item DO harus sesuai dengan item pada tiket referensi.",
+            );
+          }
+        }
+      }
+
+      const activeDirectPurchaseLookup = buildActiveDirectPurchaseLookup(
+        ticket?.directStockPurchases ?? [],
+      );
       const code = await generateAvailablePublicCode(transaction);
       const doNumber = await nextDocumentNumber(transaction, "DO");
-      const warehouseItems = ticket
-        ? ticket.items.flatMap((ticketItem, index) => {
-          const orderItem = input.items[index];
-          return ticketItem.categoryHint === TicketCategoryHint.WAREHOUSE &&
-            ticketItem.status === FulfillmentStatus.PENDING &&
-            orderItem.qtyDelivered > 0
-            ? [
-              {
-                itemName: ticketItem.itemName,
-                unit: ticketItem.unit,
-                quantity: new Prisma.Decimal(
-                  orderItem.qtyDelivered.toString(),
-                ),
-              },
-            ]
-            : [];
-        })
-        : [];
+
+      const paidTicketPoIds = new Set(
+        ticket?.purchaseOrders.map((po) => po.id) ?? [],
+      );
+      const warehouseItems: Array<{
+        itemName: string;
+        unit: string;
+        stockItemId: string | null;
+        quantity: Prisma.Decimal;
+      }> = [];
+
+      for (const entry of matchedItems) {
+        const { ticketItem, orderItem } = entry;
+        if (ticketItem) {
+          const pendingPurchaseNumber = findActiveDirectPurchaseNumber(
+            activeDirectPurchaseLookup,
+            ticketItem,
+          );
+          if (pendingPurchaseNumber) {
+            throw new Error(
+              `Item "${ticketItem.itemName}" sedang dipesan melalui pembelian langsung ${pendingPurchaseNumber} dan belum diterima di gudang.`,
+            );
+          }
+        }
+        if (!ticketItem || orderItem.qtyDelivered <= 0) {
+          continue;
+        }
+        if (ticketItem.status === FulfillmentStatus.PROCESSED_TO_PO) {
+          const itemPo = ticketItem.poItem?.po;
+          const isPaidPoItem =
+            itemPo?.status === POStatus.APPROVED &&
+            (itemPo.paidAt !== null || paidTicketPoIds.has(itemPo.id));
+          if (!isPaidPoItem) {
+            throw new Error(
+              `Item "${ticketItem.itemName}" sedang diproses melalui PO dan belum dibayar lunas oleh Keuangan.`,
+            );
+          }
+        } else if (ticketItem.status !== FulfillmentStatus.PENDING) {
+          throw new Error(
+            `Item "${ticketItem.itemName}" sudah diproses dan tidak dapat diterbitkan DO lagi.`,
+          );
+        }
+        warehouseItems.push({
+          itemName: ticketItem.itemName,
+          unit: ticketItem.unit,
+          stockItemId:
+            ticketItem.poItem?.stockItemId ?? ticketItem.stockItemId ?? null,
+          quantity: new Prisma.Decimal(orderItem.qtyDelivered.toString()),
+        });
+      }
+
+      if (warehouseItems.length > 0) {
+        const canDeductWarehouseStock =
+          session.user.role === UserRole.LOGISTICS ||
+          session.user.role === UserRole.ADMINISTRATIONS ||
+          session.user.role === UserRole.DIRECTOR ||
+          session.user.role === UserRole.DEPUTY_DIRECTOR;
+        if (!canDeductWarehouseStock) {
+          throw new Error(
+            "Anda tidak memiliki otorisasi untuk mengurangi stok gudang melalui Delivery Order.",
+          );
+        }
+      }
+
       const stockItems = warehouseItems.length
         ? await transaction.stockItem.findMany({
           select: {
@@ -1660,8 +1839,6 @@ export async function createDeliveryOrder(
           },
         })
         : [];
-      const normalize = (value: string) =>
-        value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
       const reservations = new Map<
         string,
         {
@@ -1672,11 +1849,16 @@ export async function createDeliveryOrder(
         }
       >();
       for (const item of warehouseItems) {
-        const matches = stockItems.filter(
-          (stockItem) =>
-            normalize(stockItem.name) === normalize(item.itemName) &&
-            normalize(stockItem.unit) === normalize(item.unit),
-        );
+        const directMatch = item.stockItemId
+          ? stockItems.find((stockItem) => stockItem.id === item.stockItemId)
+          : undefined;
+        const matches = directMatch
+          ? [directMatch]
+          : stockItems.filter(
+            (stockItem) =>
+              normalize(stockItem.name) === normalize(item.itemName) &&
+              normalize(stockItem.unit) === normalize(item.unit),
+          );
         if (matches.length !== 1) {
           throw new Error(
             matches.length === 0
@@ -1713,7 +1895,7 @@ export async function createDeliveryOrder(
         data: {
           publicCode: code,
           doNumber,
-          poId: purchaseOrder?.id,
+          poId: purchaseOrder?.id ?? ticket?.purchaseOrders[0]?.id,
           ticketId: ticket?.id,
           createdById: session.user.id,
           deliveryMethod,
@@ -1722,7 +1904,7 @@ export async function createDeliveryOrder(
           vehicleDocumentNumber:
             input.vehicleDocumentNumber?.trim() || null,
           driverName:
-            input.deliveryMethod === DODeliveryMethod.EXPEDITION
+            isExpedition
               ? input.driverName!.trim()
               : ticket?.moverAssignee?.name ?? input.driverName?.trim() ?? null,
           vehiclePlate:
@@ -1731,18 +1913,19 @@ export async function createDeliveryOrder(
           driverIdentityNumber: input.driverIdentityNumber?.trim() || null,
           driverPhone: input.driverPhone?.trim() || null,
           receiverName:
-            input.deliveryMethod === DODeliveryMethod.EXPEDITION
+            isExpedition
               ? session.user.name?.trim() || "Tim Logistik"
               : input.receiverName?.trim() || null,
           status: input.status,
           items: {
-            create: input.items.map((item) => ({
-              itemCode: item.itemCode?.trim() || null,
-              qtyOrdered: item.qtyOrdered,
-              qtyDelivered: item.qtyDelivered,
-              itemName: item.itemName.trim(),
-              unit: item.unit.trim(),
-              remarks: item.remarks?.trim() || null,
+            create: matchedItems.map(({ id, orderItem }) => ({
+              id,
+              itemCode: orderItem.itemCode?.trim() || null,
+              qtyOrdered: orderItem.qtyOrdered,
+              qtyDelivered: orderItem.qtyDelivered,
+              itemName: orderItem.itemName.trim(),
+              unit: orderItem.unit.trim(),
+              remarks: orderItem.remarks?.trim() || null,
             })),
           },
         },
@@ -1800,17 +1983,24 @@ export async function createDeliveryOrder(
         });
       }
       if (ticket) {
-        const nextTicketStatus =
+        for (const entry of matchedItems) {
+          if (entry.ticketItem && entry.orderItem.qtyDelivered > 0) {
+            await transaction.ticketItem.update({
+              where: { id: entry.ticketItem.id },
+              data: {
+                doItemId: entry.id,
+                status: FulfillmentStatus.PROCESSED_TO_DO,
+              },
+            });
+          }
+        }
+        await syncTicketStatus(
+          transaction,
+          ticket.id,
           deliveryMethod === DODeliveryMethod.EXPEDITION
             ? TicketStatus.IN_TRANSIT
-            : TicketStatus.ASSIGNED_TO_MOVER;
-        await transaction.ticket.update({
-          where: { id: ticket.id },
-          data: {
-            status: nextTicketStatus,
-            updatedAt: new Date(),
-          },
-        });
+            : TicketStatus.ASSIGNED_TO_MOVER,
+        );
         await transaction.ticketAuditLog.create({
           data: {
             id: randomUUID(),
@@ -2030,6 +2220,26 @@ export async function updateDeliveryOrder(
           "Status DO internal hanya dapat diubah melalui Ruang Kerja Mover.",
         );
       }
+      if (
+        currentOrder.deliveryMethod === DODeliveryMethod.EXPEDITION &&
+        input.status !== currentOrder.status
+      ) {
+        const allowedNextStatuses: Record<DOStatus, DOStatus[]> = {
+          [DOStatus.PENDING]: [
+            DOStatus.IN_TRANSIT,
+            DOStatus.DELIVERED,
+            DOStatus.RETURNED,
+          ],
+          [DOStatus.IN_TRANSIT]: [DOStatus.DELIVERED, DOStatus.RETURNED],
+          [DOStatus.DELIVERED]: [],
+          [DOStatus.RETURNED]: [],
+        };
+        if (!allowedNextStatuses[currentOrder.status].includes(input.status)) {
+          throw new Error(
+            "Status Delivery Order hanya dapat maju searah dan tidak dapat dikembalikan.",
+          );
+        }
+      }
       let assignedVehicle: { id: string; plateNumber: string } | null = null;
       if (input.vehicleId && input.vehicleId !== currentOrder.vehicleId) {
         if (
@@ -2104,7 +2314,7 @@ export async function updateDeliveryOrder(
       }
 
       const nextDriverName =
-        input.deliveryMethod === DODeliveryMethod.EXPEDITION
+        currentOrder.deliveryMethod === DODeliveryMethod.EXPEDITION
           ? input.driverName!.trim()
           : assignedMoverName ?? input.driverName?.trim() ?? null;
       const nextVehiclePlate =
@@ -2332,7 +2542,7 @@ export async function updateDeliveryOrder(
           vehicleDocumentNumber:
             input.vehicleDocumentNumber?.trim() || null,
           driverName:
-            input.deliveryMethod === DODeliveryMethod.EXPEDITION
+            currentOrder.deliveryMethod === DODeliveryMethod.EXPEDITION
               ? input.driverName!.trim()
               : assignedMoverName ?? input.driverName?.trim() ?? null,
           vehiclePlate: input.vehiclePlate?.trim() || null,

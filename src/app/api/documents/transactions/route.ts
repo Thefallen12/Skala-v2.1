@@ -35,6 +35,7 @@ const allowedPrivateRoles: UserRole[] = [
 const allowedPreviewRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
 ];
 
 const formatDate = (date: Date | null | undefined) =>

@@ -5,8 +5,10 @@ import { readDirectStockPurchasePhoto } from "@/lib/direct-stock-purchase-photos
 
 const allowedRoles = new Set<UserRole>([
   UserRole.LOGISTICS,
+  UserRole.FINANCE,
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
 ]);
 
 export async function GET(

@@ -116,7 +116,12 @@ export default async function LogisticsStockPage({
     prisma.ticket.findMany({
       where: {
         type: TicketType.MATERIAL,
-        status: TicketStatus.PROCESSED_LOGISTIC,
+        status: {
+          in: [
+            TicketStatus.PROCESSED_LOGISTIC,
+            TicketStatus.PROCESSED_FINANCE,
+          ],
+        },
       },
       orderBy: { createdAt: "desc" },
       select: {

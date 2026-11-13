@@ -363,6 +363,7 @@ export default async function LogisticsPage({
               status: {
                 in: [
                   TicketStatus.PROCESSED_LOGISTIC,
+                  TicketStatus.PROCESSED_FINANCE,
                   TicketStatus.ASSIGNED_TO_MOVER,
                   TicketStatus.IN_TRANSIT,
                   TicketStatus.COMPLETED,

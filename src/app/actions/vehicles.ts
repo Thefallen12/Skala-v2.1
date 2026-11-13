@@ -252,7 +252,7 @@ export async function updateVehicle(
             );
           }
           initialKilometerUpdate = {
-            currentKilometer: input.initialKilometer.toString(),
+            currentKilometer: scaledIntegerFromDecimal(input.initialKilometer),
             odometerInitialized: true,
           };
         }

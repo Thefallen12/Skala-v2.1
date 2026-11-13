@@ -428,6 +428,9 @@ export default function LogisticsWorkspace({
         (ticket) =>
           ticket.id === initialOpenSheet ||
           ((statusFilter === "ALL" ||
+            (statusFilter === "PENDING_LOGISTICS" &&
+              (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+                ticket.status === TicketStatus.PROCESSED_FINANCE)) ||
             (statusFilter === "IN_DELIVERY" &&
               (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
                 ticket.status === TicketStatus.IN_TRANSIT)) ||
@@ -480,7 +483,9 @@ export default function LogisticsWorkspace({
   );
 
   const pendingCount = tickets.filter(
-    (ticket) => ticket.status === TicketStatus.PROCESSED_LOGISTIC,
+    (ticket) =>
+      ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE,
   ).length;
   const deliveryCount = tickets.filter(
     (ticket) =>
@@ -630,7 +635,7 @@ export default function LogisticsWorkspace({
       label: "Menunggu Logistik",
       value: pendingCount,
       note: "Klik untuk melihat tiket yang perlu diproses",
-      filter: TicketStatus.PROCESSED_LOGISTIC,
+      filter: "PENDING_LOGISTICS",
       Icon: PackageOpen,
       color: "text-warning",
       background: "bg-lightwarning",
@@ -1454,19 +1459,20 @@ export default function LogisticsWorkspace({
               Stok diperbarui hanya setelah Logistik mencatat penerimaan dan foto bukti.
             </p>
           </div>
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>No. Pembelian</TableHead>
-                  <TableHead>Vendor</TableHead>
+                  <TableHead>Pembelian &amp; Vendor</TableHead>
                   <TableHead>Tiket / Permintaan</TableHead>
                   <TableHead>Barang</TableHead>
-                  <TableHead>Total</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Invoice / BON Faktur</TableHead>
+                  <TableHead>Invoice / BON</TableHead>
                   <TableHead>Penerimaan</TableHead>
-                  {canCreatePurchaseOrder && <TableHead>Aksi</TableHead>}
+                  {canCreatePurchaseOrder && (
+                    <TableHead className="w-[72px] text-right">Aksi</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1477,23 +1483,28 @@ export default function LogisticsWorkspace({
                       : purchase.arrivalPhotoUrl
                         ? [purchase.arrivalPhotoUrl]
                         : [];
+                  const itemNamesSummary = purchase.items
+                    .map((item) => item.itemName)
+                    .join(", ");
+                  const itemQtySummary = purchase.items
+                    .map((item) => `${item.quantity} ${item.unit}`)
+                    .join(" · ");
                   return (
                   <TableRow key={purchase.id}>
-                    <TableCell className="font-medium">
-                      {purchase.purchaseNumber}
+                    <TableCell className="align-top font-medium whitespace-normal">
+                      <p className="whitespace-nowrap">{purchase.purchaseNumber}</p>
                       <p className="text-xs font-normal text-muted-foreground">
-                        {stockDateLabel.format(new Date(purchase.createdAt))}
+                        {purchase.vendorName} · {stockDateLabel.format(new Date(purchase.createdAt))}
                       </p>
                     </TableCell>
-                    <TableCell>{purchase.vendorName}</TableCell>
-                    <TableCell>
+                    <TableCell className="max-w-[170px] align-top whitespace-normal">
                       {purchase.ticket ? (
                         <Link
                           className="font-medium text-primary underline-offset-4 hover:underline"
                           href={`/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(purchase.ticket.id)}`}
                         >
                           {purchase.ticket.ticketNumber}
-                          <span className="block max-w-48 truncate text-xs font-normal text-muted-foreground">
+                          <span className="block truncate text-xs font-normal text-muted-foreground">
                             {purchase.ticket.title}
                           </span>
                         </Link>
@@ -1501,20 +1512,23 @@ export default function LogisticsWorkspace({
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <p>{purchase.items.map((item) => item.itemName).join(", ")}</p>
+                    <TableCell className="max-w-[180px] align-top whitespace-normal">
+                      <p className="line-clamp-2" title={itemNamesSummary}>
+                        {itemNamesSummary}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        {purchase.items
-                          .map((item) => `${item.quantity} ${item.unit}`)
-                          .join(" · ")}
+                        {itemQtySummary}
                       </p>
                     </TableCell>
-                    <TableCell>{currency.format(Number(purchase.totalAmount))}</TableCell>
-                    <TableCell>
+                    <TableCell className="align-top text-right whitespace-nowrap font-medium tabular-nums">
+                      {currency.format(Number(purchase.totalAmount))}
+                    </TableCell>
+                    <TableCell className="align-top whitespace-normal">
                       <Badge
                         variant={
                           purchase.status === "RECEIVED" ? "lightSuccess" : "lightWarning"
                         }
+                        className="whitespace-normal text-left"
                       >
                         {purchase.status === "RECEIVED"
                           ? "Diterima"
@@ -1527,11 +1541,11 @@ export default function LogisticsWorkspace({
                               : "Siap diterima Logistik"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <div className="space-y-1">
                         {purchase.vendorInvoiceUploadedAt && (
                           <>
-                          <p>
+                          <p className="whitespace-nowrap">
                             {stockDateLabel.format(
                               new Date(purchase.vendorInvoiceUploadedAt),
                             )}
@@ -1552,10 +1566,10 @@ export default function LogisticsWorkspace({
                         />
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       {purchase.receivedAt ? (
                         <>
-                          <p>
+                          <p className="whitespace-nowrap">
                             {stockDateLabel.format(new Date(purchase.receivedAt))}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -1587,8 +1601,8 @@ export default function LogisticsWorkspace({
                       )}
                     </TableCell>
                     {canCreatePurchaseOrder && (
-                      <TableCell>
-                        <div className="flex flex-col items-start gap-2">
+                      <TableCell className="align-top text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           {purchase.status === "PENDING_RECEIPT" &&
                             purchase.isApprovedByDirector &&
                             purchase.hasFinanceProof && (
@@ -1604,6 +1618,29 @@ export default function LogisticsWorkspace({
                                 }}
                               />
                             )}
+                          {purchase.ticket && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  asChild
+                                  type="button"
+                                  size="icon"
+                                  variant="outline"
+                                  className="h-8 w-8 shrink-0"
+                                >
+                                  <Link
+                                    href={`/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(purchase.ticket.id)}`}
+                                    aria-label={`Lihat tiket ${purchase.ticket.ticketNumber}`}
+                                  >
+                                    <Eye className="size-4" />
+                                  </Link>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Lihat tiket {purchase.ticket.ticketNumber}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                       </TableCell>
                     )}
@@ -1613,7 +1650,7 @@ export default function LogisticsWorkspace({
                 {stockPurchases.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={canCreatePurchaseOrder ? 9 : 8}
+                      colSpan={canCreatePurchaseOrder ? 8 : 7}
                       className="py-8 text-center text-sm text-muted-foreground"
                     >
                       Belum ada pembelian langsung.

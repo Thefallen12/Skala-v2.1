@@ -61,9 +61,17 @@ export async function POST(request: NextRequest) {
       { status: 401 },
     );
   }
-  if (role !== UserRole.LOGISTICS && !canManageUsers(role)) {
+  if (
+    role !== UserRole.LOGISTICS &&
+    role !== UserRole.FINANCE &&
+    role !== UserRole.DEPUTY_DIRECTOR &&
+    !canManageUsers(role)
+  ) {
     return NextResponse.json(
-      { message: "Hanya Logistik, Direktur, atau Administrasi yang dapat mencetak PO." },
+      {
+        message:
+          "Hanya Logistik, Keuangan, Direktur, Wakil Direktur, atau Administrasi yang dapat mencetak PO.",
+      },
       { status: 403 },
     );
   }

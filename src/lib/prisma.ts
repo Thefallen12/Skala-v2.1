@@ -498,27 +498,88 @@ function createModelHandler(modelName: string) {
   };
 }
 
+const MONGO_CONNECTION_ERROR_CODES = new Set([
+  "P1000",
+  "P1001",
+  "P1002",
+  "P1008",
+  "P1017",
+  "P2024",
+]);
+
+function isMongoConnectionError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const candidate = err as { name?: unknown; code?: unknown; message?: unknown };
+  if (candidate.name === "PrismaClientInitializationError") return true;
+  if (
+    typeof candidate.code === "string" &&
+    MONGO_CONNECTION_ERROR_CODES.has(candidate.code)
+  ) {
+    return true;
+  }
+  if (typeof candidate.message === "string") {
+    return /Server selection timeout|No available servers|fatal alert|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EHOSTUNREACH|Connection timed out|Topology was destroyed|socket hang up/i.test(
+      candidate.message,
+    );
+  }
+  return false;
+}
+
 // Resilient Prisma Client Proxy
 export const prisma: PrismaClient = new Proxy(
   {},
   {
     get(_target, prop: string) {
       if (prop === "$transaction") {
-        return async (arg: any) => {
-          if (typeof arg === "function") {
-            return arg(prisma);
+        return async (arg: any, options?: any) => {
+          const runFallback = async () => {
+            if (typeof arg === "function") {
+              return arg(prisma);
+            }
+            if (Array.isArray(arg)) {
+              return Promise.all(arg);
+            }
+            return arg;
+          };
+
+          if (!realPrisma) {
+            return runFallback();
           }
-          if (Array.isArray(arg)) {
-            return Promise.all(arg);
+
+          if (mongoConnectionFailed && Date.now() - lastFailureTime < 30000) {
+            return runFallback();
           }
-          return arg;
+
+          try {
+            const result = await (realPrisma as any).$transaction(arg, options);
+            mongoConnectionFailed = false;
+            return result;
+          } catch (err: any) {
+            if (isMongoConnectionError(err)) {
+              mongoConnectionFailed = true;
+              lastFailureTime = Date.now();
+              console.warn(
+                "[Prisma] MongoDB unreachable (IP not whitelisted or TLS error). Menggunakan in-memory fallback.",
+              );
+              return runFallback();
+            }
+            throw err;
+          }
         };
       }
       if (prop === "$disconnect") {
-        return async () => {};
+        return async () => {
+          if (realPrisma && typeof (realPrisma as any).$disconnect === "function") {
+            return (realPrisma as any).$disconnect();
+          }
+        };
       }
       if (prop === "$connect") {
-        return async () => {};
+        return async () => {
+          if (realPrisma && typeof (realPrisma as any).$connect === "function") {
+            return (realPrisma as any).$connect();
+          }
+        };
       }
 
       // Check if realPrisma has the property and try to execute safely
@@ -543,30 +604,21 @@ export const prisma: PrismaClient = new Proxy(
                   try {
                     const result = await originalMethod.apply(modelTarget, args);
                     mongoConnectionFailed = false;
-                    if (
-                      result === null &&
-                      prop === "user" &&
-                      (method === "findUnique" || method === "findFirst")
-                    ) {
-                      const mockHandler = createModelHandler("user") as any;
-                      return mockHandler[method](...args);
-                    }
                     return result;
                   } catch (err: any) {
-                    if (
-                      err?.message?.includes("Server selection timeout") ||
-                      err?.message?.includes("fatal alert") ||
-                      err?.message?.includes("No available servers")
-                    ) {
+                    if (isMongoConnectionError(err)) {
                       mongoConnectionFailed = true;
                       lastFailureTime = Date.now();
-                      console.warn("[Prisma] MongoDB unreachable (IP not whitelisted or TLS error). Menggunakan in-memory fallback.");
+                      console.warn(
+                        "[Prisma] MongoDB unreachable (IP not whitelisted or TLS error). Menggunakan in-memory fallback.",
+                      );
+                      const mockHandler = createModelHandler(prop) as any;
+                      if (mockHandler && typeof mockHandler[method] === "function") {
+                        return mockHandler[method](...args);
+                      }
+                      return null;
                     }
-                    const mockHandler = createModelHandler(prop) as any;
-                    if (mockHandler && typeof mockHandler[method] === "function") {
-                      return mockHandler[method](...args);
-                    }
-                    return null;
+                    throw err;
                   }
                 };
               }

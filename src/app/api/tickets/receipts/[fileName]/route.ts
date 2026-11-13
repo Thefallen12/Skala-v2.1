@@ -141,6 +141,7 @@ export async function GET(
     role === UserRole.LOGISTICS &&
     deliveryOrder?.ticket?.type === TicketType.MATERIAL &&
     (deliveryOrder.ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      deliveryOrder.ticket.status === TicketStatus.PROCESSED_FINANCE ||
       deliveryOrder.ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
       deliveryOrder.ticket.status === TicketStatus.IN_TRANSIT ||
       deliveryOrder.ticket.status === TicketStatus.COMPLETED);
@@ -169,6 +170,7 @@ export async function GET(
       ((ticket &&
         ticket.type === TicketType.MATERIAL &&
         (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+          ticket.status === TicketStatus.PROCESSED_FINANCE ||
           ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
           ticket.status === TicketStatus.IN_TRANSIT ||
           ticket.status === TicketStatus.COMPLETED) &&
@@ -179,6 +181,7 @@ export async function GET(
         (deliveryOrder &&
           deliveryOrder.ticket?.type === TicketType.MATERIAL &&
           (deliveryOrder.ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+            deliveryOrder.ticket.status === TicketStatus.PROCESSED_FINANCE ||
             deliveryOrder.ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
             deliveryOrder.ticket.status === TicketStatus.IN_TRANSIT ||
             deliveryOrder.ticket.status === TicketStatus.COMPLETED)))) ||

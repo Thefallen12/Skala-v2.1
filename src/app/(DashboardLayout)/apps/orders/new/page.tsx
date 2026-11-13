@@ -4,7 +4,10 @@ import BreadcrumbComp from "../../../layout/shared/breadcrumb/BreadcrumbComp";
 import DOEditForm from "@/components/orders/DOEditForm";
 import POEditForm from "@/components/orders/POEditForm";
 import {
+  DirectStockPurchaseStatus,
   DOStatus,
+  FulfillmentStatus,
+  POStatus,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -15,6 +18,10 @@ import { canManageUsers } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { projectSiteName } from "@/lib/documents/project-site-name";
+import {
+  buildActiveDirectPurchaseLookup,
+  findActiveDirectPurchaseNumber,
+} from "@/lib/ticket-utils";
 
 export const metadata: Metadata = {
   title: "Buat PO / DO",
@@ -63,10 +70,9 @@ export default async function NewOrderPage({
             status: {
               in: [
                 TicketStatus.PROCESSED_LOGISTIC,
+                TicketStatus.PROCESSED_FINANCE,
                 TicketStatus.ASSIGNED_TO_MOVER,
                 TicketStatus.IN_TRANSIT,
-                TicketStatus.WAITING_FINANCE_PAYMENT,
-                TicketStatus.COMPLETED,
               ],
             },
           },
@@ -86,8 +92,36 @@ export default async function NewOrderPage({
                 location: true,
               },
             },
+            directStockPurchases: {
+              where: { status: DirectStockPurchaseStatus.PENDING_RECEIPT },
+              select: {
+                purchaseNumber: true,
+                items: {
+                  select: {
+                    stockItemId: true,
+                    itemName: true,
+                    unit: true,
+                  },
+                },
+              },
+            },
             items: {
-              select: { itemName: true, quantity: true, unit: true },
+              select: {
+                stockItemId: true,
+                itemName: true,
+                quantity: true,
+                unit: true,
+                categoryHint: true,
+                status: true,
+                doItemId: true,
+                poItem: {
+                  select: {
+                    po: {
+                      select: { status: true, paidAt: true },
+                    },
+                  },
+                },
+              },
               orderBy: { id: "asc" },
             },
           },
@@ -166,49 +200,79 @@ export default async function NewOrderPage({
               session.user.role === UserRole.LOGISTICS
             }
             ticketId={ticketId}
-            ticketOptions={ticketOptions.map((ticket) => {
-              const poItems =
-                ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
-                  ? (ticket.relatedPoIds || []).flatMap((poId) =>
-                      (poMap.get(poId)?.items ?? []).map((item) => ({
-                        itemName: item.itemName,
-                        quantity: item.quantity,
-                        unit: item.unit,
-                      })),
-                    )
-                  : [];
-              const effectiveItems =
-                ticket.items.length > 0
-                  ? ticket.items.map((item) => ({
-                      itemName: item.itemName,
-                      quantity: item.quantity,
-                      unit: item.unit,
-                    }))
-                  : poItems;
-              const poVendors =
-                ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
-                  ? (ticket.relatedPoIds || [])
-                      .map((poId) => poMap.get(poId)?.vendorName)
-                      .filter(Boolean)
-                      .join(", ")
-                  : "";
-              return {
-                id: ticket.id,
-                ticketNumber: ticket.ticketNumber,
-                title: ticket.title,
-                projectName:
-                  projectSiteName(
-                    ticket.project?.kelompokTani,
-                    ticket.project?.location,
-                  ) ||
-                  (poVendors ? `Vendor: ${poVendors}` : ticket.title),
-                projectLocation: ticket.project?.location ?? "",
-                vendorName: ticket.project?.vendor ?? poVendors,
-                requesterName: ticket.requester.name,
-                moverName: ticket.moverAssignee?.name ?? "",
-                items: effectiveItems,
-              };
-            })}
+            ticketOptions={ticketOptions
+              .map((ticket) => {
+                const activePurchaseLookup = buildActiveDirectPurchaseLookup(
+                  ticket.directStockPurchases,
+                );
+                const poItems =
+                  ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+                    ? (ticket.relatedPoIds || []).flatMap((poId) =>
+                        (poMap.get(poId)?.items ?? []).map((item) => ({
+                          itemName: item.itemName,
+                          quantity: item.quantity,
+                          unit: item.unit,
+                        })),
+                      )
+                    : [];
+                const deliverableTicketItems = ticket.items
+                  .filter((item) => {
+                    if (
+                      item.doItemId !== null ||
+                      item.status === FulfillmentStatus.PROCESSED_TO_DO
+                    ) {
+                      return false;
+                    }
+                    if (item.status === FulfillmentStatus.PROCESSED_TO_PO) {
+                      const itemPo = item.poItem?.po;
+                      return (
+                        itemPo?.status === POStatus.APPROVED &&
+                        itemPo.paidAt !== null
+                      );
+                    }
+                    if (item.status !== FulfillmentStatus.PENDING) {
+                      return false;
+                    }
+                    return !findActiveDirectPurchaseNumber(
+                      activePurchaseLookup,
+                      item,
+                    );
+                  })
+                  .map((item) => ({
+                    itemName: item.itemName,
+                    quantity: item.quantity,
+                    unit: item.unit,
+                  }));
+                const effectiveItems =
+                  ticket.items.length > 0 ? deliverableTicketItems : poItems;
+                const poVendors =
+                  ticket.requestCategory === TicketRequestCategory.SHIPPING_COST
+                    ? (ticket.relatedPoIds || [])
+                        .map((poId) => poMap.get(poId)?.vendorName)
+                        .filter(Boolean)
+                        .join(", ")
+                    : "";
+                return {
+                  id: ticket.id,
+                  ticketNumber: ticket.ticketNumber,
+                  title: ticket.title,
+                  projectName:
+                    projectSiteName(
+                      ticket.project?.kelompokTani,
+                      ticket.project?.location,
+                    ) ||
+                    (poVendors ? `Vendor: ${poVendors}` : ticket.title),
+                  projectLocation: ticket.project?.location ?? "",
+                  vendorName: ticket.project?.vendor ?? poVendors,
+                  requesterName: ticket.requester.name,
+                  moverName: ticket.moverAssignee?.name ?? "",
+                  items: effectiveItems,
+                };
+              })
+              .filter(
+                (option) =>
+                  option.items.length > 0 || option.id === ticketId,
+              )}
           />
         ) : (
           <POEditForm createdAt={new Date().toLocaleDateString("id-ID")} />

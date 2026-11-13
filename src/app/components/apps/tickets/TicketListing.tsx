@@ -46,6 +46,7 @@ import {
   DOStatus,
   PaymentType,
   POPaymentMethod,
+  POStatus,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -259,7 +260,8 @@ function workflowFor(
       role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
-    ticket.status === TicketStatus.PROCESSED_LOGISTIC
+    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE)
   ) {
     return "LOGISTICS_DO";
   }
@@ -282,17 +284,16 @@ function workflowFor(
       role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.type === TicketType.MATERIAL &&
-    ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
-    ticket.fulfillmentStatus === "COMPLETED" &&
+    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE) &&
     ticket.purchaseOrders?.some((purchaseOrder) => purchaseOrder.paidAt) &&
-    ticket.deliveryOrders?.length === 0
+    ticket.items.some((item) => item.status !== FulfillmentStatus.PROCESSED_TO_DO)
   ) {
     return "LOGISTICS";
   }
   if (
     role === UserRole.FINANCE &&
-    (ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
-      ticket.status === TicketStatus.PROCESSED_FINANCE)
+    ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT
   ) {
     return "FINANCE";
   }
@@ -301,6 +302,46 @@ function workflowFor(
     ticket.status === TicketStatus.ASSIGNED_TO_MOVER
   ) {
     return "MOVER";
+  }
+  return null;
+}
+
+function getFinanceActionTarget(
+  ticket: TicketRow,
+): { href: string; label: string } | null {
+  const payablePurchase = ticket.directStockPurchases?.find(
+    (purchase) =>
+      purchase.status === "PENDING_RECEIPT" &&
+      purchase.isApprovedByDirector &&
+      Boolean(purchase.vendorInvoiceUrl) &&
+      !purchase.hasFinanceProof,
+  );
+  if (payablePurchase) {
+    return {
+      href: `/apps/finance?tab=payment&openSheet=${encodeURIComponent(payablePurchase.id)}`,
+      label: `Bayar ${payablePurchase.purchaseNumber} di Finance`,
+    };
+  }
+  const payablePo = ticket.purchaseOrders?.find(
+    (po) =>
+      po.status === POStatus.APPROVED &&
+      !po.paidAt &&
+      Boolean(po.vendorInvoiceUrl),
+  );
+  if (payablePo) {
+    return {
+      href: `/apps/finance?tab=payment&openSheet=${encodeURIComponent(payablePo.publicCode)}`,
+      label: `Bayar ${payablePo.poNumber} di Finance`,
+    };
+  }
+  const reviewPo = ticket.purchaseOrders?.find(
+    (po) => po.status === POStatus.PENDING_FINANCE_REVIEW,
+  );
+  if (reviewPo) {
+    return {
+      href: `/apps/finance?tab=check&openSheet=${encodeURIComponent(reviewPo.publicCode)}`,
+      label: `Periksa ${reviewPo.poNumber} di Finance`,
+    };
   }
   return null;
 }
@@ -440,7 +481,8 @@ export default function TicketListing({
       role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR) &&
     selectedTicket?.type === TicketType.MATERIAL &&
-    selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC;
+    (selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      selectedTicket.status === TicketStatus.PROCESSED_FINANCE);
 
   const openTicketSheet = (ticket: TicketRow) => {
     setSelectedReceipt(null);
@@ -1008,7 +1050,8 @@ export default function TicketListing({
                             role === UserRole.DIRECTOR ||
                             role === UserRole.DEPUTY_DIRECTOR) &&
                           ticket.type === TicketType.MATERIAL &&
-                          ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
+                          (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+                            ticket.status === TicketStatus.PROCESSED_FINANCE) &&
                           ticket.items.length > 0
                         ) {
                           const hasPendingItems = ticket.items.some(
@@ -1029,6 +1072,46 @@ export default function TicketListing({
                               <ClipboardList className="size-4" />
                             </Button>
                           );
+                        }
+                        if (role === UserRole.FINANCE) {
+                          const financeTarget = getFinanceActionTarget(ticket);
+                          if (financeTarget || (showDoPrint && primaryDo)) {
+                            return (
+                              <>
+                                {showDoPrint && primaryDo && (
+                                  <Button
+                                    asChild
+                                    type="button"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
+                                  >
+                                    <Link
+                                      href={`/d/${primaryDo.publicCode}`}
+                                      title="Cetak Surat Jalan (DO)"
+                                      aria-label="Cetak DO"
+                                    >
+                                      <Printer className="size-4" />
+                                    </Link>
+                                  </Button>
+                                )}
+                                {financeTarget && (
+                                  <Button
+                                    asChild
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                  >
+                                    <Link
+                                      href={financeTarget.href}
+                                      title={financeTarget.label}
+                                      aria-label={financeTarget.label}
+                                    >
+                                      <CircleDollarSign className="size-4" />
+                                    </Link>
+                                  </Button>
+                                )}
+                              </>
+                            );
+                          }
                         }
                         if (showDoPrint && primaryDo) {
                           return (
@@ -1196,6 +1279,18 @@ export default function TicketListing({
                         {labels[workflow]}
                       </Button>
                     );
+                  }
+                  if (role === UserRole.FINANCE) {
+                    const financeTarget = getFinanceActionTarget(selectedTicket);
+                    if (financeTarget) {
+                      return (
+                        <Button asChild>
+                          <Link href={financeTarget.href}>
+                            {financeTarget.label}
+                          </Link>
+                        </Button>
+                      );
+                    }
                   }
                   return action ? (
                     <Button
@@ -1679,18 +1774,36 @@ export default function TicketListing({
                           >
                             {stageLabel}
                           </Badge>
-                          {purchase.status === "PENDING_RECEIPT" && (
-                            <Button
-                              asChild
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-xs"
-                            >
-                              <Link href="/apps/logistics?tab=stock">
-                                Kelola di Stok
-                              </Link>
-                            </Button>
-                          )}
+                          {purchase.status === "PENDING_RECEIPT" &&
+                            role === UserRole.FINANCE &&
+                            purchase.isApprovedByDirector &&
+                            Boolean(purchase.vendorInvoiceUrl) &&
+                            !purchase.hasFinanceProof && (
+                              <Button
+                                asChild
+                                size="sm"
+                                className="h-8 text-xs"
+                              >
+                                <Link
+                                  href={`/apps/finance?tab=payment&openSheet=${encodeURIComponent(purchase.id)}`}
+                                >
+                                  Bayar di Finance
+                                </Link>
+                              </Button>
+                            )}
+                          {purchase.status === "PENDING_RECEIPT" &&
+                            role !== UserRole.FINANCE && (
+                              <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs"
+                              >
+                                <Link href="/apps/logistics?tab=stock">
+                                  Kelola di Stok
+                                </Link>
+                              </Button>
+                            )}
                         </div>
                       </div>
                       {(purchase.vendorInvoiceUrl || purchasePhotoUrls.length > 0) && (
@@ -2055,6 +2168,7 @@ export default function TicketListing({
         }}
         title="Konfirmasi Pemenuhan dari Stok Gudang"
         description="Status stok dihitung otomatis untuk barang yang dipilih. Buat Surat Jalan (DO) untuk barang ready dan teruskan barang yang kurang ke pengadaan PO atau Pembelian Langsung."
+        className="sm:max-w-4xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button
@@ -2139,13 +2253,13 @@ export default function TicketListing({
       >
         <div className="space-y-4">
           <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
+            <Table className="w-full table-auto">
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead>Barang yang Dibutuhkan</TableHead>
-                  <TableHead>Jumlah</TableHead>
-                  <TableHead>Stok Tersedia</TableHead>
-                  <TableHead>Status Ketersediaan</TableHead>
+                  <TableHead className="min-w-[140px]">Barang yang Dibutuhkan</TableHead>
+                  <TableHead className="whitespace-nowrap">Jumlah</TableHead>
+                  <TableHead className="whitespace-nowrap">Stok Tersedia</TableHead>
+                  <TableHead className="min-w-[260px]">Status Ketersediaan</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2163,16 +2277,18 @@ export default function TicketListing({
                   );
                   return (
                     <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.itemName}</TableCell>
-                      <TableCell>
+                      <TableCell className="align-top font-medium whitespace-normal break-words">
+                        {item.itemName}
+                      </TableCell>
+                      <TableCell className="align-top whitespace-nowrap tabular-nums">
                         {item.quantity} {item.unit}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top whitespace-nowrap tabular-nums">
                         {availability
                           ? `${availability.availableQuantity} ${item.unit}`
                           : "Belum diperiksa"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="align-top whitespace-normal">
                         <Badge
                           variant={
                             availability?.ready
@@ -2189,7 +2305,7 @@ export default function TicketListing({
                             : "Menunggu pemeriksaan"}
                         </Badge>
                         {availability?.message && (
-                          <span className="mt-1 block text-xs text-muted-foreground">
+                          <span className="mt-1.5 block whitespace-normal break-words text-xs leading-relaxed text-muted-foreground">
                             {availability.message}
                           </span>
                         )}
@@ -2199,7 +2315,7 @@ export default function TicketListing({
                           </span>
                         )}
                         {availability && !availability.pendingPurchaseNumber && (
-                          <label className="mt-2 block max-w-xs space-y-1 text-xs text-muted-foreground">
+                          <label className="mt-2 block w-full max-w-md space-y-1 text-xs text-muted-foreground">
                             <span>Tautkan ke SKU katalog stok</span>
                             <select
                               value={availability.stockItemId ?? ""}
@@ -2212,7 +2328,7 @@ export default function TicketListing({
                               disabled={
                                 fulfillmentPending || stockItems.length === 0
                               }
-                              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground"
                             >
                               <option value="">Pilih SKU</option>
                               {stockItems.map((stockItem) => (
@@ -2236,13 +2352,13 @@ export default function TicketListing({
           </div>
           {readyStockItems.length > 0 && (
             <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3.5 sm:grid-cols-2">
-              <FormLabel className="space-y-1.5 text-sm">
+              <FormLabel className="min-w-0 space-y-1.5 text-sm">
                 <span className="font-semibold">Mover Pengiriman</span>
                 <select
                   value={selectedMoverId}
                   onChange={(event) => setSelectedMoverId(event.target.value)}
                   disabled={fulfillmentPending || moverOptions.length === 0}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
                   required
                 >
                   <option value="">Pilih Petugas Mover</option>
@@ -2258,13 +2374,13 @@ export default function TicketListing({
                   </span>
                 )}
               </FormLabel>
-              <FormLabel className="space-y-1.5 text-sm">
+              <FormLabel className="min-w-0 space-y-1.5 text-sm">
                 <span className="font-semibold">Kendaraan Operasional</span>
                 <select
                   value={selectedVehicleId}
                   onChange={(event) => setSelectedVehicleId(event.target.value)}
                   disabled={fulfillmentPending || vehicleOptions.length === 0}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
                   required
                 >
                   <option value="">Pilih Kendaraan</option>

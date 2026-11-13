@@ -33,6 +33,8 @@ export type PaymentModalTarget = {
   paidAmount: number;
   isFirstPayment?: boolean;
   transferDestination: string;
+  defaultPaymentMethod?: POPaymentMethod;
+  allowPaymentMethodSelection?: boolean;
   isInternalFunding?: boolean;
   requesterName?: string;
   receiptUrls?: string[];
@@ -87,8 +89,16 @@ export default function PaymentModal({
   );
   const [financeAccountId, setFinanceAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<POPaymentMethod>(
-    POPaymentMethod.TRANSFER,
+    target?.defaultPaymentMethod ?? POPaymentMethod.TRANSFER,
   );
+  const canSelectPaymentMethod = Boolean(
+    target?.isInternalFunding || target?.allowPaymentMethodSelection,
+  );
+  const requiresTransferDestination = !(
+    canSelectPaymentMethod && paymentMethod === POPaymentMethod.CASH
+  );
+  const isCashPayment =
+    canSelectPaymentMethod && paymentMethod === POPaymentMethod.CASH;
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [isMessageError, setIsMessageError] = useState(false);
@@ -132,9 +142,7 @@ export default function PaymentModal({
     const transferAmount = parseRupiahInput(amount);
     if (needsNominalInput) {
       if (
-        ((!target.isInternalFunding ||
-          paymentMethod === POPaymentMethod.TRANSFER) &&
-          !destination.trim()) ||
+        (requiresTransferDestination && !destination.trim()) ||
         !Number.isFinite(transferAmount) ||
         transferAmount <= 0
       ) {
@@ -143,9 +151,7 @@ export default function PaymentModal({
         return;
       }
     } else if (
-      ((!target.isInternalFunding ||
-        paymentMethod === POPaymentMethod.TRANSFER) &&
-        !destination.trim()) ||
+      (requiresTransferDestination && !destination.trim()) ||
       !Number.isFinite(transferAmount) ||
       transferAmount <= 0 ||
       transferAmount > remainingAmount ||
@@ -176,7 +182,7 @@ export default function PaymentModal({
         paymentType,
         transferAmount,
         financeAccountId,
-        target.isInternalFunding ? paymentMethod : undefined,
+        canSelectPaymentMethod ? paymentMethod : undefined,
       );
       setMessage(result.message);
       setIsMessageError(!result.success);
@@ -310,32 +316,34 @@ export default function PaymentModal({
                     </div>
                   )}
                 </section>
-                <div className="space-y-2">
-                  <Label htmlFor="payment-modal-method">Metode Pembayaran</Label>
-                  <Select
-                    value={paymentMethod}
-                    onValueChange={(value) => {
-                      if (
-                        value === POPaymentMethod.CASH ||
-                        value === POPaymentMethod.TRANSFER
-                      ) {
-                        setPaymentMethod(value);
-                      }
-                    }}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger id="payment-modal-method">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={POPaymentMethod.TRANSFER}>
-                        Transfer
-                      </SelectItem>
-                      <SelectItem value={POPaymentMethod.CASH}>Cash</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </>
+            )}
+            {canSelectPaymentMethod && (
+              <div className="space-y-2">
+                <Label htmlFor="payment-modal-method">Metode Pembayaran</Label>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(value) => {
+                    if (
+                      value === POPaymentMethod.CASH ||
+                      value === POPaymentMethod.TRANSFER
+                    ) {
+                      setPaymentMethod(value);
+                    }
+                  }}
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="payment-modal-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={POPaymentMethod.TRANSFER}>
+                      Transfer
+                    </SelectItem>
+                    <SelectItem value={POPaymentMethod.CASH}>Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             <section className="grid gap-2 rounded-lg border p-4 text-sm sm:grid-cols-3">
               <div>
@@ -465,8 +473,7 @@ export default function PaymentModal({
                       pengajuan ini.
                     </p>
                   )}
-                {(!target.isInternalFunding ||
-                  paymentMethod === POPaymentMethod.TRANSFER) && (
+                {requiresTransferDestination && (
                 <div className="space-y-2">
                   <Label htmlFor="payment-modal-destination">
                     {target.isInternalFunding
@@ -486,7 +493,7 @@ export default function PaymentModal({
                 )}
                 <div className="space-y-2">
                   <Label>
-                    {target.isInternalFunding && paymentMethod === POPaymentMethod.CASH
+                    {isCashPayment
                       ? "Bukti Kwitansi / Tanda Terima"
                       : "Bukti Transfer"}
                   </Label>

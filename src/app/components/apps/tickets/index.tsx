@@ -79,13 +79,14 @@ function isMaterialOrLogisticsTicket(ticket: TicketRow): boolean {
 function requiresRoleAction(role: TicketPageRole, ticket: TicketRow): boolean {
   const hasLogisticsWorkflowAction =
     (ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
-      ticket.status === TicketStatus.PROCESSED_LOGISTIC) ||
+      (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+        ticket.status === TicketStatus.PROCESSED_FINANCE)) ||
     (ticket.type === TicketType.MATERIAL &&
-      ((ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
+      (((ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+        ticket.status === TicketStatus.PROCESSED_FINANCE) &&
         (ticket.items.some((item) => item.status === "PENDING") ||
-          (ticket.fulfillmentStatus === "COMPLETED" &&
-            Boolean(ticket.purchaseOrders?.some((po) => po.paidAt)) &&
-            (ticket.deliveryOrders?.length ?? 0) === 0))) ||
+          (Boolean(ticket.purchaseOrders?.some((po) => po.paidAt)) &&
+            ticket.items.some((item) => item.status !== "PROCESSED_TO_DO")))) ||
         (ticket.status === TicketStatus.IN_TRANSIT &&
           Boolean(
             ticket.deliveryOrders?.some(
@@ -105,14 +106,12 @@ function requiresRoleAction(role: TicketPageRole, ticket: TicketRow): boolean {
         hasLogisticsWorkflowAction
       );
     case UserRole.FINANCE:
-      return (
-        ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
-        ticket.status === TicketStatus.PROCESSED_FINANCE
-      );
+      return ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT;
     case UserRole.LOGISTICS:
       return (
         isMaterialOrLogisticsTicket(ticket) &&
         (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+          ticket.status === TicketStatus.PROCESSED_FINANCE ||
           ticket.status === TicketStatus.IN_TRANSIT)
       );
     case UserRole.MOVER:

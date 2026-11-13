@@ -252,7 +252,8 @@ export default function DocumentWorkspace({
     () =>
       tickets.filter((ticket) =>
         kind === OperationalDocumentKind.PURCHASE_ORDER
-          ? ticket.status === TicketStatus.PROCESSED_LOGISTIC
+          ? ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+            ticket.status === TicketStatus.PROCESSED_FINANCE
           : true,
       ),
     [kind, tickets],

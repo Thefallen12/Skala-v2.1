@@ -36,7 +36,9 @@ import {
 import { lockTicketDeliveryOrderCreation } from "@/lib/documents/lock-ticket-delivery-order";
 import {
   lockTicketFulfillment,
+  normalizeTicketStockValue,
   syncTicketStatus,
+  ticketStockItemKey,
 } from "@/lib/ticket-utils";
 import { sendNotification } from "@/lib/notifications";
 import { sendPushNotification } from "@/lib/push-notifications";
@@ -258,12 +260,6 @@ const actionFailure = (message: string): TicketActionResult => ({
 
 const warehouseInsufficientMessage =
   "Stok gudang tidak mencukupi untuk memenuhi permintaan ini.";
-
-const normalizeTicketStockValue = (value: string) =>
-  value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
-
-const ticketStockItemKey = (itemName: string, unit: string) =>
-  `${normalizeTicketStockValue(itemName)}\u0000${normalizeTicketStockValue(unit)}`;
 
 type WarehouseReservation = {
   stockItemId: string;
@@ -2728,10 +2724,11 @@ export async function createTicket(
     await retryTicketNumberTransaction(() =>
       nextTicketNumber(prisma).then((generatedTicketNumber) => {
         ticketNumber = generatedTicketNumber;
+        const createdTicketId = randomUUID();
         return prisma.$transaction(async (transaction) => {
       await transaction.ticket.create({
         data: {
-          id: randomUUID(),
+          id: createdTicketId,
           ticketNumber,
           title: input.title.trim(),
           description: input.description?.trim() || null,
@@ -2815,7 +2812,7 @@ export async function createTicket(
           roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
           title: "Pengajuan Internal Menunggu Persetujuan",
           message: `${ticketNumber} · ${input.title.trim()} menunggu persetujuan Direktur.`,
-          actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(ticketNumber)}`,
+          actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(createdTicketId)}`,
           type: NotificationType.APPROVAL,
           database: transaction,
         });
@@ -3738,7 +3735,7 @@ export async function processLogisticsMaterial(
   revalidatePath("/apps/orders");
   return {
     success: true,
-    message: `Invoice ${parsedInvoice.data.invoiceNumber} PO ${approvedPurchaseOrder.poNumber} berhasil dikirim ke Keuangan.`,
+    message: `Invoice${parsedInvoice.data.invoiceNumber ? ` ${parsedInvoice.data.invoiceNumber}` : " tanpa nomor"} PO ${approvedPurchaseOrder.poNumber} berhasil dikirim ke Keuangan.`,
     invoiceId,
   };
 }
@@ -4522,7 +4519,7 @@ export async function createLogisticsPurchaseOrderForTicket(
         roleTarget: UserRole.FINANCE,
         title: "PO Menunggu Verifikasi",
         message: `PO #${purchaseOrder.poNumber} Butuh Pemeriksaan (Checked By).`,
-        actionUrl: `/apps/finance?tab=po-check&openSheet=${encodeURIComponent(publicCode)}`,
+        actionUrl: `/apps/finance?tab=check&openSheet=${encodeURIComponent(publicCode)}`,
         type: NotificationType.APPROVAL,
         database: transaction,
       });
@@ -4607,6 +4604,7 @@ async function createWarehouseDeliveryOrder(
               quantity: true,
               unit: true,
               stockItemId: true,
+              doItemId: true,
               status: true,
               categoryHint: true,
               poItem: { select: { itemCode: true } },
@@ -4623,28 +4621,31 @@ async function createWarehouseDeliveryOrder(
           "Tiket harus memiliki persetujuan eksekutif sebelum DO diterbitkan.",
         );
       }
+      const paidPurchaseOrder = ticket.purchaseOrders[0] ?? null;
+      const hasPaidPurchaseOrder =
+        !selectedTicketItemIds && Boolean(paidPurchaseOrder);
       const selectedItems = selectedTicketItemIds
         ? ticket.items.filter((item) =>
             selectedTicketItemIds.includes(item.id),
           )
-        : ticket.items;
+        : ticket.items.filter(
+            (item) =>
+              item.doItemId === null &&
+              item.status !== FulfillmentStatus.PROCESSED_TO_DO,
+          );
       if (
         selectedTicketItemIds &&
         (selectedItems.length !== selectedTicketItemIds.length ||
           selectedItems.some(
-            (item) => item.status !== FulfillmentStatus.PENDING,
+            (item) =>
+              item.status !== FulfillmentStatus.PENDING ||
+              item.doItemId !== null,
           ))
       ) {
         throw new Error(
           "Sebagian item sudah diproses. Muat ulang tiket.",
         );
       }
-      if (selectedItems.length === 0) {
-        throw new Error("Tidak ada item yang dapat dipenuhi dari stok.");
-      }
-      const paidPurchaseOrder = ticket.purchaseOrders[0] ?? null;
-      const hasPaidPurchaseOrder =
-        !selectedTicketItemIds && Boolean(paidPurchaseOrder);
       const existingOrder = await transaction.deliveryOrder.findFirst({
         where: { ticketId },
         orderBy: { createdAt: "desc" },
@@ -4656,7 +4657,7 @@ async function createWarehouseDeliveryOrder(
           deliveryMethod: true,
         },
       });
-      if (existingOrder && !selectedTicketItemIds) {
+      if (existingOrder && !selectedTicketItemIds && selectedItems.length === 0) {
         if (paidPurchaseOrder && !existingOrder.poId) {
           await transaction.deliveryOrder.update({
             where: { id: existingOrder.id },
@@ -4692,7 +4693,26 @@ async function createWarehouseDeliveryOrder(
           pushTicketTitle: "",
         };
       }
-      if (ticket.status !== TicketStatus.PROCESSED_LOGISTIC) {
+      if (selectedItems.length === 0) {
+        throw new Error("Tidak ada item yang dapat dipenuhi dari stok.");
+      }
+      if (
+        !selectedTicketItemIds &&
+        selectedItems.some((item) =>
+          hasPaidPurchaseOrder
+            ? item.status !== FulfillmentStatus.PENDING &&
+              item.status !== FulfillmentStatus.PROCESSED_TO_PO
+            : item.status !== FulfillmentStatus.PENDING,
+        )
+      ) {
+        throw new Error(
+          "Sebagian item belum siap diterbitkan Delivery Order.",
+        );
+      }
+      if (
+        ticket.status !== TicketStatus.PROCESSED_LOGISTIC &&
+        ticket.status !== TicketStatus.PROCESSED_FINANCE
+      ) {
         throw new Error("Tiket tidak lagi berada di antrean Logistik.");
       }
       const selectedMover = moverAssigneeId
@@ -4846,9 +4866,7 @@ async function createWarehouseDeliveryOrder(
           where: { id: item.id },
           data: {
             doItemId: doItem.id,
-            ...(item.status === FulfillmentStatus.PENDING
-              ? { status: FulfillmentStatus.PROCESSED_TO_DO }
-              : {}),
+            status: FulfillmentStatus.PROCESSED_TO_DO,
           },
         });
       }
@@ -5305,29 +5323,24 @@ export async function processFinancePayment(
           notes: `Penerimaan pembelian PO ${order.poNumber}; menunggu DO untuk pemenuhan tiket.`,
           items: order.items,
         });
-        await transaction.ticketItem.updateMany({
-          where: {
-            ticketId,
-            poItemId: { in: order.items.map((item) => item.id) },
-            status: FulfillmentStatus.PROCESSED_TO_PO,
-          },
-          data: {
-            status: FulfillmentStatus.PENDING,
-            categoryHint: TicketCategoryHint.WAREHOUSE,
-          },
-        });
       }
 
       const isShippingCostRequest =
         ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
 
       if (isFullyPaid) {
+        const shouldAdvanceTicketStatus =
+          ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+          (ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
+            Boolean(order || isShippingCostRequest));
         await transaction.ticket.update({
           where: { id: ticketId },
           data: {
-            ...(order || isShippingCostRequest
-              ? { status: TicketStatus.PROCESSED_LOGISTIC }
-              : { status: TicketStatus.COMPLETED }),
+            ...(shouldAdvanceTicketStatus
+              ? order || isShippingCostRequest
+                ? { status: TicketStatus.PROCESSED_FINANCE }
+                : { status: TicketStatus.COMPLETED }
+              : {}),
             transferReceiptUrl: receiptUrl,
             transferDestination: effectiveTransferDestination,
             ...(isInternalFundingRequest
@@ -5706,6 +5719,7 @@ export async function processFinanceDirectStockPurchasePayment(
   financeAccountId: string,
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
   requestedPaymentAmount?: number,
+  requestedPaymentMethod?: POPaymentMethod,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
@@ -5717,8 +5731,11 @@ export async function processFinanceDirectStockPurchasePayment(
     return actionFailure("Data pembelian tidak valid.");
   }
   if (
-    !isBoundedText(transferDestination, 300) ||
-    !isBoundedText(financeAccountId, 100)
+    typeof transferDestination !== "string" ||
+    transferDestination.trim().length > 300 ||
+    !isBoundedText(financeAccountId, 100) ||
+    (requestedPaymentMethod !== undefined &&
+      !Object.values(POPaymentMethod).includes(requestedPaymentMethod))
   ) {
     return actionFailure(
       "Keterangan tujuan transfer dan buku bank/kas sumber wajib dipilih.",
@@ -5756,6 +5773,7 @@ export async function processFinanceDirectStockPurchasePayment(
           id: true,
           purchaseNumber: true,
           vendorName: true,
+          paymentMethod: true,
           totalAmount: true,
           isApprovedByDirector: true,
           vendorInvoiceUrl: true,
@@ -5770,6 +5788,20 @@ export async function processFinanceDirectStockPurchasePayment(
       }
       if (!purchase.vendorInvoiceUrl) {
         throw new Error("Logistik harus melampirkan invoice/bon sebelum pembayaran.");
+      }
+      const resolvedPaymentMethod =
+        requestedPaymentMethod ??
+        purchase.paymentMethod ??
+        POPaymentMethod.TRANSFER;
+      const resolvedTransferDestination =
+        transferDestination.trim() ||
+        (resolvedPaymentMethod === POPaymentMethod.CASH
+          ? "Pembayaran tunai pembelian langsung"
+          : "");
+      if (!resolvedTransferDestination) {
+        throw new Error(
+          "Keterangan tujuan transfer wajib diisi untuk pembayaran transfer.",
+        );
       }
       await acquireMongoTransactionLock(
         transaction,
@@ -5808,7 +5840,7 @@ export async function processFinanceDirectStockPurchasePayment(
           directStockPurchaseId: purchase.id,
           paymentType,
           amount,
-          transferDestination: transferDestination.trim(),
+          transferDestination: resolvedTransferDestination,
           status: PaymentStatus.PAID,
           processedById: session.user.id,
           proofOfTransferUrl: receiptUrl,
@@ -5824,7 +5856,8 @@ export async function processFinanceDirectStockPurchasePayment(
         amount,
         sourceDesc: `Pembelian langsung ${purchase.purchaseNumber} · ${purchase.vendorName}`,
         projectId: purchase.ticket?.projectId,
-        paymentMethod: "TRANSFER",
+        paymentMethod:
+          resolvedPaymentMethod === POPaymentMethod.CASH ? "CASH" : "TRANSFER",
         proofUrl: receiptUrl,
         recordedBy: session.user.id,
       });
@@ -5876,6 +5909,8 @@ export async function processFinanceDirectStockPurchasePayment(
             "Pembelian langsung wajib disetujui Direktur sebelum pembayaran." ||
           error.message ===
             "Logistik harus melampirkan invoice/bon sebelum pembayaran." ||
+          error.message ===
+            "Keterangan tujuan transfer wajib diisi untuk pembayaran transfer." ||
         error.message === "Pembelian langsung ini sudah lunas." ||
           error.message.startsWith("Saldo buku bank/kas") ||
           error.message.startsWith("Buku bank/kas sumber") ||
@@ -5982,6 +6017,7 @@ export async function submitPaymentRecord(input: {
       input.financeAccountId,
       input.paymentType,
       input.amount,
+      input.paymentMethod,
     );
   }
   return actionFailure("Jenis tagihan tidak valid.");

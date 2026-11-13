@@ -309,6 +309,7 @@ export async function createSignedOperationalDocument(
       ? ticket.status === TicketStatus.PROCESSED_LOGISTIC
       : [
           TicketStatus.PROCESSED_LOGISTIC,
+          TicketStatus.PROCESSED_FINANCE,
           TicketStatus.ASSIGNED_TO_MOVER,
         ].some((status) => ticket.status === status);
   if (!canPrepareForStatus) {
@@ -427,6 +428,7 @@ export async function issueOperationalDocument(
         document.kind === OperationalDocumentKind.DELIVERY_ORDER &&
         ![
           TicketStatus.PROCESSED_LOGISTIC,
+          TicketStatus.PROCESSED_FINANCE,
           TicketStatus.ASSIGNED_TO_MOVER,
         ].some((status) => document.ticket.status === status)
       ) {

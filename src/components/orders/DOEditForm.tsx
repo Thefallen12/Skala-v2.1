@@ -97,6 +97,7 @@ export default function DOEditForm({
   receivedAt,
   receivedByName,
   canReceiveMaterial = false,
+  canEdit = true,
   items,
   qrDataUrl,
   createdAt,
@@ -128,6 +129,7 @@ export default function DOEditForm({
   receivedAt?: string | null;
   receivedByName?: string | null;
   canReceiveMaterial?: boolean;
+  canEdit?: boolean;
   items?: DeliveryOrderItemInput[];
   qrDataUrl?: string | null;
   createdAt?: string;
@@ -207,6 +209,7 @@ export default function DOEditForm({
 
   const submit = form.handleSubmit(
     async (values) => {
+      if (!canEdit) return;
       setMessage("");
       setIsSaving(true);
       try {
@@ -272,6 +275,7 @@ export default function DOEditForm({
 
   return (
     <form onSubmit={submit} className="order-editor-print-area space-y-6">
+      <fieldset disabled={!canEdit} className="space-y-6">
       <Card className="space-y-5 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>
@@ -712,15 +716,17 @@ export default function DOEditForm({
               Jumlah terkirim tidak dapat melebihi jumlah yang dipesan.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              append({ itemName: "", qtyOrdered: 1, qtyDelivered: 0, unit: "pcs", remarks: "" })
-            }
-          >
-            <Plus className="mr-2 h-4 w-4" /> Tambah item
-          </Button>
+          {canEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                append({ itemName: "", qtyOrdered: 1, qtyDelivered: 0, unit: "pcs", remarks: "" })
+              }
+            >
+              <Plus className="mr-2 h-4 w-4" /> Tambah item
+            </Button>
+          )}
         </div>
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <Table className="min-w-[680px]">
@@ -731,7 +737,9 @@ export default function DOEditForm({
                 <TableHead className="w-36 min-w-[110px]">Qty dikirim</TableHead>
                 <TableHead className="w-24 min-w-[90px]">Satuan</TableHead>
                 <TableHead className="min-w-[160px]">Catatan kondisi</TableHead>
-                <TableHead className="w-16"><span className="sr-only">Aksi</span></TableHead>
+                {canEdit && (
+                  <TableHead className="w-16"><span className="sr-only">Aksi</span></TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -799,23 +807,26 @@ export default function DOEditForm({
                       {...form.register(`items.${index}.remarks`, { maxLength: 1000 })}
                     />
                   </TableCell>
-                  <TableCell>
-                    <ActionIconButton
-                      type="button"
-                      label={`Hapus item baris ${index + 1}`}
-                      tooltip={`Hapus item baris ${index + 1}`}
-                      icon={Trash2}
-                      className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      disabled={fields.length <= 1}
-                      onClick={() => remove(index)}
-                    />
-                  </TableCell>
+                  {canEdit && (
+                    <TableCell>
+                      <ActionIconButton
+                        type="button"
+                        label={`Hapus item baris ${index + 1}`}
+                        tooltip={`Hapus item baris ${index + 1}`}
+                        icon={Trash2}
+                        className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        disabled={fields.length <= 1}
+                        onClick={() => remove(index)}
+                      />
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       </Card>
+      </fieldset>
 
       {showQr && (
         <Card className="flex flex-col items-center gap-3 p-5 text-center">
@@ -860,14 +871,16 @@ export default function DOEditForm({
         </p>
       )}
       <div className="order-editor-actions sticky bottom-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur xl:bottom-4">
-        <Button type="submit" disabled={isSaving}>
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving
-            ? "Menyimpan..."
-            : publicCode
-              ? "Simpan Perubahan"
-              : "Buat Delivery Order"}
-        </Button>
+        {canEdit && (
+          <Button type="submit" disabled={isSaving}>
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving
+              ? "Menyimpan..."
+              : publicCode
+                ? "Simpan Perubahan"
+                : "Buat Delivery Order"}
+          </Button>
+        )}
         {publicCode && (
           <>
             <Button

@@ -49,10 +49,14 @@ export async function nextDocumentNumber(
                 where: { invoiceNumber: number },
                 select: { id: true },
               })
-            : await transaction.stockPurchase.findUnique({
+            : (await transaction.stockPurchase.findUnique({
                 where: { purchaseNumber: number },
                 select: { id: true },
-              });
+              })) ??
+              (await transaction.directStockPurchase.findUnique({
+                where: { purchaseNumber: number },
+                select: { id: true },
+              }));
     if (!existing) return number;
   }
 }

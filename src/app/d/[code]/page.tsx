@@ -31,7 +31,9 @@ function canAccessPurchaseOrder(role: UserRole): boolean {
     canEditPurchaseOrder(role) ||
     role === UserRole.FINANCE ||
     role === UserRole.DIRECTOR ||
-    role === UserRole.DEPUTY_DIRECTOR
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.KOORDINATOR ||
+    role === UserRole.FIELD_TEAM
   );
 }
 
@@ -44,9 +46,12 @@ function canEditDeliveryOrder(role: UserRole): boolean {
     role === UserRole.LOGISTICS ||
     role === UserRole.FIELD_TEAM ||
     role === UserRole.KOORDINATOR ||
-    role === UserRole.MOVER ||
-    role === UserRole.FINANCE
+    role === UserRole.MOVER
   );
+}
+
+function canAccessDeliveryOrder(role: UserRole): boolean {
+  return canEditDeliveryOrder(role) || role === UserRole.FINANCE;
 }
 
 function canReadConstructionDocument(
@@ -315,8 +320,10 @@ export default async function OrderEditPage({
   }
 
   if (deliveryOrder) {
-    if (!canEditDeliveryOrder(session.user.role)) notFound();
+    if (!canAccessDeliveryOrder(session.user.role)) notFound();
+    const canEdit = canEditDeliveryOrder(session.user.role);
     const canAssignVehicle =
+      canEdit &&
       session.user.role === UserRole.LOGISTICS &&
       deliveryOrder.deliveryMethod === "INTERNAL_MOVER" &&
       deliveryOrder.status === "PENDING" &&
@@ -378,6 +385,7 @@ export default async function OrderEditPage({
           receivedByName={deliveryOrder.receivedBy?.name ?? null}
           arrivalPhotoUrl={deliveryOrder.arrivalPhotoUrl}
           canReceiveMaterial={session.user.role === UserRole.LOGISTICS}
+          canEdit={canEdit}
           status={deliveryOrder.status}
           createdAt={deliveryOrder.createdAt.toLocaleDateString("id-ID")}
           logisticsStaffName={deliveryOrder.createdBy?.name}

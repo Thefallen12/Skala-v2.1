@@ -31,6 +31,17 @@ export async function receivePurchaseOrderStock(
   if (input.items.length === 0) {
     throw new Error("PO tidak memiliki rincian material untuk diterima ke stok.");
   }
+  await acquireMongoTransactionLock(
+    transaction,
+    `po-receipt:${input.purchaseOrderId}`,
+  );
+  const existingReceipt = await transaction.stockPurchase.findFirst({
+    where: { purchaseOrderId: input.purchaseOrderId },
+    select: { id: true },
+  });
+  if (existingReceipt) {
+    return;
+  }
 
   const stockItemsByKey = new Map<
     string,

@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
           UserRole.LOGISTICS,
           UserRole.FINANCE,
           UserRole.DIRECTOR,
+          UserRole.DEPUTY_DIRECTOR,
           UserRole.ADMINISTRATIONS,
         ]
       : input.recordType === "DO"
@@ -74,12 +75,14 @@ export async function POST(request: NextRequest) {
             UserRole.LOGISTICS,
             UserRole.MOVER,
             UserRole.DIRECTOR,
+            UserRole.DEPUTY_DIRECTOR,
             UserRole.ADMINISTRATIONS,
           ]
         : [
             UserRole.LOGISTICS,
             UserRole.FINANCE,
             UserRole.DIRECTOR,
+            UserRole.DEPUTY_DIRECTOR,
             UserRole.ADMINISTRATIONS,
           ];
   if (!allowed.includes(session.user.role)) {

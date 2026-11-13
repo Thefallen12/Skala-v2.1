@@ -243,6 +243,7 @@ export default async function FinancePage({
         id: true,
         purchaseNumber: true,
         vendorName: true,
+        paymentMethod: true,
         totalAmount: true,
         paymentBankName: true,
         paymentAccountNumber: true,
@@ -556,22 +557,26 @@ export default async function FinancePage({
               select: {
                 poNumber: true,
                 vendorName: true,
-                ticket: {
-                  select: canViewAPH
-                    ? { ticketNumber: true, title: true }
-                    : undefined,
-                },
+                ...(canViewAPH
+                  ? {
+                      ticket: {
+                        select: { ticketNumber: true, title: true },
+                      },
+                    }
+                  : {}),
               },
             },
             directStockPurchase: {
               select: {
                 purchaseNumber: true,
                 vendorName: true,
-                ticket: {
-                  select: canViewAPH
-                    ? { ticketNumber: true, title: true }
-                    : undefined,
-                },
+                ...(canViewAPH
+                  ? {
+                      ticket: {
+                        select: { ticketNumber: true, title: true },
+                      },
+                    }
+                  : {}),
               },
             },
           },
@@ -1405,6 +1410,7 @@ export default async function FinancePage({
           id: purchase.id,
           purchaseNumber: purchase.purchaseNumber,
           vendorName: purchase.vendorName,
+          paymentMethod: purchase.paymentMethod,
           totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
           paymentBankName: purchase.paymentBankName,
           paymentAccountNumber: purchase.paymentAccountNumber,

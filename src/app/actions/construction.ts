@@ -170,7 +170,8 @@ export async function reviewBlueprint(
   if (
     session.user.role !== UserRole.KOORDINATOR &&
     session.user.role !== UserRole.DIRECTOR &&
-    session.user.role !== UserRole.DEPUTY_DIRECTOR
+    session.user.role !== UserRole.DEPUTY_DIRECTOR &&
+    session.user.role !== UserRole.ADMINISTRATIONS
   ) {
     return failure("Role Anda tidak diizinkan meninjau gambar kerja.");
   }

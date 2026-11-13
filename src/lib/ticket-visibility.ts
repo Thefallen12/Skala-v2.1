@@ -32,12 +32,7 @@ export function getTicketPageVisibilityWhere(
     case UserRole.DEPUTY_DIRECTOR:
       return {
         OR: [
-          {
-            status: TicketStatus.COMPLETED,
-            auditLogs: {
-              some: { action: "FINANCE_PAYMENT_COMPLETED" },
-            },
-          },
+          { status: { not: TicketStatus.DRAFT } },
           requesterTickets,
         ],
       };
@@ -66,6 +61,7 @@ export function getTicketPageVisibilityWhere(
       return {
         OR: [
           { status: TicketStatus.PROCESSED_LOGISTIC },
+          { status: TicketStatus.PROCESSED_FINANCE },
           { status: TicketStatus.ASSIGNED_TO_MOVER },
           { status: TicketStatus.IN_TRANSIT },
           {
