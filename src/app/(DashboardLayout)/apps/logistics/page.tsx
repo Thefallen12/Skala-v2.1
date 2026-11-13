@@ -874,7 +874,7 @@ export default async function LogisticsPage({
       ...log,
       createdAt: log.createdAt.toISOString(),
     })),
-    operationalDocuments: ticket.operationalDocuments.map((document) => ({
+    operationalDocuments: (ticket.operationalDocuments ?? []).map((document) => ({
       ...document,
       signedAt: document.signedAt.toISOString(),
       issuedAt: document.issuedAt?.toISOString() ?? null,
