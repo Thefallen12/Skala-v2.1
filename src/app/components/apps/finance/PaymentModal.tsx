@@ -25,6 +25,13 @@ import {
   parseRupiahInput,
 } from "@/lib/indonesian-currency";
 
+export type PaymentVendorBankOption = {
+  id: string;
+  label: string;
+  destination: string;
+  isPrimary?: boolean;
+};
+
 export type PaymentModalTarget = {
   id: string;
   reference: string;
@@ -33,6 +40,8 @@ export type PaymentModalTarget = {
   paidAmount: number;
   isFirstPayment?: boolean;
   transferDestination: string;
+  vendorBankDestination?: string;
+  vendorBankAccounts?: PaymentVendorBankOption[];
   defaultPaymentMethod?: POPaymentMethod;
   allowPaymentMethodSelection?: boolean;
   isInternalFunding?: boolean;
@@ -41,6 +50,8 @@ export type PaymentModalTarget = {
   hasInvoice?: boolean;
   needsNominalInput?: boolean;
 };
+
+const CASH_DIRECT_PURCHASE_DESTINATION = "Pembayaran tunai pembelian langsung";
 
 const currency = (amount: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -84,9 +95,13 @@ export default function PaymentModal({
   const [paymentType, setPaymentType] = useState<PaymentType>(
     PaymentType.FULL_PAYMENT,
   );
-  const [destination, setDestination] = useState(
-    target?.transferDestination ?? "",
-  );
+  const [destination, setDestination] = useState(() => {
+    if (!target) return "";
+    const vendorDest = target.vendorBankDestination?.trim() ?? "";
+    if (vendorDest) return vendorDest;
+    const existing = target.transferDestination?.trim() ?? "";
+    return existing === CASH_DIRECT_PURCHASE_DESTINATION ? "" : existing;
+  });
   const [financeAccountId, setFinanceAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<POPaymentMethod>(
     target?.defaultPaymentMethod ?? POPaymentMethod.TRANSFER,
@@ -176,9 +191,17 @@ export default function PaymentModal({
     setRequiresReload(false);
     setIsPending(true);
     try {
+      const submittedDestination = isCashPayment
+        ? destination.trim() &&
+          destination.trim() !== target.vendorBankDestination?.trim()
+          ? destination.trim()
+          : target.isInternalFunding
+            ? "Pembayaran tunai"
+            : CASH_DIRECT_PURCHASE_DESTINATION
+        : destination.trim();
       const result = await onPay(
         proofFile,
-        destination.trim(),
+        submittedDestination,
         paymentType,
         transferAmount,
         financeAccountId,
@@ -329,6 +352,18 @@ export default function PaymentModal({
                       value === POPaymentMethod.TRANSFER
                     ) {
                       setPaymentMethod(value);
+                      if (value === POPaymentMethod.TRANSFER) {
+                        setDestination((current) => {
+                          const trimmed = current.trim();
+                          if (
+                            !trimmed ||
+                            trimmed === CASH_DIRECT_PURCHASE_DESTINATION
+                          ) {
+                            return target?.vendorBankDestination ?? "";
+                          }
+                          return current;
+                        });
+                      }
                     }
                   }}
                   disabled={isPending}
@@ -475,6 +510,40 @@ export default function PaymentModal({
                   )}
                 {requiresTransferDestination && (
                 <div className="space-y-2">
+                  {(target.vendorBankAccounts?.length ?? 0) > 1 && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="payment-modal-vendor-bank">
+                        Pilih Rekening Vendor
+                      </Label>
+                      <Select
+                        value={
+                          target.vendorBankAccounts?.find(
+                            (account) =>
+                              account.destination === destination.trim(),
+                          )?.id ?? ""
+                        }
+                        onValueChange={(accountId) => {
+                          const picked = target.vendorBankAccounts?.find(
+                            (account) => account.id === accountId,
+                          );
+                          if (picked) setDestination(picked.destination);
+                        }}
+                        disabled={isPending}
+                      >
+                        <SelectTrigger id="payment-modal-vendor-bank">
+                          <SelectValue placeholder="Pilih rekening vendor terdaftar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {target.vendorBankAccounts?.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.label}
+                              {account.isPrimary ? " (Utama)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <Label htmlFor="payment-modal-destination">
                     {target.isInternalFunding
                       ? "Tujuan Transfer"
@@ -489,6 +558,16 @@ export default function PaymentModal({
                     disabled={isPending}
                     placeholder="Nama bank, nomor rekening, atas nama"
                   />
+                  {!target.isInternalFunding &&
+                    (target.vendorBankDestination ? (
+                      <p className="text-xs text-muted-foreground">
+                        Otomatis diisi dari rekening vendor terdaftar. Anda tetap dapat menyesuaikan keterangan ini bila perlu.
+                      </p>
+                    ) : !destination.trim() ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Vendor belum memiliki nomor rekening terdaftar. Isi detail bank tujuan secara manual di atas.
+                      </p>
+                    ) : null)}
                 </div>
                 )}
                 <div className="space-y-2">

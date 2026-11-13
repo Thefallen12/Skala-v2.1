@@ -5879,10 +5879,15 @@ export async function processFinanceDirectStockPurchasePayment(
           },
         });
       }
-      if (isFullyPaid) {
+      if (isFullyPaid || resolvedPaymentMethod !== purchase.paymentMethod) {
         await transaction.directStockPurchase.update({
           where: { id: purchase.id },
-          data: { paidAt: now },
+          data: {
+            ...(isFullyPaid ? { paidAt: now } : {}),
+            ...(resolvedPaymentMethod !== purchase.paymentMethod
+              ? { paymentMethod: resolvedPaymentMethod }
+              : {}),
+          },
         });
       }
       if (
@@ -5976,7 +5981,10 @@ export async function submitPaymentRecord(input: {
         !isValidFinancePaymentProofInput(input.file))) ||
     (input.proofOfTransferUrl !== undefined &&
       !isValidFinancePaymentProofInput(input.proofOfTransferUrl)) ||
-    !isBoundedText(input.transferDestination, 300) ||
+    typeof input.transferDestination !== "string" ||
+    input.transferDestination.length > 300 ||
+    (input.paymentMethod !== POPaymentMethod.CASH &&
+      !isBoundedText(input.transferDestination, 300)) ||
     !isBoundedText(input.financeAccountId, 100) ||
     !Object.values(PaymentType).includes(input.paymentType) ||
     (input.paymentMethod !== undefined &&

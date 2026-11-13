@@ -26,6 +26,11 @@ import {
   decimalNumberFromScaledInteger,
   decimalStringFromScaledInteger,
 } from "@/lib/scaled-decimal";
+import {
+  getVendorBankAccounts,
+  resolveVendorBankAccount,
+  type VendorBankAccountOption,
+} from "@/lib/vendor-bank-accounts";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import type {
   RentalItemRow,
@@ -83,6 +88,29 @@ export default async function FinancePage({
         ],
       };
 
+  const vendorBankAccountSelect = {
+    orderBy: [{ isPrimary: "desc" as const }, { createdAt: "asc" as const }],
+    select: {
+      id: true,
+      label: true,
+      bankName: true,
+      bankAccount: true,
+      bankHolder: true,
+      isPrimary: true,
+    },
+  };
+  const vendorWithBankAccountsSelect = {
+    id: true,
+    name: true,
+    address: true,
+    phone: true,
+    email: true,
+    bankName: true,
+    bankAccount: true,
+    bankHolder: true,
+    bankAccounts: vendorBankAccountSelect,
+  };
+
   const [
     orders,
     standalonePayments,
@@ -123,14 +151,7 @@ export default async function FinancePage({
         poNumber: true,
         vendorName: true,
         vendor: {
-          select: {
-            address: true,
-            phone: true,
-            email: true,
-            bankName: true,
-            bankAccount: true,
-            bankHolder: true,
-          },
+          select: vendorWithBankAccountsSelect,
         },
         paymentMethod: true,
         paymentBankName: true,
@@ -180,14 +201,7 @@ export default async function FinancePage({
         poNumber: true,
         vendorName: true,
         vendor: {
-          select: {
-            address: true,
-            phone: true,
-            email: true,
-            bankName: true,
-            bankAccount: true,
-            bankHolder: true,
-          },
+          select: vendorWithBankAccountsSelect,
         },
         paymentMethod: true,
         paymentBankName: true,
@@ -243,6 +257,9 @@ export default async function FinancePage({
         id: true,
         purchaseNumber: true,
         vendorName: true,
+        vendor: {
+          select: vendorWithBankAccountsSelect,
+        },
         paymentMethod: true,
         totalAmount: true,
         paymentBankName: true,
@@ -350,6 +367,9 @@ export default async function FinancePage({
           select: {
             poNumber: true,
             vendorName: true,
+            vendor: {
+              select: vendorWithBankAccountsSelect,
+            },
             includeTax: true,
             paymentBankName: true,
             paymentAccountNumber: true,
@@ -445,15 +465,7 @@ export default async function FinancePage({
     }),
     prisma.vendor.findMany({
       where: { isApproved: true },
-      select: {
-        name: true,
-        address: true,
-        phone: true,
-        email: true,
-        bankName: true,
-        bankAccount: true,
-        bankHolder: true,
-      },
+      select: vendorWithBankAccountsSelect,
     }),
     prisma.documentTemplate.findMany({
       where: {
@@ -1178,6 +1190,77 @@ export default async function FinancePage({
         name.trim().toLocaleLowerCase("id-ID"),
     );
 
+  const resolveVendorBankDetails = (
+    directFields: {
+      paymentBankName: string | null;
+      paymentAccountNumber: string | null;
+      paymentAccountName: string | null;
+    },
+    linkedVendor:
+      | {
+          address?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          bankName: string | null;
+          bankAccount: string | null;
+          bankHolder: string | null;
+          bankAccounts?: VendorBankAccountOption[];
+        }
+      | null
+      | undefined,
+    vendorName: string,
+  ) => {
+    const matchedVendor = linkedVendor ?? findVendor(vendorName);
+    const vendorAccounts = matchedVendor
+      ? getVendorBankAccounts(matchedVendor)
+      : [];
+    const primaryVendorBank = matchedVendor
+      ? resolveVendorBankAccount(matchedVendor.bankAccounts ?? [], matchedVendor)
+      : null;
+    const paymentBankName =
+      directFields.paymentBankName ?? primaryVendorBank?.bankName ?? null;
+    const paymentAccountNumber =
+      directFields.paymentAccountNumber ?? primaryVendorBank?.bankAccount ?? null;
+    const paymentAccountName =
+      directFields.paymentAccountName ?? primaryVendorBank?.bankHolder ?? null;
+    const hasExplicitOrderAccount =
+      Boolean(paymentBankName?.trim()) &&
+      Boolean(paymentAccountNumber?.trim()) &&
+      !vendorAccounts.some(
+        (account) =>
+          account.bankName.trim().toLocaleLowerCase("id-ID") ===
+            paymentBankName?.trim().toLocaleLowerCase("id-ID") &&
+          account.bankAccount.trim() === paymentAccountNumber?.trim(),
+      );
+    const mergedVendorBankAccounts: VendorBankAccountOption[] = [
+      ...(hasExplicitOrderAccount && paymentBankName && paymentAccountNumber
+        ? [
+            {
+              id: "document-selected",
+              label: "Rekening di dokumen",
+              bankName: paymentBankName,
+              bankAccount: paymentAccountNumber,
+              bankHolder: paymentAccountName ?? vendorName,
+              isPrimary: true,
+            },
+          ]
+        : []),
+      ...vendorAccounts,
+    ];
+    return {
+      vendorAddress:
+        linkedVendor?.address ?? findVendor(vendorName)?.address ?? null,
+      vendorContact:
+        linkedVendor?.email ?? findVendor(vendorName)?.email ?? null,
+      vendorPhone:
+        linkedVendor?.phone ?? findVendor(vendorName)?.phone ?? null,
+      paymentBankName,
+      paymentAccountNumber,
+      paymentAccountName,
+      vendorBankAccounts: mergedVendorBankAccounts,
+    };
+  };
+
   const historicalPayments = unmatchedHistoricalPayments.flatMap((payment) => {
     if (!payment.paidAt) return [];
     const source = payment.ticket
@@ -1252,6 +1335,9 @@ export default async function FinancePage({
             id: true,
             poNumber: true,
             vendorName: true,
+            vendor: {
+              select: vendorWithBankAccountsSelect,
+            },
             paymentBankName: true,
             paymentAccountNumber: true,
             paymentAccountName: true,
@@ -1332,124 +1418,144 @@ export default async function FinancePage({
             previewUrl: `/api/documents/transactions?kind=KO&id=${encodeURIComponent(document.id)}`,
           })),
         ]}
-        purchaseOrders={orders.map((order) => ({
-          id: order.id,
-          publicCode: order.publicCode,
-          poNumber: order.poNumber,
-          vendorName: order.vendorName,
-          vendorAddress: order.vendor?.address ?? findVendor(order.vendorName)?.address ?? null,
-          vendorContact: order.vendor?.email ?? findVendor(order.vendorName)?.email ?? null,
-          vendorPhone: order.vendor?.phone ?? findVendor(order.vendorName)?.phone ?? null,
-          createdAt: order.createdAt.toISOString(),
-          paidAt: order.paidAt?.toISOString() ?? null,
-          paymentReceiptUrl: order.paymentReceiptUrl,
-          vendorInvoiceUrl: order.vendorInvoiceUrl,
-          paymentMethod: order.paymentMethod,
-          paymentBankName:
-            order.paymentBankName ??
-            order.vendor?.bankName ??
-            findVendor(order.vendorName)?.bankName ??
-            null,
-          paymentAccountNumber:
-            order.paymentAccountNumber ??
-            order.vendor?.bankAccount ??
-            findVendor(order.vendorName)?.bankAccount ??
-            null,
-          paymentAccountName:
-            order.paymentAccountName ??
-            order.vendor?.bankHolder ??
-            findVendor(order.vendorName)?.bankHolder ??
-            null,
-          paymentTerms: order.paymentTerms,
-          includeTax: order.includeTax,
-          items: order.items,
-          paymentTransactions: order.paymentTransactions.map((payment) => ({
-            ...payment,
-            paidAt: payment.paidAt?.toISOString() ?? null,
-          })),
-        }))}
-        standalonePayments={standalonePayments.map((order) => ({
-          id: order.id,
-          publicCode: order.publicCode,
-          poNumber: order.poNumber,
-          vendorName: order.vendorName,
-          vendorAddress: order.vendor?.address ?? findVendor(order.vendorName)?.address ?? null,
-          vendorContact: order.vendor?.email ?? findVendor(order.vendorName)?.email ?? null,
-          vendorPhone: order.vendor?.phone ?? findVendor(order.vendorName)?.phone ?? null,
-          createdAt: order.createdAt.toISOString(),
-          paidAt: order.paidAt?.toISOString() ?? null,
-          paymentReceiptUrl: order.paymentReceiptUrl,
-          vendorInvoiceUrl:
-            order.vendorInvoiceUrl ?? order.invoices[0]?.documentUrl ?? null,
-          invoiceGrandTotal: order.invoices[0]?.grandTotal ?? null,
-          paymentMethod: order.paymentMethod,
-          paymentBankName:
-            order.paymentBankName ??
-            order.vendor?.bankName ??
-            findVendor(order.vendorName)?.bankName ??
-            null,
-          paymentAccountNumber:
-            order.paymentAccountNumber ??
-            order.vendor?.bankAccount ??
-            findVendor(order.vendorName)?.bankAccount ??
-            null,
-          paymentAccountName:
-            order.paymentAccountName ??
-            order.vendor?.bankHolder ??
-            findVendor(order.vendorName)?.bankHolder ??
-            null,
-          paymentTerms: order.paymentTerms,
-          includeTax: order.includeTax,
-          items: order.items,
-          paymentTransactions: order.paymentTransactions.map((payment) => ({
-            ...payment,
-            paidAt: payment.paidAt?.toISOString() ?? null,
-          })),
-        }))}
-        directPurchases={directPurchases.map((purchase) => ({
-          id: purchase.id,
-          purchaseNumber: purchase.purchaseNumber,
-          vendorName: purchase.vendorName,
-          paymentMethod: purchase.paymentMethod,
-          totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
-          paymentBankName: purchase.paymentBankName,
-          paymentAccountNumber: purchase.paymentAccountNumber,
-          paymentAccountName: purchase.paymentAccountName,
-          vendorInvoiceUrl: purchase.vendorInvoiceUrl,
-          createdAt: purchase.createdAt.toISOString(),
-          items: purchase.items.map((item) => ({
-            itemName: item.itemName,
-            quantity: decimalNumberFromScaledInteger(item.quantity),
-            unit: item.unit,
-            unitPrice: decimalNumberFromScaledInteger(item.unitPrice),
-            totalPrice: decimalNumberFromScaledInteger(item.totalPrice),
-          })),
-          paymentTransactions: purchase.paymentTransactions.map((payment) => ({
-            ...payment,
-            paidAt: payment.paidAt?.toISOString() ?? null,
-          })),
-        }))}
+        purchaseOrders={orders.map((order) => {
+          const bankDetails = resolveVendorBankDetails(
+            order,
+            order.vendor,
+            order.vendorName,
+          );
+          return {
+            id: order.id,
+            publicCode: order.publicCode,
+            poNumber: order.poNumber,
+            vendorName: order.vendorName,
+            vendorAddress: bankDetails.vendorAddress,
+            vendorContact: bankDetails.vendorContact,
+            vendorPhone: bankDetails.vendorPhone,
+            createdAt: order.createdAt.toISOString(),
+            paidAt: order.paidAt?.toISOString() ?? null,
+            paymentReceiptUrl: order.paymentReceiptUrl,
+            vendorInvoiceUrl: order.vendorInvoiceUrl,
+            paymentMethod: order.paymentMethod,
+            paymentBankName: bankDetails.paymentBankName,
+            paymentAccountNumber: bankDetails.paymentAccountNumber,
+            paymentAccountName: bankDetails.paymentAccountName,
+            vendorBankAccounts: bankDetails.vendorBankAccounts,
+            paymentTerms: order.paymentTerms,
+            includeTax: order.includeTax,
+            items: order.items,
+            paymentTransactions: order.paymentTransactions.map((payment) => ({
+              ...payment,
+              paidAt: payment.paidAt?.toISOString() ?? null,
+            })),
+          };
+        })}
+        standalonePayments={standalonePayments.map((order) => {
+          const bankDetails = resolveVendorBankDetails(
+            order,
+            order.vendor,
+            order.vendorName,
+          );
+          return {
+            id: order.id,
+            publicCode: order.publicCode,
+            poNumber: order.poNumber,
+            vendorName: order.vendorName,
+            vendorAddress: bankDetails.vendorAddress,
+            vendorContact: bankDetails.vendorContact,
+            vendorPhone: bankDetails.vendorPhone,
+            createdAt: order.createdAt.toISOString(),
+            paidAt: order.paidAt?.toISOString() ?? null,
+            paymentReceiptUrl: order.paymentReceiptUrl,
+            vendorInvoiceUrl:
+              order.vendorInvoiceUrl ?? order.invoices[0]?.documentUrl ?? null,
+            invoiceGrandTotal: order.invoices[0]?.grandTotal ?? null,
+            paymentMethod: order.paymentMethod,
+            paymentBankName: bankDetails.paymentBankName,
+            paymentAccountNumber: bankDetails.paymentAccountNumber,
+            paymentAccountName: bankDetails.paymentAccountName,
+            vendorBankAccounts: bankDetails.vendorBankAccounts,
+            paymentTerms: order.paymentTerms,
+            includeTax: order.includeTax,
+            items: order.items,
+            paymentTransactions: order.paymentTransactions.map((payment) => ({
+              ...payment,
+              paidAt: payment.paidAt?.toISOString() ?? null,
+            })),
+          };
+        })}
+        directPurchases={directPurchases.map((purchase) => {
+          const bankDetails = resolveVendorBankDetails(
+            purchase,
+            purchase.vendor,
+            purchase.vendorName,
+          );
+          return {
+            id: purchase.id,
+            purchaseNumber: purchase.purchaseNumber,
+            vendorName: purchase.vendorName,
+            paymentMethod: purchase.paymentMethod,
+            totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
+            paymentBankName: bankDetails.paymentBankName,
+            paymentAccountNumber: bankDetails.paymentAccountNumber,
+            paymentAccountName: bankDetails.paymentAccountName,
+            vendorBankAccounts: bankDetails.vendorBankAccounts,
+            vendorInvoiceUrl: purchase.vendorInvoiceUrl,
+            createdAt: purchase.createdAt.toISOString(),
+            items: purchase.items.map((item) => ({
+              itemName: item.itemName,
+              quantity: decimalNumberFromScaledInteger(item.quantity),
+              unit: item.unit,
+              unitPrice: decimalNumberFromScaledInteger(item.unitPrice),
+              totalPrice: decimalNumberFromScaledInteger(item.totalPrice),
+            })),
+            paymentTransactions: purchase.paymentTransactions.map((payment) => ({
+              ...payment,
+              paidAt: payment.paidAt?.toISOString() ?? null,
+            })),
+          };
+        })}
         tickets={tickets.map((ticket) => {
           const firstRelatedPo =
             ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
             ticket.relatedPoIds?.length
               ? financePoMap.get(ticket.relatedPoIds[0])
               : undefined;
+          const activeTicketPo = ticket.purchaseOrders[0];
+          const ticketPoBankDetails = activeTicketPo
+            ? resolveVendorBankDetails(
+                activeTicketPo,
+                activeTicketPo.vendor,
+                activeTicketPo.vendorName,
+              )
+            : firstRelatedPo
+              ? resolveVendorBankDetails(
+                  firstRelatedPo,
+                  firstRelatedPo.vendor,
+                  firstRelatedPo.vendorName,
+                )
+              : null;
+          const resolvedPoBankName =
+            ticketPoBankDetails?.paymentBankName ?? null;
+          const resolvedPoAccountNumber =
+            ticketPoBankDetails?.paymentAccountNumber ?? null;
+          const resolvedPoAccountName =
+            ticketPoBankDetails?.paymentAccountName ?? null;
           return {
             id: ticket.id,
             ticketNumber: ticket.ticketNumber,
             title: ticket.title,
             type: ticket.type,
             hasApprovedPo: ticket.purchaseOrders.length > 0,
-            poNumber: ticket.purchaseOrders[0]?.poNumber ?? null,
+            poNumber: activeTicketPo?.poNumber ?? null,
             totalAmount:
-              (ticket.purchaseOrders[0]
+              (activeTicketPo
                 ? Math.round(
-                    ticket.purchaseOrders[0].items.reduce(
+                    activeTicketPo.items.reduce(
                       (sum, item) => sum + item.totalPrice,
                       0,
                     ) *
-                      (ticket.purchaseOrders[0].includeTax ? 1.11 : 1) *
+                      (activeTicketPo.includeTax ? 1.11 : 1) *
                       100,
                   ) / 100
                 : null)?.toString() ??
@@ -1466,43 +1572,37 @@ export default async function FinancePage({
             requestPaymentDescription: ticket.requestPaymentDescription,
             recipientName:
               ticket.recipientName ??
-              firstRelatedPo?.paymentAccountName ??
+              resolvedPoAccountName ??
               ticket.requester.bankAccountName ??
               ticket.requester.name,
             bankName:
               ticket.bankName ??
-              firstRelatedPo?.paymentBankName ??
+              resolvedPoBankName ??
               ticket.requester.bankName,
             accountNumber:
               ticket.accountNumber ??
-              firstRelatedPo?.paymentAccountNumber ??
+              resolvedPoAccountNumber ??
               ticket.requester.bankAccountNumber,
             transferDestination:
               ticket.requestCategory === TicketRequestCategory.APH
                 ? ticket.transferDestination
-                : ticket.purchaseOrders[0]?.paymentBankName &&
-              ticket.purchaseOrders[0]?.paymentAccountNumber
-                ? `Ditransfer ke: ${ticket.purchaseOrders[0].paymentBankName} & ${ticket.purchaseOrders[0].paymentAccountNumber}`
-                : firstRelatedPo?.paymentBankName &&
-                  firstRelatedPo?.paymentAccountNumber
-                  ? `Ditransfer ke: ${firstRelatedPo.paymentBankName} & ${firstRelatedPo.paymentAccountNumber}`
+                : resolvedPoBankName && resolvedPoAccountNumber
+                  ? `Ditransfer ke: ${resolvedPoBankName}, ${resolvedPoAccountNumber}, a.n. ${resolvedPoAccountName ?? activeTicketPo?.vendorName ?? firstRelatedPo?.vendorName ?? ""}`
                   : ticket.transferDestination ?? null,
             vendorBankName:
-              ticket.purchaseOrders[0]?.paymentBankName ??
-              firstRelatedPo?.paymentBankName ??
+              resolvedPoBankName ??
               ticket.bankName ??
               ticket.requester.bankName,
             vendorAccountNumber:
-              ticket.purchaseOrders[0]?.paymentAccountNumber ??
-              firstRelatedPo?.paymentAccountNumber ??
+              resolvedPoAccountNumber ??
               ticket.accountNumber ??
               ticket.requester.bankAccountNumber,
             vendorAccountName:
-              ticket.purchaseOrders[0]?.paymentAccountName ??
-              firstRelatedPo?.paymentAccountName ??
+              resolvedPoAccountName ??
               ticket.recipientName ??
               ticket.requester.bankAccountName ??
               ticket.requester.name,
+            vendorBankAccounts: ticketPoBankDetails?.vendorBankAccounts ?? [],
             projectName: ticket.project
               ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
               : null,

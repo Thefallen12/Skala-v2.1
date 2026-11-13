@@ -24,7 +24,9 @@ import FinanceDashboard, {
 } from "@/app/components/apps/finance/FinanceDashboard";
 import PaymentModal, {
   type PaymentModalTarget,
+  type PaymentVendorBankOption,
 } from "@/app/components/apps/finance/PaymentModal";
+import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
 import FinancePaymentProofReplacement from "@/app/components/apps/finance/FinancePaymentProofReplacement";
@@ -116,6 +118,46 @@ import {
   Wallet,
 } from "lucide-react";
 
+const CASH_DIRECT_PURCHASE_DESTINATION = "Pembayaran tunai pembelian langsung";
+
+function formatVendorTransferDestination(details: {
+  bankName: string | null | undefined;
+  accountNumber: string | null | undefined;
+  accountName: string | null | undefined;
+  fallbackOwner?: string | null;
+}): string {
+  const bankName = details.bankName?.trim();
+  const accountNumber = details.accountNumber?.trim();
+  if (!bankName || !accountNumber) return "";
+  const holder = details.accountName?.trim() || details.fallbackOwner?.trim();
+  return holder
+    ? `Ditransfer ke: ${bankName}, ${accountNumber}, a.n. ${holder}`
+    : `Ditransfer ke: ${bankName}, ${accountNumber}`;
+}
+
+function toPaymentVendorBankOptions(
+  accounts: VendorBankAccountOption[] | undefined,
+  fallbackOwner?: string | null,
+): PaymentVendorBankOption[] {
+  return (accounts ?? []).flatMap((account) => {
+    const destination = formatVendorTransferDestination({
+      bankName: account.bankName,
+      accountNumber: account.bankAccount,
+      accountName: account.bankHolder,
+      fallbackOwner,
+    });
+    if (!destination) return [];
+    return [
+      {
+        id: account.id,
+        label: `${account.label ? `${account.label} · ` : ""}${account.bankName} · ${account.bankAccount}${account.bankHolder ? ` (a.n. ${account.bankHolder})` : ""}`,
+        destination,
+        isPrimary: account.isPrimary,
+      },
+    ];
+  });
+}
+
 type FinanceOrder = {
   id: string;
   publicCode: string;
@@ -133,6 +175,7 @@ type FinanceOrder = {
   paymentBankName: string | null;
   paymentAccountNumber: string | null;
   paymentAccountName: string | null;
+  vendorBankAccounts?: VendorBankAccountOption[];
   paymentTerms: string | null;
   includeTax: boolean;
   items: {
@@ -178,6 +221,7 @@ type FinanceTicket = {
   vendorBankName: string | null;
   vendorAccountNumber: string | null;
   vendorAccountName: string | null;
+  vendorBankAccounts?: VendorBankAccountOption[];
   projectName: string | null;
   paymentTransactions: PaymentTransaction[];
 };
@@ -191,6 +235,7 @@ type FinanceDirectPurchase = {
   paymentBankName: string | null;
   paymentAccountNumber: string | null;
   paymentAccountName: string | null;
+  vendorBankAccounts?: VendorBankAccountOption[];
   vendorInvoiceUrl: string | null;
   createdAt: string;
   items: {
@@ -506,6 +551,9 @@ export default function FinanceHub({
   >({});
   const [directPurchasePaymentMethods, setDirectPurchasePaymentMethods] =
     useState<Record<string, POPaymentMethod>>({});
+  const [directPurchaseDestinations, setDirectPurchaseDestinations] = useState<
+    Record<string, string>
+  >({});
   const [isPending, startTransition] = useTransition();
   const activeOrder =
     selection?.kind === "po"
@@ -572,6 +620,18 @@ export default function FinanceHub({
       const needsInvoice =
         (ticket.type === TicketType.MATERIAL || Boolean(ticket.hasApprovedPo)) &&
         !ticket.purchaseReceiptUrl;
+      const ticketVendorAccounts = toPaymentVendorBankOptions(
+        ticket.vendorBankAccounts,
+        ticket.vendorAccountName ?? ticket.recipientName ?? ticket.requesterName,
+      );
+      const ticketVendorBankDestination =
+        formatVendorTransferDestination({
+          bankName: ticket.vendorBankName,
+          accountNumber: ticket.vendorAccountNumber,
+          accountName: ticket.vendorAccountName,
+        }) ||
+        ticketVendorAccounts[0]?.destination ||
+        "";
       return {
         id: ticket.id,
         kind: "ticket" as const,
@@ -583,10 +643,9 @@ export default function FinanceHub({
         paidAmount: paidTicketAmount,
         isFirstPayment: ticket.paymentTransactions.length === 0,
         transferDestination:
-          ticket.transferDestination ??
-          (ticket.vendorBankName && ticket.vendorAccountNumber
-            ? `Ditransfer ke: ${ticket.vendorBankName}, ${ticket.vendorAccountNumber}, a.n. ${ticket.vendorAccountName ?? ""}`
-            : ""),
+          ticket.transferDestination ?? ticketVendorBankDestination,
+        vendorBankDestination: ticketVendorBankDestination,
+        vendorBankAccounts: ticketVendorAccounts,
         isInternalFunding: internalFundingCategories.some(
           (category) => category === ticket.requestCategory,
         ),
@@ -598,52 +657,81 @@ export default function FinanceHub({
           paidTicketAmount === 0,
       };
     }),
-    ...standalonePayments.map((order) => ({
-      id: order.publicCode,
-      kind: "standalone-po" as const,
-      reference: order.poNumber,
-      title: `Pembelian PO · ${order.vendorName}`,
-      grandTotal:
-        order.invoiceGrandTotal ??
-        Math.round(
-          order.items.reduce((total, item) => total + item.totalPrice, 0) *
-            (order.includeTax ? 1.11 : 1) *
-            100,
-        ) / 100,
-      paidAmount: (order.paymentTransactions ?? []).reduce(
-        (total, payment) => total + payment.amount,
-        0,
-      ),
-      isFirstPayment: (order.paymentTransactions ?? []).length === 0,
-      transferDestination:
-        order.paymentBankName && order.paymentAccountNumber
-          ? `Ditransfer ke: ${order.paymentBankName}, ${order.paymentAccountNumber}, a.n. ${order.paymentAccountName ?? order.vendorName}`
-          : "",
-      hasInvoice: Boolean(order.vendorInvoiceUrl),
-      needsNominalInput: false,
-    })),
-    ...directPurchases.map((purchase) => ({
-      id: purchase.id,
-      kind: "direct-purchase" as const,
-      reference: purchase.purchaseNumber,
-      title: `Pembelian Langsung · ${purchase.vendorName}`,
-      grandTotal: Number(purchase.totalAmount),
-      paidAmount: purchase.paymentTransactions.reduce(
-        (total, payment) => total + payment.amount,
-        0,
-      ),
-      isFirstPayment: purchase.paymentTransactions.length === 0,
-      defaultPaymentMethod: purchase.paymentMethod,
-      allowPaymentMethodSelection: true,
-      transferDestination:
-        purchase.paymentBankName && purchase.paymentAccountNumber
-          ? `Ditransfer ke: ${purchase.paymentBankName}, ${purchase.paymentAccountNumber}, a.n. ${purchase.paymentAccountName ?? purchase.vendorName}`
-          : purchase.paymentMethod === POPaymentMethod.CASH
-            ? "Pembayaran tunai pembelian langsung"
+    ...standalonePayments.map((order) => {
+      const orderVendorAccounts = toPaymentVendorBankOptions(
+        order.vendorBankAccounts,
+        order.vendorName,
+      );
+      const orderVendorBankDestination =
+        formatVendorTransferDestination({
+          bankName: order.paymentBankName,
+          accountNumber: order.paymentAccountNumber,
+          accountName: order.paymentAccountName,
+          fallbackOwner: order.vendorName,
+        }) ||
+        orderVendorAccounts[0]?.destination ||
+        "";
+      return {
+        id: order.publicCode,
+        kind: "standalone-po" as const,
+        reference: order.poNumber,
+        title: `Pembelian PO · ${order.vendorName}`,
+        grandTotal:
+          order.invoiceGrandTotal ??
+          Math.round(
+            order.items.reduce((total, item) => total + item.totalPrice, 0) *
+              (order.includeTax ? 1.11 : 1) *
+              100,
+          ) / 100,
+        paidAmount: (order.paymentTransactions ?? []).reduce(
+          (total, payment) => total + payment.amount,
+          0,
+        ),
+        isFirstPayment: (order.paymentTransactions ?? []).length === 0,
+        transferDestination: orderVendorBankDestination,
+        vendorBankDestination: orderVendorBankDestination,
+        vendorBankAccounts: orderVendorAccounts,
+        hasInvoice: Boolean(order.vendorInvoiceUrl),
+        needsNominalInput: false,
+      };
+    }),
+    ...directPurchases.map((purchase) => {
+      const purchaseVendorAccounts = toPaymentVendorBankOptions(
+        purchase.vendorBankAccounts,
+        purchase.vendorName,
+      );
+      const purchaseVendorBankDestination =
+        formatVendorTransferDestination({
+          bankName: purchase.paymentBankName,
+          accountNumber: purchase.paymentAccountNumber,
+          accountName: purchase.paymentAccountName,
+          fallbackOwner: purchase.vendorName,
+        }) ||
+        purchaseVendorAccounts[0]?.destination ||
+        "";
+      return {
+        id: purchase.id,
+        kind: "direct-purchase" as const,
+        reference: purchase.purchaseNumber,
+        title: `Pembelian Langsung · ${purchase.vendorName}`,
+        grandTotal: Number(purchase.totalAmount),
+        paidAmount: purchase.paymentTransactions.reduce(
+          (total, payment) => total + payment.amount,
+          0,
+        ),
+        isFirstPayment: purchase.paymentTransactions.length === 0,
+        defaultPaymentMethod: purchase.paymentMethod,
+        allowPaymentMethodSelection: true,
+        transferDestination:
+          purchase.paymentMethod === POPaymentMethod.TRANSFER
+            ? purchaseVendorBankDestination
             : "",
-      hasInvoice: Boolean(purchase.vendorInvoiceUrl),
-      needsNominalInput: false,
-    })),
+        vendorBankDestination: purchaseVendorBankDestination,
+        vendorBankAccounts: purchaseVendorAccounts,
+        hasInvoice: Boolean(purchase.vendorInvoiceUrl),
+        needsNominalInput: false,
+      };
+    }),
   ].filter(
     (row) =>
       (Number.isFinite(row.grandTotal) && row.grandTotal > 0) ||
@@ -2847,10 +2935,12 @@ export default function FinanceHub({
                     id="standalone-po-transfer-destination"
                     name="transferDestination"
                     defaultValue={
-                      activeStandaloneOrder.paymentBankName &&
-                      activeStandaloneOrder.paymentAccountNumber
-                        ? `Ditransfer ke: ${activeStandaloneOrder.paymentBankName} & ${activeStandaloneOrder.paymentAccountNumber}`
-                        : "Pembayaran cash untuk restock gudang"
+                      formatVendorTransferDestination({
+                        bankName: activeStandaloneOrder.paymentBankName,
+                        accountNumber: activeStandaloneOrder.paymentAccountNumber,
+                        accountName: activeStandaloneOrder.paymentAccountName,
+                        fallbackOwner: activeStandaloneOrder.vendorName,
+                      }) || "Pembayaran cash untuk restock gudang"
                     }
                     maxLength={300}
                     required
@@ -3032,62 +3122,180 @@ export default function FinanceHub({
                         />
                       </div>
                     </section>
-                    <div className="space-y-2">
-                      <Label htmlFor="direct-purchase-payment-method">
-                        Metode Pembayaran
-                      </Label>
-                      <select
-                        key={`${activeDirectPurchase.id}:method`}
-                        id="direct-purchase-payment-method"
-                        name="paymentMethod"
-                        value={
-                          directPurchasePaymentMethods[
-                            activeDirectPurchase.id
-                          ] ?? activeDirectPurchase.paymentMethod
-                        }
-                        onChange={(event) =>
-                          setDirectPurchasePaymentMethods((current) => ({
-                            ...current,
-                            [activeDirectPurchase.id]:
-                              event.target.value === POPaymentMethod.CASH
-                                ? POPaymentMethod.CASH
-                                : POPaymentMethod.TRANSFER,
-                          }))
-                        }
-                        disabled={isPending}
-                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                      >
-                        <option value={POPaymentMethod.TRANSFER}>Transfer</option>
-                        <option value={POPaymentMethod.CASH}>Cash / Tunai</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="direct-purchase-transfer-destination">
-                        Tujuan Transfer / Keterangan Pembayaran
-                      </Label>
-                      <Input
-                        key={activeDirectPurchase.id}
-                        id="direct-purchase-transfer-destination"
-                        name="transferDestination"
-                        defaultValue={
-                          activeDirectPurchase.paymentBankName &&
-                          activeDirectPurchase.paymentAccountNumber
-                            ? `Ditransfer ke: ${activeDirectPurchase.paymentBankName}, ${activeDirectPurchase.paymentAccountNumber}, a.n. ${activeDirectPurchase.paymentAccountName ?? activeDirectPurchase.vendorName}`
-                            : activeDirectPurchase.paymentMethod === POPaymentMethod.CASH
-                              ? "Pembayaran tunai pembelian langsung"
-                              : ""
-                        }
-                        placeholder="Bank, nomor rekening, a.n. penerima (atau keterangan tunai)"
-                        maxLength={300}
-                        required={
-                          (directPurchasePaymentMethods[
-                            activeDirectPurchase.id
-                          ] ?? activeDirectPurchase.paymentMethod) ===
-                          POPaymentMethod.TRANSFER
-                        }
-                        disabled={isPending}
-                      />
-                    </div>
+                    {(() => {
+                      const activeDirectMethod =
+                        directPurchasePaymentMethods[
+                          activeDirectPurchase.id
+                        ] ?? activeDirectPurchase.paymentMethod;
+                      const activeDirectVendorAccounts =
+                        toPaymentVendorBankOptions(
+                          activeDirectPurchase.vendorBankAccounts,
+                          activeDirectPurchase.vendorName,
+                        );
+                      const activeDirectVendorDestination =
+                        formatVendorTransferDestination({
+                          bankName: activeDirectPurchase.paymentBankName,
+                          accountNumber:
+                            activeDirectPurchase.paymentAccountNumber,
+                          accountName: activeDirectPurchase.paymentAccountName,
+                          fallbackOwner: activeDirectPurchase.vendorName,
+                        }) ||
+                        activeDirectVendorAccounts[0]?.destination ||
+                        "";
+                      const currentDestinationValue =
+                        directPurchaseDestinations[activeDirectPurchase.id] ??
+                        (activeDirectMethod === POPaymentMethod.TRANSFER
+                          ? activeDirectVendorDestination
+                          : CASH_DIRECT_PURCHASE_DESTINATION);
+
+                      return (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="direct-purchase-payment-method">
+                              Metode Pembayaran
+                            </Label>
+                            <select
+                              key={`${activeDirectPurchase.id}:method`}
+                              id="direct-purchase-payment-method"
+                              name="paymentMethod"
+                              value={activeDirectMethod}
+                              onChange={(event) => {
+                                const nextMethod =
+                                  event.target.value === POPaymentMethod.CASH
+                                    ? POPaymentMethod.CASH
+                                    : POPaymentMethod.TRANSFER;
+                                setDirectPurchasePaymentMethods((current) => ({
+                                  ...current,
+                                  [activeDirectPurchase.id]: nextMethod,
+                                }));
+                                setDirectPurchaseDestinations((current) => {
+                                  const existing = (
+                                    current[activeDirectPurchase.id] ??
+                                    currentDestinationValue
+                                  ).trim();
+                                  if (nextMethod === POPaymentMethod.TRANSFER) {
+                                    if (
+                                      !existing ||
+                                      existing ===
+                                        CASH_DIRECT_PURCHASE_DESTINATION
+                                    ) {
+                                      return {
+                                        ...current,
+                                        [activeDirectPurchase.id]:
+                                          activeDirectVendorDestination,
+                                      };
+                                    }
+                                    return current;
+                                  }
+                                  return {
+                                    ...current,
+                                    [activeDirectPurchase.id]:
+                                      !existing ||
+                                      existing === activeDirectVendorDestination
+                                        ? CASH_DIRECT_PURCHASE_DESTINATION
+                                        : existing,
+                                  };
+                                });
+                              }}
+                              disabled={isPending}
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                            >
+                              <option value={POPaymentMethod.TRANSFER}>
+                                Transfer
+                              </option>
+                              <option value={POPaymentMethod.CASH}>
+                                Cash / Tunai
+                              </option>
+                            </select>
+                          </div>
+                          {activeDirectMethod === POPaymentMethod.TRANSFER &&
+                            activeDirectVendorAccounts.length > 1 && (
+                              <div className="space-y-2">
+                                <Label htmlFor="direct-purchase-vendor-bank">
+                                  Pilih Rekening Vendor
+                                </Label>
+                                <select
+                                  id="direct-purchase-vendor-bank"
+                                  value={
+                                    activeDirectVendorAccounts.find(
+                                      (account) =>
+                                        account.destination ===
+                                        currentDestinationValue.trim(),
+                                    )?.id ?? ""
+                                  }
+                                  onChange={(event) => {
+                                    const picked =
+                                      activeDirectVendorAccounts.find(
+                                        (account) =>
+                                          account.id === event.target.value,
+                                      );
+                                    if (picked) {
+                                      setDirectPurchaseDestinations(
+                                        (current) => ({
+                                          ...current,
+                                          [activeDirectPurchase.id]:
+                                            picked.destination,
+                                        }),
+                                      );
+                                    }
+                                  }}
+                                  disabled={isPending}
+                                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                                >
+                                  <option value="">
+                                    Pilih rekening vendor terdaftar
+                                  </option>
+                                  {activeDirectVendorAccounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                      {account.label}
+                                      {account.isPrimary ? " (Utama)" : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          <div className="space-y-2">
+                            <Label htmlFor="direct-purchase-transfer-destination">
+                              {activeDirectMethod === POPaymentMethod.CASH
+                                ? "Keterangan Pembayaran Tunai"
+                                : "Ditransfer Ke (Bank/Rekening/Atas Nama)"}
+                            </Label>
+                            <Input
+                              key={activeDirectPurchase.id}
+                              id="direct-purchase-transfer-destination"
+                              name="transferDestination"
+                              value={currentDestinationValue}
+                              onChange={(event) =>
+                                setDirectPurchaseDestinations((current) => ({
+                                  ...current,
+                                  [activeDirectPurchase.id]: event.target.value,
+                                }))
+                              }
+                              placeholder={
+                                activeDirectMethod === POPaymentMethod.CASH
+                                  ? "Keterangan pembayaran tunai"
+                                  : "Nama bank, nomor rekening, atas nama"
+                              }
+                              maxLength={300}
+                              required={
+                                activeDirectMethod === POPaymentMethod.TRANSFER
+                              }
+                              disabled={isPending}
+                            />
+                            {activeDirectMethod === POPaymentMethod.TRANSFER &&
+                              (activeDirectVendorDestination ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Otomatis diisi dari rekening vendor terdaftar.
+                                </p>
+                              ) : !currentDestinationValue.trim() ? (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                  Vendor belum memiliki nomor rekening terdaftar. Isi rekening tujuan di atas.
+                                </p>
+                              ) : null)}
+                          </div>
+                        </>
+                      );
+                    })()}
                     <FinanceAccountField
                       id="direct-purchase-finance-account"
                       accounts={financeAccounts}
@@ -3459,7 +3667,7 @@ export default function FinanceHub({
       <PaymentModal
         key={
           selectedPaymentRow
-            ? `${selectedPaymentRow.kind}:${selectedPaymentRow.id}:${selectedPaymentRow.grandTotal}:${selectedPaymentRow.paidAmount}:${selectedPaymentRow.isFirstPayment}`
+            ? `${selectedPaymentRow.kind}:${selectedPaymentRow.id}:${selectedPaymentRow.grandTotal}:${selectedPaymentRow.paidAmount}:${selectedPaymentRow.isFirstPayment}:${selectedPaymentRow.vendorBankDestination ?? ""}`
             : "closed"
         }
         open={paymentModalSelection !== null}
