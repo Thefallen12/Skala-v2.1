@@ -247,7 +247,9 @@ function resolveProjectRelation(projObj: any) {
     drawingDocuments: [],
     subkonContracts: [],
     bastDocuments: [],
-    tickets: store.tickets.filter((t) => t.projectId === projObj.id),
+    tickets: store.tickets
+      .filter((t) => t.projectId === projObj.id)
+      .map(resolveTicketRelation),
   };
 }
 
