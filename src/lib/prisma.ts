@@ -288,6 +288,7 @@ function createModelHandler(modelName: string) {
           createdBy: store.users.find((u) => u.id === "usr_admin"),
           paymentTransactions: [],
           invoices: [],
+          stockPurchases: [],
         }));
       } else if (modelName === "deliveryOrder") {
         list = store.deliveryOrders.map((doDoc) => ({

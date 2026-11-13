@@ -1005,9 +1005,9 @@ export default async function LogisticsPage({
           paidAt: order.paidAt?.toISOString() ?? null,
           ticketId: order.ticketId,
           vendorInvoiceUrl:
-            order.vendorInvoiceUrl ?? order.invoices[0]?.documentUrl ?? null,
-          invoiceId: order.invoices[0]?.id ?? null,
-          receivedAt: order.stockPurchases[0]?.createdAt.toISOString() ?? null,
+            order.vendorInvoiceUrl ?? order.invoices?.[0]?.documentUrl ?? null,
+          invoiceId: order.invoices?.[0]?.id ?? null,
+          receivedAt: order.stockPurchases?.[0]?.createdAt?.toISOString() ?? null,
           vendorPoSentAt: order.vendorPoSentAt?.toISOString() ?? null,
           includeTax: order.includeTax,
           paymentMethod: order.paymentMethod,
