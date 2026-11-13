@@ -161,6 +161,7 @@ class InMemoryStore {
   ];
   operationalDocuments: Array<{
     id: string;
+    ticketId?: string | null;
     documentNumber: string;
     kind: string;
     status: string;
@@ -263,6 +264,7 @@ function resolveTicketRelation(ticketObj: any) {
     moverAssignee: mover ? { name: mover.name } : null,
     items: ticketObj.items ?? [],
     auditLogs: [],
+    operationalDocuments: store.operationalDocuments.filter((d) => d.ticketId === ticketObj.id),
     purchaseOrders: store.purchaseOrders.filter((p) => p.ticketId === ticketObj.id),
     directStockPurchases: [],
     paymentTransactions: [],
