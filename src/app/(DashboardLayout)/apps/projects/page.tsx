@@ -510,7 +510,9 @@ export default async function ProjectsWorkstationPage({
         : "",
       isApproved: bast.isApproved,
     })),
-    wageTicketPayments: project.tickets.map((ticket) => ({
+    wageTicketPayments: project.tickets.map((ticket) => {
+      const paidLog = ticket.auditLogs?.[0];
+      return {
       id: ticket.id,
       ticketNumber: ticket.ticketNumber,
       title: ticket.title,
@@ -520,13 +522,14 @@ export default async function ProjectsWorkstationPage({
           ? decimalStringFromScaledInteger(ticket.totalAmount)
           : null,
       paid: ticket.transferReceiptUrl !== null,
-      paidAt: ticket.auditLogs[0]?.createdAt
-        ? typeof ticket.auditLogs[0].createdAt === "string"
-          ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
-          : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
+      paidAt: paidLog?.createdAt
+        ? typeof paidLog.createdAt === "string"
+          ? (paidLog.createdAt as string).slice(0, 10)
+          : paidLog.createdAt.toISOString().slice(0, 10)
         : null,
       requesterName: ticket.requester?.name ?? "Pemohon",
-    })),
+      };
+    }),
   }));
 
   return (

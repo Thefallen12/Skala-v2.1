@@ -504,10 +504,10 @@ export default async function ProjectDetailPage({
               ? decimalStringFromScaledInteger(ticket.totalAmount)
               : "0",
         paid: ticket.transferReceiptUrl !== null,
-        paidAt: ticket.auditLogs[0]?.createdAt
-          ? typeof ticket.auditLogs[0].createdAt === "string"
-            ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
-            : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
+        paidAt: ticket.auditLogs?.[0]?.createdAt
+          ? typeof ticket.auditLogs?.[0].createdAt === "string"
+            ? (ticket.auditLogs?.[0].createdAt as string).slice(0, 10)
+            : ticket.auditLogs?.[0].createdAt.toISOString().slice(0, 10)
           : null,
         requesterName: ticket.requester?.name ?? "Pemohon",
         items: ticket.items.map((it) => {
