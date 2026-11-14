@@ -88,6 +88,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import { compressFieldImageFiles } from "@/lib/image-compression-client";
 import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import {
@@ -1066,13 +1067,20 @@ export default function ProjectWorkstationMaster({
     if (!activeProject) return;
     const form = event.currentTarget;
     const data = new FormData(form);
-    const photos = data.getAll("photos").filter((value) => value instanceof File);
-    if (photos.length > 5 || photos.some((photo) => photo.size > 5 * 1024 * 1024)) {
-      setNotice("Maksimal 5 foto laporan dengan ukuran maksimal 5 MB per foto.");
+    const photos = data
+      .getAll("photos")
+      .filter((value): value is File => value instanceof File && value.size > 0);
+    if (photos.length > 5) {
+      setNotice("Maksimal 5 foto laporan.");
       return;
     }
     startTransition(async () => {
       try {
+        if (photos.length > 0) {
+          const compressedPhotos = await compressFieldImageFiles(photos);
+          data.delete("photos");
+          compressedPhotos.forEach((photo) => data.append("photos", photo));
+        }
         const result = await addProjectProgress(activeProject.id, data);
         setNotice(result.message);
         if (result.success) {
@@ -1081,7 +1089,11 @@ export default function ProjectWorkstationMaster({
         }
       } catch (error) {
         console.error("Saving project daily report failed:", error);
-        setNotice("Laporan gagal disimpan. Periksa data dan coba kembali.");
+        setNotice(
+          error instanceof Error && error.message
+            ? error.message
+            : "Laporan gagal disimpan. Periksa data dan coba kembali.",
+        );
       }
     });
   };
@@ -2130,6 +2142,18 @@ export default function ProjectWorkstationMaster({
           activeProject ? (
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
+                {isFieldTeam &&
+                  (activeProject.fieldPicId === currentUserId ||
+                    currentUserRole === UserRole.KOORDINATOR) && (
+                    <CreateTicketModal
+                      key={`equipment-request-${activeProject.id}`}
+                      projects={ticketProjectOptions}
+                      requesterRole={currentUserRole}
+                      defaultRequestCategory="EQUIPMENT_REQUEST"
+                      fixedProjectId={activeProject.id}
+                      triggerLabel="Ajukan Alat/Kendaraan"
+                    />
+                  )}
                 <Button
                   type="button"
                   variant="outline"
@@ -2723,6 +2747,7 @@ export default function ProjectWorkstationMaster({
                                     key={`wage-ticket-${point.id}`}
                                     projects={ticketProjectOptions}
                                     requesterRole={currentUserRole}
+                                    fixedProjectId={activeProject.id}
                                     triggerLabel="Ajukan pembayaran lewat tiket"
                                     initialWageRequest={{
                                       projectId: activeProject.id,
@@ -2928,8 +2953,8 @@ export default function ProjectWorkstationMaster({
                             Uraian pekerjaan harian
                             <Textarea name="workSummary" maxLength={2000} required />
                           </Label>
-                          <Label className="sm:col-span-2">Foto progres (maks. 5 foto, 5 MB/foto)
-                            <Input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple />
+                          <Label className="sm:col-span-2">Foto progres (maks. 5 foto, otomatis dikompresi)
+                            <Input name="photos" type="file" accept="image/*,.heic,.heif" multiple />
                           </Label>
                           <Button
                             type="submit"

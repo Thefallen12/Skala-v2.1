@@ -10,6 +10,8 @@ import {
   DODeliveryMethod,
   PaymentStatus,
   POStatus,
+  TicketFulfillmentStatus,
+  TicketPriority,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -31,6 +33,16 @@ import type {
   RentalStatus,
   RentalType,
 } from "@/app/actions/rentals";
+import { loadMaterialContractsBundle } from "@/lib/material-contracts-server";
+import { connectToMongoDB } from "@/lib/mongoose";
+import EquipmentTicket from "@/models/ticket";
+import TicketAuditLog from "@/models/ticket-audit-log";
+import User from "@/models/user";
+import Project from "@/models/project";
+import {
+  EQUIPMENT_REQUEST_TYPE,
+  EQUIPMENT_TIME_UNITS,
+} from "@/lib/equipment-request";
 
 export const metadata: Metadata = {
   title: "Logistik Lapangan",
@@ -815,6 +827,9 @@ export default async function LogisticsPage({
   ]);
 
   const stockPriceLookup = createStockPriceLookup(stockItems);
+  const materialContractsBundle = await loadMaterialContractsBundle({
+    includeInvoices: false,
+  });
 
   const ticketRows: TicketRow[] = tickets.map((ticket) => ({
     id: ticket.id,
@@ -904,6 +919,171 @@ export default async function LogisticsPage({
       createdAt: deliveryOrder.createdAt.toISOString(),
     })),
   }));
+
+  if (session.user.role === UserRole.LOGISTICS) {
+    await connectToMongoDB();
+    const equipmentTickets = await EquipmentTicket.find({
+      ticketType: EQUIPMENT_REQUEST_TYPE,
+      status: TicketStatus.PROCESSED_LOGISTIC,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+    const equipmentTicketIds = equipmentTickets.map((ticket) =>
+      String(ticket._id),
+    );
+    if (equipmentTicketIds.length > 0) {
+      const requesterIds = [
+        ...new Set(equipmentTickets.map((ticket) => ticket.requesterId)),
+      ];
+      const projectIds = [
+        ...new Set(
+          equipmentTickets
+            .map((ticket) => ticket.projectId)
+            .filter((projectId): projectId is string => Boolean(projectId)),
+        ),
+      ];
+      const equipmentAuditLogs = await TicketAuditLog.find({
+        ticketId: { $in: equipmentTicketIds },
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+      const userIds = [
+        ...new Set([
+          ...requesterIds,
+          ...equipmentAuditLogs.map((audit) => audit.userId),
+        ]),
+      ];
+      const [equipmentUsers, equipmentProjects] = await Promise.all([
+        User.find({ _id: { $in: userIds } })
+          .select({ _id: 1, name: 1 })
+          .lean(),
+        Project.find({ _id: { $in: projectIds } })
+          .select({ _id: 1, title: 1, kelompokTani: 1 })
+          .lean(),
+      ]);
+      const usersById = new Map(
+        equipmentUsers.map((user) => [String(user._id), user]),
+      );
+      const projectsById = new Map(
+        equipmentProjects.map((project) => [String(project._id), project]),
+      );
+      const auditLogsByTicketId = new Map<
+        string,
+        (typeof equipmentAuditLogs)[number][]
+      >();
+      for (const audit of equipmentAuditLogs) {
+        const logs = auditLogsByTicketId.get(audit.ticketId) ?? [];
+        logs.push(audit);
+        auditLogsByTicketId.set(audit.ticketId, logs);
+      }
+
+      ticketRows.push(
+        ...equipmentTickets.map((ticket): TicketRow => {
+          const ticketId = String(ticket._id);
+          const requester = usersById.get(String(ticket.requesterId));
+          if (!requester || typeof requester.name !== "string") {
+            throw new Error(
+              `Pemohon tiket alat ${ticket.ticketNumber} tidak ditemukan.`,
+            );
+          }
+          const priority = Object.values(TicketPriority).find(
+            (value) => value === ticket.priority,
+          );
+          if (!priority) {
+            throw new Error(
+              `Prioritas tiket alat ${ticket.ticketNumber} tidak valid.`,
+            );
+          }
+          const equipmentDetails = ticket.equipmentDetails;
+          if (
+            equipmentDetails &&
+            !EQUIPMENT_TIME_UNITS.includes(equipmentDetails.timeUnit)
+          ) {
+            throw new Error(
+              `Satuan waktu tiket alat ${ticket.ticketNumber} tidak valid.`,
+            );
+          }
+          const project = ticket.projectId
+            ? projectsById.get(String(ticket.projectId))
+            : null;
+          const auditLogs = auditLogsByTicketId.get(ticketId) ?? [];
+          return {
+            id: ticketId,
+            ticketNumber: ticket.ticketNumber,
+            title: ticket.title,
+            description: ticket.description ?? null,
+            type: TicketType.OPERATIONAL,
+            ticketType: EQUIPMENT_REQUEST_TYPE,
+            equipmentDetails: equipmentDetails
+              ? {
+                  equipmentName: equipmentDetails.equipmentName ?? null,
+                  startDate:
+                    equipmentDetails.startDate?.toISOString().slice(0, 10) ??
+                    null,
+                  duration: equipmentDetails.duration ?? null,
+                  timeUnit: equipmentDetails.timeUnit,
+                  fulfillmentSource:
+                    equipmentDetails.fulfillmentSource ?? null,
+                  vendorName: equipmentDetails.vendorName ?? null,
+                  quotedCost: equipmentDetails.quotedCost ?? null,
+                  processedAt:
+                    equipmentDetails.processedAt?.toISOString() ?? null,
+                }
+              : null,
+            requestCategory: TicketRequestCategory.OPS,
+            fieldCategory: null,
+            requestPaymentMethod: null,
+            requestPaymentDescription:
+              ticket.requestPaymentDescription ?? null,
+            transferDestination: ticket.transferDestination ?? null,
+            priority,
+            status: TicketStatus.PROCESSED_LOGISTIC,
+            fulfillmentStatus: TicketFulfillmentStatus.PENDING,
+            canSubmit: false,
+            canRequesterEdit: false,
+            totalAmount:
+              ticket.totalAmount?.toString() ??
+              ticket.requestedAmount?.toString() ??
+              null,
+            paymentTransactions: [],
+            attachmentUrl: ticket.attachmentUrl ?? null,
+            receiptUrls: ticket.receiptUrls ?? [],
+            paymentProofUrl: ticket.paymentProofUrl ?? null,
+            purchaseReceiptUrl: ticket.purchaseReceiptUrl ?? null,
+            transferReceiptUrl: ticket.transferReceiptUrl ?? null,
+            deliveryReceiptUrl: ticket.deliveryReceiptUrl ?? null,
+            recipientName: ticket.recipientName ?? null,
+            bankName: ticket.bankName ?? null,
+            accountNumber: ticket.accountNumber ?? null,
+            createdAt: ticket.createdAt.toISOString(),
+            requester: { name: requester.name },
+            project: project
+              ? {
+                  title: project.title,
+                  kelompokTani: project.kelompokTani,
+                }
+              : null,
+            items: [],
+            auditLogs: auditLogs.map((audit) => {
+              const user = usersById.get(String(audit.userId));
+              if (!user || typeof user.name !== "string") {
+                throw new Error(
+                  `Pengguna audit tiket ${ticket.ticketNumber} tidak ditemukan.`,
+                );
+              }
+              return {
+                id: String(audit._id),
+                action: audit.action,
+                notes: audit.notes ?? null,
+                createdAt: audit.createdAt.toISOString(),
+                user: { name: user.name },
+              };
+            }),
+          };
+        }),
+      );
+    }
+  }
 
   return (
     <>
@@ -1115,6 +1295,8 @@ export default async function LogisticsPage({
           paymentAccountName: r.paymentAccountName,
           financeNotes: r.financeNotes,
         }))}
+        materialContracts={materialContractsBundle.contracts}
+        materialDeliveries={materialContractsBundle.deliveries}
       />
     </>
   );

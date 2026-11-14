@@ -2,11 +2,28 @@ import TicketsApp from "@/app/components/apps/tickets";
 import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
 import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import type { Metadata } from "next";
-import { PaymentStatus, UserRole } from "@prisma/client";
+import {
+  PaymentStatus,
+  TicketFulfillmentStatus,
+  TicketPriority,
+  TicketRequestCategory,
+  TicketStatus,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import { connectToMongoDB } from "@/lib/mongoose";
+import EquipmentTicket from "@/models/ticket";
+import TicketAuditLog from "@/models/ticket-audit-log";
+import User from "@/models/user";
+import Project from "@/models/project";
+import {
+  EQUIPMENT_TIME_UNITS,
+  EQUIPMENT_REQUEST_TYPE,
+} from "@/lib/equipment-request";
 import {
   createStockPriceLookup,
   resolveTicketTotalAmount,
@@ -26,6 +43,69 @@ const BCrumb = [
     title: "Tiket & Permintaan",
   },
 ];
+
+function getEquipmentTicketVisibilityFilter(role: UserRole, userId: string) {
+  const requester = { requesterId: userId };
+  switch (role) {
+    case UserRole.DIRECTOR:
+    case UserRole.DEPUTY_DIRECTOR:
+      return { $or: [{ status: { $ne: TicketStatus.DRAFT } }, requester] };
+    case UserRole.KOORDINATOR:
+      return {
+        $or: [{ status: TicketStatus.PENDING_DIRECTOR }, requester],
+      };
+    case UserRole.FINANCE:
+      return {
+        $or: [
+          {
+            status: {
+              $in: [
+                TicketStatus.WAITING_FINANCE_PAYMENT,
+                TicketStatus.PROCESSED_FINANCE,
+                TicketStatus.PROCESSED_LOGISTIC,
+                TicketStatus.COMPLETED,
+              ],
+            },
+          },
+          requester,
+        ],
+      };
+    case UserRole.LOGISTICS:
+      return {
+        $or: [
+          {
+            status: {
+              $in: [
+                "PENDING_LOGISTIK",
+                TicketStatus.PROCESSED_LOGISTIC,
+                TicketStatus.PROCESSED_FINANCE,
+                TicketStatus.ASSIGNED_TO_MOVER,
+                TicketStatus.IN_TRANSIT,
+              ],
+            },
+          },
+          requester,
+        ],
+      };
+    case UserRole.ADMINISTRATIONS:
+      return {};
+    default:
+      return requester;
+  }
+}
+
+function requireTicketEnumValue<T extends string>(
+  values: readonly T[],
+  value: string,
+  fieldName: string,
+): T {
+  const match = values.find((candidate) => candidate === value);
+  if (!match) {
+    throw new Error(`Tiket alat memiliki nilai ${fieldName} yang tidak valid.`);
+  }
+  return match;
+}
+
 const Tickets = async ({
   searchParams,
 }: {
@@ -245,6 +325,82 @@ const Tickets = async ({
     Promise.resolve([]),
   ]);
 
+  await connectToMongoDB();
+  const equipmentTickets = await EquipmentTicket.find({
+    ticketType: EQUIPMENT_REQUEST_TYPE,
+    ...getEquipmentTicketVisibilityFilter(session.user.role, session.user.id),
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+  const equipmentTicketIds = equipmentTickets.map((ticket) =>
+    String(ticket._id),
+  );
+  const [equipmentRequesters, equipmentProjects, equipmentAuditLogs] =
+    equipmentTicketIds.length > 0
+      ? await Promise.all([
+          User.find({
+            _id: {
+              $in: [
+                ...new Set(equipmentTickets.map((ticket) => ticket.requesterId)),
+              ],
+            },
+          })
+            .select({
+              _id: 1,
+              name: 1,
+              bankName: 1,
+              bankAccountName: 1,
+              bankAccountNumber: 1,
+            })
+            .lean(),
+          Project.find({
+            _id: {
+              $in: [
+                ...new Set(
+                  equipmentTickets
+                    .map((ticket) => ticket.projectId)
+                    .filter((projectId): projectId is string =>
+                      Boolean(projectId),
+                    ),
+                ),
+              ],
+            },
+          })
+            .select({ _id: 1, title: 1, kelompokTani: 1 })
+            .lean(),
+          TicketAuditLog.find({ ticketId: { $in: equipmentTicketIds } })
+            .sort({ createdAt: -1 })
+            .lean(),
+        ])
+      : [[], [], []];
+  const auditUserIds = [
+    ...new Set(equipmentAuditLogs.map((audit) => audit.userId)),
+  ];
+  const auditUsers =
+    auditUserIds.length > 0
+      ? await User.find({ _id: { $in: auditUserIds } })
+          .select({ _id: 1, name: 1 })
+          .lean()
+      : [];
+  const requestersById = new Map(
+    equipmentRequesters.map((requester) => [String(requester._id), requester]),
+  );
+  const projectsById = new Map(
+    equipmentProjects.map((project) => [String(project._id), project]),
+  );
+  const auditUsersById = new Map(
+    auditUsers.map((user) => [String(user._id), user]),
+  );
+  const auditLogsByTicketId = new Map<
+    string,
+    (typeof equipmentAuditLogs)[number][]
+  >();
+  for (const audit of equipmentAuditLogs) {
+    const logs = auditLogsByTicketId.get(audit.ticketId) ?? [];
+    logs.push(audit);
+    auditLogsByTicketId.set(audit.ticketId, logs);
+  }
+
   const canViewPaymentDetails =
     session.user.role === UserRole.FINANCE ||
     session.user.role === UserRole.DIRECTOR ||
@@ -253,12 +409,140 @@ const Tickets = async ({
     canViewPaymentDetails || requesterId === session.user.id;
   const stockPriceLookup = createStockPriceLookup(stockItems);
 
-  const ticketRows: TicketRow[] = tickets.map((ticket) => ({
+  const equipmentTicketRows: TicketRow[] = equipmentTickets.map((ticket) => {
+    const ticketId = String(ticket._id);
+    const requesterId = String(ticket.requesterId);
+    const requester = requestersById.get(requesterId);
+    if (!requester || typeof requester.name !== "string") {
+      throw new Error(`Pemohon tiket alat ${ticket.ticketNumber} tidak ditemukan.`);
+    }
+    const project = ticket.projectId
+      ? projectsById.get(String(ticket.projectId))
+      : null;
+    const auditLogs = auditLogsByTicketId.get(ticketId) ?? [];
+    const ticketPriority = requireTicketEnumValue(
+      Object.values(TicketPriority),
+      ticket.priority,
+      "prioritas",
+    );
+    const ticketStatus =
+      ticket.status === "PENDING_LOGISTIK"
+        ? "PENDING_LOGISTIK"
+        : requireTicketEnumValue(
+            Object.values(TicketStatus),
+            ticket.status,
+            "status",
+          );
+    const ticketFulfillmentStatus = requireTicketEnumValue(
+      Object.values(TicketFulfillmentStatus),
+      ticket.fulfillmentStatus,
+      "status pemenuhan",
+    );
+    const canViewPaymentDetails =
+      session.user.role === UserRole.FINANCE ||
+      session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.ADMINISTRATIONS ||
+      requesterId === session.user.id;
+
+    return {
+      id: ticketId,
+      ticketNumber: ticket.ticketNumber,
+      title: ticket.title,
+      description: ticket.description ?? null,
+      type: TicketType.OPERATIONAL,
+      ticketType: EQUIPMENT_REQUEST_TYPE,
+      equipmentDetails: ticket.equipmentDetails
+        ? {
+            equipmentName: ticket.equipmentDetails.equipmentName ?? null,
+            startDate:
+              ticket.equipmentDetails.startDate?.toISOString().slice(0, 10) ??
+              null,
+            duration: ticket.equipmentDetails.duration ?? null,
+            timeUnit: requireTicketEnumValue(
+              EQUIPMENT_TIME_UNITS,
+              ticket.equipmentDetails.timeUnit,
+              "satuan waktu",
+            ),
+            fulfillmentSource:
+              ticket.equipmentDetails.fulfillmentSource ?? null,
+            vendorName: ticket.equipmentDetails.vendorName ?? null,
+            quotedCost: ticket.equipmentDetails.quotedCost ?? null,
+            processedAt:
+              ticket.equipmentDetails.processedAt?.toISOString() ?? null,
+          }
+        : null,
+      requestCategory: TicketRequestCategory.OPS,
+      fieldCategory: null,
+      requestPaymentMethod: null,
+      requestPaymentDescription: ticket.requestPaymentDescription ?? null,
+      transferDestination: ticket.transferDestination ?? null,
+      priority: ticketPriority,
+      status: ticketStatus,
+      fulfillmentStatus: ticketFulfillmentStatus,
+      canSubmit: requesterId === session.user.id,
+      canRequesterEdit: !auditLogs.some(
+        (audit) =>
+          audit.userId === requesterId &&
+          (audit.action === "UPDATED" || audit.action === "REQUESTER_EDITED"),
+      ),
+      totalAmount:
+        ticket.totalAmount === null || ticket.totalAmount === undefined
+          ? ticket.requestedAmount?.toString() ?? null
+          : ticket.totalAmount.toString(),
+      paymentTransactions: [],
+      attachmentUrl: ticket.attachmentUrl ?? null,
+      receiptUrls: ticket.receiptUrls ?? [],
+      paymentProofUrl: ticket.paymentProofUrl ?? null,
+      purchaseReceiptUrl: ticket.purchaseReceiptUrl ?? null,
+      transferReceiptUrl: ticket.transferReceiptUrl ?? null,
+      deliveryReceiptUrl: ticket.deliveryReceiptUrl ?? null,
+      recipientName: canViewPaymentDetails
+        ? ticket.recipientName ?? requester.bankAccountName ?? null
+        : null,
+      bankName: canViewPaymentDetails
+        ? ticket.bankName ?? requester.bankName ?? null
+        : null,
+      accountNumber: canViewPaymentDetails
+        ? ticket.accountNumber ?? requester.bankAccountNumber ?? null
+        : null,
+      createdAt: ticket.createdAt.toISOString(),
+      requester: { name: requester.name },
+      project: project
+        ? {
+            title: project.title,
+            kelompokTani: project.kelompokTani,
+          }
+        : null,
+      items: [],
+      auditLogs: auditLogs.map((audit) => {
+        const user = auditUsersById.get(String(audit.userId));
+        if (!user || typeof user.name !== "string") {
+          throw new Error(`Pengguna audit tiket ${ticket.ticketNumber} tidak ditemukan.`);
+        }
+        return {
+          id: String(audit._id),
+          action: audit.action,
+          notes: audit.notes ?? null,
+          createdAt: audit.createdAt.toISOString(),
+          user: { name: user.name },
+        };
+      }),
+      purchaseOrders: [],
+      directStockPurchases: [],
+      deliveryOrders: [],
+    };
+  });
+  const equipmentTicketIdSet = new Set(equipmentTicketIds);
+  const legacyTicketRows: TicketRow[] = tickets
+    .filter((ticket) => !equipmentTicketIdSet.has(ticket.id))
+    .map((ticket) => ({
     id: ticket.id,
     ticketNumber: ticket.ticketNumber,
     title: ticket.title,
     description: ticket.description,
     type: ticket.type,
+    ticketType: null,
+    equipmentDetails: null,
     requestCategory: ticket.requestCategory,
     fieldCategory: ticket.fieldCategory,
     requestPaymentMethod: ticket.requestPaymentMethod,
@@ -319,10 +603,10 @@ const Tickets = async ({
       paidAt: purchaseOrder.paidAt?.toISOString() ?? null,
       vendorInvoiceUrl:
         purchaseOrder.vendorInvoiceUrl ??
-        purchaseOrder.invoices[0]?.documentUrl ??
+        purchaseOrder.invoices?.[0]?.documentUrl ??
         null,
       vendorPoSentAt: purchaseOrder.vendorPoSentAt?.toISOString() ?? null,
-      invoiceId: purchaseOrder.invoices[0]?.id ?? null,
+      invoiceId: purchaseOrder.invoices?.[0]?.id ?? null,
       includeTax: purchaseOrder.includeTax,
       items: purchaseOrder.items.map((item) => ({
         itemCode: item.itemCode,
@@ -382,7 +666,11 @@ const Tickets = async ({
       ...deliveryOrder,
       createdAt: deliveryOrder.createdAt.toISOString(),
     })),
-  }));
+    }));
+  const ticketRows = [...equipmentTicketRows, ...legacyTicketRows].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  );
 
   return (
     <>

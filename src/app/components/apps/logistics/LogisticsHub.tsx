@@ -25,7 +25,12 @@ import PurchaseOrderInvoiceUpload from "@/app/components/apps/logistics/Purchase
 import VehicleFleetPanel from "@/app/components/apps/logistics/VehicleFleetPanel";
 import VehicleOperationsPanel from "@/app/components/apps/logistics/VehicleOperationsPanel";
 import EquipmentVehicleRentalPanel from "@/app/components/apps/logistics/EquipmentVehicleRentalPanel";
+import MaterialContractsPanel from "@/app/components/apps/logistics/MaterialContractsPanel";
 import type { RentalItemRow } from "@/app/actions/rentals";
+import type {
+  MaterialContractRow,
+  MaterialDeliveryRow,
+} from "@/lib/material-contracts";
 import { VendorFormDialog } from "@/app/components/forms/VendorFormDialog";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
@@ -83,6 +88,7 @@ import {
   FilePenLine,
   FileText,
   Fuel,
+  Layers,
   Pencil,
   Send,
   Store,
@@ -223,6 +229,8 @@ export default function LogisticsHub({
   vehicleTripLogs,
   vehicles,
   rentals = [],
+  materialContracts = [],
+  materialDeliveries = [],
   initialTab,
   initialOpenSheet,
   today,
@@ -243,6 +251,8 @@ export default function LogisticsHub({
   vehicleTripLogs: VehicleTripLogRow[];
   vehicles: VehicleSummary[];
   rentals?: RentalItemRow[];
+  materialContracts?: MaterialContractRow[];
+  materialDeliveries?: MaterialDeliveryRow[];
   initialTab?: string;
   initialOpenSheet?: string;
   today: string;
@@ -255,6 +265,7 @@ export default function LogisticsHub({
     "equipment",
     "vehicles",
     "vendors",
+    "bulk-contracts",
   ];
   const resolvedTab = allowedTabs.includes(initialTab ?? "")
     ? initialTab!
@@ -396,7 +407,7 @@ export default function LogisticsHub({
       onValueChange={setActiveTab}
       className="space-y-5"
     >
-      <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 md:grid-cols-3 lg:grid-cols-6">
+      <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 md:grid-cols-4 lg:grid-cols-7">
         <TabsTrigger
           value="tickets"
           className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
@@ -438,6 +449,13 @@ export default function LogisticsHub({
         >
           <Store className="size-4 shrink-0" aria-hidden="true" />
           <span className="truncate">6. Katalog Vendor</span>
+        </TabsTrigger>
+        <TabsTrigger
+          value="bulk-contracts"
+          className="h-auto justify-start gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
+        >
+          <Layers className="size-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">7. Kontrak Curah</span>
         </TabsTrigger>
       </TabsList>
 
@@ -939,6 +957,20 @@ export default function LogisticsHub({
           canManage={
             role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS
           }
+        />
+      </TabsContent>
+
+      <TabsContent value="bulk-contracts">
+        <MaterialContractsPanel
+          role={role}
+          contracts={materialContracts}
+          deliveries={materialDeliveries}
+          vendors={vendors.map((v) => ({
+            id: v.id,
+            name: v.name,
+            category: v.category,
+          }))}
+          projects={projects}
         />
       </TabsContent>
 

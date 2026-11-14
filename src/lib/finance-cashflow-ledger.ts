@@ -32,7 +32,7 @@ export async function recordFinanceCashflowOutflow(
     );
   }
 
-  await transaction.cashflow.create({
+  return transaction.cashflow.create({
     data: {
       type: "OUT",
       amount: input.amount,

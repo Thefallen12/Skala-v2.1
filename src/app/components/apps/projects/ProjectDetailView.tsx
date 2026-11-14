@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useMemo, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -88,6 +89,11 @@ import CoreTeamModal from "./CoreTeamModal";
 import ProjectFundRecapTab from "./ProjectFundRecapTab";
 import { applyRabAsContract, applyRapAsBudget, recordProjectOpname } from "@/app/actions/project";
 import { ProjectPrintRabView, ProjectPrintProgressView } from "./ProjectPrintViews";
+import ProjectMaterialDeliveriesCard from "./ProjectMaterialDeliveriesCard";
+import type {
+  MaterialContractRow,
+  MaterialDeliveryRow,
+} from "@/lib/material-contracts";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -185,14 +191,20 @@ export default function ProjectDetailView({
   project,
   fieldTeamUsers = [],
   stockItems = [],
+  currentUserId,
   currentUserRole,
   initialMilestones = [],
+  materialContracts = [],
+  materialDeliveries = [],
 }: {
   project: ProjectWorkstationMasterData;
   fieldTeamUsers?: FieldTeamOption[];
   stockItems?: StockItemOption[];
+  currentUserId?: string;
   currentUserRole?: UserRole;
   initialMilestones?: ScheduleMilestoneItem[];
+  materialContracts?: MaterialContractRow[];
+  materialDeliveries?: MaterialDeliveryRow[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -232,6 +244,14 @@ export default function ProjectDetailView({
     currentUserRole === UserRole.DIRECTOR ||
     currentUserRole === UserRole.ADMINISTRATIONS ||
     currentUserRole === UserRole.LOGISTICS;
+  const canEditProjectRab =
+    currentUserRole === UserRole.ADMINISTRATIONS ||
+    currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.DEPUTY_DIRECTOR ||
+    ((currentUserRole === UserRole.FIELD_TEAM ||
+      currentUserRole === UserRole.KOORDINATOR) &&
+      Boolean(currentUserId) &&
+      project.fieldPicId === currentUserId);
 
   // Papan & Status Kanban integration
   const [currentKanbanKey, setCurrentKanbanKey] = useState<"tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda">(() =>
@@ -475,7 +495,7 @@ export default function ProjectDetailView({
       sCurveSeries: series,
       sCurveOptions: options,
     };
-  }, [project.startDate, project.endDate, project.progress, project.reports]);
+  }, [project.startDate, project.endDate, project.progress, project.reports, mountNowMs]);
 
   // Work Points parsed into grouped RAB table
   const savedRapMaterials = project.rapMaterialPlans ?? [];
@@ -800,18 +820,20 @@ export default function ProjectDetailView({
             </p>
           </div>
           <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-            <ProjectActionButton
-              type="button"
-              label={project.workPoints.length === 0 ? "Isi RAB" : "Buka jadwal"}
-              icon={project.workPoints.length === 0 ? <ClipboardList /> : <CalendarDays />}
-              size="sm"
-              onClick={() =>
-                project.workPoints.length === 0
-                  ? setIsEditRabModalOpen(true)
-                  : setActiveTab("papan")
-              }
-              className="h-8 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
-            />
+            {(project.workPoints.length > 0 || canEditProjectRab) && (
+              <ProjectActionButton
+                type="button"
+                label={project.workPoints.length === 0 ? "Isi RAB" : "Buka jadwal"}
+                icon={project.workPoints.length === 0 ? <ClipboardList /> : <CalendarDays />}
+                size="sm"
+                onClick={() =>
+                  project.workPoints.length === 0
+                    ? setIsEditRabModalOpen(true)
+                    : setActiveTab("papan")
+                }
+                className="h-8 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
+              />
+            )}
             <button
               type="button"
               aria-label="Tutup panduan"
@@ -1138,9 +1160,11 @@ export default function ProjectDetailView({
                             rel="noreferrer"
                             className="group relative block size-16 overflow-hidden rounded-lg border border-border"
                           >
-                            <img
+                            <Image
                               src={photo}
                               alt="Progres foto"
+                              width={64}
+                              height={64}
                               className="size-full object-cover transition group-hover:scale-105"
                             />
                           </a>
@@ -1265,10 +1289,12 @@ export default function ProjectDetailView({
                         <ClipboardList />
                         Catat progres
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setIsEditRabModalOpen(true)}>
-                        <Pencil />
-                        Ubah RAB
-                      </DropdownMenuItem>
+                      {canEditProjectRab && (
+                        <DropdownMenuItem onSelect={() => setIsEditRabModalOpen(true)}>
+                          <Pencil />
+                          Ubah RAB
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -1283,13 +1309,15 @@ export default function ProjectDetailView({
                     <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
                       Belum ada RAB untuk proyek ini. Isi item pekerjaan dengan volume dan harga satuan, atau tempel langsung dari Excel. Setelah itu progres dicatat per item lewat opname.
                     </p>
-                    <ProjectActionButton
-                      type="button"
-                      label="Isi RAB"
-                      icon={<ClipboardList className="size-3.5" />}
-                      onClick={() => setIsEditRabModalOpen(true)}
-                      className="h-8 gap-1.5 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium rounded-lg"
-                    />
+                    {canEditProjectRab && (
+                      <ProjectActionButton
+                        type="button"
+                        label="Isi RAB"
+                        icon={<ClipboardList className="size-3.5" />}
+                        onClick={() => setIsEditRabModalOpen(true)}
+                        className="h-8 gap-1.5 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium rounded-lg"
+                      />
+                    )}
                   </div>
 
                   {canAccessMaterialPlanning && (
@@ -1917,6 +1945,16 @@ export default function ProjectDetailView({
 
         {/* ===================== TAB 4: LAPANGAN ===================== */}
         <TabsContent value="lapangan" className="space-y-6">
+          <ProjectMaterialDeliveriesCard
+            project={{
+              id: project.id,
+              title: project.title,
+              kelompokTani: project.kelompokTani,
+            }}
+            contracts={materialContracts}
+            deliveries={materialDeliveries}
+            currentUserRole={currentUserRole ?? UserRole.FIELD_TEAM}
+          />
           <Card className="border-border/80 shadow-2xs">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -1984,9 +2022,11 @@ export default function ProjectDetailView({
                               rel="noreferrer"
                               className="group relative block size-20 overflow-hidden rounded-lg border border-border"
                             >
-                              <img
+                              <Image
                                 src={photo}
                                 alt="Foto lapangan"
+                                width={80}
+                                height={80}
                                 className="size-full object-cover transition group-hover:scale-105"
                               />
                             </a>

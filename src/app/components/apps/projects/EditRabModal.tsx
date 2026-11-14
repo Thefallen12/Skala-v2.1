@@ -197,6 +197,7 @@ export default function EditRabModal({
         try {
           const base64 = (reader.result as string).split(",")[1];
           const parsed = await parseDrtRabFileAction({
+            projectId,
             fileBase64: base64,
             fileName: file.name,
           });

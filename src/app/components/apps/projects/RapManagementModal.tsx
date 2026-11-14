@@ -172,7 +172,8 @@ export default function RapManagementModal({
             setLaborPlans(res.workPoints.map((wp) => {
               const volume = Math.max(0, Number(wp.volume) || 0);
               const estimatedTotal = Math.round(wp.totalRab * 0.3);
-              const boronganRate = volume > 0 ? estimatedTotal / volume : 0;
+              const boronganRate =
+                volume > 0 ? Math.round(estimatedTotal / volume) : 0;
 
               return {
                 workPointId: wp.id,

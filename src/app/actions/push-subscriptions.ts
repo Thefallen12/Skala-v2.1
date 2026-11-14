@@ -106,3 +106,79 @@ export async function removePushSubscription(
     };
   }
 }
+
+function isValidFcmToken(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 20 &&
+    value.length <= 2048 &&
+    /^[A-Za-z0-9:._-]+$/.test(value)
+  );
+}
+
+export async function saveFcmToken(
+  token: string,
+  platform: "android" | "ios" | "web" = "android",
+): Promise<PushSubscriptionActionResult> {
+  const session = await authForProxy();
+  const userId = session?.user?.id;
+  if (typeof userId !== "string" || !userId) {
+    return { success: false, message: "Silakan masuk terlebih dahulu." };
+  }
+  try {
+    if (!isValidFcmToken(token)) {
+      return { success: false, message: "Token perangkat FCM tidak valid." };
+    }
+
+    const entry = {
+      token,
+      platform,
+      updatedAt: new Date().toISOString(),
+    };
+    const users = (await getPushDatabase()).collection<PushUserDocument>("User");
+    const updated = await users.updateOne(
+      { _id: userId, isActive: true, "fcmTokens.token": token },
+      { $set: { "fcmTokens.$": entry } },
+    );
+    if (updated.matchedCount === 0) {
+      await users.updateOne(
+        { _id: userId, isActive: true },
+        { $push: { fcmTokens: { $each: [entry], $slice: -15 } } },
+      );
+    }
+    return { success: true, message: "Token notifikasi perangkat tersimpan." };
+  } catch (error) {
+    console.error("Saving FCM token failed:", error);
+    return {
+      success: false,
+      message: "Token perangkat gagal disimpan. Silakan coba kembali.",
+    };
+  }
+}
+
+export async function removeFcmToken(
+  token: string,
+): Promise<PushSubscriptionActionResult> {
+  const session = await authForProxy();
+  const userId = session?.user?.id;
+  if (typeof userId !== "string" || !userId) {
+    return { success: false, message: "Silakan masuk terlebih dahulu." };
+  }
+  try {
+    if (!isValidFcmToken(token)) {
+      return { success: false, message: "Token perangkat FCM tidak valid." };
+    }
+    const users = (await getPushDatabase()).collection<PushUserDocument>("User");
+    await users.updateOne(
+      { _id: userId },
+      { $pull: { fcmTokens: { token } } },
+    );
+    return { success: true, message: "Token perangkat dihapus." };
+  } catch (error) {
+    console.error("Removing FCM token failed:", error);
+    return {
+      success: false,
+      message: "Token perangkat gagal dihapus. Silakan coba kembali.",
+    };
+  }
+}

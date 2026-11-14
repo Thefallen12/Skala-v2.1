@@ -3859,10 +3859,8 @@ export async function switchTicketItemsToPurchase(
         ticket.items.some(
           (item) =>
             item.status !== FulfillmentStatus.PENDING ||
-            ![
-              TicketCategoryHint.WAREHOUSE,
-              TicketCategoryHint.PURCHASE,
-            ].includes(item.categoryHint),
+            (item.categoryHint !== TicketCategoryHint.WAREHOUSE &&
+              item.categoryHint !== TicketCategoryHint.PURCHASE),
         )
       ) {
         throw new Error(

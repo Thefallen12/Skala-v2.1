@@ -79,6 +79,7 @@ export default function NotificationBell({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            suppressHydrationWarning
             aria-label={`Notifikasi${unreadCount ? `, ${unreadCount} belum dibaca` : ""}`}
             className="relative flex size-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >

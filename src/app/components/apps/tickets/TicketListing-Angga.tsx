@@ -79,9 +79,10 @@ import {
 import { printUrlInFrame } from "@/lib/print-url";
 import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
 
-const statusLabels: Record<TicketStatus, string> = {
+const statusLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Draft",
   PENDING_DIRECTOR: "Menunggu persetujuan Direktur",
+  PENDING_LOGISTIK: "Menunggu diproses Logistik",
   APPROVED_DIR: "Disetujui Direktur",
   PROCESSED_FINANCE: "Diproses Finance",
   PROCESSED_LOGISTIC: "Diproses Logistik",
@@ -92,9 +93,10 @@ const statusLabels: Record<TicketStatus, string> = {
   REJECTED: "Ditolak",
 };
 
-const nextStepLabels: Record<TicketStatus, string> = {
+const nextStepLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Pemohon perlu mengajukan tiket.",
   PENDING_DIRECTOR: "Menunggu Direktur menyetujui tiket.",
+  PENDING_LOGISTIK: "Logistik perlu menentukan alat internal atau vendor.",
   APPROVED_DIR: "Menunggu Finance memproses kebutuhan.",
   PROCESSED_FINANCE: "Menunggu Logistik menyiapkan barang atau pengiriman.",
   PROCESSED_LOGISTIC: "Menunggu proses pengiriman atau konfirmasi kebutuhan.",
@@ -106,11 +108,12 @@ const nextStepLabels: Record<TicketStatus, string> = {
 };
 
 const statusVariants: Record<
-  TicketStatus,
+  TicketRow["status"],
   "gray" | "lightWarning" | "lightSuccess" | "lightInfo" | "lightError"
 > = {
   DRAFT: "gray",
   PENDING_DIRECTOR: "lightWarning",
+  PENDING_LOGISTIK: "lightWarning",
   APPROVED_DIR: "lightSuccess",
   PROCESSED_FINANCE: "lightInfo",
   PROCESSED_LOGISTIC: "lightInfo",

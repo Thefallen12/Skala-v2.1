@@ -20,6 +20,7 @@ import {
   getNotificationSoundEnabled,
   setNotificationSoundEnabled,
   setupAudioUnlockListeners,
+  setupNativeFcmPush,
   showNativeWhatsAppNotification,
   syncNativeSeenNotificationIds,
   triggerIncomingNotificationFeedback,
@@ -264,9 +265,24 @@ export default function DashboardLayoutClient({
 
     window.addEventListener('skala:open-notification', onOpenNotificationEvent)
     window.addEventListener('skala:native-ready', onNativeReady)
+
+    let cleanupFcm: (() => void) | undefined
+    const setupFcm = () => {
+      cleanupFcm?.()
+      void setupNativeFcmPush((url) => {
+        router.push(url)
+      }).then((cleanup) => {
+        cleanupFcm = cleanup
+      })
+    }
+    setupFcm()
+    window.addEventListener('skala:permissions-changed', setupFcm)
+
     return () => {
+      cleanupFcm?.()
       window.removeEventListener('skala:open-notification', onOpenNotificationEvent)
       window.removeEventListener('skala:native-ready', onNativeReady)
+      window.removeEventListener('skala:permissions-changed', setupFcm)
     }
   }, [openNotificationTarget, router])
 

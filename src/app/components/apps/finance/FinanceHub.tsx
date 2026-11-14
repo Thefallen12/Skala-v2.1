@@ -22,6 +22,8 @@ import {
   submitPaymentRecord,
 } from "@/app/actions/tickets";
 import type { TicketActionResult } from "@/app/actions/tickets";
+import { submitEquipmentRentalPayment } from "@/app/actions/equipment-requests";
+import { EQUIPMENT_REQUEST_TYPE } from "@/lib/equipment-request";
 import FinanceDashboard, {
   type FinanceDashboardTransaction,
   type FinanceExpenseCategory,
@@ -51,7 +53,12 @@ import DocumentPdfGenerator, {
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import VehicleTripLogTable from "@/app/components/apps/logistics/VehicleTripLogTable";
 import RentalBillingQueue from "@/app/components/apps/finance/RentalBillingQueue";
+import VendorContractBillingPanel from "@/app/components/apps/finance/VendorContractBillingPanel";
 import type { RentalItemRow } from "@/app/actions/rentals";
+import type {
+  MaterialContractRow,
+  VendorInvoiceRow,
+} from "@/lib/material-contracts";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
@@ -207,6 +214,7 @@ type PaymentTransaction = {
 
 type FinanceTicket = {
   id: string;
+  ticketType?: string | null;
   ticketNumber: string;
   title: string;
   type: TicketType;
@@ -424,6 +432,8 @@ export default function FinanceHub({
   coordinatorSignerName,
   directorSignerName,
   rentals = [],
+  materialContracts = [],
+  vendorInvoices = [],
 }: {
   purchaseOrders: FinanceOrder[];
   documentSignoffTasks: DocumentSignoffTask[];
@@ -455,6 +465,8 @@ export default function FinanceHub({
   coordinatorSignerName?: string;
   directorSignerName?: string;
   rentals?: RentalItemRow[];
+  materialContracts?: MaterialContractRow[];
+  vendorInvoices?: VendorInvoiceRow[];
 }) {
   const router = useRouter();
   const legacyOperationalTabs = ["subcontract", "rentals", "fuel-logs", "fuel-requests"];
@@ -463,6 +475,7 @@ export default function FinanceHub({
     payments: "payment",
     check: "check",
     payment: "payment",
+    "vendor-contracts": "vendor-contracts",
     history: "history",
     operations: "operations",
     ledger: "ledger",
@@ -1029,15 +1042,27 @@ export default function FinanceHub({
               ? { kind: "direct-purchase" as const, id: activeDirectPurchase.id }
               : null;
         if (!target) return;
-        const result: TicketActionResult = await submitPaymentRecord({
-          target,
-          files: receiptUrl,
-          transferDestination,
-          financeAccountId,
-          paymentType: currentPaymentType,
-          amount,
-          ...(directPaymentMethod ? { paymentMethod: directPaymentMethod } : {}),
-        });
+        const result: TicketActionResult =
+          activeTicket?.ticketType === EQUIPMENT_REQUEST_TYPE
+            ? await submitEquipmentRentalPayment({
+                ticketId: activeTicket.id,
+                proof: receiptUrl,
+                transferDestination,
+                financeAccountId,
+                paymentType: currentPaymentType,
+                amount,
+              })
+            : await submitPaymentRecord({
+                target,
+                files: receiptUrl,
+                transferDestination,
+                financeAccountId,
+                paymentType: currentPaymentType,
+                amount,
+                ...(directPaymentMethod
+                  ? { paymentMethod: directPaymentMethod }
+                  : {}),
+              });
         setMessage(result.message);
         if (result.success) {
           setReceiptUrl([]);
@@ -1063,6 +1088,24 @@ export default function FinanceHub({
   ): Promise<TicketActionResult> => {
     if (!selectedPaymentRow) {
       return { success: false, message: "Tagihan tidak ditemukan." };
+    }
+    if (selectedPaymentRow.kind === "ticket") {
+      const equipmentTicket = tickets.find(
+        (ticket) => ticket.id === selectedPaymentRow.id,
+      );
+      if (equipmentTicket?.ticketType === EQUIPMENT_REQUEST_TYPE) {
+        return submitEquipmentRentalPayment({
+          ticketId: equipmentTicket.id,
+          proof,
+          transferDestination:
+            paymentMethod === POPaymentMethod.CASH
+              ? "Tunai"
+              : transferDestination,
+          financeAccountId,
+          paymentType: type,
+          amount,
+        });
+      }
     }
     const target =
       selectedPaymentRow.kind === "ticket"
@@ -1447,9 +1490,7 @@ export default function FinanceHub({
         <div
           role="tablist"
           aria-label="Navigasi Tahapan Finance Hub"
-          className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${
-            canManageOfficeExpenses ? " xl:grid-cols-6" : "xl:grid-cols-5"
-          }`}
+          className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4"
         >
           {(
             [
@@ -1471,6 +1512,19 @@ export default function FinanceHub({
                 badgeVariant:
                   pendingPaymentCount > 0
                     ? ("error" as const)
+                    : ("outline" as const),
+              },
+              {
+                value: "vendor-contracts",
+                title: "Tagihan Kontrak Vendor",
+                subtitle: "Rekap DO pasir, batu & curah",
+                count: `${
+                  vendorInvoices.filter((invoice) => invoice.status !== "PAID")
+                    .length
+                } Tagihan`,
+                badgeVariant:
+                  vendorInvoices.some((invoice) => invoice.status !== "PAID")
+                    ? ("warning" as const)
                     : ("outline" as const),
               },
               {
@@ -2767,6 +2821,21 @@ export default function FinanceHub({
           />
         </TabsContent>
           </Tabs>
+        </TabsContent>
+
+        <TabsContent value="vendor-contracts">
+          <VendorContractBillingPanel
+            contracts={materialContracts}
+            vendorInvoices={vendorInvoices}
+            financeAccounts={financeAccounts}
+            canManage={
+              role === UserRole.FINANCE ||
+              role === UserRole.ADMINISTRATIONS ||
+              role === UserRole.DIRECTOR ||
+              role === UserRole.DEPUTY_DIRECTOR
+            }
+            onPreviewProof={(url, label) => setReceiptPreview({ url, label })}
+          />
         </TabsContent>
       </Tabs>
 

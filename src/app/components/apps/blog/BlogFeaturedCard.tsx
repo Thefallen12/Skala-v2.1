@@ -10,6 +10,7 @@ import { BlogPostType } from '@/app/(DashboardLayout)/types/blog'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import Image from 'next/image'
 
 interface Btype {
   post: BlogPostType
@@ -56,9 +57,10 @@ const BlogFeaturedCard = ({ post, index }: Btype) => {
             {/* Background Image */}
             <div className='absolute inset-0'>
               {coverImg ? (
-                <img
+                <Image
                   src={coverImg}
                   alt={title || 'blog image'}
+                  fill
                   className='w-full h-full object-cover'
                 />
               ) : (

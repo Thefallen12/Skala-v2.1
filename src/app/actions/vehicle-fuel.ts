@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import {
@@ -13,6 +14,14 @@ import {
 } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Cashflow from "@/models/cashflow";
+import FinanceAccount from "@/models/finance-account";
+import Notification from "@/models/notification";
+import {
+  DeliveryOrder,
+  VehicleFuelRequest,
+} from "@/models/finance-records";
 import { sendNotification } from "@/lib/notifications";
 import { getFinancePaymentProofMimeType } from "@/lib/finance-payment-proof-file";
 import { removeTicketReceipt, saveTicketReceipt } from "@/lib/ticket-receipts";
@@ -24,7 +33,6 @@ import {
   decimalFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
-import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
 
 export type VehicleFuelActionResult = {
   success: boolean;
@@ -493,68 +501,109 @@ export async function processVehicleFuelRequest(
 
   let processed = false;
   try {
-    processed = await prisma.$transaction(async (transaction) => {
-      const request = await transaction.vehicleFuelRequest.findUnique({
-        where: { id: requestId },
-        select: {
-          status: true,
-          afterFillingPhotoUrl: true,
-          requestedAmount: true,
-          projectId: true,
-          deliveryOrder: { select: { doNumber: true } },
-          requestedById: true,
-        },
-      });
-      if (!request || request.status !== VehicleFuelRequestStatus.PENDING_FINANCE) {
-        return false;
+    const mongoose = await connectToMongoDB();
+    processed = await mongoose.connection.transaction(async (mongoSession) => {
+      const request = await VehicleFuelRequest.findOne({
+        _id: requestId,
+        status: VehicleFuelRequestStatus.PENDING_FINANCE,
+      })
+        .session(mongoSession)
+        .lean();
+      if (!request) return false;
+      const deliveryOrder = await DeliveryOrder.findById(
+        request.deliveryOrderId,
+      )
+        .select({ doNumber: 1 })
+        .session(mongoSession)
+        .lean();
+      if (!deliveryOrder) throw new Error("DO untuk request BBM tidak ditemukan.");
+      const now = new Date();
+      const nextStatus = approve
+        ? request.afterFillingPhotoUrl
+          ? VehicleFuelRequestStatus.COMPLETED
+          : VehicleFuelRequestStatus.FUNDED
+        : VehicleFuelRequestStatus.REJECTED;
+
+      if (approve) {
+        const amount = decimalFromScaledInteger(request.requestedAmount).toNumber();
+        const account = await FinanceAccount.findOneAndUpdate(
+          {
+            _id: input!.financeAccountId!,
+            balance: { $gte: amount },
+          },
+          { $inc: { balance: -amount } },
+          { new: true, session: mongoSession },
+        ).select({ _id: 1 });
+        if (!account) {
+          const exists = await FinanceAccount.exists({
+            _id: input!.financeAccountId!,
+          }).session(mongoSession);
+          throw new Error(
+            exists
+              ? "Saldo buku bank/kas tidak mencukupi."
+              : "Buku bank/kas sumber pembayaran tidak ditemukan.",
+          );
+        }
+        await Cashflow.create(
+          [
+            {
+              _id: randomUUID(),
+              type: "OUT",
+              amount,
+              sourceDesc: `Reimbursement BBM ${deliveryOrder.doNumber}`,
+              projectId: request.projectId,
+              paymentMethod:
+                input!.disbursementMethod === POPaymentMethod.CASH
+                  ? "CASH"
+                  : "TRANSFER",
+              proofUrl: transferProofUrl,
+              accountId: input!.financeAccountId!,
+              recordedBy: session.user.id,
+              createdAt: now,
+            },
+          ],
+          { session: mongoSession },
+        );
       }
-      const result = await transaction.vehicleFuelRequest.updateMany({
-        where: {
-          id: requestId,
+
+      const result = await VehicleFuelRequest.updateOne(
+        {
+          _id: requestId,
           status: VehicleFuelRequestStatus.PENDING_FINANCE,
         },
-        data: {
-          status: approve
-            ? request.afterFillingPhotoUrl
-              ? VehicleFuelRequestStatus.COMPLETED
-              : VehicleFuelRequestStatus.FUNDED
-            : VehicleFuelRequestStatus.REJECTED,
-          reviewedById: session.user.id,
-          reviewedAt: new Date(),
-          disbursedAt: approve ? new Date() : null,
-          financeNote: input?.financeNote?.trim() || null,
-          disbursementMethod: approve ? input?.disbursementMethod : null,
-          transferDestination: approve
-            ? input?.transferDestination?.trim() ?? null
-            : null,
-          transferProofUrl: approve ? transferProofUrl : null,
+        {
+          $set: {
+            status: nextStatus,
+            reviewedById: session.user.id,
+            reviewedAt: now,
+            disbursedAt: approve ? now : null,
+            financeNote: input?.financeNote?.trim() || null,
+            disbursementMethod: approve ? input?.disbursementMethod : null,
+            transferDestination: approve
+              ? input?.transferDestination?.trim() ?? null
+              : null,
+            transferProofUrl: approve ? transferProofUrl : null,
+          },
         },
-      });
-      if (result.count !== 1) return false;
-      if (approve) {
-        await recordFinanceCashflowOutflow(transaction, {
-          financeAccountId: input!.financeAccountId!,
-          amount: decimalFromScaledInteger(request.requestedAmount).toNumber(),
-          sourceDesc: `Reimbursement BBM ${request.deliveryOrder.doNumber}`,
-          projectId: request.projectId,
-          paymentMethod:
-            input!.disbursementMethod === POPaymentMethod.CASH
-              ? "CASH"
-              : "TRANSFER",
-          proofUrl: transferProofUrl,
-          recordedBy: session.user.id,
-        });
-      }
-      await sendNotification({
-        userId: request.requestedById,
-        title: approve ? "Dana BBM Disetujui" : "Request BBM Ditolak",
-        message: approve
-          ? `Reimbursement BBM untuk ${request.deliveryOrder.doNumber} telah selesai disalurkan melalui ${input?.disbursementMethod === POPaymentMethod.TRANSFER ? "transfer" : "tunai"}.`
-          : `Request BBM untuk ${request.deliveryOrder.doNumber} ditolak oleh Keuangan.`,
-        actionUrl: "/apps/logistics",
-        type: approve ? NotificationType.APPROVAL : NotificationType.INFO,
-        database: transaction,
-      });
+        { session: mongoSession },
+      );
+      if (result.modifiedCount !== 1) return false;
+      await Notification.create(
+        [
+          {
+            _id: randomUUID(),
+            userId: request.requestedById,
+            title: approve ? "Dana BBM Disetujui" : "Request BBM Ditolak",
+            message: approve
+              ? `Reimbursement BBM untuk ${deliveryOrder.doNumber} telah selesai disalurkan melalui ${input?.disbursementMethod === POPaymentMethod.TRANSFER ? "transfer" : "tunai"}.`
+              : `Request BBM untuk ${deliveryOrder.doNumber} ditolak oleh Keuangan.`,
+            type: approve ? NotificationType.APPROVAL : NotificationType.INFO,
+            actionUrl: "/apps/logistics",
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
       return true;
     });
     if (!processed) {
@@ -608,46 +657,55 @@ export async function completeVehicleFuelRequestReview(
   }
 
   try {
-    const completed = await prisma.$transaction(async (transaction) => {
-      const request = await transaction.vehicleFuelRequest.findUnique({
-        where: { id: requestId },
-        select: {
-          status: true,
-          requestedById: true,
-          deliveryOrder: { select: { doNumber: true } },
-        },
-      });
-      if (
-        !request ||
-        request.status !== VehicleFuelRequestStatus.PROOF_SUBMITTED
-      ) {
-        return false;
-      }
-
-      const updated = await transaction.vehicleFuelRequest.updateMany({
-        where: {
-          id: requestId,
+    const mongoose = await connectToMongoDB();
+    const completed = await mongoose.connection.transaction(async (mongoSession) => {
+      const request = await VehicleFuelRequest.findOne({
+        _id: requestId,
+        status: VehicleFuelRequestStatus.PROOF_SUBMITTED,
+      })
+        .session(mongoSession)
+        .lean();
+      if (!request) return false;
+      const deliveryOrder = await DeliveryOrder.findById(
+        request.deliveryOrderId,
+      )
+        .select({ doNumber: 1 })
+        .session(mongoSession)
+        .lean();
+      if (!deliveryOrder) throw new Error("DO untuk request BBM tidak ditemukan.");
+      const reviewedAt = new Date();
+      const updated = await VehicleFuelRequest.updateOne(
+        {
+          _id: requestId,
           status: VehicleFuelRequestStatus.PROOF_SUBMITTED,
         },
-        data: {
-          status: VehicleFuelRequestStatus.COMPLETED,
-          reviewedById: session.user.id,
-          reviewedAt: new Date(),
-          ...(financeNote.trim()
-            ? { financeNote: financeNote.trim() }
-            : {}),
+        {
+          $set: {
+            status: VehicleFuelRequestStatus.COMPLETED,
+            reviewedById: session.user.id,
+            reviewedAt,
+            ...(financeNote.trim()
+              ? { financeNote: financeNote.trim() }
+              : {}),
+          },
         },
-      });
-      if (updated.count !== 1) return false;
-
-      await sendNotification({
-        userId: request.requestedById,
-        title: "Rekonsiliasi BBM Selesai",
-        message: `Bukti BBM untuk ${request.deliveryOrder.doNumber} telah ditinjau dan rekonsiliasinya ditutup oleh Keuangan.`,
-        actionUrl: "/apps/logistics",
-        type: NotificationType.APPROVAL,
-        database: transaction,
-      });
+        { session: mongoSession },
+      );
+      if (updated.modifiedCount !== 1) return false;
+      await Notification.create(
+        [
+          {
+            _id: randomUUID(),
+            userId: request.requestedById,
+            title: "Rekonsiliasi BBM Selesai",
+            message: `Bukti BBM untuk ${deliveryOrder.doNumber} telah ditinjau dan rekonsiliasinya ditutup oleh Keuangan.`,
+            type: NotificationType.APPROVAL,
+            actionUrl: "/apps/logistics",
+            createdAt: reviewedAt,
+          },
+        ],
+        { session: mongoSession },
+      );
       return true;
     });
 

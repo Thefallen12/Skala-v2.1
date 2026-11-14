@@ -4,6 +4,10 @@ import { Prisma } from "@prisma/client";
 import { NotificationType, UserRole } from "@prisma/client";
 import { sendNotificationEmails } from "@/lib/email-notifications";
 import { prisma } from "@/lib/prisma";
+import {
+  isAnyPushChannelConfigured,
+  sendPushNotification,
+} from "@/lib/push-notifications";
 
 type NotificationDatabase = Pick<Prisma.TransactionClient, "user" | "notification">;
 
@@ -105,6 +109,19 @@ export async function sendNotification({
         actionUrl: actionUrl ?? null,
         type,
       });
+
+      if (isAnyPushChannelConfigured()) {
+        const targetUrl = actionUrl ?? "/apps/tickets";
+        await Promise.allSettled(
+          recipients.map(({ id: recipientId }) =>
+            sendPushNotification(recipientId, {
+              title: normalizedTitle,
+              body: normalizedMessage,
+              url: targetUrl,
+            }),
+          ),
+        );
+      }
     } catch (error) {
       console.error("[Notification] Email background dispatch failed:", error);
     }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { compressFieldImageFiles } from "@/lib/image-compression-client";
 import {
   Select,
   SelectContent,
@@ -72,21 +73,19 @@ export default function ProjectProgressModal({
       setErrorMessage("Pilih maksimal 5 foto untuk satu laporan.");
       return;
     }
-    if (photos.some((photo) => photo.size > 5 * 1024 * 1024)) {
-      setErrorMessage("Ukuran setiap foto maksimal 5 MB.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.set("progress", progress);
-    formData.set("reportDate", reportDate);
-    formData.set("weather", weather);
-    formData.set("workersCount", workersCount);
-    formData.set("workSummary", workSummary);
-    photos.forEach((photo) => formData.append("photos", photo));
 
     startTransition(async () => {
       try {
+        const compressedPhotos =
+          photos.length > 0 ? await compressFieldImageFiles(photos) : [];
+        const formData = new FormData();
+        formData.set("progress", progress);
+        formData.set("reportDate", reportDate);
+        formData.set("weather", weather);
+        formData.set("workersCount", workersCount);
+        formData.set("workSummary", workSummary);
+        compressedPhotos.forEach((photo) => formData.append("photos", photo));
+
         const result = await addProjectProgress(project.id, formData);
         if (!result.success) {
           setErrorMessage(result.message);
@@ -96,7 +95,11 @@ export default function ProjectProgressModal({
         router.refresh();
       } catch (error) {
         console.error("Project progress submission failed:", error);
-        setErrorMessage("Progres proyek gagal diperbarui. Silakan coba kembali.");
+        setErrorMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Progres proyek gagal diperbarui. Silakan coba kembali.",
+        );
       }
     });
   };
@@ -201,34 +204,13 @@ export default function ProjectProgressModal({
             <Input
               id="project-progress-photos"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/*,.heic,.heif"
               multiple
               disabled={isPending}
               onChange={(event) => {
                 const selected = Array.from(event.currentTarget.files ?? []);
                 if (selected.length > 5) {
                   setErrorMessage("Pilih maksimal 5 foto untuk satu laporan.");
-                  event.currentTarget.value = "";
-                  setPhotos([]);
-                  setPhotoPreviews([]);
-                  return;
-                }
-                if (selected.some((photo) => photo.size > 5 * 1024 * 1024)) {
-                  setErrorMessage("Ukuran setiap foto maksimal 5 MB.");
-                  event.currentTarget.value = "";
-                  setPhotos([]);
-                  setPhotoPreviews([]);
-                  return;
-                }
-                if (
-                  selected.some(
-                    (photo) =>
-                      !["image/jpeg", "image/png", "image/webp"].includes(
-                        photo.type,
-                      ),
-                  )
-                ) {
-                  setErrorMessage("Format foto harus JPG, PNG, atau WEBP.");
                   event.currentTarget.value = "";
                   setPhotos([]);
                   setPhotoPreviews([]);
@@ -242,8 +224,8 @@ export default function ProjectProgressModal({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Maksimal 5 foto, masing-masing 5 MB. Format JPG, PNG, atau WEBP.
-              Foto tersimpan privat dan dapat dilihat oleh pengguna menu Project.
+              Maksimal 5 foto. Foto kamera berukuran besar otomatis dikompresi
+              di perangkat sebelum diunggah.
             </p>
             {photos.length > 0 && (
               <div className="flex flex-wrap gap-3">

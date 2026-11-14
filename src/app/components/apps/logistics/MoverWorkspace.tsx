@@ -34,6 +34,10 @@ import {
 } from "@/lib/vehicle-fuel";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
 import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  compressFieldImageFile,
+  compressFieldImageFiles,
+} from "@/lib/image-compression-client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -179,14 +183,20 @@ export default function MoverWorkspace({
     setMessage("");
     startTransition(async () => {
       try {
+        const compressedBefore = await compressFieldImageFile(beforePhoto);
+        const compressedAfter = await compressFieldImageFile(afterPhoto);
+        const compressedReceipt =
+          receipt instanceof File && receipt.size > 0
+            ? await compressFieldImageFile(receipt)
+            : undefined;
         const result = await createVehicleFuelRequest(publicCode, {
           source:
             data.get("source") === VehicleFuelSource.RETAIL
               ? VehicleFuelSource.RETAIL
               : VehicleFuelSource.SPBU,
-          beforeFillingPhoto: beforePhoto,
-          afterFillingPhoto: afterPhoto,
-          ...(receipt instanceof File && receipt.size > 0 ? { receiptPhoto: receipt } : {}),
+          beforeFillingPhoto: compressedBefore,
+          afterFillingPhoto: compressedAfter,
+          ...(compressedReceipt ? { receiptPhoto: compressedReceipt } : {}),
           includeExceptionAllowance,
           ...(includeExceptionAllowance
             ? { exceptionReason: String(data.get("exceptionReason") ?? "") }
@@ -209,7 +219,11 @@ export default function MoverWorkspace({
         }
       } catch (error) {
         console.error("Mover fuel request failed:", error);
-        setMessage("Request dana BBM gagal dikirim. Silakan coba kembali.");
+        setMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Request dana BBM gagal dikirim. Silakan coba kembali.",
+        );
         setIsError(true);
       } finally {
         setPendingCode("");
@@ -236,10 +250,15 @@ export default function MoverWorkspace({
     setMessage("");
     startTransition(async () => {
       try {
+        const compressedAfter = await compressFieldImageFile(afterPhoto);
+        const compressedReceipt =
+          receipt instanceof File && receipt.size > 0
+            ? await compressFieldImageFile(receipt)
+            : undefined;
         const result = await submitVehicleFuelProof(
           requestId,
-          afterPhoto,
-          receipt instanceof File && receipt.size > 0 ? receipt : undefined,
+          compressedAfter,
+          compressedReceipt,
         );
         setMessage(result.message);
         setIsError(!result.success);
@@ -250,7 +269,11 @@ export default function MoverWorkspace({
         }
       } catch (error) {
         console.error("Mover fuel proof submission failed:", error);
-        setMessage("Bukti pengisian gagal dikirim. Silakan coba kembali.");
+        setMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Bukti pengisian gagal dikirim. Silakan coba kembali.",
+        );
         setIsError(true);
       } finally {
         setPendingCode("");
@@ -287,9 +310,11 @@ export default function MoverWorkspace({
     setMessage("");
     startTransition(async () => {
       try {
+        const compressedFiles =
+          files.length > 0 ? await compressFieldImageFiles(files) : [];
         const result = await submitMoverDeliveryProofs(
           publicCode,
-          files,
+          compressedFiles,
           completeDelivery,
           completeDelivery ? kmStart : undefined,
           completeDelivery ? kmEnd : undefined,
@@ -303,7 +328,11 @@ export default function MoverWorkspace({
         }
       } catch (error) {
         console.error("Mover could not complete delivery:", error);
-        setMessage("Pengiriman gagal diselesaikan. Coba muat ulang halaman.");
+        setMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Pengiriman gagal diselesaikan. Coba muat ulang halaman.",
+        );
         setIsError(true);
       } finally {
         setPendingCode("");
@@ -674,7 +703,7 @@ export default function MoverWorkspace({
                               <Input
                                 name="deliveryProofs"
                                 type="file"
-                                accept="image/jpeg,image/png,image/webp"
+                                accept="image/*,.heic,.heif"
                                 multiple
                                 disabled={isPending}
                                 className="h-9 text-xs file:text-xs"
@@ -822,7 +851,7 @@ export default function MoverWorkspace({
                                 <Input
                                   name="afterFillingPhoto"
                                   type="file"
-                                  accept="image/jpeg,image/png,image/webp"
+                                  accept="image/*,.heic,.heif"
                                   required
                                   disabled={isPending}
                                   className="h-8 text-xs file:text-xs"
@@ -833,7 +862,7 @@ export default function MoverWorkspace({
                                 <Input
                                   name="receiptPhoto"
                                   type="file"
-                                  accept="image/jpeg,image/png,image/webp"
+                                  accept="image/*,.heic,.heif"
                                   disabled={isPending}
                                   className="h-8 text-xs file:text-xs"
                                 />

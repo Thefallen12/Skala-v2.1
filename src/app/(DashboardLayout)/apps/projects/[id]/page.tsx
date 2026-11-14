@@ -12,6 +12,7 @@ import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import ProjectDetailView from "@/app/components/apps/projects/ProjectDetailView";
 import type { ProjectWorkstationMasterData } from "@/app/components/apps/projects/ProjectWorkstationMaster";
 import type { StockItemOption } from "@/app/components/apps/projects/MaterialPlanModal";
+import { loadMaterialContractsBundle } from "@/lib/material-contracts-server";
 
 export async function generateMetadata({
   params,
@@ -173,7 +174,13 @@ export default async function ProjectDetailPage({
       : new Date().toISOString().slice(0, 10),
   }));
 
-  const realizationMap = await getPaidProjectTicketRealization([project.id]);
+  const [realizationMap, materialContractsBundle] = await Promise.all([
+    getPaidProjectTicketRealization([project.id]),
+    loadMaterialContractsBundle({
+      projectId: project.id,
+      includeInvoices: false,
+    }),
+  ]);
   const realization = realizationMap.get(project.id);
 
   const dateKey = (date: Date | string | null | undefined) =>
@@ -545,8 +552,11 @@ export default async function ProjectDetailPage({
       project={formattedProject}
       fieldTeamUsers={fieldTeamUsers}
       stockItems={stockItems}
+      currentUserId={session.user.id}
       currentUserRole={session.user.role}
       initialMilestones={initialMilestones}
+      materialContracts={materialContractsBundle.contracts}
+      materialDeliveries={materialContractsBundle.deliveries}
     />
   );
 }

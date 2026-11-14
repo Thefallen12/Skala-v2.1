@@ -32,6 +32,11 @@ import {
   submitTicket,
   type TicketActionResult,
 } from "@/app/actions/tickets";
+import {
+  approveEquipmentRequest,
+  processEquipmentRequestAtLogistics,
+  submitEquipmentRequest,
+} from "@/app/actions/equipment-requests";
 import CreatePOForm from "@/app/components/forms/CreatePOForm";
 import DirectStockPurchaseForm from "@/app/components/forms/DirectStockPurchaseForm";
 import ExpeditionArrivalModal from "@/app/components/apps/tickets/ExpeditionArrivalModal";
@@ -41,6 +46,7 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import type { VehicleSummary } from "@/app/actions/vehicles";
+import { EQUIPMENT_REQUEST_TYPE } from "@/lib/equipment-request";
 import {
   FulfillmentStatus,
   DOStatus,
@@ -84,9 +90,10 @@ import {
 import { printUrlInFrame } from "@/lib/print-url";
 import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
 
-const statusLabels: Record<TicketStatus, string> = {
+const statusLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Draft",
   PENDING_DIRECTOR: "Menunggu persetujuan Direktur",
+  PENDING_LOGISTIK: "Menunggu diproses Logistik",
   APPROVED_DIR: "Disetujui Direktur",
   PROCESSED_FINANCE: "Diproses Finance",
   PROCESSED_LOGISTIC: "Diproses Logistik",
@@ -97,9 +104,10 @@ const statusLabels: Record<TicketStatus, string> = {
   REJECTED: "Ditolak",
 };
 
-const nextStepLabels: Record<TicketStatus, string> = {
+const nextStepLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Pemohon perlu mengajukan tiket.",
   PENDING_DIRECTOR: "Menunggu Direktur menyetujui tiket.",
+  PENDING_LOGISTIK: "Logistik perlu menentukan alat internal atau vendor.",
   APPROVED_DIR: "Menunggu Finance memproses kebutuhan.",
   PROCESSED_FINANCE: "Menunggu Logistik menyiapkan barang atau pengiriman.",
   PROCESSED_LOGISTIC: "Menunggu proses pengiriman atau konfirmasi kebutuhan.",
@@ -111,11 +119,12 @@ const nextStepLabels: Record<TicketStatus, string> = {
 };
 
 const statusVariants: Record<
-  TicketStatus,
+  TicketRow["status"],
   "gray" | "lightWarning" | "lightSuccess" | "lightInfo" | "lightError"
 > = {
   DRAFT: "gray",
   PENDING_DIRECTOR: "lightWarning",
+  PENDING_LOGISTIK: "lightWarning",
   APPROVED_DIR: "lightSuccess",
   PROCESSED_FINANCE: "lightInfo",
   PROCESSED_LOGISTIC: "lightInfo",
@@ -201,8 +210,12 @@ const auditActionLabels: Record<string, string> = {
   APPROVED_BY_DIR: "Disetujui Direktur",
   REJECTED_BY_DIR: "Ditolak Direktur",
   REVISION_REQUESTED_BY_DIR: "Diminta revisi oleh Direktur",
+  LOGISTICS_EQUIPMENT_INTERNAL: "Dipenuhi dengan alat internal",
+  LOGISTICS_EQUIPMENT_RENTAL: "Diteruskan ke penyewaan vendor",
+  FINANCE_PAYMENT_PARTIAL: "Pembayaran dicatat sebagian oleh Keuangan",
   LOGISTICS_READY_WAREHOUSE: "Stok gudang siap; ditugaskan ke Mover",
   LOGISTICS_TICKET_ITEM_SKU_MAPPED: "Item tiket ditautkan ke SKU stok",
+  MATERIAL_CONTRACT_DELIVERY_RECORDED: "Surat Jalan kontrak dicatat",
   LOGISTICS_SWITCHED_TO_PURCHASE: "Dialihkan ke pengadaan baru",
   LOGISTICS_BUY_STORE: "Dibeli di toko; diteruskan ke Keuangan",
   LOGISTICS_PO_CREATED: "PO dibuat; menunggu persetujuan",
@@ -244,10 +257,18 @@ function actionFor(
     return {
       label: "Setujui",
       run: (currentTicket) =>
-        approveByDirector(currentTicket.id, currentTicket.type),
+        currentTicket.ticketType === EQUIPMENT_REQUEST_TYPE
+          ? approveEquipmentRequest(currentTicket.id)
+          : approveByDirector(currentTicket.id, currentTicket.type),
     };
   }
   return null;
+}
+
+function submitTicketRequest(ticket: TicketRow) {
+  return ticket.ticketType === EQUIPMENT_REQUEST_TYPE
+    ? submitEquipmentRequest(ticket.id)
+    : submitTicket(ticket.id);
 }
 
 function workflowFor(
@@ -416,6 +437,15 @@ export default function TicketListing({
   const [selectedMoverId, setSelectedMoverId] = useState("");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
   const [poDialogOpen, setPoDialogOpen] = useState(false);
+  const [equipmentDecisionOpen, setEquipmentDecisionOpen] = useState(false);
+  const [equipmentSource, setEquipmentSource] = useState<
+    "INTERNAL" | "EXTERNAL_VENDOR"
+  >("INTERNAL");
+  const [equipmentVendorName, setEquipmentVendorName] = useState("");
+  const [equipmentQuotedCost, setEquipmentQuotedCost] = useState("");
+  const [equipmentDecisionError, setEquipmentDecisionError] = useState("");
+  const [equipmentDecisionPending, setEquipmentDecisionPending] =
+    useState(false);
   const [purchaseMode, setPurchaseMode] = useState<
     "PURCHASE_ORDER" | "DIRECT_PURCHASE"
   >("PURCHASE_ORDER");
@@ -702,6 +732,38 @@ export default function TicketListing({
     });
   };
 
+  const processEquipmentLogisticsDecision = async () => {
+    if (!selectedTicket) return;
+    const quotedCost =
+      equipmentSource === "EXTERNAL_VENDOR"
+        ? Number(equipmentQuotedCost)
+        : undefined;
+    setEquipmentDecisionPending(true);
+    setEquipmentDecisionError("");
+    try {
+      const result = await processEquipmentRequestAtLogistics(
+        selectedTicket.id,
+        equipmentSource,
+        equipmentVendorName,
+        quotedCost,
+      );
+      if (!result.success) {
+        setEquipmentDecisionError(result.message);
+        return;
+      }
+      setEquipmentDecisionOpen(false);
+      setSelectedTicket(null);
+      router.refresh();
+    } catch (error) {
+      console.error("Logistics equipment decision failed:", error);
+      setEquipmentDecisionError(
+        "Pemrosesan gagal. Silakan muat ulang dan coba kembali.",
+      );
+    } finally {
+      setEquipmentDecisionPending(false);
+    }
+  };
+
   const printPurchaseOrder = async (ticketId: string, publicCode?: string) => {
     setPrintMessage("Menyiapkan PDF Purchase Order...");
     let pdfUrl: string | null = null;
@@ -741,7 +803,9 @@ export default function TicketListing({
     }
   };
 
-  const getTicketStageNumber = (status: TicketStatus): 1 | 2 | 3 | 4 => {
+  const getTicketStageNumber = (
+    status: TicketRow["status"],
+  ): 1 | 2 | 3 | 4 => {
     if (status === TicketStatus.DRAFT) return 1;
     if (status === TicketStatus.PENDING_DIRECTOR) return 2;
     if (status === TicketStatus.COMPLETED) return 4;
@@ -889,7 +953,9 @@ export default function TicketListing({
                             : ""
                         }`}
                       >
-                        {typeLabels[ticket.type]}
+                        {ticket.ticketType === EQUIPMENT_REQUEST_TYPE
+                          ? "Alat & Kendaraan"
+                          : typeLabels[ticket.type]}
                       </Badge>
                       <span className="inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
                         {ticket.project
@@ -968,8 +1034,7 @@ export default function TicketListing({
                           (canSubmit
                             ? {
                                 label: "Ajukan",
-                                run: (currentTicket: TicketRow) =>
-                                  submitTicket(currentTicket.id),
+                                run: submitTicketRequest,
                               }
                             : null);
                         const primaryDo = ticket.deliveryOrders?.[0];
@@ -1201,7 +1266,9 @@ export default function TicketListing({
         description={
           selectedTicket
             ? `${
-                selectedTicket.requestCategory
+                selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
+                  ? "Permintaan Alat & Kendaraan"
+                  : selectedTicket.requestCategory
                   ? requestCategoryLabels[selectedTicket.requestCategory]
                   : typeLabels[selectedTicket.type]
               } · Prioritas ${priorityLabels[selectedTicket.priority]} · Status: ${statusLabels[selectedTicket.status]}`
@@ -1247,11 +1314,32 @@ export default function TicketListing({
                     selectedTicket.canSubmit
                       ? {
                           label: "Ajukan ke Direktur",
-                          run: (currentTicket: TicketRow) =>
-                            submitTicket(currentTicket.id),
+                          run: submitTicketRequest,
                         }
                       : null);
                   const workflow = workflowFor(role, selectedTicket);
+                  if (
+                    role === UserRole.LOGISTICS &&
+                    selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE &&
+                    (selectedTicket.status === "PENDING_LOGISTIK" ||
+                      selectedTicket.status ===
+                        TicketStatus.PROCESSED_LOGISTIC)
+                  ) {
+                    return (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setEquipmentSource("INTERNAL");
+                          setEquipmentVendorName("");
+                          setEquipmentQuotedCost("");
+                          setEquipmentDecisionError("");
+                          setEquipmentDecisionOpen(true);
+                        }}
+                      >
+                        Proses Permintaan Alat
+                      </Button>
+                    );
+                  }
                   if (workflow) {
                     const labels = {
                       LOGISTICS: "Lanjutkan Proses Logistik (DO)",
@@ -1310,13 +1398,68 @@ export default function TicketListing({
         {selectedTicket && (() => {
           const parsedDesc = parseTicketDescription(selectedTicket.description);
           const categoryDisplay =
-            (selectedTicket.requestCategory &&
-              requestCategoryLabels[selectedTicket.requestCategory]) ||
-            parsedDesc.categoryFromDesc ||
-            typeLabels[selectedTicket.type];
+            selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
+              ? "Permintaan Alat & Kendaraan"
+              : (selectedTicket.requestCategory &&
+                  requestCategoryLabels[selectedTicket.requestCategory]) ||
+                parsedDesc.categoryFromDesc ||
+                typeLabels[selectedTicket.type];
 
           return (
             <div className="space-y-4">
+              {selectedTicket.equipmentDetails && (
+                <div className="rounded-xl border border-border bg-muted/20 p-3.5">
+                  <h3 className="text-sm font-semibold">Detail alat/kendaraan</h3>
+                  <dl className="mt-2 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <dt className="text-muted-foreground">Alat/kendaraan</dt>
+                      <dd>{selectedTicket.equipmentDetails.equipmentName || "-"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Tanggal pakai</dt>
+                      <dd>{selectedTicket.equipmentDetails.startDate || "-"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Lama pakai</dt>
+                      <dd>
+                        {selectedTicket.equipmentDetails.duration ?? "-"}{" "}
+                        {selectedTicket.equipmentDetails.timeUnit}
+                      </dd>
+                    </div>
+                    {selectedTicket.equipmentDetails.fulfillmentSource && (
+                      <div>
+                        <dt className="text-muted-foreground">Pemenuhan</dt>
+                        <dd>
+                          {selectedTicket.equipmentDetails.fulfillmentSource ===
+                          "INTERNAL"
+                            ? "Alat internal"
+                            : "Sewa vendor eksternal"}
+                        </dd>
+                      </div>
+                    )}
+                    {selectedTicket.equipmentDetails.vendorName && (
+                      <div>
+                        <dt className="text-muted-foreground">Vendor</dt>
+                        <dd>{selectedTicket.equipmentDetails.vendorName}</dd>
+                      </div>
+                    )}
+                    {selectedTicket.equipmentDetails.quotedCost != null && (
+                      <div>
+                        <dt className="text-muted-foreground">
+                          Estimasi biaya sewa
+                        </dt>
+                        <dd>
+                          {formatCurrency(
+                            String(
+                              selectedTicket.equipmentDetails.quotedCost,
+                            ),
+                          )}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              )}
               {/* 1. Alur Tahapan Visual 4 Langkah */}
               <div className="rounded-xl border border-border bg-muted/20 p-3.5">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -2156,6 +2299,129 @@ export default function TicketListing({
           </div>
           );
         })()}
+      </GlobalModal>
+
+      <GlobalModal
+        isOpen={equipmentDecisionOpen}
+        onClose={() => {
+          if (equipmentDecisionPending) return;
+          setEquipmentDecisionOpen(false);
+          setEquipmentDecisionError("");
+        }}
+        title="Proses Permintaan Alat"
+        description="Tentukan apakah kebutuhan dipenuhi dari aset internal atau melalui penyewaan vendor."
+        className="sm:max-w-xl"
+      >
+        <div className="space-y-4">
+          <RadioGroup
+            value={equipmentSource}
+            onValueChange={(value) =>
+              setEquipmentSource(
+                value === "EXTERNAL_VENDOR" ? "EXTERNAL_VENDOR" : "INTERNAL",
+              )
+            }
+            className="grid gap-3 sm:grid-cols-2"
+          >
+            <FormLabel
+              htmlFor="equipment-source-internal"
+              className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${
+                equipmentSource === "INTERNAL"
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card"
+              }`}
+            >
+              <RadioGroupItem
+                value="INTERNAL"
+                id="equipment-source-internal"
+              />
+              <span>
+                <span className="block font-semibold">Alat Internal</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Tandai permintaan selesai dengan aset perusahaan.
+                </span>
+              </span>
+            </FormLabel>
+            <FormLabel
+              htmlFor="equipment-source-vendor"
+              className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${
+                equipmentSource === "EXTERNAL_VENDOR"
+                  ? "border-primary bg-primary/10"
+                  : "border-border bg-card"
+              }`}
+            >
+              <RadioGroupItem
+                value="EXTERNAL_VENDOR"
+                id="equipment-source-vendor"
+              />
+              <span>
+                <span className="block font-semibold">Sewa Vendor Eksternal</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Kirim estimasi biaya sewa ke Finance untuk pembayaran.
+                </span>
+              </span>
+            </FormLabel>
+          </RadioGroup>
+          {equipmentSource === "EXTERNAL_VENDOR" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormLabel className="space-y-1.5 text-sm">
+                <span className="font-semibold">Nama Vendor</span>
+                <Input
+                  value={equipmentVendorName}
+                  onChange={(event) =>
+                    setEquipmentVendorName(event.target.value)
+                  }
+                  maxLength={160}
+                  placeholder="Nama penyedia alat"
+                  disabled={equipmentDecisionPending}
+                  required
+                />
+              </FormLabel>
+              <FormLabel className="space-y-1.5 text-sm">
+                <span className="font-semibold">Estimasi Biaya Sewa (IDR)</span>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={equipmentQuotedCost}
+                  onChange={(event) =>
+                    setEquipmentQuotedCost(event.target.value)
+                  }
+                  placeholder="Contoh: 1500000"
+                  disabled={equipmentDecisionPending}
+                  required
+                />
+              </FormLabel>
+            </div>
+          )}
+          {equipmentDecisionError && (
+            <p className="text-sm text-destructive" role="alert">
+              {equipmentDecisionError}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEquipmentDecisionOpen(false)}
+              disabled={equipmentDecisionPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={processEquipmentLogisticsDecision}
+              disabled={
+                equipmentDecisionPending ||
+                (equipmentSource === "EXTERNAL_VENDOR" &&
+                  (!equipmentVendorName.trim() ||
+                    !equipmentQuotedCost ||
+                    Number(equipmentQuotedCost) <= 0))
+              }
+            >
+              {equipmentDecisionPending ? "Menyimpan..." : "Simpan Keputusan"}
+            </Button>
+          </div>
+        </div>
       </GlobalModal>
 
       {/* Modal Konfirmasi Pemenuhan dari Stok Gudang */}

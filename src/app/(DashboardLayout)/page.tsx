@@ -215,9 +215,16 @@ export default async function DashboardPage() {
           project: { select: { name: true } },
         },
       }),
-    ]).then(([activeList, closedList]) =>
-      [...activeList, ...closedList].slice(0, 6),
-    ),
+    ]).then(([activeList, closedList]) => {
+      const seen = new Set<string>();
+      return [...activeList, ...closedList]
+        .filter((ticket) => {
+          if (seen.has(ticket.id)) return false;
+          seen.add(ticket.id);
+          return true;
+        })
+        .slice(0, 6);
+    }),
     prisma.workTask.groupBy({
       by: ["status"],
       where: {

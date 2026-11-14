@@ -963,6 +963,11 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public boolean isFirebasePushConfigured() {
+            return getResources().getIdentifier("google_app_id", "string", getPackageName()) != 0;
+        }
+
+        @JavascriptInterface
         public String consumePendingNotificationAction() {
             String url = pendingNotificationActionUrl;
             String id = pendingNotificationActionId;

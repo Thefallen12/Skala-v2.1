@@ -134,6 +134,12 @@ const projectManagerRoles: UserRole[] = [
   UserRole.DIRECTOR,
 ];
 
+const projectRabEditorRoles: UserRole[] = [
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+];
+
 const rapEditorRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
@@ -1703,6 +1709,15 @@ export async function saveProjectRab(
   if (!project || project.isDeleted) {
     return { success: false, message: "Proyek tidak ditemukan." };
   }
+  if (
+    !projectRabEditorRoles.includes(session.user.role) &&
+    !(isFieldPicRole(session.user.role) && project.fieldPicId === session.user.id)
+  ) {
+    return {
+      success: false,
+      message: "Hanya manajer proyek yang ditunjuk atau Direktur yang dapat mengubah RAB.",
+    };
+  }
 
   try {
     const totalRab = input.items.reduce(
@@ -2585,7 +2600,7 @@ export async function getProjectRap(projectId: string) {
       location: wp.location || "Pekerjaan Utama",
       volume: wp.proposedVolume ? decimalNumberFromScaledInteger(wp.proposedVolume) : 1,
       unit: wp.proposedUnit || "paket",
-      totalRab: Number(wp.proposedTotalWage),
+      totalRab: decimalNumberFromScaledInteger(wp.proposedTotalWage),
     })),
     totalRab: project?.pagu ? decimalNumberFromScaledInteger(project.pagu) : 0,
     totalBudget: project?.budget ? decimalNumberFromScaledInteger(project.budget) : 0,
@@ -2949,14 +2964,74 @@ export async function importDrtRabProject(input: {
 }
 
 export async function parseDrtRabFileAction(input: {
+  projectId: string;
   fileBase64: string;
   fileName: string;
 }) {
   const session = await auth();
-  if (!session?.user?.id || !projectManagerRoles.includes(session.user.role)) {
+  if (!session?.user?.id) {
     return {
       success: false,
-      message: "Akses manajer proyek atau Direktur diperlukan untuk memproses file RAB.",
+      message: "Silakan masuk untuk memproses file RAB.",
+      metadata: {
+        code: "",
+        title: "",
+        poktanName: "",
+        desa: "",
+        kecamatan: "",
+        kabupaten: "",
+        provinsi: "",
+        address: "",
+        activityName: "",
+        satuanKerja: "",
+        year: "",
+        landAreaHa: 0,
+        totalBudget: 0,
+      },
+      workItems: [],
+      materials: [],
+      laborRates: [],
+      divisions: [],
+    };
+  }
+  const project = input.projectId
+    ? await prisma.project.findFirst({
+        where: { id: input.projectId, isDeleted: false },
+        select: { fieldPicId: true },
+      })
+    : null;
+  if (!project) {
+    return {
+      success: false,
+      message: "Proyek tidak ditemukan.",
+      metadata: {
+        code: "",
+        title: "",
+        poktanName: "",
+        desa: "",
+        kecamatan: "",
+        kabupaten: "",
+        provinsi: "",
+        address: "",
+        activityName: "",
+        satuanKerja: "",
+        year: "",
+        landAreaHa: 0,
+        totalBudget: 0,
+      },
+      workItems: [],
+      materials: [],
+      laborRates: [],
+      divisions: [],
+    };
+  }
+  if (
+    !projectRabEditorRoles.includes(session.user.role) &&
+    !(isFieldPicRole(session.user.role) && project.fieldPicId === session.user.id)
+  ) {
+    return {
+      success: false,
+      message: "Hanya manajer proyek yang ditunjuk atau Direktur yang dapat memproses file RAB.",
       metadata: {
         code: "",
         title: "",

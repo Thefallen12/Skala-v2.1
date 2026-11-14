@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
+import { compressFieldImageFile } from "@/lib/image-compression-client";
 
 export default function ExpeditionArrivalModal({
   open,
@@ -37,7 +38,11 @@ export default function ExpeditionArrivalModal({
     setMessage("");
     startTransition(async () => {
       try {
-        const result = await receiveExpeditionDeliveryOrder(publicCode, photo);
+        const preparedPhoto = await compressFieldImageFile(photo);
+        const result = await receiveExpeditionDeliveryOrder(
+          publicCode,
+          preparedPhoto,
+        );
         setMessage(result.message);
         if (result.success) {
           setPhoto(null);
@@ -46,7 +51,11 @@ export default function ExpeditionArrivalModal({
         }
       } catch (error) {
         console.error("Expedition arrival confirmation failed:", error);
-        setMessage("Penerimaan material gagal. Silakan coba kembali.");
+        setMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Penerimaan material gagal. Silakan coba kembali.",
+        );
       }
     });
   };
@@ -91,7 +100,7 @@ export default function ExpeditionArrivalModal({
           <div className="flex items-center gap-2">
             <Input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/*,.heic,.heif"
               required
               disabled={isPending}
               onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}

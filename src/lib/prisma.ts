@@ -251,22 +251,135 @@ function resolveProjectRelation(projObj: any) {
   };
 }
 
+function resolvePurchaseOrderBase(po: any) {
+  if (!po) return null;
+  return {
+    vendorInvoiceUrl: null,
+    vendorPoSentAt: null,
+    paidAt: null,
+    paymentMethod: null,
+    paymentTerms: null,
+    paymentBankName: null,
+    paymentAccountNumber: null,
+    paymentAccountName: null,
+    includeTax: true,
+    ...po,
+    items: (po.items ?? []).map((item: any) => ({
+      itemCode: null,
+      ...item,
+    })),
+    vendor: store.vendors.find((v) => v.name === po.vendorName) ?? null,
+    approvedBy: store.users.find((u) => u.id === po.approvedById) ?? null,
+    reviewedBy: store.users.find((u) => u.id === po.reviewedById) ?? null,
+    createdBy: store.users.find((u) => u.id === "usr_admin") ?? null,
+    paymentTransactions: po.paymentTransactions ?? [],
+    invoices: po.invoices ?? [],
+    stockPurchases: po.stockPurchases ?? [],
+  };
+}
+
+function resolveDeliveryOrderBase(doDoc: any) {
+  if (!doDoc) return null;
+  return {
+    arrivalPhotoUrl: null,
+    deliveryReceiptUrl: null,
+    ...doDoc,
+    signedBy: store.users.find((u) => u.id === doDoc.signedById) ?? null,
+    acknowledgedBy: store.users.find((u) => u.id === doDoc.acknowledgedById) ?? null,
+    createdBy: store.users.find((u) => u.id === "usr_logistics") ?? null,
+    vehicle: store.vehicles.find((v) => v.id === doDoc.vehicleId) ?? null,
+    vehicleTripLog: null,
+    receiptPhotos: doDoc.receiptPhotos ?? [],
+    fuelRequests: doDoc.fuelRequests ?? [],
+  };
+}
+
 function resolveTicketRelation(ticketObj: any) {
   if (!ticketObj) return null;
   const requester = store.users.find((u) => u.id === ticketObj.requesterId);
   const project = store.projects.find((p) => p.id === ticketObj.projectId);
   const mover = store.users.find((u) => u.id === ticketObj.moverAssigneeId);
   return {
+    description: null,
+    requestPaymentMethod: null,
+    requestPaymentDescription: null,
+    transferDestination: null,
+    fulfillmentStatus: null,
+    totalAmount: null,
+    requestedAmount: null,
+    attachmentUrl: null,
+    paymentProofUrl: null,
+    purchaseReceiptUrl: null,
+    transferReceiptUrl: null,
+    deliveryReceiptUrl: null,
+    recipientName: null,
+    bankName: null,
+    accountNumber: null,
     ...ticketObj,
-    requester: requester ? { name: requester.name, bankName: requester.bankName, bankAccountName: requester.bankAccountName, bankAccountNumber: requester.bankAccountNumber } : { name: "Staf Proyek" },
-    project: project ? { title: project.title, name: project.name, kelompokTani: project.kelompokTani, location: project.location, vendor: project.vendor, clientName: project.clientName } : null,
+    requester: requester
+      ? {
+          name: requester.name,
+          bankName: requester.bankName ?? null,
+          bankAccountName: requester.bankAccountName ?? null,
+          bankAccountNumber: requester.bankAccountNumber ?? null,
+        }
+      : {
+          name: "Staf Proyek",
+          bankName: null,
+          bankAccountName: null,
+          bankAccountNumber: null,
+        },
+    project: project
+      ? {
+          title: project.title,
+          name: project.name,
+          kelompokTani: project.kelompokTani ?? null,
+          location: project.location ?? null,
+          vendor: project.vendor ?? null,
+          clientName: project.clientName ?? null,
+        }
+      : null,
     moverAssignee: mover ? { name: mover.name } : null,
-    items: ticketObj.items ?? [],
-    auditLogs: [],
-    purchaseOrders: store.purchaseOrders.filter((p) => p.ticketId === ticketObj.id),
-    directStockPurchases: [],
-    paymentTransactions: [],
-    deliveryOrders: store.deliveryOrders.filter((d) => d.ticketId === ticketObj.id),
+    receiptUrls: ticketObj.receiptUrls ?? [],
+    items: (ticketObj.items ?? []).map((item: any) => ({
+      stockItemId: null,
+      estimatedCost: null,
+      categoryHint: null,
+      expectedDeliveryDate: null,
+      poItemId: null,
+      doItemId: null,
+      ...item,
+    })),
+    auditLogs: ticketObj.auditLogs ?? [],
+    operationalDocuments: ticketObj.operationalDocuments ?? [],
+    purchaseOrders: store.purchaseOrders
+      .filter((p) => p.ticketId === ticketObj.id)
+      .map(resolvePurchaseOrderBase),
+    directStockPurchases: ticketObj.directStockPurchases ?? [],
+    paymentTransactions: ticketObj.paymentTransactions ?? [],
+    deliveryOrders: store.deliveryOrders
+      .filter((d) => d.ticketId === ticketObj.id)
+      .map(resolveDeliveryOrderBase),
+  };
+}
+
+function resolvePurchaseOrderRelation(po: any) {
+  if (!po) return null;
+  const ticket = store.tickets.find((t) => t.id === po.ticketId);
+  return {
+    ...resolvePurchaseOrderBase(po),
+    ticket: ticket ? resolveTicketRelation(ticket) : null,
+  };
+}
+
+function resolveDeliveryOrderRelation(doDoc: any) {
+  if (!doDoc) return null;
+  const ticket = store.tickets.find((t) => t.id === doDoc.ticketId);
+  const po = store.purchaseOrders.find((p) => p.id === doDoc.poId);
+  return {
+    ...resolveDeliveryOrderBase(doDoc),
+    ticket: ticket ? resolveTicketRelation(ticket) : null,
+    po: po ? resolvePurchaseOrderBase(po) : null,
   };
 }
 
@@ -279,29 +392,9 @@ function createModelHandler(modelName: string) {
       else if (modelName === "ticket") list = store.tickets.map(resolveTicketRelation);
       else if (modelName === "stockItem") list = store.stockItems;
       else if (modelName === "purchaseOrder") {
-        list = store.purchaseOrders.map((po) => ({
-          ...po,
-          vendor: store.vendors.find((v) => v.name === po.vendorName) ?? null,
-          ticket: store.tickets.find((t) => t.id === po.ticketId) ? resolveTicketRelation(store.tickets.find((t) => t.id === po.ticketId)) : null,
-          approvedBy: store.users.find((u) => u.id === po.approvedById) ?? null,
-          reviewedBy: store.users.find((u) => u.id === po.reviewedById) ?? null,
-          createdBy: store.users.find((u) => u.id === "usr_admin"),
-          paymentTransactions: [],
-          invoices: [],
-        }));
+        list = store.purchaseOrders.map(resolvePurchaseOrderRelation);
       } else if (modelName === "deliveryOrder") {
-        list = store.deliveryOrders.map((doDoc) => ({
-          ...doDoc,
-          ticket: store.tickets.find((t) => t.id === doDoc.ticketId) ? resolveTicketRelation(store.tickets.find((t) => t.id === doDoc.ticketId)) : null,
-          po: store.purchaseOrders.find((p) => p.id === doDoc.poId) ?? null,
-          signedBy: store.users.find((u) => u.id === doDoc.signedById) ?? null,
-          acknowledgedBy: store.users.find((u) => u.id === doDoc.acknowledgedById) ?? null,
-          createdBy: store.users.find((u) => u.id === "usr_logistics"),
-          vehicle: store.vehicles.find((v) => v.id === doDoc.vehicleId) ?? null,
-          vehicleTripLog: null,
-          receiptPhotos: [],
-          fuelRequests: [],
-        }));
+        list = store.deliveryOrders.map(resolveDeliveryOrderRelation);
       } else if (modelName === "workTask") {
         list = store.workTasks.map((t) => ({
           ...t,
@@ -362,6 +455,35 @@ function createModelHandler(modelName: string) {
         if (args.where.projectId) {
           list = list.filter((item) => item.projectId === args.where.projectId);
         }
+
+        // Dukungan filter status (in / notIn / equals), termasuk di dalam AND[]
+        const statusConditions: any[] = [];
+        if (args.where.status !== undefined) statusConditions.push(args.where.status);
+        if (Array.isArray(args.where.AND)) {
+          for (const clause of args.where.AND) {
+            if (clause && clause.status !== undefined) statusConditions.push(clause.status);
+          }
+        }
+        for (const cond of statusConditions) {
+          if (typeof cond === "string") {
+            list = list.filter((item) => item.status === cond);
+          } else if (cond && typeof cond === "object") {
+            if (Array.isArray(cond.in)) {
+              list = list.filter((item) => cond.in.includes(item.status));
+            }
+            if (Array.isArray(cond.notIn)) {
+              list = list.filter((item) => !cond.notIn.includes(item.status));
+            }
+          }
+        }
+      }
+
+      if (args.orderBy && !Array.isArray(args.orderBy) && args.orderBy.createdAt) {
+        const dir = args.orderBy.createdAt === "asc" ? 1 : -1;
+        list = [...list].sort(
+          (a, b) =>
+            (new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()) * dir,
+        );
       }
 
       if (args.take) {
@@ -394,10 +516,12 @@ function createModelHandler(modelName: string) {
         return t ? resolveTicketRelation(t) : null;
       }
       if (modelName === "purchaseOrder") {
-        return store.purchaseOrders.find((p) => p.publicCode === where.publicCode || p.id === where.id) ?? null;
+        const po = store.purchaseOrders.find((p) => p.publicCode === where.publicCode || p.id === where.id);
+        return po ? resolvePurchaseOrderRelation(po) : null;
       }
       if (modelName === "deliveryOrder") {
-        return store.deliveryOrders.find((d) => d.publicCode === where.publicCode || d.id === where.id) ?? null;
+        const doDoc = store.deliveryOrders.find((d) => d.publicCode === where.publicCode || d.id === where.id);
+        return doDoc ? resolveDeliveryOrderRelation(doDoc) : null;
       }
       if (modelName === "fieldSurvey") {
         const s = store.fieldSurveys.find((f) => f.id === where.id);

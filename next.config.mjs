@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 if (
     process.env.CLOUDINARY_URL &&
@@ -43,4 +44,20 @@ const nextConfig = {
     }
 };
 
-export default nextConfig;
+const hasSentryAuth = Boolean(process.env.SENTRY_AUTH_TOKEN?.trim());
+
+export default withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG?.trim() || "skala-prioritas",
+    project: process.env.SENTRY_PROJECT?.trim() || "skala-v21",
+    authToken: process.env.SENTRY_AUTH_TOKEN?.trim() || undefined,
+    silent: !process.env.CI,
+    telemetry: false,
+    widenClientFileUpload: true,
+    tunnelRoute: "/monitoring",
+    sourcemaps: {
+        disable: !hasSentryAuth,
+    },
+    release: {
+        create: hasSentryAuth,
+    },
+});

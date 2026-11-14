@@ -1,17 +1,23 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { NotificationType, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Cashflow from "@/models/cashflow";
+import FinanceAccount from "@/models/finance-account";
+import Notification from "@/models/notification";
+import { EquipmentRental } from "@/models/finance-records";
+import User from "@/models/user";
 import { sendNotification } from "@/lib/notifications";
 import {
   decimalNumberFromScaledInteger,
   decimalStringFromScaledInteger,
   scaledIntegerFromDecimal,
 } from "@/lib/scaled-decimal";
-import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
 
 const allowedRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
@@ -382,66 +388,106 @@ export async function processRentalPayment(input: {
     };
   }
 
-  const rental = await prisma.equipmentRental.findUnique({
-    where: { id: input.rentalId },
-  });
-  if (!rental) {
-    return { success: false, message: "Data sewa tidak ditemukan." };
-  }
-
-  const totalAmount = decimalNumberFromScaledInteger(rental.totalCost);
-
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.equipmentRental.update({
-        where: { id: input.rentalId },
-        data: {
-          paymentStatus: "PAID",
-          paidAt: new Date(),
-          paidById: session.user.id,
-          paidByName: session.user.name || null,
-          proofOfPaymentUrl: input.proofOfPaymentUrl,
-          paymentBankName: input.paymentBankName || rental.paymentBankName,
-          paymentAccountNumber: input.paymentAccountNumber || rental.paymentAccountNumber,
-          paymentAccountName: input.paymentAccountName || rental.paymentAccountName,
-          financeNotes: input.financeNotes || null,
-        },
-      });
+    const mongoose = await connectToMongoDB();
+    const rental = await mongoose.connection.transaction(async (mongoSession) => {
+      const current = await EquipmentRental.findById(input.rentalId)
+        .session(mongoSession)
+        .lean();
+      if (!current) throw new Error("Data sewa tidak ditemukan.");
+      if (current.paymentStatus !== "PENDING_PAYMENT") {
+        throw new Error("Tagihan sewa belum diajukan atau sudah dibayar.");
+      }
 
+      const totalAmount = decimalNumberFromScaledInteger(current.totalCost);
+      const paidAt = new Date();
       if (input.financeAccountId && totalAmount > 0) {
-        await recordFinanceCashflowOutflow(tx, {
-          financeAccountId: input.financeAccountId,
-          amount: totalAmount,
-          sourceDesc: `Pelunasan Sewa ${rental.type === "EQUIPMENT" ? "Alat" : "Kendaraan"} · ${rental.name} (${rental.vendorName})`,
-          projectId: rental.projectId,
-          paymentMethod: "TRANSFER",
-          proofUrl: input.proofOfPaymentUrl,
-          recordedBy: session.user.id,
-        });
+        const account = await FinanceAccount.findOneAndUpdate(
+          {
+            _id: input.financeAccountId,
+            balance: { $gte: totalAmount },
+          },
+          { $inc: { balance: -totalAmount } },
+          { new: true, session: mongoSession },
+        ).select({ _id: 1 });
+        if (!account) {
+          const exists = await FinanceAccount.exists({
+            _id: input.financeAccountId,
+          }).session(mongoSession);
+          throw new Error(
+            exists
+              ? "Saldo buku bank/kas tidak mencukupi."
+              : "Buku bank/kas sumber pembayaran tidak ditemukan.",
+          );
+        }
+        await Cashflow.create(
+          [
+            {
+              _id: randomUUID(),
+              type: "OUT",
+              amount: totalAmount,
+              sourceDesc: `Pelunasan Sewa ${current.type === "EQUIPMENT" ? "Alat" : "Kendaraan"} · ${current.name} (${current.vendorName})`,
+              projectId: current.projectId,
+              paymentMethod: "TRANSFER",
+              proofUrl: input.proofOfPaymentUrl,
+              accountId: input.financeAccountId,
+              recordedBy: session.user.id,
+              createdAt: paidAt,
+            },
+          ],
+          { session: mongoSession },
+        );
       }
 
-      if (
-        rental.billingSubmittedById &&
-        rental.billingSubmittedById !== session.user.id
-      ) {
-        await sendNotification({
-          userId: rental.billingSubmittedById,
-          title: "Pembayaran Sewa Selesai",
-          message: `Tagihan sewa ${rental.type === "EQUIPMENT" ? "alat" : "kendaraan"} ${rental.name} (${rental.vendorName}) sebesar Rp${totalAmount.toLocaleString("id-ID")} telah dibayar lunas Keuangan.`,
-          actionUrl: "/apps/logistics?tab=equipment",
-          type: NotificationType.SUCCESS,
-          database: tx,
-        });
-      } else if (!rental.billingSubmittedById) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "Pembayaran Sewa Selesai",
-          message: `Tagihan sewa ${rental.type === "EQUIPMENT" ? "alat" : "kendaraan"} ${rental.name} (${rental.vendorName}) sebesar Rp${totalAmount.toLocaleString("id-ID")} telah dibayar lunas Keuangan.`,
-          actionUrl: "/apps/logistics?tab=equipment",
-          type: NotificationType.SUCCESS,
-          database: tx,
-        });
+      const updated = await EquipmentRental.updateOne(
+        { _id: input.rentalId, paymentStatus: "PENDING_PAYMENT" },
+        {
+          $set: {
+            paymentStatus: "PAID",
+            paidAt,
+            paidById: session.user.id,
+            paidByName: session.user.name || null,
+            proofOfPaymentUrl: input.proofOfPaymentUrl,
+            paymentBankName: input.paymentBankName || current.paymentBankName,
+            paymentAccountNumber:
+              input.paymentAccountNumber || current.paymentAccountNumber,
+            paymentAccountName:
+              input.paymentAccountName || current.paymentAccountName,
+            financeNotes: input.financeNotes || null,
+            updatedAt: paidAt,
+          },
+        },
+        { session: mongoSession },
+      );
+      if (updated.modifiedCount !== 1) {
+        throw new Error("Status tagihan sewa berubah. Muat ulang sebelum membayar.");
       }
+
+      const recipientIds = current.billingSubmittedById
+        ? current.billingSubmittedById !== session.user.id
+          ? [current.billingSubmittedById]
+          : []
+        : (
+            await User.find({ isActive: true, role: UserRole.LOGISTICS })
+              .select({ _id: 1 })
+              .session(mongoSession)
+              .lean()
+          ).map((user) => String(user._id));
+      if (recipientIds.length) {
+        await Notification.insertMany(
+          recipientIds.map((userId) => ({
+            _id: randomUUID(),
+            userId,
+            title: "Pembayaran Sewa Selesai",
+            message: `Tagihan sewa ${current.type === "EQUIPMENT" ? "alat" : "kendaraan"} ${current.name} (${current.vendorName}) sebesar Rp${totalAmount.toLocaleString("id-ID")} telah dibayar lunas Keuangan.`,
+            type: NotificationType.SUCCESS,
+            actionUrl: "/apps/logistics?tab=equipment",
+            createdAt: paidAt,
+          })),
+          { session: mongoSession },
+        );
+      }
+      return current;
     });
 
     revalidatePath("/apps/logistics");

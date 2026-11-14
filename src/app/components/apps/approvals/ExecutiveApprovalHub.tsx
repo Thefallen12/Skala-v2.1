@@ -20,6 +20,15 @@ import {
   rejectTicketByDirector,
   requestTicketRevisionByDirector,
 } from "@/app/actions/tickets";
+import {
+  approveEquipmentRequest,
+  rejectEquipmentRequest,
+  requestEquipmentRequestRevision,
+} from "@/app/actions/equipment-requests";
+import {
+  EQUIPMENT_REQUEST_TYPE,
+  type EquipmentRequestType,
+} from "@/lib/equipment-request";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,6 +97,7 @@ type ApprovalTicket = {
   title: string;
   description?: string | null;
   type: TicketType;
+  ticketType?: EquipmentRequestType | null;
   priority?: TicketPriority;
   requestCategory?: TicketRequestCategory | null;
   requestPaymentMethod?: POPaymentMethod | null;
@@ -657,16 +667,20 @@ export default function ExecutiveApprovalHub({
 
     runApproval(() =>
       decision === "REJECT"
-        ? rejectTicketByDirector(
-            selectedTicket.id,
-            selectedTicket.type,
-            reason,
-          )
-        : requestTicketRevisionByDirector(
-            selectedTicket.id,
-            selectedTicket.type,
-            reason,
-          ),
+        ? selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
+          ? rejectEquipmentRequest(selectedTicket.id, reason)
+          : rejectTicketByDirector(
+              selectedTicket.id,
+              selectedTicket.type,
+              reason,
+            )
+        : selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
+          ? requestEquipmentRequestRevision(selectedTicket.id, reason)
+          : requestTicketRevisionByDirector(
+              selectedTicket.id,
+              selectedTicket.type,
+              reason,
+            ),
     );
   };
 
@@ -704,7 +718,10 @@ export default function ExecutiveApprovalHub({
           id: `ticket:${ticket.id}`,
           code: ticket.ticketNumber,
           title: ticket.title,
-          categoryLabel: ticketTypeLabelMap[ticket.type] ?? "Tiket",
+          categoryLabel:
+            ticket.ticketType === EQUIPMENT_REQUEST_TYPE
+              ? "Permintaan Alat & Kendaraan"
+              : ticketTypeLabelMap[ticket.type] ?? "Tiket",
           subCategoryKey: "TICKET",
           priority: ticket.priority,
           counterparty: ticket.requesterName,
@@ -2050,17 +2067,22 @@ export default function ExecutiveApprovalHub({
                       disabled={isPending}
                       onClick={() =>
                         runApproval(() =>
-                          approveByDirector(
-                            selectedTicket.id,
-                            selectedTicket.type,
-                          ),
+                          selectedTicket.ticketType ===
+                            EQUIPMENT_REQUEST_TYPE
+                            ? approveEquipmentRequest(selectedTicket.id)
+                            : approveByDirector(
+                                selectedTicket.id,
+                                selectedTicket.type,
+                              ),
                         )
                       }
                     >
                       <CheckCircle2 className="mr-1.5 size-4" />
                       {isPending
                         ? "Memproses..."
-                        : selectedTicket.type === TicketType.MATERIAL
+                        : selectedTicket.ticketType ===
+                            EQUIPMENT_REQUEST_TYPE ||
+                          selectedTicket.type === TicketType.MATERIAL
                           ? "Setujui & Teruskan ke Logistik"
                           : "Setujui Pencairan Dana"}
                     </Button>

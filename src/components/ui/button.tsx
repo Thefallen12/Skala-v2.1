@@ -80,6 +80,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Comp
         className={cn(buttonVariants({ variant, size, shape, className }))}
         ref={ref}
+        // Ekstensi browser (autofill/password manager) menyisipkan atribut
+        // seperti fdprocessedid sebelum hidrasi; abaikan mismatch atribut tombol.
+        suppressHydrationWarning
         {...props}
       />
     )

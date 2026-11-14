@@ -14,6 +14,10 @@ import type {
   OperationalDocumentStatus,
   POStatus,
 } from "@prisma/client";
+import type {
+  EquipmentRequestType,
+  EquipmentTimeUnit,
+} from "@/lib/equipment-request";
 
 export type TicketRow = {
   id: string;
@@ -21,13 +25,24 @@ export type TicketRow = {
   title: string;
   description: string | null;
   type: TicketType;
+  ticketType?: EquipmentRequestType | null;
+  equipmentDetails?: {
+    equipmentName: string | null;
+    startDate: string | null;
+    duration: number | null;
+    timeUnit: EquipmentTimeUnit;
+    fulfillmentSource?: "INTERNAL" | "EXTERNAL_VENDOR" | null;
+    vendorName?: string | null;
+    quotedCost?: number | null;
+    processedAt?: string | null;
+  } | null;
   requestCategory: TicketRequestCategory | null;
   fieldCategory: TicketFieldCategory | null;
   requestPaymentMethod: POPaymentMethod | null;
   requestPaymentDescription: string | null;
   transferDestination: string | null;
   priority: TicketPriority;
-  status: TicketStatus;
+  status: TicketStatus | "PENDING_LOGISTIK";
   fulfillmentStatus: TicketFulfillmentStatus;
   canSubmit: boolean;
   canRequesterEdit: boolean;

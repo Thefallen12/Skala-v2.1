@@ -34,6 +34,7 @@ import {
   measureSurveyGeoJSON,
   type SurveyGeoJSON,
 } from "@/lib/field-survey-geojson";
+import { compressFieldImageFile } from "@/lib/image-compression-client";
 import type { FieldSurveySummary, SurveyProjectOption } from "./SurveySidebar";
 
 const formSchema = z.object({
@@ -200,6 +201,13 @@ export default function SurveyForm({
         return;
       }
 
+      const compressedPhotoFiles = await Promise.all(
+        documentationPhotos.map(async (item) => ({
+          ...item,
+          file: await compressFieldImageFile(item.file),
+        })),
+      );
+
       const result = await saveFieldSurvey({
         projectId: values.projectId,
         locationName: values.surveyName,
@@ -211,7 +219,7 @@ export default function SurveyForm({
         landOwnership: values.landOwnership,
         notes: values.notes,
         documentationUrls: values.documentationUrls,
-        documentationPhotoFiles: documentationPhotos,
+        documentationPhotoFiles: compressedPhotoFiles,
         geoJsonData,
         surveyType: "REHAB_SAWAH",
         features: geoJsonData.features
@@ -616,7 +624,7 @@ export default function SurveyForm({
                   <input
                     ref={photoInputRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*,.heic,.heif"
                     multiple
                     hidden
                     onChange={(event) => {
@@ -629,15 +637,8 @@ export default function SurveyForm({
                         setUploadError("Maksimal 10 foto dokumentasi per survei.");
                         return;
                       }
-                      if (
-                        selected.some(
-                          (file) =>
-                            file.size < 1 ||
-                            file.size > 8 * 1024 * 1024 ||
-                            !["image/jpeg", "image/png", "image/webp"].includes(file.type),
-                        )
-                      ) {
-                        setUploadError("Pilih foto JPG, PNG, atau WEBP maksimal 8 MB.");
+                      if (selected.some((file) => file.size < 1)) {
+                        setUploadError("File foto kosong.");
                         return;
                       }
                       if (!navigator.geolocation) {

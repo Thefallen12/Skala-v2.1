@@ -20,6 +20,10 @@ import {
 } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Notification from "@/models/notification";
+import PurchaseOrder from "@/models/purchase-order";
+import User from "@/models/user";
 import { resolveVendorBankAccount } from "@/lib/vendor-bank-accounts";
 import {
   generateAvailablePublicCode,
@@ -697,37 +701,55 @@ export async function reviewPurchaseOrder(
   }
 
   try {
-    const result = await prisma.$transaction(async (transaction) => {
-      const update = await transaction.purchaseOrder.updateMany({
-        where: {
-          publicCode,
-          status: {
-            in: [POStatus.DRAFT, POStatus.PENDING_FINANCE_REVIEW],
+    const mongoose = await connectToMongoDB();
+    const reviewedAt = new Date();
+    const updatedOrder = await mongoose.connection.transaction(
+      async (mongoSession) => {
+        const order = await PurchaseOrder.findOneAndUpdate(
+          {
+            publicCode,
+            status: {
+              $in: [POStatus.DRAFT, POStatus.PENDING_FINANCE_REVIEW],
+            },
           },
-        },
-        data: {
-          status: POStatus.PENDING_APPROVAL,
-          reviewedById: session.user.id,
-          reviewedAt: new Date(),
-        },
-      });
-      if (update.count === 1) {
-        const order = await transaction.purchaseOrder.findUniqueOrThrow({
-          where: { publicCode },
-          select: { poNumber: true },
-        });
-        await sendNotification({
-          roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
-          title: "PO Menunggu Tanda Tangan",
-          message: `PO #${order.poNumber} Butuh Persetujuan & QR Sign.`,
-          actionUrl: `/apps/approvals?tab=po&openSheet=${encodeURIComponent(publicCode)}`,
-          type: NotificationType.APPROVAL,
-          database: transaction,
-        });
-      }
-      return update;
-    });
-    if (result.count !== 1) {
+          {
+            $set: {
+              status: POStatus.PENDING_APPROVAL,
+              reviewedById: session.user.id,
+              reviewedAt,
+            },
+          },
+          { new: true, session: mongoSession },
+        )
+          .select({ _id: 1, poNumber: 1 })
+          .lean();
+        if (!order) return null;
+
+        const recipients = await User.find({
+          isActive: true,
+          role: { $in: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR] },
+        })
+          .select({ _id: 1 })
+          .session(mongoSession)
+          .lean();
+        if (recipients.length) {
+          await Notification.insertMany(
+            recipients.map((recipient) => ({
+              _id: randomUUID(),
+              userId: String(recipient._id),
+              title: "PO Menunggu Tanda Tangan",
+              message: `PO #${order.poNumber} Butuh Persetujuan & QR Sign.`,
+              type: NotificationType.APPROVAL,
+              actionUrl: `/apps/approvals?tab=po&openSheet=${encodeURIComponent(publicCode)}`,
+              createdAt: reviewedAt,
+            })),
+            { session: mongoSession },
+          );
+        }
+        return order;
+      },
+    );
+    if (!updatedOrder) {
       return fail("PO tidak ditemukan atau sudah masuk proses persetujuan.");
     }
   } catch (error) {

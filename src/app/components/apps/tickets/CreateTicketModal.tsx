@@ -22,6 +22,7 @@ import {
   createTicket,
   getShippingDocumentOptions,
 } from "@/app/actions/tickets";
+import { createEquipmentRequest } from "@/app/actions/equipment-requests";
 import type { ShippingDocumentOptions } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
@@ -55,15 +56,24 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { formatRupiahNumber, parseRupiahInput } from "@/lib/indonesian-currency";
+import {
+  DEFAULT_EQUIPMENT_TIME_UNIT,
+  EQUIPMENT_REQUEST_TYPE,
+  EQUIPMENT_TIME_UNITS,
+  EQUIPMENT_TIME_UNIT_LABELS,
+} from "@/lib/equipment-request";
 
-const requestCategories = Object.values(TicketRequestCategory);
+const requestCategorySchema = z
+  .nativeEnum(TicketRequestCategory)
+  .or(z.literal(EQUIPMENT_REQUEST_TYPE));
+type RequestCategoryValue = z.infer<typeof requestCategorySchema>;
 const fieldCategories = Object.values(TicketFieldCategory).filter(
   (category) => category !== TicketFieldCategory.DIRECT_STORE,
 );
 const itemCategoryHints = Object.values(TicketCategoryHint);
 const priorities = ["NON_URGENT", "URGENT", "EMERGENCY"] as const;
 
-const requestCategoryLabels: Record<TicketRequestCategory, string> = {
+const requestCategoryLabels: Record<RequestCategoryValue, string> = {
   OPS: "Operasional (OPS)",
   MATERIAL: "Belanja Material",
   WAREHOUSE: "Permintaan Material dari Gudang",
@@ -74,6 +84,7 @@ const requestCategoryLabels: Record<TicketRequestCategory, string> = {
   KASBON: "Kasbon / Ambilan",
   OPERATING_EXPENSE: "Biaya Operasional",
   SHIPPING_COST: "Pengiriman Barang PO",
+  [EQUIPMENT_REQUEST_TYPE]: "Permintaan Alat Berat & Kendaraan",
 };
 
 const internalFundingCategories = [
@@ -83,7 +94,7 @@ const internalFundingCategories = [
 ] as const;
 
 const isInternalFundingCategory = (
-  category: TicketRequestCategory,
+  category: RequestCategoryValue,
 ): category is (typeof internalFundingCategories)[number] =>
   internalFundingCategories.some((value) => value === category);
 
@@ -97,7 +108,7 @@ const ticketFormSchema = z
   .object({
     projectId: z.string(),
     moverAssigneeId: z.string().optional(),
-    requestCategory: z.enum(requestCategories),
+    requestCategory: requestCategorySchema,
     fieldCategory: z.enum(fieldCategories).optional(),
     priority: z.enum(priorities),
     neededDate: z.date().optional(),
@@ -154,14 +165,23 @@ const ticketFormSchema = z
       .positive()
       .max(Number.MAX_SAFE_INTEGER)
       .optional(),
+    equipmentDetails: z.object({
+      equipmentName: z.string().optional(),
+      startDate: z.string().optional(),
+      duration: z.number().optional(),
+      timeUnit: z.enum(EQUIPMENT_TIME_UNITS),
+    }),
   })
   .superRefine((values, context) => {
     const projectLinkedRequest =
       values.requestCategory === TicketRequestCategory.MATERIAL ||
       values.requestCategory === TicketRequestCategory.WAREHOUSE ||
-      values.requestCategory === TicketRequestCategory.FIELD;
+      values.requestCategory === TicketRequestCategory.FIELD ||
+      values.requestCategory === EQUIPMENT_REQUEST_TYPE;
     const isAPHRequest = values.requestCategory === TicketRequestCategory.APH;
     const isInternalFunding = isInternalFundingCategory(values.requestCategory);
+    const isEquipmentRequest =
+      values.requestCategory === EQUIPMENT_REQUEST_TYPE;
     const isShippingCostRequest =
       values.requestCategory === TicketRequestCategory.SHIPPING_COST;
     if (projectLinkedRequest && !values.projectId) {
@@ -191,6 +211,7 @@ const ticketFormSchema = z
       !usesItemDeliveryDates &&
       !isAPHRequest &&
       !isInternalFunding &&
+      !isEquipmentRequest &&
       (!values.neededDate || Number.isNaN(values.neededDate.getTime()))
     ) {
       context.addIssue({
@@ -237,6 +258,57 @@ const ticketFormSchema = z
         path: ["fieldCategory"],
         message: "Pilih jenis kebutuhan lapangan.",
       });
+    }
+    if (isEquipmentRequest) {
+      if (
+        !values.equipmentDetails.equipmentName?.trim() ||
+        values.equipmentDetails.equipmentName.trim().length < 2 ||
+        values.equipmentDetails.equipmentName.trim().length > 120
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["equipmentDetails", "equipmentName"],
+          message: "Nama alat/kendaraan wajib diisi (maksimal 120 karakter).",
+        });
+      }
+      if (
+        !values.equipmentDetails.startDate ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(values.equipmentDetails.startDate) ||
+        (() => {
+          const parsedDate = new Date(
+            `${values.equipmentDetails.startDate}T00:00:00.000Z`,
+          );
+          return (
+            Number.isNaN(parsedDate.getTime()) ||
+            parsedDate.toISOString().slice(0, 10) !==
+              values.equipmentDetails.startDate
+          );
+        })()
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["equipmentDetails", "startDate"],
+          message: "Tanggal mulai pemakaian wajib diisi.",
+        });
+      }
+      if (
+        values.equipmentDetails.duration === undefined ||
+        !Number.isFinite(values.equipmentDetails.duration) ||
+        values.equipmentDetails.duration <= 0
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["equipmentDetails", "duration"],
+          message: "Lama pemakaian harus lebih besar dari 0.",
+        });
+      }
+      if (values.items.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["items"],
+          message: "Permintaan alat tidak menggunakan rincian barang.",
+        });
+      }
     }
     if (isAPHRequest) {
       if (!values.requestPaymentMethod) {
@@ -407,7 +479,12 @@ const ticketFormSchema = z
           });
         }
       }
-    } else if (isAPHRequest || isInternalFunding || isShippingCostRequest) {
+    } else if (
+      isAPHRequest ||
+      isInternalFunding ||
+      isShippingCostRequest ||
+      isEquipmentRequest
+    ) {
       if (values.items.length > 0) {
         context.addIssue({
           code: "custom",
@@ -481,8 +558,8 @@ const formatCurrency = (amount: number) =>
 const getRequestTypeOptions = (
   role?: UserRole,
   selectedProjectId?: string,
-): { label: string; value: TicketRequestCategory }[] => {
-  const options: { label: string; value: TicketRequestCategory }[] = [
+): { label: string; value: RequestCategoryValue }[] => {
+  const options: { label: string; value: RequestCategoryValue }[] = [
     {
       label: "Operasional (OPS)",
       value: TicketRequestCategory.OPS,
@@ -509,6 +586,12 @@ const getRequestTypeOptions = (
       options.push({
         label: requestCategoryLabels[TicketRequestCategory.FIELD],
         value: TicketRequestCategory.FIELD,
+      });
+    }
+    if (role === UserRole.FIELD_TEAM || role === UserRole.KOORDINATOR) {
+      options.push({
+        label: "Permintaan Alat Berat & Kendaraan",
+        value: EQUIPMENT_REQUEST_TYPE,
       });
     }
   }
@@ -574,6 +657,7 @@ export default function CreateTicketModal({
   triggerLabel = "Tambah Tiket Baru",
   defaultOpen = false,
   defaultRequestCategory,
+  fixedProjectId,
   initialWageRequest,
 }: {
   projects: TicketProjectOption[];
@@ -587,7 +671,8 @@ export default function CreateTicketModal({
   movers?: Array<{ id: string; name: string }>;
   triggerLabel?: string;
   defaultOpen?: boolean;
-  defaultRequestCategory?: TicketRequestCategory;
+  defaultRequestCategory?: RequestCategoryValue;
+  fixedProjectId?: string;
   initialWageRequest?: {
     projectId: string;
     projectTitle: string;
@@ -615,7 +700,7 @@ export default function CreateTicketModal({
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
     defaultValues: {
-      projectId: initialWageRequest?.projectId ?? "",
+      projectId: initialWageRequest?.projectId ?? fixedProjectId ?? "",
       moverAssigneeId: "",
       requestCategory: initialWageRequest
         ? TicketRequestCategory.FIELD
@@ -650,6 +735,12 @@ export default function CreateTicketModal({
       surveyConsumptionAmount: 0,
       surveyFuelAmount: 0,
       requestedAmount: undefined,
+      equipmentDetails: {
+        equipmentName: "",
+        startDate: "",
+        duration: undefined,
+        timeUnit: DEFAULT_EQUIPMENT_TIME_UNIT,
+      },
     },
   });
   const { fields, append, remove, replace } = useFieldArray({
@@ -744,8 +835,35 @@ export default function CreateTicketModal({
           : TicketCategoryHint.PURCHASE,
       );
       form.setValue("itemsExpectedDeliveryDate", "");
+    } else if (requestCategory === EQUIPMENT_REQUEST_TYPE) {
+      form.setValue(
+        "items",
+        [
+          {
+            stockItemId: "",
+            itemName: "",
+            unit: "",
+            quantity: 1,
+            estimatedCost: undefined,
+            categoryHint: TicketCategoryHint.PURCHASE,
+            expectedDeliveryDate: "",
+          },
+        ],
+        { shouldValidate: true },
+      );
+      form.setValue("itemSource", TicketCategoryHint.PURCHASE);
+      form.setValue("itemsExpectedDeliveryDate", "");
     } else {
       form.setValue("items", [], { shouldValidate: true });
+    }
+    if (nextRequestCategory !== EQUIPMENT_REQUEST_TYPE) {
+      form.setValue("equipmentDetails.equipmentName", "");
+      form.setValue("equipmentDetails.startDate", "");
+      form.setValue("equipmentDetails.duration", undefined);
+      form.setValue(
+        "equipmentDetails.timeUnit",
+        DEFAULT_EQUIPMENT_TIME_UNIT,
+      );
     }
     form.clearErrors(["fieldCategory", "items"]);
   }, [form, requestCategory, requestTypeOptions]);
@@ -754,6 +872,7 @@ export default function CreateTicketModal({
     fieldCategory !== undefined;
   const isOperationalFunding =
     requestCategory === TicketRequestCategory.OPS;
+  const isEquipmentRequest = requestCategory === EQUIPMENT_REQUEST_TYPE;
   const isAPHRequest = requestCategory === TicketRequestCategory.APH;
   const isInternalFunding = isInternalFundingCategory(requestCategory);
   const isShippingCostRequest =
@@ -834,7 +953,8 @@ export default function CreateTicketModal({
     isOperationalFunding ||
     isAPHRequest ||
     isInternalFunding ||
-    isShippingCostRequest;
+    isShippingCostRequest ||
+    isEquipmentRequest;
   const operationalRequestedAmount =
     operationalRequestType === "SURVEY"
       ? (watchedSurveyConsumptionAmount ?? 0) + (watchedSurveyFuelAmount ?? 0)
@@ -855,6 +975,7 @@ export default function CreateTicketModal({
       !usesItemDeliveryDates &&
       !isAPHRequest &&
       !isInternalFunding &&
+      !isEquipmentRequest &&
       !values.neededDate
     ) {
       setError("Pilih tanggal perlu dibayarkan/disediakan terlebih dahulu.");
@@ -878,7 +999,9 @@ export default function CreateTicketModal({
     const conciseTitle = `${categoryLabel}: ${
       shortDetail.length > 50 ? `${shortDetail.slice(0, 47).trimEnd()}...` : shortDetail
     }`;
-    const title = isOperationalFunding
+    const title = isEquipmentRequest
+      ? `${categoryLabel}: ${values.equipmentDetails.equipmentName?.trim() ?? ""}`.slice(0, 160)
+      : isOperationalFunding
       ? `Operasional: ${operationalRequestLabel}`
       : isAPHRequest
         ? "Permintaan APH"
@@ -936,6 +1059,9 @@ export default function CreateTicketModal({
       values.neededDate
         ? `Tanggal perlu dibayarkan/disediakan: ${format(values.neededDate, "yyyy-MM-dd")}`
         : null,
+      isEquipmentRequest
+        ? `Nama alat/kendaraan: ${values.equipmentDetails.equipmentName?.trim()}\nTanggal mulai pemakaian: ${values.equipmentDetails.startDate}\nDurasi pemakaian: ${values.equipmentDetails.duration} ${values.equipmentDetails.timeUnit.toLowerCase()}`
+        : null,
       values.itemSource === TicketCategoryHint.WAREHOUSE &&
       values.itemsExpectedDeliveryDate
         ? `Tanggal diperlukan untuk seluruh barang gudang: ${values.itemsExpectedDeliveryDate}`
@@ -959,64 +1085,73 @@ export default function CreateTicketModal({
           : TicketPriority.LOW;
 
     try {
-      const result = await createTicket({
-        title,
-        description,
-        type: ticketType,
-        requestCategory: values.requestCategory,
-        fieldCategory: values.fieldCategory,
-        requestPaymentMethod: isAPHRequest
-          ? values.requestPaymentMethod
-          : undefined,
-        transferDestination:
-          isAPHRequest &&
-          values.requestPaymentMethod === POPaymentMethod.TRANSFER
-            ? values.transferDestination
-            : undefined,
-        requestPaymentDescription: isAPHRequest
-          ? values.requestPaymentDescription
-          : undefined,
-        relatedDocumentNumbers: isShippingCostRequest
-          ? values.relatedDocumentNumbers
-          : undefined,
-        deliveryReceiptFile: isShippingCostRequest
-          ? values.deliveryReceiptFile ?? undefined
-          : undefined,
-        priority,
-        projectId: values.projectId || undefined,
-        moverAssigneeId: undefined,
-        recipientName: requiresRecipientPayment
-          ? values.recipientName
-          : undefined,
-        bankName: requiresRecipientPayment ? values.bankName : undefined,
-        accountNumber: requiresRecipientPayment
-          ? values.accountNumber
-          : undefined,
-        requestedAmount: requiresRecipientPayment
-          ? values.requestedAmount
-          : isOperationalFunding
-            ? operationalAmount
-            : isAPHRequest || isInternalFunding || isShippingCostRequest
-              ? values.requestedAmount
+      const result = values.requestCategory === EQUIPMENT_REQUEST_TYPE
+        ? await createEquipmentRequest({
+            projectId: values.projectId,
+            equipmentName: values.equipmentDetails.equipmentName ?? "",
+            startDate: values.equipmentDetails.startDate ?? "",
+            duration: values.equipmentDetails.duration ?? 0,
+            timeUnit: values.equipmentDetails.timeUnit,
+            priority,
+          })
+        : await createTicket({
+            title,
+            description,
+            type: ticketType,
+            requestCategory: values.requestCategory,
+            fieldCategory: values.fieldCategory,
+            requestPaymentMethod: isAPHRequest
+              ? values.requestPaymentMethod
               : undefined,
-        receiptFiles: isInternalFunding ? values.receiptFiles : [],
-        items: requiresFundingRequest
-          ? []
-          : values.items.map((item) => ({
-              ...(item.stockItemId
-                ? { stockItemId: item.stockItemId }
-                : {}),
-              itemName: item.itemName ?? "",
-              quantity: item.quantity ?? 0,
-              unit: item.unit ?? "",
-              estimatedCost: undefined,
-              categoryHint: values.itemSource,
-              expectedDeliveryDate:
-                values.itemSource === TicketCategoryHint.WAREHOUSE
-                  ? values.itemsExpectedDeliveryDate
+            transferDestination:
+              isAPHRequest &&
+              values.requestPaymentMethod === POPaymentMethod.TRANSFER
+                ? values.transferDestination
+                : undefined,
+            requestPaymentDescription: isAPHRequest
+              ? values.requestPaymentDescription
+              : undefined,
+            relatedDocumentNumbers: isShippingCostRequest
+              ? values.relatedDocumentNumbers
+              : undefined,
+            deliveryReceiptFile: isShippingCostRequest
+              ? values.deliveryReceiptFile ?? undefined
+              : undefined,
+            priority,
+            projectId: values.projectId || undefined,
+            moverAssigneeId: undefined,
+            recipientName: requiresRecipientPayment
+              ? values.recipientName
+              : undefined,
+            bankName: requiresRecipientPayment ? values.bankName : undefined,
+            accountNumber: requiresRecipientPayment
+              ? values.accountNumber
+              : undefined,
+            requestedAmount: requiresRecipientPayment
+              ? values.requestedAmount
+              : isOperationalFunding
+                ? operationalAmount
+                : isAPHRequest || isInternalFunding || isShippingCostRequest
+                  ? values.requestedAmount
                   : undefined,
-          })),
-      });
+            receiptFiles: isInternalFunding ? values.receiptFiles : [],
+            items: requiresFundingRequest
+              ? []
+              : values.items.map((item) => ({
+                  ...(item.stockItemId
+                    ? { stockItemId: item.stockItemId }
+                    : {}),
+                  itemName: item.itemName ?? "",
+                  quantity: item.quantity ?? 0,
+                  unit: item.unit ?? "",
+                  estimatedCost: undefined,
+                  categoryHint: values.itemSource,
+                  expectedDeliveryDate:
+                    values.itemSource === TicketCategoryHint.WAREHOUSE
+                      ? values.itemsExpectedDeliveryDate
+                      : undefined,
+                })),
+          });
       if (!result.success) {
         setError(result.message);
         return;
@@ -1042,6 +1177,9 @@ export default function CreateTicketModal({
       invalidFields.bankName?.message,
       invalidFields.accountNumber?.message,
       invalidFields.requestedAmount?.message,
+      invalidFields.equipmentDetails?.equipmentName?.message,
+      invalidFields.equipmentDetails?.startDate?.message,
+      invalidFields.equipmentDetails?.duration?.message,
       invalidFields.itemsExpectedDeliveryDate?.message,
       invalidFields.items?.root?.message,
       invalidFields.items?.message,
@@ -1079,12 +1217,18 @@ export default function CreateTicketModal({
         isOpen={open}
         onClose={() => setOpen(false)}
         title="Buat Tiket & Permintaan Baru"
-        description="Lengkapi 3 langkah di bawah ini: (1) Proyek & Jenis Permintaan, (2) Rincian Barang / Dana & Bukti, dan (3) Prioritas & Target Tanggal."
+        description={
+          isEquipmentRequest
+            ? "Lengkapi spesifikasi alat dan durasi pemakaian. Permintaan langsung masuk ke antrean Logistik."
+            : "Lengkapi 3 langkah di bawah ini: (1) Proyek & Jenis Permintaan, (2) Rincian Barang / Dana & Bukti, dan (3) Prioritas & Target Tanggal."
+        }
         className="max-w-4xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">
-              Setelah draft disimpan, klik tombol <strong>Ajukan</strong> pada tabel untuk meneruskan ke Direktur.
+              {isEquipmentRequest
+                ? "Permintaan alat langsung diteruskan ke Logistik setelah dikirim."
+                : <>Setelah draft disimpan, klik tombol <strong>Ajukan</strong> pada tabel untuk meneruskan ke Direktur.</>}
             </span>
             <div className="flex items-center gap-2">
               <Button
@@ -1107,7 +1251,9 @@ export default function CreateTicketModal({
                     Menyimpan...
                   </>
                 ) : (
-                  "Simpan Draft Tiket"
+                  isEquipmentRequest
+                    ? "Kirim Permintaan ke Logistik"
+                    : "Simpan Draft Tiket"
                 )}
               </Button>
             </div>
@@ -1160,6 +1306,7 @@ export default function CreateTicketModal({
                       id="ticket-project"
                       className="w-full"
                       aria-invalid={!!form.formState.errors.projectId}
+                      disabled={Boolean(fixedProjectId)}
                     >
                       <SelectValue placeholder="Pilih proyek" />
                     </SelectTrigger>
@@ -1237,7 +1384,8 @@ export default function CreateTicketModal({
                       }
                       if (
                         value === TicketRequestCategory.APH ||
-                        value === TicketRequestCategory.SHIPPING_COST
+                        value === TicketRequestCategory.SHIPPING_COST ||
+                        value === EQUIPMENT_REQUEST_TYPE
                       ) {
                         form.setValue(
                           "items",
@@ -1253,7 +1401,8 @@ export default function CreateTicketModal({
                       } else if (
                         requestCategory === TicketRequestCategory.APH ||
                         isInternalFundingCategory(requestCategory) ||
-                        requestCategory === TicketRequestCategory.SHIPPING_COST
+                        requestCategory === TicketRequestCategory.SHIPPING_COST ||
+                        requestCategory === EQUIPMENT_REQUEST_TYPE
                       ) {
                         form.setValue(
                           "itemSource",
@@ -1729,6 +1878,115 @@ export default function CreateTicketModal({
                   </p>
                 )}
               </div>
+            )}
+
+            {isEquipmentRequest && (
+              <section className="space-y-4 rounded-lg border border-slate-500/30 bg-slate-500/5 p-4 md:col-span-2">
+                <div>
+                  <h3 className="font-semibold">
+                    Permintaan Alat Berat & Kendaraan
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Permintaan akan langsung diteruskan ke antrean Logistik.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="space-y-2 sm:col-span-3">
+                    <Label htmlFor="equipment-name">
+                      Pilih Alat / Kendaraan Khusus
+                    </Label>
+                    <Input
+                      id="equipment-name"
+                      placeholder="Contoh: Excavator Komatsu PC200, Dump Truck Tronton"
+                      aria-invalid={
+                        !!form.formState.errors.equipmentDetails?.equipmentName
+                      }
+                      {...form.register("equipmentDetails.equipmentName")}
+                    />
+                    {form.formState.errors.equipmentDetails?.equipmentName && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {
+                          form.formState.errors.equipmentDetails.equipmentName
+                            .message
+                        }
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="equipment-start-date">
+                      Tgl Mulai Pakai
+                    </Label>
+                    <Input
+                      id="equipment-start-date"
+                      type="date"
+                      aria-invalid={
+                        !!form.formState.errors.equipmentDetails?.startDate
+                      }
+                      {...form.register("equipmentDetails.startDate")}
+                    />
+                    {form.formState.errors.equipmentDetails?.startDate && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {
+                          form.formState.errors.equipmentDetails.startDate
+                            .message
+                        }
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="equipment-duration">Lama Pakai</Label>
+                    <Input
+                      id="equipment-duration"
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      placeholder="Contoh: 3"
+                      aria-invalid={
+                        !!form.formState.errors.equipmentDetails?.duration
+                      }
+                      {...form.register("equipmentDetails.duration", {
+                        setValueAs: (value: string) =>
+                          value === "" ? undefined : Number(value),
+                      })}
+                    />
+                    {form.formState.errors.equipmentDetails?.duration && (
+                      <p className="text-sm text-destructive" role="alert">
+                        {
+                          form.formState.errors.equipmentDetails.duration
+                            .message
+                        }
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="equipment-time-unit">Satuan Waktu</Label>
+                    <Controller
+                      control={form.control}
+                      name="equipmentDetails.timeUnit"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger
+                            id="equipment-time-unit"
+                            className="w-full"
+                          >
+                            <SelectValue placeholder="Pilih satuan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EQUIPMENT_TIME_UNITS.map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {EQUIPMENT_TIME_UNIT_LABELS[unit]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                </div>
+              </section>
             )}
 
           </div>

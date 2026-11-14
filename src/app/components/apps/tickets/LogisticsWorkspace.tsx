@@ -51,6 +51,7 @@ import {
 } from "@/lib/direct-stock-purchase-photo-config";
 import { getJakartaDateKey, shiftDateKey } from "@/lib/habit-date";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import { compressFieldImageFile } from "@/lib/image-compression-client";
 import {
   deleteLogisticsStockItem,
   importLogisticsStockCsv,
@@ -101,9 +102,10 @@ import {
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-const statusLabels: Record<TicketStatus, string> = {
+const statusLabels: Record<TicketRow["status"], string> = {
   [TicketStatus.DRAFT]: "Draf",
   [TicketStatus.PENDING_DIRECTOR]: "Menunggu persetujuan Direktur",
+  PENDING_LOGISTIK: "Menunggu diproses Logistik",
   [TicketStatus.APPROVED_DIR]: "Disetujui Direktur",
   [TicketStatus.PROCESSED_FINANCE]: "Diproses Finance",
   [TicketStatus.PROCESSED_LOGISTIC]: "Diproses Logistik",
@@ -114,9 +116,10 @@ const statusLabels: Record<TicketStatus, string> = {
   [TicketStatus.REJECTED]: "Ditolak",
 };
 
-const statusColors: Record<TicketStatus, string> = {
+const statusColors: Record<TicketRow["status"], string> = {
   [TicketStatus.DRAFT]: "var(--color-muted-foreground)",
   [TicketStatus.PENDING_DIRECTOR]: "var(--color-warning)",
+  PENDING_LOGISTIK: "var(--color-warning)",
   [TicketStatus.APPROVED_DIR]: "var(--color-success)",
   [TicketStatus.PROCESSED_FINANCE]: "var(--color-info)",
   [TicketStatus.PROCESSED_LOGISTIC]: "var(--color-primary)",
@@ -675,7 +678,6 @@ export default function LogisticsWorkspace({
     event.currentTarget.value = "";
     if (files.length === 0) return;
 
-    const validTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
     const newPhotos: ReceivingPhoto[] = [];
     const errors: string[] = [];
     const remainingSlots =
@@ -689,12 +691,8 @@ export default function LogisticsWorkspace({
         errors.push(`Maksimal ${MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS} foto.`);
         break;
       }
-      if (!validTypes.has(file.type)) {
-        errors.push(`${file.name}: format harus JPG, PNG, atau WEBP.`);
-        continue;
-      }
-      if (file.size < 1 || file.size > 5 * 1024 * 1024) {
-        errors.push(`${file.name}: ukuran foto harus maksimal 5 MB.`);
+      if (file.size < 1) {
+        errors.push(`${file.name}: file foto kosong.`);
         continue;
       }
 
@@ -719,12 +717,13 @@ export default function LogisticsWorkspace({
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    receivingPhotos.forEach(({ file }) =>
-      formData.append("receivedPhotos", file, file.name),
-    );
     setReceivingPurchaseError("");
     setReceivingPurchaseSubmitting(true);
     try {
+      for (const { file } of receivingPhotos) {
+        const compressed = await compressFieldImageFile(file);
+        formData.append("receivedPhotos", compressed, compressed.name);
+      }
       const result = await receiveDirectStockPurchase(formData);
       if (!result.success) {
         setReceivingPurchaseError(result.message);
@@ -738,7 +737,9 @@ export default function LogisticsWorkspace({
     } catch (error) {
       console.error("Receiving direct stock purchase failed:", error);
       setReceivingPurchaseError(
-        "Penerimaan barang gagal dicatat. Periksa koneksi lalu coba kembali.",
+        error instanceof Error && error.message
+          ? error.message
+          : "Penerimaan barang gagal dicatat. Periksa koneksi lalu coba kembali.",
       );
     } finally {
       setReceivingPurchaseSubmitting(false);
@@ -1934,7 +1935,7 @@ export default function LogisticsWorkspace({
                   <input
                     ref={receivingPhotoInput}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*,.heic,.heif"
                     multiple
                     className="sr-only"
                     onChange={selectReceivingPhotos}

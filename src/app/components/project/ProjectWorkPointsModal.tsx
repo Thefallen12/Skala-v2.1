@@ -10,6 +10,7 @@ import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { compressFieldImageFiles } from "@/lib/image-compression-client";
 import {
   photoDownloadLabel,
   photoDownloadLinkProps,
@@ -143,19 +144,22 @@ export default function ProjectWorkPointsModal({
       setMessage("Progres titik harus di antara 0 sampai 100%.");
       return;
     }
-    if (photos.length > 5 || photos.some((photo) => photo.size > 5 * 1024 * 1024)) {
-      setMessage("Maksimal 5 foto dan ukuran setiap foto maksimal 5 MB.");
+    if (photos.length > 5) {
+      setMessage("Maksimal 5 foto untuk satu laporan progres titik.");
       return;
     }
 
-    const formData = new FormData();
-    formData.set("reportDate", reportDate);
-    formData.set("progress", progress);
-    formData.set("workSummary", workSummary);
-    photos.forEach((photo) => formData.append("photos", photo));
     setMessage("");
     startTransition(async () => {
       try {
+        const compressedPhotos =
+          photos.length > 0 ? await compressFieldImageFiles(photos) : [];
+        const formData = new FormData();
+        formData.set("reportDate", reportDate);
+        formData.set("progress", progress);
+        formData.set("workSummary", workSummary);
+        compressedPhotos.forEach((photo) => formData.append("photos", photo));
+
         const result = await addProjectWorkPointProgress(progressPointId, formData);
         setMessage(result.message);
         if (result.success) {
@@ -168,7 +172,11 @@ export default function ProjectWorkPointsModal({
         }
       } catch (error) {
         console.error("Saving work point progress failed:", error);
-        setMessage("Progres titik gagal disimpan.");
+        setMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Progres titik gagal disimpan.",
+        );
       }
     });
   };
@@ -492,30 +500,13 @@ export default function ProjectWorkPointsModal({
                           <Input
                             id={`point-photos-${point.id}`}
                             type="file"
-                            accept="image/jpeg,image/png,image/webp"
+                            accept="image/*,.heic,.heif"
                             multiple
                             disabled={isPending}
                             onChange={(event) => {
                               const selected = Array.from(event.currentTarget.files ?? []);
-                              if (
-                                selected.length > 5 ||
-                                selected.some((photo) => photo.size > 5 * 1024 * 1024)
-                              ) {
-                                setMessage("Maksimal 5 foto dan ukuran setiap foto maksimal 5 MB.");
-                                event.currentTarget.value = "";
-                                setPhotos([]);
-                                setPhotoPreviews([]);
-                                return;
-                              }
-                              if (
-                                selected.some(
-                                  (photo) =>
-                                    !["image/jpeg", "image/png", "image/webp"].includes(
-                                      photo.type,
-                                    ),
-                                )
-                              ) {
-                                setMessage("Format foto harus JPG, PNG, atau WEBP.");
+                              if (selected.length > 5) {
+                                setMessage("Maksimal 5 foto untuk satu laporan progres titik.");
                                 event.currentTarget.value = "";
                                 setPhotos([]);
                                 setPhotoPreviews([]);

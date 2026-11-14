@@ -1,9 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { auth } from "../../../auth";
 import { UserRole } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Cashflow from "@/models/cashflow";
+import FinanceAccount from "@/models/finance-account";
+import OfficeExpense from "@/models/office-expense";
+import User from "@/models/user";
 import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
 import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import {
@@ -37,12 +42,16 @@ export async function updateOfficeExpense(
     return { success: false, message: "ID pengeluaran tidak valid." };
   }
 
-  const existing = await prisma.officeExpense.findUnique({
-    where: { id: input.id },
-    include: { account: true, cashflow: true },
-  });
+  await connectToMongoDB();
+  const existing = await OfficeExpense.findById(input.id).lean();
   if (!existing) {
     return { success: false, message: "Data pengeluaran tidak ditemukan." };
+  }
+  const existingAccount = await FinanceAccount.findById(
+    existing.accountId,
+  ).lean();
+  if (!existingAccount) {
+    return { success: false, message: "Akun kas/bank pengeluaran tidak ditemukan." };
   }
 
   const newAmount =
@@ -51,7 +60,7 @@ export async function updateOfficeExpense(
       : existing.amount;
 
   const diff = newAmount - existing.amount;
-  if (diff > 0 && existing.account.balance < diff) {
+  if (diff > 0 && existingAccount.balance < diff) {
     return {
       success: false,
       message: `Saldo akun tidak mencukupi untuk penambahan nominal (Kurang Rp ${Math.round(diff).toLocaleString("id-ID")}).`,
@@ -91,52 +100,79 @@ export async function updateOfficeExpense(
       };
     }
 
-    const effectiveDate = input.transactionDate
-      ? parseTransactionDate(input.transactionDate)
-      : existing.createdAt;
-
-    await prisma.$transaction(async (tx) => {
-      if (diff > 0) {
-        const deducted = await tx.financeAccount.updateMany({
-          where: {
-            id: existing.accountId,
-            balance: { gte: diff },
-          },
-          data: { balance: { decrement: diff } },
-        });
-        if (deducted.count !== 1) {
-          throw new Error("INSUFFICIENT_BALANCE");
-        }
-      } else if (diff < 0) {
-        await tx.financeAccount.update({
-          where: { id: existing.accountId },
-          data: { balance: { increment: -diff } },
-        });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
+      const currentExpense = await OfficeExpense.findById(input.id)
+        .session(transactionSession)
+        .lean();
+      if (!currentExpense) {
+        throw new OfficeExpenseError("Data pengeluaran tidak ditemukan.");
       }
 
-      await tx.cashflow.update({
-        where: { id: existing.cashflowId },
-        data: {
-          amount: newAmount,
-          createdAt: effectiveDate,
-          proofUrl: finalProofUrls[0],
-          ...(input.description?.trim()
-            ? { sourceDesc: `[${existing.expenseType}] ${input.description.trim()}` }
-            : {}),
-        },
-      });
+      const currentDiff = newAmount - currentExpense.amount;
+      if (currentDiff > 0) {
+        const deducted = await FinanceAccount.updateOne(
+          {
+            _id: currentExpense.accountId,
+            balance: { $gte: currentDiff },
+          },
+          { $inc: { balance: -currentDiff } },
+          { session: transactionSession },
+        );
+        if (deducted.modifiedCount !== 1) {
+          throw new Error("INSUFFICIENT_BALANCE");
+        }
+      } else if (currentDiff < 0) {
+        const credited = await FinanceAccount.updateOne(
+          { _id: currentExpense.accountId },
+          { $inc: { balance: -currentDiff } },
+          { session: transactionSession },
+        );
+        if (credited.modifiedCount !== 1) {
+          throw new OfficeExpenseError("Akun kas/bank tidak ditemukan.");
+        }
+      }
 
-      await tx.officeExpense.update({
-        where: { id: existing.id },
-        data: {
-          amount: newAmount,
-          createdAt: effectiveDate,
-          proofUrls: finalProofUrls,
-          ...(input.description?.trim()
-            ? { description: input.description.trim() }
-            : {}),
+      const effectiveDate = input.transactionDate
+        ? parseTransactionDate(input.transactionDate)
+        : currentExpense.createdAt;
+      const cashflowUpdated = await Cashflow.updateOne(
+        { _id: currentExpense.cashflowId },
+        {
+          $set: {
+            amount: newAmount,
+            createdAt: effectiveDate,
+            proofUrl: finalProofUrls[0],
+            ...(input.description?.trim()
+              ? {
+                  sourceDesc: `[${currentExpense.expenseType}] ${input.description.trim()}`,
+                }
+              : {}),
+          },
         },
-      });
+        { session: transactionSession },
+      );
+      if (cashflowUpdated.modifiedCount !== 1) {
+        throw new OfficeExpenseError("Catatan buku kas tidak ditemukan.");
+      }
+
+      const expenseUpdated = await OfficeExpense.updateOne(
+        { _id: currentExpense._id },
+        {
+          $set: {
+            amount: newAmount,
+            createdAt: effectiveDate,
+            proofUrls: finalProofUrls,
+            ...(input.description?.trim()
+              ? { description: input.description.trim() }
+              : {}),
+          },
+        },
+        { session: transactionSession },
+      );
+      if (expenseUpdated.modifiedCount !== 1) {
+        throw new OfficeExpenseError("Data pengeluaran gagal diperbarui.");
+      }
     });
 
     revalidatePath("/apps/finance");
@@ -254,15 +290,14 @@ export async function recordOfficeExpense(
     };
   }
 
+  await connectToMongoDB();
   const [recipientBeforeUpload, accountBeforeUpload] = await Promise.all([
-    prisma.user.findFirst({
-      where: { id: input.recipientId, isActive: true },
-      select: { id: true },
-    }),
-    prisma.financeAccount.findUnique({
-      where: { id: input.accountId },
-      select: { id: true, balance: true },
-    }),
+    User.findOne({ _id: input.recipientId, isActive: true })
+      .select({ _id: 1 })
+      .lean(),
+    FinanceAccount.findById(input.accountId)
+      .select({ _id: 1, balance: 1 })
+      .lean(),
   ]);
   if (!recipientBeforeUpload) {
     return { success: false, message: "Penerima tidak ditemukan atau tidak aktif." };
@@ -287,62 +322,74 @@ export async function recordOfficeExpense(
 
     const effectiveDate = parseTransactionDate(input.transactionDate);
 
-    await prisma.$transaction(async (transaction) => {
-      const recipient = await transaction.user.findFirst({
-        where: { id: input.recipientId, isActive: true },
-        select: { id: true },
-      });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
+      const recipient = await User.findOne({
+        _id: input.recipientId,
+        isActive: true,
+      })
+        .select({ _id: 1 })
+        .session(transactionSession)
+        .lean();
       if (!recipient) {
         throw new OfficeExpenseError("Penerima tidak ditemukan atau tidak aktif.");
       }
 
-      const debit = await transaction.financeAccount.updateMany({
-        where: {
-          id: input.accountId,
-          balance: { gte: input.amount },
+      const debit = await FinanceAccount.updateOne(
+        {
+          _id: input.accountId,
+          balance: { $gte: input.amount },
         },
-        data: { balance: { decrement: input.amount } },
-      });
-      if (debit.count !== 1) {
-        const account = await transaction.financeAccount.findUnique({
-          where: { id: input.accountId },
-          select: { id: true },
-        });
+        { $inc: { balance: -input.amount } },
+        { session: transactionSession },
+      );
+      if (debit.modifiedCount !== 1) {
+        const accountExists = await FinanceAccount.exists({
+          _id: input.accountId,
+        }).session(transactionSession);
         throw new OfficeExpenseError(
-          account
+          accountExists
             ? "Saldo di akun kas/bank ini tidak mencukupi!"
             : "Akun kas/bank sumber dana tidak ditemukan.",
         );
       }
 
-      const cashflow = await transaction.cashflow.create({
-        data: {
-          type: "OUT",
-          amount: input.amount,
-          sourceDesc: `[${input.expenseType}] ${input.description.trim()}`,
-          paymentMethod: input.paymentMethod,
-          proofUrl: uploadedProofUrls[0],
-          accountId: input.accountId,
-          recordedBy: session.user.id,
-          createdAt: effectiveDate,
-        },
-        select: { id: true },
-      });
+      const cashflowId = randomUUID();
+      await Cashflow.create(
+        [
+          {
+            _id: cashflowId,
+            type: "OUT",
+            amount: input.amount,
+            sourceDesc: `[${input.expenseType}] ${input.description.trim()}`,
+            paymentMethod: input.paymentMethod,
+            proofUrl: uploadedProofUrls[0],
+            accountId: input.accountId,
+            recordedBy: session.user.id,
+            createdAt: effectiveDate,
+          },
+        ],
+        { session: transactionSession },
+      );
 
-      await transaction.officeExpense.create({
-        data: {
-          expenseType: input.expenseType,
-          description: input.description.trim(),
-          amount: input.amount,
-          recipientId: input.recipientId,
-          accountId: input.accountId,
-          paymentMethod: input.paymentMethod,
-          proofUrls: uploadedProofUrls,
-          recordedBy: session.user.id,
-          cashflowId: cashflow.id,
-          createdAt: effectiveDate,
-        },
-      });
+      await OfficeExpense.create(
+        [
+          {
+            _id: randomUUID(),
+            expenseType: input.expenseType,
+            description: input.description.trim(),
+            amount: input.amount,
+            recipientId: input.recipientId,
+            accountId: input.accountId,
+            paymentMethod: input.paymentMethod,
+            proofUrls: uploadedProofUrls,
+            recordedBy: session.user.id,
+            cashflowId,
+            createdAt: effectiveDate,
+          },
+        ],
+        { session: transactionSession },
+      );
     });
 
     revalidatePath("/apps/finance");

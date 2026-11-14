@@ -39,6 +39,7 @@ import type {
   SurveyProjectOption,
 } from "@/app/components/apps/gis/SurveySidebar";
 import { printUrlInFrame } from "@/lib/print-url";
+import { compressFieldImageFile } from "@/lib/image-compression-client";
 
 const ReadOnlyMap = dynamic(() => import("@/components/gis/ReadOnlyMap"), {
   ssr: false,
@@ -354,12 +355,16 @@ export default function SurveyDetailModal({
         throw new Error("Survei atau aksi penyimpanan foto tidak tersedia.");
       }
 
-      const selectedPhotos = photos
-        .filter((photo) => photo.url)
-        .map((photo, index) => ({
-          ...(photo.file ? { file: photo.file } : { url: photo.url }),
-          label: sanitizePhotoLabel(index, photo.label),
-        }));
+      const selectedPhotos = await Promise.all(
+        photos
+          .filter((photo) => photo.url)
+          .map(async (photo, index) => ({
+            ...(photo.file
+              ? { file: await compressFieldImageFile(photo.file) }
+              : { url: photo.url }),
+            label: sanitizePhotoLabel(index, photo.label),
+          })),
+      );
       const result = await savePhotoToDatabase(survey.id, selectedPhotos);
       if (!result.success) throw new Error(result.message);
 

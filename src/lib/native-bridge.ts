@@ -2,6 +2,7 @@
 
 import {
   removePushSubscription,
+  saveFcmToken,
   savePushSubscription,
 } from "@/app/actions/push-subscriptions";
 
@@ -46,6 +47,7 @@ export interface SkalaNativeBridgeInterface {
   syncSeenNotificationIds: (jsonIdsArray: string) => void;
   cancelNotification: (notificationId: string) => void;
   playNotificationFeedback: (playSound: boolean, vibrate: boolean) => void;
+  isFirebasePushConfigured?: () => boolean;
   consumePendingNotificationAction: () => string;
 }
 
@@ -738,5 +740,86 @@ export function consumePendingNativeNotificationAction(): {
   } catch {
     return null;
   }
+}
+
+export function isNativeFirebasePushConfigured(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.SkalaNativeBridge?.isFirebasePushConfigured?.() === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Registers Firebase Cloud Messaging (FCM) on Capacitor Android when google-services.json
+ * was bundled into the APK and runtime notification permissions are granted.
+ */
+export async function setupNativeFcmPush(
+  onNavigate?: (actionUrl: string) => void,
+): Promise<() => void> {
+  if (
+    typeof window === "undefined" ||
+    !isAndroidApkEnvironment() ||
+    !isNativeFirebasePushConfigured()
+  ) {
+    return () => {};
+  }
+
+  let disposed = false;
+  const handles: Array<{ remove: () => Promise<void> }> = [];
+
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (!Capacitor.isNativePlatform()) {
+      return () => {};
+    }
+
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    const permission = await PushNotifications.checkPermissions();
+    if (disposed || permission.receive !== "granted") {
+      return () => {};
+    }
+
+    handles.push(
+      await PushNotifications.addListener("registration", (token) => {
+        if (!token?.value) return;
+        void saveFcmToken(token.value, "android").catch(() => {});
+      }),
+    );
+
+    handles.push(
+      await PushNotifications.addListener("pushNotificationReceived", () => {
+        requestNotificationFeedRefresh();
+      }),
+    );
+
+    handles.push(
+      await PushNotifications.addListener(
+        "pushNotificationActionPerformed",
+        (action) => {
+          const rawUrl = action.notification?.data?.actionUrl;
+          if (
+            typeof rawUrl === "string" &&
+            rawUrl.startsWith("/") &&
+            !rawUrl.startsWith("//")
+          ) {
+            onNavigate?.(rawUrl);
+          }
+        },
+      ),
+    );
+
+    await PushNotifications.register();
+  } catch {
+    // Graceful fallback to SkalaNotificationJobService + WebView polling
+  }
+
+  return () => {
+    disposed = true;
+    for (const handle of handles) {
+      void handle.remove().catch(() => {});
+    }
+  };
 }
 

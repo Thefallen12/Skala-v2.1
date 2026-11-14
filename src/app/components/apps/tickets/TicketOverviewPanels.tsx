@@ -23,9 +23,10 @@ import {
 } from "@prisma/client";
 import { categoryForTicket } from "./ticket-statistics";
 
-const statusLabels: Record<TicketStatus, string> = {
+const statusLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Draft",
   PENDING_DIRECTOR: "Menunggu persetujuan Direktur",
+  PENDING_LOGISTIK: "Menunggu diproses Logistik",
   APPROVED_DIR: "Disetujui Direktur",
   PROCESSED_FINANCE: "Diproses Finance",
   PROCESSED_LOGISTIC: "Diproses Logistik",
@@ -37,11 +38,12 @@ const statusLabels: Record<TicketStatus, string> = {
 };
 
 const statusVariants: Record<
-  TicketStatus,
+  TicketRow["status"],
   "gray" | "lightWarning" | "lightSuccess" | "lightInfo" | "lightError"
 > = {
   DRAFT: "gray",
   PENDING_DIRECTOR: "lightWarning",
+  PENDING_LOGISTIK: "lightWarning",
   APPROVED_DIR: "lightSuccess",
   PROCESSED_FINANCE: "lightInfo",
   PROCESSED_LOGISTIC: "lightInfo",

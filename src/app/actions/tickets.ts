@@ -23,6 +23,25 @@ import {
 } from "@prisma/client";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Cashflow from "@/models/cashflow";
+import DirectStockPurchase from "@/models/direct-stock-purchase";
+import DocumentNumberSequence from "@/models/document-number-sequence";
+import FinanceAccount from "@/models/finance-account";
+import Notification from "@/models/notification";
+import PaymentTransaction from "@/models/payment-transaction";
+import Ticket from "@/models/ticket";
+import TicketAuditLog from "@/models/ticket-audit-log";
+import User from "@/models/user";
+import {
+  Invoice,
+  KOItem,
+  OrderConfirmation,
+  POItem,
+  TicketItem,
+  DeliveryOrder,
+} from "@/models/finance-records";
+import PurchaseOrder from "@/models/purchase-order";
 import {
   decimalFromScaledInteger,
   scaledIntegerFromDecimal,
@@ -30,6 +49,7 @@ import {
 import { resolveVendorBankAccount } from "@/lib/vendor-bank-accounts";
 import { nextDocumentNumber } from "@/lib/documents/numbering";
 import {
+  generateRandomCode,
   generateAvailablePublicCode,
   isValidPublicCode,
 } from "@/lib/documents/random-code";
@@ -43,6 +63,7 @@ import {
 import { sendNotification } from "@/lib/notifications";
 import { sendPushNotification } from "@/lib/push-notifications";
 import { receivePurchaseOrderStock } from "@/lib/logistics/receive-purchase-order-stock";
+import { receivePurchaseOrderStockMongo } from "@/lib/logistics/receive-purchase-order-stock-mongodb";
 import {
   DirectStockPurchasePhotoValidationError,
   removeDirectStockPurchasePhoto,
@@ -79,7 +100,6 @@ import {
 import { formatVendorBankAccount } from "@/lib/vendor-bank-accounts";
 import { isPurchaseOrderInvoiceUrl } from "@/lib/purchase-order-invoices";
 import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-invoice-config";
-import { recordFinanceCashflowOutflow } from "@/lib/finance-cashflow-ledger";
 import { isTicketRequestReceiptUrl } from "@/lib/ticket-request-receipts";
 import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-config";
 
@@ -173,6 +193,7 @@ type TicketItemInput = {
   estimatedCost?: number | null;
   categoryHint?: TicketCategoryHint;
   expectedDeliveryDate?: string | null;
+  materialContractId?: string | null;
 };
 
 export type CreateTicketInput = {
@@ -2531,11 +2552,53 @@ export async function createTicket(
     warehouseStockItems.map((item) => [item.id, item]),
   );
   const selectedStockIds = new Set<string>();
+  const contractIds = input.items.flatMap((item) =>
+    item?.categoryHint === TicketCategoryHint.CONTRACT &&
+    typeof item.materialContractId === "string"
+      ? [item.materialContractId]
+      : [],
+  );
+  const materialContracts = contractIds.length
+    ? await prisma.materialContract.findMany({
+        where: { id: { in: [...new Set(contractIds)] }, isActive: true },
+        select: {
+          id: true,
+          contractNumber: true,
+          materialType: true,
+          unit: true,
+          unitPrice: true,
+          startDate: true,
+          endDate: true,
+        },
+      })
+    : [];
+  const contractsById = new Map(
+    materialContracts.map((contract) => [contract.id, contract]),
+  );
   const items: TicketItemInput[] = [];
   for (const item of input.items) {
     const categoryHint = supportsItemSource
       ? item?.categoryHint ?? TicketCategoryHint.WAREHOUSE
       : TicketCategoryHint.PURCHASE;
+    const contract =
+      categoryHint === TicketCategoryHint.CONTRACT &&
+      typeof item?.materialContractId === "string"
+        ? contractsById.get(item.materialContractId)
+        : undefined;
+    if (categoryHint === TicketCategoryHint.CONTRACT) {
+      const now = new Date();
+      if (
+        isWarehouseRequest ||
+        requestCategory !== TicketRequestCategory.MATERIAL ||
+        !contract ||
+        contract.startDate > now ||
+        (contract.endDate && contract.endDate < now)
+      ) {
+        return actionFailure(
+          "Pilih kontrak pasir/batu yang masih aktif dan berlaku untuk item ini.",
+        );
+      }
+    }
     const stockItem =
       typeof item?.stockItemId === "string"
         ? warehouseItemsById.get(item.stockItemId)
@@ -2566,6 +2629,7 @@ export async function createTicket(
           parsedDeliveryDate.toISOString().slice(0, 10) !==
             expectedDeliveryDate)) ||
       (!stockItem &&
+        !contract &&
         (typeof item.itemName !== "string" ||
           item.itemName.trim().length < 1 ||
           item.itemName.trim().length > 160 ||
@@ -2592,16 +2656,25 @@ export async function createTicket(
     }
     items.push({
       stockItemId: item.stockItemId,
-      itemName: stockItem?.name ?? item.itemName.trim(),
+      itemName:
+        stockItem?.name ??
+        (contract ? contract.materialType : item.itemName.trim()),
       quantity: item.quantity,
-      unit: stockItem?.unit ?? item.unit.trim(),
-      estimatedCost:
-        categoryHint === TicketCategoryHint.WAREHOUSE
+      unit: stockItem?.unit ?? (contract ? contract.unit : item.unit.trim()),
+      estimatedCost: contract
+        ? contract.unitPrice
+        : categoryHint === TicketCategoryHint.WAREHOUSE
           ? null
           : item.estimatedCost,
       categoryHint,
+      materialContractId: contract?.id ?? null,
       expectedDeliveryDate:
-        categoryHint === TicketCategoryHint.WAREHOUSE
+        categoryHint === TicketCategoryHint.WAREHOUSE ||
+        (contract &&
+          expectedDeliveryDate &&
+          /^\d{4}-\d{2}-\d{2}$/.test(expectedDeliveryDate) &&
+          parsedDeliveryDate &&
+          !Number.isNaN(parsedDeliveryDate.getTime()))
           ? expectedDeliveryDate
           : null,
     });
@@ -2799,6 +2872,7 @@ export async function createTicket(
                   ? null
                   : scaledIntegerFromDecimal(item.estimatedCost),
               categoryHint: item.categoryHint,
+              materialContractId: item.materialContractId ?? null,
               expectedDeliveryDate: item.expectedDeliveryDate
                 ? new Date(`${item.expectedDeliveryDate}T00:00:00.000Z`)
                 : null,
@@ -4217,10 +4291,8 @@ export async function switchTicketItemsToPurchase(
         ticket.items.some(
           (item) =>
             item.status !== FulfillmentStatus.PENDING ||
-            ![
-              TicketCategoryHint.WAREHOUSE,
-              TicketCategoryHint.PURCHASE,
-            ].includes(item.categoryHint),
+            (item.categoryHint !== TicketCategoryHint.WAREHOUSE &&
+              item.categoryHint !== TicketCategoryHint.PURCHASE),
         )
       ) {
         throw new Error(
@@ -5127,95 +5199,41 @@ export async function processFinancePayment(
   }
 
   try {
-    await prisma.$transaction(async (transaction) => {
-      await lockTicketFulfillment(transaction, ticketId);
-      await lockTicketDeliveryOrderCreation(transaction);
-      const ticket = await transaction.ticket.findUnique({
-        where: { id: ticketId },
-        select: {
-          ticketNumber: true,
-          title: true,
-          type: true,
-          status: true,
-          isApprovedByDirector: true,
-          requestCategory: true,
-          requestPaymentMethod: true,
-          requestedAmount: true,
-          totalAmount: true,
-          projectId: true,
-          purchaseReceiptUrl: true,
-          requesterId: true,
-          requester: { select: { role: true } },
-          purchaseOrders: {
-            where: { status: POStatus.APPROVED },
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: {
-              id: true,
-              poNumber: true,
-              status: true,
-              includeTax: true,
-              vendorName: true,
-              paymentTerms: true,
-              items: {
-                select: {
-                  id: true,
-                  itemCode: true,
-                  stockItemId: true,
-                  itemName: true,
-                  quantity: true,
-                  unit: true,
-                  unitPrice: true,
-                  totalPrice: true,
-                },
-              },
-              invoices: {
-                orderBy: { createdAt: "desc" },
-                take: 1,
-                select: {
-                  subTotal: true,
-                  tax: true,
-                  deduction: true,
-                  grandTotal: true,
-                  items: {
-                    orderBy: { id: "asc" },
-                    select: {
-                      itemCode: true,
-                      description: true,
-                      quantity: true,
-                      unit: true,
-                      unitPrice: true,
-                      totalPrice: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (mongoSession) => {
+      const now = new Date();
+      const ticket = await Ticket.findById(ticketId)
+        .session(mongoSession)
+        .lean();
       if (!ticket) throw new Error("Tiket tidak ditemukan.");
-      const isPaymentEligibleTicketStatus = [
+      const requester = await User.findById(ticket.requesterId)
+        .select({ role: 1 })
+        .session(mongoSession)
+        .lean();
+      if (!requester) throw new Error("Pemohon tiket tidak ditemukan.");
+      const isPaymentEligibleTicketStatus: TicketStatus[] = [
         TicketStatus.WAITING_FINANCE_PAYMENT,
         TicketStatus.PROCESSED_FINANCE,
         TicketStatus.PROCESSED_LOGISTIC,
         TicketStatus.ASSIGNED_TO_MOVER,
         TicketStatus.IN_TRANSIT,
         TicketStatus.COMPLETED,
-      ].some((status) => status === ticket.status);
-      if (!isPaymentEligibleTicketStatus) {
+      ];
+      if (!isPaymentEligibleTicketStatus.includes(ticket.status as TicketStatus)) {
         throw new Error("Tiket belum siap dibayar atau statusnya sudah berubah.");
       }
 
-      const isAPHRequest =
-        ticket.requestCategory === TicketRequestCategory.APH;
-      const isInternalFundingRequest =
-        ticket.requestCategory !== null &&
-        [
+      const isAPHRequest = ticket.requestCategory === TicketRequestCategory.APH;
+      const internalFundingCategories: TicketRequestCategory[] = [
         TicketRequestCategory.REIMBURSEMENT,
         TicketRequestCategory.KASBON,
         TicketRequestCategory.OPERATING_EXPENSE,
-        ].some((category) => category === ticket.requestCategory);
+      ];
+      const isInternalFundingRequest =
+        ticket.requestCategory !== null &&
+        internalFundingCategories.includes(
+          ticket.requestCategory as TicketRequestCategory,
+        );
       if (
         isInternalFundingRequest &&
         (!paymentMethod ||
@@ -5236,11 +5254,41 @@ export async function processFinancePayment(
       ) {
         throw new Error("Metode pembayaran APH tidak valid.");
       }
-      const order = ticket.purchaseOrders[0];
+
+      const orderDocument = await PurchaseOrder.findOne({
+        ticketId,
+        status: POStatus.APPROVED,
+      })
+        .sort({ createdAt: -1 })
+        .session(mongoSession)
+        .lean();
+      const order = orderDocument
+        ? {
+            id: String(orderDocument._id),
+            poNumber: orderDocument.poNumber ?? "",
+            status: orderDocument.status,
+            includeTax: Boolean(orderDocument.includeTax),
+            vendorName: orderDocument.vendorName ?? "",
+            paymentTerms: orderDocument.paymentTerms ?? null,
+            items: await POItem.find({ poId: String(orderDocument._id) })
+              .sort({ _id: 1 })
+              .session(mongoSession)
+              .lean(),
+          }
+        : null;
+      const invoice = order
+        ? await Invoice.findOne({ poId: order.id })
+            .sort({ createdAt: -1 })
+            .session(mongoSession)
+            .lean()
+        : null;
+      if (order && !order.status) {
+        throw new Error("PO belum disetujui Direktur.");
+      }
       const isDirectAPHRequest =
         isAPHRequest &&
-        (ticket.requester.role === UserRole.DIRECTOR ||
-          ticket.requester.role === UserRole.FINANCE);
+        (requester.role === UserRole.DIRECTOR ||
+          requester.role === UserRole.FINANCE);
       if (!order && !ticket.isApprovedByDirector && !isDirectAPHRequest) {
         throw new Error(
           "Tiket tanpa PO wajib disetujui Direktur sebelum pembayaran.",
@@ -5253,14 +5301,11 @@ export async function processFinancePayment(
       ) {
         throw new Error("Tiket material belum memiliki bukti pembelian dari Logistik.");
       }
-      if (order && order.status !== POStatus.APPROVED) {
-        throw new Error("PO belum disetujui Direktur.");
-      }
       if (order && !ticket.purchaseReceiptUrl) {
         throw new Error("Logistik harus mengunggah invoice/bon sebelum pembayaran PO.");
       }
       const rawInvoiceTotal = order
-        ? order.invoices[0]?.grandTotal ??
+        ? invoice?.grandTotal ??
           Math.round(
             order.items.reduce((sum, item) => sum + item.totalPrice, 0) *
               (order.includeTax ? 1.11 : 1) *
@@ -5296,124 +5341,209 @@ export async function processFinancePayment(
         isInternalFundingRequest && paymentMethod === POPaymentMethod.CASH
           ? "Tunai"
           : transferDestination.trim();
-      const paymentWhere = {
+      const previousPayments = await PaymentTransaction.find({
         status: PaymentStatus.PAID,
         ...(order ? { poId: order.id } : { ticketId }),
-      };
-      const previousPayments = await transaction.paymentTransaction.aggregate({
-        where: paymentWhere,
-        _sum: { amount: true },
-      });
+      })
+        .session(mongoSession)
+        .select({ amount: 1 })
+        .lean();
+      const paidAmount = previousPayments.reduce(
+        (sum, payment) => sum + payment.amount,
+        0,
+      );
       if (
         paymentType === PaymentType.DOWN_PAYMENT &&
-        (await transaction.paymentTransaction.findFirst({
-          where: paymentWhere,
-          select: { id: true },
-        }))
+        previousPayments.length > 0
       ) {
         throw new Error("DP hanya dapat digunakan pada pembayaran pertama.");
       }
-      const allocation = allocatePaymentAmount(
-        invoiceTotal,
-        previousPayments._sum.amount ?? 0,
-        paymentType,
-        requestedPaymentAmount,
-      );
-      const { amount, remainingAfter: newRemaining, isFullyPaid } = allocation;
-      const now = new Date();
-      const confirmationOrderNumber = order
-        ? await nextDocumentNumber(transaction, "KO")
-        : null;
-      const payment = await transaction.paymentTransaction.create({
-        data: {
-          poId: order?.id,
-          ticketId: order ? undefined : ticketId,
-          confirmationOrderNumber,
+      const { amount, remainingAfter: newRemaining, isFullyPaid } =
+        allocatePaymentAmount(
+          invoiceTotal,
+          paidAmount,
           paymentType,
-          amount,
-          transferDestination: effectiveTransferDestination,
-          status: PaymentStatus.PAID,
-          processedById: session.user.id,
-          proofOfTransferUrl: receiptUrl,
-          additionalProofUrls: receiptUrls.slice(1),
-          proofEditDisabledUrls: receiptUrls,
-          paidAt: now,
-        },
-        select: { id: true },
-      });
-      await recordFinanceCashflowOutflow(transaction, {
-        paymentTransactionId: payment.id,
-        financeAccountId,
-        amount,
-        sourceDesc: `Pembayaran ${order?.poNumber ?? ticket.ticketNumber} · ${ticket.title}`,
-        projectId: ticket.projectId,
-        paymentMethod:
-          isInternalFundingRequest
-            ? paymentMethod === POPaymentMethod.CASH
-              ? "CASH"
-              : "TRANSFER"
-            : ticket.requestPaymentMethod === POPaymentMethod.CASH
-            ? "CASH"
-            : "TRANSFER",
-        proofUrl: receiptUrl,
-        recordedBy: session.user.id,
-      });
+          requestedPaymentAmount,
+        );
+      await Ticket.updateOne(
+        { _id: ticketId },
+        { $set: { updatedAt: now } },
+        { session: mongoSession },
+      );
 
-      if (order && confirmationOrderNumber) {
-        const invoice = order.invoices[0];
+      let confirmationOrderNumber: string | null = null;
+      let confirmationPublicCode: string | null = null;
+      if (order) {
+        const year = now.getFullYear();
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const sequence = await DocumentNumberSequence.findOneAndUpdate(
+            { kind: "KO", year },
+            {
+              $inc: { value: 1 },
+              $setOnInsert: { _id: randomUUID() },
+            },
+            { upsert: true, new: true, session: mongoSession },
+          );
+          if (!sequence) throw new Error("Nomor KO gagal dibuat.");
+          const candidate = `SPE-${new Intl.NumberFormat("id-ID", {
+            maximumFractionDigits: 0,
+          }).format(sequence.value)}/KO/${year}`;
+          const [existingPayment, existingConfirmation] = await Promise.all([
+            PaymentTransaction.exists({
+              confirmationOrderNumber: candidate,
+            }).session(mongoSession),
+            OrderConfirmation.exists({ koNumber: candidate }).session(mongoSession),
+          ]);
+          if (!existingPayment && !existingConfirmation) {
+            confirmationOrderNumber = candidate;
+            break;
+          }
+        }
+        if (!confirmationOrderNumber) {
+          throw new Error("Nomor KO unik tidak dapat dibuat.");
+        }
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const candidate = generateRandomCode();
+          if (!(await OrderConfirmation.exists({ publicCode: candidate }).session(mongoSession))) {
+            confirmationPublicCode = candidate;
+            break;
+          }
+        }
+        if (!confirmationPublicCode) {
+          throw new Error("Kode KO unik tidak dapat dibuat.");
+        }
+      }
+
+      const paymentId = randomUUID();
+      await PaymentTransaction.create(
+        [
+          {
+            _id: paymentId,
+            ...(order ? { poId: order.id } : { ticketId }),
+            confirmationOrderNumber,
+            paymentType,
+            amount,
+            transferDestination: effectiveTransferDestination,
+            status: PaymentStatus.PAID,
+            processedById: session.user.id,
+            proofOfTransferUrl: receiptUrl,
+            additionalProofUrls: receiptUrls.slice(1),
+            proofEditDisabledUrls: receiptUrls,
+            paidAt: now,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+      const financeAccount = await FinanceAccount.findOneAndUpdate(
+        { _id: financeAccountId, balance: { $gte: amount } },
+        { $inc: { balance: -amount } },
+        { new: true, session: mongoSession },
+      ).select({ _id: 1 });
+      if (!financeAccount) {
+        const exists = await FinanceAccount.exists({
+          _id: financeAccountId,
+        }).session(mongoSession);
+        throw new Error(
+          exists
+            ? "Saldo buku bank/kas tidak mencukupi."
+            : "Buku bank/kas sumber pembayaran tidak ditemukan.",
+        );
+      }
+      await Cashflow.create(
+        [
+          {
+            _id: randomUUID(),
+            type: "OUT",
+            amount,
+            sourceDesc: `Pembayaran ${order?.poNumber ?? ticket.ticketNumber} · ${ticket.title}`,
+            projectId: ticket.projectId,
+            paymentMethod:
+              isInternalFundingRequest
+                ? paymentMethod === POPaymentMethod.CASH
+                  ? "CASH"
+                  : "TRANSFER"
+                : ticket.requestPaymentMethod === POPaymentMethod.CASH
+                  ? "CASH"
+                  : "TRANSFER",
+            proofUrl: receiptUrl,
+            accountId: financeAccountId,
+            recordedBy: session.user.id,
+            paymentTransactionId: paymentId,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+
+      if (order && confirmationOrderNumber && confirmationPublicCode) {
         const subtotal =
           invoice?.subTotal ??
           order.items.reduce((sum, item) => sum + item.totalPrice, 0);
         const tax =
           invoice?.tax ??
           (order.includeTax ? Math.round(subtotal * 0.11 * 100) / 100 : 0);
-        await transaction.orderConfirmation.create({
-          data: {
-            publicCode: await generateAvailablePublicCode(transaction),
-            koNumber: confirmationOrderNumber,
-            poId: order.id,
-            paymentTransactionId: payment.id,
-            paymentTerms: order.paymentTerms,
-            paymentType,
-            paymentAmount: amount,
-            transferDestination: transferDestination.trim(),
-            proofOfTransferUrl: receiptUrl,
-            paidAt: now,
-            subTotal: subtotal,
-            tax,
-            grandTotal: invoice?.grandTotal ?? subtotal + tax,
-            items: {
-              create: order.items.map((item) => ({
-                itemCode: item.itemCode,
-                description: item.itemName,
-                quantity: item.quantity,
-                unit: item.unit,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice,
-              })),
+        const confirmationId = randomUUID();
+        await OrderConfirmation.create(
+          [
+            {
+              _id: confirmationId,
+              publicCode: confirmationPublicCode,
+              koNumber: confirmationOrderNumber,
+              poId: order.id,
+              paymentTransactionId: paymentId,
+              paymentTerms: order.paymentTerms,
+              paymentType,
+              paymentAmount: amount,
+              transferDestination: transferDestination.trim(),
+              proofOfTransferUrl: receiptUrl,
+              paidAt: now,
+              subTotal: subtotal,
+              tax,
+              grandTotal: invoice?.grandTotal ?? subtotal + tax,
+              createdAt: now,
             },
-          },
-        });
+          ],
+          { session: mongoSession },
+        );
+        if (order.items.length) {
+          await KOItem.insertMany(
+            order.items.map((item) => ({
+              _id: randomUUID(),
+              koId: confirmationId,
+              itemCode: item.itemCode,
+              description: item.itemName,
+              quantity: item.quantity,
+              unit: item.unit,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+            })),
+            { session: mongoSession },
+          );
+        }
         if (invoice) {
-          await transaction.invoice.updateMany({
-            where: { poId: order.id, status: { not: "PAID" } },
-            data: {
-              status: isFullyPaid ? "PAID" : "PARTIAL",
-            },
-          });
+          await Invoice.updateMany(
+            { poId: order.id, status: { $ne: "PAID" } },
+            { $set: { status: isFullyPaid ? "PAID" : "PARTIAL", updatedAt: now } },
+            { session: mongoSession },
+          );
         }
       }
 
       if (order && isFullyPaid) {
-        await transaction.purchaseOrder.update({
-          where: { id: order.id },
-          data: {
-            paidAt: now,
-            paymentReceiptUrl: receiptUrl,
-            transferDestination: transferDestination.trim(),
+        await PurchaseOrder.updateOne(
+          { _id: order.id },
+          {
+            $set: {
+              paidAt: now,
+              paymentReceiptUrl: receiptUrl,
+              transferDestination: transferDestination.trim(),
+              updatedAt: now,
+            },
           },
-        });
-        await receivePurchaseOrderStock(transaction, {
+          { session: mongoSession },
+        );
+        await receivePurchaseOrderStockMongo(mongoSession, {
           purchaseOrderId: order.id,
           poNumber: order.poNumber,
           vendorName: order.vendorName,
@@ -5426,132 +5556,186 @@ export async function processFinancePayment(
 
       const isShippingCostRequest =
         ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
-      let completedByFinance = false;
-
-      if (isFullyPaid) {
-        const shouldAdvanceTicketStatus =
-          ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+      const shouldAdvanceTicketStatus =
+        isFullyPaid &&
+        (ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
           (ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
-            Boolean(order || isShippingCostRequest));
-        completedByFinance =
-          shouldAdvanceTicketStatus && !order && !isShippingCostRequest;
-        await transaction.ticket.update({
-          where: { id: ticketId },
-          data: {
-            ...(shouldAdvanceTicketStatus
-              ? order || isShippingCostRequest
-                ? { status: TicketStatus.PROCESSED_FINANCE }
-                : { status: TicketStatus.COMPLETED }
-              : {}),
-            transferReceiptUrl: receiptUrl,
-            transferDestination: effectiveTransferDestination,
-            ...(isInternalFundingRequest
-              ? { paymentProofUrl: receiptUrl }
-              : {}),
-            ...(establishedTicketNominal !== null
-              ? {
-                  requestedAmount: Math.round(establishedTicketNominal),
-                  totalAmount: scaledIntegerFromDecimal(establishedTicketNominal),
-                }
-              : {}),
-            updatedAt: now,
-          },
-        });
-      } else {
-        await transaction.ticket.update({
-          where: { id: ticketId },
-          data: {
-            transferReceiptUrl: receiptUrl,
-            transferDestination: effectiveTransferDestination,
-            ...(establishedTicketNominal !== null
-              ? {
-                  requestedAmount: Math.round(establishedTicketNominal),
-                  totalAmount: scaledIntegerFromDecimal(establishedTicketNominal),
-                }
-              : {}),
-            updatedAt: now,
-          },
-        });
-      }
+            Boolean(order || isShippingCostRequest)));
+      const completedByFinance =
+        shouldAdvanceTicketStatus && !order && !isShippingCostRequest;
+      const ticketUpdate: Record<string, unknown> = {
+        transferReceiptUrl: receiptUrl,
+        transferDestination: effectiveTransferDestination,
+        updatedAt: now,
+        ...(isInternalFundingRequest ? { paymentProofUrl: receiptUrl } : {}),
+        ...(establishedTicketNominal !== null
+          ? {
+              requestedAmount: Math.round(establishedTicketNominal),
+              totalAmount: scaledIntegerFromDecimal(establishedTicketNominal),
+            }
+          : {}),
+        ...(shouldAdvanceTicketStatus
+          ? {
+              status:
+                order || isShippingCostRequest
+                  ? TicketStatus.PROCESSED_FINANCE
+                  : TicketStatus.COMPLETED,
+            }
+          : {}),
+      };
+      await Ticket.updateOne(
+        { _id: ticketId },
+        { $set: ticketUpdate },
+        { session: mongoSession },
+      );
+
       if (ticket.type === TicketType.MATERIAL) {
-        await syncTicketStatus(transaction, ticketId);
-      }
-      await transaction.ticketAuditLog.create({
-        data: {
-          id: randomUUID(),
-          ticketId,
-          userId: session.user.id,
-          action: isFullyPaid
-            ? "FINANCE_PAYMENT_COMPLETED"
-            : "FINANCE_PAYMENT_PARTIAL",
-          notes: isShippingCostRequest && isFullyPaid
-            ? `Pelunasan biaya pengiriman sebesar Rp${amount.toLocaleString("id-ID")} berhasil dibayar; diteruskan ke Logistik untuk menerbitkan Surat Jalan (DO).`
-            : `${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "Pembayaran termin" : "Pelunasan"} sebesar Rp${amount.toLocaleString("id-ID")}; sisa tagihan Rp${newRemaining.toLocaleString("id-ID")}.`,
-        },
-      });
-      if (isShippingCostRequest && isFullyPaid) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "Biaya Pengiriman Dibayar - Siap Terbitkan DO",
-          message: `${ticket.ticketNumber} · ${ticket.title} telah dibayar Keuangan. Silakan terbitkan Surat Jalan (DO) untuk pengiriman barang.`,
-          actionUrl: `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticketId)}`,
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
-      }
-      if (order && confirmationOrderNumber) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "KO Siap Dikirim ke Vendor",
-          message: `KO ${confirmationOrderNumber} untuk pembayaran ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "termin" : "pelunasan"} PO #${order.poNumber} siap diteruskan bersama bukti transfer.`,
-          actionUrl: "/apps/logistics?tab=documents",
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
-      }
-      if (order && isFullyPaid) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "PO Lunas",
-          message: `PO #${order.poNumber} telah lunas dan material masuk stok gudang.`,
-          actionUrl: `/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(ticketId)}`,
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
-      }
-      if (completedByFinance) {
-        await sendNotification({
-          userId: ticket.requesterId,
-          title: "Tiket Selesai - Pembayaran Diproses",
-          message: `${ticket.ticketNumber} · ${ticket.title} telah dibayar Keuangan (Rp${amount.toLocaleString("id-ID")}) dengan bukti pembayaran terlampir.`,
-          actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
-      } else if (ticket.requesterId !== session.user.id) {
-        if (isFullyPaid) {
-          await sendNotification({
-            userId: ticket.requesterId,
-            title: isShippingCostRequest
-              ? "Biaya Pengiriman Dibayar"
-              : order
-                ? "Pembayaran PO Tiket Lunas"
-                : "Pembayaran Tiket Lunas",
-            message: `${ticket.ticketNumber} · ${ticket.title} telah dilunasi Keuangan (Rp${amount.toLocaleString("id-ID")}).`,
-            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
-            type: NotificationType.SUCCESS,
-            database: transaction,
-          });
+        const items = await TicketItem.find({ ticketId })
+          .select({ status: 1, doItemId: 1 })
+          .session(mongoSession)
+          .lean();
+        if (items.length === 0 && isShippingCostRequest) {
+          const deliveryOrders = await DeliveryOrder.find({ ticketId })
+            .select({ status: 1 })
+            .session(mongoSession)
+            .lean();
+          await Ticket.updateOne(
+            { _id: ticketId },
+            {
+              $set: {
+                fulfillmentStatus:
+                  ticket.status === TicketStatus.COMPLETED
+                    ? "COMPLETED"
+                    : deliveryOrders.length
+                      ? "PARTIALLY_FULFILLED"
+                      : "PENDING",
+              },
+            },
+            { session: mongoSession },
+          );
         } else {
-          await sendNotification({
-            userId: ticket.requesterId,
-            title: "Pembayaran Sebagian Tiket Dicatat",
-            message: `${ticket.ticketNumber} · ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : "Pembayaran termin"} Rp${amount.toLocaleString("id-ID")} telah diproses Keuangan (sisa Rp${newRemaining.toLocaleString("id-ID")}).`,
-            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
-            type: NotificationType.INFO,
-            database: transaction,
+          const allProcessed = items.length > 0 &&
+            items.every((item) => item.status === "PROCESSED_TO_DO");
+          const hasAnyFulfillment = items.some(
+            (item) => item.status !== "PENDING",
+          );
+          await Ticket.updateOne(
+            { _id: ticketId },
+            {
+              $set: {
+                fulfillmentStatus: allProcessed
+                  ? "COMPLETED"
+                  : hasAnyFulfillment
+                    ? "PARTIALLY_FULFILLED"
+                    : "PENDING",
+              },
+            },
+            { session: mongoSession },
+          );
+        }
+      }
+      await TicketAuditLog.create(
+        [
+          {
+            _id: randomUUID(),
+            ticketId,
+            userId: session.user.id,
+            action: isFullyPaid
+              ? "FINANCE_PAYMENT_COMPLETED"
+              : "FINANCE_PAYMENT_PARTIAL",
+            notes: isShippingCostRequest && isFullyPaid
+              ? `Pelunasan biaya pengiriman sebesar Rp${amount.toLocaleString("id-ID")} berhasil dibayar; diteruskan ke Logistik untuk menerbitkan Surat Jalan (DO).`
+              : `${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "Pembayaran termin" : "Pelunasan"} sebesar Rp${amount.toLocaleString("id-ID")}; sisa tagihan Rp${newRemaining.toLocaleString("id-ID")}.`,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+
+      const logisticsUsers = await User.find({
+        isActive: true,
+        role: UserRole.LOGISTICS,
+      })
+        .select({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+      const notificationRows: Array<Record<string, string | Date>> = [];
+      const addRoleNotification = (
+        users: typeof logisticsUsers,
+        title: string,
+        message: string,
+        actionUrl: string,
+      ) => {
+        for (const user of users) {
+          notificationRows.push({
+            _id: randomUUID(),
+            userId: String(user._id),
+            title,
+            message,
+            type: NotificationType.SUCCESS,
+            actionUrl,
+            createdAt: now,
           });
         }
+      };
+      if (isShippingCostRequest && isFullyPaid) {
+        addRoleNotification(
+          logisticsUsers,
+          "Biaya Pengiriman Dibayar - Siap Terbitkan DO",
+          `${ticket.ticketNumber} · ${ticket.title} telah dibayar Keuangan. Silakan terbitkan Surat Jalan (DO) untuk pengiriman barang.`,
+          `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticketId)}`,
+        );
+      }
+      if (order && confirmationOrderNumber) {
+        addRoleNotification(
+          logisticsUsers,
+          "KO Siap Dikirim ke Vendor",
+          `KO ${confirmationOrderNumber} untuk pembayaran ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "termin" : "pelunasan"} PO #${order.poNumber} siap diteruskan bersama bukti transfer.`,
+          "/apps/logistics?tab=documents",
+        );
+      }
+      if (order && isFullyPaid) {
+        addRoleNotification(
+          logisticsUsers,
+          "PO Lunas",
+          `PO #${order.poNumber} telah lunas dan material masuk stok gudang.`,
+          `/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(ticketId)}`,
+        );
+      }
+
+      if (completedByFinance || ticket.requesterId !== session.user.id) {
+        const requesterActive = await User.exists({
+          _id: ticket.requesterId,
+          isActive: true,
+        }).session(mongoSession);
+        if (requesterActive) {
+          const title = completedByFinance
+            ? "Tiket Selesai - Pembayaran Diproses"
+            : isFullyPaid
+              ? isShippingCostRequest
+                ? "Biaya Pengiriman Dibayar"
+                : order
+                  ? "Pembayaran PO Tiket Lunas"
+                  : "Pembayaran Tiket Lunas"
+              : "Pembayaran Sebagian Tiket Dicatat";
+          const message = completedByFinance
+            ? `${ticket.ticketNumber} · ${ticket.title} telah dibayar Keuangan (Rp${amount.toLocaleString("id-ID")}) dengan bukti pembayaran terlampir.`
+            : isFullyPaid
+              ? `${ticket.ticketNumber} · ${ticket.title} telah dilunasi Keuangan (Rp${amount.toLocaleString("id-ID")}).`
+              : `${ticket.ticketNumber} · ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : "Pembayaran termin"} Rp${amount.toLocaleString("id-ID")} telah diproses Keuangan (sisa Rp${newRemaining.toLocaleString("id-ID")}).`;
+          notificationRows.push({
+            _id: randomUUID(),
+            userId: ticket.requesterId,
+            title,
+            message,
+            type: isFullyPaid ? NotificationType.SUCCESS : NotificationType.INFO,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+            createdAt: now,
+          });
+        }
+      }
+      if (notificationRows.length) {
+        await Notification.insertMany(notificationRows, { session: mongoSession });
       }
     });
   } catch (error) {
@@ -5627,189 +5811,271 @@ export async function processFinanceStandalonePurchaseOrderPayment(
   }
 
   try {
-    await prisma.$transaction(async (transaction) => {
-      const order = await transaction.purchaseOrder.findUnique({
-        where: { publicCode },
-        select: {
-          id: true,
-          projectId: true,
-          poNumber: true,
-          vendorName: true,
-          status: true,
-          ticketId: true,
-          vendorInvoiceUrl: true,
-          includeTax: true,
-          paymentTerms: true,
-          invoices: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: {
-              subTotal: true,
-              tax: true,
-              deduction: true,
-              grandTotal: true,
-              documentUrl: true,
-              items: {
-                orderBy: { id: "asc" },
-                select: {
-                  itemCode: true,
-                  description: true,
-                  quantity: true,
-                  unit: true,
-                  unitPrice: true,
-                  totalPrice: true,
-                },
-              },
-            },
-          },
-          items: {
-            orderBy: { id: "asc" },
-            select: {
-              itemCode: true,
-              stockItemId: true,
-              itemName: true,
-              quantity: true,
-              unit: true,
-              unitPrice: true,
-              totalPrice: true,
-            },
-          },
-        },
-      });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (mongoSession) => {
+      const order = await PurchaseOrder.findOne({ publicCode })
+        .session(mongoSession)
+        .lean();
       if (!order || order.ticketId) {
         throw new Error("PO restock gudang tidak ditemukan.");
       }
       if (order.status !== POStatus.APPROVED) {
         throw new Error("PO belum disetujui Direktur.");
       }
-      if (!order.vendorInvoiceUrl && !order.invoices[0]?.documentUrl) {
+      const invoice = await Invoice.findOne({ poId: String(order._id) })
+        .sort({ createdAt: -1 })
+        .session(mongoSession)
+        .lean();
+      if (!order.vendorInvoiceUrl && !invoice?.documentUrl) {
         throw new Error("Logistik harus mengunggah invoice/bon sebelum pembayaran PO.");
       }
-      await acquireMongoTransactionLock(transaction, `po-payment:${order.id}`);
-      const subtotal = order.invoices[0]?.subTotal ?? order.items.reduce(
-        (sum, item) => sum + item.totalPrice,
+      const items = await POItem.find({ poId: String(order._id) })
+        .sort({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+      const now = new Date();
+      const lockUpdate = await PurchaseOrder.updateOne(
+        { _id: order._id },
+        { $set: { updatedAt: now } },
+        { session: mongoSession },
+      );
+      if (lockUpdate.matchedCount !== 1) {
+        throw new Error("PO restock gudang tidak ditemukan.");
+      }
+
+      const subtotal =
+        invoice?.subTotal ??
+        items.reduce((sum, item) => sum + item.totalPrice, 0);
+      const tax =
+        invoice?.tax ??
+        Math.round(subtotal * (order.includeTax ? 0.11 : 0) * 100) / 100;
+      const total = invoice?.grandTotal ?? subtotal + tax;
+      const paymentHistory = await PaymentTransaction.find({
+        poId: String(order._id),
+        status: PaymentStatus.PAID,
+      })
+        .session(mongoSession)
+        .select({ amount: 1 })
+        .lean();
+      const paidAmount = paymentHistory.reduce(
+        (sum, payment) => sum + payment.amount,
         0,
       );
-      const tax =
-        order.invoices[0]?.tax ??
-        Math.round(subtotal * (order.includeTax ? 0.11 : 0) * 100) / 100;
-      const total =
-        order.invoices[0]?.grandTotal ?? subtotal + tax;
-      const paymentHistory = await transaction.paymentTransaction.aggregate({
-        where: { poId: order.id, status: PaymentStatus.PAID },
-        _sum: { amount: true },
-      });
       if (
         paymentType === PaymentType.DOWN_PAYMENT &&
-        (await transaction.paymentTransaction.findFirst({
-          where: { poId: order.id, status: PaymentStatus.PAID },
-          select: { id: true },
-        }))
+        paymentHistory.length > 0
       ) {
         throw new Error("DP hanya dapat digunakan pada pembayaran pertama.");
       }
-      const allocation = allocatePaymentAmount(
+      const { amount, isFullyPaid } = allocatePaymentAmount(
         total,
-        paymentHistory._sum.amount ?? 0,
+        paidAmount,
         paymentType,
         requestedPaymentAmount,
       );
-      const { amount, isFullyPaid } = allocation;
-      const now = new Date();
-      const confirmationOrderNumber = await nextDocumentNumber(
-        transaction,
-        "KO",
-      );
-      const payment = await transaction.paymentTransaction.create({
-        data: {
-          poId: order.id,
-          confirmationOrderNumber,
-          paymentType,
-          amount,
-          transferDestination: transferDestination.trim(),
-          status: PaymentStatus.PAID,
-          processedById: session.user.id,
-          proofOfTransferUrl: receiptUrl,
-          additionalProofUrls: receiptUrls.slice(1),
-          proofEditDisabledUrls: receiptUrls,
-          paidAt: now,
-        },
-        select: { id: true },
-      });
-      await recordFinanceCashflowOutflow(transaction, {
-        paymentTransactionId: payment.id,
-        financeAccountId,
-        amount,
-        sourceDesc: `Pembayaran ${order.poNumber} · ${order.vendorName}`,
-        projectId: order.projectId,
-        paymentMethod: "TRANSFER",
-        proofUrl: receiptUrl,
-        recordedBy: session.user.id,
-      });
-      const invoice = order.invoices[0];
-      await transaction.orderConfirmation.create({
-        data: {
-          publicCode: await generateAvailablePublicCode(transaction),
-          koNumber: confirmationOrderNumber,
-          poId: order.id,
-          paymentTransactionId: payment.id,
-          paymentTerms: order.paymentTerms,
-          paymentType,
-          paymentAmount: amount,
-          transferDestination: transferDestination.trim(),
-          proofOfTransferUrl: receiptUrl,
-          paidAt: now,
-          subTotal: subtotal,
-          tax,
-          grandTotal: invoice?.grandTotal ?? total,
-          items: {
-            create: order.items.map((item) => ({
-              itemCode: item.itemCode,
-              description: item.itemName,
-              quantity: item.quantity,
-              unit: item.unit,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-            })),
+      const year = now.getFullYear();
+      let confirmationOrderNumber = "";
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const sequence = await DocumentNumberSequence.findOneAndUpdate(
+          { kind: "KO", year },
+          {
+            $inc: { value: 1 },
+            $setOnInsert: { _id: randomUUID() },
           },
-        },
-      });
-      if (invoice) {
-        await transaction.invoice.updateMany({
-          where: { poId: order.id, status: { not: "PAID" } },
-          data: { status: isFullyPaid ? "PAID" : "PARTIAL" },
-        });
+          { upsert: true, new: true, session: mongoSession },
+        );
+        if (!sequence) throw new Error("Nomor KO gagal dibuat.");
+        const candidate = `SPE-${new Intl.NumberFormat("id-ID", {
+          maximumFractionDigits: 0,
+        }).format(sequence.value)}/KO/${year}`;
+        const [existingPayment, existingConfirmation] = await Promise.all([
+          PaymentTransaction.exists({
+            confirmationOrderNumber: candidate,
+          }).session(mongoSession),
+          OrderConfirmation.exists({ koNumber: candidate }).session(mongoSession),
+        ]);
+        if (!existingPayment && !existingConfirmation) {
+          confirmationOrderNumber = candidate;
+          break;
+        }
+      }
+      if (!confirmationOrderNumber) {
+        throw new Error("Nomor KO unik tidak dapat dibuat.");
+      }
+      let confirmationPublicCode = "";
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = generateRandomCode();
+        if (!(await OrderConfirmation.exists({ publicCode: candidate }).session(mongoSession))) {
+          confirmationPublicCode = candidate;
+          break;
+        }
+      }
+      if (!confirmationPublicCode) {
+        throw new Error("Kode KO unik tidak dapat dibuat.");
       }
 
-      if (isFullyPaid) {
-        await transaction.purchaseOrder.update({
-          where: { id: order.id },
-          data: {
-            paidAt: now,
-            paymentReceiptUrl: receiptUrl,
+      const paymentId = randomUUID();
+      await PaymentTransaction.create(
+        [
+          {
+            _id: paymentId,
+            poId: String(order._id),
+            confirmationOrderNumber,
+            paymentType,
+            amount,
             transferDestination: transferDestination.trim(),
+            status: PaymentStatus.PAID,
+            processedById: session.user.id,
+            proofOfTransferUrl: receiptUrl,
+            additionalProofUrls: receiptUrls.slice(1),
+            proofEditDisabledUrls: receiptUrls,
+            paidAt: now,
+            createdAt: now,
           },
-        });
+        ],
+        { session: mongoSession },
+      );
+      const account = await FinanceAccount.findOneAndUpdate(
+        { _id: financeAccountId, balance: { $gte: amount } },
+        { $inc: { balance: -amount } },
+        { new: true, session: mongoSession },
+      ).select({ _id: 1 });
+      if (!account) {
+        const accountExists = await FinanceAccount.exists({
+          _id: financeAccountId,
+        }).session(mongoSession);
+        throw new Error(
+          accountExists
+            ? "Saldo buku bank/kas tidak mencukupi."
+            : "Buku bank/kas sumber pembayaran tidak ditemukan.",
+        );
+      }
+      await Cashflow.create(
+        [
+          {
+            _id: randomUUID(),
+            type: "OUT",
+            amount,
+            sourceDesc: `Pembayaran ${order.poNumber} · ${order.vendorName}`,
+            projectId: order.projectId ?? null,
+            paymentMethod: "TRANSFER",
+            proofUrl: receiptUrl,
+            accountId: financeAccountId,
+            recordedBy: session.user.id,
+            paymentTransactionId: paymentId,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+      await OrderConfirmation.create(
+        [
+          {
+            _id: randomUUID(),
+            publicCode: confirmationPublicCode,
+            koNumber: confirmationOrderNumber,
+            poId: String(order._id),
+            paymentTransactionId: paymentId,
+            paymentTerms: order.paymentTerms,
+            paymentType,
+            paymentAmount: amount,
+            transferDestination: transferDestination.trim(),
+            proofOfTransferUrl: receiptUrl,
+            paidAt: now,
+            subTotal: subtotal,
+            tax,
+            grandTotal: invoice?.grandTotal ?? total,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+      const confirmation = await OrderConfirmation.findOne({
+        paymentTransactionId: paymentId,
+      })
+        .select({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+      if (!confirmation) throw new Error("KO tidak berhasil disimpan.");
+      if (items.length) {
+        await KOItem.insertMany(
+          items.map((item) => ({
+            _id: randomUUID(),
+            koId: String(confirmation._id),
+            itemCode: item.itemCode,
+            description: item.itemName,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
+          { session: mongoSession },
+        );
+      }
+      if (invoice) {
+        await Invoice.updateMany(
+          { poId: String(order._id), status: { $ne: "PAID" } },
+          { $set: { status: isFullyPaid ? "PAID" : "PARTIAL", updatedAt: now } },
+          { session: mongoSession },
+        );
+      }
+      if (isFullyPaid) {
+        await PurchaseOrder.updateOne(
+          { _id: order._id },
+          {
+            $set: {
+              paidAt: now,
+              paymentReceiptUrl: receiptUrl,
+              transferDestination: transferDestination.trim(),
+              updatedAt: now,
+            },
+          },
+          { session: mongoSession },
+        );
       }
 
-      await sendNotification({
-        roleTarget: UserRole.LOGISTICS,
-        title: "KO Siap Dikirim ke Vendor",
-        message: `KO ${confirmationOrderNumber} untuk pembayaran ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "termin" : "pelunasan"} PO #${order.poNumber} siap diteruskan bersama bukti transfer.`,
-        actionUrl: "/apps/logistics?tab=documents",
-        type: NotificationType.SUCCESS,
-        database: transaction,
-      });
-
-      if (isFullyPaid) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "PO Lunas, Menunggu Penerimaan",
-          message: `Pembayaran PO #${order.poNumber} telah lunas. Catat penerimaan barang setelah dikirim vendor.`,
-          actionUrl: "/apps/logistics?tab=documents",
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
+      const logisticsUsers = await User.find({
+        isActive: true,
+        role: UserRole.LOGISTICS,
+      })
+        .select({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+      if (logisticsUsers.length) {
+        const messages = [
+          {
+            _id: randomUUID(),
+            userId: "",
+            title: "KO Siap Dikirim ke Vendor",
+            message: `KO ${confirmationOrderNumber} untuk pembayaran ${paymentType === PaymentType.DOWN_PAYMENT ? "DP" : paymentType === PaymentType.PROGRESS_PAYMENT ? "termin" : "pelunasan"} PO #${order.poNumber} siap diteruskan bersama bukti transfer.`,
+            type: NotificationType.SUCCESS,
+            actionUrl: "/apps/logistics?tab=documents",
+            createdAt: now,
+          },
+          ...(isFullyPaid
+            ? [
+                {
+                  _id: randomUUID(),
+                  userId: "",
+                  title: "PO Lunas, Menunggu Penerimaan",
+                  message: `Pembayaran PO #${order.poNumber} telah lunas. Catat penerimaan barang setelah dikirim vendor.`,
+                  type: NotificationType.SUCCESS,
+                  actionUrl: "/apps/logistics?tab=documents",
+                  createdAt: now,
+                },
+              ]
+            : []),
+        ];
+        await Notification.insertMany(
+          messages.flatMap((message) =>
+            logisticsUsers.map((user) => ({
+              ...message,
+              _id: randomUUID(),
+              userId: String(user._id),
+            })),
+          ),
+          { session: mongoSession },
+        );
       }
     });
   } catch (error) {
@@ -5902,22 +6168,11 @@ export async function processFinanceDirectStockPurchasePayment(
   }
 
   try {
-    await prisma.$transaction(async (transaction) => {
-      const purchase = await transaction.directStockPurchase.findUnique({
-        where: { id: purchaseId },
-        select: {
-          id: true,
-          purchaseNumber: true,
-          vendorName: true,
-          paymentMethod: true,
-          totalAmount: true,
-          isApprovedByDirector: true,
-          vendorInvoiceUrl: true,
-          status: true,
-          ticketId: true,
-          ticket: { select: { projectId: true } },
-        },
-      });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (mongoSession) => {
+      const purchase = await DirectStockPurchase.findById(purchaseId)
+        .session(mongoSession)
+        .lean();
       if (!purchase) throw new Error("Pembelian langsung tidak ditemukan.");
       if (!purchase.isApprovedByDirector) {
         throw new Error("Pembelian langsung wajib disetujui Direktur sebelum pembayaran.");
@@ -5939,64 +6194,102 @@ export async function processFinanceDirectStockPurchasePayment(
           "Keterangan tujuan transfer wajib diisi untuk pembayaran transfer.",
         );
       }
-      await acquireMongoTransactionLock(
-        transaction,
-        `direct-stock-payment:${purchase.id}`,
+
+      const now = new Date();
+      const lockUpdate = await DirectStockPurchase.updateOne(
+        { _id: purchaseId },
+        { $set: { updatedAt: now } },
+        { session: mongoSession },
       );
-      const paymentHistory = await transaction.paymentTransaction.aggregate({
-        where: {
-          directStockPurchaseId: purchase.id,
-          status: PaymentStatus.PAID,
-        },
-        _sum: { amount: true },
-      });
+      if (lockUpdate.matchedCount !== 1) {
+        throw new Error("Pembelian langsung tidak ditemukan.");
+      }
+      const paymentHistory = await PaymentTransaction.find({
+        directStockPurchaseId: purchaseId,
+        status: PaymentStatus.PAID,
+      })
+        .session(mongoSession)
+        .select({ amount: 1 })
+        .lean();
+      const paidAmount = paymentHistory.reduce(
+        (sum, payment) => sum + payment.amount,
+        0,
+      );
       if (
         paymentType === PaymentType.DOWN_PAYMENT &&
-        (await transaction.paymentTransaction.findFirst({
-          where: {
-            directStockPurchaseId: purchase.id,
-            status: PaymentStatus.PAID,
-          },
-          select: { id: true },
-        }))
+        paymentHistory.length > 0
       ) {
         throw new Error("DP hanya dapat digunakan pada pembayaran pertama.");
       }
       const total = decimalFromScaledInteger(purchase.totalAmount).toNumber();
-      const allocation = allocatePaymentAmount(
+      const { amount, isFullyPaid } = allocatePaymentAmount(
         total,
-        paymentHistory._sum.amount ?? 0,
+        paidAmount,
         paymentType,
         requestedPaymentAmount,
       );
-      const { amount, isFullyPaid } = allocation;
-      const now = new Date();
-      const payment = await transaction.paymentTransaction.create({
-        data: {
-          directStockPurchaseId: purchase.id,
-          paymentType,
-          amount,
-          transferDestination: resolvedTransferDestination,
-          status: PaymentStatus.PAID,
-          processedById: session.user.id,
-          proofOfTransferUrl: receiptUrl,
-          additionalProofUrls: receiptUrls.slice(1),
-          proofEditDisabledUrls: receiptUrls,
-          paidAt: now,
-        },
-        select: { id: true },
-      });
-      await recordFinanceCashflowOutflow(transaction, {
-        paymentTransactionId: payment.id,
-        financeAccountId,
-        amount,
-        sourceDesc: `Pembelian langsung ${purchase.purchaseNumber} · ${purchase.vendorName}`,
-        projectId: purchase.ticket?.projectId,
-        paymentMethod:
-          resolvedPaymentMethod === POPaymentMethod.CASH ? "CASH" : "TRANSFER",
-        proofUrl: receiptUrl,
-        recordedBy: session.user.id,
-      });
+      const ticket = purchase.ticketId
+        ? await Ticket.findById(purchase.ticketId)
+            .select({ projectId: 1 })
+            .session(mongoSession)
+            .lean()
+        : null;
+      const account = await FinanceAccount.findOneAndUpdate(
+        { _id: financeAccountId, balance: { $gte: amount } },
+        { $inc: { balance: -amount } },
+        { new: true, session: mongoSession },
+      ).select({ _id: 1 });
+      if (!account) {
+        const accountExists = await FinanceAccount.exists({
+          _id: financeAccountId,
+        }).session(mongoSession);
+        throw new Error(
+          accountExists
+            ? "Saldo buku bank/kas tidak mencukupi."
+            : "Buku bank/kas sumber pembayaran tidak ditemukan.",
+        );
+      }
+
+      const paymentId = randomUUID();
+      await PaymentTransaction.create(
+        [
+          {
+            _id: paymentId,
+            directStockPurchaseId: purchaseId,
+            paymentType,
+            amount,
+            transferDestination: resolvedTransferDestination,
+            status: PaymentStatus.PAID,
+            processedById: session.user.id,
+            proofOfTransferUrl: receiptUrl,
+            additionalProofUrls: receiptUrls.slice(1),
+            proofEditDisabledUrls: receiptUrls,
+            paidAt: now,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+      await Cashflow.create(
+        [
+          {
+            _id: randomUUID(),
+            type: "OUT",
+            amount,
+            sourceDesc: `Pembelian langsung ${purchase.purchaseNumber} · ${purchase.vendorName}`,
+            projectId: ticket?.projectId ?? null,
+            paymentMethod:
+              resolvedPaymentMethod === POPaymentMethod.CASH ? "CASH" : "TRANSFER",
+            proofUrl: receiptUrl,
+            accountId: financeAccountId,
+            recordedBy: session.user.id,
+            paymentTransactionId: paymentId,
+            createdAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+
       if (purchase.ticketId) {
         const paymentLabel =
           paymentType === PaymentType.DOWN_PAYMENT
@@ -6006,47 +6299,68 @@ export async function processFinanceDirectStockPurchasePayment(
               : isFullyPaid
                 ? "pelunasan"
                 : "pembayaran";
-        await transaction.ticketAuditLog.create({
-          data: {
-            ticketId: purchase.ticketId,
-            userId: session.user.id,
-            action: "DIRECT_PURCHASE_PAYMENT",
-            notes: `${paymentLabel} pembelian langsung ${purchase.purchaseNumber} sebesar Rp${amount.toLocaleString("id-ID")} dicatat oleh Keuangan; bukti transfer tersedia di Riwayat Pembayaran.`,
-          },
-        });
+        await TicketAuditLog.create(
+          [
+            {
+              _id: randomUUID(),
+              ticketId: purchase.ticketId,
+              userId: session.user.id,
+              action: "DIRECT_PURCHASE_PAYMENT",
+              notes: `${paymentLabel} pembelian langsung ${purchase.purchaseNumber} sebesar Rp${amount.toLocaleString("id-ID")} dicatat oleh Keuangan; bukti transfer tersedia di Riwayat Pembayaran.`,
+              createdAt: now,
+            },
+          ],
+          { session: mongoSession },
+        );
       }
       if (isFullyPaid || resolvedPaymentMethod !== purchase.paymentMethod) {
-        await transaction.directStockPurchase.update({
-          where: { id: purchase.id },
-          data: {
-            ...(isFullyPaid ? { paidAt: now } : {}),
-            ...(resolvedPaymentMethod !== purchase.paymentMethod
-              ? { paymentMethod: resolvedPaymentMethod }
-              : {}),
+        await DirectStockPurchase.updateOne(
+          { _id: purchaseId },
+          {
+            $set: {
+              ...(isFullyPaid ? { paidAt: now } : {}),
+              ...(resolvedPaymentMethod !== purchase.paymentMethod
+                ? { paymentMethod: resolvedPaymentMethod }
+                : {}),
+              updatedAt: now,
+            },
           },
-        });
+          { session: mongoSession },
+        );
       }
-      if (
+
+      const notificationTitle =
         purchase.status === DirectStockPurchaseStatus.PENDING_RECEIPT &&
-        (paymentHistory._sum.amount ?? 0) === 0
-      ) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "Pembelian Langsung Siap Diterima",
-          message: `Bukti pembayaran pembelian ${purchase.purchaseNumber} telah diunggah. Logistik dapat mencatat penerimaan dan mengunggah foto barang.`,
-          actionUrl: "/apps/logistics?tab=stock",
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
-      } else if (isFullyPaid && (paymentHistory._sum.amount ?? 0) > 0) {
-        await sendNotification({
-          roleTarget: UserRole.LOGISTICS,
-          title: "Pembelian Langsung Lunas",
-          message: `Pelunasan pembelian langsung ${purchase.purchaseNumber} (Rp${amount.toLocaleString("id-ID")}) telah dicatat Keuangan.`,
-          actionUrl: "/apps/logistics?tab=stock",
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
+        paidAmount === 0
+          ? "Pembelian Langsung Siap Diterima"
+          : isFullyPaid && paidAmount > 0
+            ? "Pembelian Langsung Lunas"
+            : null;
+      if (notificationTitle) {
+        const recipients = await User.find({
+          isActive: true,
+          role: UserRole.LOGISTICS,
+        })
+          .select({ _id: 1 })
+          .session(mongoSession)
+          .lean();
+        if (recipients.length) {
+          await Notification.insertMany(
+            recipients.map((recipient) => ({
+              _id: randomUUID(),
+              userId: String(recipient._id),
+              title: notificationTitle,
+              message:
+                notificationTitle === "Pembelian Langsung Siap Diterima"
+                  ? `Bukti pembayaran pembelian ${purchase.purchaseNumber} telah diunggah. Logistik dapat mencatat penerimaan dan mengunggah foto barang.`
+                  : `Pelunasan pembelian langsung ${purchase.purchaseNumber} (Rp${amount.toLocaleString("id-ID")}) telah dicatat Keuangan.`,
+              type: NotificationType.SUCCESS,
+              actionUrl: "/apps/logistics?tab=stock",
+              createdAt: now,
+            })),
+            { session: mongoSession },
+          );
+        }
       }
     });
   } catch (error) {
@@ -6228,21 +6542,15 @@ export async function replaceFinancePaymentProof(
       throw new Error("Cloudinary mengembalikan URL bukti yang tidak valid.");
     }
 
-    const updated = await prisma.$transaction(async (transaction) => {
-      const currentPayment = await transaction.paymentTransaction.findFirst({
-        where: {
-          id: paymentTransactionId.trim(),
-          status: PaymentStatus.PAID,
-        },
-        select: {
-          proofOfTransferUrl: true,
-          additionalProofUrls: true,
-          proofEditDisabledUrls: true,
-        },
-      });
-      if (!currentPayment) {
-        return false;
-      }
+    const mongoose = await connectToMongoDB();
+    const updated = await mongoose.connection.transaction(async (mongoSession) => {
+      const currentPayment = await PaymentTransaction.findOne({
+        _id: paymentTransactionId.trim(),
+        status: PaymentStatus.PAID,
+      })
+        .session(mongoSession)
+        .lean();
+      if (!currentPayment) return false;
 
       if (
         (proofIndex === 0
@@ -6254,34 +6562,40 @@ export async function replaceFinancePaymentProof(
         return false;
       }
 
-      const nextAdditionalProofUrls = currentPayment.additionalProofUrls.slice();
-      if (proofIndex > 0) {
-        nextAdditionalProofUrls[proofIndex - 1] = storedProofUrl;
-      }
-      await transaction.paymentTransaction.update({
-        where: { id: paymentTransactionId.trim() },
-        data: {
-          proofOfTransferUrl:
-            proofIndex === 0
-              ? storedProofUrl
-              : currentPayment.proofOfTransferUrl ?? undefined,
-          additionalProofUrls: nextAdditionalProofUrls,
-          proofEditDisabledUrls: [
-            ...currentPayment.proofEditDisabledUrls,
-            storedProofUrl,
-          ],
+      const setFields: Record<string, string> =
+        proofIndex === 0
+          ? { proofOfTransferUrl: storedProofUrl }
+          : { [`additionalProofUrls.${proofIndex - 1}`]: storedProofUrl };
+      const paymentUpdate = await PaymentTransaction.updateOne(
+        {
+          _id: paymentTransactionId.trim(),
+          status: PaymentStatus.PAID,
+          proofEditDisabledUrls: { $ne: existingProofUrl },
+          ...(proofIndex === 0
+            ? { proofOfTransferUrl: existingProofUrl }
+            : {
+                [`additionalProofUrls.${proofIndex - 1}`]: existingProofUrl,
+              }),
         },
-      });
+        {
+          $set: setFields,
+          $addToSet: { proofEditDisabledUrls: storedProofUrl },
+        },
+        { session: mongoSession },
+      );
+      if (paymentUpdate.modifiedCount !== 1) return false;
 
       if (proofIndex === 0) {
-        await transaction.cashflow.updateMany({
-          where: { paymentTransactionId: paymentTransactionId.trim() },
-          data: { proofUrl: storedProofUrl },
-        });
-        await transaction.orderConfirmation.updateMany({
-          where: { paymentTransactionId: paymentTransactionId.trim() },
-          data: { proofOfTransferUrl: storedProofUrl },
-        });
+        await Cashflow.updateMany(
+          { paymentTransactionId: paymentTransactionId.trim() },
+          { $set: { proofUrl: storedProofUrl } },
+          { session: mongoSession },
+        );
+        await OrderConfirmation.updateMany(
+          { paymentTransactionId: paymentTransactionId.trim() },
+          { $set: { proofOfTransferUrl: storedProofUrl } },
+          { session: mongoSession },
+        );
       }
       return true;
     });

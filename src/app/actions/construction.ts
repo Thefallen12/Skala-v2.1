@@ -17,8 +17,22 @@ import {
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Cashflow from "@/models/cashflow";
+import DocumentNumberSequence from "@/models/document-number-sequence";
+import FinanceAccount from "@/models/finance-account";
+import Notification from "@/models/notification";
+import {
+  Invoice,
+  InvoiceItem,
+  SubkonContract,
+  SubkonTermyn,
+} from "@/models/finance-records";
+import Project from "@/models/project";
+import User from "@/models/user";
 import { sendNotification } from "@/lib/notifications";
 import {
+  generateRandomCode,
   generateAvailablePublicCode,
   isValidPublicCode,
 } from "@/lib/documents/random-code";
@@ -731,34 +745,69 @@ export async function verifySubkonTermynField(id: string) {
 }
 
 export async function reviewSubkonTermynFinance(id: string) {
-  return transitionSubkonTermyn(
-    id,
-    SubkonTermynStatus.FIELD_VERIFIED,
-    SubkonTermynStatus.FINANCE_CHECKED,
-    [UserRole.FINANCE, UserRole.ADMINISTRATIONS],
-    "financeReviewedById",
-    "financeReviewedAt",
-    undefined,
-    async (transaction, termynId) => {
-      const termyn = await transaction.subkonTermyn.findUnique({
-        where: { id: termynId },
-        select: {
-          termynNumber: true,
-          netAmount: true,
-          subkonContract: { select: { contractNumber: true, subkonName: true } },
+  const session = await auth();
+  if (!session?.user?.id) return failure("Silakan masuk untuk memproses termin.");
+  if (
+    session.user.role !== UserRole.FINANCE &&
+    session.user.role !== UserRole.ADMINISTRATIONS
+  ) {
+    return failure("Role Anda tidak diizinkan memproses termin.");
+  }
+  if (!validId(id)) return failure("Data termin tidak valid.");
+
+  try {
+    const mongoose = await connectToMongoDB();
+    const updated = await mongoose.connection.transaction(async (mongoSession) => {
+      const termyn = await SubkonTermyn.findOneAndUpdate(
+        { _id: id, status: SubkonTermynStatus.FIELD_VERIFIED },
+        {
+          $set: {
+            status: SubkonTermynStatus.FINANCE_CHECKED,
+            financeReviewedById: session.user.id,
+            financeReviewedAt: new Date(),
+          },
         },
-      });
-      if (!termyn) return;
-      await sendNotification({
-        roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
-        title: "Termin Subkon Menunggu Persetujuan",
-        message: `Termin ${termyn.termynNumber} · SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) senilai Rp${decimalFromScaledInteger(termyn.netAmount).toNumber().toLocaleString("id-ID")} telah diperiksa Keuangan.`,
-        actionUrl: `/apps/approvals?tab=wages&openSheet=${encodeURIComponent(termynId)}`,
-        type: NotificationType.APPROVAL,
-        database: transaction,
-      });
-    },
-  );
+        { new: true, session: mongoSession },
+      ).lean();
+      if (!termyn) return false;
+
+      const contract = await SubkonContract.findById(termyn.subkonContractId)
+        .session(mongoSession)
+        .lean();
+      if (!contract) throw new Error("Kontrak subkon termin tidak ditemukan.");
+      const recipients = await User.find({
+        isActive: true,
+        role: { $in: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR] },
+      })
+        .select({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+      if (recipients.length) {
+        await Notification.insertMany(
+          recipients.map((recipient) => ({
+            _id: randomUUID(),
+            userId: String(recipient._id),
+            title: "Termin Subkon Menunggu Persetujuan",
+            message: `Termin ${termyn.termynNumber} · SPK ${contract.contractNumber} (${contract.subkonName}) senilai Rp${decimalFromScaledInteger(termyn.netAmount).toNumber().toLocaleString("id-ID")} telah diperiksa Keuangan.`,
+            type: NotificationType.APPROVAL,
+            actionUrl: `/apps/approvals?tab=wages&openSheet=${encodeURIComponent(id)}`,
+            createdAt: new Date(),
+          })),
+          { session: mongoSession },
+        );
+      }
+      return true;
+    });
+    if (!updated) {
+      return failure("Termin tidak ditemukan atau statusnya telah berubah.");
+    }
+  } catch (error) {
+    console.error("Subcontract termyn finance review failed:", error);
+    return failure("Pemeriksaan termin gagal disimpan. Silakan coba kembali.");
+  }
+
+  revalidateConstruction();
+  return { success: true, message: "Status termin berhasil diperbarui." };
 }
 
 export async function approveSubkonTermyn(id: string) {
@@ -835,13 +884,6 @@ export async function paySubkonTermyn(
   if (!validId(id) || !validId(financeAccountId)) {
     return failure("Data termin atau buku kas/bank tidak valid.");
   }
-  const current = await prisma.subkonTermyn.findUnique({
-    where: { id },
-    select: { status: true },
-  });
-  if (current?.status !== SubkonTermynStatus.APPROVED) {
-    return failure("Termin harus disetujui Direktur sebelum dibayar.");
-  }
   let proofUrl: string;
   try {
     proofUrl = await saveTicketReceipt(file);
@@ -849,97 +891,176 @@ export async function paySubkonTermyn(
     return failure(error instanceof Error ? error.message : "Bukti pembayaran tidak valid.");
   }
   try {
-    await prisma.$transaction(async (transaction) => {
-      const transitioned = await transaction.subkonTermyn.updateMany({
-        where: { id, status: SubkonTermynStatus.APPROVED },
-        data: {
-          status: SubkonTermynStatus.PAID,
-          paidById: session.user.id,
-          paidAt: new Date(),
-          paymentProofUrl: proofUrl,
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (mongoSession) => {
+      const termyn = await SubkonTermyn.findOne({
+        _id: id,
+        status: SubkonTermynStatus.APPROVED,
+      })
+        .session(mongoSession)
+        .lean();
+      if (!termyn) {
+        throw new Error("Termin tidak ditemukan atau belum disetujui Direktur.");
+      }
+      const contract = await SubkonContract.findById(termyn.subkonContractId)
+        .session(mongoSession)
+        .lean();
+      if (!contract) throw new Error("Kontrak subkon termin tidak ditemukan.");
+      const project = await Project.findById(contract.projectId)
+        .select({ _id: 1, fieldPicId: 1 })
+        .session(mongoSession)
+        .lean();
+      const amount = decimalFromScaledInteger(termyn.netAmount).toNumber();
+      const paidAt = new Date();
+      const account = await FinanceAccount.findOneAndUpdate(
+        { _id: financeAccountId, balance: { $gte: amount } },
+        { $inc: { balance: -amount } },
+        { new: true, session: mongoSession },
+      ).select({ _id: 1 });
+      if (!account) {
+        const accountExists = await FinanceAccount.exists({
+          _id: financeAccountId,
+        }).session(mongoSession);
+        throw new Error(
+          accountExists
+            ? "Saldo buku bank/kas tidak mencukupi."
+            : "Buku bank/kas sumber pembayaran tidak ditemukan.",
+        );
+      }
+      await Cashflow.create(
+        [
+          {
+            _id: randomUUID(),
+            type: "OUT",
+            amount,
+            sourceDesc: `Pembayaran Termin ${termyn.termynNumber} · ${contract.contractNumber} · ${contract.subkonName}`,
+            projectId: contract.projectId,
+            paymentMethod: "TRANSFER",
+            proofUrl,
+            accountId: financeAccountId,
+            recordedBy: session.user.id,
+            createdAt: paidAt,
+          },
+        ],
+        { session: mongoSession },
+      );
+
+      const transitioned = await SubkonTermyn.updateOne(
+        { _id: id, status: SubkonTermynStatus.APPROVED },
+        {
+          $set: {
+            status: SubkonTermynStatus.PAID,
+            paidById: session.user.id,
+            paidAt,
+            paymentProofUrl: proofUrl,
+          },
         },
-      });
-      if (transitioned.count !== 1) {
+        { session: mongoSession },
+      );
+      if (transitioned.modifiedCount !== 1) {
         throw new Error("Termin tidak ditemukan atau statusnya telah berubah.");
       }
-      const termyn = await transaction.subkonTermyn.findUniqueOrThrow({
-        where: { id },
-        select: {
-          id: true,
-          termynNumber: true,
-          claimedPercent: true,
-          grossAmount: true,
-          retentionAmount: true,
-          netAmount: true,
-          createdById: true,
-          invoice: { select: { id: true } },
-          subkonContract: {
-            select: {
-              projectId: true,
-              contractNumber: true,
-              subkonName: true,
-              workScope: true,
-              project: { select: { fieldPicId: true } },
-            },
-          },
-        },
-      });
-      await recordFinanceCashflowOutflow(transaction, {
-        financeAccountId,
-        amount: decimalFromScaledInteger(termyn.netAmount).toNumber(),
-        sourceDesc: `Pembayaran Termin ${termyn.termynNumber} · ${termyn.subkonContract.contractNumber} · ${termyn.subkonContract.subkonName}`,
-        projectId: termyn.subkonContract.projectId,
-        paymentMethod: "TRANSFER",
-        proofUrl,
-        recordedBy: session.user.id,
-      });
-      if (termyn.invoice) {
-        await transaction.invoice.update({
-          where: { id: termyn.invoice.id },
-          data: { status: "PAID" },
-        });
+
+      const invoice = await Invoice.findOne({ subkonTermynId: id })
+        .session(mongoSession)
+        .lean();
+      if (invoice) {
+        await Invoice.updateOne(
+          { _id: invoice._id },
+          { $set: { status: "PAID", updatedAt: paidAt } },
+          { session: mongoSession },
+        );
       } else {
-        const invoiceNumber = await nextDocumentNumber(transaction, "INV");
-        await transaction.invoice.create({
-          data: {
-            publicCode: await generateAvailablePublicCode(transaction),
-            invoiceNumber,
-            projectId: termyn.subkonContract.projectId,
-            subkonTermynId: termyn.id,
-            vendorName: termyn.subkonContract.subkonName,
-            periodOrDate: `Termin ${termyn.termynNumber} · progres ${decimalFromScaledInteger(termyn.claimedPercent).toString()}%`,
-            subTotal: decimalFromScaledInteger(termyn.grossAmount).toNumber(),
-            tax: 0,
-            deduction: decimalFromScaledInteger(termyn.retentionAmount).toNumber(),
-            grandTotal: decimalFromScaledInteger(termyn.netAmount).toNumber(),
-            status: "PAID",
-            items: {
-              create: {
-                description: termyn.subkonContract.workScope,
-                quantity: 1,
-                unit: `Termin ${termyn.termynNumber}`,
-                unitPrice: decimalFromScaledInteger(termyn.grossAmount).toNumber(),
-                totalPrice: decimalFromScaledInteger(termyn.grossAmount).toNumber(),
-              },
+        const year = paidAt.getFullYear();
+        let invoiceNumber = "";
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const sequence = await DocumentNumberSequence.findOneAndUpdate(
+            { kind: "INV", year },
+            {
+              $inc: { value: 1 },
+              $setOnInsert: { _id: randomUUID() },
             },
-          },
-        });
+            { upsert: true, new: true, session: mongoSession },
+          );
+          if (!sequence) throw new Error("Nomor invoice gagal dibuat.");
+          const candidate = `SPE-${new Intl.NumberFormat("id-ID", {
+            maximumFractionDigits: 0,
+          }).format(sequence.value)}/INV/${year}`;
+          if (!(await Invoice.exists({ invoiceNumber: candidate }).session(mongoSession))) {
+            invoiceNumber = candidate;
+            break;
+          }
+        }
+        if (!invoiceNumber) {
+          throw new Error("Nomor invoice unik tidak dapat dibuat.");
+        }
+        let publicCode = "";
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const candidate = generateRandomCode();
+          if (!(await Invoice.exists({ publicCode: candidate }).session(mongoSession))) {
+            publicCode = candidate;
+            break;
+          }
+        }
+        if (!publicCode) throw new Error("Kode invoice unik tidak dapat dibuat.");
+
+        const invoiceId = randomUUID();
+        const grossAmount = decimalFromScaledInteger(termyn.grossAmount).toNumber();
+        await Invoice.create(
+          [
+            {
+              _id: invoiceId,
+              publicCode,
+              invoiceNumber,
+              projectId: contract.projectId,
+              subkonTermynId: id,
+              vendorName: contract.subkonName,
+              periodOrDate: `Termin ${termyn.termynNumber} · progres ${decimalFromScaledInteger(termyn.claimedPercent).toString()}%`,
+              subTotal: grossAmount,
+              tax: 0,
+              deduction: decimalFromScaledInteger(termyn.retentionAmount).toNumber(),
+              grandTotal: amount,
+              status: "PAID",
+              createdAt: paidAt,
+              updatedAt: paidAt,
+            },
+          ],
+          { session: mongoSession },
+        );
+        await InvoiceItem.create(
+          [
+            {
+              _id: randomUUID(),
+              invoiceId,
+              description: contract.workScope,
+              quantity: 1,
+              unit: `Termin ${termyn.termynNumber}`,
+              unitPrice: grossAmount,
+              totalPrice: grossAmount,
+            },
+          ],
+          { session: mongoSession },
+        );
       }
+
       const recipients = new Set(
-        [
-          termyn.createdById,
-          termyn.subkonContract.project.fieldPicId,
-        ].filter((userId): userId is string => Boolean(userId)),
+        [termyn.createdById, project?.fieldPicId].filter(
+          (userId): userId is string => Boolean(userId),
+        ),
       );
-      for (const userId of recipients) {
-        await sendNotification({
-          userId,
-          title: "Pembayaran Termin Subkon Selesai",
-          message: `Termin ${termyn.termynNumber} · SPK ${termyn.subkonContract.contractNumber} (${termyn.subkonContract.subkonName}) sebesar Rp${decimalFromScaledInteger(termyn.netAmount).toNumber().toLocaleString("id-ID")} telah dibayar Keuangan.`,
-          actionUrl: `/apps/projects?projectId=${encodeURIComponent(termyn.subkonContract.projectId)}`,
-          type: NotificationType.SUCCESS,
-          database: transaction,
-        });
+      if (recipients.size) {
+        await Notification.insertMany(
+          Array.from(recipients, (userId) => ({
+            _id: randomUUID(),
+            userId,
+            title: "Pembayaran Termin Subkon Selesai",
+            message: `Termin ${termyn.termynNumber} · SPK ${contract.contractNumber} (${contract.subkonName}) sebesar Rp${amount.toLocaleString("id-ID")} telah dibayar Keuangan.`,
+            type: NotificationType.SUCCESS,
+            actionUrl: `/apps/projects?projectId=${encodeURIComponent(contract.projectId)}`,
+            createdAt: paidAt,
+          })),
+          { session: mongoSession },
+        );
       }
     });
   } catch (error) {

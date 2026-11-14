@@ -7,16 +7,36 @@ import {
   ProjectAddendumStatus,
   SPKStatus,
   SubkonTermynStatus,
+  TicketPriority,
+  TicketRequestCategory,
   TicketStatus,
+  TicketType,
   UserRole,
 } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import EquipmentTicket from "@/models/ticket";
+import User from "@/models/user";
+import Project from "@/models/project";
+import {
+  EQUIPMENT_REQUEST_TYPE,
+} from "@/lib/equipment-request";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
 export const metadata: Metadata = {
   title: "Executive Approval Hub",
 };
+
+function requireTicketPriority(value: string) {
+  const priority = Object.values(TicketPriority).find(
+    (candidate) => candidate === value,
+  );
+  if (!priority) {
+    throw new Error("Tiket alat memiliki prioritas yang tidak valid.");
+  }
+  return priority;
+}
 
 const executiveRoles: UserRole[] = [
   UserRole.DIRECTOR,
@@ -415,6 +435,117 @@ export default async function ApprovalsPage({
     }),
   ]);
 
+  let equipmentApprovalTickets: {
+    id: string;
+    ticketNumber: string;
+    title: string;
+    description: string | null;
+    type: TicketType;
+    ticketType: typeof EQUIPMENT_REQUEST_TYPE;
+    priority: TicketPriority;
+    requestCategory: TicketRequestCategory;
+    requestPaymentMethod: null;
+    requestPaymentDescription: string | null;
+    attachmentUrl: string | null;
+    receiptUrls: string[];
+    purchaseReceiptUrl: string | null;
+    totalAmount: string | null;
+    recipientName: string | null;
+    bankName: string | null;
+    accountNumber: string | null;
+    createdAt: string;
+    requesterName: string;
+    projectName: string | null;
+    items: { itemName: string; quantity: number; unit: string }[];
+  }[] = [];
+  if (
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR
+  ) {
+    await connectToMongoDB();
+    const equipmentTickets = await EquipmentTicket.find({
+      ticketType: EQUIPMENT_REQUEST_TYPE,
+      status: TicketStatus.PENDING_DIRECTOR,
+    })
+      .sort({ priority: -1, createdAt: 1 })
+      .lean();
+    const requesterIds = [
+      ...new Set(equipmentTickets.map((ticket) => ticket.requesterId)),
+    ];
+    const projectIds = [
+      ...new Set(
+        equipmentTickets
+          .map((ticket) => ticket.projectId)
+          .filter((projectId): projectId is string => Boolean(projectId)),
+      ),
+    ];
+    const [requesters, projects] = await Promise.all([
+      requesterIds.length > 0
+        ? User.find({ _id: { $in: requesterIds } })
+            .select({
+              _id: 1,
+              name: 1,
+              bankName: 1,
+              bankAccountName: 1,
+              bankAccountNumber: 1,
+            })
+            .lean()
+        : [],
+      projectIds.length > 0
+        ? Project.find({ _id: { $in: projectIds } })
+            .select({ _id: 1, title: 1, kelompokTani: 1 })
+            .lean()
+        : [],
+    ]);
+    const requestersById = new Map(
+      requesters.map((requester) => [String(requester._id), requester]),
+    );
+    const projectsById = new Map(
+      projects.map((project) => [String(project._id), project]),
+    );
+    equipmentApprovalTickets = equipmentTickets.map((ticket) => {
+      const requester = requestersById.get(String(ticket.requesterId));
+      if (!requester || typeof requester.name !== "string") {
+        throw new Error(`Pemohon tiket ${ticket.ticketNumber} tidak ditemukan.`);
+      }
+      const project = ticket.projectId
+        ? projectsById.get(String(ticket.projectId))
+        : null;
+      return {
+        id: String(ticket._id),
+        ticketNumber: ticket.ticketNumber,
+        title: ticket.title,
+        description: ticket.description ?? null,
+        type: TicketType.OPERATIONAL,
+        ticketType: EQUIPMENT_REQUEST_TYPE,
+        priority: requireTicketPriority(ticket.priority),
+        requestCategory: TicketRequestCategory.OPS,
+        requestPaymentMethod: null,
+        requestPaymentDescription: ticket.requestPaymentDescription ?? null,
+        attachmentUrl: ticket.attachmentUrl ?? null,
+        receiptUrls: ticket.receiptUrls ?? [],
+        purchaseReceiptUrl: ticket.purchaseReceiptUrl ?? null,
+        totalAmount:
+          ticket.totalAmount === null || ticket.totalAmount === undefined
+            ? ticket.requestedAmount?.toString() ?? null
+            : ticket.totalAmount.toString(),
+        recipientName: ticket.recipientName ?? requester.bankAccountName ?? null,
+        bankName: ticket.bankName ?? requester.bankName ?? null,
+        accountNumber:
+          ticket.accountNumber ?? requester.bankAccountNumber ?? null,
+        createdAt: ticket.createdAt.toISOString(),
+        requesterName: requester.name,
+        projectName: project
+          ? `${project.kelompokTani} · ${project.title}`
+          : null,
+        items: [],
+      };
+    });
+  }
+  const equipmentApprovalTicketIds = new Set(
+    equipmentApprovalTickets.map((ticket) => ticket.id),
+  );
+
   const approvalHistory = [
     ...ticketHistory.map((entry) => ({
       id: `ticket:${entry.id}`,
@@ -589,7 +720,11 @@ export default async function ApprovalsPage({
             totalPrice: decimalStringFromScaledInteger(item.totalPrice),
           })),
         }))}
-        tickets={tickets.map((ticket) => ({
+        tickets={[
+          ...equipmentApprovalTickets,
+          ...tickets
+            .filter((ticket) => !equipmentApprovalTicketIds.has(ticket.id))
+            .map((ticket) => ({
           id: ticket.id,
           ticketNumber: ticket.ticketNumber,
           title: ticket.title,
@@ -619,7 +754,8 @@ export default async function ApprovalsPage({
             ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
             : null,
           items: ticket.items,
-        }))}
+            })),
+        ]}
         approvalHistory={approvalHistory}
         wages={workPoints.map((workPoint) => ({
           id: workPoint.id,

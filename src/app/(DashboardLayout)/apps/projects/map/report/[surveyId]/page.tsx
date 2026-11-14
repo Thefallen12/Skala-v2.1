@@ -5,6 +5,7 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { createBrandedQrDataUrl } from "@/lib/documents/qr-code";
 import { resolvePublicAppUrl } from "@/lib/documents/public-app-url";
 import ReportStaticMapLoader from "./ReportStaticMapLoader";
+import Image from 'next/image';
 
 type Coordinate = [number, number];
 type GeometryData = {
@@ -238,7 +239,7 @@ export default async function SurveyReportPage({
           {(documentedPhotos.length > 0 ? documentedPhotos : reportPhotos).map((photo, index) => (
             <div key={photo.url} className="overflow-hidden rounded border border-[#E2E8F0]">
               <div className="h-[85px] bg-[#eaeaea]">
-                <img src={photo.url} alt={`Foto ${index + 1}`} className="h-full w-full object-cover" />
+                <Image src={photo.url} alt={`Foto ${index + 1}`} width={400} height={300} className="h-full w-full object-cover" />
               </div>
               <p className="flex min-h-7 flex-col items-center justify-center bg-[#F5F5F5] p-1 text-center text-[8.5px] font-bold text-[#0F2C59]">
                 <span>Foto {index + 1}: {String(photo.label)}</span>
@@ -259,7 +260,7 @@ export default async function SurveyReportPage({
           <div className="mt-2 flex flex-col items-center">
             {coordinatorQrDataUrl ? (
               <>
-                <img src={coordinatorQrDataUrl} alt="QR tanda tangan koordinator lapangan" className="h-[48px] w-[48px]" />
+                <Image src={coordinatorQrDataUrl} alt="QR tanda tangan koordinator lapangan" width={48} height={48} className="h-[48px] w-[48px]" />
                 <span className="mt-1 text-[7px] text-[#666]">QR verifikasi</span>
               </>
             ) : null}

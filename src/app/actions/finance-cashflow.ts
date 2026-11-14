@@ -2,10 +2,16 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
 import { PaymentStatus, UserRole } from "@prisma/client";
 import { auth } from "../../../auth";
-import { prisma } from "@/lib/prisma";
+import { connectToMongoDB } from "@/lib/mongoose";
+import Cashflow from "@/models/cashflow";
+import DirectStockPurchase from "@/models/direct-stock-purchase";
+import FinanceAccount from "@/models/finance-account";
+import PaymentTransaction from "@/models/payment-transaction";
+import Project from "@/models/project";
+import PurchaseOrder from "@/models/purchase-order";
+import Ticket from "@/models/ticket";
 import {
   CloudinaryConfigurationError,
   CloudinaryPhotoValidationError,
@@ -200,10 +206,16 @@ export async function listFinanceAccountsForPayments(): Promise<
   const session = await auth();
   if (!session?.user || !isFinanceOperator(session.user.role)) return [];
 
-  return prisma.financeAccount.findMany({
-    orderBy: { accountName: "asc" },
-    select: { id: true, accountName: true, balance: true },
-  });
+  await connectToMongoDB();
+  const accounts = await FinanceAccount.find({})
+    .sort({ accountName: 1 })
+    .select({ _id: 1, accountName: 1, balance: 1 })
+    .lean();
+  return accounts.map((account) => ({
+    id: String(account._id),
+    accountName: account.accountName,
+    balance: account.balance,
+  }));
 }
 
 export async function createFinanceAccount(
@@ -228,21 +240,23 @@ export async function createFinanceAccount(
   }
 
   try {
+    await connectToMongoDB();
     if (input.accountName.trim() === "Kas Tunai") {
-      const existingCashAccount = await prisma.financeAccount.findFirst({
-        where: { accountName: "Kas Tunai" },
-        select: { id: true },
-      });
+      const existingCashAccount = await FinanceAccount.findOne({
+        accountName: "Kas Tunai",
+      })
+        .select({ _id: 1 })
+        .lean();
       if (existingCashAccount) {
         return { success: true, message: "Akun Kas Tunai sudah tersedia." };
       }
     }
-    await prisma.financeAccount.create({
-      data: {
-        accountName: input.accountName.trim(),
-        accountNumber: input.accountNumber?.trim() || null,
-        holderName: input.holderName.trim(),
-      },
+    await FinanceAccount.create({
+      _id: randomUUID(),
+      accountName: input.accountName.trim(),
+      accountNumber: input.accountNumber?.trim() || null,
+      holderName: input.holderName.trim(),
+      balance: 0,
     });
   } catch (error) {
     console.error("Finance account creation failed:", error);
@@ -298,47 +312,55 @@ export async function recordIncomingFund(
   }
 
   try {
-    await prisma.$transaction(
-      async (transaction) => {
-        const account = await transaction.financeAccount.findUnique({
-          where: { id: input.accountId },
-          select: { id: true },
-        });
-        if (!account) throw new Error("Buku bank/kas yang dipilih tidak ditemukan.");
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
+        const account = await FinanceAccount.findById(input.accountId)
+          .select({ _id: 1 })
+          .session(transactionSession)
+          .lean();
+        if (!account) {
+          throw new Error("Buku bank/kas yang dipilih tidak ditemukan.");
+        }
         if (input.projectId) {
-          const project = await transaction.project.findUnique({
-            where: { id: input.projectId },
-            select: { id: true },
-          });
+          const project = await Project.exists({ _id: input.projectId }).session(
+            transactionSession,
+          );
           if (!project) throw new Error("Proyek yang dipilih tidak ditemukan.");
         }
 
         const effectiveDate = parseTransactionDate(input.transactionDate);
 
-        await transaction.financeAccount.update({
-          where: { id: account.id },
-          data: { balance: { increment: input.amount } },
-        });
-        await transaction.cashflow.create({
-          data: {
-            type: "IN",
-            amount: input.amount,
-            sourceDesc: input.sourceDesc.trim(),
-            projectId: input.projectId || null,
-            paymentMethod: input.paymentMethod,
-            senderName:
-              input.paymentMethod === "TRANSFER"
-                ? input.senderName!.trim()
-                : null,
-            proofUrl,
-            accountId: account.id,
-            recordedBy: session.user.id,
-            transferGroupId: null,
-            createdAt: effectiveDate,
-          },
-        });
-      },
-    );
+        const updatedAccount = await FinanceAccount.updateOne(
+          { _id: account._id },
+          { $inc: { balance: input.amount } },
+          { session: transactionSession },
+        );
+        if (updatedAccount.modifiedCount !== 1) {
+          throw new Error("Buku bank/kas yang dipilih tidak ditemukan.");
+        }
+        await Cashflow.create(
+          [
+            {
+              _id: randomUUID(),
+              type: "IN",
+              amount: input.amount,
+              sourceDesc: input.sourceDesc.trim(),
+              projectId: input.projectId || null,
+              paymentMethod: input.paymentMethod,
+              senderName:
+                input.paymentMethod === "TRANSFER"
+                  ? input.senderName!.trim()
+                  : null,
+              proofUrl,
+              accountId: String(account._id),
+              recordedBy: session.user.id,
+              transferGroupId: null,
+              createdAt: effectiveDate,
+            },
+          ],
+          { session: transactionSession },
+        );
+      });
   } catch (error) {
     console.error("Incoming fund recording failed:", error);
     await removeUploadedCashflowProof(proofUrl);
@@ -399,51 +421,54 @@ export async function recordOutgoingFund(
   }
 
   try {
-    await prisma.$transaction(
-      async (transaction) => {
-        const account = await transaction.financeAccount.findUnique({
-          where: { id: input.accountId },
-          select: { id: true, balance: true },
-        });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
+        const account = await FinanceAccount.findById(input.accountId)
+          .select({ _id: 1 })
+          .session(transactionSession)
+          .lean();
         if (!account) throw new Error("Buku bank/kas yang dipilih tidak ditemukan.");
         if (input.projectId) {
-          const project = await transaction.project.findUnique({
-            where: { id: input.projectId },
-            select: { id: true },
-          });
+          const project = await Project.exists({ _id: input.projectId }).session(
+            transactionSession,
+          );
           if (!project) throw new Error("Proyek yang dipilih tidak ditemukan.");
         }
 
-        const debit = await transaction.financeAccount.updateMany({
-          where: {
-            id: account.id,
-            balance: { gte: input.amount },
+        const debit = await FinanceAccount.updateOne(
+          {
+            _id: account._id,
+            balance: { $gte: input.amount },
           },
-          data: { balance: { decrement: input.amount } },
-        });
-        if (debit.count !== 1) {
+          { $inc: { balance: -input.amount } },
+          { session: transactionSession },
+        );
+        if (debit.modifiedCount !== 1) {
           throw new Error("Saldo buku bank/kas tidak mencukupi untuk pengeluaran ini.");
         }
 
         const effectiveDate = parseTransactionDate(input.transactionDate);
 
-        await transaction.cashflow.create({
-          data: {
-            type: "OUT",
-            amount: input.amount,
-            sourceDesc: input.sourceDesc.trim(),
-            projectId: input.projectId || null,
-            paymentMethod: input.paymentMethod,
-            senderName: input.recipientName?.trim() || null,
-            proofUrl,
-            accountId: account.id,
-            recordedBy: session.user.id,
-            transferGroupId: null,
-            createdAt: effectiveDate,
-          },
-        });
-      },
-    );
+        await Cashflow.create(
+          [
+            {
+              _id: randomUUID(),
+              type: "OUT",
+              amount: input.amount,
+              sourceDesc: input.sourceDesc.trim(),
+              projectId: input.projectId || null,
+              paymentMethod: input.paymentMethod,
+              senderName: input.recipientName?.trim() || null,
+              proofUrl,
+              accountId: String(account._id),
+              recordedBy: session.user.id,
+              transferGroupId: null,
+              createdAt: effectiveDate,
+            },
+          ],
+          { session: transactionSession },
+        );
+      });
   } catch (error) {
     console.error("Outgoing fund recording failed:", error);
     await removeUploadedCashflowProof(proofUrl);
@@ -478,41 +503,13 @@ export async function recordHistoricalPaymentCashflow(
   }
 
   try {
-    await prisma.$transaction(
-      async (transaction) => {
-        const payment = await transaction.paymentTransaction.findUnique({
-          where: { id: input.paymentTransactionId },
-          select: {
-            id: true,
-            amount: true,
-            transferDestination: true,
-            proofOfTransferUrl: true,
-            status: true,
-            paidAt: true,
-            cashflow: { select: { id: true } },
-            ticket: {
-              select: {
-                ticketNumber: true,
-                title: true,
-                projectId: true,
-              },
-            },
-            po: {
-              select: {
-                poNumber: true,
-                vendorName: true,
-                projectId: true,
-              },
-            },
-            directStockPurchase: {
-              select: {
-                purchaseNumber: true,
-                vendorName: true,
-                ticket: { select: { projectId: true } },
-              },
-            },
-          },
-        });
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
+        const payment = await PaymentTransaction.findById(
+          input.paymentTransactionId,
+        )
+          .session(transactionSession)
+          .lean();
         if (
           !payment ||
           payment.status !== PaymentStatus.PAID ||
@@ -520,30 +517,58 @@ export async function recordHistoricalPaymentCashflow(
         ) {
           throw new Error("Pembayaran lunas tidak ditemukan.");
         }
-        if (payment.cashflow) {
+        if (
+          await Cashflow.exists({
+            paymentTransactionId: input.paymentTransactionId,
+          }).session(transactionSession)
+        ) {
           throw new Error("Pembayaran ini sudah tercatat di Buku Kas.");
         }
 
-        const account = await transaction.financeAccount.findUnique({
-          where: { id: input.financeAccountId },
-          select: { id: true },
-        });
+        const account = await FinanceAccount.findById(input.financeAccountId)
+          .select({ _id: 1 })
+          .session(transactionSession)
+          .lean();
         if (!account) throw new Error("Buku bank/kas sumber tidak ditemukan.");
 
-        const source = payment.ticket
+        const ticket = payment.ticketId
+          ? await Ticket.findById(payment.ticketId)
+              .select({ ticketNumber: 1, title: 1, projectId: 1 })
+              .session(transactionSession)
+              .lean()
+          : null;
+        const purchaseOrder = payment.poId
+          ? await PurchaseOrder.findById(payment.poId)
+              .select({ poNumber: 1, vendorName: 1, projectId: 1 })
+              .session(transactionSession)
+              .lean()
+          : null;
+        const directPurchase = payment.directStockPurchaseId
+          ? await DirectStockPurchase.findById(payment.directStockPurchaseId)
+              .select({ purchaseNumber: 1, vendorName: 1, ticketId: 1 })
+              .session(transactionSession)
+              .lean()
+          : null;
+        const directPurchaseTicket = directPurchase?.ticketId
+          ? await Ticket.findById(directPurchase.ticketId)
+              .select({ projectId: 1 })
+              .session(transactionSession)
+              .lean()
+          : null;
+        const source = ticket
           ? {
-              description: `${payment.ticket.ticketNumber} · ${payment.ticket.title}`,
-              projectId: payment.ticket.projectId,
+              description: `${ticket.ticketNumber} · ${ticket.title}`,
+              projectId: ticket.projectId,
             }
-          : payment.po
+          : purchaseOrder
             ? {
-                description: `${payment.po.poNumber} · ${payment.po.vendorName}`,
-                projectId: payment.po.projectId,
+                description: `${purchaseOrder.poNumber} · ${purchaseOrder.vendorName}`,
+                projectId: purchaseOrder.projectId,
               }
-            : payment.directStockPurchase
+            : directPurchase
               ? {
-                  description: `${payment.directStockPurchase.purchaseNumber} · ${payment.directStockPurchase.vendorName}`,
-                  projectId: payment.directStockPurchase.ticket?.projectId ?? null,
+                  description: `${directPurchase.purchaseNumber} · ${directPurchase.vendorName}`,
+                  projectId: directPurchaseTicket?.projectId ?? null,
                 }
               : null;
         if (!source) {
@@ -553,14 +578,15 @@ export async function recordHistoricalPaymentCashflow(
           throw new Error("Nominal pembayaran historis tidak valid.");
         }
 
-        const debit = await transaction.financeAccount.updateMany({
-          where: {
-            id: account.id,
-            balance: { gte: payment.amount },
+        const debit = await FinanceAccount.updateOne(
+          {
+            _id: account._id,
+            balance: { $gte: payment.amount },
           },
-          data: { balance: { decrement: payment.amount } },
-        });
-        if (debit.count !== 1) {
+          { $inc: { balance: -payment.amount } },
+          { session: transactionSession },
+        );
+        if (debit.modifiedCount !== 1) {
           throw new Error(
             "Saldo akun tidak mencukupi. Catat total dana masuk terlebih dahulu.",
           );
@@ -569,22 +595,25 @@ export async function recordHistoricalPaymentCashflow(
         const paymentMethod = /cash|tunai/i.test(payment.transferDestination)
           ? "HISTORICAL_CASH"
           : "HISTORICAL_TRANSFER";
-        await transaction.cashflow.create({
-          data: {
-            type: "OUT",
-            amount: payment.amount,
-            sourceDesc: source.description,
-            projectId: source.projectId,
-            paymentMethod,
-            proofUrl: payment.proofOfTransferUrl,
-            accountId: account.id,
-            recordedBy: session.user.id,
-            paymentTransactionId: payment.id,
-            createdAt: payment.paidAt,
-          },
-        });
-      },
-    );
+        await Cashflow.create(
+          [
+            {
+              _id: randomUUID(),
+              type: "OUT",
+              amount: payment.amount,
+              sourceDesc: source.description,
+              projectId: source.projectId,
+              paymentMethod,
+              proofUrl: payment.proofOfTransferUrl,
+              accountId: String(account._id),
+              recordedBy: session.user.id,
+              paymentTransactionId: String(payment._id),
+              createdAt: payment.paidAt,
+            },
+          ],
+          { session: transactionSession },
+        );
+      });
   } catch (error) {
     console.error("Historical payment cashflow recording failed:", error);
     return fail(
@@ -645,68 +674,75 @@ export async function transferBetweenFinanceAccounts(
 
   const transferGroupId = randomUUID();
   try {
-    await prisma.$transaction(
-      async (transaction) => {
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
         const [source, destination] = await Promise.all([
-          transaction.financeAccount.findUnique({
-            where: { id: input.sourceAccountId },
-            select: { id: true, accountName: true },
-          }),
-          transaction.financeAccount.findUnique({
-            where: { id: input.destinationAccountId },
-            select: { id: true, accountName: true },
-          }),
+          FinanceAccount.findById(input.sourceAccountId)
+            .select({ _id: 1, accountName: 1 })
+            .session(transactionSession)
+            .lean(),
+          FinanceAccount.findById(input.destinationAccountId)
+            .select({ _id: 1, accountName: 1 })
+            .session(transactionSession)
+            .lean(),
         ]);
         if (!source || !destination) {
           throw new Error("Buku bank/kas sumber atau tujuan tidak ditemukan.");
         }
-        const debit = await transaction.financeAccount.updateMany({
-          where: {
-            id: source.id,
-            balance: { gte: input.amount },
+        const debit = await FinanceAccount.updateOne(
+          {
+            _id: source._id,
+            balance: { $gte: input.amount },
           },
-          data: { balance: { decrement: input.amount } },
-        });
-        if (debit.count !== 1) {
+          { $inc: { balance: -input.amount } },
+          { session: transactionSession },
+        );
+        if (debit.modifiedCount !== 1) {
           throw new Error("Saldo buku sumber tidak mencukupi.");
         }
-        await transaction.financeAccount.update({
-          where: { id: destination.id },
-          data: { balance: { increment: input.amount } },
-        });
+        const credit = await FinanceAccount.updateOne(
+          { _id: destination._id },
+          { $inc: { balance: input.amount } },
+          { session: transactionSession },
+        );
+        if (credit.modifiedCount !== 1) {
+          throw new Error("Akun tujuan tidak ditemukan.");
+        }
 
         const effectiveDate = parseTransactionDate(input.transactionDate);
         const description = input.sourceDesc.trim();
-        await transaction.cashflow.createMany({
-          data: [
+        await Cashflow.create(
+          [
             {
+              _id: randomUUID(),
               type: "OUT",
               amount: input.amount,
               sourceDesc: `${description} · Transfer ke ${destination.accountName}`,
               paymentMethod: "TRANSFER",
               senderName: null,
               proofUrl,
-              accountId: source.id,
+              accountId: String(source._id),
               recordedBy: session.user.id,
               transferGroupId,
               createdAt: effectiveDate,
             },
             {
+              _id: randomUUID(),
               type: "IN",
               amount: input.amount,
               sourceDesc: `${description} · Transfer dari ${source.accountName}`,
               paymentMethod: "TRANSFER",
               senderName: source.accountName,
               proofUrl,
-              accountId: destination.id,
+              accountId: String(destination._id),
               recordedBy: session.user.id,
               transferGroupId,
               createdAt: effectiveDate,
             },
           ],
-        });
-      },
-    );
+          { session: transactionSession },
+        );
+      });
   } catch (error) {
     console.error("Finance account transfer failed:", error);
     await removeUploadedCashflowProof(proofUrl);

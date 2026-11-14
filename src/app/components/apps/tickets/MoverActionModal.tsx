@@ -8,6 +8,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
+import { compressFieldImageFile } from "@/lib/image-compression-client";
 
 export default function MoverActionModal({
   open,
@@ -30,7 +31,10 @@ export default function MoverActionModal({
     setMessage("");
     startTransition(async () => {
       try {
-        const result = await processMoverDelivery(ticketId, file);
+        const preparedFile = await compressFieldImageFile(file, {
+          allowPdfPassthrough: true,
+        });
+        const result = await processMoverDelivery(ticketId, preparedFile);
         setMessage(result.message);
         if (result.success) {
           setFile(null);
@@ -39,7 +43,11 @@ export default function MoverActionModal({
         }
       } catch (error) {
         console.error("Mover ticket action failed:", error);
-        setMessage("Konfirmasi pengiriman gagal. Silakan coba kembali.");
+        setMessage(
+          error instanceof Error && error.message
+            ? error.message
+            : "Konfirmasi pengiriman gagal. Silakan coba kembali.",
+        );
       }
     });
   };

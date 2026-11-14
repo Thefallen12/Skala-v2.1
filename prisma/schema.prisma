@@ -142,6 +142,7 @@ enum TicketStatus {
 enum TicketCategoryHint {
   WAREHOUSE
   PURCHASE
+  CONTRACT
 }
 
 enum FulfillmentStatus {
@@ -208,6 +209,17 @@ enum PaymentStatus {
 enum POPaymentMethod {
   CASH
   TRANSFER
+}
+
+enum MaterialDeliveryBillingStatus {
+  UNBILLED
+  BILLED
+}
+
+enum VendorInvoiceStatus {
+  UNPAID
+  PARTIAL
+  PAID
 }
 
 enum NotificationType {
@@ -401,6 +413,10 @@ model User {
   cashflowsRecorded                                 Cashflow[]                    @relation("CashflowRecorder")
   officeExpensesReceived                            OfficeExpense[]               @relation("OfficeExpenseRecipient")
   officeExpensesRecorded                            OfficeExpense[]               @relation("OfficeExpenseRecorder")
+  createdMaterialContracts                          MaterialContract[]            @relation("MaterialContractCreator")
+  receivedMaterialDeliveries                        MaterialDelivery[]            @relation("MaterialDeliveryReceiver")
+  processedVendorInvoices                           VendorInvoice[]               @relation("VendorInvoiceProcessor")
+  processedVendorInvoicePayments                    VendorInvoicePayment[]        @relation("VendorInvoicePaymentProcessor")
 }
 
 model UserNote {
@@ -659,6 +675,7 @@ model Project {
   materialPlans       ProjectMaterialPlan[]
   rabMaterials        ProjectRabMaterial[]
   laborPlans          ProjectLaborPlan[]
+  materialDeliveries  MaterialDelivery[]
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -1104,6 +1121,7 @@ model Vendor {
   purchaseOrders       PurchaseOrder[]
   directStockPurchases DirectStockPurchase[]
   bankAccounts         VendorBankAccount[]
+  materialContracts    MaterialContract[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
@@ -1397,6 +1415,7 @@ model Ticket {
   auditLogs                 TicketAuditLog[]
   operationalDocuments      OperationalDocument[]
   deliveryOrders            DeliveryOrder[]
+  materialDeliveries        MaterialDelivery[]
   createdAt                 DateTime                @default(now())
   updatedAt                 DateTime                @updatedAt
 
@@ -1753,31 +1772,33 @@ model FinanceAccount {
   accountNumber  String?
   holderName     String
   balance        Float           @default(0)
-  transactions   Cashflow[]
-  officeExpenses OfficeExpense[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  transactions          Cashflow[]
+  officeExpenses        OfficeExpense[]
+  vendorInvoicePayments VendorInvoicePayment[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 }
 
 model Cashflow {
-  id                   String              @id @default(cuid()) @map("_id")
+  id                   String                @id @default(cuid()) @map("_id")
   type                 String
   amount               Float
   sourceDesc           String
   projectId            String?
-  project              Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  project              Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
   paymentMethod        String
   senderName           String?
   proofUrl             String?
   accountId            String
-  account              FinanceAccount      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  account              FinanceAccount        @relation(fields: [accountId], references: [id], onDelete: Restrict)
   recordedBy           String
-  recorder             User                @relation("CashflowRecorder", fields: [recordedBy], references: [id], onDelete: Restrict)
+  recorder             User                  @relation("CashflowRecorder", fields: [recordedBy], references: [id], onDelete: Restrict)
   transferGroupId      String?
-  paymentTransactionId String?             @unique
-  paymentTransaction   PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
+  paymentTransactionId String?               @unique
+  paymentTransaction   PaymentTransaction?   @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
   officeExpense        OfficeExpense?
-  createdAt            DateTime            @default(now())
+  vendorInvoicePayment VendorInvoicePayment?
+  createdAt            DateTime              @default(now())
 
   @@index([accountId, createdAt])
   @@index([projectId, createdAt])
@@ -1917,11 +1938,14 @@ model TicketItem {
   poItem               POItem?            @relation(fields: [poItemId], references: [id], onDelete: SetNull)
   doItemId             String?
   doItem               DOItem?            @relation(fields: [doItemId], references: [id], onDelete: SetNull)
+  materialContractId   String?
+  materialContract     MaterialContract?  @relation(fields: [materialContractId], references: [id], onDelete: SetNull)
 
   @@index([ticketId, status])
   @@index([stockItemId])
   @@index([poItemId])
   @@index([doItemId])
+  @@index([materialContractId])
 }
 
 model TicketAuditLog {
@@ -1936,4 +1960,116 @@ model TicketAuditLog {
 
   @@index([ticketId, createdAt])
   @@index([userId])
+}
+
+// ============================================================================
+// Blanket Purchase Order (Kontrak Payung Material Curah)
+// Isolated from PurchaseOrder / Ticket so bulk sand/stone deliveries &
+// cumulative vendor billing never collide with per-ticket procurement.
+// ============================================================================
+
+model MaterialContract {
+  id              String             @id @default(cuid()) @map("_id")
+  contractNumber  String             @unique
+  vendorId        String?
+  vendor          Vendor?            @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  vendorName      String
+  materialType    String             @default("PASIR")
+  unitPrice       Float
+  unit            String
+  estimatedVolume Float?
+  notes           String?
+  startDate       DateTime
+  endDate         DateTime?
+  isActive        Boolean            @default(true)
+  createdById     String?
+  createdBy       User?              @relation("MaterialContractCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries      MaterialDelivery[]
+  vendorInvoices  VendorInvoice[]
+  ticketItems     TicketItem[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([vendorId])
+  @@index([isActive, createdAt])
+}
+
+model MaterialDelivery {
+  id               String                        @id @default(cuid()) @map("_id")
+  contractId       String
+  contract         MaterialContract              @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  projectId        String
+  project          Project                       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  ticketId         String?
+  ticket           Ticket?                       @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  deliveryDate     DateTime
+  doNumber         String
+  vehiclePlate     String?
+  driverName       String?
+  quantityReceived Float
+  billingStatus    MaterialDeliveryBillingStatus @default(UNBILLED)
+  vendorInvoiceId  String?
+  vendorInvoice    VendorInvoice?                @relation(fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
+  receivedById     String?
+  receivedBy       User?                         @relation("MaterialDeliveryReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
+  proofUrl         String?
+  notes            String?
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  @@index([contractId, billingStatus, deliveryDate])
+  @@index([contractId, doNumber])
+  @@index([projectId, deliveryDate])
+  @@index([ticketId])
+  @@index([vendorInvoiceId])
+  @@index([receivedById])
+}
+
+model VendorInvoice {
+  id            String                 @id @default(cuid()) @map("_id")
+  invoiceNumber String                 @unique
+  contractId    String
+  contract      MaterialContract       @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  deliveries    MaterialDelivery[]
+  totalQuantity Float
+  unitPrice     Float
+  grandTotal    Float
+  paidAmount    Float                  @default(0)
+  dueDate       DateTime?
+  status        VendorInvoiceStatus    @default(UNPAID)
+  notes         String?
+  processedById String?
+  processedBy   User?                  @relation("VendorInvoiceProcessor", fields: [processedById], references: [id], onDelete: SetNull)
+  payments      VendorInvoicePayment[]
+  paidAt        DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([contractId, status, createdAt])
+  @@index([status, dueDate])
+  @@index([processedById])
+}
+
+model VendorInvoicePayment {
+  id                  String          @id @default(cuid()) @map("_id")
+  vendorInvoiceId     String
+  vendorInvoice       VendorInvoice   @relation(fields: [vendorInvoiceId], references: [id], onDelete: Cascade)
+  paymentType         PaymentType
+  paymentMethod       POPaymentMethod @default(TRANSFER)
+  amount              Float
+  transferDestination String
+  proofOfTransferUrl  String
+  financeAccountId    String?
+  financeAccount      FinanceAccount? @relation(fields: [financeAccountId], references: [id], onDelete: SetNull)
+  cashflowId          String?         @unique
+  cashflow            Cashflow?       @relation(fields: [cashflowId], references: [id], onDelete: SetNull)
+  notes               String?
+  processedById       String
+  processedBy         User            @relation("VendorInvoicePaymentProcessor", fields: [processedById], references: [id], onDelete: Restrict)
+  paidAt              DateTime        @default(now())
+  createdAt           DateTime        @default(now())
+
+  @@index([vendorInvoiceId, paidAt])
+  @@index([financeAccountId])
+  @@index([processedById])
 }

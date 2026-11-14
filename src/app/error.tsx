@@ -1,19 +1,22 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, Home, RefreshCw } from "lucide-react";
+import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 
 export default function GlobalError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
   useEffect(() => {
+    Sentry.captureException(error);
     console.error("Unhandled application error");
-  }, []);
+  }, [error]);
 
   return (
     <main className="error-shell" role="alert">

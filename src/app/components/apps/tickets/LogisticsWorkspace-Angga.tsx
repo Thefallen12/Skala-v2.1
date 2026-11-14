@@ -93,9 +93,10 @@ import {
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-const statusLabels: Record<TicketStatus, string> = {
+const statusLabels: Record<TicketRow["status"], string> = {
   [TicketStatus.DRAFT]: "Draf",
   [TicketStatus.PENDING_DIRECTOR]: "Menunggu persetujuan Direktur",
+  PENDING_LOGISTIK: "Menunggu diproses Logistik",
   [TicketStatus.APPROVED_DIR]: "Disetujui Direktur",
   [TicketStatus.PROCESSED_FINANCE]: "Diproses Finance",
   [TicketStatus.PROCESSED_LOGISTIC]: "Diproses Logistik",
@@ -106,9 +107,10 @@ const statusLabels: Record<TicketStatus, string> = {
   [TicketStatus.REJECTED]: "Ditolak",
 };
 
-const statusColors: Record<TicketStatus, string> = {
+const statusColors: Record<TicketRow["status"], string> = {
   [TicketStatus.DRAFT]: "var(--color-muted-foreground)",
   [TicketStatus.PENDING_DIRECTOR]: "var(--color-warning)",
+  PENDING_LOGISTIK: "var(--color-warning)",
   [TicketStatus.APPROVED_DIR]: "var(--color-success)",
   [TicketStatus.PROCESSED_FINANCE]: "var(--color-info)",
   [TicketStatus.PROCESSED_LOGISTIC]: "var(--color-primary)",
