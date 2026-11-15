@@ -48,6 +48,10 @@ import {
   X,
 } from "lucide-react";
 import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
+import {
+  buildProjectSCurveSeries,
+  calculateWeightedProjectProgress,
+} from "@/lib/project-progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,11 +90,14 @@ import AnalisaMaterialModal, { type MaterialAnalysisItem } from "./AnalisaMateri
 import { getStandardAnalysisForWorkItem } from "@/lib/drt-rab-parser";
 import UploadDocumentModal from "./UploadDocumentModal";
 import CoreTeamModal from "./CoreTeamModal";
-import ProjectFundRecapTab from "./ProjectFundRecapTab";
+import ProjectFundRecapTab, {
+  classifyTicketFundCategory,
+} from "./ProjectFundRecapTab";
 import { applyRabAsContract, applyRapAsBudget, recordProjectOpname } from "@/app/actions/project";
 import { ProjectPrintRabView, ProjectPrintProgressView } from "./ProjectPrintViews";
 import ProjectMaterialDeliveriesCard from "./ProjectMaterialDeliveriesCard";
 import type {
+  ContractTicketDeliveryOption,
   MaterialContractRow,
   MaterialDeliveryRow,
 } from "@/lib/material-contracts";
@@ -196,6 +203,7 @@ export default function ProjectDetailView({
   initialMilestones = [],
   materialContracts = [],
   materialDeliveries = [],
+  contractTickets = [],
 }: {
   project: ProjectWorkstationMasterData;
   fieldTeamUsers?: FieldTeamOption[];
@@ -205,6 +213,7 @@ export default function ProjectDetailView({
   initialMilestones?: ScheduleMilestoneItem[];
   materialContracts?: MaterialContractRow[];
   materialDeliveries?: MaterialDeliveryRow[];
+  contractTickets?: ContractTicketDeliveryOption[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -354,22 +363,87 @@ export default function ProjectDetailView({
 
   // S-Curve & Progress calculations
   const { plannedToday, deviation, healthStatus, healthBadgeColor, sCurveSeries, sCurveOptions } = useMemo(() => {
-    const startMs = project.startDate ? new Date(project.startDate).getTime() : mountNowMs - 14 * 86400000;
-    const endMs = project.endDate ? new Date(project.endDate).getTime() : startMs + 60 * 86400000;
     const nowMs = mountNowMs;
-    const duration = Math.max(endMs - startMs, 7 * 86400000);
+    const plannedStartDates = localWorkPoints
+      .map((point) => point.plannedStartDate)
+      .filter((date): date is string => Boolean(date))
+      .sort();
+    const targetDates = localWorkPoints
+      .map((point) => point.targetDate)
+      .filter((date): date is string => Boolean(date))
+      .sort();
+    const reportDates = (project.reports ?? [])
+      .map((report) => report.reportDate)
+      .filter(Boolean)
+      .sort();
 
-    let planToday = 0;
-    if (nowMs <= startMs) {
-      planToday = 0;
-    } else if (nowMs >= endMs) {
-      planToday = 100;
-    } else {
-      const t = (nowMs - startMs) / duration;
-      planToday = Math.round((3 * t ** 2 - 2 * t ** 3) * 1000) / 10;
+    const effectiveStartDate =
+      project.startDate ??
+      plannedStartDates[0] ??
+      reportDates[0] ??
+      new Date(nowMs - 14 * 86400000).toISOString().slice(0, 10);
+    const startMs = new Date(`${effectiveStartDate}T00:00:00.000Z`).getTime();
+    const fallbackEnd = new Date(startMs + 84 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const effectiveEndDate =
+      project.endDate ?? targetDates.at(-1) ?? fallbackEnd;
+
+    const progressByDate = new Map<string, Map<string, number>>();
+    for (const point of localWorkPoints) {
+      for (const report of point.progressReports ?? []) {
+        const progressAtDate =
+          progressByDate.get(report.reportDate) ?? new Map();
+        progressAtDate.set(point.id, report.progress);
+        progressByDate.set(report.reportDate, progressAtDate);
+      }
     }
+    const latestPointProgress = new Map<string, number>();
+    for (const point of localWorkPoints) latestPointProgress.set(point.id, 0);
 
-    const actual = Number((project.progress ?? 0).toFixed(1));
+    const weightedFromPoints = [...progressByDate.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, progressAtDate]) => {
+        for (const [pointId, progress] of progressAtDate) {
+          latestPointProgress.set(pointId, progress);
+        }
+        return {
+          reportDate: date,
+          progress: calculateWeightedProjectProgress(
+            localWorkPoints.map((pt) => ({
+              progress: latestPointProgress.get(pt.id) ?? 0,
+              proposedTotalWage: pt.proposedTotalWage,
+              approvedTotalWage: pt.approvedTotalWage,
+            })),
+          ),
+        };
+      });
+
+    const directReports = (project.reports ?? [])
+      .filter(
+        (r): r is typeof r & { progress: number } =>
+          r.progress !== null && r.progress !== undefined,
+      )
+      .map((r) => ({
+        reportDate: r.reportDate,
+        progress: Number(r.progress),
+      }));
+
+    const hasWpProgress = localWorkPoints.some((wp) => (wp.progress ?? 0) > 0);
+    const effectiveCurrentProgress = hasWpProgress
+      ? calculateWeightedProjectProgress(localWorkPoints)
+      : Number(project.progress ?? 0);
+
+    const built = buildProjectSCurveSeries({
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      currentProgress: effectiveCurrentProgress,
+      dailyReports: [...weightedFromPoints, ...directReports],
+      nowMs,
+    });
+
+    const planToday = built.plannedToday ?? 0;
+    const actual = Number(effectiveCurrentProgress.toFixed(1));
     const dev = Number((actual - planToday).toFixed(1));
 
     let health = "Sehat";
@@ -382,56 +456,14 @@ export default function ProjectDetailView({
       color = "bg-amber-500/10 text-amber-600 border-amber-500/30";
     }
 
-    const pointsCount = 9;
-    const targetPoints: { x: number; y: number }[] = [];
-    const actualPoints: { x: number; y: number | null }[] = [];
-
-    for (let i = 0; i < pointsCount; i++) {
-      const pointTime = startMs + (duration / (pointsCount - 1)) * i;
-      const progressRatio = i / (pointsCount - 1);
-      const easedProgress = Math.round((3 * progressRatio ** 2 - 2 * progressRatio ** 3) * 1000) / 10;
-      targetPoints.push({ x: pointTime, y: easedProgress });
-    }
-
-    // Aktual: riwayat laporan harian / opname (harian & mingguan), diurutkan per tanggal
-    const reportPoints = (project.reports ?? [])
-      .filter((r) => r.progress !== null && r.progress !== undefined)
-      .map((r) => ({ x: new Date(r.reportDate).getTime(), y: Number(r.progress) }))
-      .filter((pt) => Number.isFinite(pt.x) && Number.isFinite(pt.y))
-      .sort((a, b) => a.x - b.x);
-
-    // Satu titik per hari (ambil nilai terakhir di hari itu), progres tidak boleh turun
-    const byDay = new Map<number, number>();
-    for (const pt of reportPoints) {
-      const d = new Date(pt.x);
-      d.setHours(0, 0, 0, 0);
-      byDay.set(d.getTime(), pt.y);
-    }
-    actualPoints.push({ x: startMs, y: 0 });
-    let runningMax = 0;
-    for (const [day, value] of [...byDay.entries()].sort((a, b) => a[0] - b[0])) {
-      runningMax = Math.max(runningMax, Math.min(100, value));
-      actualPoints.push({ x: Math.max(day, startMs), y: Math.round(runningMax * 10) / 10 });
-    }
-    // Titik hari ini mengikuti progres proyek terkini
-    if (nowMs > startMs) {
-      const lastX = actualPoints[actualPoints.length - 1]?.x ?? startMs;
-      const todayX = Math.min(nowMs, endMs);
-      if (todayX > lastX) {
-        actualPoints.push({ x: todayX, y: Math.max(runningMax, actual) });
-      } else {
-        actualPoints[actualPoints.length - 1].y = Math.max(runningMax, actual);
-      }
-    }
-
     const series = [
       {
         name: "Aktual",
-        data: actualPoints.filter((p): p is { x: number; y: number } => p.y !== null),
+        data: built.actual,
       },
       {
         name: "Rencana",
-        data: targetPoints,
+        data: built.planned,
       },
     ];
 
@@ -495,7 +527,14 @@ export default function ProjectDetailView({
       sCurveSeries: series,
       sCurveOptions: options,
     };
-  }, [project.startDate, project.endDate, project.progress, project.reports, mountNowMs]);
+  }, [
+    project.startDate,
+    project.endDate,
+    project.progress,
+    project.reports,
+    localWorkPoints,
+    mountNowMs,
+  ]);
 
   // Work Points parsed into grouped RAB table
   const savedRapMaterials = project.rapMaterialPlans ?? [];
@@ -1020,11 +1059,44 @@ export default function ProjectDetailView({
           0,
         );
         const totalPaidFunds = (project.wageTicketPayments || []).reduce(
+          (sum, p) =>
+            sum +
+            (p.status !== "REJECTED" && p.paid ? Number(p.amount || 0) : 0),
+          0,
+        );
+        const laborTickets = (project.wageTicketPayments || []).filter(
+          (p) =>
+            p.status !== "REJECTED" &&
+            (p.fundCategory ?? classifyTicketFundCategory(p).key) === "TUKANG",
+        );
+        const paidLaborFromTickets = laborTickets.reduce(
           (sum, p) => sum + (p.paid ? Number(p.amount || 0) : 0),
           0,
         );
-        const effectiveRealized = Math.max(totalPaidFunds, Number(project.realized || 0));
-        const effectiveRequested = Math.max(totalRequestedFunds, effectiveRealized);
+        const requestedLaborFromTickets = laborTickets.reduce(
+          (sum, p) => sum + Number(p.amount || 0),
+          0,
+        );
+        const effectiveRealized = Math.max(
+          totalPaidFunds,
+          Number(project.realized || 0),
+        );
+        const effectiveRequested = Math.max(
+          totalRequestedFunds,
+          Number(project.requestedTotal || 0),
+          effectiveRealized,
+        );
+        const effectiveLaborRealized = Math.max(
+          paidLaborFromTickets,
+          Number(project.laborRealized || 0),
+        );
+        const effectiveLaborRequested = Math.max(
+          requestedLaborFromTickets,
+          Number(project.laborRequested || 0),
+          effectiveLaborRealized,
+        );
+        const contractValueDisplay =
+          Number(project.pagu) > 0 ? Number(project.pagu) : totalRabNumber;
 
         return (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -1051,47 +1123,52 @@ export default function ProjectDetailView({
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Calendar className="size-3.5 shrink-0" />
-                <span>Mulai</span>
+                <span>Jadwal Proyek</span>
               </div>
               <p className="mt-1 text-xs font-bold text-foreground">
-                {formatDateIndo(project.startDate)}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Calendar className="size-3.5 shrink-0" />
-                <span>Selesai</span>
-              </div>
-              <p className="mt-1 text-xs font-bold text-foreground">
-                {formatDateIndo(project.endDate)}
+                {formatDateIndo(project.startDate)} – {formatDateIndo(project.endDate)}
               </p>
             </div>
 
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Coins className="size-3.5 shrink-0" />
-                <span>Nilai kontrak</span>
+                <span>Nilai kontrak (Pagu)</span>
               </div>
               <p className="mt-1 text-xs font-bold text-foreground">
-                {currency(totalRabNumber)}
+                {currency(contractValueDisplay)}
+              </p>
+              {totalRabNumber > 0 &&
+                Math.abs(totalRabNumber - contractValueDisplay) > 1 && (
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    Total RAB: {currency(totalRabNumber)}
+                  </p>
+                )}
+            </div>
+
+            <div className="rounded-xl border border-emerald-500/30 bg-card p-3.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <WalletCards className="size-3.5 shrink-0 text-emerald-500" />
+                <span className="truncate">Pengeluaran Tiket (Cair)</span>
+              </div>
+              <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                {currency(effectiveRealized)}
+              </p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                Total pengajuan: {currency(effectiveRequested)}
               </p>
             </div>
 
-            <div className="col-span-2 rounded-xl border border-amber-500/30 bg-card p-3.5 shadow-2xs sm:col-span-1">
+            <div className="rounded-xl border border-amber-500/30 bg-card p-3.5 shadow-2xs">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <WalletCards className="size-3.5 shrink-0 text-amber-500" />
-                <span className="truncate">Penggunaan dana (Request)</span>
+                <HardHat className="size-3.5 shrink-0 text-amber-500" />
+                <span className="truncate">Upah Tukang (Tiket)</span>
               </div>
               <p className="mt-1 text-xs font-bold text-amber-600 dark:text-amber-400">
-                {currency(effectiveRequested)}
+                {currency(effectiveLaborRealized)}
               </p>
               <p className="mt-0.5 text-[10px] text-muted-foreground">
-                {effectiveRealized > 0
-                  ? `Realisasi cair: ${currency(effectiveRealized)}`
-                  : totalRabNumber > 0 && effectiveRequested > 0
-                    ? `${Math.round((effectiveRequested / totalRabNumber) * 100)}% dari kontrak`
-                    : "Belum ada pencairan"}
+                Pengajuan upah: {currency(effectiveLaborRequested)}
               </p>
             </div>
           </div>
@@ -1129,58 +1206,166 @@ export default function ProjectDetailView({
 
         {/* ===================== TAB 1: RINGKASAN ===================== */}
         <TabsContent value="ringkasan" className="space-y-6">
-          <Card className="border-border/80 shadow-2xs">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Aktivitas proyek</CardTitle>
-              <CardDescription className="text-xs">
-                Kondisi lapangan dan aktivitas proyek saat ini.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
-                <span className="text-xs font-medium text-muted-foreground">Laporan terakhir</span>
-                {latestReport ? (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-2xl font-black text-foreground">
-                      {formatDateIndo(latestReport.reportDate)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      oleh <strong className="text-foreground">{project.fieldPicName || "Field Team"}</strong> · {latestReport.workersCount} pekerja
-                    </p>
-                    <p className="text-xs font-medium text-foreground">
-                      Akumulasi progres proyek: {latestReport.progress ?? 0}%
-                    </p>
-                    {latestReport.photoUrls && latestReport.photoUrls.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {latestReport.photoUrls.map((photo, i) => (
-                          <a
-                            key={i}
-                            href={photo}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group relative block size-16 overflow-hidden rounded-lg border border-border"
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card className="border-border/80 shadow-2xs lg:col-span-1">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Aktivitas &amp; Status Lapangan</CardTitle>
+                <CardDescription className="text-xs">
+                  Kondisi lapangan, progres fisik, dan aktivitas proyek saat ini.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
+                  <span className="text-xs font-medium text-muted-foreground">Laporan terakhir</span>
+                  {latestReport ? (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-2xl font-black text-foreground">
+                        {formatDateIndo(latestReport.reportDate)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        oleh <strong className="text-foreground">{project.fieldPicName || "Field Team"}</strong> · {latestReport.workersCount} pekerja
+                      </p>
+                      <p className="text-xs font-medium text-foreground">
+                        Akumulasi progres proyek: {latestReport.progress ?? project.progress}%
+                      </p>
+                      {latestReport.photoUrls && latestReport.photoUrls.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {latestReport.photoUrls.map((photo, i) => (
+                            <a
+                              key={i}
+                              href={photo}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group relative block size-16 overflow-hidden rounded-lg border border-border"
+                            >
+                              <Image
+                                src={photo}
+                                alt="Progres foto"
+                                width={64}
+                                height={64}
+                                className="size-full object-cover transition group-hover:scale-105"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-lg font-bold text-foreground">
+                        {project.progress > 0
+                          ? `Progres Opname ${project.progress.toLocaleString("id-ID")}%`
+                          : "Belum ada laporan harian"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        PIC Lapangan:{" "}
+                        <strong className="text-foreground">
+                          {project.fieldPicName || "Belum ditentukan"}
+                        </strong>{" "}
+                        · {project.workPoints.length} item RAB
+                      </p>
+                      <div className="pt-1 flex flex-wrap gap-2">
+                        {project.workPoints.length > 0 && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setIsOpnameModalOpen(true)}
+                            className="h-7 text-[11px] font-semibold"
                           >
-                            <Image
-                              src={photo}
-                              alt="Progres foto"
-                              width={64}
-                              height={64}
-                              className="size-full object-cover transition group-hover:scale-105"
-                            />
-                          </a>
-                        ))}
+                            Catat Progres Opname
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setActiveTab("lapangan")}
+                          className="h-7 text-[11px]"
+                        >
+                          Buka Tab Lapangan
+                        </Button>
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
+                    <span className="text-[11px] text-muted-foreground">Progres Aktual</span>
+                    <p className="mt-0.5 text-lg font-extrabold text-orange-500">
+                      {project.progress.toLocaleString("id-ID")}%
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      Rencana hari ini: {project.startDate ? `${plannedToday.toLocaleString("id-ID")}%` : "—"}
+                    </span>
                   </div>
-                ) : (
-                  <div className="mt-2">
-                    <p className="text-xl font-bold text-foreground">9 Nov 2026</p>
-                    <p className="text-xs text-muted-foreground">oleh {project.fieldPicName || "Angga Okta Pratama"}</p>
+                  <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
+                    <span className="text-[11px] text-muted-foreground">Kelompok Tani</span>
+                    <p className="mt-0.5 line-clamp-1 text-sm font-bold text-foreground">
+                      {project.kelompokTani || project.clientName || "—"}
+                    </p>
+                    <span className="line-clamp-1 text-[10px] text-muted-foreground">
+                      {project.jenisPekerjaan || "Pekerjaan Konstruksi"}
+                    </span>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/80 shadow-2xs lg:col-span-2">
+              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pb-2">
+                <div>
+                  <CardTitle className="text-base font-bold">
+                    Kurva S — Target Rencana vs Realisasi Aktual
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Kurva rencana dihitung dari jadwal proyek; kurva aktual ditarik otomatis dari opname RAB &amp; laporan harian.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab("rab")}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Buka RAB &amp; Progres
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab("rekap-dana")}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Buka Rekap Dana
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-xl border border-border/70 p-3">
+                  <Chart
+                    options={sCurveOptions}
+                    series={sCurveSeries}
+                    type="line"
+                    height={230}
+                  />
+                  <div className="mt-1 flex items-center justify-center gap-6 text-xs font-medium text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-orange-500" />
+                      <span>Aktual ({project.progress.toLocaleString("id-ID")}%)</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="inline-block h-0.5 w-3.5 border-t-2 border-dashed border-muted-foreground" />
+                      <span>Rencana ({project.startDate ? `${plannedToday.toLocaleString("id-ID")}%` : "—"})</span>
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Pintasan / Quick actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1856,7 +2041,9 @@ export default function ProjectDetailView({
           <ProjectFundRecapTab
             projectTitle={project.title}
             projectCode={project.code}
-            contractValue={totalRabNumber}
+            contractValue={
+              Number(project.pagu) > 0 ? Number(project.pagu) : totalRabNumber
+            }
             tickets={project.wageTicketPayments}
             stockItems={stockItems}
           />
@@ -1953,6 +2140,7 @@ export default function ProjectDetailView({
             }}
             contracts={materialContracts}
             deliveries={materialDeliveries}
+            contractTickets={contractTickets}
             currentUserRole={currentUserRole ?? UserRole.FIELD_TEAM}
           />
           <Card className="border-border/80 shadow-2xs">

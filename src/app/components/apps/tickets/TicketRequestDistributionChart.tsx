@@ -87,7 +87,7 @@ export default function TicketRequestDistributionChart({
   const statusCounts = Object.values(TicketStatus)
     .map((status) => ({
       status,
-      count: tickets.filter((ticket) => ticket.status === status).length,
+      count: countableTickets.filter((ticket) => ticket.status === status).length,
     }))
     .filter((item) => item.count > 0)
     .sort((left, right) => right.count - left.count);

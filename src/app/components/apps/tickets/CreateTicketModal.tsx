@@ -7,6 +7,7 @@ import { id } from "date-fns/locale";
 import { CalendarDays, Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   TicketCategoryHint,
@@ -17,6 +18,7 @@ import {
   UserRole,
   POPaymentMethod,
 } from "@prisma/client";
+import type { TicketMaterialContractOption } from "@/lib/material-contracts";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import {
   createTicket,
@@ -75,7 +77,7 @@ const priorities = ["NON_URGENT", "URGENT", "EMERGENCY"] as const;
 
 const requestCategoryLabels: Record<RequestCategoryValue, string> = {
   OPS: "Operasional (OPS)",
-  MATERIAL: "Belanja Material",
+  MATERIAL: "Belanja Material / Alam",
   WAREHOUSE: "Permintaan Material dari Gudang",
   OFFICE: "Belanja Kantor",
   FIELD: "Belanja Kebutuhan Tim Lapangan",
@@ -123,6 +125,7 @@ const ticketFormSchema = z
           quantity: z.number().optional(),
           estimatedCost: z.number().optional(),
           categoryHint: z.enum(itemCategoryHints),
+          materialContractId: z.string().optional(),
           expectedDeliveryDate: z.string().optional(),
         }),
       )
@@ -248,6 +251,16 @@ const ticketFormSchema = z
             code: "custom",
             path: ["items", index, "stockItemId"],
             message: "Pilih barang dari katalog gudang.",
+          });
+        }
+        if (
+          values.itemSource === TicketCategoryHint.CONTRACT &&
+          !item.materialContractId
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["items", index, "materialContractId"],
+            message: "Pilih kontrak material alam yang aktif.",
           });
         }
       });
@@ -567,17 +580,23 @@ const getRequestTypeOptions = (
   ];
 
   if (selectedProjectId) {
-    options.push(
-      role === UserRole.FIELD_TEAM
-        ? {
+    if (role === UserRole.FIELD_TEAM) {
+      options.push(
+        {
             label: requestCategoryLabels[TicketRequestCategory.WAREHOUSE],
             value: TicketRequestCategory.WAREHOUSE,
-          }
-        : {
-            label: "Permintaan Material",
-            value: TicketRequestCategory.MATERIAL,
           },
-    );
+        {
+          label: "Permintaan Material / Alam",
+          value: TicketRequestCategory.MATERIAL,
+        },
+      );
+    } else {
+      options.push({
+        label: "Permintaan Material / Alam",
+        value: TicketRequestCategory.MATERIAL,
+      });
+    }
     if (
       role === UserRole.DIRECTOR ||
       role === UserRole.KOORDINATOR ||
@@ -659,6 +678,7 @@ export default function CreateTicketModal({
   defaultRequestCategory,
   fixedProjectId,
   initialWageRequest,
+  materialContracts = [],
 }: {
   projects: TicketProjectOption[];
   stockItems?: Array<{
@@ -673,6 +693,7 @@ export default function CreateTicketModal({
   defaultOpen?: boolean;
   defaultRequestCategory?: RequestCategoryValue;
   fixedProjectId?: string;
+  materialContracts?: TicketMaterialContractOption[];
   initialWageRequest?: {
     projectId: string;
     projectTitle: string;
@@ -719,6 +740,7 @@ export default function CreateTicketModal({
         quantity: 1,
         estimatedCost: undefined,
         categoryHint: TicketCategoryHint.WAREHOUSE,
+        materialContractId: "",
         expectedDeliveryDate: "",
       }],
       recipientName: "",
@@ -823,6 +845,7 @@ export default function CreateTicketModal({
               nextRequestCategory === TicketRequestCategory.WAREHOUSE
                 ? TicketCategoryHint.WAREHOUSE
                 : TicketCategoryHint.PURCHASE,
+            materialContractId: "",
             expectedDeliveryDate: "",
           },
         ],
@@ -960,10 +983,22 @@ export default function CreateTicketModal({
       ? (watchedSurveyConsumptionAmount ?? 0) + (watchedSurveyFuelAmount ?? 0)
       : watchedOperationalAmount ?? 0;
   const itemSource = useWatch({ control: form.control, name: "itemSource" });
+  const watchedItems = useWatch({ control: form.control, name: "items" });
   const itemsExpectedDeliveryDate = useWatch({
     control: form.control,
     name: "itemsExpectedDeliveryDate",
   });
+  const contractEstimatedTotal = useMemo(() => {
+    if (itemSource !== TicketCategoryHint.CONTRACT) return 0;
+    return (watchedItems ?? []).reduce((sum, item) => {
+      const qty = Number(item?.quantity ?? 0);
+      const unitPrice = Number(item?.estimatedCost ?? 0);
+      if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+        return sum;
+      }
+      return sum + Math.round(qty * unitPrice);
+    }, 0);
+  }, [itemSource, watchedItems]);
   const usesItemDeliveryDates =
     requestCategory === TicketRequestCategory.MATERIAL ||
     requestCategory === TicketRequestCategory.WAREHOUSE;
@@ -1065,7 +1100,10 @@ export default function CreateTicketModal({
       values.itemSource === TicketCategoryHint.WAREHOUSE &&
       values.itemsExpectedDeliveryDate
         ? `Tanggal diperlukan untuk seluruh barang gudang: ${values.itemsExpectedDeliveryDate}`
-        : null,
+        : values.itemSource === TicketCategoryHint.CONTRACT &&
+            values.itemsExpectedDeliveryDate
+          ? `Target tanggal pengiriman material alam: ${values.itemsExpectedDeliveryDate}`
+          : null,
     ]
       .filter(Boolean)
       .join("\n");
@@ -1144,10 +1182,19 @@ export default function CreateTicketModal({
                   itemName: item.itemName ?? "",
                   quantity: item.quantity ?? 0,
                   unit: item.unit ?? "",
-                  estimatedCost: undefined,
+                  estimatedCost:
+                    values.itemSource === TicketCategoryHint.CONTRACT
+                      ? item.estimatedCost
+                      : undefined,
                   categoryHint: values.itemSource,
+                  materialContractId:
+                    values.itemSource === TicketCategoryHint.CONTRACT
+                      ? item.materialContractId
+                      : undefined,
                   expectedDeliveryDate:
-                    values.itemSource === TicketCategoryHint.WAREHOUSE
+                    (values.itemSource === TicketCategoryHint.WAREHOUSE ||
+                      values.itemSource === TicketCategoryHint.CONTRACT) &&
+                    values.itemsExpectedDeliveryDate
                       ? values.itemsExpectedDeliveryDate
                       : undefined,
                 })),
@@ -1377,6 +1424,7 @@ export default function CreateTicketModal({
                             quantity: 1,
                             estimatedCost: undefined,
                             categoryHint: TicketCategoryHint.WAREHOUSE,
+                            materialContractId: "",
                             expectedDeliveryDate: "",
                           }],
                           { shouldValidate: true },
@@ -1418,6 +1466,7 @@ export default function CreateTicketModal({
                             quantity: 1,
                             estimatedCost: undefined,
                             categoryHint: TicketCategoryHint.PURCHASE,
+                            materialContractId: "",
                             expectedDeliveryDate: "",
                           }],
                           { shouldValidate: true },
@@ -2370,6 +2419,7 @@ export default function CreateTicketModal({
                                 unit: "",
                                 estimatedCost: undefined,
                                 categoryHint: value,
+                                materialContractId: "",
                                 expectedDeliveryDate: "",
                               })),
                             );
@@ -2392,22 +2442,28 @@ export default function CreateTicketModal({
                             <SelectItem value={TicketCategoryHint.PURCHASE}>
                               Pembelian Baru
                             </SelectItem>
+                            <SelectItem value={TicketCategoryHint.CONTRACT}>
+                              Kontrak Material Alam
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       )}
                     />
                   </div>
                 )}
-                {itemSource === TicketCategoryHint.WAREHOUSE && (
+                {(itemSource === TicketCategoryHint.WAREHOUSE ||
+                  itemSource === TicketCategoryHint.CONTRACT) && (
                   <div className="space-y-2">
                     <Label className="hidden sm:flex" htmlFor="ticket-items-delivery-date">
-                      Tanggal Diperlukan
+                      {itemSource === TicketCategoryHint.CONTRACT
+                        ? "Target Tanggal Kirim (Opsional)"
+                        : "Tanggal Diperlukan"}
                     </Label>
                     <Input
                       id="ticket-items-delivery-date"
                       type="date"
                       className="h-9 text-xs sm:h-10 sm:text-sm"
-                      required
+                      required={itemSource === TicketCategoryHint.WAREHOUSE}
                       value={itemsExpectedDeliveryDate ?? ""}
                       min={format(new Date(), "yyyy-MM-dd")}
                       onChange={(event) =>
@@ -2445,6 +2501,7 @@ export default function CreateTicketModal({
                     quantity: 1,
                     estimatedCost: undefined,
                     categoryHint: itemSource ?? TicketCategoryHint.WAREHOUSE,
+                    materialContractId: "",
                     expectedDeliveryDate: "",
                   })
                 }
@@ -2466,7 +2523,120 @@ export default function CreateTicketModal({
                       : "grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]",
                   )}
                 >
-                  {usesStockCatalog ? (
+                  {itemSource === TicketCategoryHint.CONTRACT ? (
+                    <div className="space-y-2">
+                      <Label
+                        className="text-xs sm:text-sm"
+                        htmlFor={`ticket-material-contract-${index}`}
+                      >
+                        Material Alam
+                      </Label>
+                      <Controller
+                        control={form.control}
+                        name={`items.${index}.materialContractId`}
+                        render={({ field: contractField }) => (
+                          <Select
+                            value={contractField.value || undefined}
+                            onValueChange={(contractId) => {
+                              const contract = materialContracts.find(
+                                (option) => option.id === contractId,
+                              );
+                              contractField.onChange(contractId);
+                              if (!contract) return;
+                              form.setValue(
+                                `items.${index}.itemName`,
+                                contract.materialType,
+                                { shouldDirty: true, shouldValidate: true },
+                              );
+                              form.setValue(
+                                `items.${index}.unit`,
+                                contract.unit,
+                                { shouldDirty: true, shouldValidate: true },
+                              );
+                              form.setValue(
+                                `items.${index}.estimatedCost`,
+                                contract.unitPrice,
+                                { shouldDirty: true, shouldValidate: true },
+                              );
+                              form.clearErrors([
+                                `items.${index}.materialContractId`,
+                                `items.${index}.itemName`,
+                                `items.${index}.unit`,
+                              ]);
+                            }}
+                          >
+                            <SelectTrigger
+                              id={`ticket-material-contract-${index}`}
+                              className="h-9 w-full text-xs sm:h-10 sm:text-sm"
+                              aria-invalid={
+                                !!form.formState.errors.items?.[index]
+                                  ?.materialContractId
+                              }
+                            >
+                              <SelectValue placeholder="Pilih kontrak material alam" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {materialContracts.map((contract) => (
+                                <SelectItem
+                                  key={contract.id}
+                                  value={contract.id}
+                                >
+                                  {contract.materialType} · {contract.vendorName} ·{" "}
+                                  {formatCurrency(contract.unitPrice)}/{contract.unit}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {form.formState.errors.items?.[index]
+                        ?.materialContractId && (
+                        <p className="text-sm text-destructive" role="alert">
+                          {
+                            form.formState.errors.items[index]
+                              ?.materialContractId?.message
+                          }
+                        </p>
+                      )}
+                      {materialContracts.length === 0 ? (
+                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+                          Belum ada Kontrak Material Alam yang aktif.{" "}
+                          <Link
+                            href="/apps/logistics?tab=bulk-contracts"
+                            className="font-semibold underline underline-offset-2"
+                          >
+                            Buka Logistik &rarr; Kontrak Curah
+                          </Link>{" "}
+                          untuk menambah kontrak pasir/batu, atau ubah Sumber Barang ke Pembelian Baru.
+                        </div>
+                      ) : (
+                        (() => {
+                          const selectedId = watchedItems?.[index]?.materialContractId;
+                          const matched = selectedId
+                            ? materialContracts.find((c) => c.id === selectedId)
+                            : undefined;
+                          if (!matched) return null;
+                          const qty = Number(watchedItems?.[index]?.quantity ?? 0);
+                          const lineEstimate =
+                            Number.isFinite(qty) && qty > 0
+                              ? Math.round(qty * matched.unitPrice)
+                              : 0;
+                          return (
+                            <p className="text-[11px] text-muted-foreground">
+                              Kontrak{" "}
+                              <span className="font-semibold text-foreground">
+                                {matched.contractNumber}
+                              </span>{" "}
+                              &middot; {formatCurrency(matched.unitPrice)}/{matched.unit}
+                              {lineEstimate > 0
+                                ? ` · Estimasi: ${formatCurrency(lineEstimate)}`
+                                : ""}
+                            </p>
+                          );
+                        })()
+                      )}
+                    </div>
+                  ) : usesStockCatalog ? (
                     <div className="space-y-2">
                       <Label className="text-xs sm:text-sm" htmlFor={`ticket-stock-item-${index}`}>Barang</Label>
                       <Controller
@@ -2622,7 +2792,8 @@ export default function CreateTicketModal({
 
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm" htmlFor={`ticket-unit-${index}`}>Satuan</Label>
-                    {usesStockCatalog ? (
+                    {usesStockCatalog ||
+                    itemSource === TicketCategoryHint.CONTRACT ? (
                       <Controller
                         control={form.control}
                         name={`items.${index}.unit`}
@@ -2663,6 +2834,20 @@ export default function CreateTicketModal({
                 </div>
               ))}
             </div>
+            {itemSource === TicketCategoryHint.CONTRACT && materialContracts.length > 0 && (
+              <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-900 dark:text-sky-200">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    Pengajuan memakai Kontrak Payung vendor (tanpa PO/pembelian baru). Surat Jalan (DO) truk dicatat saat pengiriman tiba.
+                  </span>
+                  {contractEstimatedTotal > 0 && (
+                    <span className="font-bold">
+                      Total Estimasi: {formatCurrency(contractEstimatedTotal)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             {(form.formState.errors.items?.root?.message ||
               form.formState.errors.items?.message) && (
               <p className="text-sm text-destructive" role="alert">

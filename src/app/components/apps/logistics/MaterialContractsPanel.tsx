@@ -25,6 +25,7 @@ import {
   canManageMaterialContracts,
   canRecordMaterialDeliveries,
   formatMaterialVolume,
+  type ContractTicketDeliveryOption,
   type MaterialContractRow,
   type MaterialDeliveryRow,
 } from "@/lib/material-contracts";
@@ -89,12 +90,14 @@ export default function MaterialContractsPanel({
   deliveries,
   vendors,
   projects,
+  contractTickets = [],
 }: {
   role: TicketPageRole;
   contracts: MaterialContractRow[];
   deliveries: MaterialDeliveryRow[];
   vendors: ContractVendorCatalogOption[];
   projects: TicketProjectOption[];
+  contractTickets?: ContractTicketDeliveryOption[];
 }) {
   const router = useRouter();
   const canCreateContract = canManageMaterialContracts(role);
@@ -484,7 +487,12 @@ export default function MaterialContractsPanel({
                         {delivery.deliveryDate}
                       </TableCell>
                       <TableCell className="text-xs font-bold">
-                        {delivery.doNumber}
+                        <div>{delivery.doNumber}</div>
+                        {delivery.ticketNumber && (
+                          <Badge variant="outline" className="mt-0.5 text-[10px] font-medium">
+                            {delivery.ticketNumber}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="text-xs font-medium">
@@ -585,6 +593,7 @@ export default function MaterialContractsPanel({
         onOpenChange={setDeliveryModalOpen}
         contracts={contracts}
         projects={projects}
+        contractTickets={contractTickets}
         defaultContractId={selectedContractForDo}
       />
 

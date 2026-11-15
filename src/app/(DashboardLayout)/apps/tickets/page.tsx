@@ -16,6 +16,12 @@ import { prisma } from "@/lib/prisma";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { connectToMongoDB } from "@/lib/mongoose";
+import {
+  loadActiveTicketMaterialContractOptions,
+  loadMaterialContractsBundle,
+  loadOpenContractDeliveryTickets,
+} from "@/lib/material-contracts-server";
+import { mapTicketMaterialDeliveries } from "@/lib/material-contracts";
 import EquipmentTicket from "@/models/ticket";
 import TicketAuditLog from "@/models/ticket-audit-log";
 import User from "@/models/user";
@@ -148,12 +154,47 @@ const Tickets = async ({
             unit: true,
             estimatedCost: true,
             categoryHint: true,
+            materialContractId: true,
+            materialContract: {
+              select: {
+                id: true,
+                contractNumber: true,
+                vendorName: true,
+                materialType: true,
+                unit: true,
+                unitPrice: true,
+              },
+            },
             expectedDeliveryDate: true,
             status: true,
             poItemId: true,
             doItemId: true,
           },
           orderBy: { id: "asc" },
+        },
+        materialDeliveries: {
+          orderBy: { deliveryDate: "desc" },
+          select: {
+            id: true,
+            contractId: true,
+            deliveryDate: true,
+            doNumber: true,
+            vehiclePlate: true,
+            driverName: true,
+            quantityReceived: true,
+            billingStatus: true,
+            proofUrl: true,
+            notes: true,
+            contract: {
+              select: {
+                contractNumber: true,
+                vendorName: true,
+                materialType: true,
+                unit: true,
+                unitPrice: true,
+              },
+            },
+          },
         },
         auditLogs: {
           orderBy: { createdAt: "desc" },
@@ -298,7 +339,9 @@ const Tickets = async ({
       },
     }),
     session.user.role === UserRole.LOGISTICS ||
-    session.user.role === UserRole.ADMINISTRATIONS
+    session.user.role === UserRole.ADMINISTRATIONS ||
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR
       ? prisma.vendor.findMany({
           where: { isApproved: true },
           orderBy: { name: "asc" },
@@ -326,6 +369,12 @@ const Tickets = async ({
   ]);
 
   await connectToMongoDB();
+  const [materialContractOptions, materialContractsBundle, openContractTickets] =
+    await Promise.all([
+      loadActiveTicketMaterialContractOptions(),
+      loadMaterialContractsBundle({ includeInvoices: false }),
+      loadOpenContractDeliveryTickets(),
+    ]);
   const equipmentTickets = await EquipmentTicket.find({
     ticketType: EQUIPMENT_REQUEST_TYPE,
     ...getEquipmentTicketVisibilityFilter(session.user.role, session.user.id),
@@ -404,6 +453,7 @@ const Tickets = async ({
   const canViewPaymentDetails =
     session.user.role === UserRole.FINANCE ||
     session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
     session.user.role === UserRole.ADMINISTRATIONS;
   const canViewTicketPaymentDetails = (requesterId: string) =>
     canViewPaymentDetails || requesterId === session.user.id;
@@ -441,6 +491,7 @@ const Tickets = async ({
     const canViewPaymentDetails =
       session.user.role === UserRole.FINANCE ||
       session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR ||
       session.user.role === UserRole.ADMINISTRATIONS ||
       requesterId === session.user.id;
 
@@ -575,6 +626,7 @@ const Tickets = async ({
       : null,
     createdAt: ticket.createdAt.toISOString(),
     requester: { name: ticket.requester.name },
+    projectId: ticket.projectId,
     project: ticket.project,
     items: ticket.items.map((item) => ({
       ...item,
@@ -585,6 +637,7 @@ const Tickets = async ({
       expectedDeliveryDate:
         item.expectedDeliveryDate?.toISOString().slice(0, 10) ?? null,
     })),
+    materialDeliveries: mapTicketMaterialDeliveries(ticket.materialDeliveries),
     auditLogs: ticket.auditLogs.map((audit) => ({
       ...audit,
       createdAt: audit.createdAt.toISOString(),
@@ -632,6 +685,7 @@ const Tickets = async ({
     paymentTransactions:
       session.user.role === UserRole.FINANCE ||
       session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR ||
       session.user.role === UserRole.ADMINISTRATIONS ||
       ticket.requesterId === session.user.id
         ? [
@@ -689,6 +743,7 @@ const Tickets = async ({
                 unitPrice: decimalStringFromScaledInteger(item.unitPrice),
                 stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
               }))}
+              materialContracts={materialContractOptions}
             />
           }
         />
@@ -704,6 +759,8 @@ const Tickets = async ({
           unit: item.unit,
           unitPrice: decimalStringFromScaledInteger(item.unitPrice),
         }))}
+        materialContracts={materialContractsBundle.contracts}
+        contractTickets={openContractTickets}
         role={session.user.role}
         initialOpenSheet={openSheet}
         initialFilter={filter}

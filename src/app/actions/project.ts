@@ -132,6 +132,7 @@ export type ProjectScheduleTaskSaveResult =
 const projectManagerRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
 ];
 
 const projectRabEditorRoles: UserRole[] = [
@@ -143,6 +144,7 @@ const projectRabEditorRoles: UserRole[] = [
 const rapEditorRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
   UserRole.LOGISTICS,
 ];
 
@@ -1442,7 +1444,11 @@ export async function addProjectProgress(
         });
         const updatedPoints = await transaction.projectWorkPoint.findMany({
           where: { projectId },
-          select: { progress: true, proposedTotalWage: true },
+          select: {
+            progress: true,
+            proposedTotalWage: true,
+            approvedTotalWage: true,
+          },
         });
         cumulativeProjectProgress =
           calculateWeightedProjectProgress(updatedPoints);
@@ -1606,7 +1612,14 @@ export async function getProjectFinancialBreakdown(
     return failure("Silakan masuk untuk melihat realisasi anggaran.");
   }
 
-  if (session.user.role !== UserRole.DIRECTOR) {
+  const allowedBreakdownRoles: UserRole[] = [
+    UserRole.DIRECTOR,
+    UserRole.DEPUTY_DIRECTOR,
+    UserRole.ADMINISTRATIONS,
+    UserRole.FINANCE,
+    UserRole.LOGISTICS,
+  ];
+  if (!allowedBreakdownRoles.includes(session.user.role)) {
     return failure("Role Anda tidak diizinkan melihat realisasi anggaran.");
   }
 
@@ -1617,7 +1630,16 @@ export async function getProjectFinancialBreakdown(
   try {
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { title: true, pagu: true },
+      select: {
+        title: true,
+        pagu: true,
+        workPoints: {
+          select: {
+            proposedTotalWage: true,
+            approvedTotalWage: true,
+          },
+        },
+      },
     });
     if (!project) {
       return failure("Project tidak ditemukan.");
@@ -1628,7 +1650,15 @@ export async function getProjectFinancialBreakdown(
       await getPaidProjectTicketRealization([projectId])
     ).get(projectId);
     const realized = paidRealization?.total ?? zero;
-    const budget = decimalFromScaledInteger(project.pagu);
+    const computedWorkPointsScaled = project.workPoints.reduce(
+      (sum, pt) => sum + (pt.approvedTotalWage ?? pt.proposedTotalWage),
+      BigInt(0),
+    );
+    const effectivePaguScaled =
+      project.pagu && project.pagu > BigInt(0)
+        ? project.pagu
+        : computedWorkPointsScaled;
+    const budget = decimalFromScaledInteger(effectivePaguScaled);
     const remaining = budget.minus(realized);
     const percentage = budget.greaterThan(0)
       ? realized.dividedBy(budget).times(100).toNumber()
@@ -1720,35 +1750,50 @@ export async function saveProjectRab(
   }
 
   try {
-    const totalRab = input.items.reduce(
-      (sum, item) => sum + item.volume * item.unitPrice,
-      0,
-    );
-    const totalRap = input.items.reduce(
+    const activeItems = input.items.filter((item) => {
+      const explicitTotal = Number((item as any).totalPrice ?? 0);
+      const isZeroMeterSection = /\(0\s*METER\)/i.test(item.section || "");
+      if (isZeroMeterSection && explicitTotal <= 0) return false;
+      if (item.volume <= 0 && explicitTotal <= 0) return false;
+      return true;
+    });
+
+    const totalRab = activeItems.reduce((sum, item) => {
+      const explicitTotal = Number((item as any).totalPrice ?? 0);
+      return sum + (explicitTotal > 0 ? explicitTotal : item.volume * item.unitPrice);
+    }, 0);
+    const totalRap = activeItems.reduce(
       (sum, item) => sum + item.volume * (item.rapPrice ?? item.unitPrice * 0.8),
       0,
     );
 
-    const startDates = input.items
+    const startDates = activeItems
       .map((it) => it.startDate)
       .filter((d) => Boolean(d))
       .sort();
-    const endDates = input.items
+    const endDates = activeItems
       .map((it) => it.endDate)
       .filter((d) => Boolean(d))
       .sort();
 
     await prisma.$transaction(async (tx) => {
-      if (input.replaceExisting) {
-        await tx.projectWorkPoint.deleteMany({
-          where: {
-            projectId,
-            progressReports: { none: {} },
-          },
-        });
-      }
+      const existingPoints = input.replaceExisting
+        ? await tx.projectWorkPoint.findMany({
+            where: { projectId },
+            select: {
+              id: true,
+              title: true,
+              progress: true,
+              completedVolume: true,
+            },
+          })
+        : [];
+      const existingByTitle = new Map(
+        existingPoints.map((pt) => [pt.title.trim().toLowerCase(), pt]),
+      );
+      const keptIds = new Set<string>();
 
-      for (const item of input.items) {
+      for (const item of activeItems) {
         const fullTitle = item.code ? (item.code + " " + item.title).trim() : item.title.trim();
         const itemVol = item.volume > 0 ? item.volume : 1;
         const total = (item as any).totalPrice && (item as any).totalPrice > 0
@@ -1759,14 +1804,19 @@ export async function saveProjectRab(
         const unitPriceVal = item.unitPrice > 0 ? item.unitPrice : Math.round(total / itemVol);
         const proposedUnitPrice = scaledIntegerFromDecimal(unitPriceVal);
 
-        if (item.id) {
+        const targetExistingId =
+          item.id ||
+          existingByTitle.get(fullTitle.toLowerCase())?.id;
+
+        if (targetExistingId) {
           const existing = await tx.projectWorkPoint.findUnique({
-            where: { id: item.id },
+            where: { id: targetExistingId },
             select: { id: true },
           });
           if (existing) {
+            keptIds.add(existing.id);
             await tx.projectWorkPoint.update({
-              where: { id: item.id },
+              where: { id: existing.id },
               data: {
                 title: fullTitle,
                 location: item.section || "Umum",
@@ -1783,7 +1833,7 @@ export async function saveProjectRab(
           }
         }
 
-        await tx.projectWorkPoint.create({
+        const created = await tx.projectWorkPoint.create({
           data: {
             projectId,
             title: fullTitle,
@@ -1801,8 +1851,31 @@ export async function saveProjectRab(
             progress: 0,
             completedVolume: 0,
           },
+          select: { id: true },
         });
+        keptIds.add(created.id);
       }
+
+      if (input.replaceExisting) {
+        const obsoleteIds = existingPoints
+          .map((pt) => pt.id)
+          .filter((id) => !keptIds.has(id));
+        if (obsoleteIds.length > 0) {
+          await tx.projectWorkPoint.deleteMany({
+            where: { id: { in: obsoleteIds } },
+          });
+        }
+      }
+
+      const updatedPoints = await tx.projectWorkPoint.findMany({
+        where: { projectId },
+        select: {
+          progress: true,
+          proposedTotalWage: true,
+          approvedTotalWage: true,
+        },
+      });
+      const weightedProgress = calculateWeightedProjectProgress(updatedPoints);
 
       const firstStartDate = startDates[0];
       const lastEndDate = endDates[endDates.length - 1];
@@ -1812,11 +1885,14 @@ export async function saveProjectRab(
         data: {
           pagu: scaledIntegerFromDecimal(totalRab),
           budget: scaledIntegerFromDecimal(totalRap),
+          progress: weightedProgress,
           ...(firstStartDate ? { startDate: new Date(firstStartDate) } : {}),
           ...(lastEndDate ? { endDate: new Date(lastEndDate) } : {}),
         },
       });
     });
+
+    await activateProjectIfReady(projectId);
 
     revalidatePath("/apps/projects/" + projectId);
     revalidatePath("/apps/projects");
@@ -1912,7 +1988,11 @@ export async function recordProjectOpname(
 
       const updatedPoints = await tx.projectWorkPoint.findMany({
         where: { projectId },
-        select: { progress: true, proposedTotalWage: true },
+        select: {
+          progress: true,
+          proposedTotalWage: true,
+          approvedTotalWage: true,
+        },
       });
       const roundedOverallProgress =
         calculateWeightedProjectProgress(updatedPoints);
@@ -2055,27 +2135,15 @@ export async function saveProjectScheduleTask(
     // Sinkronkan agregat progres proyek & Kurva S
     const updatedPoints = await prisma.projectWorkPoint.findMany({
       where: { projectId },
-      select: { progress: true, proposedTotalWage: true },
+      select: {
+        progress: true,
+        proposedTotalWage: true,
+        approvedTotalWage: true,
+      },
     });
 
-    const totalWage = updatedPoints.reduce(
-      (acc, p) => acc + Number(p.proposedTotalWage),
-      0,
-    );
-
-    let overallProgress = 0;
-    if (totalWage > 0) {
-      overallProgress = updatedPoints.reduce(
-        (acc, p) => acc + p.progress * (Number(p.proposedTotalWage) / totalWage),
-        0,
-      );
-    } else if (updatedPoints.length > 0) {
-      overallProgress =
-        updatedPoints.reduce((acc, p) => acc + p.progress, 0) /
-        updatedPoints.length;
-    }
-
-    const roundedOverallProgress = Math.round(overallProgress * 10) / 10;
+    const roundedOverallProgress =
+      calculateWeightedProjectProgress(updatedPoints);
     await prisma.project.update({
       where: { id: projectId },
       data: {
@@ -2361,7 +2429,10 @@ export async function updateProjectCoreTeam(
       },
     });
 
+    await activateProjectIfReady(projectId);
+
     revalidatePath(`/apps/projects/${projectId}`);
+    revalidatePath("/apps/projects");
     return { success: true, message: "Tim inti proyek berhasil diperbarui." };
   } catch (error) {
     console.error("Update core team error:", error);

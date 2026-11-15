@@ -33,7 +33,12 @@ import type {
   RentalStatus,
   RentalType,
 } from "@/app/actions/rentals";
-import { loadMaterialContractsBundle } from "@/lib/material-contracts-server";
+import {
+  loadActiveTicketMaterialContractOptions,
+  loadMaterialContractsBundle,
+  loadOpenContractDeliveryTickets,
+} from "@/lib/material-contracts-server";
+import { mapTicketMaterialDeliveries } from "@/lib/material-contracts";
 import { connectToMongoDB } from "@/lib/mongoose";
 import EquipmentTicket from "@/models/ticket";
 import TicketAuditLog from "@/models/ticket-audit-log";
@@ -448,12 +453,47 @@ export default async function LogisticsPage({
             unit: true,
             estimatedCost: true,
             categoryHint: true,
+            materialContractId: true,
+            materialContract: {
+              select: {
+                id: true,
+                contractNumber: true,
+                vendorName: true,
+                materialType: true,
+                unit: true,
+                unitPrice: true,
+              },
+            },
             expectedDeliveryDate: true,
             status: true,
             poItemId: true,
             doItemId: true,
           },
           orderBy: { id: "asc" },
+        },
+        materialDeliveries: {
+          orderBy: { deliveryDate: "desc" },
+          select: {
+            id: true,
+            contractId: true,
+            deliveryDate: true,
+            doNumber: true,
+            vehiclePlate: true,
+            driverName: true,
+            quantityReceived: true,
+            billingStatus: true,
+            proofUrl: true,
+            notes: true,
+            contract: {
+              select: {
+                contractNumber: true,
+                vendorName: true,
+                materialType: true,
+                unit: true,
+                unitPrice: true,
+              },
+            },
+          },
         },
         auditLogs: {
           orderBy: { createdAt: "desc" },
@@ -827,9 +867,14 @@ export default async function LogisticsPage({
   ]);
 
   const stockPriceLookup = createStockPriceLookup(stockItems);
-  const materialContractsBundle = await loadMaterialContractsBundle({
-    includeInvoices: false,
-  });
+  const [materialContractsBundle, materialContractOptions, openContractTickets] =
+    await Promise.all([
+      loadMaterialContractsBundle({
+        includeInvoices: false,
+      }),
+      loadActiveTicketMaterialContractOptions(),
+      loadOpenContractDeliveryTickets(),
+    ]);
 
   const ticketRows: TicketRow[] = tickets.map((ticket) => ({
     id: ticket.id,
@@ -860,21 +905,25 @@ export default async function LogisticsPage({
     deliveryReceiptUrl: ticket.deliveryReceiptUrl,
     recipientName:
       session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR ||
       session.user.role === UserRole.ADMINISTRATIONS
         ? ticket.recipientName
         : null,
     bankName:
       session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR ||
       session.user.role === UserRole.ADMINISTRATIONS
         ? ticket.bankName
         : null,
     accountNumber:
       session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR ||
       session.user.role === UserRole.ADMINISTRATIONS
         ? ticket.accountNumber
         : null,
     createdAt: ticket.createdAt.toISOString(),
     requester: ticket.requester,
+    projectId: ticket.projectId,
     project: ticket.project,
     items: ticket.items.map((item) => ({
       ...item,
@@ -885,6 +934,7 @@ export default async function LogisticsPage({
       expectedDeliveryDate:
         item.expectedDeliveryDate?.toISOString().slice(0, 10) ?? null,
     })),
+    materialDeliveries: mapTicketMaterialDeliveries(ticket.materialDeliveries),
     auditLogs: ticket.auditLogs.map((log) => ({
       ...log,
       createdAt: log.createdAt.toISOString(),
@@ -1296,7 +1346,9 @@ export default async function LogisticsPage({
           financeNotes: r.financeNotes,
         }))}
         materialContracts={materialContractsBundle.contracts}
+        materialContractOptions={materialContractOptions}
         materialDeliveries={materialContractsBundle.deliveries}
+        contractTickets={openContractTickets}
       />
     </>
   );

@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   BASTType,
   POPaymentMethod,
+  TicketCategoryHint,
   TicketPriority,
   TicketRequestCategory,
   TicketType,
@@ -112,7 +113,17 @@ type ApprovalTicket = {
   createdAt: string;
   requesterName: string;
   projectName: string | null;
-  items: { itemName: string; quantity: number; unit: string }[];
+  items: {
+    itemName: string;
+    quantity: number;
+    unit: string;
+    categoryHint?: TicketCategoryHint;
+    estimatedCost?: string | null;
+    materialContract?: {
+      contractNumber: string;
+      vendorName: string;
+    } | null;
+  }[];
 };
 
 type ApprovalHistoryItem = {
@@ -1991,15 +2002,42 @@ export default function ExecutiveApprovalHub({
                   <ul className="divide-y divide-border text-sm">
                     {selectedTicket.items.map((item, index) => (
                       <li
-                        className="flex items-center justify-between py-2"
+                        className="flex flex-wrap items-center justify-between gap-2 py-2"
                         key={`${item.itemName}-${index}`}
                       >
-                        <span className="font-medium text-foreground">
-                          {item.itemName}
-                        </span>
-                        <Badge variant="secondary">
-                          {item.quantity} {item.unit}
-                        </Badge>
+                        <div className="space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium text-foreground">
+                              {item.itemName}
+                            </span>
+                            {item.categoryHint === TicketCategoryHint.CONTRACT && (
+                              <Badge variant="outline" className="text-[10px]">
+                                Kontrak Material Alam
+                              </Badge>
+                            )}
+                          </div>
+                          {item.categoryHint === TicketCategoryHint.CONTRACT &&
+                            item.materialContract && (
+                              <p className="text-xs text-muted-foreground">
+                                {item.materialContract.contractNumber} ·{" "}
+                                {item.materialContract.vendorName}
+                                {item.estimatedCost
+                                  ? ` · ${currency(item.estimatedCost)}/${item.unit}`
+                                  : ""}
+                              </p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">
+                            {item.quantity} {item.unit}
+                          </Badge>
+                          {item.categoryHint === TicketCategoryHint.CONTRACT &&
+                            item.estimatedCost && (
+                              <span className="text-xs font-semibold text-foreground">
+                                {currency(Number(item.estimatedCost) * item.quantity)}
+                              </span>
+                            )}
+                        </div>
                       </li>
                     ))}
                   </ul>

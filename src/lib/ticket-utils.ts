@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import {
   DOStatus,
   FulfillmentStatus,
+  TicketCategoryHint,
   TicketFulfillmentStatus,
   TicketRequestCategory,
   TicketStatus,
@@ -23,17 +24,22 @@ export async function syncTicketStatus(
         select: {
           status: true,
           doItemId: true,
+          categoryHint: true,
         },
       },
     },
   });
   const items = ticket.items;
+  const nonContractItems = items.filter(
+    (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
+  );
   const isShippingCostTicket =
     items.length === 0 &&
     ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
 
   const needsDeliveryOrders =
-    isShippingCostTicket || requestedStatus === TicketStatus.COMPLETED;
+    isShippingCostTicket ||
+    (requestedStatus === TicketStatus.COMPLETED && nonContractItems.length > 0);
   const deliveryOrders = needsDeliveryOrders
     ? await transaction.deliveryOrder.findMany({
         where: { ticketId },
@@ -43,8 +49,8 @@ export async function syncTicketStatus(
 
   const allItemsHaveDeliveryOrders = isShippingCostTicket
     ? deliveryOrders.length > 0
-    : items.length > 0 &&
-      items.every(
+    : nonContractItems.length > 0 &&
+      nonContractItems.every(
         (item) =>
           item.status === FulfillmentStatus.PROCESSED_TO_DO &&
           item.doItemId !== null,
@@ -79,10 +85,11 @@ export async function syncTicketStatus(
     allItemsProcessedToDo
   ) {
     if (
-      deliveryOrders.length > 0 &&
-      deliveryOrders.every(
-        (deliveryOrder) => deliveryOrder.status === DOStatus.DELIVERED,
-      )
+      nonContractItems.length === 0 ||
+      (deliveryOrders.length > 0 &&
+        deliveryOrders.every(
+          (deliveryOrder) => deliveryOrder.status === DOStatus.DELIVERED,
+        ))
     ) {
       nextStatus = TicketStatus.COMPLETED;
     }

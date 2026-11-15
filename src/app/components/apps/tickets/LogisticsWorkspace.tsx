@@ -37,6 +37,11 @@ import CardBox from "@/app/components/shared/CardBox";
 import TicketListing from "@/app/components/apps/tickets/TicketListing";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import type { VehicleSummary } from "@/app/actions/vehicles";
+import type {
+  ContractTicketDeliveryOption,
+  MaterialContractRow,
+  TicketMaterialContractOption,
+} from "@/lib/material-contracts";
 import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
 import CreatePurchaseModal from "@/app/components/forms/CreatePurchaseModal";
 import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
@@ -46,6 +51,7 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import { TicketRequestCategory, TicketStatus } from "@prisma/client";
+import { getCountableTickets } from "./ticket-statistics";
 import {
   MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS,
 } from "@/lib/direct-stock-purchase-photo-config";
@@ -346,6 +352,9 @@ export default function LogisticsWorkspace({
   stockItems = [],
   stockPurchases = [],
   purchaseTickets = [],
+  materialContracts = [],
+  materialDeliveryContracts = [],
+  contractTickets = [],
   initialAction,
   initialOpenSheet,
 }: {
@@ -358,6 +367,9 @@ export default function LogisticsWorkspace({
   stockItems?: LogisticsStockItem[];
   stockPurchases?: DirectStockPurchaseRow[];
   purchaseTickets?: PurchaseTicketOption[];
+  materialContracts?: TicketMaterialContractOption[];
+  materialDeliveryContracts?: MaterialContractRow[];
+  contractTickets?: ContractTicketDeliveryOption[];
   initialAction?: "ticket" | "stock-purchase";
   initialOpenSheet?: string;
 }) {
@@ -476,15 +488,19 @@ export default function LogisticsWorkspace({
     };
   }, [period, periodTickets, startDate]);
 
+  const countableTickets = useMemo(
+    () => getCountableTickets(tickets),
+    [tickets],
+  );
   const statusCounts = useMemo(
     () =>
       Object.values(TicketStatus)
         .map((status) => ({
           status,
-          count: tickets.filter((ticket) => ticket.status === status).length,
+          count: countableTickets.filter((ticket) => ticket.status === status).length,
         }))
         .filter((entry) => entry.count > 0),
-    [tickets],
+    [countableTickets],
   );
 
   const pendingCount = tickets.filter(
@@ -577,7 +593,7 @@ export default function LogisticsWorkspace({
             total: {
               show: true,
               label: "Total",
-              formatter: () => `${tickets.length}`,
+              formatter: () => `${countableTickets.length}`,
             },
           },
         },
@@ -629,7 +645,7 @@ export default function LogisticsWorkspace({
   const stats = [
     {
       label: "Total Pesanan",
-      value: tickets.length,
+      value: countableTickets.length,
       note: "Klik untuk melihat seluruh tiket",
       filter: "ALL",
       Icon: ClipboardList,
@@ -2147,6 +2163,7 @@ export default function LogisticsWorkspace({
             <CreateTicketModal
               projects={projects}
               stockItems={stockItems}
+              materialContracts={materialContracts}
               requesterRole={role}
               triggerLabel="Order Baru"
               defaultRequestCategory={TicketRequestCategory.MATERIAL}
@@ -2314,6 +2331,8 @@ export default function LogisticsWorkspace({
             projects={projects}
             vendors={vendors}
             stockItems={stockItems}
+            materialContracts={materialDeliveryContracts}
+            contractTickets={contractTickets}
             role={role}
             ticketSearch={search}
             searchTickets={setSearch}

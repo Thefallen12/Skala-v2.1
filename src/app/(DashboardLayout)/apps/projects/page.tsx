@@ -15,7 +15,9 @@ import {
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
+import { calculateWeightedProjectProgress } from "@/lib/project-progress";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import { loadActiveTicketMaterialContractOptions } from "@/lib/material-contracts-server";
 
 export const metadata: Metadata = {
   title: "Project Workstation",
@@ -49,7 +51,9 @@ export default async function ProjectsWorkstationPage({
   const isFieldRole =
     session.user.role === UserRole.FIELD_TEAM ||
     session.user.role === UserRole.KOORDINATOR;
-  const isDirector = session.user.role === UserRole.DIRECTOR;
+  const isDirector =
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR;
   const projectWhere =
     isFieldRole
       ? { fieldPicId: session.user.id, isDeleted: false }
@@ -325,214 +329,276 @@ export default async function ProjectsWorkstationPage({
           select: { id: true, name: true, email: true, profilePhotoUrl: true },
         })
     : [];
-  const realizedMap = isDirector
-    ? await getPaidProjectTicketRealization(projectIds)
-    : null;
+  const realizedMap = await getPaidProjectTicketRealization(projectIds);
 
-  const projectRows: ProjectWorkstationMasterData[] = projects.map((project) => ({
-    id: project.id,
-    code: project.code,
-    address: project.address,
-    title: project.title,
-    name: project.name,
-    kelompokTani: project.kelompokTani,
-    jenisPekerjaan: project.jenisPekerjaan,
-    location: project.location,
-    fieldPicId: project.fieldPicId,
-    fieldPicName: project.fieldPic?.name ?? null,
-    fieldPicPhotoUrl: project.fieldPic?.profilePhotoUrl ?? null,
-    status: project.status,
-    progress: project.progress,
-    pagu: project.pagu
-      ? decimalStringFromScaledInteger(project.pagu)
-      : "0",
-    landArea:
-      project.landArea !== null
-        ? decimalStringFromScaledInteger(project.landArea)
-        : null,
-    priority: project.priority,
-    vendor: project.vendor,
-    clientName: project.clientName,
-    budget:
-      project.budget !== null
-        ? decimalStringFromScaledInteger(project.budget)
-        : null,
-    startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
-    endDate: project.endDate?.toISOString().slice(0, 10) ?? null,
-    realized: realizedMap?.get(project.id)?.total.toString() ?? "0",
-    reports: project.dailyReports.map((report) => ({
-      id: report.id,
-      reportDate: report.reportDate
-        ? typeof report.reportDate === "string"
-          ? (report.reportDate as string).slice(0, 10)
-          : report.reportDate.toISOString().slice(0, 10)
-        : "",
-      weather: report.weather,
-      workersCount: report.workersCount,
-      progress: report.progress,
-      workPointId: report.workPointId,
-      dailyVolume: report.dailyVolume,
-      workSummary: report.workSummary,
-      notes: report.notes,
-      photoUrls: report.progressPhotos.map((photo) => photo.fileUrl ?? photo.url),
-    })),
-    workPoints: project.workPoints.map((point) => ({
-      id: point.id,
-      title: point.title,
-      location: point.location,
-      plannedStartDate: point.plannedStartDate
-        ? typeof point.plannedStartDate === "string"
-          ? (point.plannedStartDate as string).slice(0, 10)
-          : point.plannedStartDate.toISOString().slice(0, 10)
-        : null,
-      targetDate: point.targetDate
-        ? typeof point.targetDate === "string"
-          ? (point.targetDate as string).slice(0, 10)
-          : point.targetDate.toISOString().slice(0, 10)
-        : null,
-      progress: point.progress,
-      proposedVolume:
-        point.proposedVolume !== null
-          ? decimalStringFromScaledInteger(point.proposedVolume)
+  const projectRows: ProjectWorkstationMasterData[] = projects.map((project) => {
+    const realizedEntry = realizedMap?.get(project.id);
+    const hasWorkPointProgress = project.workPoints.some(
+      (wp) => wp.progress > 0,
+    );
+    const dynamicProjectProgress = hasWorkPointProgress
+      ? calculateWeightedProjectProgress(project.workPoints)
+      : project.progress;
+    const computedWorkPointsWage = project.workPoints.reduce(
+      (sum, pt) => sum + (pt.approvedTotalWage ?? pt.proposedTotalWage),
+      BigInt(0),
+    );
+    const effectivePaguScaled =
+      project.pagu && project.pagu > BigInt(0)
+        ? project.pagu
+        : computedWorkPointsWage;
+
+    return {
+      id: project.id,
+      code: project.code,
+      address: project.address,
+      title: project.title,
+      name: project.name,
+      kelompokTani: project.kelompokTani,
+      jenisPekerjaan: project.jenisPekerjaan,
+      location: project.location,
+      fieldPicId: project.fieldPicId,
+      fieldPicName: project.fieldPic?.name ?? null,
+      fieldPicPhotoUrl: project.fieldPic?.profilePhotoUrl ?? null,
+      status: project.status,
+      progress: dynamicProjectProgress,
+      pagu:
+        effectivePaguScaled > BigInt(0)
+          ? decimalStringFromScaledInteger(effectivePaguScaled)
+          : "0",
+      landArea:
+        project.landArea !== null
+          ? decimalStringFromScaledInteger(project.landArea)
           : null,
-      proposedUnit: point.proposedUnit,
-      proposedUnitPrice:
-        point.proposedUnitPrice !== null
-          ? decimalStringFromScaledInteger(point.proposedUnitPrice)
+      priority: project.priority,
+      vendor: project.vendor,
+      clientName: project.clientName,
+      budget:
+        project.budget !== null
+          ? decimalStringFromScaledInteger(project.budget)
           : null,
-      completedVolume: point.completedVolume,
-      proposedTotalWage: decimalStringFromScaledInteger(
-        point.proposedTotalWage,
-      ),
-      approvedTotalWage: point.approvedTotalWage !== null
-        ? decimalStringFromScaledInteger(point.approvedTotalWage)
-        : null,
-      wageAuditLogs: point.wageAuditLogs.map((log) => ({
-        id: log.id,
-        oldWage: decimalStringFromScaledInteger(log.oldWage),
-        newWage: decimalStringFromScaledInteger(log.newWage),
-        reason: log.reason,
-        createdAt: log.createdAt
-          ? typeof log.createdAt === "string"
-            ? log.createdAt
-            : log.createdAt.toISOString()
-          : new Date().toISOString(),
-        changedByName: log.changedBy?.name ?? "Admin",
+      startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
+      endDate: project.endDate?.toISOString().slice(0, 10) ?? null,
+      realized: realizedEntry?.total.toString() ?? "0",
+      requestedTotal: realizedEntry?.requestedTotal.toString() ?? "0",
+      laborRealized: realizedEntry?.labor.toString() ?? "0",
+      laborRequested: realizedEntry?.requestedLabor.toString() ?? "0",
+      materialRealized: realizedEntry?.material.toString() ?? "0",
+      materialRequested: realizedEntry?.requestedMaterial.toString() ?? "0",
+      operationalRealized: realizedEntry
+        ? realizedEntry.operational.plus(realizedEntry.transport).toString()
+        : "0",
+      operationalRequested:
+        realizedEntry?.requestedOperational.toString() ?? "0",
+      reports: project.dailyReports.map((report) => ({
+        id: report.id,
+        reportDate: report.reportDate
+          ? typeof report.reportDate === "string"
+            ? (report.reportDate as string).slice(0, 10)
+            : report.reportDate.toISOString().slice(0, 10)
+          : "",
+        weather: report.weather,
+        workersCount: report.workersCount,
+        progress: report.progress,
+        workPointId: report.workPointId,
+        dailyVolume: report.dailyVolume,
+        workSummary: report.workSummary,
+        notes: report.notes,
+        photoUrls: report.progressPhotos.map(
+          (photo) => photo.fileUrl ?? photo.url,
+        ),
       })),
-      progressReports: [
-        ...point.progressReports.map((report) => ({
-          id: report.id,
-          reportDate: report.reportDate
-            ? typeof report.reportDate === "string"
-              ? (report.reportDate as string).slice(0, 10)
-              : report.reportDate.toISOString().slice(0, 10)
-            : "",
-          progress: report.progress,
-          workSummary: report.workSummary,
-          photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
+      workPoints: project.workPoints.map((point) => ({
+        id: point.id,
+        title: point.title,
+        location: point.location,
+        plannedStartDate: point.plannedStartDate
+          ? typeof point.plannedStartDate === "string"
+            ? (point.plannedStartDate as string).slice(0, 10)
+            : point.plannedStartDate.toISOString().slice(0, 10)
+          : null,
+        targetDate: point.targetDate
+          ? typeof point.targetDate === "string"
+            ? (point.targetDate as string).slice(0, 10)
+            : point.targetDate.toISOString().slice(0, 10)
+          : null,
+        progress: point.progress,
+        proposedVolume:
+          point.proposedVolume !== null
+            ? decimalStringFromScaledInteger(point.proposedVolume)
+            : null,
+        proposedUnit: point.proposedUnit,
+        proposedUnitPrice:
+          point.proposedUnitPrice !== null
+            ? decimalStringFromScaledInteger(point.proposedUnitPrice)
+            : null,
+        completedVolume: point.completedVolume,
+        proposedTotalWage: decimalStringFromScaledInteger(
+          point.proposedTotalWage,
+        ),
+        approvedTotalWage:
+          point.approvedTotalWage !== null
+            ? decimalStringFromScaledInteger(point.approvedTotalWage)
+            : null,
+        wageAuditLogs: point.wageAuditLogs.map((log) => ({
+          id: log.id,
+          oldWage: decimalStringFromScaledInteger(log.oldWage),
+          newWage: decimalStringFromScaledInteger(log.newWage),
+          reason: log.reason,
+          createdAt: log.createdAt
+            ? typeof log.createdAt === "string"
+              ? log.createdAt
+              : log.createdAt.toISOString()
+            : new Date().toISOString(),
+          changedByName: log.changedBy?.name ?? "Admin",
         })),
-        ...project.dailyReports
-          .filter(
-            (report) =>
-              report.workPointId === point.id && report.progress !== null,
-          )
-          .map((report) => ({
+        progressReports: [
+          ...point.progressReports.map((report) => ({
             id: report.id,
             reportDate: report.reportDate
               ? typeof report.reportDate === "string"
                 ? (report.reportDate as string).slice(0, 10)
                 : report.reportDate.toISOString().slice(0, 10)
               : "",
-            progress: report.progress!,
+            progress: report.progress,
             workSummary: report.workSummary,
-            photoUrls: report.progressPhotos.map(
-              (photo) => photo.fileUrl ?? photo.url,
-            ),
+            photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
+          })),
+          ...project.dailyReports
+            .filter(
+              (report) =>
+                report.workPointId === point.id && report.progress !== null,
+            )
+            .map((report) => ({
+              id: report.id,
+              reportDate: report.reportDate
+                ? typeof report.reportDate === "string"
+                  ? (report.reportDate as string).slice(0, 10)
+                  : report.reportDate.toISOString().slice(0, 10)
+                : "",
+              progress: report.progress!,
+              workSummary: report.workSummary,
+              photoUrls: report.progressPhotos.map(
+                (photo) => photo.fileUrl ?? photo.url,
+              ),
+            })),
+        ],
+      })),
+      blueprints: [
+        ...project.blueprints
+          .filter(
+            (blueprint) =>
+              !isFieldRole || blueprint.status === "APPROVED_FOR_CONSTRUCTION",
+          )
+          .map((blueprint) => ({
+            id: blueprint.id,
+            publicCode: blueprint.publicCode,
+            drawingNumber: blueprint.drawingNumber,
+            title: blueprint.title,
+            category: blueprint.category,
+            revision: blueprint.revision,
+            fileUrl: blueprint.fileUrl,
+            status: blueprint.status,
+            drafterName: blueprint.drafter?.name ?? "Drafter",
+          })),
+        ...(project.drawingDocuments ?? [])
+          .filter((doc) => !isFieldRole || doc.status === "APPROVED")
+          .map((doc) => ({
+            id: doc.id,
+            publicCode: doc.drawingCode,
+            drawingNumber: doc.drawingCode,
+            title: doc.title,
+            category: doc.category,
+            revision: `Rev ${doc.version ?? 0}`,
+            fileUrl: doc.fileUrl || "/documents/sample.pdf",
+            status: doc.status || "REVIEW",
+            drafterName: doc.uploadedBy?.name ?? "Drafter",
           })),
       ],
-    })),
-    blueprints: [
-      ...project.blueprints
-        .filter(
-          (blueprint) =>
-            !isFieldRole || blueprint.status === "APPROVED_FOR_CONSTRUCTION",
-        )
-        .map((blueprint) => ({
-          id: blueprint.id,
-          publicCode: blueprint.publicCode,
-          drawingNumber: blueprint.drawingNumber,
-          title: blueprint.title,
-          category: blueprint.category,
-          revision: blueprint.revision,
-          fileUrl: blueprint.fileUrl,
-          status: blueprint.status,
-          drafterName: blueprint.drafter?.name ?? "Drafter",
-        })),
-      ...(project.drawingDocuments ?? [])
-        .filter((doc) => !isFieldRole || doc.status === "APPROVED")
-        .map((doc) => ({
-          id: doc.id,
-          publicCode: doc.drawingCode,
-          drawingNumber: doc.drawingCode,
-          title: doc.title,
-          category: doc.category,
-          revision: `Rev ${doc.version ?? 0}`,
-          fileUrl: doc.fileUrl || "/documents/sample.pdf",
-          status: doc.status || "REVIEW",
-          drafterName: doc.uploadedBy?.name ?? "Drafter",
-        })),
-    ],
-    subkonContracts: isFieldRole ? [] : project.subkonContracts.map((contract) => ({
-      id: contract.id,
-      publicCode: contract.publicCode,
-      contractNumber: contract.contractNumber,
-      subkonName: contract.subkonName,
-      contractValue: decimalStringFromScaledInteger(contract.contractValue),
-      status: contract.status,
-      termyns: contract.termyns.map((termyn) => ({
-        id: termyn.id,
-        termynNumber: termyn.termynNumber,
-        claimedPercent: decimalStringFromScaledInteger(termyn.claimedPercent),
-        grossAmount: decimalStringFromScaledInteger(termyn.grossAmount),
-        retentionAmount: decimalStringFromScaledInteger(termyn.retentionAmount),
-        netAmount: decimalStringFromScaledInteger(termyn.netAmount),
-        status: termyn.status,
-      })),
-    })),
-    bastDocuments: isFieldRole ? [] : project.bastDocuments.map((bast) => ({
-      publicCode: bast.publicCode,
-      bastNumber: bast.bastNumber,
-      type: bast.type,
-      date: bast.date
-        ? typeof bast.date === "string"
-          ? (bast.date as string).slice(0, 10)
-          : bast.date.toISOString().slice(0, 10)
-        : "",
-      isApproved: bast.isApproved,
-    })),
-    wageTicketPayments: project.tickets.map((ticket) => ({
-      id: ticket.id,
-      ticketNumber: ticket.ticketNumber,
-      title: ticket.title,
-      status: ticket.status,
-      amount:
-        ticket.totalAmount !== null
-          ? decimalStringFromScaledInteger(ticket.totalAmount)
-          : null,
-      paid: ticket.transferReceiptUrl !== null,
-      paidAt: ticket.auditLogs[0]?.createdAt
-        ? typeof ticket.auditLogs[0].createdAt === "string"
-          ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
-          : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
-        : null,
-      requesterName: ticket.requester?.name ?? "Pemohon",
-    })),
-  }));
+      subkonContracts: isFieldRole
+        ? []
+        : project.subkonContracts.map((contract) => ({
+            id: contract.id,
+            publicCode: contract.publicCode,
+            contractNumber: contract.contractNumber,
+            subkonName: contract.subkonName,
+            contractValue: decimalStringFromScaledInteger(
+              contract.contractValue,
+            ),
+            status: contract.status,
+            termyns: contract.termyns.map((termyn) => ({
+              id: termyn.id,
+              termynNumber: termyn.termynNumber,
+              claimedPercent: decimalStringFromScaledInteger(
+                termyn.claimedPercent,
+              ),
+              grossAmount: decimalStringFromScaledInteger(termyn.grossAmount),
+              retentionAmount: decimalStringFromScaledInteger(
+                termyn.retentionAmount,
+              ),
+              netAmount: decimalStringFromScaledInteger(termyn.netAmount),
+              status: termyn.status,
+            })),
+          })),
+      bastDocuments: isFieldRole
+        ? []
+        : project.bastDocuments.map((bast) => ({
+            publicCode: bast.publicCode,
+            bastNumber: bast.bastNumber,
+            type: bast.type,
+            date: bast.date
+              ? typeof bast.date === "string"
+                ? (bast.date as string).slice(0, 10)
+                : bast.date.toISOString().slice(0, 10)
+              : "",
+            isApproved: bast.isApproved,
+          })),
+      wageTicketPayments: realizedEntry
+        ? realizedEntry.tickets.map((t) => ({
+            id: t.id,
+            ticketNumber: t.ticketNumber,
+            title: t.title,
+            status: t.status,
+            amount: t.amount,
+            paid: t.paid,
+            paidAt: t.paidAt ? t.paidAt.slice(0, 10) : null,
+            requesterName: t.requesterName,
+            type: t.type,
+            requestCategory: t.requestCategory,
+            fieldCategory: t.fieldCategory,
+            fundCategory: t.fundCategory,
+            createdAt: t.createdAt ? t.createdAt.slice(0, 10) : null,
+            items: t.items,
+          }))
+        : project.tickets.map((ticket) => ({
+            id: ticket.id,
+            ticketNumber: ticket.ticketNumber,
+            title: ticket.title,
+            status: ticket.status,
+            amount:
+              ticket.totalAmount !== null
+                ? decimalStringFromScaledInteger(ticket.totalAmount)
+                : null,
+            paid: ticket.transferReceiptUrl !== null,
+            paidAt: ticket.auditLogs[0]?.createdAt
+              ? typeof ticket.auditLogs[0].createdAt === "string"
+                ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
+                : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
+              : null,
+            requesterName: ticket.requester?.name ?? "Pemohon",
+            fundCategory: "TUKANG" as const,
+          })),
+    };
+  });
+
+  const materialContractOptions =
+    await loadActiveTicketMaterialContractOptions();
 
   return (
     <ProjectWorkstationMaster
       key={section === "surveys" ? "surveys" : (requestedProjectId ?? "list")}
       projects={projectRows}
+      materialContracts={materialContractOptions}
       fieldTeamUsers={fieldTeamUsers}
       currentUserId={session.user.id}
       currentUserRole={session.user.role}

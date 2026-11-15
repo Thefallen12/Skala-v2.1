@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import {
+  DOStatus,
   FulfillmentStatus,
   MaterialDeliveryBillingStatus,
   NotificationType,
@@ -116,8 +117,19 @@ async function syncContractTicketFulfillment(
   contractNumber: string,
   userId: string,
   doNumber: string,
+  mode: "RECORDED" | "REMOVED" = "RECORDED",
 ) {
-  const [ticketItems, deliveries] = await Promise.all([
+  const [ticket, ticketItems, deliveries] = await Promise.all([
+    tx.ticket.findUnique({
+      where: { id: ticketId },
+      select: {
+        id: true,
+        ticketNumber: true,
+        title: true,
+        status: true,
+        requesterId: true,
+      },
+    }),
     tx.ticketItem.findMany({
       where: { ticketId },
       select: {
@@ -133,6 +145,10 @@ async function syncContractTicketFulfillment(
       select: { contractId: true, quantityReceived: true },
     }),
   ]);
+  if (!ticket) {
+    return null;
+  }
+
   const requestedByContract = new Map<string, number>();
   const deliveredByContract = new Map<string, number>();
 
@@ -156,21 +172,29 @@ async function syncContractTicketFulfillment(
     );
   }
 
-  const completedContractItemIds = ticketItems
-    .filter(
-      (item) =>
-        item.categoryHint === TicketCategoryHint.CONTRACT &&
-        item.materialContractId &&
-        roundMaterialNumber(
-          deliveredByContract.get(item.materialContractId) ?? 0,
-          2,
-        ) >=
-          roundMaterialNumber(
-            requestedByContract.get(item.materialContractId) ?? 0,
-            2,
-          ),
-    )
-    .map((item) => item.id);
+  const completedContractItemIds: string[] = [];
+  const pendingContractItemIds: string[] = [];
+  for (const item of ticketItems) {
+    if (
+      item.categoryHint !== TicketCategoryHint.CONTRACT ||
+      !item.materialContractId
+    ) {
+      continue;
+    }
+    const delivered = roundMaterialNumber(
+      deliveredByContract.get(item.materialContractId) ?? 0,
+      2,
+    );
+    const requested = roundMaterialNumber(
+      requestedByContract.get(item.materialContractId) ?? 0,
+      2,
+    );
+    if (delivered >= requested && requested > 0) {
+      completedContractItemIds.push(item.id);
+    } else {
+      pendingContractItemIds.push(item.id);
+    }
+  }
 
   if (completedContractItemIds.length > 0) {
     await tx.ticketItem.updateMany({
@@ -178,38 +202,109 @@ async function syncContractTicketFulfillment(
       data: { status: FulfillmentStatus.PROCESSED_TO_DO },
     });
   }
+  if (pendingContractItemIds.length > 0) {
+    await tx.ticketItem.updateMany({
+      where: { id: { in: pendingContractItemIds } },
+      data: { status: FulfillmentStatus.PENDING },
+    });
+  }
 
-  const completedItems = new Set(completedContractItemIds);
+  const completedSet = new Set(completedContractItemIds);
+  const pendingSet = new Set(pendingContractItemIds);
+  const effectiveItemStatus = (item: (typeof ticketItems)[number]) =>
+    completedSet.has(item.id)
+      ? FulfillmentStatus.PROCESSED_TO_DO
+      : pendingSet.has(item.id)
+        ? FulfillmentStatus.PENDING
+        : item.status;
+
+  const nonContractItems = ticketItems.filter(
+    (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
+  );
   const allItemsFulfilled =
     ticketItems.length > 0 &&
     ticketItems.every(
-      (item) =>
-        completedItems.has(item.id) ||
-        item.status === FulfillmentStatus.PROCESSED_TO_DO,
+      (item) => effectiveItemStatus(item) === FulfillmentStatus.PROCESSED_TO_DO,
     );
   const hasAnyFulfillment =
     deliveries.length > 0 ||
-    ticketItems.some((item) => item.status !== FulfillmentStatus.PENDING);
+    ticketItems.some(
+      (item) => effectiveItemStatus(item) !== FulfillmentStatus.PENDING,
+    );
+
+  const regularDeliveryOrders =
+    nonContractItems.length > 0 && allItemsFulfilled
+      ? await tx.deliveryOrder.findMany({
+          where: { ticketId },
+          select: { status: true },
+        })
+      : [];
+  const nonContractReadyForCompletion =
+    nonContractItems.length === 0 ||
+    (regularDeliveryOrders.length > 0 &&
+      regularDeliveryOrders.every((order) => order.status === DOStatus.DELIVERED));
+
+  const completableStatuses: TicketStatus[] = [
+    TicketStatus.APPROVED_DIR,
+    TicketStatus.PROCESSED_FINANCE,
+    TicketStatus.PROCESSED_LOGISTIC,
+    TicketStatus.ASSIGNED_TO_MOVER,
+    TicketStatus.IN_TRANSIT,
+  ];
+  let nextStatus = ticket.status;
+  if (
+    allItemsFulfilled &&
+    nonContractReadyForCompletion &&
+    completableStatuses.includes(ticket.status)
+  ) {
+    nextStatus = TicketStatus.COMPLETED;
+  } else if (
+    !allItemsFulfilled &&
+    ticket.status === TicketStatus.COMPLETED
+  ) {
+    nextStatus = TicketStatus.PROCESSED_LOGISTIC;
+  }
+
+  const nextFulfillmentStatus = allItemsFulfilled
+    ? TicketFulfillmentStatus.COMPLETED
+    : hasAnyFulfillment
+      ? TicketFulfillmentStatus.PARTIALLY_FULFILLED
+      : TicketFulfillmentStatus.PENDING;
 
   await tx.ticket.update({
     where: { id: ticketId },
     data: {
-      fulfillmentStatus: allItemsFulfilled
-        ? TicketFulfillmentStatus.COMPLETED
-        : hasAnyFulfillment
-          ? TicketFulfillmentStatus.PARTIALLY_FULFILLED
-          : TicketFulfillmentStatus.PENDING,
+      fulfillmentStatus: nextFulfillmentStatus,
+      ...(nextStatus !== ticket.status
+        ? { status: nextStatus, updatedAt: new Date() }
+        : {}),
     },
   });
+
   await tx.ticketAuditLog.create({
     data: {
       id: randomUUID(),
       ticketId,
       userId,
-      action: "MATERIAL_CONTRACT_DELIVERY_RECORDED",
-      notes: `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; pemenuhan tiket disinkronkan.`,
+      action:
+        mode === "REMOVED"
+          ? "MATERIAL_CONTRACT_DELIVERY_REMOVED"
+          : "MATERIAL_CONTRACT_DELIVERY_RECORDED",
+      notes:
+        mode === "REMOVED"
+          ? `Surat Jalan ${doNumber} pada kontrak ${contractNumber} dihapus; status pemenuhan tiket disinkronkan ulang.`
+          : nextStatus === TicketStatus.COMPLETED
+            ? `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; seluruh volume kontrak pada tiket telah terpenuhi.`
+            : `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; pemenuhan tiket disinkronkan.`,
     },
   });
+
+  return {
+    ticketNumber: ticket.ticketNumber,
+    title: ticket.title,
+    requesterId: ticket.requesterId,
+    isCompleted: nextStatus === TicketStatus.COMPLETED,
+  };
 }
 
 async function uploadDeliveryProofFile(file: File): Promise<string> {
@@ -581,19 +676,35 @@ export async function recordMaterialDelivery(
       });
 
       if (linkedTicketId) {
-        await syncContractTicketFulfillment(
+        const synced = await syncContractTicketFulfillment(
           tx,
           linkedTicketId,
           contract.contractNumber,
           session.user.id,
           normalizedDoNumber,
+          "RECORDED",
         );
+        if (synced && synced.requesterId !== session.user.id) {
+          await sendNotification({
+            userId: synced.requesterId,
+            title: synced.isCompleted
+              ? "Pengiriman Material Alam Selesai"
+              : "Surat Jalan Material Alam Dicatat",
+            message: `${synced.ticketNumber} · ${synced.title} — Surat Jalan ${normalizedDoNumber} (${normalizedQty}) telah dicatat pada kontrak ${contract.contractNumber}.`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(linkedTicketId)}`,
+            type: synced.isCompleted
+              ? NotificationType.SUCCESS
+              : NotificationType.INFO,
+            database: tx,
+          });
+        }
       }
 
       return createdDelivery;
     });
 
     revalidatePath("/apps/logistics");
+    revalidatePath("/apps/tickets");
     revalidatePath("/apps/finance");
     revalidatePath(`/apps/projects/${created.projectId}`);
     return {
@@ -635,10 +746,12 @@ export async function deleteUnbilledMaterialDelivery(
         id: true,
         doNumber: true,
         projectId: true,
+        ticketId: true,
         billingStatus: true,
         vendorInvoiceId: true,
         receivedById: true,
         proofUrl: true,
+        contract: { select: { contractNumber: true } },
       },
     });
     if (!existing) {
@@ -668,14 +781,31 @@ export async function deleteUnbilledMaterialDelivery(
       };
     }
 
-    const deleted = await prisma.materialDelivery.deleteMany({
-      where: {
-        id: existing.id,
-        billingStatus: MaterialDeliveryBillingStatus.UNBILLED,
-        vendorInvoiceId: null,
-      },
+    const deletedCount = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.materialDelivery.deleteMany({
+        where: {
+          id: existing.id,
+          billingStatus: MaterialDeliveryBillingStatus.UNBILLED,
+          vendorInvoiceId: null,
+        },
+      });
+      if (deleted.count !== 1) {
+        return 0;
+      }
+
+      if (existing.ticketId) {
+        await syncContractTicketFulfillment(
+          tx,
+          existing.ticketId,
+          existing.contract.contractNumber,
+          session.user.id,
+          existing.doNumber,
+          "REMOVED",
+        );
+      }
+      return 1;
     });
-    if (deleted.count !== 1) {
+    if (deletedCount !== 1) {
       return {
         success: false,
         message: "Surat Jalan baru saja ditagihkan atau sudah dihapus.",
@@ -685,6 +815,7 @@ export async function deleteUnbilledMaterialDelivery(
     await removeDeliveryProofFile(existing.proofUrl);
 
     revalidatePath("/apps/logistics");
+    revalidatePath("/apps/tickets");
     revalidatePath("/apps/finance");
     revalidatePath(`/apps/projects/${existing.projectId}`);
     return {
@@ -741,7 +872,14 @@ export async function getUnbilledDeliveriesForContract(
         deliveries: [],
       };
     }
-    const [projects, receivers] = await Promise.all([
+    const ticketIds = [
+      ...new Set(
+        rows
+          .map((delivery) => delivery.ticketId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const [projects, receivers, linkedTickets] = await Promise.all([
       rows.length
         ? Project.find({
             _id: { $in: [...new Set(rows.map((delivery) => delivery.projectId))] },
@@ -764,12 +902,21 @@ export async function getUnbilledDeliveriesForContract(
             .select({ _id: 1, name: 1 })
             .lean()
         : Promise.resolve([]),
+      ticketIds.length
+        ? prisma.ticket.findMany({
+            where: { id: { in: ticketIds } },
+            select: { id: true, ticketNumber: true },
+          })
+        : Promise.resolve([]),
     ]);
     const projectsById = new Map(
       projects.map((project) => [String(project._id), project]),
     );
     const receiversById = new Map(
       receivers.map((receiver) => [String(receiver._id), receiver]),
+    );
+    const ticketNumbersById = new Map(
+      linkedTickets.map((ticket) => [ticket.id, ticket.ticketNumber]),
     );
 
     return {
@@ -792,6 +939,10 @@ export async function getUnbilledDeliveriesForContract(
             unit: contract.unit,
             projectId: delivery.projectId,
             projectName: `${project.kelompokTani} · ${project.title}`,
+            ticketId: delivery.ticketId ?? null,
+            ticketNumber: delivery.ticketId
+              ? (ticketNumbersById.get(delivery.ticketId) ?? null)
+              : null,
             deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
             doNumber: delivery.doNumber,
             vehiclePlate: delivery.vehiclePlate ?? null,

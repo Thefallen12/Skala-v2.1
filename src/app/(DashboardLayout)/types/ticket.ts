@@ -67,6 +67,7 @@ export type TicketRow = {
   accountNumber: string | null;
   createdAt: string;
   requester: { name: string };
+  projectId?: string | null;
   project: { title: string; kelompokTani: string } | null;
   items: {
     id: string;
@@ -76,10 +77,37 @@ export type TicketRow = {
     unit: string;
     estimatedCost: string | null;
     categoryHint: TicketCategoryHint;
+    materialContractId?: string | null;
+    materialContract?: {
+      id: string;
+      contractNumber: string;
+      vendorName: string;
+      materialType: string;
+      unit: string;
+      unitPrice: number;
+    } | null;
     expectedDeliveryDate: string | null;
     status: FulfillmentStatus;
     poItemId: string | null;
     doItemId: string | null;
+  }[];
+  materialDeliveries?: {
+    id: string;
+    contractId: string;
+    contractNumber: string;
+    vendorName: string;
+    materialType: string;
+    unit: string;
+    unitPrice: number;
+    deliveryDate: string;
+    doNumber: string;
+    vehiclePlate: string | null;
+    driverName: string | null;
+    quantityReceived: number;
+    estimatedAmount: number;
+    billingStatus: "UNBILLED" | "BILLED";
+    proofUrl: string | null;
+    notes: string | null;
   }[];
   auditLogs: {
     id: string;

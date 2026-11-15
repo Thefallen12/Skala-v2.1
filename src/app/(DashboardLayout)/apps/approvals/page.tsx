@@ -157,7 +157,21 @@ export default async function ApprovalsPage({
               },
             },
             project: { select: { title: true, kelompokTani: true } },
-            items: { select: { itemName: true, quantity: true, unit: true } },
+            items: {
+              select: {
+                itemName: true,
+                quantity: true,
+                unit: true,
+                categoryHint: true,
+                estimatedCost: true,
+                materialContract: {
+                  select: {
+                    contractNumber: true,
+                    vendorName: true,
+                  },
+                },
+              },
+            },
           },
         })
       : Promise.resolve([]),
@@ -753,7 +767,17 @@ export default async function ApprovalsPage({
           projectName: ticket.project
             ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
             : null,
-          items: ticket.items,
+          items: ticket.items.map((item) => ({
+            itemName: item.itemName,
+            quantity: item.quantity,
+            unit: item.unit,
+            categoryHint: item.categoryHint,
+            estimatedCost:
+              item.estimatedCost !== null
+                ? decimalStringFromScaledInteger(item.estimatedCost)
+                : null,
+            materialContract: item.materialContract,
+          })),
             })),
         ]}
         approvalHistory={approvalHistory}

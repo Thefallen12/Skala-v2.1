@@ -12,7 +12,10 @@ import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import ProjectDetailView from "@/app/components/apps/projects/ProjectDetailView";
 import type { ProjectWorkstationMasterData } from "@/app/components/apps/projects/ProjectWorkstationMaster";
 import type { StockItemOption } from "@/app/components/apps/projects/MaterialPlanModal";
-import { loadMaterialContractsBundle } from "@/lib/material-contracts-server";
+import {
+  loadMaterialContractsBundle,
+  loadOpenContractDeliveryTickets,
+} from "@/lib/material-contracts-server";
 
 export async function generateMetadata({
   params,
@@ -174,13 +177,17 @@ export default async function ProjectDetailPage({
       : new Date().toISOString().slice(0, 10),
   }));
 
-  const [realizationMap, materialContractsBundle] = await Promise.all([
-    getPaidProjectTicketRealization([project.id]),
-    loadMaterialContractsBundle({
-      projectId: project.id,
-      includeInvoices: false,
-    }),
-  ]);
+  const [realizationMap, materialContractsBundle, openContractTickets] =
+    await Promise.all([
+      getPaidProjectTicketRealization([project.id]),
+      loadMaterialContractsBundle({
+        projectId: project.id,
+        includeInvoices: false,
+      }),
+      loadOpenContractDeliveryTickets({
+        projectId: project.id,
+      }),
+    ]);
   const realization = realizationMap.get(project.id);
 
   const dateKey = (date: Date | string | null | undefined) =>
@@ -205,24 +212,38 @@ export default async function ProjectDetailPage({
     fallbackProgress: number | null,
   ) => {
     const reportDateKey = dateKey(reportDate);
-    const pointsAtDate = project.workPoints.filter(
-      (point) => dateKey(point.createdAt) <= reportDateKey,
-    );
-    const pointProgresses = pointsAtDate.map((point) => {
+    const pointProgresses = project.workPoints.map((point) => {
       const latestReport = point.progressReports.find(
         (progressReport) => dateKey(progressReport.reportDate) <= reportDateKey,
       );
       return {
         progress: latestReport?.progress ?? 0,
         proposedTotalWage: point.proposedTotalWage,
+        approvedTotalWage: point.approvedTotalWage,
       };
     });
-    if (pointProgresses.length === 0) {
-      return clampProjectProgress(fallbackProgress ?? project.progress);
-    }
-
-    return calculateWeightedProjectProgress(pointProgresses);
+    const weightedAtDate =
+      pointProgresses.length > 0
+        ? calculateWeightedProjectProgress(pointProgresses)
+        : 0;
+    const clampedFallback = clampProjectProgress(fallbackProgress ?? 0);
+    return Math.max(weightedAtDate, clampedFallback);
   };
+
+  const hasWorkPointProgress = project.workPoints.some(
+    (wp) => wp.progress > 0,
+  );
+  const dynamicProjectProgress = hasWorkPointProgress
+    ? calculateWeightedProjectProgress(project.workPoints)
+    : clampProjectProgress(project.progress);
+  const computedWorkPointsWage = project.workPoints.reduce(
+    (sum, pt) => sum + (pt.approvedTotalWage ?? pt.proposedTotalWage),
+    BigInt(0),
+  );
+  const effectivePaguScaled =
+    project.pagu && project.pagu > BigInt(0)
+      ? project.pagu
+      : computedWorkPointsWage;
 
   const formattedProject: ProjectWorkstationMasterData = {
     id: project.id,
@@ -237,8 +258,11 @@ export default async function ProjectDetailPage({
     fieldPicName: project.fieldPic?.name ?? null,
     fieldPicPhotoUrl: project.fieldPic?.profilePhotoUrl ?? null,
     status: project.status,
-    progress: clampProjectProgress(project.progress),
-    pagu: project.pagu ? decimalStringFromScaledInteger(project.pagu) : "0",
+    progress: dynamicProjectProgress,
+    pagu:
+      effectivePaguScaled > BigInt(0)
+        ? decimalStringFromScaledInteger(effectivePaguScaled)
+        : "0",
     landArea:
       project.landArea !== null
         ? decimalStringFromScaledInteger(project.landArea)
@@ -273,6 +297,19 @@ export default async function ProjectDetailPage({
       notes: plan.notes,
     })),
     realized: realization ? realization.total.toString() : "0",
+    requestedTotal: realization ? realization.requestedTotal.toString() : "0",
+    laborRealized: realization ? realization.labor.toString() : "0",
+    laborRequested: realization ? realization.requestedLabor.toString() : "0",
+    materialRealized: realization ? realization.material.toString() : "0",
+    materialRequested: realization
+      ? realization.requestedMaterial.toString()
+      : "0",
+    operationalRealized: realization
+      ? realization.operational.plus(realization.transport).toString()
+      : "0",
+    operationalRequested: realization
+      ? realization.requestedOperational.toString()
+      : "0",
     startDate: project.startDate
       ? typeof project.startDate === "string"
         ? (project.startDate as string).slice(0, 10)
@@ -450,12 +487,7 @@ export default async function ProjectDetailPage({
         : "",
       isApproved: bast.isApproved,
     })),
-    wageTicketPayments: project.tickets.map((ticket) => {
-      let ticketTotal =
-        ticket.totalAmount !== null && Number(ticket.totalAmount) > 0
-          ? Number(decimalStringFromScaledInteger(ticket.totalAmount))
-          : 0;
-
+    wageTicketPayments: (realization?.tickets ?? []).map((ticket) => {
       const cleanStr = (s: string) =>
         s
           .toLowerCase()
@@ -464,25 +496,28 @@ export default async function ProjectDetailPage({
           .replace(/\s+/g, " ")
           .trim();
 
-      // Compute total from items * stock catalog unit price if ticket total is 0
+      let ticketTotal = ticket.amount ? Number(ticket.amount) : 0;
+
       if (ticketTotal === 0 && ticket.items && ticket.items.length > 0) {
         let itemsSum = 0;
         for (const it of ticket.items) {
           const qty = Number(it.quantity || 0);
-          const estCost =
-            it.estimatedCost !== null
-              ? Number(decimalStringFromScaledInteger(it.estimatedCost))
-              : 0;
+          const estCost = it.estimatedCost ? Number(it.estimatedCost) : 0;
           const targetClean = cleanStr(it.itemName);
 
           const matchedStock = stockItems.find((s) => {
-            if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+            if (
+              s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()
+            )
+              return true;
             if (cleanStr(s.name) === targetClean) return true;
             const sClean = cleanStr(s.name);
             return sClean.includes(targetClean) || targetClean.includes(sClean);
           });
 
-          const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+          const stockPrice = matchedStock?.unitPrice
+            ? Number(matchedStock.unitPrice)
+            : 0;
           const unitPrice = stockPrice > 0 ? stockPrice : estCost;
           itemsSum += qty * unitPrice;
         }
@@ -498,49 +533,42 @@ export default async function ProjectDetailPage({
         type: ticket.type,
         requestCategory: ticket.requestCategory,
         fieldCategory: ticket.fieldCategory,
-        createdAt: ticket.createdAt
-          ? typeof ticket.createdAt === "string"
-            ? (ticket.createdAt as string).slice(0, 10)
-            : ticket.createdAt.toISOString().slice(0, 10)
-          : "",
+        fundCategory: ticket.fundCategory,
+        createdAt: ticket.createdAt ? ticket.createdAt.slice(0, 10) : "",
         status: ticket.status,
-        amount:
-          ticketTotal > 0
-            ? String(ticketTotal)
-            : ticket.totalAmount !== null
-              ? decimalStringFromScaledInteger(ticket.totalAmount)
-              : "0",
-        paid: ticket.transferReceiptUrl !== null,
-        paidAt: ticket.auditLogs[0]?.createdAt
-          ? typeof ticket.auditLogs[0].createdAt === "string"
-            ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
-            : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
-          : null,
-        requesterName: ticket.requester?.name ?? "Pemohon",
+        amount: ticketTotal > 0 ? String(ticketTotal) : "0",
+        paid: ticket.paid,
+        paidAt: ticket.paidAt ? ticket.paidAt.slice(0, 10) : null,
+        requesterName: ticket.requesterName || "Pemohon",
         items: ticket.items.map((it) => {
-          const estCostNum =
-            it.estimatedCost !== null
-              ? Number(decimalStringFromScaledInteger(it.estimatedCost))
-              : 0;
+          const estCostNum = it.estimatedCost ? Number(it.estimatedCost) : 0;
           let calculatedEstCost = estCostNum;
           if (calculatedEstCost === 0) {
             const targetClean = cleanStr(it.itemName);
             const matchedStock = stockItems.find((s) => {
-              if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+              if (
+                s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()
+              )
+                return true;
               if (cleanStr(s.name) === targetClean) return true;
               const sClean = cleanStr(s.name);
-              return sClean.includes(targetClean) || targetClean.includes(sClean);
+              return (
+                sClean.includes(targetClean) || targetClean.includes(sClean)
+              );
             });
-            const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+            const stockPrice = matchedStock?.unitPrice
+              ? Number(matchedStock.unitPrice)
+              : 0;
             if (stockPrice > 0) {
-              calculatedEstCost = stockPrice * Number(it.quantity || 0);
+              calculatedEstCost = stockPrice;
             }
           }
           return {
             itemName: it.itemName,
             quantity: it.quantity,
             unit: it.unit,
-            estimatedCost: calculatedEstCost > 0 ? String(calculatedEstCost) : null,
+            estimatedCost:
+              calculatedEstCost > 0 ? String(calculatedEstCost) : null,
           };
         }),
       };
@@ -557,6 +585,7 @@ export default async function ProjectDetailPage({
       initialMilestones={initialMilestones}
       materialContracts={materialContractsBundle.contracts}
       materialDeliveries={materialContractsBundle.deliveries}
+      contractTickets={openContractTickets}
     />
   );
 }

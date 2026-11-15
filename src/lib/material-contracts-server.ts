@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  TicketCategoryHint,
+  TicketStatus,
+  TicketType,
+} from "@prisma/client";
 import type { PaymentVendorBankOption } from "@/app/components/apps/finance/PaymentModal";
 import {
   formatVendorBankAccount,
@@ -8,10 +13,12 @@ import {
 import { connectToMongoDB } from "@/lib/mongoose";
 import FinanceAccount from "@/models/finance-account";
 import Project from "@/models/project";
+import Ticket from "@/models/ticket";
 import User from "@/models/user";
 import {
   MaterialContract,
   MaterialDelivery,
+  TicketItem,
   Vendor,
   VendorBankAccount,
   VendorInvoice,
@@ -19,7 +26,11 @@ import {
 } from "@/models/finance-records";
 import {
   calculateContractDeliverySubtotal,
+  getJakartaDateOnlyUtc,
   roundMaterialNumber,
+  type ContractTicketDeliveryItemOption,
+  type ContractTicketDeliveryOption,
+  type TicketMaterialContractOption,
   type MaterialContractRow,
   type MaterialContractsBundle,
   type MaterialDeliveryRow,
@@ -56,6 +67,208 @@ function mapVendorBankOptions(
       } satisfies PaymentVendorBankOption;
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
+}
+
+export async function loadActiveTicketMaterialContractOptions(): Promise<
+  TicketMaterialContractOption[]
+> {
+  await connectToMongoDB();
+  const today = getJakartaDateOnlyUtc();
+  const contracts = await MaterialContract.find({
+    isActive: true,
+    startDate: { $lte: today },
+    $or: [{ endDate: null }, { endDate: { $gte: today } }],
+  })
+    .select({
+      contractNumber: 1,
+      vendorName: 1,
+      materialType: 1,
+      unit: 1,
+      unitPrice: 1,
+    })
+    .sort({ materialType: 1, contractNumber: 1 })
+    .lean();
+
+  return contracts.map((contract) => ({
+    id: String(contract._id),
+    contractNumber: contract.contractNumber,
+    vendorName: contract.vendorName,
+    materialType: contract.materialType,
+    unit: contract.unit,
+    unitPrice: contract.unitPrice,
+  }));
+}
+
+const OPEN_CONTRACT_DELIVERY_TICKET_STATUSES: TicketStatus[] = [
+  TicketStatus.APPROVED_DIR,
+  TicketStatus.PROCESSED_FINANCE,
+  TicketStatus.PROCESSED_LOGISTIC,
+  TicketStatus.ASSIGNED_TO_MOVER,
+  TicketStatus.IN_TRANSIT,
+];
+
+export async function loadOpenContractDeliveryTickets(options?: {
+  projectId?: string;
+}): Promise<ContractTicketDeliveryOption[]> {
+  await connectToMongoDB();
+
+  const contractTicketItems = await TicketItem.find({
+    categoryHint: TicketCategoryHint.CONTRACT,
+    materialContractId: { $ne: null },
+  })
+    .sort({ _id: 1 })
+    .lean();
+
+  if (contractTicketItems.length === 0) return [];
+
+  const candidateTicketIds = [
+    ...new Set(
+      contractTicketItems
+        .map((item) => item.ticketId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const tickets = await Ticket.find({
+    _id: { $in: candidateTicketIds },
+    type: TicketType.MATERIAL,
+    isApprovedByDirector: true,
+    status: { $in: OPEN_CONTRACT_DELIVERY_TICKET_STATUSES },
+    ...(options?.projectId
+      ? { projectId: options.projectId }
+      : { projectId: { $ne: null } }),
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (tickets.length === 0) return [];
+
+  const ticketIds = tickets.map((t) => String(t._id));
+  const projectIds = [
+    ...new Set(
+      tickets
+        .map((t) => t.projectId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const contractIds = [
+    ...new Set(
+      contractTicketItems
+        .filter((item) => item.ticketId && ticketIds.includes(item.ticketId))
+        .map((item) => item.materialContractId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const [projects, contracts, deliveries] = await Promise.all([
+    projectIds.length
+      ? Project.find({ _id: { $in: projectIds } })
+          .select({ _id: 1, title: 1, kelompokTani: 1 })
+          .lean()
+      : Promise.resolve([]),
+    contractIds.length
+      ? MaterialContract.find({ _id: { $in: contractIds } })
+          .select({
+            _id: 1,
+            contractNumber: 1,
+            vendorName: 1,
+            materialType: 1,
+            unit: 1,
+            unitPrice: 1,
+          })
+          .lean()
+      : Promise.resolve([]),
+    MaterialDelivery.find({ ticketId: { $in: ticketIds } })
+      .select({
+        ticketId: 1,
+        contractId: 1,
+        quantityReceived: 1,
+      })
+      .lean(),
+  ]);
+
+  const projectById = new Map(projects.map((p) => [String(p._id), p]));
+  const contractById = new Map(contracts.map((c) => [String(c._id), c]));
+  const itemsByTicketId = new Map<string, typeof contractTicketItems>();
+  for (const item of contractTicketItems) {
+    if (!item.ticketId) continue;
+    const list = itemsByTicketId.get(item.ticketId) ?? [];
+    list.push(item);
+    itemsByTicketId.set(item.ticketId, list);
+  }
+  const deliveriesByTicketId = new Map<string, typeof deliveries>();
+  for (const del of deliveries) {
+    if (!del.ticketId) continue;
+    const list = deliveriesByTicketId.get(del.ticketId) ?? [];
+    list.push(del);
+    deliveriesByTicketId.set(del.ticketId, list);
+  }
+
+  return tickets.flatMap((ticket) => {
+    const ticketId = String(ticket._id);
+    if (!ticket.projectId) return [];
+    const project = projectById.get(ticket.projectId);
+    if (!project) return [];
+
+    const deliveredByContract = new Map<string, number>();
+    for (const delivery of deliveriesByTicketId.get(ticketId) ?? []) {
+      if (!delivery.contractId) continue;
+      deliveredByContract.set(
+        delivery.contractId,
+        roundMaterialNumber(
+          (deliveredByContract.get(delivery.contractId) ?? 0) +
+            (delivery.quantityReceived ?? 0),
+          2,
+        ),
+      );
+    }
+
+    const contractGroups = new Map<string, ContractTicketDeliveryItemOption>();
+    for (const item of itemsByTicketId.get(ticketId) ?? []) {
+      if (!item.materialContractId) continue;
+      const mc = contractById.get(item.materialContractId);
+      if (!mc) continue;
+      const existing = contractGroups.get(item.materialContractId);
+      const delivered = deliveredByContract.get(item.materialContractId) ?? 0;
+      const requested = roundMaterialNumber(
+        (existing?.requestedQuantity ?? 0) + (item.quantity ?? 0),
+        2,
+      );
+      contractGroups.set(item.materialContractId, {
+        ticketItemId: existing?.ticketItemId ?? String(item._id),
+        materialContractId: item.materialContractId,
+        contractNumber: mc.contractNumber ?? "",
+        vendorName: mc.vendorName ?? "",
+        materialType: mc.materialType ?? "PASIR",
+        unit: mc.unit ?? "m3",
+        unitPrice: mc.unitPrice ?? 0,
+        requestedQuantity: requested,
+        deliveredQuantity: delivered,
+        remainingQuantity: Math.max(
+          0,
+          roundMaterialNumber(requested - delivered, 2),
+        ),
+      });
+    }
+
+    const items = Array.from(contractGroups.values());
+    if (items.length === 0) return [];
+
+    return [
+      {
+        id: ticketId,
+        ticketNumber: ticket.ticketNumber,
+        title: ticket.title,
+        projectId: ticket.projectId,
+        projectName: `${project.kelompokTani} · ${project.title}`,
+        status: ticket.status as TicketStatus,
+        fulfillmentStatus:
+          (ticket.fulfillmentStatus as ContractTicketDeliveryOption["fulfillmentStatus"]) ??
+          "PENDING",
+        items,
+      },
+    ];
+  });
 }
 
 export async function loadMaterialContractsBundle(options?: {
@@ -146,7 +359,14 @@ export async function loadMaterialContractsBundle(options?: {
   const projectIds = [
     ...new Set(allDeliveryRows.map((row) => row.projectId)),
   ];
-  const [vendorRows, bankAccountRows, users, projectRows, accounts] =
+  const deliveryTicketIds = [
+    ...new Set(
+      deliveryRows
+        .map((row) => row.ticketId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [vendorRows, bankAccountRows, users, projectRows, accounts, linkedTickets] =
     await Promise.all([
       vendorIds.length
         ? Vendor.find({ _id: { $in: vendorIds } }).lean()
@@ -175,7 +395,15 @@ export async function loadMaterialContractsBundle(options?: {
             .select({ _id: 1, accountName: 1 })
             .lean()
         : Promise.resolve([]),
+      deliveryTicketIds.length
+        ? Ticket.find({ _id: { $in: deliveryTicketIds } })
+            .select({ _id: 1, ticketNumber: 1 })
+            .lean()
+        : Promise.resolve([]),
     ]);
+  const ticketsById = new Map(
+    linkedTickets.map((row) => [String(row._id), { id: String(row._id), ticketNumber: row.ticketNumber }]),
+  );
 
   const vendorById = new Map(vendorRows.map((row) => [String(row._id), row]));
   const bankAccountsByVendorId = new Map<
@@ -305,6 +533,9 @@ export async function loadMaterialContractsBundle(options?: {
           (row) => String(row._id) === delivery.vendorInvoiceId,
         )
       : null;
+    const linkedTicket = delivery.ticketId
+      ? ticketsById.get(delivery.ticketId)
+      : null;
     return {
       id: String(delivery._id),
       contractId: delivery.contractId,
@@ -315,6 +546,8 @@ export async function loadMaterialContractsBundle(options?: {
       unit: contract.unit,
       projectId: delivery.projectId,
       projectName: `${project.kelompokTani} · ${project.title}`,
+      ticketId: delivery.ticketId ?? null,
+      ticketNumber: linkedTicket?.ticketNumber ?? null,
       deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
       doNumber: delivery.doNumber,
       vehiclePlate: delivery.vehiclePlate ?? null,

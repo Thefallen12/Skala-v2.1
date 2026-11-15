@@ -7,6 +7,8 @@ import { recordMaterialDelivery } from "@/app/actions/material-contracts";
 import { compressFieldImageFile } from "@/lib/image-compression-client";
 import {
   calculateContractDeliverySubtotal,
+  formatMaterialVolume,
+  type ContractTicketDeliveryOption,
   type MaterialContractRow,
 } from "@/lib/material-contracts";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
@@ -49,20 +51,26 @@ export default function MaterialDeliveryModal({
   onOpenChange,
   contracts,
   projects,
+  contractTickets = [],
   defaultContractId,
+  defaultTicketId,
   lockedProjectId,
+  lockedTicketId,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contracts: MaterialContractRow[];
   projects: DeliveryProjectOption[];
+  contractTickets?: ContractTicketDeliveryOption[];
   defaultContractId?: string;
+  defaultTicketId?: string;
   lockedProjectId?: string;
+  lockedTicketId?: string;
   onSaved?: () => void;
 }) {
   const activeContracts = contracts.filter((contract) => contract.isActive);
-  const modalKey = `${open ? "open" : "closed"}:${defaultContractId ?? ""}:${lockedProjectId ?? ""}`;
+  const modalKey = `${open ? "open" : "closed"}:${defaultContractId ?? ""}:${defaultTicketId ?? ""}:${lockedProjectId ?? ""}:${lockedTicketId ?? ""}`;
 
   return (
     <GlobalModal
@@ -77,8 +85,11 @@ export default function MaterialDeliveryModal({
         key={modalKey}
         activeContracts={activeContracts}
         projects={projects}
+        contractTickets={contractTickets}
         defaultContractId={defaultContractId}
+        defaultTicketId={defaultTicketId}
         lockedProjectId={lockedProjectId}
+        lockedTicketId={lockedTicketId}
         onClose={() => onOpenChange(false)}
         onSaved={onSaved}
       />
@@ -89,20 +100,44 @@ export default function MaterialDeliveryModal({
 function MaterialDeliveryFormBody({
   activeContracts,
   projects,
+  contractTickets,
   defaultContractId,
+  defaultTicketId,
   lockedProjectId,
+  lockedTicketId,
   onClose,
   onSaved,
 }: {
   activeContracts: MaterialContractRow[];
   projects: DeliveryProjectOption[];
+  contractTickets: ContractTicketDeliveryOption[];
   defaultContractId?: string;
+  defaultTicketId?: string;
   lockedProjectId?: string;
+  lockedTicketId?: string;
   onClose: () => void;
   onSaved?: () => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const availableTickets = lockedProjectId
+    ? contractTickets.filter((ticket) => ticket.projectId === lockedProjectId)
+    : contractTickets;
+  const initialTicketId = (() => {
+    const candidateId = lockedTicketId || defaultTicketId || "";
+    if (!candidateId) return "";
+    return availableTickets.some((ticket) => ticket.id === candidateId)
+      ? candidateId
+      : "";
+  })();
+  const initialTicket =
+    availableTickets.find((ticket) => ticket.id === initialTicketId) ?? null;
+  const initialTicketItem =
+    initialTicket?.items.find((item) => item.remainingQuantity > 0) ??
+    initialTicket?.items[0] ??
+    null;
+
+  const [ticketId, setTicketId] = useState(initialTicketId);
   const [contractId, setContractId] = useState(() => {
     if (
       defaultContractId &&
@@ -110,22 +145,34 @@ function MaterialDeliveryFormBody({
     ) {
       return defaultContractId;
     }
+    if (
+      initialTicketItem &&
+      activeContracts.some((c) => c.id === initialTicketItem.materialContractId)
+    ) {
+      return initialTicketItem.materialContractId;
+    }
     return activeContracts[0]?.id ?? "";
   });
   const [projectId, setProjectId] = useState(
-    () => lockedProjectId || projects[0]?.id || "",
+    () => lockedProjectId || initialTicket?.projectId || projects[0]?.id || "",
   );
   const [deliveryDate, setDeliveryDate] = useState(() => getLocalTodayIsoDate());
   const [doNumber, setDoNumber] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [driverName, setDriverName] = useState("");
-  const [quantityReceived, setQuantityReceived] = useState("");
+  const [quantityReceived, setQuantityReceived] = useState(() =>
+    initialTicketItem && initialTicketItem.remainingQuantity > 0
+      ? String(initialTicketItem.remainingQuantity)
+      : "",
+  );
   const [notes, setNotes] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
+  const selectedTicket =
+    availableTickets.find((ticket) => ticket.id === ticketId) ?? null;
   const selectedContract =
     activeContracts.find((contract) => contract.id === contractId) ?? null;
   const parsedQty = Number(quantityReceived);
@@ -133,6 +180,33 @@ function MaterialDeliveryFormBody({
     selectedContract && Number.isFinite(parsedQty) && parsedQty > 0
       ? calculateContractDeliverySubtotal(parsedQty, selectedContract.unitPrice)
       : 0;
+
+  const handleTicketChange = (nextValue: string) => {
+    if (nextValue === "__NONE__") {
+      setTicketId("");
+      return;
+    }
+    setTicketId(nextValue);
+    const matchedTicket = availableTickets.find(
+      (ticket) => ticket.id === nextValue,
+    );
+    if (!matchedTicket) return;
+    if (!lockedProjectId && matchedTicket.projectId) {
+      setProjectId(matchedTicket.projectId);
+    }
+    const preferredItem =
+      matchedTicket.items.find((item) => item.remainingQuantity > 0) ??
+      matchedTicket.items[0];
+    if (
+      preferredItem &&
+      activeContracts.some((c) => c.id === preferredItem.materialContractId)
+    ) {
+      setContractId(preferredItem.materialContractId);
+      if (preferredItem.remainingQuantity > 0) {
+        setQuantityReceived(String(preferredItem.remainingQuantity));
+      }
+    }
+  };
 
   const handleFileChange = async (file: File | null) => {
     if (!file) {
@@ -175,6 +249,9 @@ function MaterialDeliveryFormBody({
     const formData = new FormData();
     formData.set("contractId", contractId);
     formData.set("projectId", projectId);
+    if (ticketId) {
+      formData.set("ticketId", ticketId);
+    }
     formData.set("deliveryDate", deliveryDate);
     formData.set("doNumber", doNumber.trim());
     formData.set("vehiclePlate", vehiclePlate.trim());
@@ -226,6 +303,71 @@ function MaterialDeliveryFormBody({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {(lockedTicketId && selectedTicket) || availableTickets.length > 0 ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="md-ticket">
+            {lockedTicketId
+              ? "Tiket Permintaan Terkait"
+              : "Tautkan ke Tiket Permintaan (Opsional)"}
+          </Label>
+          {lockedTicketId && selectedTicket ? (
+            <Input
+              id="md-ticket"
+              readOnly
+              value={`${selectedTicket.ticketNumber} · ${selectedTicket.title}`}
+              className="bg-muted/50"
+            />
+          ) : (
+            <Select
+              value={ticketId || "__NONE__"}
+              onValueChange={handleTicketChange}
+            >
+              <SelectTrigger id="md-ticket">
+                <SelectValue placeholder="Pilih tiket permintaan material alam..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__NONE__">
+                  Tanpa tautan tiket (pengiriman langsung proyek)
+                </SelectItem>
+                {availableTickets.map((ticket) => (
+                  <SelectItem key={ticket.id} value={ticket.id}>
+                    {ticket.ticketNumber} · {ticket.projectName} —{" "}
+                    {ticket.items
+                      .map(
+                        (item) =>
+                          `${item.materialType} (sisa ${formatMaterialVolume(item.remainingQuantity, item.unit)})`,
+                      )
+                      .join(", ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {selectedTicket && (
+            <div className="space-y-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-900 dark:text-sky-200">
+              {selectedTicket.items.map((item) => (
+                <div
+                  key={item.ticketItemId}
+                  className="flex flex-wrap items-center justify-between gap-2"
+                >
+                  <span className="font-medium">
+                    {item.materialType} ({item.contractNumber})
+                  </span>
+                  <span>
+                    Diminta {formatMaterialVolume(item.requestedQuantity, item.unit)} ·
+                    Terkirim {formatMaterialVolume(item.deliveredQuantity, item.unit)} ·
+                    Sisa{" "}
+                    <strong>
+                      {formatMaterialVolume(item.remainingQuantity, item.unit)}
+                    </strong>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
       <div className="space-y-1.5">
         <Label htmlFor="md-contract">
           Kontrak Payung Material <span className="text-destructive">*</span>

@@ -82,6 +82,46 @@ export type MaterialContractRow = {
   unbilledEstimatedAmount: number;
 };
 
+export type TicketMaterialContractOption = {
+  id: string;
+  contractNumber: string;
+  vendorName: string;
+  materialType: string;
+  unit: string;
+  unitPrice: number;
+};
+
+export type ContractTicketDeliveryItemOption = {
+  ticketItemId: string;
+  materialContractId: string;
+  contractNumber: string;
+  vendorName: string;
+  materialType: string;
+  unit: string;
+  unitPrice: number;
+  requestedQuantity: number;
+  deliveredQuantity: number;
+  remainingQuantity: number;
+};
+
+export type ContractTicketDeliveryOption = {
+  id: string;
+  ticketNumber: string;
+  title: string;
+  projectId: string;
+  projectName: string;
+  status: string;
+  fulfillmentStatus: string;
+  items: ContractTicketDeliveryItemOption[];
+};
+
+export function getJakartaDateOnlyUtc(): Date {
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
+  return new Date(`${ymd}T00:00:00.000Z`);
+}
+
 export type MaterialDeliveryRow = {
   id: string;
   contractId: string;
@@ -92,6 +132,8 @@ export type MaterialDeliveryRow = {
   unit: string;
   projectId: string;
   projectName: string;
+  ticketId: string | null;
+  ticketNumber: string | null;
   deliveryDate: string;
   doNumber: string;
   vehiclePlate: string | null;
@@ -187,6 +229,50 @@ export function formatMaterialVolume(volume: number, unit: string): string {
     maximumFractionDigits: 2,
   }).format(volume);
   return `${formatted} ${unit}`;
+}
+
+export function mapTicketMaterialDeliveries(
+  deliveries: Array<{
+    id: string;
+    contractId: string;
+    deliveryDate: Date;
+    doNumber: string;
+    vehiclePlate: string | null;
+    driverName: string | null;
+    quantityReceived: number;
+    billingStatus: MaterialDeliveryBillingStatusValue;
+    proofUrl: string | null;
+    notes: string | null;
+    contract: {
+      contractNumber: string;
+      vendorName: string;
+      materialType: string;
+      unit: string;
+      unitPrice: number;
+    };
+  }>,
+) {
+  return deliveries.map((delivery) => ({
+    id: delivery.id,
+    contractId: delivery.contractId,
+    contractNumber: delivery.contract.contractNumber,
+    vendorName: delivery.contract.vendorName,
+    materialType: delivery.contract.materialType,
+    unit: delivery.contract.unit,
+    unitPrice: delivery.contract.unitPrice,
+    deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
+    doNumber: delivery.doNumber,
+    vehiclePlate: delivery.vehiclePlate,
+    driverName: delivery.driverName,
+    quantityReceived: roundMaterialNumber(delivery.quantityReceived, 2),
+    estimatedAmount: calculateContractDeliverySubtotal(
+      delivery.quantityReceived,
+      delivery.contract.unitPrice,
+    ),
+    billingStatus: delivery.billingStatus,
+    proofUrl: delivery.proofUrl,
+    notes: delivery.notes,
+  }));
 }
 
 export const createMaterialContractSchema = z.object({

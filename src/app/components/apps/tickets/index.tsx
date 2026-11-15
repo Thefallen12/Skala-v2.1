@@ -31,8 +31,13 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import type { PurchaseVendorOption } from "@/app/components/forms/CreateVendorInline";
+import type {
+  ContractTicketDeliveryOption,
+  MaterialContractRow,
+} from "@/lib/material-contracts";
 import {
   DOStatus,
+  FulfillmentStatus,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -84,9 +89,9 @@ function requiresRoleAction(role: TicketPageRole, ticket: TicketRow): boolean {
     (ticket.type === TicketType.MATERIAL &&
       (((ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
         ticket.status === TicketStatus.PROCESSED_FINANCE) &&
-        (ticket.items.some((item) => item.status === "PENDING") ||
+        (ticket.items.some((item) => item.status === FulfillmentStatus.PENDING) ||
           (Boolean(ticket.purchaseOrders?.some((po) => po.paidAt)) &&
-            ticket.items.some((item) => item.status !== "PROCESSED_TO_DO")))) ||
+            ticket.items.some((item) => item.status !== FulfillmentStatus.PROCESSED_TO_DO)))) ||
         (ticket.status === TicketStatus.IN_TRANSIT &&
           Boolean(
             ticket.deliveryOrders?.some(
@@ -142,6 +147,8 @@ export default function TicketsApp({
   projects,
   vendors,
   stockItems,
+  materialContracts = [],
+  contractTickets = [],
   role,
   initialOpenSheet,
   initialFilter,
@@ -156,6 +163,8 @@ export default function TicketsApp({
     unit: string;
     unitPrice: string;
   }[];
+  materialContracts?: MaterialContractRow[];
+  contractTickets?: ContractTicketDeliveryOption[];
   role: TicketPageRole;
   initialOpenSheet?: string;
   initialFilter?: string;
@@ -552,6 +561,8 @@ export default function TicketsApp({
             projects={projects}
             vendors={vendors}
             stockItems={stockItems}
+            materialContracts={materialContracts}
+            contractTickets={contractTickets}
             role={role}
             ticketSearch={ticketSearch}
             searchTickets={setTicketSearch}

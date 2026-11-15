@@ -495,3 +495,53 @@ const vendorInvoicePaymentSchema = new Schema(
 export const VendorInvoicePayment =
   models.VendorInvoicePayment ||
   model("VendorInvoicePayment", vendorInvoicePaymentSchema, "VendorInvoicePayment");
+
+const projectMaterialPlanSchema = new Schema(
+  {
+    _id: String,
+    projectId: String,
+    stockItemId: String,
+    workPointId: String,
+    materialName: String,
+    unit: String,
+    plannedQuantity: Number,
+    actualQuantity: Number,
+    unitPrice: Schema.Types.BigInt,
+    totalPrice: Schema.Types.BigInt,
+    scope: String,
+    notes: String,
+    createdAt: Date,
+    updatedAt: Date,
+  },
+  { ...looseOptions, collection: "ProjectMaterialPlan" },
+);
+export const ProjectMaterialPlan =
+  models.ProjectMaterialPlan ||
+  model("ProjectMaterialPlan", projectMaterialPlanSchema, "ProjectMaterialPlan");
+
+const operationalDocumentSchema = new Schema(
+  {
+    _id: String,
+    documentNumber: String,
+    kind: String,
+    status: String,
+    title: String,
+    content: String,
+    signatureImage: String,
+    signerName: String,
+    signerRole: String,
+    signedAt: Date,
+    preparedById: String,
+    signedById: String,
+    issuedById: String,
+    issuedAt: Date,
+    ticketId: String,
+    templateId: String,
+    createdAt: Date,
+    updatedAt: Date,
+  },
+  { ...looseOptions, collection: "OperationalDocument" },
+);
+export const OperationalDocument =
+  models.OperationalDocument ||
+  model("OperationalDocument", operationalDocumentSchema, "OperationalDocument");

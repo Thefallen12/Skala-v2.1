@@ -21,7 +21,7 @@ import {
   TicketRequestCategory,
   TicketStatus,
 } from "@prisma/client";
-import { categoryForTicket } from "./ticket-statistics";
+import { categoryForTicket, getCountableTickets } from "./ticket-statistics";
 
 const statusLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Draft",
@@ -161,12 +161,13 @@ const fieldCategoryLabels: Record<TicketFieldCategory, string> = {
 };
 
 function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
+  const countableTickets = getCountableTickets(tickets);
   const counts = statuses
     .map((status) => ({
       status,
       byCategory: requestCategories.map((category) => ({
         ...category,
-        count: tickets.filter(
+        count: countableTickets.filter(
           (ticket) =>
             ticket.status === status &&
             categoryForTicket(ticket) === category.value,
@@ -184,7 +185,7 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
       <div className="border-b border-border px-5 py-4">
         <h3 className="font-semibold">Distribusi Status Tiket</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Jumlah tiket pada setiap status, dirinci menurut jenis permintaan
+          Ringkasan status selain tiket yang ditolak, dirinci menurut jenis permintaan
         </p>
       </div>
       <div className="max-h-[440px] space-y-4 overflow-y-auto p-5">

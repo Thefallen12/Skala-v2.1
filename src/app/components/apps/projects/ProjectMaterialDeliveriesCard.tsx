@@ -8,6 +8,7 @@ import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts
 import {
   canRecordMaterialDeliveries,
   formatMaterialVolume,
+  type ContractTicketDeliveryOption,
   type MaterialContractRow,
   type MaterialDeliveryRow,
 } from "@/lib/material-contracts";
@@ -46,11 +47,13 @@ export default function ProjectMaterialDeliveriesCard({
   project,
   contracts,
   deliveries,
+  contractTickets = [],
   currentUserRole,
 }: {
   project: DeliveryProjectOption;
   contracts: MaterialContractRow[];
   deliveries: MaterialDeliveryRow[];
+  contractTickets?: ContractTicketDeliveryOption[];
   currentUserRole: UserRole;
 }) {
   const router = useRouter();
@@ -190,7 +193,14 @@ export default function ProjectMaterialDeliveriesCard({
                       {delivery.deliveryDate}
                     </TableCell>
                     <TableCell>
-                      <div className="text-xs font-bold">{delivery.doNumber}</div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                        <span>{delivery.doNumber}</span>
+                        {delivery.ticketNumber && (
+                          <Badge variant="outline" className="text-[10px] font-medium">
+                            {delivery.ticketNumber}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-[11px] text-muted-foreground">
                         {delivery.vehiclePlate || "-"}
                         {delivery.driverName ? ` · ${delivery.driverName}` : ""}
@@ -279,6 +289,7 @@ export default function ProjectMaterialDeliveriesCard({
         onOpenChange={setModalOpen}
         contracts={contracts}
         projects={[project]}
+        contractTickets={contractTickets}
         lockedProjectId={project.id}
       />
 

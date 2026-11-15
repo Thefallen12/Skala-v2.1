@@ -357,6 +357,7 @@ function resolveTicketRelation(ticketObj: any) {
       .map(resolvePurchaseOrderBase),
     directStockPurchases: ticketObj.directStockPurchases ?? [],
     paymentTransactions: ticketObj.paymentTransactions ?? [],
+    materialDeliveries: ticketObj.materialDeliveries ?? [],
     deliveryOrders: store.deliveryOrders
       .filter((d) => d.ticketId === ticketObj.id)
       .map(resolveDeliveryOrderBase),
@@ -642,7 +643,7 @@ function isMongoConnectionError(err: unknown): boolean {
     return true;
   }
   if (typeof candidate.message === "string") {
-    return /Server selection timeout|No available servers|fatal alert|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EHOSTUNREACH|Connection timed out|Topology was destroyed|socket hang up/i.test(
+    return /Server selection timeout|No available servers|fatal alert|forcibly closed|os error 10054|I\/O error|DNS resolution|request timed out|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EHOSTUNREACH|Connection timed out|Topology was destroyed|socket hang up/i.test(
       candidate.message,
     );
   }

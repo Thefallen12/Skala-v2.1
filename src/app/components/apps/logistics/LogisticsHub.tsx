@@ -28,8 +28,10 @@ import EquipmentVehicleRentalPanel from "@/app/components/apps/logistics/Equipme
 import MaterialContractsPanel from "@/app/components/apps/logistics/MaterialContractsPanel";
 import type { RentalItemRow } from "@/app/actions/rentals";
 import type {
+  ContractTicketDeliveryOption,
   MaterialContractRow,
   MaterialDeliveryRow,
+  TicketMaterialContractOption,
 } from "@/lib/material-contracts";
 import { VendorFormDialog } from "@/app/components/forms/VendorFormDialog";
 import type { VehicleSummary } from "@/app/actions/vehicles";
@@ -230,7 +232,9 @@ export default function LogisticsHub({
   vehicles,
   rentals = [],
   materialContracts = [],
+  materialContractOptions = [],
   materialDeliveries = [],
+  contractTickets = [],
   initialTab,
   initialOpenSheet,
   today,
@@ -252,7 +256,9 @@ export default function LogisticsHub({
   vehicles: VehicleSummary[];
   rentals?: RentalItemRow[];
   materialContracts?: MaterialContractRow[];
+  materialContractOptions?: TicketMaterialContractOption[];
   materialDeliveries?: MaterialDeliveryRow[];
+  contractTickets?: ContractTicketDeliveryOption[];
   initialTab?: string;
   initialOpenSheet?: string;
   today: string;
@@ -467,6 +473,9 @@ export default function LogisticsHub({
           vendors={vendors}
           vehicles={vehicles}
           stockItems={stockItems}
+          materialContracts={materialContractOptions}
+          materialDeliveryContracts={materialContracts}
+          contractTickets={contractTickets}
           initialOpenSheet={initialOpenSheet}
         />
       </TabsContent>
@@ -965,6 +974,7 @@ export default function LogisticsHub({
           role={role}
           contracts={materialContracts}
           deliveries={materialDeliveries}
+          contractTickets={contractTickets}
           vendors={vendors.map((v) => ({
             id: v.id,
             name: v.name,

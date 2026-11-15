@@ -15,23 +15,40 @@ import {
   ExternalLink,
   Eye,
   FileText,
+  Lock,
   PackageOpen,
   Paperclip,
+  Pencil,
+  Plus,
   Printer,
   RefreshCw,
+  Save,
   ShoppingCart,
   Send,
+  Trash2,
   Truck,
   UploadCloud,
+  X,
 } from "lucide-react";
+import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts";
 import {
+  canRecordMaterialDeliveries,
+  formatMaterialVolume,
+  type ContractTicketDeliveryOption,
+  type MaterialContractRow,
+} from "@/lib/material-contracts";
+import {
+  addTicketItemByExecutive,
   checkTicketItemsStock,
   approveByDirector,
+  deleteTicketItemByExecutive,
   fulfillTicketItemsFromStock,
   mapTicketItemToStock,
   submitTicket,
+  updateTicketItemByExecutive,
   type TicketActionResult,
 } from "@/app/actions/tickets";
+import { isTicketProcessedByFinance } from "@/lib/ticket-finance-lock";
 import {
   approveEquipmentRequest,
   processEquipmentRequestAtLogistics,
@@ -53,6 +70,7 @@ import {
   PaymentType,
   POPaymentMethod,
   POStatus,
+  TicketCategoryHint,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -73,6 +91,7 @@ import FinanceActionModal from "./FinanceActionModal";
 import LogisticsActionModal from "./LogisticsActionModal";
 import MoverActionModal from "./MoverActionModal";
 import TicketManagementActions from "./TicketManagementActions";
+import MaterialDeliveryModal from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
 import {
   Table,
   TableBody,
@@ -252,6 +271,12 @@ function actionFor(
 ): DirectAction | null {
   if (
     (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
+    isTicketProcessedByFinance(ticket)
+  ) {
+    return null;
+  }
+  if (
+    (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.status === TicketStatus.PENDING_DIRECTOR
   ) {
     return {
@@ -275,6 +300,12 @@ function workflowFor(
   role: TicketPageRole,
   ticket: TicketRow,
 ): "LOGISTICS" | "LOGISTICS_DO" | "EXPEDITION_RECEIPT" | "FINANCE" | "MOVER" | null {
+  if (
+    (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
+    isTicketProcessedByFinance(ticket)
+  ) {
+    return null;
+  }
   if (
     (role === UserRole.LOGISTICS ||
       role === UserRole.ADMINISTRATIONS ||
@@ -390,6 +421,8 @@ export default function TicketListing({
   vendors = [],
   stockItems = [],
   vehicles = [],
+  materialContracts = [],
+  contractTickets = [],
   role,
   ticketSearch,
   searchTickets,
@@ -401,6 +434,8 @@ export default function TicketListing({
   vendors?: TicketVendorOption[];
   stockItems?: TicketStockItemOption[];
   vehicles?: VehicleSummary[];
+  materialContracts?: MaterialContractRow[];
+  contractTickets?: ContractTicketDeliveryOption[];
   role: TicketPageRole;
   ticketSearch: string;
   searchTickets: (term: string) => void;
@@ -465,6 +500,15 @@ export default function TicketListing({
     setSelectedReceipt(null);
   };
   const [workflowTicket, setWorkflowTicket] = useState<TicketRow | null>(null);
+  const [contractDoModalTicket, setContractDoModalTicket] =
+    useState<TicketRow | null>(null);
+  const [contractDoFeedback, setContractDoFeedback] = useState<{
+    text: string;
+    isError: boolean;
+  } | null>(null);
+  const [deletingDeliveryId, setDeletingDeliveryId] = useState<string | null>(
+    null,
+  );
   const [message, setMessage] = useState("");
   const [printMessage, setPrintMessage] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -472,16 +516,42 @@ export default function TicketListing({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const canRecordContractDo = canRecordMaterialDeliveries(role);
   const selectedItemIds =
     selectedTicket && itemSelection?.ticketId === selectedTicket.id
       ? itemSelection.itemIds
       : [];
 
+  const getContractItemDeliveredVolume = (
+    ticket: TicketRow,
+    materialContractId?: string | null,
+  ) =>
+    materialContractId
+      ? (ticket.materialDeliveries ?? [])
+          .filter((delivery) => delivery.contractId === materialContractId)
+          .reduce((sum, delivery) => sum + delivery.quantityReceived, 0)
+      : 0;
+
+  const hasOpenContractDelivery = (ticket: TicketRow) =>
+    !(
+      (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
+      isTicketProcessedByFinance(ticket)
+    ) &&
+    ticket.type === TicketType.MATERIAL &&
+    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE) &&
+    ticket.items.some(
+      (item) =>
+        item.categoryHint === TicketCategoryHint.CONTRACT &&
+        item.status === FulfillmentStatus.PENDING,
+    );
+
   const selectedTicketItems = selectedTicket
     ? selectedTicket.items.filter(
         (item) =>
           selectedItemIds.includes(item.id) &&
-          item.status === FulfillmentStatus.PENDING,
+          item.status === FulfillmentStatus.PENDING &&
+          item.categoryHint !== TicketCategoryHint.CONTRACT,
       )
     : [];
   const readyTicketItemIds = stockAvailability
@@ -498,26 +568,228 @@ export default function TicketListing({
     .map((item) => item.ticketItemId);
   const pendingTicketItemIds =
     selectedTicket?.items
-      .filter((item) => item.status === FulfillmentStatus.PENDING)
+      .filter(
+        (item) =>
+          item.status === FulfillmentStatus.PENDING &&
+          item.categoryHint !== TicketCategoryHint.CONTRACT,
+      )
       .map((item) => item.id) ?? [];
   const allPendingItemsSelected =
     pendingTicketItemIds.length > 0 &&
     pendingTicketItemIds.every((id) => selectedItemIds.includes(id));
   const somePendingItemsSelected =
     pendingTicketItemIds.some((id) => selectedItemIds.includes(id));
+  const isExecutive =
+    role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR;
+  const selectedTicketFinanceLocked = selectedTicket
+    ? isTicketProcessedByFinance(selectedTicket)
+    : false;
+  const canExecutiveManageTicket =
+    Boolean(selectedTicket) && isExecutive && !selectedTicketFinanceLocked;
   const canSplitFulfillment =
     (role === UserRole.LOGISTICS ||
       role === UserRole.ADMINISTRATIONS ||
-      role === UserRole.DIRECTOR ||
-      role === UserRole.DEPUTY_DIRECTOR) &&
+      ((role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
+        !selectedTicketFinanceLocked)) &&
     selectedTicket?.type === TicketType.MATERIAL &&
     (selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC ||
-      selectedTicket.status === TicketStatus.PROCESSED_FINANCE);
+      selectedTicket.status === TicketStatus.PROCESSED_FINANCE) &&
+    Boolean(
+      selectedTicket.items.some(
+        (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
+      ),
+    );
+
+  // State khusus Direktur & Wakil Direktur untuk tambah/edit/hapus barang langsung di modal
+  const [addingItemOpen, setAddingItemOpen] = useState(false);
+  const [newItemStockId, setNewItemStockId] = useState("");
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQuantity, setNewItemQuantity] = useState("1");
+  const [newItemUnit, setNewItemUnit] = useState("pcs");
+  const [newItemCost, setNewItemCost] = useState("");
+  const [newItemCategoryHint, setNewItemCategoryHint] =
+    useState<TicketCategoryHint>(TicketCategoryHint.WAREHOUSE);
+  const [newItemDeliveryDate, setNewItemDeliveryDate] = useState("");
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemStockId, setEditItemStockId] = useState("");
+  const [editItemName, setEditItemName] = useState("");
+  const [editItemQuantity, setEditItemQuantity] = useState("");
+  const [editItemUnit, setEditItemUnit] = useState("");
+  const [editItemCost, setEditItemCost] = useState("");
+  const [editItemCategoryHint, setEditItemCategoryHint] =
+    useState<TicketCategoryHint>(TicketCategoryHint.WAREHOUSE);
+  const [editItemDeliveryDate, setEditItemDeliveryDate] = useState("");
+
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(
+    null,
+  );
+  const [executiveItemPending, setExecutiveItemPending] = useState(false);
+  const [executiveItemFeedback, setExecutiveItemFeedback] = useState<{
+    text: string;
+    isError: boolean;
+  } | null>(null);
+
+  const resetExecutiveItemState = () => {
+    setAddingItemOpen(false);
+    setEditingItemId(null);
+    setConfirmDeleteItemId(null);
+    setExecutiveItemFeedback(null);
+  };
+
+  const openAddItemForm = () => {
+    const defaultDate =
+      selectedTicket?.items.find((i) => i.expectedDeliveryDate)
+        ?.expectedDeliveryDate || new Date().toISOString().slice(0, 10);
+    setNewItemStockId("");
+    setNewItemName("");
+    setNewItemQuantity("1");
+    setNewItemUnit("pcs");
+    setNewItemCost("");
+    setNewItemCategoryHint(TicketCategoryHint.WAREHOUSE);
+    setNewItemDeliveryDate(defaultDate);
+    setEditingItemId(null);
+    setConfirmDeleteItemId(null);
+    setExecutiveItemFeedback(null);
+    setAddingItemOpen(true);
+  };
+
+  const openEditItemRow = (item: TicketRow["items"][number]) => {
+    setAddingItemOpen(false);
+    setConfirmDeleteItemId(null);
+    setExecutiveItemFeedback(null);
+    setEditingItemId(item.id);
+    setEditItemStockId(item.stockItemId ?? "");
+    setEditItemName(item.itemName);
+    setEditItemQuantity(String(item.quantity));
+    setEditItemUnit(item.unit);
+    setEditItemCost(item.estimatedCost ?? "");
+    setEditItemCategoryHint(item.categoryHint ?? TicketCategoryHint.WAREHOUSE);
+    setEditItemDeliveryDate(item.expectedDeliveryDate ?? "");
+  };
+
+  const handleExecutiveAddItem = async () => {
+    if (!selectedTicket || executiveItemPending) return;
+    const qty = Number(newItemQuantity);
+    if (!newItemName.trim() || !newItemUnit.trim() || !Number.isFinite(qty) || qty <= 0) {
+      setExecutiveItemFeedback({
+        text: "Nama barang, satuan, dan jumlah (> 0) wajib diisi.",
+        isError: true,
+      });
+      return;
+    }
+    setExecutiveItemPending(true);
+    setExecutiveItemFeedback(null);
+    try {
+      const result = await addTicketItemByExecutive(selectedTicket.id, {
+        stockItemId: newItemStockId || null,
+        itemName: newItemName.trim(),
+        quantity: qty,
+        unit: newItemUnit.trim(),
+        estimatedCost: newItemCost.trim() !== "" ? Number(newItemCost) : null,
+        categoryHint: newItemCategoryHint,
+        expectedDeliveryDate: newItemDeliveryDate.trim() || null,
+      });
+      setExecutiveItemFeedback({
+        text: result.message,
+        isError: !result.success,
+      });
+      if (result.success) {
+        setAddingItemOpen(false);
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Executive add item failed:", error);
+      setExecutiveItemFeedback({
+        text: "Gagal menambahkan barang ke tiket.",
+        isError: true,
+      });
+    } finally {
+      setExecutiveItemPending(false);
+    }
+  };
+
+  const handleExecutiveUpdateItem = async (itemId: string) => {
+    if (!selectedTicket || executiveItemPending) return;
+    const qty = Number(editItemQuantity);
+    if (!editItemName.trim() || !editItemUnit.trim() || !Number.isFinite(qty) || qty <= 0) {
+      setExecutiveItemFeedback({
+        text: "Nama barang, satuan, dan jumlah (> 0) wajib diisi.",
+        isError: true,
+      });
+      return;
+    }
+    setExecutiveItemPending(true);
+    setExecutiveItemFeedback(null);
+    try {
+      const result = await updateTicketItemByExecutive(
+        selectedTicket.id,
+        itemId,
+        {
+          stockItemId: editItemStockId || null,
+          itemName: editItemName.trim(),
+          quantity: qty,
+          unit: editItemUnit.trim(),
+          estimatedCost:
+            editItemCost.trim() !== "" ? Number(editItemCost) : null,
+          categoryHint: editItemCategoryHint,
+          expectedDeliveryDate: editItemDeliveryDate.trim() || null,
+        },
+      );
+      setExecutiveItemFeedback({
+        text: result.message,
+        isError: !result.success,
+      });
+      if (result.success) {
+        setEditingItemId(null);
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Executive update item failed:", error);
+      setExecutiveItemFeedback({
+        text: "Gagal memperbarui rincian barang.",
+        isError: true,
+      });
+    } finally {
+      setExecutiveItemPending(false);
+    }
+  };
+
+  const handleExecutiveDeleteItem = async (itemId: string) => {
+    if (!selectedTicket || executiveItemPending || deletingItemId) return;
+    setDeletingItemId(itemId);
+    setExecutiveItemFeedback(null);
+    try {
+      const result = await deleteTicketItemByExecutive(
+        selectedTicket.id,
+        itemId,
+      );
+      setExecutiveItemFeedback({
+        text: result.message,
+        isError: !result.success,
+      });
+      if (result.success) {
+        setConfirmDeleteItemId(null);
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Executive delete item failed:", error);
+      setExecutiveItemFeedback({
+        text: "Gagal menghapus barang dari tiket.",
+        isError: true,
+      });
+    } finally {
+      setDeletingItemId(null);
+    }
+  };
 
   const openTicketSheet = (ticket: TicketRow) => {
     setSelectedReceipt(null);
     setDoDialogOpen(false);
     setPoDialogOpen(false);
+    setContractDoFeedback(null);
+    resetExecutiveItemState();
     setItemSelection(null);
     setFulfillmentMessage("");
     setStockAvailability([]);
@@ -529,6 +801,8 @@ export default function TicketListing({
     setSelectedReceipt(null);
     setDoDialogOpen(false);
     setPoDialogOpen(false);
+    setContractDoFeedback(null);
+    resetExecutiveItemState();
     setSelectedTicket(null);
     setItemSelection(null);
     setFulfillmentMessage("");
@@ -693,6 +967,32 @@ export default function TicketListing({
     } finally {
       setFulfillmentPending(false);
     }
+  };
+
+  const handleDeleteContractDelivery = (deliveryId: string, doNumber: string) => {
+    if (deletingDeliveryId) return;
+    setDeletingDeliveryId(deliveryId);
+    setContractDoFeedback(null);
+    startTransition(async () => {
+      try {
+        const result = await deleteUnbilledMaterialDelivery(deliveryId);
+        setContractDoFeedback({
+          text: result.message || `Surat Jalan ${doNumber} berhasil dihapus.`,
+          isError: !result.success,
+        });
+        if (result.success) {
+          router.refresh();
+        }
+      } catch (error) {
+        console.error("Delete material delivery failed:", error);
+        setContractDoFeedback({
+          text: "Gagal menghapus Surat Jalan material alam.",
+          isError: true,
+        });
+      } finally {
+        setDeletingDeliveryId(null);
+      }
+    });
   };
 
   const openPurchaseOrderForUnavailableItems = () => {
@@ -968,6 +1268,13 @@ export default function TicketListing({
                           Ada Nota / Bukti
                         </span>
                       )}
+                      {ticket.items.some(
+                        (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+                      ) && (
+                        <span className="inline-flex items-center rounded-md border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[11px] font-medium text-teal-600 dark:text-teal-300">
+                          Kontrak Alam
+                        </span>
+                      )}
                       {ticket.items.length > 0 && (
                         <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                           {ticket.items.length} Item
@@ -1109,18 +1416,43 @@ export default function TicketListing({
                             </>
                           );
                         }
+                        const hasNonContractItems = ticket.items.some(
+                          (item) =>
+                            item.categoryHint !== TicketCategoryHint.CONTRACT,
+                        );
+                        const hasOpenContract =
+                          canRecordContractDo && hasOpenContractDelivery(ticket);
+                        if (hasOpenContract && !hasNonContractItems) {
+                          return (
+                            <Button
+                              type="button"
+                              size="icon"
+                              title="Catat Surat Jalan Kontrak (DO)"
+                              aria-label="Catat Surat Jalan Kontrak (DO)"
+                              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+                              onClick={() => setContractDoModalTicket(ticket)}
+                            >
+                              <Truck className="size-4" />
+                            </Button>
+                          );
+                        }
                         if (
                           (role === UserRole.LOGISTICS ||
                             role === UserRole.ADMINISTRATIONS ||
-                            role === UserRole.DIRECTOR ||
-                            role === UserRole.DEPUTY_DIRECTOR) &&
+                            ((role === UserRole.DIRECTOR ||
+                              role === UserRole.DEPUTY_DIRECTOR) &&
+                              !isTicketProcessedByFinance(ticket))) &&
                           ticket.type === TicketType.MATERIAL &&
                           (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
                             ticket.status === TicketStatus.PROCESSED_FINANCE) &&
-                          ticket.items.length > 0
+                          ticket.items.length > 0 &&
+                          hasNonContractItems
                         ) {
                           const hasPendingItems = ticket.items.some(
-                            (item) => item.status === FulfillmentStatus.PENDING,
+                            (item) =>
+                              item.categoryHint !==
+                                TicketCategoryHint.CONTRACT &&
+                              item.status === FulfillmentStatus.PENDING,
                           );
                           const itemLabel = hasPendingItems
                             ? "Proses & Alokasi Item Gudang"
@@ -1135,6 +1467,20 @@ export default function TicketListing({
                               onClick={() => openTicketSheet(ticket)}
                             >
                               <ClipboardList className="size-4" />
+                            </Button>
+                          );
+                        }
+                        if (hasOpenContract) {
+                          return (
+                            <Button
+                              type="button"
+                              size="icon"
+                              title="Catat Surat Jalan Kontrak (DO)"
+                              aria-label="Catat Surat Jalan Kontrak (DO)"
+                              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+                              onClick={() => setContractDoModalTicket(ticket)}
+                            >
+                              <Truck className="size-4" />
                             </Button>
                           );
                         }
@@ -1282,6 +1628,7 @@ export default function TicketListing({
                 {selectedTicket.type === TicketType.MATERIAL &&
                   (role === UserRole.LOGISTICS ||
                     role === UserRole.DIRECTOR ||
+                    role === UserRole.DEPUTY_DIRECTOR ||
                     role === UserRole.ADMINISTRATIONS) && (
                     <Button
                       type="button"
@@ -1298,6 +1645,12 @@ export default function TicketListing({
                       Cetak PO
                     </Button>
                   )}
+                <TicketManagementActions
+                  ticket={selectedTicket}
+                  role={role}
+                  mode="full"
+                  onTicketDeleted={closeTicketSheet}
+                />
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -1994,59 +2347,503 @@ export default function TicketListing({
               </div>
             )}
 
-            {/* 4. Tabel Rincian Item & Pemenuhan Stok */}
-            {selectedTicket.items.length > 0 && (
+            {/* 3B. Kontrak Material Alam & Surat Jalan (DO) */}
+            {(selectedTicket.items.some(
+              (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+            ) ||
+              (selectedTicket.materialDeliveries?.length ?? 0) > 0) && (
               <section className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="text-sm font-bold text-foreground">
-                      Rincian Item Permintaan ({selectedTicket.items.length} Item)
+                      Kontrak Material Alam &amp; Surat Jalan (DO)
                     </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Pengadaan material alam menggunakan Kontrak Payung vendor tanpa PO baru. Catat setiap kedatangan truk agar progres item dan penyelesaian tiket tersinkron otomatis.
+                    </p>
+                  </div>
+                  {canRecordContractDo &&
+                    hasOpenContractDelivery(selectedTicket) && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-9 gap-1.5 text-xs"
+                        onClick={() => setContractDoModalTicket(selectedTicket)}
+                      >
+                        <Truck className="size-3.5" />
+                        Catat Surat Jalan (DO)
+                      </Button>
+                    )}
+                </div>
+
+                {contractDoFeedback && (
+                  <div
+                    className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                      contractDoFeedback.isError
+                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    }`}
+                  >
+                    {contractDoFeedback.text}
+                  </div>
+                )}
+
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  {selectedTicket.items
+                    .filter(
+                      (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+                    )
+                    .map((item) => {
+                      const delivered = getContractItemDeliveredVolume(
+                        selectedTicket,
+                        item.materialContractId,
+                      );
+                      const remaining = Math.max(0, item.quantity - delivered);
+                      const isDone =
+                        item.status === FulfillmentStatus.PROCESSED_TO_DO ||
+                        remaining <= 0;
+                      return (
+                        <div
+                          key={`contract-progress-${item.id}`}
+                          className="rounded-lg border border-border/80 bg-muted/20 p-3 text-xs space-y-1.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-bold text-foreground">
+                                {item.itemName}
+                              </p>
+                              {item.materialContract && (
+                                <p className="text-[11px] text-muted-foreground">
+                                  {item.materialContract.contractNumber} ·{" "}
+                                  {item.materialContract.vendorName} ·{" "}
+                                  {formatCurrency(
+                                    String(item.materialContract.unitPrice),
+                                  )}
+                                  /{item.unit}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={isDone ? "lightSuccess" : "lightWarning"}>
+                              {isDone ? "Terpenuhi" : "Aktif"}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-muted-foreground">
+                            <span>
+                              Diminta:{" "}
+                              <strong className="text-foreground">
+                                {formatMaterialVolume(item.quantity, item.unit)}
+                              </strong>
+                            </span>
+                            <span>
+                              Terkirim:{" "}
+                              <strong className="text-emerald-600 dark:text-emerald-400">
+                                {formatMaterialVolume(delivered, item.unit)}
+                              </strong>
+                            </span>
+                            <span>
+                              Sisa:{" "}
+                              <strong className="text-foreground">
+                                {formatMaterialVolume(remaining, item.unit)}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {(selectedTicket.materialDeliveries?.length ?? 0) > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead>Tanggal</TableHead>
+                          <TableHead>No. DO &amp; Truk</TableHead>
+                          <TableHead>Kontrak</TableHead>
+                          <TableHead className="text-right">Volume</TableHead>
+                          <TableHead className="text-right">Nilai Kontrak</TableHead>
+                          <TableHead>Status Tagihan</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedTicket.materialDeliveries!.map((delivery) => (
+                          <TableRow key={delivery.id}>
+                            <TableCell className="whitespace-nowrap text-xs">
+                              {delivery.deliveryDate}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-xs font-bold">
+                                {delivery.doNumber}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {delivery.vehiclePlate || "-"}
+                                {delivery.driverName ? ` · ${delivery.driverName}` : ""}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-xs font-medium">
+                                {delivery.materialType} · {delivery.vendorName}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {delivery.contractNumber}
+                              </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
+                              {formatMaterialVolume(
+                                delivery.quantityReceived,
+                                delivery.unit,
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-right text-xs font-medium">
+                              {formatCurrency(String(delivery.estimatedAmount))}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  delivery.billingStatus === "BILLED"
+                                    ? "lightSuccess"
+                                    : "lightWarning"
+                                }
+                              >
+                                {delivery.billingStatus}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {delivery.proofUrl && (
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-7 w-7"
+                                    title="Lihat Foto Surat Jalan"
+                                    onClick={() =>
+                                      openReceiptPreview({
+                                        label: `Surat Jalan ${delivery.doNumber}`,
+                                        url: delivery.proofUrl!,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-3.5" />
+                                  </Button>
+                                )}
+                                {canRecordContractDo &&
+                                  delivery.billingStatus === "UNBILLED" && (
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="outline"
+                                      className="h-7 w-7"
+                                      disabled={
+                                        isPending ||
+                                        deletingDeliveryId === delivery.id
+                                      }
+                                      title="Hapus DO belum ditagih"
+                                      onClick={() =>
+                                        handleDeleteContractDelivery(
+                                          delivery.id,
+                                          delivery.doNumber,
+                                        )
+                                      }
+                                    >
+                                      <Trash2 className="size-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                    Belum ada Surat Jalan (DO) material alam yang tercatat untuk tiket ini.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/* 4. Tabel Rincian Item & Pemenuhan Stok */}
+            {(selectedTicket.items.length > 0 ||
+              (canExecutiveManageTicket &&
+                selectedTicket.type === TicketType.MATERIAL)) && (
+              <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-bold text-foreground">
+                        Rincian Item Permintaan ({selectedTicket.items.length} Item)
+                      </h3>
+                      {isExecutive && selectedTicketFinanceLocked && (
+                        <Badge
+                          variant="outline"
+                          className="gap-1 border-amber-500/40 bg-amber-500/10 text-[11px] font-medium text-amber-500"
+                        >
+                          <Lock className="size-3" />
+                          Terkunci · Sudah Diproses Keuangan
+                        </Badge>
+                      )}
+                    </div>
                     {canSplitFulfillment && (
                       <p className="text-xs text-muted-foreground">
-                        Centang item di bawah untuk memeriksa ketersediaan stok gudang (DO) atau menerbitkan PO pengadaan.
+                        Centang item gudang/pembelian di bawah untuk memeriksa stok (DO) atau menerbitkan PO pengadaan. Item Kontrak Material Alam dipenuhi lewat Surat Jalan (DO) Kontrak di atas.
+                      </p>
+                    )}
+                    {canExecutiveManageTicket && (
+                      <p className="text-xs text-muted-foreground">
+                        Direktur &amp; Wakil Direktur dapat menambah barang, mengubah rincian, atau menghapus barang selama tiket belum diproses Keuangan.
                       </p>
                     )}
                   </div>
-                  {canSplitFulfillment && (
-                    <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canExecutiveManageTicket && (
                       <Button
                         type="button"
                         size="sm"
-                        disabled={
-                          selectedStockItems.length === 0 || fulfillmentPending
-                        }
-                        onClick={prepareWarehouseFulfillment}
-                        className="gap-1.5 text-xs h-9"
-                      >
-                        <PackageOpen className="size-3.5" />
-                        Periksa &amp; Penuhi dari Stok ({selectedStockItems.length})
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={
-                          selectedStockItems.length === 0 || fulfillmentPending
-                        }
+                        variant={addingItemOpen ? "secondary" : "outline"}
+                        disabled={executiveItemPending || fulfillmentPending}
                         onClick={() => {
-                          if (!selectedTicket || selectedStockItems.length === 0) return;
-                          const ticketId = selectedTicket.id;
-                          const itemIds = selectedStockItems.map((item) => item.id);
-                          setFulfillmentMessage("");
-                          setStockAvailability([]);
-                          setItemSelection({ ticketId, itemIds });
-                          setPurchaseMode("DIRECT_PURCHASE");
-                          setPoDialogOpen(true);
+                          if (addingItemOpen) {
+                            setAddingItemOpen(false);
+                          } else {
+                            openAddItemForm();
+                          }
                         }}
-                        className="gap-1.5 text-xs h-9"
+                        className="h-9 gap-1.5 border-primary/40 text-xs font-semibold text-primary hover:bg-primary/10"
                       >
-                        <ShoppingCart className="size-3.5" />
-                        Pembelian Langsung / PO ({selectedStockItems.length})
+                        <Plus className="size-3.5" />
+                        Tambah Barang
+                      </Button>
+                    )}
+                    {canSplitFulfillment && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            selectedStockItems.length === 0 || fulfillmentPending
+                          }
+                          onClick={prepareWarehouseFulfillment}
+                          className="h-9 gap-1.5 text-xs"
+                        >
+                          <PackageOpen className="size-3.5" />
+                          Periksa &amp; Penuhi dari Stok ({selectedStockItems.length})
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={
+                            selectedStockItems.length === 0 || fulfillmentPending
+                          }
+                          onClick={() => {
+                            if (!selectedTicket || selectedStockItems.length === 0)
+                              return;
+                            const ticketId = selectedTicket.id;
+                            const itemIds = selectedStockItems.map(
+                              (item) => item.id,
+                            );
+                            setFulfillmentMessage("");
+                            setStockAvailability([]);
+                            setItemSelection({ ticketId, itemIds });
+                            setPurchaseMode("DIRECT_PURCHASE");
+                            setPoDialogOpen(true);
+                          }}
+                          className="h-9 gap-1.5 text-xs"
+                        >
+                          <ShoppingCart className="size-3.5" />
+                          Pembelian Langsung / PO ({selectedStockItems.length})
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {executiveItemFeedback && (
+                  <div
+                    className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+                      executiveItemFeedback.isError
+                        ? "border-destructive/40 bg-destructive/10 text-destructive"
+                        : "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                    }`}
+                    role={executiveItemFeedback.isError ? "alert" : "status"}
+                  >
+                    {executiveItemFeedback.text}
+                  </div>
+                )}
+
+                {canExecutiveManageTicket && addingItemOpen && (
+                  <div className="space-y-3 rounded-xl border border-primary/35 bg-primary/5 p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
+                        Tambah Barang Baru ke Tiket
+                      </h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        disabled={executiveItemPending}
+                        onClick={() => setAddingItemOpen(false)}
+                      >
+                        <X className="size-3.5" />
                       </Button>
                     </div>
-                  )}
-                </div>
+                    {stockItems.length > 0 && (
+                      <div className="space-y-1">
+                        <FormLabel className="text-xs text-muted-foreground">
+                          Pilih dari Katalog Stok Gudang (Opsional)
+                        </FormLabel>
+                        <select
+                          value={newItemStockId}
+                          disabled={executiveItemPending}
+                          onChange={(event) => {
+                            const val = event.target.value;
+                            setNewItemStockId(val);
+                            const found = stockItems.find((s) => s.id === val);
+                            if (found) {
+                              setNewItemName(found.name);
+                              setNewItemUnit(found.unit);
+                              if (
+                                found.unitPrice &&
+                                Number(found.unitPrice) > 0
+                              ) {
+                                setNewItemCost(String(Number(found.unitPrice)));
+                              }
+                            }
+                          }}
+                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs"
+                        >
+                          <option value="">
+                            — Ketik manual atau pilih SKU dari katalog stok —
+                          </option>
+                          {stockItems.map((stock) => (
+                            <option key={stock.id} value={stock.id}>
+                              {stock.sku} — {stock.name} ({stock.unit})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-6">
+                      <div className="space-y-1 sm:col-span-2">
+                        <FormLabel className="text-xs">Nama Barang *</FormLabel>
+                        <Input
+                          value={newItemName}
+                          maxLength={160}
+                          placeholder="Contoh: Semen 40 Kg"
+                          disabled={executiveItemPending}
+                          onChange={(e) => setNewItemName(e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <FormLabel className="text-xs">Jumlah *</FormLabel>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          value={newItemQuantity}
+                          disabled={executiveItemPending}
+                          onChange={(e) => setNewItemQuantity(e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <FormLabel className="text-xs">Satuan *</FormLabel>
+                        <Input
+                          value={newItemUnit}
+                          maxLength={32}
+                          placeholder="Zak / pcs / m2"
+                          disabled={executiveItemPending}
+                          onChange={(e) => setNewItemUnit(e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <FormLabel className="text-xs">
+                          Harga Satuan (Rp)
+                        </FormLabel>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Opsional"
+                          value={newItemCost}
+                          disabled={executiveItemPending}
+                          onChange={(e) => setNewItemCost(e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <FormLabel className="text-xs">Sumber</FormLabel>
+                        <select
+                          value={newItemCategoryHint}
+                          disabled={executiveItemPending}
+                          onChange={(e) =>
+                            setNewItemCategoryHint(
+                              e.target.value as TicketCategoryHint,
+                            )
+                          }
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value={TicketCategoryHint.WAREHOUSE}>
+                            Stok Gudang
+                          </option>
+                          <option value={TicketCategoryHint.PURCHASE}>
+                            Pembelian
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-end justify-between gap-2 pt-1">
+                      <div className="w-full space-y-1 sm:w-48">
+                        <FormLabel className="text-xs">Target Tiba</FormLabel>
+                        <Input
+                          type="date"
+                          value={newItemDeliveryDate}
+                          disabled={executiveItemPending}
+                          onChange={(e) =>
+                            setNewItemDeliveryDate(e.target.value)
+                          }
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          disabled={executiveItemPending}
+                          onClick={() => setAddingItemOpen(false)}
+                        >
+                          Batal
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
+                          disabled={
+                            executiveItemPending ||
+                            !newItemName.trim() ||
+                            !newItemUnit.trim() ||
+                            !(Number(newItemQuantity) > 0)
+                          }
+                          onClick={() => void handleExecutiveAddItem()}
+                        >
+                          <Plus className="size-3.5" />
+                          {executiveItemPending
+                            ? "Menyimpan..."
+                            : "Simpan Barang"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <Table>
                     <TableHeader>
@@ -2081,10 +2878,18 @@ export default function TicketListing({
                         <TableHead>Sumber</TableHead>
                         <TableHead>Target Tiba</TableHead>
                         <TableHead>Status Pemenuhan</TableHead>
+                        {canExecutiveManageTicket && (
+                          <TableHead className="text-right">Aksi</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedTicket.items.map((item) => {
+                        const isEditingThisRow = editingItemId === item.id;
+                        const isConfirmingDeleteThisRow =
+                          confirmDeleteItemId === item.id;
+                        const isContractItem =
+                          item.categoryHint === TicketCategoryHint.CONTRACT;
                         const activeDirectPurchase =
                           item.status === FulfillmentStatus.PENDING
                             ? selectedTicket.directStockPurchases?.find(
@@ -2111,6 +2916,134 @@ export default function TicketListing({
                                   }),
                               )
                             : undefined;
+                        if (isEditingThisRow && canExecutiveManageTicket) {
+                          return (
+                            <TableRow
+                              key={item.id}
+                              className="bg-primary/5 align-top"
+                            >
+                              {canSplitFulfillment && <TableCell />}
+                              <TableCell className="min-w-[160px]">
+                                <Input
+                                  value={editItemName}
+                                  maxLength={160}
+                                  disabled={
+                                    isContractItem || executiveItemPending
+                                  }
+                                  onChange={(e) =>
+                                    setEditItemName(e.target.value)
+                                  }
+                                  className="h-8 text-xs"
+                                  placeholder="Nama barang"
+                                />
+                              </TableCell>
+                              <TableCell className="min-w-[130px]">
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min="0.01"
+                                    step="any"
+                                    value={editItemQuantity}
+                                    disabled={executiveItemPending}
+                                    onChange={(e) =>
+                                      setEditItemQuantity(e.target.value)
+                                    }
+                                    className="h-8 w-16 px-2 text-xs"
+                                  />
+                                  <Input
+                                    value={editItemUnit}
+                                    maxLength={32}
+                                    disabled={
+                                      isContractItem || executiveItemPending
+                                    }
+                                    onChange={(e) =>
+                                      setEditItemUnit(e.target.value)
+                                    }
+                                    className="h-8 w-16 px-2 text-xs"
+                                    placeholder="Satuan"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell className="min-w-[120px]">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={editItemCost}
+                                  disabled={executiveItemPending}
+                                  onChange={(e) =>
+                                    setEditItemCost(e.target.value)
+                                  }
+                                  className="h-8 text-xs"
+                                  placeholder="Rp"
+                                />
+                              </TableCell>
+                              <TableCell className="min-w-[120px]">
+                                {isContractItem ? (
+                                  <Badge variant="outline">Kontrak Alam</Badge>
+                                ) : (
+                                  <select
+                                    value={editItemCategoryHint}
+                                    disabled={executiveItemPending}
+                                    onChange={(e) =>
+                                      setEditItemCategoryHint(
+                                        e.target.value as TicketCategoryHint,
+                                      )
+                                    }
+                                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                                  >
+                                    <option value={TicketCategoryHint.WAREHOUSE}>
+                                      Stok Gudang
+                                    </option>
+                                    <option value={TicketCategoryHint.PURCHASE}>
+                                      Pembelian
+                                    </option>
+                                  </select>
+                                )}
+                              </TableCell>
+                              <TableCell className="min-w-[125px]">
+                                <Input
+                                  type="date"
+                                  value={editItemDeliveryDate}
+                                  disabled={executiveItemPending}
+                                  onChange={(e) =>
+                                    setEditItemDeliveryDate(e.target.value)
+                                  }
+                                  className="h-8 text-xs"
+                                />
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                Mengedit...
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-7 gap-1 px-2 text-xs"
+                                    disabled={executiveItemPending}
+                                    onClick={() =>
+                                      void handleExecutiveUpdateItem(item.id)
+                                    }
+                                  >
+                                    <Save className="size-3" />
+                                    Simpan
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs"
+                                    disabled={executiveItemPending}
+                                    onClick={() => setEditingItemId(null)}
+                                  >
+                                    Batal
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
                         return (
                           <TableRow key={item.id}>
                             {canSplitFulfillment && (
@@ -2118,7 +3051,9 @@ export default function TicketListing({
                                 <Checkbox
                                   checked={selectedItemIds.includes(item.id)}
                                   disabled={
-                                    item.status !== FulfillmentStatus.PENDING
+                                    item.status !== FulfillmentStatus.PENDING ||
+                                    item.categoryHint ===
+                                      TicketCategoryHint.CONTRACT
                                   }
                                   aria-label={`Pilih ${item.itemName}`}
                                   onCheckedChange={(checked) =>
@@ -2136,7 +3071,15 @@ export default function TicketListing({
                               </TableCell>
                             )}
                             <TableCell className="font-medium">
-                              {item.itemName}
+                              <div>{item.itemName}</div>
+                              {item.categoryHint ===
+                                TicketCategoryHint.CONTRACT &&
+                                item.materialContract && (
+                                  <div className="text-[11px] font-normal text-muted-foreground">
+                                    {item.materialContract.contractNumber} ·{" "}
+                                    {item.materialContract.vendorName}
+                                  </div>
+                                )}
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
                               {item.quantity} {item.unit}
@@ -2146,32 +3089,123 @@ export default function TicketListing({
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline">
-                                {item.categoryHint === "WAREHOUSE"
+                                {item.categoryHint ===
+                                TicketCategoryHint.WAREHOUSE
                                   ? "Stok Gudang"
-                                  : "Pembelian"}
+                                  : item.categoryHint ===
+                                      TicketCategoryHint.CONTRACT
+                                    ? "Kontrak Alam"
+                                    : "Pembelian"}
                               </Badge>
                             </TableCell>
                             <TableCell className="whitespace-nowrap text-xs">
                               {item.expectedDeliveryDate ?? "—"}
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant={
-                                  item.status === FulfillmentStatus.PENDING
-                                    ? "lightWarning"
-                                    : "lightSuccess"
-                                }
-                              >
-                                {item.status === FulfillmentStatus.PENDING
-                                  ? activeDirectPurchase
-                                    ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
-                                    : "Menunggu"
-                                  : item.status ===
-                                      FulfillmentStatus.PROCESSED_TO_DO
-                                    ? "Dipenuhi via DO"
-                                    : "Diproses via PO"}
-                              </Badge>
+                              {(() => {
+                                const deliveredContractVolume =
+                                  item.categoryHint ===
+                                  TicketCategoryHint.CONTRACT
+                                    ? getContractItemDeliveredVolume(
+                                        selectedTicket,
+                                        item.materialContractId,
+                                      )
+                                    : 0;
+                                return (
+                                  <Badge
+                                    variant={
+                                      item.status === FulfillmentStatus.PENDING
+                                        ? "lightWarning"
+                                        : "lightSuccess"
+                                    }
+                                  >
+                                    {item.categoryHint ===
+                                    TicketCategoryHint.CONTRACT
+                                      ? item.status ===
+                                        FulfillmentStatus.PROCESSED_TO_DO
+                                        ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
+                                        : deliveredContractVolume > 0
+                                          ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
+                                          : "Menunggu DO Kontrak"
+                                      : item.status ===
+                                          FulfillmentStatus.PENDING
+                                        ? activeDirectPurchase
+                                          ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
+                                          : "Menunggu"
+                                        : item.status ===
+                                            FulfillmentStatus.PROCESSED_TO_DO
+                                          ? "Dipenuhi via DO"
+                                          : "Diproses via PO"}
+                                  </Badge>
+                                );
+                              })()}
                             </TableCell>
+                            {canExecutiveManageTicket && (
+                              <TableCell className="whitespace-nowrap text-right">
+                                {isConfirmingDeleteThisRow ? (
+                                  <div className="inline-flex items-center justify-end gap-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="destructive"
+                                      className="h-7 px-2 text-xs"
+                                      disabled={deletingItemId === item.id}
+                                      onClick={() =>
+                                        void handleExecutiveDeleteItem(item.id)
+                                      }
+                                    >
+                                      {deletingItemId === item.id
+                                        ? "Menghapus..."
+                                        : "Ya, Hapus"}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 px-2 text-xs"
+                                      disabled={deletingItemId === item.id}
+                                      onClick={() =>
+                                        setConfirmDeleteItemId(null)
+                                      }
+                                    >
+                                      Batal
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center justify-end gap-1">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 gap-1 px-2 text-xs"
+                                      title={`Edit ${item.itemName}`}
+                                      onClick={() => openEditItemRow(item)}
+                                    >
+                                      <Pencil className="size-3" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 gap-1 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                      title={
+                                        selectedTicket.items.length <= 1
+                                          ? "Minimal 1 barang pada tiket (gunakan Hapus Tiket di bawah untuk menghapus seluruh tiket)"
+                                          : `Hapus ${item.itemName}`
+                                      }
+                                      disabled={selectedTicket.items.length <= 1}
+                                      onClick={() =>
+                                        setConfirmDeleteItemId(item.id)
+                                      }
+                                    >
+                                      <Trash2 className="size-3" />
+                                      Hapus
+                                    </Button>
+                                  </div>
+                                )}
+                              </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -2941,6 +3975,137 @@ export default function TicketListing({
           />
         </>
       )}
+      {contractDoModalTicket &&
+        (() => {
+          const modalContracts: MaterialContractRow[] = (() => {
+            if (materialContracts.length > 0) return materialContracts;
+            const seen = new Set<string>();
+            const synthesized: MaterialContractRow[] = [];
+            for (const item of contractDoModalTicket.items) {
+              if (
+                item.categoryHint === TicketCategoryHint.CONTRACT &&
+                item.materialContract &&
+                !seen.has(item.materialContract.id)
+              ) {
+                seen.add(item.materialContract.id);
+                synthesized.push({
+                  id: item.materialContract.id,
+                  contractNumber: item.materialContract.contractNumber,
+                  vendorId: null,
+                  vendorName: item.materialContract.vendorName,
+                  vendorBankAccounts: [],
+                  materialType: item.materialContract.materialType,
+                  unit: item.materialContract.unit,
+                  unitPrice: item.materialContract.unitPrice,
+                  estimatedVolume: null,
+                  startDate: "",
+                  endDate: null,
+                  notes: null,
+                  isActive: true,
+                  createdByName: null,
+                  createdAt: "",
+                  totalDeliveriesCount: 0,
+                  unbilledDeliveriesCount: 0,
+                  totalDeliveredVolume: 0,
+                  unbilledVolume: 0,
+                  unbilledEstimatedAmount: 0,
+                });
+              }
+            }
+            return synthesized;
+          })();
+          const modalProjects: TicketProjectOption[] =
+            contractDoModalTicket.projectId &&
+            contractDoModalTicket.project &&
+            !projects.some((p) => p.id === contractDoModalTicket.projectId)
+              ? [
+                  ...projects,
+                  {
+                    id: contractDoModalTicket.projectId,
+                    title: contractDoModalTicket.project.title,
+                    kelompokTani: contractDoModalTicket.project.kelompokTani,
+                  },
+                ]
+              : projects;
+          const modalContractTickets: ContractTicketDeliveryOption[] = (() => {
+            if (
+              contractTickets.some((t) => t.id === contractDoModalTicket.id)
+            ) {
+              return contractTickets;
+            }
+            if (!contractDoModalTicket.projectId) return contractTickets;
+            return [
+              {
+                id: contractDoModalTicket.id,
+                ticketNumber: contractDoModalTicket.ticketNumber,
+                title: contractDoModalTicket.title,
+                projectId: contractDoModalTicket.projectId,
+                projectName: contractDoModalTicket.project
+                  ? `${contractDoModalTicket.project.kelompokTani} · ${contractDoModalTicket.project.title}`
+                  : "Proyek",
+                status: contractDoModalTicket.status,
+                fulfillmentStatus: contractDoModalTicket.fulfillmentStatus,
+                items: contractDoModalTicket.items
+                  .filter(
+                    (item) =>
+                      item.categoryHint === TicketCategoryHint.CONTRACT &&
+                      Boolean(item.materialContract),
+                  )
+                  .map((item) => {
+                    const deliveredQuantity = getContractItemDeliveredVolume(
+                      contractDoModalTicket,
+                      item.materialContractId,
+                    );
+                    return {
+                      ticketItemId: item.id,
+                      materialContractId: item.materialContract!.id,
+                      contractNumber: item.materialContract!.contractNumber,
+                      vendorName: item.materialContract!.vendorName,
+                      materialType: item.materialContract!.materialType,
+                      unit: item.materialContract!.unit,
+                      unitPrice: item.materialContract!.unitPrice,
+                      requestedQuantity: item.quantity,
+                      deliveredQuantity,
+                      remainingQuantity: Math.max(
+                        0,
+                        item.quantity - deliveredQuantity,
+                      ),
+                    };
+                  }),
+              },
+              ...contractTickets,
+            ];
+          })();
+          const defaultContractId = contractDoModalTicket.items.find(
+            (item) =>
+              item.categoryHint === TicketCategoryHint.CONTRACT &&
+              item.status === FulfillmentStatus.PENDING &&
+              item.materialContractId,
+          )?.materialContractId;
+
+          return (
+            <MaterialDeliveryModal
+              open
+              onOpenChange={(open) => {
+                if (!open) setContractDoModalTicket(null);
+              }}
+              contracts={modalContracts}
+              projects={modalProjects}
+              contractTickets={modalContractTickets}
+              defaultContractId={defaultContractId ?? undefined}
+              lockedProjectId={contractDoModalTicket.projectId ?? undefined}
+              lockedTicketId={contractDoModalTicket.id}
+              onSaved={() => {
+                setContractDoFeedback({
+                  text: `Surat Jalan (DO) untuk tiket ${contractDoModalTicket.ticketNumber} berhasil dicatat.`,
+                  isError: false,
+                });
+                setContractDoModalTicket(null);
+                router.refresh();
+              }}
+            />
+          );
+        })()}
     </div>
   );
 }

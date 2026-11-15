@@ -38,6 +38,7 @@ export interface FundTicketItem {
   type?: string | null;
   requestCategory?: string | null;
   fieldCategory?: string | null;
+  fundCategory?: FundCategoryKey | null;
   createdAt?: string | null;
   items?: Array<{
     itemName: string;
@@ -94,8 +95,19 @@ export function classifyTicketFundCategory(ticket: FundTicketItem): {
   const fieldCat = (ticket.fieldCategory || "").toUpperCase();
   const type = (ticket.type || "").toUpperCase();
 
+  // 0. Upah Langsir / Hauling masuk ke Operasional & Transportasi Lapangan
+  if (fieldCat === "HAULING" || /langsir/.test(text)) {
+    return {
+      key: "OPERASIONAL",
+      label: "Operasional & Lainnya",
+      icon: Fuel,
+      badgeClass: "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-800 dark:text-slate-300",
+    };
+  }
+
   // 1. Ambilan Tukang (Labor/Wage/Kasbon)
   const isLabor =
+    ticket.fundCategory === "TUKANG" ||
     fieldCat === "LABOR" ||
     reqCat === "KASBON" ||
     /tukang|mandor|upah|kasbon|gaji|ambilan|tenaga|pekerja|borongan|ongkos/.test(text);
@@ -111,6 +123,7 @@ export function classifyTicketFundCategory(ticket: FundTicketItem): {
 
   // 2. Barang Inventaris (Equipment, Tools, Machinery, Rental)
   const isInventaris =
+    ticket.fundCategory === "INVENTARIS" ||
     /inventaris|alat|sewa|mesin|genset|molen|peralatan|perkakas|gerobak|scaffolding|helm|rompi|cangkul|meteran|equipment|aset/.test(text);
 
   if (isInventaris) {
@@ -124,9 +137,14 @@ export function classifyTicketFundCategory(ticket: FundTicketItem): {
 
   // 3. Pembelanjaan Bahan (Materials)
   const isBahan =
+    ticket.fundCategory === "BAHAN" ||
     type === "MATERIAL" ||
     reqCat === "MATERIAL" ||
     reqCat === "WAREHOUSE" ||
+    reqCat === "STOCK" ||
+    reqCat === "NEW_PURCHASE" ||
+    reqCat === "MATERIAL_CONTRACT" ||
+    fieldCat === "MATERIAL" ||
     fieldCat === "DIRECT_STORE" ||
     /bahan|material|semen|pasir|batu|besi|cat|keramik|kayu|paku|pipa|bata|toko|triplek|baut|seng/.test(text);
 
@@ -165,7 +183,8 @@ export default function ProjectFundRecapTab({
       s
         .toLowerCase()
         .replace(/½/g, "1/2")
-        .replace(/[\/,\-_]/g, " ")
+        .replace(/1[,.]5/g, "1/2")
+        .replace(/[\/,\-_x×]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
 

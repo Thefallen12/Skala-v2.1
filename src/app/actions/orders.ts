@@ -13,6 +13,7 @@ import {
   POPaymentMethod,
   POStatus,
   StockMovementType,
+  TicketCategoryHint,
   TicketRequestCategory,
   TicketStatus,
   TicketType,
@@ -1620,10 +1621,21 @@ export async function createDeliveryOrder(
       const eligibleTicketItems = ticket
         ? ticket.items.filter(
           (item) =>
+            item.categoryHint !== TicketCategoryHint.CONTRACT &&
             item.doItemId === null &&
             item.status !== FulfillmentStatus.PROCESSED_TO_DO,
         )
         : [];
+      if (
+        ticket &&
+        ticket.items.length > 0 &&
+        eligibleTicketItems.length === 0 &&
+        ticket.items.every((item) => item.categoryHint === TicketCategoryHint.CONTRACT)
+      ) {
+        throw new Error(
+          "Item Kontrak Material Alam dipenuhi melalui Surat Jalan Kontrak Curah, bukan DO gudang reguler.",
+        );
+      }
       if (ticket) {
         const existingOrder = await transaction.deliveryOrder.findFirst({
           where: { ticketId: ticket.id },

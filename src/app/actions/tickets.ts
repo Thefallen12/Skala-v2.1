@@ -40,6 +40,9 @@ import {
   POItem,
   TicketItem,
   DeliveryOrder,
+  MaterialDelivery,
+  OperationalDocument,
+  StockItem,
 } from "@/models/finance-records";
 import PurchaseOrder from "@/models/purchase-order";
 import {
@@ -60,6 +63,10 @@ import {
   syncTicketStatus,
   ticketStockItemKey,
 } from "@/lib/ticket-utils";
+import {
+  getJakartaDateOnlyUtc,
+  roundMaterialNumber,
+} from "@/lib/material-contracts";
 import { sendNotification } from "@/lib/notifications";
 import { sendPushNotification } from "@/lib/push-notifications";
 import { receivePurchaseOrderStock } from "@/lib/logistics/receive-purchase-order-stock";
@@ -1106,6 +1113,7 @@ export async function createDirectStockPurchase(input: {
                   unit: true,
                   stockItemId: true,
                   estimatedCost: true,
+                  categoryHint: true,
                   status: true,
                   poItemId: true,
                   doItemId: true,
@@ -1220,6 +1228,11 @@ export async function createDirectStockPurchase(input: {
           if (activePurchaseNumber) {
             throw new Error(
               `Item tiket ${item.itemName} (${item.unit}) masih ada dalam pesanan ${activePurchaseNumber}. Selesaikan pesanan tersebut sebelum memesan ulang.`,
+            );
+          }
+          if (linkedTicketItem?.categoryHint === TicketCategoryHint.CONTRACT) {
+            throw new Error(
+              `Item ${item.itemName} berasal dari Kontrak Material Alam dan tidak dibeli melalui pembelian toko.`,
             );
           }
           if (
@@ -2188,11 +2201,11 @@ export async function createTicket(
   }
   if (
     session.user.role === UserRole.FIELD_TEAM &&
-    (requestCategory === TicketRequestCategory.MATERIAL ||
-      (isInternalFundingRequest && !isFieldTeamInternalFundingRequest))
+    isInternalFundingRequest &&
+    !isFieldTeamInternalFundingRequest
   ) {
     return actionFailure(
-      "Tim Lapangan hanya dapat mengajukan material dari Gudang, Upah Tukang, Upah Langsir, Operasional, Reimbursement, atau Kasbon.",
+      "Tim Lapangan hanya dapat mengajukan material, kebutuhan lapangan, Operasional, Reimbursement, atau Kasbon.",
     );
   }
   if (
@@ -2586,13 +2599,13 @@ export async function createTicket(
         ? contractsById.get(item.materialContractId)
         : undefined;
     if (categoryHint === TicketCategoryHint.CONTRACT) {
-      const now = new Date();
+      const today = getJakartaDateOnlyUtc();
       if (
         isWarehouseRequest ||
         requestCategory !== TicketRequestCategory.MATERIAL ||
         !contract ||
-        contract.startDate > now ||
-        (contract.endDate && contract.endDate < now)
+        contract.startDate > today ||
+        (contract.endDate && contract.endDate < today)
       ) {
         return actionFailure(
           "Pilih kontrak pasir/batu yang masih aktif dan berlaku untuk item ini.",
@@ -3023,6 +3036,198 @@ export async function getShippingDocumentOptions(): Promise<
   };
 }
 
+function isExecutiveRole(role?: UserRole | string | null): boolean {
+  return role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR;
+}
+
+function getExecutiveRoleLabel(role?: UserRole | string | null): string {
+  return role === UserRole.DEPUTY_DIRECTOR ? "Wakil Direktur" : "Direktur";
+}
+
+function parseEstimatedCostToBigInt(
+  rawCost: number | string | null | undefined,
+): bigint | null {
+  if (rawCost === null || rawCost === undefined || rawCost === "") {
+    return null;
+  }
+  const num = typeof rawCost === "number" ? rawCost : Number(String(rawCost).replace(/[^\d.-]/g, ""));
+  if (!Number.isFinite(num) || num <= 0) {
+    return null;
+  }
+  return scaledIntegerFromDecimal(
+    new Prisma.Decimal(num.toString()).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP),
+  );
+}
+
+function parseOptionalDeliveryDate(
+  rawDate: string | null | undefined,
+): Date | null {
+  if (!rawDate || typeof rawDate !== "string" || !rawDate.trim()) {
+    return null;
+  }
+  try {
+    const parsed = new Date(`${rawDate.trim().slice(0, 10)}T00:00:00.000Z`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function checkTicketProcessedByFinanceMongo(
+  ticketDoc: {
+    status?: string | null;
+    paymentProofUrl?: string | null;
+    transferReceiptUrl?: string | null;
+    purchaseReceiptUrl?: string | null;
+  },
+  ticketId: string,
+): Promise<boolean> {
+  if (
+    ticketDoc.status === TicketStatus.PROCESSED_FINANCE ||
+    ticketDoc.status === TicketStatus.COMPLETED
+  ) {
+    return true;
+  }
+  if (
+    Boolean(
+      ticketDoc.paymentProofUrl ||
+        ticketDoc.transferReceiptUrl ||
+        ticketDoc.purchaseReceiptUrl,
+    )
+  ) {
+    return true;
+  }
+
+  const [
+    directPaymentExists,
+    linkedPOs,
+    linkedDirectPurchases,
+    billedMaterialDeliveryExists,
+    financeAuditExists,
+  ] = await Promise.all([
+    PaymentTransaction.exists({
+      ticketId,
+      status: { $ne: "CANCELLED" },
+    }),
+    PurchaseOrder.find({ ticketId })
+      .select({ _id: 1, paidAt: 1, status: 1 })
+      .lean(),
+    DirectStockPurchase.find({ ticketId })
+      .select({ _id: 1, paidAt: 1, status: 1 })
+      .lean(),
+    MaterialDelivery.exists({
+      ticketId,
+      billingStatus: "BILLED",
+    }),
+    TicketAuditLog.exists({
+      ticketId,
+      action: {
+        $in: [
+          "FINANCE_PAYMENT_COMPLETED",
+          "FINANCE_PAYMENT_PARTIAL",
+          "DIRECT_PURCHASE_PAYMENT",
+        ],
+      },
+    }),
+  ]);
+
+  if (directPaymentExists || billedMaterialDeliveryExists || financeAuditExists) {
+    return true;
+  }
+
+  if (
+    linkedPOs.some((po) => Boolean(po.paidAt))
+  ) {
+    return true;
+  }
+
+  if (
+    linkedDirectPurchases.some(
+      (dp: { paidAt?: Date | null; status?: string | null }) =>
+        Boolean(dp.paidAt) || dp.status === "RECEIVED",
+    )
+  ) {
+    return true;
+  }
+
+  const poIds = linkedPOs.map((po) => String(po._id));
+  const dpIds = linkedDirectPurchases.map((dp) => String(dp._id));
+  if (poIds.length > 0 || dpIds.length > 0) {
+    const indirectPaidExists = await PaymentTransaction.exists({
+      status: PaymentStatus.PAID,
+      $or: [
+        ...(poIds.length > 0 ? [{ poId: { $in: poIds } }] : []),
+        ...(dpIds.length > 0
+          ? [{ directStockPurchaseId: { $in: dpIds } }]
+          : []),
+      ],
+    });
+    if (indirectPaidExists) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function recalculateTicketTotalAndStatusMongo(
+  ticketId: string,
+): Promise<void> {
+  const allItems = await TicketItem.find({ ticketId }).lean();
+  const hasEstimatedCost = allItems.some(
+    (item) => item.estimatedCost !== null && item.estimatedCost !== undefined,
+  );
+
+  let totalAmountBigInt: bigint | null = null;
+  if (hasEstimatedCost) {
+    const totalDecimal = allItems
+      .reduce((total, item) => {
+        if (item.estimatedCost === null || item.estimatedCost === undefined) {
+          return total;
+        }
+        return total.plus(
+          decimalFromScaledInteger(BigInt(item.estimatedCost)).times(
+            String(item.quantity ?? 0),
+          ),
+        );
+      }, new Prisma.Decimal(0))
+      .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+    totalAmountBigInt = scaledIntegerFromDecimal(totalDecimal);
+  }
+
+  const fulfillmentStatus =
+    allItems.length === 0
+      ? "PENDING"
+      : allItems.every(
+            (item) =>
+              item.status === FulfillmentStatus.PROCESSED_TO_DO ||
+              item.status === FulfillmentStatus.PROCESSED_TO_PO,
+          )
+        ? "COMPLETED"
+        : allItems.some((item) => item.status !== FulfillmentStatus.PENDING)
+          ? "PARTIALLY_FULFILLED"
+          : "PENDING";
+
+  await Ticket.updateOne(
+    { _id: ticketId },
+    {
+      $set: {
+        ...(hasEstimatedCost ? { totalAmount: totalAmountBigInt } : {}),
+        fulfillmentStatus,
+        updatedAt: new Date(),
+      },
+    },
+  );
+}
+
+function revalidateTicketMutationPaths() {
+  revalidatePath("/apps/tickets");
+  revalidatePath("/apps/logistics");
+  revalidatePath("/apps/approvals");
+  revalidatePath("/apps/projects");
+  revalidatePath("/apps/project");
+}
+
 export async function updateTicketDetails(
   ticketId: string,
   input: {
@@ -3031,28 +3236,16 @@ export async function updateTicketDetails(
     priority: TicketPriority;
     items?: Array<{
       id: string;
+      stockItemId?: string | null;
       itemName: string;
       quantity: number;
       unit: string;
+      estimatedCost?: number | string | null;
+      categoryHint?: TicketCategoryHint;
+      expectedDeliveryDate?: string | null;
     }>;
   },
 ): Promise<TicketActionResult> {
-  const unlinkedTicketItemFilter: Prisma.TicketItemWhereInput = {
-    AND: [
-      {
-        OR: [
-          { poItemId: null },
-          { poItemId: { isSet: false } },
-        ],
-      },
-      {
-        OR: [
-          { doItemId: null },
-          { doItemId: { isSet: false } },
-        ],
-      },
-    ],
-  };
   const session = await auth();
   if (!session?.user?.id) {
     return actionFailure("Anda tidak memiliki izin untuk mengedit tiket.");
@@ -3093,220 +3286,679 @@ export async function updateTicketDetails(
   }
 
   try {
-    const updated = await prisma.$transaction(async (transaction) => {
-      const ticket = await transaction.ticket.findUnique({
-        where: { id: ticketId },
-        select: {
-          requesterId: true,
-          items: {
-            select: {
-              id: true,
-              itemName: true,
-              quantity: true,
-              unit: true,
-              estimatedCost: true,
-              poItemId: true,
-              doItemId: true,
-            },
-          },
-        },
+    await connectToMongoDB();
+    const ticket = await Ticket.findOne({ _id: ticketId }).lean();
+    if (!ticket) {
+      return actionFailure("Tiket tidak ditemukan.");
+    }
+
+    const isExecutive = isExecutiveRole(session.user.role);
+    const isRequester = String(ticket.requesterId) === session.user.id;
+    if (!isExecutive && !isRequester) {
+      return actionFailure("Anda tidak memiliki izin untuk mengedit tiket ini.");
+    }
+
+    const isProcessedByFinance = await checkTicketProcessedByFinanceMongo(
+      ticket,
+      ticketId,
+    );
+    if (isProcessedByFinance) {
+      return actionFailure(
+        "Tiket sudah diproses oleh bagian Keuangan sehingga tidak dapat dilakukan perubahan atau penghapusan.",
+      );
+    }
+
+    if (!isExecutive) {
+      if (ticket.status !== TicketStatus.DRAFT) {
+        return actionFailure(
+          "Pemohon hanya dapat mengedit tiket saat masih berstatus Draft.",
+        );
+      }
+      const previousEdits = await TicketAuditLog.countDocuments({
+        ticketId,
+        userId: session.user.id,
+        action: { $in: ["UPDATED", "REQUESTER_EDITED"] },
       });
-      if (!ticket) return "NOT_FOUND" as const;
-      const isDirector = session.user.role === UserRole.DIRECTOR;
-      const isRequester = ticket.requesterId === session.user.id;
-      if (!isDirector && !isRequester) {
-        return "FORBIDDEN" as const;
+      if (previousEdits > 0) {
+        return actionFailure("Pemohon hanya dapat mengedit tiket satu kali.");
       }
-      if (!isDirector) {
-        const previousEdits = await transaction.ticketAuditLog.count({
-          where: {
-            ticketId,
-            userId: session.user.id,
-            action: { in: ["UPDATED", "REQUESTER_EDITED"] },
-          },
-        });
-        if (previousEdits > 0) return "EDIT_LIMIT_REACHED" as const;
+    }
+
+    const [existingItems, materialDeliveries] = await Promise.all([
+      TicketItem.find({ ticketId }).lean(),
+      MaterialDelivery.find({ ticketId })
+        .select({ contractId: 1, quantityReceived: 1 })
+        .lean(),
+    ]);
+
+    const deliveredByContract = new Map<string, number>();
+    for (const delivery of materialDeliveries) {
+      if (!delivery.contractId) continue;
+      deliveredByContract.set(
+        String(delivery.contractId),
+        roundMaterialNumber(
+          (deliveredByContract.get(String(delivery.contractId)) ?? 0) +
+            Number(delivery.quantityReceived ?? 0),
+          2,
+        ),
+      );
+    }
+
+    const currentItems = new Map(
+      existingItems.map((item) => [String(item._id), item]),
+    );
+    const submittedItems = input.items;
+    const keptIds = new Set(submittedItems?.map((item) => item.id) ?? []);
+
+    if (submittedItems !== undefined) {
+      if (existingItems.length > 0 && submittedItems.length === 0) {
+        return actionFailure("Tiket harus memiliki setidaknya satu item.");
       }
 
-      const currentItems = new Map(ticket.items.map((item) => [item.id, item]));
-      const submittedItems = input.items;
-      const keptIds = new Set(submittedItems?.map((item) => item.id) ?? []);
-      if (submittedItems !== undefined) {
-        if (ticket.items.length > 0 && submittedItems.length === 0) {
-          return "ITEMS_REQUIRED" as const;
+      const requestedByContractAfter = new Map<string, number>();
+      for (const item of submittedItems) {
+        const isNewItem = item.id.startsWith("new-");
+        const current = isNewItem ? undefined : currentItems.get(item.id);
+        if (!isNewItem && !current) {
+          return actionFailure(
+            "Rincian item tiket tidak valid. Muat ulang halaman.",
+          );
         }
-
-        for (const item of submittedItems) {
-          const current = currentItems.get(item.id);
-          if (!current) return "INVALID_ITEMS" as const;
+        if (current) {
           if (
+            !isExecutive &&
             (current.poItemId || current.doItemId) &&
             (item.itemName.trim() !== current.itemName ||
               item.unit.trim() !== current.unit ||
               item.quantity !== current.quantity)
           ) {
-            return "ITEMS_LOCKED" as const;
+            return actionFailure(
+              "Item yang sudah terhubung ke PO atau Surat Jalan tidak dapat diubah atau dihapus.",
+            );
           }
-        }
-
-        if (
-          ticket.items.some(
-            (item) =>
-              (item.poItemId || item.doItemId) && !keptIds.has(item.id),
-          )
-        ) {
-          return "ITEMS_LOCKED" as const;
+          if (
+            current.categoryHint === TicketCategoryHint.CONTRACT &&
+            (item.itemName.trim() !== current.itemName ||
+              item.unit.trim() !== current.unit)
+          ) {
+            return actionFailure(
+              "Nama dan satuan item Kontrak Material Alam mengikuti kontrak aktif dan tidak dapat diubah bebas.",
+            );
+          }
+          if (
+            current.categoryHint === TicketCategoryHint.CONTRACT &&
+            current.materialContractId
+          ) {
+            const cId = String(current.materialContractId);
+            requestedByContractAfter.set(
+              cId,
+              roundMaterialNumber(
+                (requestedByContractAfter.get(cId) ?? 0) + item.quantity,
+                2,
+              ),
+            );
+          }
         }
       }
 
-      const result = await transaction.ticket.updateMany({
-        where: { id: ticketId },
-        data: {
+      if (
+        existingItems.some((item) => {
+          const idStr = String(item._id);
+          if (keptIds.has(idStr)) return false;
+          if (!isExecutive && (item.poItemId || item.doItemId)) return true;
+          if (
+            item.categoryHint === TicketCategoryHint.CONTRACT &&
+            item.materialContractId &&
+            (deliveredByContract.get(String(item.materialContractId)) ?? 0) > 0
+          ) {
+            return true;
+          }
+          return false;
+        })
+      ) {
+        return actionFailure(
+          "Item yang sudah memiliki pengiriman kontrak tidak dapat dihapus.",
+        );
+      }
+
+      for (const [contractId, deliveredQty] of deliveredByContract) {
+        if (
+          deliveredQty > 0 &&
+          (requestedByContractAfter.get(contractId) ?? 0) < deliveredQty
+        ) {
+          return actionFailure(
+            "Jumlah item kontrak tidak dapat lebih kecil dari volume Surat Jalan yang sudah diterima.",
+          );
+        }
+      }
+    }
+
+    await Ticket.updateOne(
+      { _id: ticketId },
+      {
+        $set: {
           title: input.title.trim(),
           description: input.description.trim() || null,
           priority: input.priority,
+          updatedAt: new Date(),
         },
-      });
-      if (result.count !== 1) return "LOCKED" as const;
+      },
+    );
 
-      if (submittedItems !== undefined) {
-        for (const item of submittedItems) {
-          const current = currentItems.get(item.id)!;
-          if (
-            current.poItemId ||
-            current.doItemId ||
-            (current.itemName === item.itemName.trim() &&
-              current.unit === item.unit.trim() &&
-              current.quantity === item.quantity)
-          ) {
-            continue;
-          }
-          const updatedItem = await transaction.ticketItem.updateMany({
-            where: {
-              id: item.id,
-              ticketId,
-              ...unlinkedTicketItemFilter,
-            },
-            data: {
-              itemName: item.itemName.trim(),
-              quantity: item.quantity,
-              unit: item.unit.trim(),
-            },
-          });
-          if (updatedItem.count !== 1) throw new Error("TICKET_ITEMS_LOCKED");
-        }
-
-        const removedItems = ticket.items.filter(
-          (item) => !keptIds.has(item.id),
-        );
-        for (const item of removedItems) {
-          const deletedItem = await transaction.ticketItem.deleteMany({
-            where: {
-              id: item.id,
-              ticketId,
-              ...unlinkedTicketItemFilter,
-            },
-          });
-          if (deletedItem.count !== 1) throw new Error("TICKET_ITEMS_LOCKED");
-        }
-
-        if (ticket.items.some((item) => item.estimatedCost !== null)) {
-          const totalAmount = submittedItems.reduce((total, item) => {
-            const estimatedCost = currentItems.get(item.id)?.estimatedCost;
-            if (estimatedCost === null || estimatedCost === undefined) {
-              return total;
+    if (submittedItems !== undefined) {
+      for (const item of submittedItems) {
+        const isNewItem = item.id.startsWith("new-");
+        if (isNewItem) {
+          let resolvedCost = parseEstimatedCostToBigInt(item.estimatedCost);
+          let resolvedStockItemId = item.stockItemId || null;
+          if (resolvedStockItemId && resolvedCost === null) {
+            const stockDoc = await StockItem.findOne({
+              _id: resolvedStockItemId,
+            })
+              .select({ unitPrice: 1 })
+              .lean();
+            if (stockDoc?.unitPrice !== undefined && stockDoc?.unitPrice !== null) {
+              resolvedCost = BigInt(stockDoc.unitPrice);
             }
-            return total.plus(
-              decimalFromScaledInteger(estimatedCost).times(
-                item.quantity.toString(),
-              ),
-            );
-          }, new Prisma.Decimal(0)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-          await transaction.ticket.update({
-            where: { id: ticketId },
-            data: { totalAmount: scaledIntegerFromDecimal(totalAmount) },
+          }
+          const validCategoryHint =
+            item.categoryHint === TicketCategoryHint.PURCHASE ||
+            item.categoryHint === TicketCategoryHint.CONTRACT
+              ? item.categoryHint
+              : TicketCategoryHint.WAREHOUSE;
+          await TicketItem.create({
+            _id: randomUUID(),
+            ticketId,
+            stockItemId: resolvedStockItemId,
+            itemName: item.itemName.trim(),
+            quantity: item.quantity,
+            unit: item.unit.trim(),
+            estimatedCost: resolvedCost,
+            categoryHint: validCategoryHint,
+            expectedDeliveryDate: parseOptionalDeliveryDate(
+              item.expectedDeliveryDate,
+            ),
+            status: FulfillmentStatus.PENDING,
+            poItemId: null,
+            doItemId: null,
+            materialContractId: null,
           });
+          continue;
+        }
+
+        const current = currentItems.get(item.id);
+        if (!current) continue;
+
+        const updateFields: Record<string, unknown> = {
+          itemName: item.itemName.trim(),
+          quantity: item.quantity,
+          unit: item.unit.trim(),
+        };
+        if (item.stockItemId !== undefined) {
+          updateFields.stockItemId = item.stockItemId || null;
+        }
+        if (item.estimatedCost !== undefined) {
+          updateFields.estimatedCost = parseEstimatedCostToBigInt(
+            item.estimatedCost,
+          );
+        }
+        if (
+          item.categoryHint &&
+          current.categoryHint !== TicketCategoryHint.CONTRACT
+        ) {
+          updateFields.categoryHint = item.categoryHint;
+        }
+        if (item.expectedDeliveryDate !== undefined) {
+          updateFields.expectedDeliveryDate = parseOptionalDeliveryDate(
+            item.expectedDeliveryDate,
+          );
+        }
+
+        await TicketItem.updateOne(
+          { _id: item.id, ticketId },
+          { $set: updateFields },
+        );
+
+        if (current.poItemId && isExecutive) {
+          await POItem.updateOne(
+            { _id: String(current.poItemId) },
+            {
+              $set: {
+                itemName: item.itemName.trim(),
+                quantity: item.quantity,
+                unit: item.unit.trim(),
+              },
+            },
+          );
         }
       }
 
-      await transaction.ticketAuditLog.create({
-        data: {
-          ticketId,
-          userId: session.user.id,
-          action: isDirector ? "UPDATED" : "REQUESTER_EDITED",
-          notes: "Informasi tiket dan rincian item diperbarui.",
-        },
-      });
-      return "UPDATED" as const;
-    });
-
-    if (updated === "NOT_FOUND") {
-      return actionFailure("Tiket tidak ditemukan.");
-    }
-    if (updated === "FORBIDDEN") {
-      return actionFailure("Anda tidak memiliki izin untuk mengedit tiket ini.");
-    }
-    if (updated === "LOCKED") {
-      return actionFailure("Tiket sudah tidak tersedia untuk diperbarui.");
-    }
-    if (updated === "EDIT_LIMIT_REACHED") {
-      return actionFailure("Pemohon hanya dapat mengedit tiket satu kali.");
-    }
-    if (updated === "ITEMS_REQUIRED") {
-      return actionFailure("Tiket harus memiliki setidaknya satu item.");
-    }
-    if (updated === "INVALID_ITEMS") {
-      return actionFailure("Rincian item tiket tidak valid. Muat ulang halaman.");
-    }
-    if (updated === "ITEMS_LOCKED") {
-      return actionFailure(
-        "Item yang sudah terhubung ke PO atau Surat Jalan tidak dapat diubah atau dihapus.",
+      const removedItems = existingItems.filter(
+        (item) => !keptIds.has(String(item._id)),
       );
+      for (const removed of removedItems) {
+        await TicketItem.deleteOne({ _id: String(removed._id), ticketId });
+        if (removed.poItemId && isExecutive) {
+          await POItem.deleteOne({ _id: String(removed.poItemId) });
+        }
+      }
+
+      await recalculateTicketTotalAndStatusMongo(ticketId);
     }
+
+    await TicketAuditLog.create({
+      _id: randomUUID(),
+      ticketId,
+      userId: session.user.id,
+      action: isExecutive ? "UPDATED" : "REQUESTER_EDITED",
+      notes: isExecutive
+        ? `Informasi tiket dan rincian item diperbarui oleh ${getExecutiveRoleLabel(session.user.role)}.`
+        : "Informasi tiket dan rincian item diperbarui.",
+      createdAt: new Date(),
+    });
   } catch (error) {
     console.error("Ticket update failed:", error);
-    if (error instanceof Error && error.message === "TICKET_ITEMS_LOCKED") {
-      return actionFailure(
-        "Item sudah terhubung ke PO atau Surat Jalan. Muat ulang tiket sebelum mengedit.",
-      );
-    }
     return actionFailure("Tiket gagal diperbarui. Silakan coba kembali.");
   }
 
-  revalidatePath("/apps/tickets");
-  revalidatePath("/apps/project");
+  revalidateTicketMutationPaths();
   return { success: true, message: "Tiket berhasil diperbarui." };
+}
+
+export async function addTicketItemByExecutive(
+  ticketId: string,
+  input: {
+    stockItemId?: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    estimatedCost?: number | string | null;
+    categoryHint?: TicketCategoryHint;
+    expectedDeliveryDate?: string | null;
+  },
+): Promise<TicketActionResult> {
+  const session = await auth();
+  if (!session?.user?.id || !isExecutiveRole(session.user.role)) {
+    return actionFailure(
+      "Hanya Direktur atau Wakil Direktur yang dapat menambahkan barang ke tiket.",
+    );
+  }
+  if (
+    typeof ticketId !== "string" ||
+    !ticketId ||
+    !input ||
+    typeof input.itemName !== "string" ||
+    input.itemName.trim().length < 1 ||
+    input.itemName.trim().length > 160 ||
+    typeof input.unit !== "string" ||
+    input.unit.trim().length < 1 ||
+    input.unit.trim().length > 32 ||
+    typeof input.quantity !== "number" ||
+    !Number.isFinite(input.quantity) ||
+    input.quantity <= 0 ||
+    input.quantity > 1_000_000_000
+  ) {
+    return actionFailure("Data barang yang ditambahkan tidak valid.");
+  }
+
+  try {
+    await connectToMongoDB();
+    const ticket = await Ticket.findOne({ _id: ticketId }).lean();
+    if (!ticket) {
+      return actionFailure("Tiket tidak ditemukan.");
+    }
+
+    const isProcessedByFinance = await checkTicketProcessedByFinanceMongo(
+      ticket,
+      ticketId,
+    );
+    if (isProcessedByFinance) {
+      return actionFailure(
+        "Tiket sudah diproses oleh bagian Keuangan sehingga tidak dapat ditambahkan barang baru.",
+      );
+    }
+
+    let resolvedCost = parseEstimatedCostToBigInt(input.estimatedCost);
+    let resolvedStockItemId = input.stockItemId?.trim() || null;
+    if (resolvedStockItemId && resolvedCost === null) {
+      const stockDoc = await StockItem.findOne({ _id: resolvedStockItemId })
+        .select({ unitPrice: 1 })
+        .lean();
+      if (stockDoc?.unitPrice !== undefined && stockDoc?.unitPrice !== null) {
+        resolvedCost = BigInt(stockDoc.unitPrice);
+      }
+    }
+
+    const validCategoryHint =
+      input.categoryHint === TicketCategoryHint.PURCHASE ||
+      input.categoryHint === TicketCategoryHint.CONTRACT
+        ? input.categoryHint
+        : TicketCategoryHint.WAREHOUSE;
+
+    await TicketItem.create({
+      _id: randomUUID(),
+      ticketId,
+      stockItemId: resolvedStockItemId,
+      itemName: input.itemName.trim(),
+      quantity: input.quantity,
+      unit: input.unit.trim(),
+      estimatedCost: resolvedCost,
+      categoryHint: validCategoryHint,
+      expectedDeliveryDate: parseOptionalDeliveryDate(
+        input.expectedDeliveryDate,
+      ),
+      status: FulfillmentStatus.PENDING,
+      poItemId: null,
+      doItemId: null,
+      materialContractId: null,
+    });
+
+    await recalculateTicketTotalAndStatusMongo(ticketId);
+
+    const roleLabel = getExecutiveRoleLabel(session.user.role);
+    await TicketAuditLog.create({
+      _id: randomUUID(),
+      ticketId,
+      userId: session.user.id,
+      action: "UPDATED",
+      notes: `Menambahkan barang baru: ${input.itemName.trim()} (${input.quantity} ${input.unit.trim()}) oleh ${roleLabel}.`,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Add ticket item failed:", error);
+    return actionFailure("Gagal menambahkan barang ke tiket. Silakan coba kembali.");
+  }
+
+  revalidateTicketMutationPaths();
+  return {
+    success: true,
+    message: `Barang "${input.itemName.trim()}" berhasil ditambahkan ke tiket.`,
+  };
+}
+
+export async function updateTicketItemByExecutive(
+  ticketId: string,
+  itemId: string,
+  input: {
+    stockItemId?: string | null;
+    itemName: string;
+    quantity: number;
+    unit: string;
+    estimatedCost?: number | string | null;
+    categoryHint?: TicketCategoryHint;
+    expectedDeliveryDate?: string | null;
+  },
+): Promise<TicketActionResult> {
+  const session = await auth();
+  if (!session?.user?.id || !isExecutiveRole(session.user.role)) {
+    return actionFailure(
+      "Hanya Direktur atau Wakil Direktur yang dapat mengubah rincian barang.",
+    );
+  }
+  if (
+    typeof ticketId !== "string" ||
+    !ticketId ||
+    typeof itemId !== "string" ||
+    !itemId ||
+    !input ||
+    typeof input.itemName !== "string" ||
+    input.itemName.trim().length < 1 ||
+    input.itemName.trim().length > 160 ||
+    typeof input.unit !== "string" ||
+    input.unit.trim().length < 1 ||
+    input.unit.trim().length > 32 ||
+    typeof input.quantity !== "number" ||
+    !Number.isFinite(input.quantity) ||
+    input.quantity <= 0 ||
+    input.quantity > 1_000_000_000
+  ) {
+    return actionFailure("Data barang yang diubah tidak valid.");
+  }
+
+  try {
+    await connectToMongoDB();
+    const [ticket, currentItem] = await Promise.all([
+      Ticket.findOne({ _id: ticketId }).lean(),
+      TicketItem.findOne({ _id: itemId, ticketId }).lean(),
+    ]);
+    if (!ticket) {
+      return actionFailure("Tiket tidak ditemukan.");
+    }
+    if (!currentItem) {
+      return actionFailure("Barang pada tiket tidak ditemukan.");
+    }
+
+    const isProcessedByFinance = await checkTicketProcessedByFinanceMongo(
+      ticket,
+      ticketId,
+    );
+    if (isProcessedByFinance) {
+      return actionFailure(
+        "Tiket sudah diproses oleh bagian Keuangan sehingga rincian barang tidak dapat diubah.",
+      );
+    }
+
+    if (
+      currentItem.categoryHint === TicketCategoryHint.CONTRACT &&
+      currentItem.materialContractId
+    ) {
+      const deliveries = await MaterialDelivery.find({
+        ticketId,
+        contractId: String(currentItem.materialContractId),
+      })
+        .select({ quantityReceived: 1 })
+        .lean();
+      const deliveredQty = deliveries.reduce(
+        (sum, d) => sum + Number(d.quantityReceived ?? 0),
+        0,
+      );
+      if (deliveredQty > 0 && input.quantity < deliveredQty) {
+        return actionFailure(
+          `Jumlah item kontrak tidak dapat lebih kecil dari volume Surat Jalan yang sudah diterima (${deliveredQty} ${currentItem.unit}).`,
+        );
+      }
+    }
+
+    const resolvedCost = parseEstimatedCostToBigInt(input.estimatedCost);
+    const updateFields: Record<string, unknown> = {
+      itemName:
+        currentItem.categoryHint === TicketCategoryHint.CONTRACT
+          ? currentItem.itemName
+          : input.itemName.trim(),
+      quantity: input.quantity,
+      unit:
+        currentItem.categoryHint === TicketCategoryHint.CONTRACT
+          ? currentItem.unit
+          : input.unit.trim(),
+      estimatedCost: resolvedCost,
+      expectedDeliveryDate: parseOptionalDeliveryDate(
+        input.expectedDeliveryDate,
+      ),
+    };
+    if (input.stockItemId !== undefined) {
+      updateFields.stockItemId = input.stockItemId?.trim() || null;
+    }
+    if (
+      input.categoryHint &&
+      currentItem.categoryHint !== TicketCategoryHint.CONTRACT
+    ) {
+      updateFields.categoryHint = input.categoryHint;
+    }
+
+    await TicketItem.updateOne(
+      { _id: itemId, ticketId },
+      { $set: updateFields },
+    );
+
+    if (currentItem.poItemId) {
+      await POItem.updateOne(
+        { _id: String(currentItem.poItemId) },
+        {
+          $set: {
+            itemName: String(updateFields.itemName),
+            quantity: input.quantity,
+            unit: String(updateFields.unit),
+          },
+        },
+      );
+    }
+
+    await recalculateTicketTotalAndStatusMongo(ticketId);
+
+    const roleLabel = getExecutiveRoleLabel(session.user.role);
+    await TicketAuditLog.create({
+      _id: randomUUID(),
+      ticketId,
+      userId: session.user.id,
+      action: "UPDATED",
+      notes: `Memperbarui barang "${String(updateFields.itemName)}" (${input.quantity} ${String(updateFields.unit)}) oleh ${roleLabel}.`,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Update ticket item failed:", error);
+    return actionFailure("Gagal memperbarui barang pada tiket. Silakan coba kembali.");
+  }
+
+  revalidateTicketMutationPaths();
+  return {
+    success: true,
+    message: `Barang "${input.itemName.trim()}" berhasil diperbarui.`,
+  };
+}
+
+export async function deleteTicketItemByExecutive(
+  ticketId: string,
+  itemId: string,
+): Promise<TicketActionResult> {
+  const session = await auth();
+  if (!session?.user?.id || !isExecutiveRole(session.user.role)) {
+    return actionFailure(
+      "Hanya Direktur atau Wakil Direktur yang dapat menghapus barang pada tiket.",
+    );
+  }
+  if (
+    typeof ticketId !== "string" ||
+    !ticketId ||
+    typeof itemId !== "string" ||
+    !itemId
+  ) {
+    return actionFailure("Parameter barang tidak valid.");
+  }
+
+  try {
+    await connectToMongoDB();
+    const [ticket, currentItem, itemCount] = await Promise.all([
+      Ticket.findOne({ _id: ticketId }).lean(),
+      TicketItem.findOne({ _id: itemId, ticketId }).lean(),
+      TicketItem.countDocuments({ ticketId }),
+    ]);
+    if (!ticket) {
+      return actionFailure("Tiket tidak ditemukan.");
+    }
+    if (!currentItem) {
+      return actionFailure("Barang pada tiket tidak ditemukan.");
+    }
+
+    const isProcessedByFinance = await checkTicketProcessedByFinanceMongo(
+      ticket,
+      ticketId,
+    );
+    if (isProcessedByFinance) {
+      return actionFailure(
+        "Tiket sudah diproses oleh bagian Keuangan sehingga barang tidak dapat dihapus.",
+      );
+    }
+
+    if (itemCount <= 1) {
+      return actionFailure(
+        "Tiket harus memiliki minimal 1 barang. Gunakan tombol 'Hapus Tiket' jika ingin menghapus seluruh tiket.",
+      );
+    }
+
+    if (
+      currentItem.categoryHint === TicketCategoryHint.CONTRACT &&
+      currentItem.materialContractId
+    ) {
+      const hasContractDelivery = await MaterialDelivery.exists({
+        ticketId,
+        contractId: String(currentItem.materialContractId),
+      });
+      if (hasContractDelivery) {
+        return actionFailure(
+          "Barang Kontrak Material Alam yang sudah memiliki Surat Jalan (DO) tidak dapat dihapus.",
+        );
+      }
+    }
+
+    await TicketItem.deleteOne({ _id: itemId, ticketId });
+    if (currentItem.poItemId) {
+      await POItem.deleteOne({ _id: String(currentItem.poItemId) });
+    }
+
+    await recalculateTicketTotalAndStatusMongo(ticketId);
+
+    const roleLabel = getExecutiveRoleLabel(session.user.role);
+    await TicketAuditLog.create({
+      _id: randomUUID(),
+      ticketId,
+      userId: session.user.id,
+      action: "UPDATED",
+      notes: `Menghapus barang "${currentItem.itemName}" (${currentItem.quantity} ${currentItem.unit}) dari tiket oleh ${roleLabel}.`,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Delete ticket item failed:", error);
+    return actionFailure("Gagal menghapus barang dari tiket. Silakan coba kembali.");
+  }
+
+  revalidateTicketMutationPaths();
+  return {
+    success: true,
+    message: "Barang berhasil dihapus dari tiket.",
+  };
 }
 
 export async function deleteTicket(
   ticketId: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.DIRECTOR) {
-    return actionFailure("Anda tidak memiliki izin untuk menghapus tiket.");
+  if (!session?.user?.id || !isExecutiveRole(session.user.role)) {
+    return actionFailure(
+      "Hanya Direktur atau Wakil Direktur yang memiliki izin untuk menghapus tiket.",
+    );
   }
   if (typeof ticketId !== "string" || !ticketId) {
     return actionFailure("Nomor tiket tidak valid.");
   }
 
   try {
-    const deleted = await prisma.$transaction(async (transaction) => {
-      const ticket = await transaction.ticket.findUnique({
-        where: { id: ticketId },
-        select: { id: true },
-      });
-      if (!ticket) return "NOT_FOUND" as const;
+    await connectToMongoDB();
+    const ticket = await Ticket.findOne({ _id: ticketId }).lean();
+    if (!ticket) {
+      return actionFailure("Tiket tidak ditemukan.");
+    }
 
-      await transaction.operationalDocument.deleteMany({
-        where: { ticketId },
-      });
-      const result = await transaction.ticket.deleteMany({
-        where: { id: ticketId },
-      });
-      return result.count === 1 ? ("DELETED" as const) : ("NOT_FOUND" as const);
-    });
+    const isProcessedByFinance = await checkTicketProcessedByFinanceMongo(
+      ticket,
+      ticketId,
+    );
+    if (isProcessedByFinance) {
+      return actionFailure(
+        "Tiket sudah diproses oleh bagian Keuangan sehingga tidak dapat dihapus.",
+      );
+    }
 
-    if (deleted === "NOT_FOUND") {
+    await Promise.all([
+      OperationalDocument.deleteMany({ ticketId }),
+      TicketItem.deleteMany({ ticketId }),
+      TicketAuditLog.deleteMany({ ticketId }),
+      PurchaseOrder.updateMany({ ticketId }, { $set: { ticketId: null } }),
+      DirectStockPurchase.updateMany({ ticketId }, { $set: { ticketId: null } }),
+      DeliveryOrder.updateMany({ ticketId }, { $set: { ticketId: null } }),
+    ]);
+
+    const result = await Ticket.deleteOne({ _id: ticketId });
+    if (result.deletedCount !== 1) {
       return actionFailure("Tiket tidak ditemukan.");
     }
   } catch (error) {
@@ -3314,8 +3966,7 @@ export async function deleteTicket(
     return actionFailure("Tiket gagal dihapus. Silakan coba kembali.");
   }
 
-  revalidatePath("/apps/tickets");
-  revalidatePath("/apps/project");
+  revalidateTicketMutationPaths();
   return { success: true, message: "Tiket berhasil dihapus." };
 }
 
@@ -3996,6 +4647,15 @@ export async function checkTicketItemsStock(
           "Sebagian item sudah diproses. Muat ulang tiket.",
         );
       }
+      if (
+        ticket.items.some(
+          (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+        )
+      ) {
+        throw new Error(
+          "Item Kontrak Material Alam tidak dipenuhi dari stok gudang; catat melalui Surat Jalan Kontrak Curah.",
+        );
+      }
       const stockItems = await transaction.stockItem.findMany({
         select: {
           id: true,
@@ -4161,6 +4821,7 @@ export async function mapTicketItemToStock(
             select: {
               id: true,
               status: true,
+              categoryHint: true,
               poItemId: true,
               doItemId: true,
               estimatedCost: true,
@@ -4176,6 +4837,11 @@ export async function mapTicketItemToStock(
         throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
       }
       const ticketItem = ticket.items[0];
+      if (ticketItem?.categoryHint === TicketCategoryHint.CONTRACT) {
+        throw new Error(
+          "Item Kontrak Material Alam tidak ditautkan ke SKU stok gudang.",
+        );
+      }
       if (
         !ticketItem ||
         ticketItem.status !== FulfillmentStatus.PENDING ||
@@ -4285,6 +4951,15 @@ export async function switchTicketItemsToPurchase(
         ticket.status !== TicketStatus.PROCESSED_LOGISTIC
       ) {
         throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
+      }
+      if (
+        ticket.items.some(
+          (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+        )
+      ) {
+        throw new Error(
+          "Item Kontrak Material Alam tidak dialihkan ke PO pembelian baru; catat pengiriman melalui Surat Jalan Kontrak Curah.",
+        );
       }
       if (
         ticket.items.length !== ticketItemIds.length ||
@@ -4514,6 +5189,17 @@ export async function createLogisticsPurchaseOrderForTicket(
       const ticketItemsById = new Map(
         ticket.items.map((item) => [item.id, item]),
       );
+      if (
+        items.some((inputItem) => {
+          if (!inputItem.ticketItemId) return false;
+          const ticketItem = ticketItemsById.get(inputItem.ticketItemId!);
+          return ticketItem?.categoryHint === TicketCategoryHint.CONTRACT;
+        })
+      ) {
+        throw new Error(
+          "Item Kontrak Material Alam tidak dibuatkan PO reguler; catat melalui Surat Jalan Kontrak Curah.",
+        );
+      }
       if (
         items.some((inputItem) => {
           if (!inputItem.ticketItemId) return false;
@@ -4780,9 +5466,19 @@ async function createWarehouseDeliveryOrder(
           )
         : ticket.items.filter(
             (item) =>
+              item.categoryHint !== TicketCategoryHint.CONTRACT &&
               item.doItemId === null &&
               item.status !== FulfillmentStatus.PROCESSED_TO_DO,
           );
+      if (
+        selectedItems.some(
+          (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+        )
+      ) {
+        throw new Error(
+          "Item Kontrak Material Alam tidak dipenuhi dari stok gudang; catat melalui Surat Jalan Kontrak Curah.",
+        );
+      }
       if (
         selectedTicketItemIds &&
         (selectedItems.length !== selectedTicketItemIds.length ||

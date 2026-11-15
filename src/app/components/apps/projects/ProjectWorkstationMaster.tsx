@@ -28,6 +28,7 @@ import type {
   SurveyProjectOption,
 } from "@/app/components/apps/gis/SurveySidebar";
 import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
+import type { TicketMaterialContractOption } from "@/lib/material-contracts";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import type { FieldTeamOption } from "@/app/(DashboardLayout)/types/project";
 import type { ProjectDashboardRow } from "@/app/(DashboardLayout)/types/project";
@@ -129,6 +130,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  buildProjectSCurveSeries,
+  calculatePlannedSCurveProgress,
+  calculateWeightedProjectProgress,
+} from "@/lib/project-progress";
+import { classifyTicketFundCategory } from "./ProjectFundRecapTab";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -259,6 +266,13 @@ export type ProjectWorkstationMasterData = {
     notes: string | null;
   }[];
   realized: string;
+  requestedTotal?: string;
+  laborRealized?: string;
+  laborRequested?: string;
+  materialRealized?: string;
+  materialRequested?: string;
+  operationalRealized?: string;
+  operationalRequested?: string;
   startDate: string | null;
   endDate: string | null;
   reports: {
@@ -314,6 +328,7 @@ export type ProjectWorkstationMasterData = {
     type?: string | null;
     requestCategory?: string | null;
     fieldCategory?: string | null;
+    fundCategory?: "TUKANG" | "BAHAN" | "INVENTARIS" | "OPERASIONAL" | null;
     createdAt?: string | null;
     items?: Array<{
       itemName: string;
@@ -486,18 +501,8 @@ function getSCurveSeries(project: ProjectWorkstationMasterData, nowMs: number) {
   const fallbackEnd = new Date(start.getTime() + 84 * 86400000)
     .toISOString()
     .slice(0, 10);
-  const end = new Date(
-    `${project.endDate ?? targetDates.at(-1) ?? fallbackEnd}T00:00:00.000Z`,
-  );
-  const range = Math.max(end.getTime() - start.getTime(), 7 * 86400000);
-  const target = Array.from({ length: 13 }, (_, index) => {
-    const progress = index / 12;
-    const easedProgress = 3 * progress ** 2 - 2 * progress ** 3;
-    return {
-      x: start.getTime() + range * progress,
-      y: Math.round(easedProgress * 100),
-    };
-  });
+  const endDate = project.endDate ?? targetDates.at(-1) ?? fallbackEnd;
+
   const progressByDate = new Map<string, Map<string, number>>();
   for (const point of project.workPoints) {
     for (const report of point.progressReports) {
@@ -508,46 +513,46 @@ function getSCurveSeries(project: ProjectWorkstationMasterData, nowMs: number) {
   }
   const latestPointProgress = new Map<string, number>();
   for (const point of project.workPoints) latestPointProgress.set(point.id, 0);
-  const actual = [...progressByDate.entries()]
+
+  const weightedFromPoints = [...progressByDate.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, progressAtDate]) => {
       for (const [pointId, progress] of progressAtDate) {
         latestPointProgress.set(pointId, progress);
       }
       return {
-        x: new Date(`${date}T00:00:00.000Z`).getTime(),
-        y: latestPointProgress.size > 0
-          ? [...latestPointProgress.values()].reduce(
-              (sum, progress) => sum + progress,
-              0,
-            ) / latestPointProgress.size
-          : 0,
+        reportDate: date,
+        progress: calculateWeightedProjectProgress(
+          project.workPoints.map((pt) => ({
+            progress: latestPointProgress.get(pt.id) ?? 0,
+            proposedTotalWage: pt.proposedTotalWage,
+            approvedTotalWage: pt.approvedTotalWage,
+          })),
+        ),
       };
     });
-  if (actual.length === 0) {
-    actual.push(
-      ...project.reports
-        .filter(
-          (report): report is typeof report & { progress: number } =>
-            report.progress !== null,
-        )
-        .slice()
-        .sort((left, right) => left.reportDate.localeCompare(right.reportDate))
-        .map((report) => ({
-          x: new Date(`${report.reportDate}T00:00:00.000Z`).getTime(),
-          y: report.progress,
-        })),
-    );
-  }
-  if (actual.length === 0 && project.progress > 0) {
-    actual.push({
-      x: Math.max(nowMs, start.getTime()),
-      y: project.progress,
-    });
-  }
+
+  const directReports = project.reports
+    .filter(
+      (report): report is typeof report & { progress: number } =>
+        report.progress !== null,
+    )
+    .map((report) => ({
+      reportDate: report.reportDate,
+      progress: report.progress,
+    }));
+
+  const built = buildProjectSCurveSeries({
+    startDate,
+    endDate,
+    currentProgress: project.progress,
+    dailyReports: [...weightedFromPoints, ...directReports],
+    nowMs,
+  });
+
   return [
-    { name: "Target Rencana", data: target },
-    { name: "Realisasi Aktual", data: actual },
+    { name: "Target Rencana", data: built.planned },
+    { name: "Realisasi Aktual", data: built.actual },
   ];
 }
 
@@ -558,7 +563,9 @@ type ProjectSortField =
   | "progress"
   | "endDate"
   | "attention"
-  | "pagu";
+  | "pagu"
+  | "realized"
+  | "labor";
 
 function statusSortRank(status: string) {
   if (status === "RUNNING" || status === "ON_PROGRESS" || status === "ACTIVE") {
@@ -577,19 +584,12 @@ function getPlannedProgress(
   endDate: string | null,
   nowMs: number,
 ): number | null {
-  if (!startDate || !endDate) return null;
-  const startMs = new Date(`${startDate}T00:00:00.000Z`).getTime();
-  const endMs = new Date(`${endDate}T23:59:59.999Z`).getTime();
-  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
-    return null;
-  }
-  if (nowMs <= startMs) return 0;
-  if (nowMs >= endMs) return 100;
-  return Math.round(((nowMs - startMs) / (endMs - startMs)) * 100);
+  return calculatePlannedSCurveProgress(startDate, endDate, nowMs);
 }
 
 export default function ProjectWorkstationMaster({
   projects,
+  materialContracts = [],
   fieldTeamUsers,
   currentUserId,
   currentUserRole,
@@ -601,6 +601,7 @@ export default function ProjectWorkstationMaster({
   initialSurveyProjectId,
 }: {
   projects: ProjectWorkstationMasterData[];
+  materialContracts?: TicketMaterialContractOption[];
   fieldTeamUsers: FieldTeamOption[];
   currentUserId: string;
   currentUserRole: UserRole;
@@ -786,7 +787,9 @@ export default function ProjectWorkstationMaster({
   };
 
   const isProjectManager =
-    currentUserRole === "ADMINISTRATIONS" || currentUserRole === "DIRECTOR";
+    currentUserRole === "ADMINISTRATIONS" ||
+    currentUserRole === "DIRECTOR" ||
+    currentUserRole === "DEPUTY_DIRECTOR";
   const canViewFinancials = true;
 
   const runningProjects = projectList.filter(
@@ -797,10 +800,52 @@ export default function ProjectWorkstationMaster({
     (sum, p) => sum + (parseFloat(p.pagu) || 0),
     0,
   );
+  const totalContractAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.pagu) || 0),
+    0,
+  );
+  const totalRealizedAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.realized) || 0),
+    0,
+  );
+  const totalRequestedAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.requestedTotal ?? p.realized) || 0),
+    0,
+  );
+  const totalLaborRealizedAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.laborRealized ?? "0") || 0),
+    0,
+  );
+  const totalLaborRequestedAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.laborRequested ?? "0") || 0),
+    0,
+  );
+  const totalMaterialRealizedAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.materialRealized ?? "0") || 0),
+    0,
+  );
+  const totalOperationalRealizedAll = projectList.reduce(
+    (sum, p) => sum + (parseFloat(p.operationalRealized ?? "0") || 0),
+    0,
+  );
+  const projectsWithTicketsCount = projectList.filter(
+    (p) =>
+      (parseFloat(p.realized) || 0) > 0 ||
+      (parseFloat(p.requestedTotal ?? "0") || 0) > 0,
+  ).length;
+  const projectsWithLaborCount = projectList.filter(
+    (p) =>
+      (parseFloat(p.laborRealized ?? "0") || 0) > 0 ||
+      (parseFloat(p.laborRequested ?? "0") || 0) > 0,
+  ).length;
 
   const overdueRunningCount = runningProjects.filter((p) => {
     if (!p.endDate) return false;
     return new Date(p.endDate).getTime() < currentTimeMs && p.progress < 100;
+  }).length;
+  const laggingRunningCount = runningProjects.filter((p) => {
+    const planned = getPlannedProgress(p.startDate, p.endDate, currentTimeMs);
+    return planned !== null && p.progress < 100 && Math.round(planned - p.progress) >= 10;
   }).length;
   const isFieldTeam =
     currentUserRole === UserRole.FIELD_TEAM ||
@@ -907,6 +952,19 @@ export default function ProjectWorkstationMaster({
         comparison =
           (parseFloat(left.pagu) || 0) - (parseFloat(right.pagu) || 0);
         break;
+      case "realized":
+        comparison =
+          (parseFloat(left.realized) || 0) - (parseFloat(right.realized) || 0) ||
+          (parseFloat(left.requestedTotal ?? "0") || 0) -
+            (parseFloat(right.requestedTotal ?? "0") || 0);
+        break;
+      case "labor":
+        comparison =
+          (parseFloat(left.laborRealized ?? "0") || 0) -
+            (parseFloat(right.laborRealized ?? "0") || 0) ||
+          (parseFloat(left.laborRequested ?? "0") || 0) -
+            (parseFloat(right.laborRequested ?? "0") || 0);
+        break;
     }
     return (
       comparison * direction || left.title.localeCompare(right.title, "id-ID")
@@ -918,7 +976,11 @@ export default function ProjectWorkstationMaster({
     } else {
       setSortField(field);
       setSortDir(
-        field === "progress" || field === "pagu" || field === "attention"
+        field === "progress" ||
+          field === "pagu" ||
+          field === "attention" ||
+          field === "realized" ||
+          field === "labor"
           ? "desc"
           : "asc",
       );
@@ -1470,10 +1532,32 @@ export default function ProjectWorkstationMaster({
             </div>
           </div>
 
-          {/* Page Header */}
+          {/* Section Header & Quick Import/Template Actions */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Daftar proyek</h1>
+            <div>
+              <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">
+                Daftar Proyek &amp; Realisasi Anggaran
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Klik kartu metrik di bawah untuk memfilter &amp; mengurutkan proyek berdasarkan nilai kontrak, tiket cair, upah tukang, atau deviasi Kurva S.
+              </p>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
+              {sortField !== "default" && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSortField("default");
+                    setSortDir("asc");
+                    setProjectPage(1);
+                  }}
+                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Reset urutan
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -1492,38 +1576,114 @@ export default function ProjectWorkstationMaster({
                 <LayoutTemplate className="size-3.5" />
                 <span>Template proyek</span>
               </a>
-              {isProjectManager && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setNewProjectOpen(true)}
-                  className="h-8 gap-1.5 px-3.5 text-xs font-semibold rounded-lg bg-foreground text-background hover:bg-foreground/90 transition"
-                >
-                  <Plus className="size-3.5" />
-                  <span>Tambah proyek</span>
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* Operational KPI Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
-              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+          {/* Interactive Operational KPI Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilterUrl("RUNNING");
+                setSortField("pagu");
+                setSortDir("desc");
+                setProjectViewMode("tabel");
+              }}
+              className={`rounded-xl border p-4 text-left shadow-2xs transition-all ${
+                sortField === "pagu" && projectStatusFilter === "RUNNING"
+                  ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                  : "border-border/70 bg-card hover:border-primary/40 hover:bg-accent/30"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 text-xs font-medium text-muted-foreground">
                 <span>Nilai kontrak berjalan ({runningProjects.length} proyek)</span>
-                <ChevronRight className="size-3" />
+                <ChevronRight className="size-3.5 shrink-0 text-primary" />
               </div>
-              <p className="mt-1 text-2xl font-extrabold text-foreground">{currency(totalContractRunning)}</p>
-            </div>
+              <p className="mt-1 text-2xl font-extrabold text-foreground">
+                {currency(totalContractRunning)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Total seluruh pagu ({projectList.length} proyek): {currency(totalContractAll)}
+              </p>
+            </button>
 
-            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-2xs">
-              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <span>Lewat target selesai</span>
-                <ChevronRight className="size-3" />
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilterUrl("ALL");
+                setSortField("realized");
+                setSortDir("desc");
+                setProjectViewMode("tabel");
+              }}
+              className={`rounded-xl border p-4 text-left shadow-2xs transition-all ${
+                sortField === "realized"
+                  ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/30"
+                  : "border-border/70 bg-card hover:border-emerald-500/40 hover:bg-accent/30"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 text-xs font-medium text-muted-foreground">
+                <span>Pengeluaran berdasarkan tiket (cair)</span>
+                <ChevronRight className="size-3.5 shrink-0 text-emerald-500" />
               </div>
-              <p className="mt-1 text-2xl font-extrabold text-foreground">{overdueRunningCount}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">proyek berjalan melewati batas waktu</p>
-            </div>
+              <p className="mt-1 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                {currency(totalRealizedAll)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Pengajuan: {currency(totalRequestedAll)} ({projectsWithTicketsCount} proyek) · Material/Ops cair: {currency(totalMaterialRealizedAll + totalOperationalRealizedAll)}
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilterUrl("ALL");
+                setSortField("labor");
+                setSortDir("desc");
+                setProjectViewMode("tabel");
+              }}
+              className={`rounded-xl border p-4 text-left shadow-2xs transition-all ${
+                sortField === "labor"
+                  ? "border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/30"
+                  : "border-border/70 bg-card hover:border-amber-500/40 hover:bg-accent/30"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 text-xs font-medium text-muted-foreground">
+                <span>Realisasi upah tukang (tiket)</span>
+                <ChevronRight className="size-3.5 shrink-0 text-amber-500" />
+              </div>
+              <p className="mt-1 text-2xl font-extrabold text-amber-600 dark:text-amber-400">
+                {currency(totalLaborRealizedAll)}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Pengajuan upah tukang: {currency(totalLaborRequestedAll)} ({projectsWithLaborCount} proyek)
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilterUrl("RUNNING");
+                setSortField("attention");
+                setSortDir("desc");
+                setProjectViewMode("tabel");
+              }}
+              className={`rounded-xl border p-4 text-left shadow-2xs transition-all ${
+                sortField === "attention"
+                  ? "border-rose-500 bg-rose-500/10 ring-1 ring-rose-500/30"
+                  : "border-border/70 bg-card hover:border-rose-500/40 hover:bg-accent/30"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 text-xs font-medium text-muted-foreground">
+                <span>Evaluasi jadwal &amp; Kurva S</span>
+                <ChevronRight className="size-3.5 shrink-0 text-rose-500" />
+              </div>
+              <p className="mt-1 text-2xl font-extrabold text-foreground">
+                {overdueRunningCount} terlambat · {laggingRunningCount} deviasi
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                proyek melewati batas waktu atau tertinggal &ge;10% dari Kurva S
+              </p>
+            </button>
           </div>
 
           {/* Views Toolbar: Tabel | Papan, Search, Filter, Export, Print */}
@@ -1686,7 +1846,7 @@ export default function ProjectWorkstationMaster({
                           onClick={() => toggleSort("progress")}
                           className="inline-flex items-center gap-1 hover:text-foreground"
                         >
-                          <span>Progres</span>
+                          <span>Progres &amp; Kurva S</span>
                           <ArrowUpDown className={`size-3 ${sortField === "progress" ? "text-primary" : "opacity-60"}`} />
                         </button>
                       </th>
@@ -1700,13 +1860,13 @@ export default function ProjectWorkstationMaster({
                           <ArrowUpDown className={`size-3 ${sortField === "endDate" ? "text-primary" : "opacity-60"}`} />
                         </button>
                       </th>
-                      <th className="hidden px-3 py-3 font-semibold lg:table-cell">
+                      <th className="hidden px-3 py-3 font-semibold xl:table-cell">
                         <button
                           type="button"
                           onClick={() => toggleSort("attention")}
                           className="inline-flex items-center gap-1 hover:text-foreground"
                         >
-                          <span>Perlu perhatian</span>
+                          <span>Evaluasi Kurva S</span>
                           <ArrowUpDown className={`size-3 ${sortField === "attention" ? "text-primary" : "opacity-60"}`} />
                         </button>
                       </th>
@@ -1720,7 +1880,23 @@ export default function ProjectWorkstationMaster({
                           <ArrowUpDown className={`size-3 ${sortField === "pagu" ? "text-primary" : "opacity-60"}`} />
                         </button>
                       </th>
-                      <th className="w-28 px-3 py-3 text-right font-semibold">Aksi</th>
+                      <th className="hidden w-44 px-3 py-3 font-semibold lg:table-cell">
+                        <button
+                          type="button"
+                          onClick={() => toggleSort("realized")}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                        >
+                          <span>Tiket &amp; Upah Tukang</span>
+                          <ArrowUpDown
+                            className={`size-3 ${
+                              sortField === "realized" || sortField === "labor"
+                                ? "text-primary"
+                                : "opacity-60"
+                            }`}
+                          />
+                        </button>
+                      </th>
+                      <th className="w-32 px-3 py-3 text-right font-semibold">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -1746,6 +1922,13 @@ export default function ProjectWorkstationMaster({
                         "PENDING",
                         "PLANNED",
                       ].includes(project.status);
+                      const paguNum = Number(project.pagu) || 0;
+                      const realizedNum = Number(project.realized) || 0;
+                      const requestedNum = Number(project.requestedTotal ?? 0) || 0;
+                      const laborRealizedNum = Number(project.laborRealized ?? 0) || 0;
+                      const laborRequestedNum = Number(project.laborRequested ?? 0) || 0;
+                      const absorptionPercent =
+                        paguNum > 0 ? Math.min(100, (realizedNum / paguNum) * 100) : 0;
 
                       return (
                         <tr
@@ -1776,9 +1959,20 @@ export default function ProjectWorkstationMaster({
                             >
                               {project.title}
                             </Link>
-                            <span className="mt-0.5 block break-all font-mono text-[10px] text-muted-foreground">
-                              {project.code}
-                            </span>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                              <span className="font-mono">{project.code}</span>
+                              {project.kelompokTani &&
+                                project.kelompokTani.toLowerCase() !==
+                                  project.title.toLowerCase() && (
+                                  <span>· {project.kelompokTani}</span>
+                                )}
+                            </div>
+                            {(project.location || project.address) && (
+                              <p className="mt-0.5 line-clamp-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <MapPin className="size-2.5 shrink-0 text-primary/70" />
+                                <span>{project.location || project.address}</span>
+                              </p>
+                            )}
                             {isProjectManager && fieldTeamUsers.length > 0 ? (
                               <div className="mt-1.5">
                                 <select
@@ -1819,21 +2013,34 @@ export default function ProjectWorkstationMaster({
                             >
                               {statusLabels[project.status] || "Berjalan"}
                             </Badge>
+                            <span className="mt-1 block text-[10px] text-muted-foreground">
+                              {project.workPoints.length} titik RAB
+                            </span>
                           </td>
                           <td className="px-3 py-3 align-top">
-                            <div className="flex items-center gap-2">
-                              <Progress value={project.progress} className="h-1.5 flex-1 min-w-16" />
-                              <span className="w-8 text-right font-mono text-[11px] text-foreground font-semibold">
-                                {project.progress.toFixed(0)}%
-                              </span>
-                            </div>
-                            {plannedProgress !== null &&
-                              project.progress < 100 &&
-                              plannedProgress > 0 && (
-                                <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                                  rencana {plannedProgress}%
+                            <button
+                              type="button"
+                              onClick={() => openProjectModal(project, "kurva")}
+                              title="Klik untuk membuka grafik Kurva S proyek"
+                              className="w-full text-left group/prog rounded-md p-1 -m-1 hover:bg-muted/50 transition"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Progress value={project.progress} className="h-1.5 flex-1 min-w-16" />
+                                <span className="w-10 text-right font-mono text-[11px] text-foreground font-semibold group-hover/prog:text-primary">
+                                  {project.progress > 0 && project.progress < 10
+                                    ? `${project.progress.toFixed(1)}%`
+                                    : `${project.progress.toFixed(0)}%`}
                                 </span>
-                              )}
+                              </div>
+                              <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                                <span>
+                                  {plannedProgress !== null && project.progress < 100
+                                    ? `rencana ${plannedProgress}%`
+                                    : "lihat Kurva S"}
+                                </span>
+                                <ChartSpline className="size-3 text-primary/70 opacity-0 group-hover/prog:opacity-100 transition" />
+                              </div>
+                            </button>
                           </td>
                           <td className="hidden px-3 py-3 align-top text-muted-foreground whitespace-nowrap md:table-cell">
                             {project.endDate ? (
@@ -1849,7 +2056,7 @@ export default function ProjectWorkstationMaster({
                               "—"
                             )}
                           </td>
-                          <td className="hidden px-3 py-3 align-top lg:table-cell">
+                          <td className="hidden px-3 py-3 align-top xl:table-cell">
                             {isOverdue ? (
                               <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
                                 Terlambat dari jadwal
@@ -1861,15 +2068,79 @@ export default function ProjectWorkstationMaster({
                                 </p>
                                 <p className="text-[10px]">{progressGap} poin dari rencana</p>
                               </div>
+                            ) : isPendingSetup ? (
+                              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                Perlu setup RAB &amp; PIC
+                              </span>
                             ) : (
-                              <span className="text-muted-foreground">—</span>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                <Check className="size-3" /> Sesuai Kurva S
+                              </span>
                             )}
                           </td>
                           <td className="hidden px-3 py-3 align-top font-mono font-semibold text-foreground whitespace-nowrap sm:table-cell">
-                            {Number(project.pagu) > 0 ? currency(project.pagu) : "—"}
+                            <button
+                              type="button"
+                              onClick={() => openProjectModal(project, "pagu")}
+                              title="Klik untuk rincian anggaran pagu proyek"
+                              className="text-left hover:text-primary transition"
+                            >
+                              <p>{paguNum > 0 ? currency(paguNum) : "—"}</p>
+                              {realizedNum > 0 ? (
+                                <p className="mt-0.5 font-sans text-[10px] font-normal text-muted-foreground">
+                                  Terserap {absorptionPercent.toFixed(1)}% pagu
+                                </p>
+                              ) : (
+                                <p className="mt-0.5 font-sans text-[10px] font-normal text-muted-foreground">
+                                  {project.jenisPekerjaan || "Kontrak Fisik"}
+                                </p>
+                              )}
+                            </button>
+                          </td>
+                          <td className="hidden px-3 py-3 align-top whitespace-nowrap lg:table-cell">
+                            <button
+                              type="button"
+                              onClick={() => openProjectModal(project, "timeline")}
+                              title="Klik untuk rincian pengeluaran tiket & upah tukang"
+                              className="text-left group/tiket rounded-md p-1 -m-1 hover:bg-muted/50 transition"
+                            >
+                              {realizedNum > 0 ? (
+                                <p className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  {currency(realizedNum)}
+                                </p>
+                              ) : requestedNum > 0 ? (
+                                <p className="font-mono text-xs font-semibold text-sky-600 dark:text-sky-400">
+                                  Ajuan: {currency(requestedNum)}
+                                </p>
+                              ) : (
+                                <p className="text-[11px] text-muted-foreground">Belum ada tiket</p>
+                              )}
+                              {laborRealizedNum > 0 ? (
+                                <p className="mt-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                                  Upah cair: {currency(laborRealizedNum)}
+                                </p>
+                              ) : laborRequestedNum > 0 ? (
+                                <p className="mt-0.5 text-[10px] font-medium text-amber-600/80 dark:text-amber-400/80">
+                                  Ajuan upah: {currency(laborRequestedNum)}
+                                </p>
+                              ) : requestedNum > realizedNum && realizedNum > 0 ? (
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                  Total ajuan: {currency(requestedNum)}
+                                </p>
+                              ) : null}
+                            </button>
                           </td>
                           <td className="px-3 py-3 text-right align-top">
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                title="Lihat Kurva S"
+                                aria-label={`Lihat Kurva S ${project.title}`}
+                                onClick={() => openProjectModal(project, "kurva")}
+                                className="grid size-7 place-items-center rounded-lg border border-border/70 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 hover:border-sky-500/40"
+                              >
+                                <ChartSpline className="size-3.5" />
+                              </button>
                               {isPendingSetup ? (
                                 <Button
                                   type="button"
@@ -1908,7 +2179,7 @@ export default function ProjectWorkstationMaster({
 
                     {sortedProjects.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={9} className="py-12 text-center text-muted-foreground">
                           {projects.length
                             ? "Tidak ada proyek yang sesuai dengan pencarian."
                             : "Belum ada proyek yang terdaftar. Tambahkan proyek pertama Anda."}
@@ -1994,18 +2265,30 @@ export default function ProjectWorkstationMaster({
                                 </div>
                               )}
 
-                              {p.progress > 0 && (
-                                <div className="space-y-1 pt-1">
-                                  <div className="flex items-center justify-between text-[10px]">
-                                    <span className="text-muted-foreground">Progres</span>
-                                    <span className="font-bold">{p.progress.toFixed(0)}%</span>
-                                  </div>
-                                  <Progress value={p.progress} className="h-1.5" />
+                              {Number(p.realized) > 0 && (
+                                <div className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                  Tiket cair: {currency(p.realized)}
                                 </div>
                               )}
 
+                              <div className="space-y-1 pt-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <span className="text-muted-foreground">Progres</span>
+                                  <span className="font-bold">
+                                    {p.progress > 0 && p.progress < 10
+                                      ? `${p.progress.toFixed(1)}%`
+                                      : `${p.progress.toFixed(0)}%`}
+                                  </span>
+                                </div>
+                                <Progress value={p.progress} className="h-1.5" />
+                              </div>
+
                               <div className="flex items-center justify-between border-t border-border/50 pt-1.5 text-[10px] text-muted-foreground">
-                                <span className="flex items-center gap-1">
+                                <span className="flex items-center gap-1 truncate">
+                                  <Users className="size-3 shrink-0" />
+                                  <span className="truncate">{p.fieldPicName || "Belum ada PIC"}</span>
+                                </span>
+                                <span className="flex items-center gap-1 shrink-0">
                                   <Calendar className="size-3 shrink-0" />
                                   <span>{p.endDate ? formatProjectDate(p.endDate) : "—"}</span>
                                 </span>
@@ -2102,6 +2385,7 @@ export default function ProjectWorkstationMaster({
         canViewBudget={canViewFinancials || editingProject === null}
         canManageUsers={
           currentUserRole === UserRole.DIRECTOR ||
+          currentUserRole === UserRole.DEPUTY_DIRECTOR ||
           currentUserRole === UserRole.ADMINISTRATIONS
         }
         open={newProjectOpen || editingProject !== null}
@@ -2148,6 +2432,7 @@ export default function ProjectWorkstationMaster({
                     <CreateTicketModal
                       key={`equipment-request-${activeProject.id}`}
                       projects={ticketProjectOptions}
+                      materialContracts={materialContracts}
                       requesterRole={currentUserRole}
                       defaultRequestCategory="EQUIPMENT_REQUEST"
                       fixedProjectId={activeProject.id}
@@ -2396,11 +2681,26 @@ export default function ProjectWorkstationMaster({
                       {(() => {
                         const pagu = Number(activeProject.pagu);
                         const realized = Number(activeProject.realized);
+                        const requestedTotal = Number(
+                          activeProject.requestedTotal ?? activeProject.realized,
+                        );
+                        const laborRealized = Number(
+                          activeProject.laborRealized ?? 0,
+                        );
+                        const laborRequested = Number(
+                          activeProject.laborRequested ?? 0,
+                        );
+                        const materialRealized = Number(
+                          activeProject.materialRealized ?? 0,
+                        );
+                        const operationalRealized = Number(
+                          activeProject.operationalRealized ?? 0,
+                        );
                         const percent =
                           pagu > 0 ? Math.min((realized / pagu) * 100, 100) : 0;
                         return (
                           <>
-                            <div className="grid gap-3 sm:grid-cols-3">
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                               <div className="rounded-lg border border-border bg-muted/20 p-3">
                                 <p className="text-xs text-muted-foreground">Nilai Pagu Kontrak</p>
                                 <p className="mt-1 text-base font-extrabold text-emerald-600 dark:text-emerald-400">
@@ -2409,10 +2709,25 @@ export default function ProjectWorkstationMaster({
                               </div>
                               <div className="rounded-lg border border-border bg-muted/20 p-3">
                                 <p className="text-xs text-muted-foreground">
-                                  Realisasi (Material, Upah &amp; Biaya)
+                                  Pengeluaran Tiket (Cair)
                                 </p>
                                 <p className="mt-1 text-base font-extrabold text-foreground">
                                   {currency(realized)}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                  Total diajukan: {currency(requestedTotal)}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                                <p className="text-xs text-muted-foreground">
+                                  Upah Tukang (Cair / Tiket)
+                                </p>
+                                <p className="mt-1 text-base font-extrabold text-amber-600 dark:text-amber-400">
+                                  {currency(laborRealized)}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                  Pengajuan upah: {currency(laborRequested)} · Material/Ops cair:{" "}
+                                  {currency(materialRealized + operationalRealized)}
                                 </p>
                               </div>
                               <div className="rounded-lg border border-border bg-muted/20 p-3">
@@ -3450,40 +3765,94 @@ export default function ProjectWorkstationMaster({
                   </Card>
                   {(() => {
                     const approvedTotal = activeProject.workPoints.reduce(
-                      (sum, point) => sum + Number(point.approvedTotalWage ?? 0),
+                      (sum, point) =>
+                        sum +
+                        Number(
+                          point.approvedTotalWage ??
+                            point.proposedTotalWage ??
+                            0,
+                        ),
                       0,
                     );
-                    const paidTotal = activeProject.wageTicketPayments.reduce(
+                    const laborTickets = activeProject.wageTicketPayments.filter(
+                      (payment) =>
+                        (payment.fundCategory ??
+                          classifyTicketFundCategory(payment).key) === "TUKANG",
+                    );
+                    const paidLaborTotal = laborTickets.reduce(
                       (sum, payment) =>
                         sum + (payment.paid ? Number(payment.amount ?? 0) : 0),
                       0,
                     );
-                    const remaining = Math.max(approvedTotal - paidTotal, 0);
+                    const requestedLaborTotal = laborTickets.reduce(
+                      (sum, payment) => sum + Number(payment.amount ?? 0),
+                      0,
+                    );
+                    const allPaidTicketsTotal =
+                      activeProject.wageTicketPayments.reduce(
+                        (sum, payment) =>
+                          sum +
+                          (payment.paid ? Number(payment.amount ?? 0) : 0),
+                        0,
+                      );
+                    const allRequestedTicketsTotal =
+                      activeProject.wageTicketPayments.reduce(
+                        (sum, payment) => sum + Number(payment.amount ?? 0),
+                        0,
+                      );
+                    const remaining = Math.max(
+                      approvedTotal - paidLaborTotal,
+                      0,
+                    );
 
                     return (
                       <>
                         <Card>
                           <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <CardTitle className="text-base">Ringkasan Upah Tukang</CardTitle>
+                              <CardTitle className="text-base">
+                                Ringkasan Upah Tukang &amp; Pengeluaran Tiket
+                              </CardTitle>
                               <p className="text-xs text-muted-foreground">
-                                Pengajuan pembayaran bertahap diproses dan dicatat melalui tiket.
+                                Tersinkronisasi otomatis dengan pengajuan dan pencairan tiket proyek (Upah Tukang, Material, &amp; Operasional).
                               </p>
                             </div>
                           </CardHeader>
-                          <CardContent className="grid gap-3 sm:grid-cols-3">
+                          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <div className="rounded-lg border bg-muted/20 p-3">
-                              <p className="text-xs text-muted-foreground">Total upah disetujui</p>
-                              <p className="mt-1 font-bold">{currency(approvedTotal)}</p>
-                            </div>
-                            <div className="rounded-lg border bg-muted/20 p-3">
-                              <p className="text-xs text-muted-foreground">Total sudah dibayar</p>
-                              <p className="mt-1 font-bold text-emerald-600 dark:text-emerald-400">
-                                {currency(paidTotal)}
+                              <p className="text-xs text-muted-foreground">
+                                Nilai Pekerjaan / Upah Titik
+                              </p>
+                              <p className="mt-1 font-bold">
+                                {currency(approvedTotal)}
                               </p>
                             </div>
                             <div className="rounded-lg border bg-muted/20 p-3">
-                              <p className="text-xs text-muted-foreground">Sisa kewajiban upah</p>
+                              <p className="text-xs text-muted-foreground">
+                                Upah Tukang Dibayar (Tiket)
+                              </p>
+                              <p className="mt-1 font-bold text-emerald-600 dark:text-emerald-400">
+                                {currency(paidLaborTotal)}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                Total diajukan: {currency(requestedLaborTotal)} ({laborTickets.length} tiket)
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-muted/20 p-3">
+                              <p className="text-xs text-muted-foreground">
+                                Total Seluruh Tiket Proyek
+                              </p>
+                              <p className="mt-1 font-bold text-sky-600 dark:text-sky-400">
+                                {currency(allPaidTicketsTotal)}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                Pengajuan semua kategori: {currency(allRequestedTicketsTotal)} ({activeProject.wageTicketPayments.length} tiket)
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-muted/20 p-3">
+                              <p className="text-xs text-muted-foreground">
+                                Sisa Pagu Pekerjaan / Upah
+                              </p>
                               <p className="mt-1 font-bold text-amber-600 dark:text-amber-400">
                                 {currency(remaining)}
                               </p>
@@ -3493,35 +3862,58 @@ export default function ProjectWorkstationMaster({
 
                         <Card>
                           <CardHeader className="pb-3">
-                            <CardTitle className="text-base">Histori Pencairan Tiket Upah</CardTitle>
+                            <CardTitle className="text-base">
+                              Histori Pencairan Tiket Proyek (Upah Tukang &amp; Pengeluaran)
+                            </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-3">
-                            {activeProject.wageTicketPayments.map((payment) => (
-                              <article
-                                key={payment.id}
-                                className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3.5"
-                              >
-                                <div>
-                                  <p className="font-semibold">
-                                    Tiket {payment.ticketNumber} · {payment.title}
+                            {activeProject.wageTicketPayments.map((payment) => {
+                              const cat = classifyTicketFundCategory(payment);
+                              return (
+                                <article
+                                  key={payment.id}
+                                  className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3.5"
+                                >
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="font-semibold">
+                                        Tiket {payment.ticketNumber} · {payment.title}
+                                      </p>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[10px] ${cat.badgeClass}`}
+                                      >
+                                        {cat.label}
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className={
+                                          payment.paid
+                                            ? "border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-600 dark:text-emerald-400"
+                                            : "border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-600 dark:text-amber-400"
+                                        }
+                                      >
+                                        {payment.paid ? "Cair / Dibayar" : "Menunggu Pencairan"}
+                                      </Badge>
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {payment.paid
+                                        ? `Dibayar ${formatProjectDate(payment.paidAt)}`
+                                        : `Status ${statusLabels[payment.status] ?? payment.status}`}
+                                      {" · "}Diajukan oleh {payment.requesterName}
+                                    </p>
+                                  </div>
+                                  <p className="font-bold">
+                                    {payment.amount && Number(payment.amount) > 0
+                                      ? currency(payment.amount)
+                                      : "Nominal belum ditetapkan"}
                                   </p>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {payment.paid
-                                      ? `Dibayar ${formatProjectDate(payment.paidAt)}`
-                                      : `Status ${statusLabels[payment.status] ?? payment.status}`}
-                                    {" · "}Diajukan oleh {payment.requesterName}
-                                  </p>
-                                </div>
-                                <p className="font-bold">
-                                  {payment.amount
-                                    ? currency(payment.amount)
-                                    : "Nominal belum ditetapkan"}
-                                </p>
-                              </article>
-                            ))}
+                                </article>
+                              );
+                            })}
                             {activeProject.wageTicketPayments.length === 0 && (
                               <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                Belum ada tiket pembayaran upah untuk proyek ini.
+                                Belum ada tiket pengeluaran atau pembayaran upah untuk proyek ini.
                               </p>
                             )}
                           </CardContent>
