@@ -201,6 +201,77 @@ export default function VehicleFleetPanel({
               {message}
             </p>
           )}
+          {/* Mobile Card View (< 768px) */}
+          <div className="space-y-2.5 md:hidden">
+            {vehicles.map((vehicle) => (
+              <div
+                key={vehicle.id}
+                className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm font-bold text-foreground">
+                      {vehicle.plateNumber}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {vehicle.vehicleType}
+                      {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
+                      {vehicle.brand ? ` · ${vehicle.brand}` : ""}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className={`shrink-0 ${statusVariants[vehicle.status]}`}>
+                    {statusLabels[vehicle.status]}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs">
+                  <span className="text-muted-foreground">
+                    KM: {vehicle.odometerInitialized ? `${vehicle.currentKilometer} km` : "Belum diatur"}
+                  </span>
+                  {canManage && (
+                    <div className="flex items-center gap-1.5">
+                      <ActionIconButton
+                        type="button"
+                        label={`Edit kendaraan ${vehicle.plateNumber}`}
+                        tooltip={`Edit kendaraan ${vehicle.plateNumber}`}
+                        icon={Pencil}
+                        disabled={isPending}
+                        onClick={() => openEditDialog(vehicle)}
+                      />
+                      <ActionIconButton
+                        type="button"
+                        label={`Edit KM ${vehicle.plateNumber}`}
+                        tooltip={`Edit kilometer ${vehicle.plateNumber}`}
+                        icon={Gauge}
+                        disabled={isPending}
+                        onClick={() => openKilometerDialog(vehicle)}
+                      />
+                      <ActionIconButton
+                        type="button"
+                        label={`Hapus kendaraan ${vehicle.plateNumber}`}
+                        tooltip={`Hapus kendaraan ${vehicle.plateNumber}`}
+                        icon={Trash2}
+                        className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        disabled={
+                          isPending ||
+                          vehicle.status === "IN_USE" ||
+                          vehicle.status === "RESERVED"
+                        }
+                        onClick={() => handleDelete(vehicle)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {vehicles.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+                Belum ada kendaraan terdaftar.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (>= 768px) */}
+          <div className="hidden md:block">
           <NativeDataTable itemLabel="kendaraan">
             <table className="app-data-table w-full min-w-[640px] text-sm">
               <thead>
@@ -292,6 +363,7 @@ export default function VehicleFleetPanel({
               </tbody>
             </table>
           </NativeDataTable>
+          </div>
         </CardContent>
       </Card>
 

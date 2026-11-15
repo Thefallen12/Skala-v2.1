@@ -163,6 +163,42 @@ export default function VehicleOperationsPanel({
         )}
         <section className="space-y-3">
           <h3 className="font-semibold text-primary">Daftar Kendaraan Aktif</h3>
+          {/* Mobile Card View (< 768px) */}
+          <div className="space-y-2 md:hidden">
+            {vehicles.map((vehicle) => (
+              <div
+                key={vehicle.id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-border/80 bg-card p-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-sm font-bold text-foreground">
+                    {vehicle.plateNumber}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {vehicle.vehicleType}
+                    {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
+                    {vehicle.brand ? ` (${vehicle.brand})` : ""}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {vehicle.odometerInitialized
+                      ? `${vehicle.currentKilometer} km`
+                      : "KM belum diinisialisasi"}
+                  </p>
+                </div>
+                <Badge variant="outline" className="shrink-0">
+                  {vehicleStatusLabel[vehicle.status]}
+                </Badge>
+              </div>
+            ))}
+            {vehicles.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
+                Belum ada kendaraan terdaftar.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (>= 768px) */}
+          <div className="hidden md:block">
           <NativeDataTable itemLabel="kendaraan">
             <table className="app-data-table w-full min-w-[720px] text-sm">
               <thead className="bg-[#102A4D] text-left text-white">
@@ -203,6 +239,7 @@ export default function VehicleOperationsPanel({
               </tbody>
             </table>
           </NativeDataTable>
+          </div>
         </section>
         <section className="space-y-3">
           <h3 className="font-semibold text-primary">Riwayat Log Perjalanan & BBM</h3>

@@ -1310,7 +1310,131 @@ export default function LogisticsWorkspace({
             </div>
           </div>
           {stockItems.length ? (
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 p-4 sm:p-5">
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {paginatedStockItems.map((item) => {
+                  const quantity = Number(item.stockQuantity);
+                  const minimum = Number(item.minimumStock);
+                  const isOutOfStock = quantity <= 0;
+                  const isLowStock = !isOutOfStock && quantity <= minimum;
+                  return (
+                    <div
+                      key={item.id}
+                      className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span className="shrink-0 rounded-md border border-border bg-muted p-2 text-muted-foreground">
+                            <Boxes className="size-4" aria-hidden="true" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {item.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              SKU: {item.sku}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={
+                            isOutOfStock
+                              ? "lightError"
+                              : isLowStock
+                                ? "lightWarning"
+                                : "lightSuccess"
+                          }
+                          className="shrink-0"
+                        >
+                          {isOutOfStock
+                            ? "Habis"
+                            : isLowStock
+                              ? "Menipis"
+                              : "Aman"}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Stok</span>
+                          <p className="font-semibold text-foreground">
+                            {new Intl.NumberFormat("id-ID").format(quantity)} {item.unit}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Harga</span>
+                          <p className="font-semibold tabular-nums text-foreground">
+                            {currency.format(Number(item.unitPrice))}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Nilai</span>
+                          <p className="font-semibold tabular-nums text-foreground">
+                            {currency.format(quantity * Number(item.unitPrice))}
+                          </p>
+                        </div>
+                      </div>
+
+                      {canCreatePurchaseOrder && (
+                        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border/60 pt-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs"
+                            onClick={() => openStockEditor(item)}
+                          >
+                            <Pencil className="size-3" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs"
+                            onClick={() => setStockDetail(item)}
+                          >
+                            <Eye className="size-3" />
+                            Detail
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs"
+                            onClick={() => void duplicateStockItem(item)}
+                          >
+                            <Copy className="size-3" />
+                            Duplikat
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs text-destructive"
+                            onClick={() => {
+                              setStockDeleteError("");
+                              setStockDeleteTarget(item);
+                            }}
+                          >
+                            <Trash2 className="size-3" />
+                            Hapus
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!visibleStockItems.length && (
+                  <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+                    Tidak ada barang yang cocok dengan pencarian atau filter.
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden md:block">
               <Table pagination={false}>
                 <TableHeader>
                   <TableRow>
@@ -1456,6 +1580,7 @@ export default function LogisticsWorkspace({
                   )}
                 </TableBody>
               </Table>
+              </div>
               <TablePaginationControls
                 count={visibleStockItems.length}
                 pageSize={stockPageSize}
@@ -1480,6 +1605,97 @@ export default function LogisticsWorkspace({
             </p>
           </div>
           <div className="p-4 sm:p-5">
+            {/* Mobile Card View (< 768px) */}
+            <div className="space-y-2.5 md:hidden">
+              {stockPurchases.map((purchase) => {
+                const itemNamesSummary = purchase.items
+                  .map((item) => item.itemName)
+                  .join(", ");
+                const itemQtySummary = purchase.items
+                  .map((item) => `${item.quantity} ${item.unit}`)
+                  .join(" · ");
+                return (
+                  <div
+                    key={purchase.id}
+                    className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-bold text-primary">
+                          {purchase.purchaseNumber}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {purchase.vendorName} · {stockDateLabel.format(new Date(purchase.createdAt))}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          purchase.status === "RECEIVED" ? "lightSuccess" : "lightWarning"
+                        }
+                        className="shrink-0"
+                      >
+                        {purchase.status === "RECEIVED"
+                          ? "Diterima"
+                          : !purchase.isApprovedByDirector
+                            ? "Menunggu Direktur"
+                            : !purchase.vendorInvoiceUrl
+                              ? "Menunggu Invoice"
+                              : !purchase.hasFinanceProof
+                                ? "Menunggu Keuangan"
+                                : "Siap Diterima"}
+                      </Badge>
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-medium text-foreground">{itemNamesSummary}</p>
+                      <p className="text-muted-foreground">{itemQtySummary}</p>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/60 pt-2">
+                      <span className="font-mono text-sm font-bold text-foreground tabular-nums">
+                        {currency.format(Number(purchase.totalAmount))}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {canCreatePurchaseOrder &&
+                          purchase.status === "PENDING_RECEIPT" &&
+                          purchase.isApprovedByDirector &&
+                          purchase.hasFinanceProof && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-7 gap-1 px-2.5 text-xs"
+                              onClick={() => {
+                                setReceivingPurchaseError("");
+                                clearReceivingPhotos();
+                                setReceivingPurchase(purchase);
+                              }}
+                            >
+                              <PackageOpen className="size-3.5" />
+                              Terima
+                            </Button>
+                          )}
+                        {purchase.ticket && (
+                          <Button asChild type="button" size="sm" variant="outline" className="h-7 gap-1 px-2.5 text-xs">
+                            <Link
+                              href={`/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(purchase.ticket.id)}`}
+                            >
+                              <Eye className="size-3.5" />
+                              Tiket
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {stockPurchases.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
+                  Belum ada pembelian langsung.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View (>= 768px) */}
+            <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1679,6 +1895,7 @@ export default function LogisticsWorkspace({
                 )}
               </TableBody>
             </Table>
+            </div>
           </div>
         </CardBox>
 

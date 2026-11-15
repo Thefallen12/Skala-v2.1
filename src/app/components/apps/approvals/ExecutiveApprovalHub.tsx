@@ -1559,7 +1559,66 @@ export default function ExecutiveApprovalHub({
                 Belum ada riwayat keputusan yang sesuai dengan filter.
               </p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-border">
+              <>
+                {/* Mobile Card View (< 768px) */}
+                <div className="space-y-2.5 md:hidden">
+                  {filteredHistory.map((entry) => {
+                    const isApproved =
+                      entry.action === "APPROVED" ||
+                      entry.action === "APPROVED_BY_DIR";
+                    const isRejected = entry.action === "REJECTED_BY_DIR";
+                    return (
+                      <div
+                        key={entry.id}
+                        className="space-y-2 rounded-xl border border-border bg-card p-3.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <Badge variant="outline" className="text-[11px] font-medium">
+                              {entry.category}
+                            </Badge>
+                            <p className="mt-1 text-sm font-semibold text-foreground">
+                              {entry.reference}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              isApproved
+                                ? "default"
+                                : isRejected
+                                  ? "lightError"
+                                  : "lightWarning"
+                            }
+                            className="shrink-0"
+                          >
+                            {approvalHistoryLabels[entry.action] ?? entry.action}
+                          </Badge>
+                        </div>
+                        {entry.notes && (
+                          <p className="rounded-md bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground">
+                            Catatan: {entry.notes}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span className="font-medium text-foreground">{entry.actorName}</span>
+                          <span>
+                            {new Intl.DateTimeFormat("id-ID", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone: "Asia/Jakarta",
+                            }).format(new Date(entry.createdAt))}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View (>= 768px) */}
+                <div className="hidden overflow-x-auto rounded-xl border border-border md:block">
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     <tr>
@@ -1626,6 +1685,7 @@ export default function ExecutiveApprovalHub({
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </CardContent>
         </Card>

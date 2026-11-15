@@ -633,6 +633,122 @@ export default function EquipmentVehicleRentalPanel({
         </CardHeader>
 
         <CardContent className="p-0">
+          {/* Mobile Card View (< 768px) */}
+          <div className="space-y-2.5 p-3.5 md:hidden">
+            {filteredRentals.map((r) => {
+              const periodMeta = periodTypeLabels[r.rentalPeriodType] ?? {
+                label: r.rentalPeriodType || "Sewa",
+                unit: "Hari",
+                badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
+              };
+              const statusMeta = statusLabels[r.status] ?? {
+                label: r.status || "Aktif",
+                badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+              };
+              return (
+                <div
+                  key={r.id}
+                  className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <span className="text-base">
+                        {r.type === "EQUIPMENT" ? "🚜" : "🚚"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-primary">
+                          {r.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {r.vendorName}
+                          {r.codeOrPlate ? ` · ${r.codeOrPlate}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`inline-block shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusMeta.badgeClass}`}>
+                      {statusMeta.label}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground">Durasi &amp; Jadwal</span>
+                      <p className="font-medium text-foreground">
+                        {r.duration} {periodMeta.unit} ({periodMeta.label})
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(r.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "short" })} -{" "}
+                        {new Date(r.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-muted-foreground">Total Biaya</span>
+                      <p className="font-mono text-sm font-bold text-primary">
+                        {formatCurrency(r.totalCost)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {r.projectName ?? "Tanpa proyek"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                    <div>
+                      {r.paymentStatus === "PAID" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          <CheckCircle2 className="size-3" /> Lunas
+                        </span>
+                      ) : r.paymentStatus === "PENDING_PAYMENT" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                          <Clock className="size-3" /> Menunggu Keuangan
+                        </span>
+                      ) : canManage ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openBillingModal(r)}
+                          className="h-7 gap-1 px-2 text-xs text-emerald-600 dark:text-emerald-400"
+                        >
+                          <Send className="size-3" /> Ajukan Tagihan
+                        </Button>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">Belum Diajukan</span>
+                      )}
+                    </div>
+                    {canManage && (
+                      <div className="flex items-center gap-1">
+                        <ActionIconButton
+                          type="button"
+                          label="Edit sewa"
+                          tooltip="Edit sewa"
+                          icon={Pencil}
+                          onClick={() => openEditModal(r)}
+                          className="size-7"
+                        />
+                        <ActionIconButton
+                          type="button"
+                          label="Hapus sewa"
+                          tooltip="Hapus sewa"
+                          icon={Trash2}
+                          onClick={() => handleDelete(r.id, r.name)}
+                          className="size-7 text-rose-500 hover:text-rose-700"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {filteredRentals.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+                Belum ada data sewa alat / kendaraan
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (>= 768px) */}
+          <div className="hidden md:block">
           <NativeDataTable itemLabel="data sewa">
             <table className="app-data-table w-full min-w-[850px] text-sm">
               <thead className="bg-[#102A4D] text-left text-white text-xs">
@@ -871,6 +987,7 @@ export default function EquipmentVehicleRentalPanel({
               </tbody>
             </table>
           </NativeDataTable>
+          </div>
         </CardContent>
       </Card>
 

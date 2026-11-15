@@ -1859,7 +1859,114 @@ export default function FinanceHub({
                     : "Tidak ada PO yang cocok dengan pencarian."}
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
+                <>
+                  {/* Mobile Card View (< 768px) */}
+                  <div className="space-y-2.5 md:hidden">
+                    {filteredReviewOrders.map((order) => {
+                      const subtotal = order.items.reduce(
+                        (sum, item) => sum + item.totalPrice,
+                        0,
+                      );
+                      const poGrandTotal =
+                        Math.round(
+                          subtotal * (order.includeTax ? 1.11 : 1) * 100,
+                        ) / 100;
+                      return (
+                        <div
+                          key={order.publicCode}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setMessage("");
+                            setSelection({ kind: "po", id: order.publicCode });
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelection({ kind: "po", id: order.publicCode });
+                            }
+                          }}
+                          className="cursor-pointer space-y-2 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs font-bold text-primary">
+                                {order.poNumber}
+                              </p>
+                              <p className="mt-0.5 text-sm font-semibold text-foreground">
+                                {order.vendorName}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {order.paymentMethod === "CASH"
+                                  ? "Tunai (Cash)"
+                                  : `Transfer${order.paymentBankName ? ` · ${order.paymentBankName}` : ""}`}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="shrink-0">
+                              {order.items.length} item
+                            </Badge>
+                          </div>
+
+                          <div className="flex items-center justify-between rounded-md bg-muted/30 p-2 text-xs">
+                            <span className="text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleDateString("id-ID", {
+                                dateStyle: "medium",
+                              })}
+                            </span>
+                            <div className="text-right">
+                              <span className="font-mono font-bold text-foreground tabular-nums">
+                                {currency(poGrandTotal)}
+                              </span>
+                              {order.includeTax && (
+                                <span className="block text-[10px] text-muted-foreground">
+                                  Termasuk PPN 11%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-1">
+                            {role === UserRole.FINANCE && !order.paidAt ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                disabled={isPending}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  runReview(order.publicCode);
+                                }}
+                              >
+                                <FileCheck2 className="size-3.5" aria-hidden="true" />
+                                Tandai Diperiksa
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setMessage("");
+                                  setSelection({
+                                    kind: "po",
+                                    id: order.publicCode,
+                                  });
+                                }}
+                              >
+                                <Eye className="size-3.5" aria-hidden="true" />
+                                Lihat PO
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table View (>= 768px) */}
+                  <div className="hidden overflow-x-auto rounded-lg border md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1972,6 +2079,7 @@ export default function FinanceHub({
                     </TableBody>
                   </Table>
                 </div>
+                </>
               )}
               <p className="text-xs text-muted-foreground">
                 Klik baris PO untuk melihat dokumen lengkap. Pembelian langsung dan tiket biaya yang sudah disetujui Direktur masuk ke tab <strong>2. Antrean Bayar</strong>.
@@ -2005,7 +2113,153 @@ export default function FinanceHub({
                 </div>
               </CardHeader>
               <CardContent>
-              <div className="overflow-x-auto rounded-lg border">
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {filteredPendingPaymentRows.map((row) => {
+                  const balance =
+                    Math.round((row.grandTotal - row.paidAmount) * 100) / 100;
+                  const outstanding = Math.max(0, balance);
+                  const waitingInvoice = row.hasInvoice === false;
+                  const needsNominal = Boolean(row.needsNominalInput);
+                  return (
+                    <div
+                      key={`${row.kind}:${row.id}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openPaymentHistory(row)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openPaymentHistory(row);
+                        }
+                      }}
+                      className="cursor-pointer space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs font-bold text-primary">
+                            {row.reference}
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold text-foreground">
+                            {row.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {row.transferDestination ||
+                              "Klik kartu untuk melihat tujuan rekening"}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            waitingInvoice || needsNominal
+                              ? "warning"
+                              : balance <= 0
+                                ? "success"
+                                : row.paidAmount > 0
+                                  ? "warning"
+                                  : "error"
+                          }
+                          className="shrink-0"
+                        >
+                          {waitingInvoice
+                            ? "MENUNGGU INVOICE"
+                            : needsNominal
+                              ? "BELUM ADA NOMINAL"
+                              : balance <= 0
+                                ? "LUNAS"
+                                : row.paidAmount > 0
+                                  ? "SEBAGIAN"
+                                  : "BELUM DIBAYAR"}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Tagihan</span>
+                          <p className="font-semibold tabular-nums">
+                            {needsNominal ? "—" : currency(row.grandTotal)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Terbayar</span>
+                          <p className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                            {currency(row.paidAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Sisa</span>
+                          <p className="font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                            {needsNominal ? "—" : currency(outstanding)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-0.5">
+                        {(outstanding > 0 || needsNominal) &&
+                        role === UserRole.FINANCE ? (
+                          waitingInvoice ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              disabled={isPending}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openPaymentHistory(row);
+                              }}
+                            >
+                              <Eye className="size-3.5" aria-hidden="true" />
+                              Menunggu Invoice
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              disabled={isPending}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setPaymentModalSelection({
+                                  kind: row.kind,
+                                  id: row.id,
+                                });
+                              }}
+                            >
+                              <Wallet className="size-3.5" aria-hidden="true" />
+                              Bayar Tagihan
+                            </Button>
+                          )
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                            disabled={isPending}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openPaymentHistory(row);
+                            }}
+                          >
+                            <Eye className="size-3.5" aria-hidden="true" />
+                            Rincian
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredPendingPaymentRows.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+                    {pendingPaymentRows.length === 0
+                      ? "Tidak ada tagihan yang menunggu pembayaran."
+                      : "Tidak ada tagihan yang cocok dengan pencarian."}
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-lg border md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -2200,7 +2454,88 @@ export default function FinanceHub({
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-lg border">
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {paymentHistoryPageRows.map((payment) => (
+                  <div
+                    key={payment.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      setSelection(
+                        payment.targetKind === "ticket"
+                          ? { kind: "ticket", id: payment.targetId }
+                          : payment.targetKind === "standalone-po"
+                            ? { kind: "standalone-po", id: payment.targetId }
+                            : { kind: "direct-purchase", id: payment.targetId },
+                      )
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelection(
+                          payment.targetKind === "ticket"
+                            ? { kind: "ticket", id: payment.targetId }
+                            : payment.targetKind === "standalone-po"
+                              ? { kind: "standalone-po", id: payment.targetId }
+                              : {
+                                  kind: "direct-purchase",
+                                  id: payment.targetId,
+                                },
+                        );
+                      }
+                    }}
+                    className="cursor-pointer space-y-2 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-bold text-primary">
+                          {payment.reference}
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-foreground">
+                          {payment.title}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="shrink-0">
+                        {payment.paymentType === PaymentType.DOWN_PAYMENT
+                          ? "DP"
+                          : payment.paymentType === PaymentType.PROGRESS_PAYMENT
+                            ? "Termin"
+                            : "Pelunasan"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {payment.paidAt
+                          ? new Date(payment.paidAt).toLocaleString("id-ID")
+                          : "—"}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-foreground tabular-nums">
+                        {currency(payment.amount)}
+                      </span>
+                    </div>
+                    <div className="pt-1">
+                      {renderPaymentProof(
+                        payment.id,
+                        payment.proofOfTransferUrl,
+                        payment.additionalProofUrls ?? [],
+                        payment.proofEditDisabledUrls ?? [],
+                        `Bukti transfer ${payment.reference}`,
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {filteredPaymentHistoryRows.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+                    {paymentHistoryRows.length === 0
+                      ? "Belum ada transaksi pembayaran berhasil."
+                      : "Tidak ada transaksi yang cocok dengan pencarian."}
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-lg border md:block">
                 <Table pagination={false}>
                   <TableHeader>
                     <TableRow>

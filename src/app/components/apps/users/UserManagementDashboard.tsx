@@ -717,6 +717,98 @@ export default function UserManagementDashboard({
           </Select>
         </div>
 
+        {/* Mobile Card View (< 768px) */}
+        <div className="space-y-2.5 md:hidden">
+          {filteredUsers.map((user) => (
+            <div
+              key={user.id}
+              className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card p-3.5"
+            >
+              <div className="flex min-w-0 items-start gap-2.5">
+                <Avatar className="size-10 shrink-0 border border-white/10">
+                  <AvatarImage
+                    src={user.profilePhotoUrl ?? undefined}
+                    alt={user.name}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-[#102A4D] text-white">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 space-y-1">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {user.name}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user.email}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <Badge
+                      variant="outline"
+                      className={`px-2 py-0.5 text-[10px] ${roleBadgeClasses[user.role]}`}
+                    >
+                      {roleOptions.find((role) => role.value === user.role)?.label ??
+                        user.role}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={`gap-1 px-2 py-0.5 text-[10px] ${
+                        user.isActive
+                          ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-500"
+                          : "border-slate-400/30 bg-slate-500/10 text-slate-400"
+                      }`}
+                    >
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${
+                          user.isActive ? "bg-emerald-400" : "bg-slate-400"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      {user.isActive ? "Aktif" : "Nonaktif"}
+                    </Badge>
+                    {user.id === currentUserId && (
+                      <span className="text-[11px] font-medium text-primary">
+                        · Akun Anda
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Ubah ${user.name}`}
+                  disabled={isPending}
+                  className="size-8"
+                  onClick={() => openEditAccount(user)}
+                >
+                  <Pencil className="size-3.5 text-primary" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Hapus ${user.name}`}
+                  disabled={isPending || user.id === currentUserId}
+                  className="size-8 text-destructive hover:text-destructive"
+                  onClick={() => setDeleteTarget(user)}
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          {filteredUsers.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+              Tidak ada pengguna yang cocok dengan filter.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View (>= 768px) */}
+        <div className="hidden md:block">
         <Table
           className="w-full"
           style={{ tableLayout: "fixed", width: "100%" }}
@@ -859,6 +951,7 @@ export default function UserManagementDashboard({
               )}
             </TableBody>
         </Table>
+        </div>
       </CardBox>
 
       <GlobalModal

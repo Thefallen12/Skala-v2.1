@@ -347,7 +347,7 @@ export default function TicketsApp({
   return (
     <div className="space-y-4">
       {/* 1. Alur Skema 4 Tahap Tiket (Bisa Diklik untuk Filter Tahapan) */}
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {schemaSteps.map((item) => {
           const Icon = item.icon;
           const isSelected = filter === item.filterKey;
@@ -399,7 +399,7 @@ export default function TicketsApp({
       />
 
       {/* 3. Direktori Tiket Utama */}
-      <CardBox className="overflow-hidden">
+      <CardBox className="overflow-hidden p-0 gap-0">
         <div
           id="ticket-directory"
           className="flex flex-col gap-3 border-b border-border px-4 py-3.5 sm:px-5 sm:py-4"
@@ -555,7 +555,7 @@ export default function TicketsApp({
           </div>
         </div>
 
-        <div className="px-3.5 py-2 sm:px-5">
+        <div className="px-3.5 py-3 sm:px-5 sm:py-4">
           <TicketListing
             tickets={visibleTickets}
             projects={projects}
@@ -582,7 +582,7 @@ export default function TicketsApp({
           />
 
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-            <CardBox className="overflow-hidden xl:col-span-2">
+            <CardBox className="overflow-hidden p-0 gap-0 xl:col-span-2">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
                 <div>
                   <h3 className="font-semibold">Tren Tiket &amp; Transaksi</h3>
@@ -612,7 +612,7 @@ export default function TicketsApp({
                 />
               </div>
             </CardBox>
-            <CardBox className="h-full overflow-hidden">
+            <CardBox className="h-full overflow-hidden p-0 gap-0">
               <div className="border-b border-border px-5 py-4">
                 <h3 className="font-semibold">Distribusi Jenis Permintaan</h3>
                 <p className="mt-1 text-xs text-muted-foreground">

@@ -608,7 +608,75 @@ export default function ProjectFundRecapTab({
         </CardHeader>
 
         <CardContent>
-          <div className="overflow-x-auto rounded-lg border border-border/70">
+          {/* Mobile Card View (< 768px) */}
+          <div className="space-y-2.5 md:hidden">
+            {filteredTickets.map((ticket) => {
+              const Icon = ticket.category.icon;
+              return (
+                <div
+                  key={ticket.id}
+                  className="space-y-2 rounded-lg border border-border/80 bg-card p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`}
+                        className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-primary hover:underline"
+                      >
+                        {ticket.ticketNumber}
+                        <ArrowUpRight className="size-3 opacity-60" />
+                      </Link>
+                      <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
+                        {ticket.title}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        ticket.paid
+                          ? "shrink-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]"
+                          : "shrink-0 bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]"
+                      }
+                    >
+                      {ticket.paid ? "Cair (Lunas)" : "Menunggu Cair"}
+                    </Badge>
+                  </div>
+
+                  {ticket.items && ticket.items.length > 0 && (
+                    <p className="line-clamp-2 text-[11px] text-muted-foreground">
+                      {ticket.items
+                        .map((it) => `${it.itemName} (${it.quantity} ${it.unit})`)
+                        .join(", ")}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                    <Badge variant="outline" className={`gap-1 text-[10px] ${ticket.category.badgeClass}`}>
+                      <Icon className="size-3" />
+                      <span>{ticket.category.label}</span>
+                    </Badge>
+                    <span className="font-mono text-sm font-bold text-foreground tabular-nums">
+                      {currency(ticket.amountNum)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Pemohon: {ticket.requesterName}</span>
+                    <span>{formatDateIndo(ticket.createdAt)}</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredTickets.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+                Belum ada pengajuan tiket pada kategori ini.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (>= 768px) */}
+          <div className="hidden overflow-x-auto rounded-lg border border-border/70 md:block">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-border/80 bg-muted/40 font-semibold text-muted-foreground">
                 <tr>

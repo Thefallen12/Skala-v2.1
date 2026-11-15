@@ -626,6 +626,7 @@ export default function ProjectWorkstationMaster({
   });
   const [activeModalTab, setActiveModalTab] = useState<string>("pagu");
   const [showPicChart, setShowPicChart] = useState(false);
+  const [showWorkflowGuide, setShowWorkflowGuide] = useState(false);
   const [selectedReportWorkPointId, setSelectedReportWorkPointId] =
     useState("");
   const projectStatusFilter =
@@ -1259,6 +1260,20 @@ export default function ProjectWorkstationMaster({
                 type="button"
                 variant="outline"
                 size="sm"
+                onClick={() => setShowWorkflowGuide((prev) => !prev)}
+                className="gap-1.5"
+              >
+                <span>Alur 4 Tahap</span>
+                {showWorkflowGuide ? (
+                  <ChevronUp className="size-3.5" aria-hidden="true" />
+                ) : (
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setShowPicChart((prev) => !prev)}
                 className="gap-1.5"
               >
@@ -1300,8 +1315,9 @@ export default function ProjectWorkstationMaster({
             </div>
           </div>
 
-          {/* Skema Alur Eksekusi Proyek 4 Tahap */}
-          <div className="mt-4 grid grid-cols-1 gap-2 border-t border-border/70 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Skema Alur Eksekusi Proyek 4 Tahap (Collapsible) */}
+          {showWorkflowGuide && (
+            <div className="mt-4 grid grid-cols-1 gap-2 border-t border-border/70 pt-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-start gap-2.5 rounded-lg border border-border/70 bg-muted/20 p-2.5">
               <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-xs font-extrabold text-amber-600 dark:text-amber-400">
                 01
@@ -1347,6 +1363,7 @@ export default function ProjectWorkstationMaster({
               </div>
             </div>
           </div>
+          )}
         </header>
       )}
 
@@ -1798,7 +1815,244 @@ export default function ProjectWorkstationMaster({
           {/* TABEL VIEW */}
           {projectViewMode === "tabel" && (
             <div className="space-y-4">
-              <div className="overflow-x-auto rounded-xl border border-border/80">
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-3 md:hidden">
+                {sortedProjects.length > 0 && (
+                  <div className="flex items-center justify-between rounded-xl border border-border/80 bg-muted/30 px-3 py-2">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
+                      <input
+                        type="checkbox"
+                        aria-label="Pilih semua proyek"
+                        className="size-4 rounded border-border"
+                        checked={
+                          selectedProjectIds.length > 0 &&
+                          selectedProjectIds.length === sortedProjects.length
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedProjectIds(sortedProjects.map((p) => p.id));
+                          } else {
+                            setSelectedProjectIds([]);
+                          }
+                        }}
+                      />
+                      <span>Pilih Semua ({sortedProjects.length})</span>
+                    </label>
+                    <span className="text-[11px] text-muted-foreground">
+                      Hal. {currentProjectPage}
+                    </span>
+                  </div>
+                )}
+
+                {visibleProjects.map((project) => {
+                  const isSelected = selectedProjectIds.includes(project.id);
+                  const plannedProgress = getPlannedProgress(
+                    project.startDate,
+                    project.endDate,
+                    currentTimeMs,
+                  );
+                  const isPendingSetup = [
+                    "PENDING_SETUP",
+                    "PENDING",
+                    "PLANNED",
+                  ].includes(project.status);
+                  const paguNum = Number(project.pagu) || 0;
+                  const realizedNum = Number(project.realized) || 0;
+                  const requestedNum = Number(project.requestedTotal ?? 0) || 0;
+                  const laborRealizedNum = Number(project.laborRealized ?? 0) || 0;
+
+                  return (
+                    <div
+                      key={project.id}
+                      className={`space-y-3 rounded-xl border bg-card p-3.5 transition ${
+                        isSelected
+                          ? "border-primary/60 ring-1 ring-primary/30"
+                          : "border-border/80"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <input
+                            type="checkbox"
+                            aria-label={`Pilih ${project.title}`}
+                            className="mt-1 size-4 shrink-0 rounded border-border"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProjectIds((prev) => [...prev, project.id]);
+                              } else {
+                                setSelectedProjectIds((prev) =>
+                                  prev.filter((id) => id !== project.id),
+                                );
+                              }
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <Link
+                              href={`/apps/projects/${project.id}`}
+                              className="block text-sm font-bold leading-snug text-foreground hover:text-primary hover:underline"
+                            >
+                              {project.title}
+                            </Link>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span className="font-mono font-medium">{project.code}</span>
+                              {project.kelompokTani &&
+                                project.kelompokTani.toLowerCase() !==
+                                  project.title.toLowerCase() && (
+                                  <span>· {project.kelompokTani}</span>
+                                )}
+                            </div>
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-semibold border-0 ${
+                            project.status === "DONE"
+                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                              : project.status === "TERHAMBAT" ||
+                                  (project.status as string) === "ON_HOLD"
+                                ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
+                                : isPendingSetup
+                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                  : "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+                          }`}
+                        >
+                          {statusLabels[project.status] || "Berjalan"}
+                        </Badge>
+                      </div>
+
+                      {(project.location || project.address) && (
+                        <p className="line-clamp-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <MapPin className="size-3 shrink-0 text-primary/70" />
+                          <span>{project.location || project.address}</span>
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/30 p-2.5 text-xs">
+                        <div>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Nilai Kontrak
+                          </span>
+                          <p className="font-mono font-bold text-foreground">
+                            {currency(paguNum)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Tiket Cair
+                          </span>
+                          <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {realizedNum > 0
+                              ? currency(realizedNum)
+                              : requestedNum > 0
+                                ? `Ajuan ${currency(requestedNum)}`
+                                : "Belum ada"}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Upah Cair
+                          </span>
+                          <p className="font-mono font-semibold text-amber-600 dark:text-amber-400">
+                            {laborRealizedNum > 0 ? currency(laborRealizedNum) : "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Target Selesai
+                          </span>
+                          <p className="font-medium text-foreground">
+                            {project.endDate ? formatProjectDate(project.endDate) : "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-medium text-muted-foreground">
+                            Progres ({project.workPoints.length} titik RAB)
+                            {plannedProgress !== null && project.progress < 100
+                              ? ` · Rencana ${plannedProgress}%`
+                              : ""}
+                          </span>
+                          <span className="font-mono font-bold text-foreground">
+                            {project.progress > 0 && project.progress < 10
+                              ? `${project.progress.toFixed(1)}%`
+                              : `${project.progress.toFixed(0)}%`}
+                          </span>
+                        </div>
+                        <Progress value={project.progress} className="h-1.5" />
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+                        {isProjectManager && fieldTeamUsers.length > 0 ? (
+                          <select
+                            aria-label={`Pilih PIC lapangan untuk ${project.title}`}
+                            value={project.fieldPicId ?? ""}
+                            disabled={isPending}
+                            onChange={(e) =>
+                              assignFieldPic(project.id, e.target.value)
+                            }
+                            className="h-8 min-w-0 flex-1 rounded-md border border-border/80 bg-background px-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+                          >
+                            <option value="">Pilih PIC lapangan...</option>
+                            {fieldTeamUsers.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                PIC: {member.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            PIC: {project.fieldPicName ?? "Belum ditunjuk"}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openProjectModal(project, "kurva")}
+                            className="h-8 gap-1 px-2.5 text-xs text-sky-600 dark:text-sky-400"
+                          >
+                            <ChartSpline className="size-3.5" />
+                            <span>Kurva S</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openProjectModal(project, "titik")}
+                            className="h-8 px-2.5 text-xs"
+                          >
+                            {isPendingSetup ? "Setup" : "Opname"}
+                          </Button>
+                          <button
+                            type="button"
+                            title="Edit proyek"
+                            aria-label={`Edit ${project.title}`}
+                            onClick={() => editProject(project)}
+                            className="grid size-8 place-items-center rounded-lg border border-border/70 text-foreground/80 hover:bg-muted hover:text-primary"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {sortedProjects.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-border py-12 text-center text-xs text-muted-foreground">
+                    {projects.length
+                      ? "Tidak ada proyek yang sesuai dengan pencarian."
+                      : "Belum ada proyek yang terdaftar. Tambahkan proyek pertama Anda."}
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-xl border border-border/80 md:block">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-muted/40 font-semibold text-muted-foreground">
                     <tr className="border-b border-border">
@@ -1896,7 +2150,7 @@ export default function ProjectWorkstationMaster({
                           />
                         </button>
                       </th>
-                      <th className="w-32 px-3 py-3 text-right font-semibold">Aksi</th>
+                      <th className="sticky right-0 z-10 w-32 bg-muted/95 px-3 py-3 text-right font-semibold backdrop-blur-xs">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -2130,7 +2384,7 @@ export default function ProjectWorkstationMaster({
                               ) : null}
                             </button>
                           </td>
-                          <td className="px-3 py-3 text-right align-top">
+                          <td className="sticky right-0 z-10 bg-card/95 px-3 py-3 text-right align-top backdrop-blur-xs">
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
@@ -2475,7 +2729,8 @@ export default function ProjectWorkstationMaster({
                     <span>Edit Proyek</span>
                   </Button>
                 )}
-                {currentUserRole === UserRole.DIRECTOR && (
+                {(currentUserRole === UserRole.DIRECTOR ||
+                  currentUserRole === UserRole.DEPUTY_DIRECTOR) && (
                   <Button
                     type="button"
                     variant="destructive"

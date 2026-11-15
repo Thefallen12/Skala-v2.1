@@ -1099,7 +1099,7 @@ export default function ProjectDetailView({
           Number(project.pagu) > 0 ? Number(project.pagu) : totalRabNumber;
 
         return (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <MapPin className="size-3.5 shrink-0" />
@@ -1178,28 +1178,28 @@ export default function ProjectDetailView({
       {/* 5. Main Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border/80 bg-muted/40 p-1">
-          <TabsTrigger value="ringkasan" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="ringkasan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Ringkasan
           </TabsTrigger>
-          <TabsTrigger value="papan" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="papan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Papan &amp; Jadwal
           </TabsTrigger>
-          <TabsTrigger value="rab" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="rab" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             RAB &amp; biaya
           </TabsTrigger>
-          <TabsTrigger value="rekap-dana" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="rekap-dana" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Rekap dana
           </TabsTrigger>
-          <TabsTrigger value="tagihan" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="tagihan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Tagihan
           </TabsTrigger>
-          <TabsTrigger value="lapangan" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="lapangan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Lapangan
           </TabsTrigger>
-          <TabsTrigger value="tim" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="tim" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Tim &amp; lokasi
           </TabsTrigger>
-          <TabsTrigger value="dokumen" className="rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="dokumen" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
             Dokumen
           </TabsTrigger>
         </TabsList>

@@ -173,7 +173,93 @@ export default function ProjectMaterialDeliveriesCard({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border/80">
+          <>
+            {/* Mobile Card View (< 768px) */}
+            <div className="space-y-2.5 md:hidden">
+              {deliveries.map((delivery) => (
+                <div
+                  key={delivery.id}
+                  className="space-y-2 rounded-lg border border-border/80 bg-card p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-xs font-bold text-primary">
+                          {delivery.doNumber}
+                        </span>
+                        {delivery.ticketNumber && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {delivery.ticketNumber}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs font-medium text-foreground">
+                        {delivery.materialType} · {delivery.vendorName}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
+                        {delivery.driverName ? ` (${delivery.driverName})` : ""}
+                      </p>
+                    </div>
+                    {delivery.billingStatus === "BILLED" ? (
+                      <Badge variant="success" className="shrink-0 text-[10px]">
+                        BILLED
+                      </Badge>
+                    ) : (
+                      <Badge variant="warning" className="shrink-0 text-[10px]">
+                        UNBILLED
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between rounded-md bg-muted/30 p-2 text-xs">
+                    <span className="font-semibold text-foreground">
+                      {formatMaterialVolume(
+                        delivery.quantityReceived,
+                        delivery.unit,
+                      )}
+                    </span>
+                    <span className="font-mono font-bold text-foreground">
+                      {currency(delivery.estimatedAmount)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                    {delivery.proofUrl && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 px-2 text-xs"
+                        onClick={() =>
+                          setPreview({
+                            title: `Surat Jalan ${delivery.doNumber}`,
+                            url: delivery.proofUrl!,
+                          })
+                        }
+                      >
+                        <Eye className="size-3" />
+                        Surat Jalan
+                      </Button>
+                    )}
+                    {canRecord && delivery.billingStatus === "UNBILLED" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending}
+                        className="h-7 gap-1 px-2 text-xs text-destructive"
+                        onClick={() => handleDelete(delivery)}
+                      >
+                        <Trash2 className="size-3" />
+                        Hapus
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View (>= 768px) */}
+            <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -281,6 +367,7 @@ export default function ProjectMaterialDeliveriesCard({
               </TableBody>
             </Table>
           </div>
+          </>
         )}
       </CardContent>
 

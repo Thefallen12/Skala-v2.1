@@ -299,7 +299,7 @@ export default function SurveySidebar({
             <h2 className="text-xs font-bold text-foreground">
               Alat Pemetaan (Draw Tools)
             </h2>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
               {(
                 [
                   ["point", "Point", MapPin],

@@ -343,7 +343,66 @@ export default function VendorContractBillingPanel({
               pada menu Logistik &rarr; Kontrak Curah.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border/80">
+            <>
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {visibleContracts.map((contract) => (
+                  <div
+                    key={contract.id}
+                    className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-foreground">
+                          {contract.vendorName}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {contract.contractNumber} · {contract.materialType}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={contract.isActive ? "success" : "outline"}
+                        className="shrink-0 text-[10px]"
+                      >
+                        {contract.isActive ? "Aktif" : "Nonaktif"}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground">DO Belum Ditagih</span>
+                        <p className="font-semibold text-foreground">
+                          {contract.unbilledDeliveriesCount} DO ({formatMaterialVolume(contract.unbilledVolume, contract.unit)})
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-muted-foreground">Estimasi Tagihan</span>
+                        <p className="font-mono font-bold text-primary">
+                          {currency(contract.unbilledEstimatedAmount)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{currency(contract.unitPrice)} / {contract.unit}</span>
+                      {canManage && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={contract.unbilledDeliveriesCount > 0 ? "default" : "outline"}
+                          disabled={contract.unbilledDeliveriesCount === 0}
+                          onClick={() => openCreateInvoiceModal(contract)}
+                          className="h-8 gap-1.5 text-xs"
+                        >
+                          <ListChecks className="size-3.5" />
+                          Buat Tagihan
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -426,6 +485,7 @@ export default function VendorContractBillingPanel({
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -481,7 +541,88 @@ export default function VendorContractBillingPanel({
               Tidak ada tagihan kontrak vendor pada filter ini.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border/80">
+            <>
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {filteredInvoices.map((invoice) => {
+                  const badge = invoiceStatusBadge[invoice.status];
+                  return (
+                    <div
+                      key={invoice.id}
+                      className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-mono text-xs font-bold text-primary">
+                            {invoice.invoiceNumber}
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {invoice.vendorName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {invoice.contractNumber} ({invoice.materialType}) · {invoice.deliveryCount} SJ
+                          </p>
+                        </div>
+                        <Badge variant={badge.variant} className="shrink-0 text-[10px]">
+                          {badge.label}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Total</span>
+                          <p className="font-bold tabular-nums">{currency(invoice.grandTotal)}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Terbayar</span>
+                          <p className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                            {currency(invoice.paidAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-muted-foreground">Sisa</span>
+                          <p className="font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                            {currency(invoice.remainingAmount)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          {invoice.createdAt.slice(0, 10)}
+                          {invoice.dueDate ? ` · JT ${invoice.dueDate}` : ""}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDetailInvoice(invoice)}
+                            className="h-8 gap-1 text-xs"
+                          >
+                            <Eye className="size-3.5" />
+                            Rincian
+                          </Button>
+                          {canManage && invoice.status !== "PAID" && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setPayingInvoice(invoice)}
+                              className="h-8 gap-1 text-xs"
+                            >
+                              <CreditCard className="size-3.5" />
+                              Bayar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -584,6 +725,7 @@ export default function VendorContractBillingPanel({
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

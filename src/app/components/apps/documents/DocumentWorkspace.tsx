@@ -844,7 +844,43 @@ export default function DocumentWorkspace({
                 Tambah Template
               </Button>
             </div>
-            <div className="overflow-x-auto">
+            {/* Mobile Card View (< 768px) */}
+            <div className="space-y-2.5 md:hidden">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card p-3.5"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-sm font-semibold text-foreground">
+                        {template.name}
+                      </span>
+                      <Badge variant={template.isActive ? "lightSuccess" : "gray"}>
+                        {template.isActive ? "Aktif" : "Nonaktif"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {kindLabels[template.kind]} · {template.title}
+                    </p>
+                  </div>
+                  <ActionIconButton
+                    label={`Edit template ${template.name}`}
+                    tooltip={`Edit template ${template.name}`}
+                    icon={Pencil}
+                    onClick={() => openTemplateDialog(template)}
+                  />
+                </div>
+              ))}
+              {templates.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
+                  Belum ada template. Buat template pertama untuk mempercepat dokumen berikutnya.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View (>= 768px) */}
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1029,7 +1065,65 @@ function renderDocumentTable(
 ) {
   return (
     <CardBox>
-      <div className="overflow-x-auto">
+      {/* Mobile Card View (< 768px) */}
+      <div className="space-y-2.5 md:hidden">
+        {documents.map((document) => (
+          <div
+            key={document.id}
+            className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-xs font-semibold text-primary">
+                  {document.documentNumber}
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-foreground">
+                  {document.title}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {kindLabels[document.kind]} · {document.ticket.ticketNumber}
+                </p>
+              </div>
+              <Badge
+                variant={
+                  document.status === OperationalDocumentStatus.ISSUED
+                    ? "lightSuccess"
+                    : "lightWarning"
+                }
+                className="shrink-0"
+              >
+                {document.status === OperationalDocumentStatus.ISSUED
+                  ? "Terbit"
+                  : "Siap diterbitkan"}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
+              <div className="min-w-0">
+                <span className="font-medium text-foreground">
+                  {document.signedBy.name}
+                </span>
+                <span className="block text-[11px]">
+                  {dateFormatter.format(new Date(document.signedAt))}
+                </span>
+              </div>
+              <ActionIconButton
+                label={`Lihat detail dokumen ${document.documentNumber}`}
+                tooltip={`Lihat detail dokumen ${document.documentNumber}`}
+                icon={FileText}
+                onClick={() => onSelect(document)}
+              />
+            </div>
+          </div>
+        ))}
+        {documents.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+            {emptyMessage}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View (>= 768px) */}
+      <div className="hidden overflow-x-auto md:block">
         <Table>
           <TableHeader>
             <TableRow>

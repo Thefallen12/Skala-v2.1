@@ -296,7 +296,91 @@ export default function MaterialContractsPanel({
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border/80">
+            <>
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {contracts.map((contract) => (
+                  <div
+                    key={contract.id}
+                    className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs font-bold text-primary">
+                          {contract.contractNumber}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {contract.vendorName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {contract.materialType} · {currency(contract.unitPrice)} / {contract.unit}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {canCreateContract && (
+                          <Switch
+                            checked={contract.isActive}
+                            disabled={isPending}
+                            onCheckedChange={(checked) =>
+                              handleToggleActive(contract, checked)
+                            }
+                            aria-label={`Aktifkan kontrak ${contract.contractNumber}`}
+                          />
+                        )}
+                        <Badge
+                          variant={contract.isActive ? "success" : "outline"}
+                          className="text-[10px]"
+                        >
+                          {contract.isActive ? "Aktif" : "Nonaktif"}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                      <div>
+                        <span className="text-[10px] text-muted-foreground">Total Kirim</span>
+                        <p className="font-semibold text-foreground">
+                          {formatMaterialVolume(contract.totalDeliveredVolume, contract.unit)} ({contract.totalDeliveriesCount} DO)
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-muted-foreground">Belum Ditagih</span>
+                        <p className="font-bold text-amber-700 dark:text-amber-300">
+                          {formatMaterialVolume(contract.unbilledVolume, contract.unit)}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {currency(contract.unbilledEstimatedAmount)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {contract.startDate}
+                        {contract.endDate ? ` s.d. ${contract.endDate}` : " · Tanpa batas"}
+                      </span>
+                      {canRecordDelivery && contract.isActive && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedContractForDo(contract.id);
+                            setDeliveryModalOpen(true);
+                          }}
+                          className="h-8 gap-1 text-xs"
+                        >
+                          <Plus className="size-3.5" />
+                          Catat DO
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -396,6 +480,7 @@ export default function MaterialContractsPanel({
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -465,7 +550,98 @@ export default function MaterialContractsPanel({
               Tidak ada data Surat Jalan sesuai filter saat ini.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border/80">
+            <>
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {filteredDeliveries.map((delivery) => (
+                  <div
+                    key={delivery.id}
+                    className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-xs font-bold text-primary">
+                            {delivery.doNumber}
+                          </span>
+                          {delivery.ticketNumber && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {delivery.ticketNumber}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-sm font-semibold text-foreground">
+                          {delivery.projectName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {delivery.vendorName} · {delivery.contractNumber} ({delivery.materialType})
+                        </p>
+                      </div>
+                      {delivery.billingStatus === "BILLED" ? (
+                        <Badge variant="success" className="shrink-0 gap-1 text-[10px]">
+                          <CheckCircle2 className="size-3" />
+                          BILLED
+                        </Badge>
+                      ) : (
+                        <Badge variant="warning" className="shrink-0 text-[10px]">
+                          UNBILLED
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-md bg-muted/30 p-2 text-xs">
+                      <span className="font-semibold text-foreground">
+                        {formatMaterialVolume(delivery.quantityReceived, delivery.unit)}
+                      </span>
+                      <span className="font-mono font-bold text-foreground">
+                        {currency(delivery.estimatedAmount)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>
+                        {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
+                        {delivery.driverName ? ` (${delivery.driverName})` : ""}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {delivery.proofUrl && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 gap-1 px-2 text-xs"
+                            onClick={() =>
+                              setProofPreview({
+                                title: `Surat Jalan ${delivery.doNumber}`,
+                                url: delivery.proofUrl!,
+                              })
+                            }
+                          >
+                            <Eye className="size-3" />
+                            Foto
+                          </Button>
+                        )}
+                        {canRecordDelivery && delivery.billingStatus === "UNBILLED" && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={isPending}
+                            className="h-7 gap-1 px-2 text-xs text-destructive"
+                            onClick={() => handleDeleteDelivery(delivery)}
+                          >
+                            <Trash2 className="size-3" />
+                            Hapus
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -575,6 +751,7 @@ export default function MaterialContractsPanel({
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

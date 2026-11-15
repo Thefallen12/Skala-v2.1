@@ -901,7 +901,51 @@ export default function LogisticsHub({
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Mobile Card View (< 768px) */}
+            <div className="space-y-2.5 md:hidden">
+              {vendors.map((vendor) => {
+                const accounts = getVendorBankAccounts(vendor);
+                const primaryAccount =
+                  accounts.find((account) => account.isPrimary) ?? accounts[0];
+                return (
+                  <div
+                    key={vendor.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card p-3.5"
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {vendor.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {vendor.category} · {vendor.phone ?? vendor.email ?? "Tanpa kontak"}
+                      </p>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {primaryAccount?.bankName ?? "—"} · {primaryAccount?.bankAccount ?? "—"}
+                        {accounts.length > 1 && ` (+${accounts.length - 1} rek)`}
+                      </p>
+                    </div>
+                    <ActionIconButton
+                      type="button"
+                      label={`Edit vendor ${vendor.name}`}
+                      tooltip="Edit vendor"
+                      icon={Pencil}
+                      onClick={() => {
+                        setEditingVendor(vendor);
+                        setVendorSheetOpen(true);
+                      }}
+                    />
+                  </div>
+                );
+              })}
+              {vendors.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
+                  Belum ada vendor di katalog.
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View (>= 768px) */}
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1079,6 +1123,42 @@ export default function LogisticsHub({
                       )}
                     </ul>
                   </div>
+                  {/* Mobile Card View (< 768px) */}
+                  <div className="space-y-2 md:hidden">
+                    {equipmentLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="space-y-1.5 rounded-xl border border-border/80 bg-card p-3 text-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-foreground">{log.equipmentName}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {new Date(`${log.date}T00:00:00`).toLocaleDateString("id-ID")} · {log.projectName}
+                            </p>
+                          </div>
+                          <span className="shrink-0 font-semibold text-primary">
+                            {log.effectiveHours} jam
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1.5 text-[11px]">
+                          <span>HM: {log.hmStart} – {log.hmEnd}</span>
+                          <span className="font-semibold text-foreground">BBM: {log.fuelLiter} L</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Operator: {log.operatorName ?? "Tidak dicatat"}
+                        </p>
+                      </div>
+                    ))}
+                    {equipmentLogs.length === 0 && (
+                      <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
+                        Belum ada log alat berat.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Desktop Table View (>= 768px) */}
+                  <div className="hidden md:block">
                   <NativeDataTable itemLabel="log alat">
                     <table className="app-data-table w-full min-w-[760px] text-sm">
                       <thead className="bg-[#102A4D] text-left text-white">
@@ -1116,6 +1196,7 @@ export default function LogisticsHub({
                       </tbody>
                     </table>
                   </NativeDataTable>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

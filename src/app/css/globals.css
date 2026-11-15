@@ -1054,8 +1054,7 @@ main {
   }
 
   .app-data-table th {
-    @apply h-11 whitespace-nowrap px-3 text-center align-middle font-semibold sm:px-4;
-    text-align: center !important;
+    @apply h-10 whitespace-nowrap px-3 text-left align-middle font-semibold sm:px-3.5;
   }
 
   .app-data-table td [data-slot="select-trigger"] {
@@ -1072,7 +1071,7 @@ main {
   }
 
   .app-data-table td {
-    @apply align-middle p-3 sm:p-4;
+    @apply align-middle p-2.5 sm:px-3.5 sm:py-3;
   }
 
 }
@@ -1167,36 +1166,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .app-data-table {
-    min-width: 42rem;
+    min-width: 100%;
   }
 
   .overflow-x-auto {
     max-width: 100%;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
   }
 
   input,
   textarea,
   select {
-    min-height: 2.75rem;
     max-width: 100%;
-    font-size: 1rem;
-  }
-
-  button,
-  [role="button"] {
-    min-height: 2.75rem;
-  }
-
-  .grid.grid-cols-2 {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   [data-slot="dialog-content"] {
-    width: calc(100vw - 1.5rem);
-    max-width: calc(100vw - 1.5rem);
-    max-height: calc(100dvh - 1.5rem);
+    width: calc(100vw - 1rem);
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
   }
 
   [data-testid="flowbite-drawer"] {
@@ -1204,31 +1191,42 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
-/* Clean modern thin scrollbars for modals and tables */
-[data-slot="dialog-content"] *,
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
-}
-
+/* Clean modern thin scrollbars for modals and tables without classic arrow buttons */
 [data-slot="dialog-content"] *::-webkit-scrollbar,
+[data-slot="table-container"]::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
+[data-slot="dialog-content"] *::-webkit-scrollbar-button,
+[data-slot="table-container"]::-webkit-scrollbar-button,
+.overflow-x-auto::-webkit-scrollbar-button,
+.custom-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 [data-slot="dialog-content"] *::-webkit-scrollbar-track,
+[data-slot="table-container"]::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track,
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
 [data-slot="dialog-content"] *::-webkit-scrollbar-thumb,
+[data-slot="table-container"]::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb,
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
 }
 
 [data-slot="dialog-content"] *::-webkit-scrollbar-thumb:hover,
+[data-slot="table-container"]::-webkit-scrollbar-thumb:hover,
+.overflow-x-auto::-webkit-scrollbar-thumb:hover,
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(148, 163, 184, 0.55);
 }

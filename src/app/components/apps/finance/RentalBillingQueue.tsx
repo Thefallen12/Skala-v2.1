@@ -291,6 +291,121 @@ export default function RentalBillingQueue({
         </CardHeader>
 
         <CardContent className="p-0">
+          {/* Mobile Card View (< 768px) */}
+          <div className="space-y-2.5 p-3.5 md:hidden">
+            {filteredRentals.map((r) => {
+              const isPaid = r.paymentStatus === "PAID";
+              const isPendingPay = r.paymentStatus === "PENDING_PAYMENT";
+              return (
+                <div
+                  key={r.id}
+                  className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <span className="text-base">
+                        {r.type === "EQUIPMENT" ? "🚜" : "🚚"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-primary">
+                          {r.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {r.vendorName}
+                          {r.codeOrPlate ? ` · ${r.codeOrPlate}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    {isPaid ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <CheckCircle2 className="size-3" /> Lunas
+                      </span>
+                    ) : isPendingPay ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        <Clock className="size-3" /> Menunggu
+                      </span>
+                    ) : (
+                      <span className="inline-flex shrink-0 items-center rounded-full border bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Belum Diajukan
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground">Durasi &amp; Jadwal</span>
+                      <p className="font-medium text-foreground">
+                        {r.duration}{" "}
+                        {r.rentalPeriodType === "DAILY"
+                          ? "Hari"
+                          : r.rentalPeriodType === "WEEKLY"
+                            ? "Minggu"
+                            : "Bulan"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(r.startDate).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                        })}{" "}
+                        -{" "}
+                        {new Date(r.endDate).toLocaleDateString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-muted-foreground">Total Tagihan</span>
+                      <p className="font-mono text-sm font-bold text-primary">
+                        {formatCurrency(r.totalCost)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {r.projectName ?? "Tanpa proyek"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                    <span className="font-mono">
+                      {r.paymentBankName || "Bank —"}: {r.paymentAccountNumber || "—"}
+                    </span>
+                    {canManage &&
+                      (isPaid ? (
+                        r.proofOfPaymentUrl ? (
+                          <a
+                            href={r.proofOfPaymentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                          >
+                            <ExternalLink className="size-3.5" /> Bukti Bayar
+                          </a>
+                        ) : null
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => openPaymentModal(r)}
+                          className="h-8 gap-1 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700"
+                        >
+                          <CreditCard className="size-3.5" /> Bayar Tagihan
+                        </Button>
+                      ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredRentals.length === 0 && (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center text-muted-foreground">
+                <FileText className="mb-2 size-8 text-muted-foreground/40" />
+                <p className="text-sm font-semibold">Tidak ada tagihan sewa pada status ini</p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (>= 768px) */}
+          <div className="hidden md:block">
           <NativeDataTable itemLabel="tagihan sewa">
             <table className="app-data-table w-full min-w-[900px] text-sm">
               <thead className="bg-[#102A4D] text-left text-white text-xs">
@@ -473,6 +588,7 @@ export default function RentalBillingQueue({
               </tbody>
             </table>
           </NativeDataTable>
+          </div>
         </CardContent>
       </Card>
 

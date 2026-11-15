@@ -98,6 +98,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TablePaginationControls,
   TableRow,
 } from "@/components/ui/table";
 import {
@@ -1112,8 +1113,265 @@ export default function TicketListing({
     return 3;
   };
 
+  const [mobilePage, setMobilePage] = useState(1);
+  const MOBILE_PAGE_SIZE = 10;
+  const safeMobilePage = Math.min(
+    mobilePage,
+    Math.max(1, Math.ceil(tickets.length / MOBILE_PAGE_SIZE)),
+  );
+  const visibleMobileTickets = tickets.slice(
+    (safeMobilePage - 1) * MOBILE_PAGE_SIZE,
+    safeMobilePage * MOBILE_PAGE_SIZE,
+  );
+
+  const renderTicketRowActions = (ticket: TicketRow) => (
+    <div className="flex flex-nowrap items-center justify-end gap-1.5 sm:justify-center">
+      {(() => {
+        const action = actionFor(role, ticket);
+        const workflow = workflowFor(role, ticket);
+        const canSubmit =
+          ticket.status === TicketStatus.DRAFT && ticket.canSubmit;
+        const visibleAction =
+          action ??
+          (canSubmit
+            ? {
+                label: "Ajukan",
+                run: submitTicketRequest,
+              }
+            : null);
+        const primaryDo = ticket.deliveryOrders?.[0];
+        const showDoPrint =
+          (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+            ticket.status === TicketStatus.IN_TRANSIT) &&
+          Boolean(primaryDo);
+
+        if (workflow) {
+          const labels = {
+            LOGISTICS: ticket.deliveryOrders?.length
+              ? "Lanjutkan DO"
+              : "Proses Logistik",
+            LOGISTICS_DO: "Terbitkan DO",
+            EXPEDITION_RECEIPT: "Upload Bukti Tiba & Selesaikan (Tahap 4/4)",
+            FINANCE: "Bayar / Selesaikan",
+            MOVER: "Konfirmasi Tiba (Ruang Kerja Mover)",
+          };
+          const icons = {
+            LOGISTICS: PackageOpen,
+            LOGISTICS_DO: Truck,
+            EXPEDITION_RECEIPT: UploadCloud,
+            FINANCE: CircleDollarSign,
+            MOVER: Truck,
+          };
+          const WorkflowIcon = icons[workflow];
+          return (
+            <>
+              {showDoPrint && primaryDo && (
+                <Button
+                  asChild
+                  type="button"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
+                >
+                  <Link
+                    href={`/d/${primaryDo.publicCode}`}
+                    title="Cetak Surat Jalan (DO)"
+                    aria-label="Cetak DO"
+                  >
+                    <Printer className="size-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="icon"
+                variant={
+                  workflow === "EXPEDITION_RECEIPT"
+                    ? "outline"
+                    : "default"
+                }
+                title={labels[workflow]}
+                aria-label={labels[workflow]}
+                className={
+                  workflow === "EXPEDITION_RECEIPT"
+                    ? "h-8 w-8 shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                    : "h-8 w-8 shrink-0"
+                }
+                onClick={() => {
+                  if (workflow === "LOGISTICS_DO") {
+                    router.push(
+                      `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticket.id)}`,
+                    );
+                    return;
+                  }
+                  setWorkflowTicket(ticket);
+                }}
+              >
+                <WorkflowIcon className="size-4" />
+              </Button>
+            </>
+          );
+        }
+        const hasNonContractItems = ticket.items.some(
+          (item) =>
+            item.categoryHint !== TicketCategoryHint.CONTRACT,
+        );
+        const hasOpenContract =
+          canRecordContractDo && hasOpenContractDelivery(ticket);
+        if (hasOpenContract && !hasNonContractItems) {
+          return (
+            <Button
+              type="button"
+              size="icon"
+              title="Catat Surat Jalan Kontrak (DO)"
+              aria-label="Catat Surat Jalan Kontrak (DO)"
+              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+              onClick={() => setContractDoModalTicket(ticket)}
+            >
+              <Truck className="size-4" />
+            </Button>
+          );
+        }
+        if (
+          (role === UserRole.LOGISTICS ||
+            role === UserRole.ADMINISTRATIONS ||
+            ((role === UserRole.DIRECTOR ||
+              role === UserRole.DEPUTY_DIRECTOR) &&
+              !isTicketProcessedByFinance(ticket))) &&
+          ticket.type === TicketType.MATERIAL &&
+          (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+            ticket.status === TicketStatus.PROCESSED_FINANCE) &&
+          ticket.items.length > 0 &&
+          hasNonContractItems
+        ) {
+          const hasPendingItems = ticket.items.some(
+            (item) =>
+              item.categoryHint !==
+                TicketCategoryHint.CONTRACT &&
+              item.status === FulfillmentStatus.PENDING,
+          );
+          const itemLabel = hasPendingItems
+            ? "Proses & Alokasi Item Gudang"
+            : "Kelola Item & Pengadaan";
+          return (
+            <Button
+              type="button"
+              size="icon"
+              title={itemLabel}
+              aria-label={itemLabel}
+              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
+              onClick={() => openTicketSheet(ticket)}
+            >
+              <ClipboardList className="size-4" />
+            </Button>
+          );
+        }
+        if (hasOpenContract) {
+          return (
+            <Button
+              type="button"
+              size="icon"
+              title="Catat Surat Jalan Kontrak (DO)"
+              aria-label="Catat Surat Jalan Kontrak (DO)"
+              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
+              onClick={() => setContractDoModalTicket(ticket)}
+            >
+              <Truck className="size-4" />
+            </Button>
+          );
+        }
+        if (role === UserRole.FINANCE) {
+          const financeTarget = getFinanceActionTarget(ticket);
+          if (financeTarget || (showDoPrint && primaryDo)) {
+            return (
+              <>
+                {showDoPrint && primaryDo && (
+                  <Button
+                    asChild
+                    type="button"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
+                  >
+                    <Link
+                      href={`/d/${primaryDo.publicCode}`}
+                      title="Cetak Surat Jalan (DO)"
+                      aria-label="Cetak DO"
+                    >
+                      <Printer className="size-4" />
+                    </Link>
+                  </Button>
+                )}
+                {financeTarget && (
+                  <Button
+                    asChild
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                  >
+                    <Link
+                      href={financeTarget.href}
+                      title={financeTarget.label}
+                      aria-label={financeTarget.label}
+                    >
+                      <CircleDollarSign className="size-4" />
+                    </Link>
+                  </Button>
+                )}
+              </>
+            );
+          }
+        }
+        if (showDoPrint && primaryDo) {
+          return (
+            <Button
+              asChild
+              type="button"
+              size="icon"
+              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
+            >
+              <Link
+                href={`/d/${primaryDo.publicCode}`}
+                title="Cetak Surat Jalan (DO)"
+                aria-label="Cetak DO"
+              >
+                <Printer className="size-4" />
+              </Link>
+            </Button>
+          );
+        }
+        return visibleAction ? (
+          <Button
+            type="button"
+            size="icon"
+            title={visibleAction.label}
+            aria-label={visibleAction.label}
+            className="h-8 w-8 shrink-0"
+            disabled={isPending && busyId === ticket.id}
+            onClick={() => runAction(ticket, visibleAction)}
+          >
+            {visibleAction.label === "Setujui" ? (
+              <Check className="size-4" />
+            ) : (
+              <Send className="size-4" />
+            )}
+          </Button>
+        ) : null;
+      })()}
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        title="Lihat Rincian & Lampiran Foto"
+        aria-label="Detail Tiket"
+        className="h-8 w-8 shrink-0 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+        onClick={() => openTicketSheet(ticket)}
+      >
+        <Eye className="size-4" />
+      </Button>
+      <TicketManagementActions ticket={ticket} role={role} />
+    </div>
+  );
+
   return (
-    <div className="my-3">
+    <div className="my-2">
       {!hideSearch && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="relative w-full sm:max-w-96">
@@ -1154,32 +1412,164 @@ export default function TicketListing({
         </div>
       )}
 
-      <p className="mb-2 text-xs text-muted-foreground sm:hidden">
-        Geser tabel ke samping untuk melihat seluruh kolom &amp; tombol aksi.
-      </p>
-      <div className="overflow-x-auto rounded-xl border border-border">
-        <Table>
+      {/* TAMPILAN KARTU MOBILE (< 768px) */}
+      <div className="space-y-3 md:hidden">
+        {visibleMobileTickets.map((ticket) => {
+          const stageNum = getTicketStageNumber(ticket.status);
+          const priorityBadgeClass =
+            ticket.priority === "URGENT"
+              ? "border-rose-500/35 bg-rose-500/15 text-rose-400"
+              : ticket.priority === "HIGH"
+                ? "border-amber-500/35 bg-amber-500/15 text-amber-400"
+                : ticket.priority === "MEDIUM"
+                  ? "border-sky-500/35 bg-sky-500/15 text-sky-400"
+                  : "border-border bg-muted text-muted-foreground";
+          const hasAttachment =
+            (ticket.receiptUrls?.length ?? 0) > 0 ||
+            Boolean(
+              ticket.attachmentUrl ||
+                ticket.purchaseReceiptUrl ||
+                ticket.transferReceiptUrl ||
+                ticket.deliveryReceiptUrl,
+            );
+          return (
+            <article
+              key={`mobile-${ticket.id}`}
+              onClick={() => openTicketSheet(ticket)}
+              className="cursor-pointer rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-colors hover:border-primary/40 active:bg-muted/30"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-semibold text-amber-500">
+                    {ticket.ticketNumber}
+                  </span>
+                  <span
+                    className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
+                  >
+                    {priorityLabels[ticket.priority]}
+                  </span>
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  {format(new Date(ticket.createdAt), "d MMM yyyy, HH:mm", {
+                    locale: id,
+                  })}
+                </span>
+              </div>
+
+              <h4 className="mt-2 line-clamp-2 text-sm font-bold leading-snug text-foreground">
+                {ticket.title}
+              </h4>
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                    ticket.type === TicketType.MATERIAL
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
+                      : ""
+                  }`}
+                >
+                  {ticket.ticketType === EQUIPMENT_REQUEST_TYPE
+                    ? "Alat & Kendaraan"
+                    : typeLabels[ticket.type]}
+                </Badge>
+                <span className="inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
+                  {ticket.project
+                    ? `${ticket.project.kelompokTani} — ${ticket.project.title}`
+                    : "Kantor Pusat / Overhead"}
+                </span>
+                {ticket.items.length > 0 && (
+                  <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {ticket.items.length} Item
+                  </span>
+                )}
+                {hasAttachment && (
+                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-500">
+                    <Paperclip className="size-3" />
+                    Nota/Bukti
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 text-xs">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge
+                      variant={statusVariants[ticket.status]}
+                      className="rounded-md px-2 py-0.5 text-[10px] font-medium"
+                    >
+                      {statusLabels[ticket.status]}
+                    </Badge>
+                    {ticket.status !== TicketStatus.REJECTED && (
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        · Tahap {stageNum}/4
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pemohon: <strong className="text-foreground">{ticket.requester.name}</strong>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Estimasi
+                  </span>
+                  <span className="text-sm font-extrabold tabular-nums text-foreground">
+                    {formatCurrency(ticket.totalAmount)}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  Ketuk kartu untuk rincian
+                </span>
+                {renderTicketRowActions(ticket)}
+              </div>
+            </article>
+          );
+        })}
+        {tickets.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
+            Tidak ada tiket permintaan yang cocok dengan filter saat ini.
+          </div>
+        )}
+        <TablePaginationControls
+          count={tickets.length}
+          pageSize={MOBILE_PAGE_SIZE}
+          page={safeMobilePage}
+          itemLabel="tiket"
+          onPageChange={setMobilePage}
+        />
+      </div>
+
+      {/* TAMPILAN TABEL DESKTOP (>= 768px) */}
+      <div className="hidden md:block">
+        <Table itemLabel="tiket">
           <TableHeader>
             <TableRow className="bg-muted/40">
-              <TableHead className="w-40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <TableHead className="w-40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 No. Tiket &amp; Tanggal
               </TableHead>
-              <TableHead className="min-w-60 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <TableHead className="min-w-60 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Rincian Permintaan &amp; Proyek
               </TableHead>
-              <TableHead className="hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
+              <TableHead className="hidden text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
                 Pemohon
               </TableHead>
-              <TableHead className="hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
+              <TableHead className="hidden text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
                 Prioritas
               </TableHead>
-              <TableHead className="min-w-44 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <TableHead className="min-w-44 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Status &amp; Tahap Alur
               </TableHead>
               <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Nilai Estimasi
               </TableHead>
-              <TableHead className="sticky right-0 z-10 w-[116px] border-l border-border/50 bg-card/95 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+              <TableHead className="sticky right-0 z-10 w-[132px] border-l border-border/50 bg-card/95 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
                 Aksi
               </TableHead>
             </TableRow>
@@ -1237,7 +1627,7 @@ export default function TicketListing({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="max-w-[240px] whitespace-normal break-words align-top sm:max-w-[300px] lg:max-w-[360px]">
+                  <TableCell className="max-w-[260px] whitespace-normal break-words align-top lg:max-w-[360px]">
                     <p
                       className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground"
                       title={ticket.title}
@@ -1285,7 +1675,7 @@ export default function TicketListing({
                   <TableCell className="hidden align-top text-xs font-medium lg:table-cell">
                     {ticket.requester.name}
                   </TableCell>
-                  <TableCell className="hidden align-top lg:table-cell">
+                  <TableCell className="hidden align-top text-center lg:table-cell">
                     <span
                       className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
                     >
@@ -1327,252 +1717,10 @@ export default function TicketListing({
                     {formatCurrency(ticket.totalAmount)}
                   </TableCell>
                   <TableCell
-                    className="sticky right-0 z-10 w-[116px] border-l border-border/50 bg-card/95 align-top backdrop-blur-sm"
+                    className="sticky right-0 z-10 w-[132px] border-l border-border/50 bg-card/95 align-top backdrop-blur-sm"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div className="flex flex-nowrap items-center justify-center gap-1.5">
-                      {(() => {
-                        const action = actionFor(role, ticket);
-                        const workflow = workflowFor(role, ticket);
-                        const canSubmit =
-                          ticket.status === TicketStatus.DRAFT && ticket.canSubmit;
-                        const visibleAction =
-                          action ??
-                          (canSubmit
-                            ? {
-                                label: "Ajukan",
-                                run: submitTicketRequest,
-                              }
-                            : null);
-                        const primaryDo = ticket.deliveryOrders?.[0];
-                        const showDoPrint =
-                          (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
-                            ticket.status === TicketStatus.IN_TRANSIT) &&
-                          Boolean(primaryDo);
-
-                        if (workflow) {
-                          const labels = {
-                            LOGISTICS: ticket.deliveryOrders?.length
-                              ? "Lanjutkan DO"
-                              : "Proses Logistik",
-                            LOGISTICS_DO: "Terbitkan DO",
-                            EXPEDITION_RECEIPT: "Upload Bukti Tiba & Selesaikan (Tahap 4/4)",
-                            FINANCE: "Bayar / Selesaikan",
-                            MOVER: "Konfirmasi Tiba (Ruang Kerja Mover)",
-                          };
-                          const icons = {
-                            LOGISTICS: PackageOpen,
-                            LOGISTICS_DO: Truck,
-                            EXPEDITION_RECEIPT: UploadCloud,
-                            FINANCE: CircleDollarSign,
-                            MOVER: Truck,
-                          };
-                          const WorkflowIcon = icons[workflow];
-                          return (
-                            <>
-                              {showDoPrint && primaryDo && (
-                                <Button
-                                  asChild
-                                  type="button"
-                                  size="icon"
-                                  className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-                                >
-                                  <Link
-                                    href={`/d/${primaryDo.publicCode}`}
-                                    title="Cetak Surat Jalan (DO)"
-                                    aria-label="Cetak DO"
-                                  >
-                                    <Printer className="size-4" />
-                                  </Link>
-                                </Button>
-                              )}
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant={
-                                  workflow === "EXPEDITION_RECEIPT"
-                                    ? "outline"
-                                    : "default"
-                                }
-                                title={labels[workflow]}
-                                aria-label={labels[workflow]}
-                                className={
-                                  workflow === "EXPEDITION_RECEIPT"
-                                    ? "h-8 w-8 shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                                    : "h-8 w-8 shrink-0"
-                                }
-                                onClick={() => {
-                                  if (workflow === "LOGISTICS_DO") {
-                                    router.push(
-                                      `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticket.id)}`,
-                                    );
-                                    return;
-                                  }
-                                  setWorkflowTicket(ticket);
-                                }}
-                              >
-                                <WorkflowIcon className="size-4" />
-                              </Button>
-                            </>
-                          );
-                        }
-                        const hasNonContractItems = ticket.items.some(
-                          (item) =>
-                            item.categoryHint !== TicketCategoryHint.CONTRACT,
-                        );
-                        const hasOpenContract =
-                          canRecordContractDo && hasOpenContractDelivery(ticket);
-                        if (hasOpenContract && !hasNonContractItems) {
-                          return (
-                            <Button
-                              type="button"
-                              size="icon"
-                              title="Catat Surat Jalan Kontrak (DO)"
-                              aria-label="Catat Surat Jalan Kontrak (DO)"
-                              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
-                              onClick={() => setContractDoModalTicket(ticket)}
-                            >
-                              <Truck className="size-4" />
-                            </Button>
-                          );
-                        }
-                        if (
-                          (role === UserRole.LOGISTICS ||
-                            role === UserRole.ADMINISTRATIONS ||
-                            ((role === UserRole.DIRECTOR ||
-                              role === UserRole.DEPUTY_DIRECTOR) &&
-                              !isTicketProcessedByFinance(ticket))) &&
-                          ticket.type === TicketType.MATERIAL &&
-                          (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-                            ticket.status === TicketStatus.PROCESSED_FINANCE) &&
-                          ticket.items.length > 0 &&
-                          hasNonContractItems
-                        ) {
-                          const hasPendingItems = ticket.items.some(
-                            (item) =>
-                              item.categoryHint !==
-                                TicketCategoryHint.CONTRACT &&
-                              item.status === FulfillmentStatus.PENDING,
-                          );
-                          const itemLabel = hasPendingItems
-                            ? "Proses & Alokasi Item Gudang"
-                            : "Kelola Item & Pengadaan";
-                          return (
-                            <Button
-                              type="button"
-                              size="icon"
-                              title={itemLabel}
-                              aria-label={itemLabel}
-                              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-                              onClick={() => openTicketSheet(ticket)}
-                            >
-                              <ClipboardList className="size-4" />
-                            </Button>
-                          );
-                        }
-                        if (hasOpenContract) {
-                          return (
-                            <Button
-                              type="button"
-                              size="icon"
-                              title="Catat Surat Jalan Kontrak (DO)"
-                              aria-label="Catat Surat Jalan Kontrak (DO)"
-                              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
-                              onClick={() => setContractDoModalTicket(ticket)}
-                            >
-                              <Truck className="size-4" />
-                            </Button>
-                          );
-                        }
-                        if (role === UserRole.FINANCE) {
-                          const financeTarget = getFinanceActionTarget(ticket);
-                          if (financeTarget || (showDoPrint && primaryDo)) {
-                            return (
-                              <>
-                                {showDoPrint && primaryDo && (
-                                  <Button
-                                    asChild
-                                    type="button"
-                                    size="icon"
-                                    className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-                                  >
-                                    <Link
-                                      href={`/d/${primaryDo.publicCode}`}
-                                      title="Cetak Surat Jalan (DO)"
-                                      aria-label="Cetak DO"
-                                    >
-                                      <Printer className="size-4" />
-                                    </Link>
-                                  </Button>
-                                )}
-                                {financeTarget && (
-                                  <Button
-                                    asChild
-                                    size="icon"
-                                    className="h-8 w-8 shrink-0"
-                                  >
-                                    <Link
-                                      href={financeTarget.href}
-                                      title={financeTarget.label}
-                                      aria-label={financeTarget.label}
-                                    >
-                                      <CircleDollarSign className="size-4" />
-                                    </Link>
-                                  </Button>
-                                )}
-                              </>
-                            );
-                          }
-                        }
-                        if (showDoPrint && primaryDo) {
-                          return (
-                            <Button
-                              asChild
-                              type="button"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-                            >
-                              <Link
-                                href={`/d/${primaryDo.publicCode}`}
-                                title="Cetak Surat Jalan (DO)"
-                                aria-label="Cetak DO"
-                              >
-                                <Printer className="size-4" />
-                              </Link>
-                            </Button>
-                          );
-                        }
-                        return visibleAction ? (
-                          <Button
-                            type="button"
-                            size="icon"
-                            title={visibleAction.label}
-                            aria-label={visibleAction.label}
-                            className="h-8 w-8 shrink-0"
-                            disabled={isPending && busyId === ticket.id}
-                            onClick={() => runAction(ticket, visibleAction)}
-                          >
-                            {visibleAction.label === "Setujui" ? (
-                              <Check className="size-4" />
-                            ) : (
-                              <Send className="size-4" />
-                            )}
-                          </Button>
-                        ) : null;
-                      })()}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        title="Lihat Rincian & Lampiran Foto"
-                        aria-label="Detail Tiket"
-                        className="h-8 w-8 shrink-0 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
-                        onClick={() => openTicketSheet(ticket)}
-                      >
-                        <Eye className="size-4" />
-                      </Button>
-                      <TicketManagementActions ticket={ticket} role={role} />
-                    </div>
+                    {renderTicketRowActions(ticket)}
                   </TableCell>
                 </TableRow>
               );
@@ -1620,7 +1768,7 @@ export default function TicketListing({
               } · Prioritas ${priorityLabels[selectedTicket.priority]} · Status: ${statusLabels[selectedTicket.status]}`
             : ""
         }
-        className="max-w-3xl"
+        className="sm:max-w-4xl lg:max-w-5xl"
         footer={
           selectedTicket ? (
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
@@ -2844,12 +2992,362 @@ export default function TicketListing({
                   </div>
                 )}
 
-                <div className="overflow-x-auto rounded-lg border border-border">
+                {/* Mobile Card View untuk Rincian Item Permintaan (< 768px) */}
+                <div className="space-y-2.5 md:hidden">
+                  {canSplitFulfillment && pendingTicketItemIds.length > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/30 px-3 py-2">
+                      <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
+                        <Checkbox
+                          checked={
+                            allPendingItemsSelected
+                              ? true
+                              : somePendingItemsSelected
+                                ? "indeterminate"
+                                : false
+                          }
+                          aria-label="Pilih semua item yang belum dipenuhi"
+                          onCheckedChange={(checked) =>
+                            setItemSelection({
+                              ticketId: selectedTicket.id,
+                              itemIds:
+                                checked === true
+                                  ? pendingTicketItemIds
+                                  : [],
+                            })
+                          }
+                        />
+                        <span>Pilih Semua Item Pending ({pendingTicketItemIds.length})</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {selectedTicket.items.map((item) => {
+                    const isEditingThisRow = editingItemId === item.id;
+                    const isConfirmingDeleteThisRow =
+                      confirmDeleteItemId === item.id;
+                    const isContractItem =
+                      item.categoryHint === TicketCategoryHint.CONTRACT;
+                    const activeDirectPurchase =
+                      item.status === FulfillmentStatus.PENDING
+                        ? selectedTicket.directStockPurchases?.find(
+                            (purchase) =>
+                              purchase.status === "PENDING_RECEIPT" &&
+                              (purchase.items ?? []).some((purchaseItem) => {
+                                if (
+                                  item.stockItemId &&
+                                  purchaseItem.stockItemId
+                                ) {
+                                  return (
+                                    purchaseItem.stockItemId ===
+                                    item.stockItemId
+                                  );
+                                }
+                                return (
+                                  purchaseItem.itemName.trim().toLowerCase() ===
+                                    item.itemName.trim().toLowerCase() &&
+                                  purchaseItem.unit.trim().toLowerCase() ===
+                                    item.unit.trim().toLowerCase()
+                                );
+                              }),
+                          )
+                        : undefined;
+
+                    if (isEditingThisRow && canExecutiveManageTicket) {
+                      return (
+                        <div
+                          key={item.id}
+                          className="space-y-2.5 rounded-lg border border-primary/40 bg-primary/5 p-3"
+                        >
+                          <div className="grid grid-cols-1 gap-2">
+                            <Input
+                              value={editItemName}
+                              maxLength={160}
+                              disabled={isContractItem || executiveItemPending}
+                              onChange={(e) => setEditItemName(e.target.value)}
+                              className="h-8 text-xs"
+                              placeholder="Nama barang"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                value={editItemQuantity}
+                                disabled={executiveItemPending}
+                                onChange={(e) =>
+                                  setEditItemQuantity(e.target.value)
+                                }
+                                className="h-8 text-xs"
+                                placeholder="Jumlah"
+                              />
+                              <Input
+                                value={editItemUnit}
+                                maxLength={32}
+                                disabled={isContractItem || executiveItemPending}
+                                onChange={(e) => setEditItemUnit(e.target.value)}
+                                className="h-8 text-xs"
+                                placeholder="Satuan"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={editItemCost}
+                                disabled={executiveItemPending}
+                                onChange={(e) => setEditItemCost(e.target.value)}
+                                className="h-8 text-xs"
+                                placeholder="Harga Satuan (Rp)"
+                              />
+                              {isContractItem ? (
+                                <div className="flex items-center">
+                                  <Badge variant="outline">Kontrak Alam</Badge>
+                                </div>
+                              ) : (
+                                <select
+                                  value={editItemCategoryHint}
+                                  disabled={executiveItemPending}
+                                  onChange={(e) =>
+                                    setEditItemCategoryHint(
+                                      e.target.value as TicketCategoryHint,
+                                    )
+                                  }
+                                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                                >
+                                  <option value={TicketCategoryHint.WAREHOUSE}>
+                                    Stok Gudang
+                                  </option>
+                                  <option value={TicketCategoryHint.PURCHASE}>
+                                    Pembelian
+                                  </option>
+                                </select>
+                              )}
+                            </div>
+                            <Input
+                              type="date"
+                              value={editItemDeliveryDate}
+                              disabled={executiveItemPending}
+                              onChange={(e) =>
+                                setEditItemDeliveryDate(e.target.value)
+                              }
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center justify-end gap-1.5 pt-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2.5 text-xs"
+                              disabled={executiveItemPending}
+                              onClick={() => setEditingItemId(null)}
+                            >
+                              Batal
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-7 gap-1 px-2.5 text-xs"
+                              disabled={executiveItemPending}
+                              onClick={() =>
+                                void handleExecutiveUpdateItem(item.id)
+                              }
+                            >
+                              <Save className="size-3" />
+                              Simpan
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    const deliveredContractVolume =
+                      item.categoryHint === TicketCategoryHint.CONTRACT
+                        ? getContractItemDeliveredVolume(
+                            selectedTicket,
+                            item.materialContractId,
+                          )
+                        : 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="space-y-2 rounded-lg border border-border/80 bg-card p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-start gap-2">
+                            {canSplitFulfillment && (
+                              <Checkbox
+                                className="mt-0.5"
+                                checked={selectedItemIds.includes(item.id)}
+                                disabled={
+                                  item.status !== FulfillmentStatus.PENDING ||
+                                  item.categoryHint ===
+                                    TicketCategoryHint.CONTRACT
+                                }
+                                aria-label={`Pilih ${item.itemName}`}
+                                onCheckedChange={(checked) =>
+                                  setItemSelection({
+                                    ticketId: selectedTicket.id,
+                                    itemIds:
+                                      checked === true
+                                        ? [...selectedItemIds, item.id]
+                                        : selectedItemIds.filter(
+                                            (id) => id !== item.id,
+                                          ),
+                                  })
+                                }
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold leading-snug text-foreground">
+                                {item.itemName}
+                              </p>
+                              {item.categoryHint ===
+                                TicketCategoryHint.CONTRACT &&
+                                item.materialContract && (
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {item.materialContract.contractNumber} ·{" "}
+                                    {item.materialContract.vendorName}
+                                  </p>
+                                )}
+                            </div>
+                          </div>
+                          <Badge
+                            variant={
+                              item.status === FulfillmentStatus.PENDING
+                                ? "lightWarning"
+                                : "lightSuccess"
+                            }
+                            className="shrink-0"
+                          >
+                            {item.categoryHint === TicketCategoryHint.CONTRACT
+                              ? item.status === FulfillmentStatus.PROCESSED_TO_DO
+                                ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
+                                : deliveredContractVolume > 0
+                                  ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
+                                  : "Menunggu DO Kontrak"
+                              : item.status === FulfillmentStatus.PENDING
+                                ? activeDirectPurchase
+                                  ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
+                                  : "Menunggu"
+                                : item.status ===
+                                    FulfillmentStatus.PROCESSED_TO_DO
+                                  ? "Dipenuhi via DO"
+                                  : "Diproses via PO"}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-md bg-muted/30 p-2 text-xs">
+                          <div>
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Jumlah
+                            </span>
+                            <p className="font-semibold text-foreground">
+                              {item.quantity} {item.unit}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Harga Satuan
+                            </span>
+                            <p className="font-semibold tabular-nums text-foreground">
+                              {formatCurrency(item.estimatedCost)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Sumber
+                            </span>
+                            <p className="font-medium text-foreground">
+                              {item.categoryHint ===
+                              TicketCategoryHint.WAREHOUSE
+                                ? "Stok Gudang"
+                                : item.categoryHint ===
+                                    TicketCategoryHint.CONTRACT
+                                  ? "Kontrak Alam"
+                                  : "Pembelian"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Target Tiba
+                            </span>
+                            <p className="font-medium text-foreground">
+                              {item.expectedDeliveryDate ?? "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {canExecutiveManageTicket && (
+                          <div className="flex items-center justify-end gap-1.5 border-t border-border/60 pt-2">
+                            {isConfirmingDeleteThisRow ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2.5 text-xs"
+                                  disabled={deletingItemId === item.id}
+                                  onClick={() =>
+                                    void handleExecutiveDeleteItem(item.id)
+                                  }
+                                >
+                                  {deletingItemId === item.id
+                                    ? "Menghapus..."
+                                    : "Ya, Hapus"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2.5 text-xs"
+                                  disabled={deletingItemId === item.id}
+                                  onClick={() => setConfirmDeleteItemId(null)}
+                                >
+                                  Batal
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 gap-1 px-2.5 text-xs"
+                                  onClick={() => openEditItemRow(item)}
+                                >
+                                  <Pencil className="size-3" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 gap-1 border-destructive/40 px-2.5 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                  disabled={selectedTicket.items.length <= 1}
+                                  onClick={() => setConfirmDeleteItemId(item.id)}
+                                >
+                                  <Trash2 className="size-3" />
+                                  Hapus
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View (>= 768px) */}
+                <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/40">
                         {canSplitFulfillment && (
-                          <TableHead className="w-10">
+                          <TableHead className="w-9 px-2.5 py-2">
                             <Checkbox
                               checked={
                                 allPendingItemsSelected
@@ -2872,14 +3370,14 @@ export default function TicketListing({
                             />
                           </TableHead>
                         )}
-                        <TableHead>Nama Item</TableHead>
-                        <TableHead>Jumlah</TableHead>
-                        <TableHead>Harga Satuan</TableHead>
-                        <TableHead>Sumber</TableHead>
-                        <TableHead>Target Tiba</TableHead>
-                        <TableHead>Status Pemenuhan</TableHead>
+                        <TableHead className="px-2.5 py-2 text-xs">Nama Item</TableHead>
+                        <TableHead className="px-2.5 py-2 text-xs">Jumlah</TableHead>
+                        <TableHead className="px-2.5 py-2 text-xs">Harga Satuan</TableHead>
+                        <TableHead className="px-2.5 py-2 text-xs">Sumber</TableHead>
+                        <TableHead className="px-2.5 py-2 text-xs">Target Tiba</TableHead>
+                        <TableHead className="px-2.5 py-2 text-xs">Status Pemenuhan</TableHead>
                         {canExecutiveManageTicket && (
-                          <TableHead className="text-right">Aksi</TableHead>
+                          <TableHead className="px-2.5 py-2 text-right text-xs">Aksi</TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
