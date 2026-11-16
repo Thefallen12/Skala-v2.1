@@ -63,11 +63,11 @@ type TaskRecord = {
   assigneeId: string | null;
   project: { name: string; code: string };
   assignee: { name: string } | null;
-  members: { user: { id: string; name: string } }[];
+  members?: { user: { id: string; name: string } }[] | null;
 };
 
 function getTaskMembers(task: TaskRecord) {
-  const members = task.members.map(({ user }) => user);
+  const members = (task.members ?? []).map(({ user }) => user);
   if (task.assignee && task.assigneeId) {
     members.push({ id: task.assigneeId, name: task.assignee.name });
   }
@@ -335,7 +335,7 @@ export default function DailyTaskBoard({
       memberFilter === "all" ||
       task.assigneeId === memberFilter ||
       task.creatorId === memberFilter ||
-      task.members.some(({ user }) => user.id === memberFilter);
+      (task.members ?? []).some(({ user }) => user.id === memberFilter);
     const projectMatch =
       projectFilter === "all" || task.projectId === projectFilter;
     return searchMatch && memberMatch && projectMatch;
@@ -670,7 +670,7 @@ export default function DailyTaskBoard({
             const canEdit =
               task.creatorId === currentUserId ||
               task.assigneeId === currentUserId ||
-              task.members.some(({ user }) => user.id === currentUserId);
+              (task.members ?? []).some(({ user }) => user.id === currentUserId);
             const memberNames = [
               ...new Set([
                 ...getTaskMembers(task).map(({ name }) => name),
