@@ -1,8 +1,31 @@
-import { NextResponse } from "next/server";
-import { authForProxy } from "./auth";
-import { UserRole } from "./src/generated/prisma/enums";
-import { getRoleHomePath, sanitizeCallbackUrl } from "./src/lib/role-home";
-import { drawingAccessRoles } from "./src/lib/user-access";
+import {
+  NextResponse,
+  type NextFetchEvent,
+  type NextRequest,
+} from "next/server";
+import { authForProxy } from "../auth";
+import { UserRole } from "@/generated/prisma/enums";
+import { getRoleHomePath, sanitizeCallbackUrl } from "@/lib/role-home";
+import { drawingAccessRoles } from "@/lib/user-access";
+import { isMarkdownPreferred } from "@/lib/accept-markdown";
+import { createMarkdownResponse } from "@/lib/public-markdown";
+
+const PUBLIC_INFO_PATHS = new Set([
+  "/",
+  "/about",
+  "/contact",
+  "/terms",
+  "/privacy",
+]);
+
+const MARKDOWN_NEGOTIABLE_PATHS = new Set([
+  "/",
+  "/about",
+  "/contact",
+  "/terms",
+  "/privacy",
+  "/auth/login",
+]);
 
 const projectRoles = [
   UserRole.ADMINISTRATIONS,
@@ -83,10 +106,17 @@ function rolesForPath(pathname: string): readonly UserRole[] | null {
   return null;
 }
 
-export default authForProxy((request) => {
+const authMiddleware = authForProxy((request, event: NextFetchEvent) => {
+  void event;
   const { pathname } = request.nextUrl;
   const session = request.auth;
   const user = session?.user;
+
+  if (PUBLIC_INFO_PATHS.has(pathname)) {
+    const response = NextResponse.next();
+    response.headers.set("Vary", "Accept");
+    return response;
+  }
 
   if (pathname === "/login" || pathname === "/auth/login") {
     if (user?.role) {
@@ -135,9 +165,29 @@ export default authForProxy((request) => {
   return NextResponse.next();
 });
 
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  const { pathname } = request.nextUrl;
+
+  if (
+    MARKDOWN_NEGOTIABLE_PATHS.has(pathname) &&
+    isMarkdownPreferred(request.headers.get("accept"))
+  ) {
+    const markdownResponse = createMarkdownResponse(pathname);
+    if (markdownResponse) {
+      return markdownResponse;
+    }
+  }
+
+  return authMiddleware(request, event);
+}
+
 export const config = {
   matcher: [
     "/",
+    "/about",
+    "/contact",
+    "/terms",
+    "/privacy",
     "/login",
     "/auth/login",
     "/auth/register",

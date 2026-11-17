@@ -1,6 +1,4 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
 import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
@@ -12,19 +10,15 @@ import {
   UserRole,
   WorkTaskStatus,
 } from "@prisma/client";
-import ProfileWelcome from "../components/dashboard/ProfileWelcome";
-import { TopCards } from "../components/dashboard/TopCards";
-import { WorkflowSchemaBoard } from "../components/dashboard/WorkflowSchemaBoard";
-import SalesOverview from "../components/dashboard/SalesOverview";
-import { YearlyBreakup } from "../components/dashboard/YearlyBreakup";
-import { MonthlyEarning } from "../components/dashboard/MonthlyEarning";
-import { RecentTransaction } from "../components/dashboard/RecentTransaction";
-import { ProductPerformance } from "../components/dashboard/ProductPerformance";
-import { Footer } from "../components/dashboard/Footer";
-
-export const metadata: Metadata = {
-  title: "Beranda",
-};
+import ProfileWelcome from "./ProfileWelcome";
+import { TopCards } from "./TopCards";
+import { WorkflowSchemaBoard } from "./WorkflowSchemaBoard";
+import SalesOverview from "./SalesOverview";
+import { YearlyBreakup } from "./YearlyBreakup";
+import { MonthlyEarning } from "./MonthlyEarning";
+import { RecentTransaction } from "./RecentTransaction";
+import { ProductPerformance } from "./ProductPerformance";
+import { Footer } from "./Footer";
 
 const projectStatusLabels: Record<ProjectStatus, string> = {
   [ProjectStatus.PENDING_SETUP]: "Menunggu Setup",
@@ -58,11 +52,6 @@ const rupiah = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
-const monthFormatter = new Intl.DateTimeFormat("id-ID", {
-  timeZone: "Asia/Jakarta",
-  month: "short",
-});
-
 const dateTimeFormatter = new Intl.DateTimeFormat("id-ID", {
   timeZone: "Asia/Jakarta",
   day: "numeric",
@@ -71,10 +60,13 @@ const dateTimeFormatter = new Intl.DateTimeFormat("id-ID", {
   minute: "2-digit",
 });
 
-export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/auth/login");
-
+export async function DashboardHomeView({
+  userId,
+  userRole,
+}: {
+  userId: string;
+  userRole: UserRole;
+}) {
   const todayKey = getJakartaDateKey();
   const today = getJakartaDayRange(todayKey);
   const tomorrow = getJakartaDayRange(shiftDateKey(todayKey, 1));
@@ -114,7 +106,7 @@ export default async function DashboardPage() {
     issuedDocsCount,
   ] = await Promise.all([
     prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: { name: true, role: true, profilePhotoUrl: true },
     }),
     prisma.project.count({ where: { isDeleted: false } }),
@@ -141,7 +133,7 @@ export default async function DashboardPage() {
     prisma.ticket.count({
       where: {
         AND: [
-          getTicketPageVisibilityWhere(session.user.role, session.user.id),
+          getTicketPageVisibilityWhere(userRole, userId),
           {
             status: {
               notIn: [
@@ -158,7 +150,7 @@ export default async function DashboardPage() {
       prisma.ticket.findMany({
         where: {
           AND: [
-            getTicketPageVisibilityWhere(session.user.role, session.user.id),
+            getTicketPageVisibilityWhere(userRole, userId),
             {
               status: {
                 notIn: [
@@ -188,7 +180,7 @@ export default async function DashboardPage() {
       prisma.ticket.findMany({
         where: {
           AND: [
-            getTicketPageVisibilityWhere(session.user.role, session.user.id),
+            getTicketPageVisibilityWhere(userRole, userId),
             {
               status: {
                 in: [
@@ -231,9 +223,9 @@ export default async function DashboardPage() {
         startsAt: { lt: tomorrow.start },
         endsAt: { gte: today.start },
         OR: [
-          { assigneeId: session.user.id },
-          { creatorId: session.user.id },
-          { members: { some: { userId: session.user.id } } },
+          { assigneeId: userId },
+          { creatorId: userId },
+          { members: { some: { userId } } },
         ],
       },
       _count: { _all: true },

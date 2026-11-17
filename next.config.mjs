@@ -24,6 +24,7 @@ const deploymentId = deploymentIdSource
 const nextConfig = {
     output: "standalone",
     deploymentId: deploymentId || undefined,
+    htmlLimitedBots: /.*/,
     env: {
         NEXT_PUBLIC_APP_BUILD_ID: deploymentId || "2.1.2",
     },

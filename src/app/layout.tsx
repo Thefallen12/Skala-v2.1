@@ -8,6 +8,7 @@ import ServiceWorkerRegister from "@/app/components/service-worker/ServiceWorker
 import InAppUpdateManager from "@/app/components/pwa/InAppUpdateManager";
 import ApkBackButtonHandler from "@/app/components/apk/ApkBackButtonHandler";
 import PageTransition from "@/app/components/layout/PageTransition";
+import { COMPANY_PROFILE, SITE_URL } from "@/lib/site-config";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -16,8 +17,26 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Skala Prioritas Engineering",
-  description: "Sistem operasional konstruksi dan logistik Skala Prioritas.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${COMPANY_PROFILE.legalName} — Konstruksi, Logistik & ERP Operasional`,
+    template: "%s | Skala Prioritas Engineering",
+  },
+  description: COMPANY_PROFILE.description,
+  openGraph: {
+    type: "website",
+    locale: "id_ID",
+    url: `${SITE_URL}/`,
+    siteName: COMPANY_PROFILE.legalName,
+    title: `${COMPANY_PROFILE.legalName} — Konstruksi, Logistik & ERP Operasional`,
+    description: COMPANY_PROFILE.description,
+  },
+  alternates: {
+    types: {
+      "application/mcp+json": "/.well-known/mcp/server-card.json",
+      "text/plain": "/llms.txt",
+    },
+  },
 };
 
 export const viewport = {

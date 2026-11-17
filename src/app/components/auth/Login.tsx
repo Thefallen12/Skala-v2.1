@@ -6,6 +6,7 @@ import { ArrowRight, Download, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Shi
 import { ANDROID_APK } from '@/lib/apk-config'
 import { handleApkLinkClick } from '@/lib/apk-update-client'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
@@ -136,10 +137,10 @@ export const Login = ({ callbackUrl }: { callbackUrl?: string }) => {
             <ShieldCheck className='size-3.5' aria-hidden='true' />
             Sistem Terpadu Multi-Peran
           </div>
-          <h1 className='text-3xl font-extrabold tracking-tight text-white sm:text-4xl xl:text-5xl leading-tight'>
+          <p className='text-3xl font-extrabold tracking-tight text-white sm:text-4xl xl:text-5xl leading-tight'>
             Bekerja Terarah,
             <span className='block text-[#F26522]'>Membangun Presisi.</span>
-          </h1>
+          </p>
           <p className='mt-4 max-w-md text-sm leading-relaxed text-slate-300'>
             Portal manajemen konstruksi lapangan terpadu: perizinan direksi, keuangan proyek, gudang dan logistik, verifikasi QR dokumen, hingga gambar kerja DED.
           </p>
@@ -185,9 +186,9 @@ export const Login = ({ callbackUrl }: { callbackUrl?: string }) => {
 
           <div className='rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8'>
             <div className='border-b border-slate-100 pb-4 mb-6'>
-              <h2 className='text-xl font-bold tracking-tight text-slate-900'>
+              <h1 className='text-xl font-bold tracking-tight text-slate-900'>
                 Masuk ke Sistem
-              </h2>
+              </h1>
               <p className='text-xs text-slate-500 mt-1'>
                 Masukkan email dan kata sandi Anda untuk mengakses akun
               </p>
@@ -332,9 +333,35 @@ export const Login = ({ callbackUrl }: { callbackUrl?: string }) => {
                   {ANDROID_APK.label}
                 </span>
               </a>
-              <div className='text-center text-xs text-slate-400'>
+              <div className='text-center text-xs text-slate-500'>
                 Autentikasi Aman · PT Skala Prioritas Engineering
               </div>
+              <nav
+                aria-label='Tautan informasi perusahaan'
+                className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-slate-500'
+              >
+                <Link href='/' className='hover:text-slate-800 hover:underline'>
+                  Beranda
+                </Link>
+                <Link href='/about' className='hover:text-slate-800 hover:underline'>
+                  Tentang
+                </Link>
+                <Link href='/contact' className='hover:text-slate-800 hover:underline'>
+                  Kontak
+                </Link>
+                <Link href='/terms' className='hover:text-slate-800 hover:underline'>
+                  Ketentuan
+                </Link>
+                <Link href='/privacy' className='hover:text-slate-800 hover:underline'>
+                  Privasi
+                </Link>
+                <a href='mailto:info@skala-prioritas.com' className='hover:text-slate-800 hover:underline'>
+                  info@skala-prioritas.com
+                </a>
+                <a href='tel:+628135887883' className='hover:text-slate-800 hover:underline'>
+                  +62 813-5887-883
+                </a>
+              </nav>
             </div>
           </div>
         </div>
