@@ -58,6 +58,7 @@ import {
   deleteLogisticsStockItem,
   importLogisticsStockCsv,
   receiveDirectStockPurchase,
+  replaceDirectStockPurchaseInvoice,
   saveLogisticsStockItem,
   submitDirectStockPurchaseInvoice,
 } from "@/app/actions/tickets";
@@ -226,6 +227,12 @@ function canUploadDirectPurchaseInvoice(
   );
 }
 
+function canReplaceDirectPurchaseInvoice(
+  purchase: DirectStockPurchaseRow,
+): boolean {
+  return Boolean(purchase.vendorInvoiceUrl) && purchase.isApprovedByDirector;
+}
+
 function canReceiveDirectPurchase(
   purchase: DirectStockPurchaseRow,
   canCreatePurchaseOrder: boolean,
@@ -355,13 +362,17 @@ function StockItemMobileCard({
 function DirectPurchaseMobileCard({
   purchase,
   canManage,
+  canReplaceInvoice,
   onOpenInvoiceModal,
+  onOpenReplaceInvoiceModal,
   onOpenDetailModal,
   onOpenReceiveModal,
 }: {
   purchase: DirectStockPurchaseRow;
   canManage: boolean;
+  canReplaceInvoice: boolean;
   onOpenInvoiceModal: (purchase: DirectStockPurchaseRow) => void;
+  onOpenReplaceInvoiceModal: (purchase: DirectStockPurchaseRow) => void;
   onOpenDetailModal: (purchase: DirectStockPurchaseRow) => void;
   onOpenReceiveModal: (purchase: DirectStockPurchaseRow) => void;
 }) {
@@ -373,6 +384,8 @@ function DirectPurchaseMobileCard({
     .join(" · ");
   const needsInvoice =
     canManage && canUploadDirectPurchaseInvoice(purchase);
+  const canReplace =
+    canReplaceInvoice && canReplaceDirectPurchaseInvoice(purchase);
   const readyToReceive = canReceiveDirectPurchase(purchase, canManage);
 
   return (
@@ -413,7 +426,7 @@ function DirectPurchaseMobileCard({
         <span className="type-p1 font-mono font-bold tabular-nums text-foreground">
           {currency.format(Number(purchase.totalAmount))}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           {needsInvoice ? (
             <Button
               type="button"
@@ -434,6 +447,17 @@ function DirectPurchaseMobileCard({
               Terima
             </Button>
           ) : null}
+          {canReplace && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onOpenReplaceInvoiceModal(purchase)}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Ganti Foto Invoice/Bon
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
@@ -487,9 +511,10 @@ export default function LogisticsWorkspace({
   // Hoisted Single Action Controllers for Direct Purchases & Stock
   const [directPurchaseModal, setDirectPurchaseModal] = useState<{
     purchase: DirectStockPurchaseRow;
-    mode: "invoice" | "detail";
+    mode: "invoice" | "replace-invoice" | "detail";
   } | null>(null);
   const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
+  const [isInvoicePreparing, setIsInvoicePreparing] = useState(false);
   const [isInvoicePending, startInvoiceTransition] = useTransition();
 
   const [receivingPurchase, setReceivingPurchase] =
@@ -795,22 +820,51 @@ export default function LogisticsWorkspace({
     },
   ];
 
+  const handleReplaceInvoiceFilesChange = async (files: File[]) => {
+    const rawFile = files[0];
+    if (!rawFile) {
+      setInvoiceFiles([]);
+      return;
+    }
+    setIsInvoicePreparing(true);
+    try {
+      const prepared = await compressFieldImageFile(rawFile, {
+        allowPdfPassthrough: true,
+      });
+      setInvoiceFiles([prepared]);
+    } catch (error) {
+      setInvoiceFiles([]);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Berkas invoice/bon tidak dapat diproses.",
+      );
+    } finally {
+      setIsInvoicePreparing(false);
+    }
+  };
+
   const handleUploadDirectPurchaseInvoice = (event: FormEvent) => {
     event.preventDefault();
-    if (!directPurchaseModal) return;
+    if (!directPurchaseModal || isInvoicePreparing) return;
     const file = invoiceFiles[0];
     if (!file) {
-      toast.error("Pilih foto nota/invoice terlebih dahulu.");
+      toast.error("Pilih berkas nota/invoice terlebih dahulu.");
       return;
     }
     const purchaseId = directPurchaseModal.purchase.id;
+    const isReplacing = directPurchaseModal.mode === "replace-invoice";
     startInvoiceTransition(async () => {
       try {
-        const compressed = await compressFieldImageFile(file);
+        const prepared = await compressFieldImageFile(file, {
+          allowPdfPassthrough: isReplacing,
+        });
         const formData = new FormData();
         formData.set("purchaseId", purchaseId);
-        formData.set("invoicePhoto", compressed, compressed.name);
-        const result = await submitDirectStockPurchaseInvoice(formData);
+        formData.set("invoicePhoto", prepared, prepared.name);
+        const result = isReplacing
+          ? await replaceDirectStockPurchaseInvoice(formData)
+          : await submitDirectStockPurchaseInvoice(formData);
         if (result.success) {
           toast.success(result.message);
           setInvoiceFiles([]);
@@ -822,7 +876,11 @@ export default function LogisticsWorkspace({
         }
       } catch (error) {
         console.error("Saving direct purchase invoice failed:", error);
-        toast.error("Invoice/bon gagal disimpan. Coba kembali.");
+        toast.error(
+          error instanceof Error && error.message
+            ? error.message
+            : "Invoice/bon gagal disimpan. Coba kembali.",
+        );
       }
     });
   };
@@ -872,6 +930,8 @@ export default function LogisticsWorkspace({
       role === "ADMINISTRATIONS" ||
       role === "DIRECTOR" ||
       role === "DEPUTY_DIRECTOR";
+    const canReplacePurchaseInvoice =
+      canCreatePurchaseOrder || role === "FINANCE";
     const lowStockCount = stockItems.filter(
       (item) => Number(item.stockQuantity) <= Number(item.minimumStock),
     ).length;
@@ -1628,11 +1688,19 @@ export default function LogisticsWorkspace({
                       key={purchase.id}
                       purchase={purchase}
                       canManage={canCreatePurchaseOrder}
+                      canReplaceInvoice={canReplacePurchaseInvoice}
                       onOpenInvoiceModal={(target) => {
                         setInvoiceFiles([]);
                         setDirectPurchaseModal({
                           purchase: target,
                           mode: "invoice",
+                        });
+                      }}
+                      onOpenReplaceInvoiceModal={(target) => {
+                        setInvoiceFiles([]);
+                        setDirectPurchaseModal({
+                          purchase: target,
+                          mode: "replace-invoice",
                         });
                       }}
                       onOpenDetailModal={(target) => {
@@ -1674,6 +1742,9 @@ export default function LogisticsWorkspace({
                         const needsInvoice =
                           canCreatePurchaseOrder &&
                           canUploadDirectPurchaseInvoice(purchase);
+                        const canReplaceInvoice =
+                          canReplacePurchaseInvoice &&
+                          canReplaceDirectPurchaseInvoice(purchase);
                         const readyToReceive = canReceiveDirectPurchase(
                           purchase,
                           canCreatePurchaseOrder,
@@ -1758,7 +1829,7 @@ export default function LogisticsWorkspace({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1.5">
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
                                 {needsInvoice ? (
                                   <Button
                                     type="button"
@@ -1794,6 +1865,26 @@ export default function LogisticsWorkspace({
                                     Terima
                                   </Button>
                                 ) : null}
+                                {canReplaceInvoice && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setInvoiceFiles([]);
+                                      setDirectPurchaseModal({
+                                        purchase,
+                                        mode: "replace-invoice",
+                                      });
+                                    }}
+                                  >
+                                    <Pencil
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Ganti Foto Invoice/Bon
+                                  </Button>
+                                )}
                                 <Button
                                   type="button"
                                   size="sm"
@@ -1821,40 +1912,56 @@ export default function LogisticsWorkspace({
           </div>
         </CardBox>
 
-        {/* HOISTED SINGLE DIRECT PURCHASE MODAL (Unggah Nota / Detail) */}
+        {/* HOISTED SINGLE DIRECT PURCHASE MODAL (Unggah Nota / Ganti Nota / Detail) */}
         <GlobalModal
           isOpen={directPurchaseModal !== null}
           onClose={() => {
-            if (!isInvoicePending) {
+            if (!isInvoicePending && !isInvoicePreparing) {
               setDirectPurchaseModal(null);
               setInvoiceFiles([]);
             }
           }}
           title={
-            directPurchaseModal?.mode === "invoice"
-              ? `Unggah Nota · ${directPurchaseModal.purchase.purchaseNumber}`
-              : `Detail Pembelian · ${directPurchaseModal?.purchase.purchaseNumber ?? ""}`
+            directPurchaseModal?.mode === "replace-invoice"
+              ? `Ganti Foto Invoice/Bon · ${directPurchaseModal.purchase.purchaseNumber}`
+              : directPurchaseModal?.mode === "invoice"
+                ? `Unggah Nota · ${directPurchaseModal.purchase.purchaseNumber}`
+                : `Detail Pembelian · ${directPurchaseModal?.purchase.purchaseNumber ?? ""}`
           }
           description={directPurchaseModal?.purchase.vendorName}
           className="sm:max-w-lg"
           footer={
             directPurchaseModal ? (
-              directPurchaseModal.mode === "invoice" ? (
+              directPurchaseModal.mode === "invoice" ||
+              directPurchaseModal.mode === "replace-invoice" ? (
                 <>
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={isInvoicePending}
-                    onClick={() => setDirectPurchaseModal(null)}
+                    disabled={isInvoicePending || isInvoicePreparing}
+                    onClick={() => {
+                      setDirectPurchaseModal(null);
+                      setInvoiceFiles([]);
+                    }}
                   >
                     Batal
                   </Button>
                   <Button
                     type="submit"
                     form="hoisted-direct-purchase-invoice-form"
-                    disabled={isInvoicePending || invoiceFiles.length === 0}
+                    disabled={
+                      isInvoicePending ||
+                      isInvoicePreparing ||
+                      invoiceFiles.length === 0
+                    }
                   >
-                    {isInvoicePending ? "Mengirim..." : "Kirim ke Keuangan"}
+                    {directPurchaseModal.mode === "replace-invoice"
+                      ? isInvoicePending
+                        ? "Menyimpan..."
+                        : "Simpan Invoice/Bon Baru"
+                      : isInvoicePending
+                        ? "Mengirim..."
+                        : "Kirim ke Keuangan"}
                   </Button>
                 </>
               ) : (
@@ -1872,15 +1979,35 @@ export default function LogisticsWorkspace({
                     ) && (
                       <Button
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setInvoiceFiles([]);
                           setDirectPurchaseModal({
                             purchase: directPurchaseModal.purchase,
                             mode: "invoice",
-                          })
-                        }
+                          });
+                        }}
                       >
                         <Upload className="size-4" aria-hidden="true" />
                         Unggah Nota
+                      </Button>
+                    )}
+                  {canReplacePurchaseInvoice &&
+                    canReplaceDirectPurchaseInvoice(
+                      directPurchaseModal.purchase,
+                    ) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setInvoiceFiles([]);
+                          setDirectPurchaseModal({
+                            purchase: directPurchaseModal.purchase,
+                            mode: "replace-invoice",
+                          });
+                        }}
+                      >
+                        <Pencil className="size-4" aria-hidden="true" />
+                        Ganti Foto Invoice/Bon
                       </Button>
                     )}
                   {canReceiveDirectPurchase(
@@ -1906,8 +2033,10 @@ export default function LogisticsWorkspace({
           }
         >
           {directPurchaseModal ? (
-            directPurchaseModal.mode === "invoice" ? (
+            directPurchaseModal.mode === "invoice" ||
+            directPurchaseModal.mode === "replace-invoice" ? (
               <form
+                key={`${directPurchaseModal.mode}:${directPurchaseModal.purchase.id}`}
                 id="hoisted-direct-purchase-invoice-form"
                 className="space-y-4"
                 onSubmit={handleUploadDirectPurchaseInvoice}
@@ -1929,21 +2058,67 @@ export default function LogisticsWorkspace({
                   ) : null}
                 </div>
 
+                {directPurchaseModal.mode === "replace-invoice" &&
+                  directPurchaseModal.purchase.vendorInvoiceUrl && (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                      <p className="type-p3 text-muted-foreground">
+                        Berkas invoice/bon lama akan diganti tanpa mengubah rincian pembelian.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setStockReceiptPreviewFailed(false);
+                          setStockReceiptPreview({
+                            url: directPurchaseModal.purchase.vendorInvoiceUrl!,
+                            label: `${directPurchaseModal.purchase.purchaseNumber} · Invoice / BON`,
+                          });
+                        }}
+                      >
+                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                        Lihat Lama
+                      </Button>
+                    </div>
+                  )}
+
                 <div className="space-y-1.5">
                   <Label className="type-p2 font-semibold">
-                    Foto Invoice / Bon Faktur{" "}
+                    {directPurchaseModal.mode === "replace-invoice"
+                      ? "Berkas Invoice / Bon Pengganti"
+                      : "Foto Invoice / Bon Faktur"}{" "}
                     <span className="text-destructive">*</span>
                   </Label>
                   <FileDropzone
-                    accept="image/jpeg,image/png,image/webp"
+                    accept={
+                      directPurchaseModal.mode === "replace-invoice"
+                        ? "application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+                        : "image/jpeg,image/png,image/webp"
+                    }
                     capture="environment"
                     maxFiles={1}
                     maxSizeMb={5}
                     files={invoiceFiles}
-                    disabled={isInvoicePending}
-                    label="Unggah Foto Nota / Bon"
-                    hint="Format JPG, PNG, atau WEBP (maksimal 5 MB)."
-                    onFilesChange={setInvoiceFiles}
+                    disabled={isInvoicePending || isInvoicePreparing}
+                    label={
+                      isInvoicePreparing
+                        ? "Memproses berkas..."
+                        : directPurchaseModal.mode === "replace-invoice"
+                          ? "Unggah Foto / PDF Invoice/Bon Baru"
+                          : "Unggah Foto Nota / Bon"
+                    }
+                    hint={
+                      directPurchaseModal.mode === "replace-invoice"
+                        ? "Format PDF, JPG, PNG, atau WEBP (maksimal 5 MB)."
+                        : "Format JPG, PNG, atau WEBP (maksimal 5 MB)."
+                    }
+                    onFilesChange={
+                      directPurchaseModal.mode === "replace-invoice"
+                        ? (files) => {
+                            void handleReplaceInvoiceFilesChange(files);
+                          }
+                        : setInvoiceFiles
+                    }
                     onError={(err) => toast.error(err)}
                   />
                 </div>
@@ -2012,6 +2187,26 @@ export default function LogisticsWorkspace({
                       <ExternalLink className="size-3.5" aria-hidden="true" />
                       Lihat Nota Vendor
                     </Button>
+                    {canReplacePurchaseInvoice &&
+                      canReplaceDirectPurchaseInvoice(
+                        directPurchaseModal.purchase,
+                      ) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setInvoiceFiles([]);
+                            setDirectPurchaseModal({
+                              purchase: directPurchaseModal.purchase,
+                              mode: "replace-invoice",
+                            });
+                          }}
+                        >
+                          <Pencil className="size-3.5" aria-hidden="true" />
+                          Ganti Foto Invoice/Bon
+                        </Button>
+                      )}
                   </div>
                 )}
 

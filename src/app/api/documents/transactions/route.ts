@@ -649,7 +649,18 @@ async function loadDocument(
         acknowledgedAt: true,
         acknowledgedBy: { select: { name: true } },
         project: { select: { kelompokTani: true, location: true } },
-        po: { select: { poNumber: true, paymentTerms: true } },
+        po: {
+          select: {
+            poNumber: true,
+            paymentTerms: true,
+            project: { select: { kelompokTani: true, location: true } },
+            ticket: {
+              select: {
+                project: { select: { kelompokTani: true, location: true } },
+              },
+            },
+          },
+        },
         subkonTermyn: {
           select: {
             termynNumber: true,
@@ -679,12 +690,17 @@ async function loadDocument(
     const project = invoice.project ??
       (invoice.subkonTermyn
         ? invoice.subkonTermyn.subkonContract.project
-        : null);
+        : null) ??
+      invoice.po?.project ??
+      invoice.po?.ticket?.project ??
+      null;
     return {
       kind,
       title: "INVOICE PEMBAYARAN",
       subtitle: invoice.subkonTermyn ? "UPAH TUKANG & LANSIR" : "TAGIHAN VENDOR",
-      number: invoice.invoiceNumber ?? "Tanpa Nomor",
+      number:
+        invoice.invoiceNumber?.trim() ||
+        (invoice.po?.poNumber ? `Nota ${invoice.po.poNumber}` : "Tanpa Nomor"),
       date: invoice.periodOrDate ?? formatDate(invoice.createdAt),
       verificationPublicCode: invoice.signedAt ? invoice.publicCode : null,
       leftDetails: [
@@ -699,7 +715,9 @@ async function loadDocument(
       ],
       items: documentItems(invoice.items),
       summary: summary(invoice.subTotal, invoice.tax ?? 0, invoice.deduction ?? 0),
-      notes: invoice.documentUrl ? `Dokumen invoice vendor: ${invoice.documentUrl}` : undefined,
+      notes: invoice.documentUrl
+        ? "Lampiran nota/invoice vendor tersimpan di sistem."
+        : undefined,
       signatures: [
         { heading: "Ditandatangani Oleh / Signed By", name: invoice.signedBy?.name ?? undefined, role: "Keuangan / Finance" },
         { heading: "Diketahui Oleh / Acknowledged By", name: invoice.acknowledgedBy?.name ?? undefined, role: "Direktur / Director" },

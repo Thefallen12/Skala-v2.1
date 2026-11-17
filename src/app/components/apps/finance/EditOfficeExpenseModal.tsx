@@ -268,7 +268,7 @@ export default function EditOfficeExpenseModal({
               <span className="text-xs font-medium text-muted-foreground">Bukti Saat Ini:</span>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {keepUrls.map((url, idx) => (
-                  <div key={url} className="relative overflow-hidden rounded-lg border bg-card p-2 flex flex-col justify-between">
+                  <div key={`${url}-${idx}`} className="relative overflow-hidden rounded-lg border bg-card p-2 flex flex-col justify-between">
                     <div className="flex items-center justify-between pb-1.5">
                       <span className="text-xs font-medium">Bukti {idx + 1}</span>
                       <div className="flex items-center gap-1">

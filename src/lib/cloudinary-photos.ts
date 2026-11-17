@@ -97,6 +97,8 @@ export async function uploadCloudinaryPhoto(
       {
         folder,
         public_id: randomUUID(),
+        use_filename: false,
+        unique_filename: false,
         overwrite: false,
         resource_type: "image",
       },

@@ -11,10 +11,12 @@ import {
   Clock,
   CreditCard,
   ExternalLink,
+  Eye,
   FileText,
   Filter,
   Home,
   MapPin,
+  Pencil,
   Phone,
   Search,
   Truck,
@@ -27,8 +29,11 @@ import {
   type RentalType,
   getRentals,
   processRentalPayment,
+  replaceRentalPaymentProof,
 } from "@/app/actions/rentals";
 import { getDefaultRentalUnit } from "@/lib/equipment-catalog";
+import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import FinancePaymentProofReplacement from "@/app/components/apps/finance/FinancePaymentProofReplacement";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,10 +111,12 @@ export default function RentalBillingQueue({
   rentals = [],
   financeAccounts = [],
   canManage = true,
+  onPreviewProof,
 }: {
   rentals: RentalItemRow[];
   financeAccounts: FinanceAccountOption[];
   canManage?: boolean;
+  onPreviewProof?: (url: string, label: string) => void;
 }) {
   const router = useRouter();
   const [hydratedRentals, setHydratedRentals] = useState<
@@ -123,6 +130,9 @@ export default function RentalBillingQueue({
   const [searchQuery, setSearchQuery] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedRental, setSelectedRental] = useState<RentalItemRow | null>(
+    null,
+  );
+  const [replacingRental, setReplacingRental] = useState<RentalItemRow | null>(
     null,
   );
 
@@ -557,18 +567,46 @@ export default function RentalBillingQueue({
                     </span>
                     {canManage &&
                       (isPaid ? (
-                        r.proofOfPaymentUrl ? (
-                          <Button asChild variant="outline" size="sm">
-                            <a
-                              href={r.proofOfPaymentUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <ExternalLink className="size-3.5" aria-hidden="true" />
-                              Bukti Bayar
-                            </a>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          {r.proofOfPaymentUrl ? (
+                            onPreviewProof ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  onPreviewProof(
+                                    r.proofOfPaymentUrl!,
+                                    `Bukti Bayar ${r.name}`,
+                                  )
+                                }
+                              >
+                                <Eye className="size-3.5" aria-hidden="true" />
+                                Bukti Bayar
+                              </Button>
+                            ) : (
+                              <Button asChild variant="outline" size="sm">
+                                <a
+                                  href={withLocalPhotoPreview(r.proofOfPaymentUrl)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                                  Bukti Bayar
+                                </a>
+                              </Button>
+                            )
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setReplacingRental(r)}
+                          >
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                            {r.proofOfPaymentUrl ? "Ganti Bukti" : "Unggah Bukti"}
                           </Button>
-                        ) : null
+                        </div>
                       ) : isPendingPay ? (
                         <Button
                           type="button"
@@ -770,22 +808,46 @@ export default function RentalBillingQueue({
                       {canManage && (
                         <TableCell className="text-right">
                           {isPaid ? (
-                            r.proofOfPaymentUrl ? (
-                              <Button asChild variant="outline" size="sm">
-                                <a
-                                  href={r.proofOfPaymentUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  <ExternalLink className="size-3.5" aria-hidden="true" />
-                                  Bukti Bayar
-                                </a>
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              {r.proofOfPaymentUrl ? (
+                                onPreviewProof ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      onPreviewProof(
+                                        r.proofOfPaymentUrl!,
+                                        `Bukti Bayar ${r.name}`,
+                                      )
+                                    }
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Bukti Bayar
+                                  </Button>
+                                ) : (
+                                  <Button asChild variant="outline" size="sm">
+                                    <a
+                                      href={withLocalPhotoPreview(r.proofOfPaymentUrl)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                                      Bukti Bayar
+                                    </a>
+                                  </Button>
+                                )
+                              ) : null}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setReplacingRental(r)}
+                              >
+                                <Pencil className="size-3.5" aria-hidden="true" />
+                                {r.proofOfPaymentUrl ? "Ganti Bukti" : "Unggah Bukti"}
                               </Button>
-                            ) : (
-                              <span className="type-p3 text-muted-foreground">
-                                Lunas
-                              </span>
-                            )
+                            </div>
                           ) : isPendingPay ? (
                             <Button
                               type="button"
@@ -1012,6 +1074,46 @@ export default function RentalBillingQueue({
           </form>
         )}
       </GlobalModal>
+
+      <FinancePaymentProofReplacement
+        key={
+          replacingRental
+            ? `${replacingRental.id}-${replacingRental.proofOfPaymentUrl ?? ""}`
+            : "none"
+        }
+        existingProofUrl={replacingRental?.proofOfPaymentUrl ?? undefined}
+        label={
+          replacingRental
+            ? `bukti pembayaran sewa ${replacingRental.name}`
+            : "bukti pembayaran sewa"
+        }
+        buttonLabel="Ganti Bukti"
+        allowAllProofFormats
+        open={replacingRental !== null}
+        onOpenChange={(open) => {
+          if (!open) setReplacingRental(null);
+        }}
+        showTrigger={false}
+        onSubmitFile={async (file) => {
+          if (!replacingRental) {
+            return {
+              success: false,
+              message: "Data sewa tidak ditemukan.",
+            };
+          }
+          const formData = new FormData();
+          formData.set("rentalId", replacingRental.id);
+          formData.set("proof", file);
+          return replaceRentalPaymentProof(formData);
+        }}
+        onSaved={() => {
+          setReplacingRental(null);
+          getRentals()
+            .then((fresh) => setHydratedRentals(fresh))
+            .catch(() => undefined);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

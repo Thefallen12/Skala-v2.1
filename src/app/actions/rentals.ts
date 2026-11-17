@@ -7,13 +7,32 @@ import { z } from "zod";
 import { auth } from "../../../auth";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Cashflow from "@/models/cashflow";
+import DirectStockPurchase from "@/models/direct-stock-purchase";
 import FinanceAccount from "@/models/finance-account";
-import { EquipmentRental } from "@/models/finance-records";
+import {
+  DeliveryOrder,
+  EquipmentRental,
+  Invoice,
+  MaterialDelivery,
+  OrderConfirmation,
+  SubkonTermyn,
+  VehicleFuelRequest,
+  VendorInvoicePayment,
+} from "@/models/finance-records";
 import Notification from "@/models/notification";
+import OfficeExpense from "@/models/office-expense";
 import PaymentTransaction from "@/models/payment-transaction";
 import Project from "@/models/project";
+import PurchaseOrder from "@/models/purchase-order";
+import Ticket from "@/models/ticket";
 import User from "@/models/user";
+import {
+  CloudinaryConfigurationError,
+  CloudinaryPhotoValidationError,
+} from "@/lib/cloudinary-photos";
+import { CloudinaryPrivatePdfValidationError } from "@/lib/cloudinary-private-pdfs";
 import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
+import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
 import {
   decimalNumberFromScaledInteger,
@@ -1106,6 +1125,277 @@ export async function payEquipmentRentalBilling(
   input: RentalPaymentInput,
 ): Promise<RentalActionResult> {
   return processRentalPayment(input);
+}
+
+function isLegacySharedProofUrl(url: string): boolean {
+  return /\/file\.(?:jpe?g|png|webp|pdf)(?:[?#]|$)/i.test(url);
+}
+
+async function isProofUrlReferencedInDb(url: string): Promise<boolean> {
+  const [
+    cashflowRef,
+    officeExpenseRef,
+    paymentTxRef,
+    vendorPaymentRef,
+    rentalRef,
+    ticketRef,
+    poRef,
+    directPurchaseRef,
+    deliveryRef,
+    fuelRef,
+    invoiceRef,
+    confirmationRef,
+    termynRef,
+    deliveryOrderRef,
+  ] = await Promise.all([
+    Cashflow.exists({ proofUrl: url }),
+    OfficeExpense.exists({ proofUrls: url }),
+    PaymentTransaction.exists({
+      $or: [{ proofOfTransferUrl: url }, { additionalProofUrls: url }],
+    }),
+    VendorInvoicePayment.exists({ proofOfTransferUrl: url }),
+    EquipmentRental.exists({ proofOfPaymentUrl: url }),
+    Ticket.exists({
+      $or: [
+        { paymentProofUrl: url },
+        { purchaseReceiptUrl: url },
+        { transferReceiptUrl: url },
+        { deliveryReceiptUrl: url },
+        { deliveryOrderReceiptUrl: url },
+        { receiptUrls: url },
+      ],
+    }),
+    PurchaseOrder.exists({
+      $or: [{ paymentReceiptUrl: url }, { vendorInvoiceUrl: url }],
+    }),
+    DirectStockPurchase.exists({ vendorInvoiceUrl: url }),
+    MaterialDelivery.exists({ proofUrl: url }),
+    VehicleFuelRequest.exists({
+      $or: [
+        { transferProofUrl: url },
+        { beforeFillingPhotoUrl: url },
+        { afterFillingPhotoUrl: url },
+        { receiptPhotoUrl: url },
+      ],
+    }),
+    Invoice.exists({ documentUrl: url }),
+    OrderConfirmation.exists({ proofOfTransferUrl: url }),
+    SubkonTermyn.exists({ paymentProofUrl: url }),
+    DeliveryOrder.exists({
+      $or: [{ deliveryReceiptUrl: url }, { arrivalPhotoUrl: url }],
+    }),
+  ]);
+
+  return Boolean(
+    cashflowRef ||
+      officeExpenseRef ||
+      paymentTxRef ||
+      vendorPaymentRef ||
+      rentalRef ||
+      ticketRef ||
+      poRef ||
+      directPurchaseRef ||
+      deliveryRef ||
+      fuelRef ||
+      invoiceRef ||
+      confirmationRef ||
+      termynRef ||
+      deliveryOrderRef,
+  );
+}
+
+export async function replaceRentalPaymentProof(
+  formData: FormData,
+): Promise<{ success: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan login terlebih dahulu." };
+  }
+
+  if (!financeRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message:
+        "Role Anda tidak memiliki izin untuk mengganti bukti pembayaran sewa.",
+    };
+  }
+
+  if (!(formData instanceof FormData)) {
+    return { success: false, message: "Data unggahan tidak valid." };
+  }
+
+  const rawRentalId = formData.get("rentalId");
+  const rawProof = formData.get("proof");
+  const rentalId =
+    typeof rawRentalId === "string" ? rawRentalId.trim() : "";
+
+  if (!rentalId || rentalId.length > 191) {
+    return { success: false, message: "Referensi data sewa tidak valid." };
+  }
+
+  if (
+    !(rawProof instanceof File) ||
+    rawProof.size < 1 ||
+    rawProof.size > 5 * 1024 * 1024
+  ) {
+    return {
+      success: false,
+      message: "Pilih file bukti (PDF/JPG/PNG/WEBP) maksimal 5 MB.",
+    };
+  }
+
+  const normalizedFile = normalizeFinancePaymentProofFile(rawProof);
+  if (!normalizedFile) {
+    return {
+      success: false,
+      message: "Format file bukti harus PDF, JPG, PNG, atau WEBP.",
+    };
+  }
+
+  let uploadedProofUrl: string | null = null;
+  try {
+    const mongoose = await connectToMongoDB();
+
+    const existing = await EquipmentRental.findById(rentalId)
+      .select({ _id: 1, status: 1, paymentStatus: 1 })
+      .lean();
+    if (!existing) {
+      return { success: false, message: "Data sewa tidak ditemukan." };
+    }
+    if (existing.status === "CANCELLED") {
+      return { success: false, message: "Tagihan sewa berstatus dibatalkan." };
+    }
+    if (existing.paymentStatus !== "PAID") {
+      return {
+        success: false,
+        message: "Bukti hanya dapat diganti untuk tagihan sewa yang sudah lunas.",
+      };
+    }
+
+    uploadedProofUrl = await uploadCashflowProof(normalizedFile);
+    if (!isFinanceCashflowProofUrl(uploadedProofUrl)) {
+      throw new Error("URL bukti pembayaran sewa yang diunggah tidak valid.");
+    }
+    const nextProofUrl = uploadedProofUrl;
+
+    const result = await mongoose.connection.transaction(
+      async (mongoSession) => {
+        const current = await EquipmentRental.findById(rentalId)
+          .session(mongoSession)
+          .lean();
+        if (!current) {
+          throw new Error("Data sewa tidak ditemukan.");
+        }
+        if (current.status === "CANCELLED") {
+          throw new Error("Tagihan sewa berstatus dibatalkan.");
+        }
+        if (current.paymentStatus !== "PAID") {
+          throw new Error(
+            "Bukti hanya dapat diganti untuk tagihan sewa yang sudah lunas.",
+          );
+        }
+
+        const oldProofUrl = cleanOptionalText(current.proofOfPaymentUrl);
+        const cashflowId = cleanOptionalText(current.cashflowId);
+        const paymentTransactionId = cleanOptionalText(
+          current.paymentTransactionId,
+        );
+        const projectId = cleanOptionalText(current.projectId);
+        const now = new Date();
+
+        const updatedRental = await EquipmentRental.updateOne(
+          {
+            _id: rentalId,
+            paymentStatus: "PAID",
+            status: { $ne: "CANCELLED" },
+          },
+          {
+            $set: {
+              proofOfPaymentUrl: nextProofUrl,
+              updatedAt: now,
+            },
+          },
+          { session: mongoSession },
+        );
+        if (updatedRental.matchedCount !== 1) {
+          throw new Error(
+            "Status tagihan sewa berubah. Muat ulang sebelum mengganti bukti.",
+          );
+        }
+
+        if (paymentTransactionId) {
+          await PaymentTransaction.updateOne(
+            { _id: paymentTransactionId },
+            { $set: { proofOfTransferUrl: nextProofUrl } },
+            { session: mongoSession },
+          );
+        }
+
+        const cashflowOr: Array<Record<string, unknown>> = [
+          { equipmentRentalId: String(current._id) },
+        ];
+        if (cashflowId) {
+          cashflowOr.push({ _id: cashflowId });
+        }
+        if (paymentTransactionId) {
+          cashflowOr.push({ paymentTransactionId });
+        }
+        await Cashflow.updateMany(
+          { $or: cashflowOr },
+          { $set: { proofUrl: nextProofUrl } },
+          { session: mongoSession },
+        );
+
+        return { oldProofUrl, projectId };
+      },
+    );
+
+    if (
+      result.oldProofUrl &&
+      result.oldProofUrl !== nextProofUrl &&
+      !isLegacySharedProofUrl(result.oldProofUrl)
+    ) {
+      const stillReferenced = await isProofUrlReferencedInDb(
+        result.oldProofUrl,
+      ).catch(() => true);
+      if (!stillReferenced) {
+        await removeUploadedCashflowProof(result.oldProofUrl).catch(
+          () => undefined,
+        );
+      }
+    }
+
+    revalidateRentalPaths();
+    if (result.projectId) {
+      revalidatePath(`/apps/projects/${result.projectId}`);
+    }
+
+    return {
+      success: true,
+      message: "Bukti pembayaran sewa berhasil diperbarui.",
+    };
+  } catch (error) {
+    if (uploadedProofUrl) {
+      await removeUploadedCashflowProof(uploadedProofUrl).catch(
+        () => undefined,
+      );
+    }
+    console.error("Replace rental payment proof error:", error);
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryConfigurationError ||
+      error instanceof CloudinaryPrivatePdfValidationError
+    ) {
+      return { success: false, message: error.message };
+    }
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Gagal memperbarui bukti pembayaran sewa.",
+    };
+  }
 }
 
 export async function deleteRental(id: string): Promise<RentalActionResult> {

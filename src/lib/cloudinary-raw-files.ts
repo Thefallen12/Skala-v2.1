@@ -90,7 +90,14 @@ export async function uploadCloudinaryRawFile(
   const publicId = `${randomUUID()}.${extension}`;
   return new Promise((resolveUpload, rejectUpload) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, public_id: publicId, overwrite: false, resource_type: "raw" },
+      {
+        folder,
+        public_id: publicId,
+        use_filename: false,
+        unique_filename: false,
+        overwrite: false,
+        resource_type: "raw",
+      },
       (error, response) => {
         if (error) {
           rejectUpload(error);

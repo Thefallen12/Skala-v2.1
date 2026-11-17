@@ -122,6 +122,8 @@ export async function uploadCloudinaryPrivatePdf(
         access_mode: "authenticated",
         folder: TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER,
         public_id: randomUUID(),
+        use_filename: false,
+        unique_filename: false,
         overwrite: false,
         resource_type: "raw",
         type: "authenticated",

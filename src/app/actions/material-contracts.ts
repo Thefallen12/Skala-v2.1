@@ -24,6 +24,8 @@ import DirectStockPurchase from "@/models/direct-stock-purchase";
 import DocumentNumberSequence from "@/models/document-number-sequence";
 import FinanceAccount from "@/models/finance-account";
 import Notification from "@/models/notification";
+import OfficeExpense from "@/models/office-expense";
+import PaymentTransaction from "@/models/payment-transaction";
 import Project from "@/models/project";
 import PurchaseOrder from "@/models/purchase-order";
 import Ticket from "@/models/ticket";
@@ -31,9 +33,14 @@ import TicketAuditLog from "@/models/ticket-audit-log";
 import User from "@/models/user";
 import {
   DeliveryOrder,
+  EquipmentRental,
+  Invoice,
   MaterialContract,
   MaterialDelivery,
+  OrderConfirmation,
+  SubkonTermyn,
   TicketItem,
+  VehicleFuelRequest,
   Vendor,
   VendorInvoice,
   VendorInvoicePayment,
@@ -49,6 +56,7 @@ import {
   saveTicketReceipt,
 } from "@/lib/ticket-receipts";
 import { CloudinaryPrivatePdfValidationError } from "@/lib/cloudinary-private-pdfs";
+import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
 import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import {
   removeUploadedCashflowProof,
@@ -1774,6 +1782,283 @@ export async function payVendorInvoice(input: {
         error instanceof Error
           ? error.message
           : "Gagal memproses pembayaran tagihan vendor.",
+    };
+  }
+}
+
+function isLegacySharedProofUrl(url: string): boolean {
+  return /\/file\.(?:jpe?g|png|webp|pdf)(?:[?#]|$)/i.test(url);
+}
+
+async function isProofUrlReferencedInDb(url: string): Promise<boolean> {
+  const [
+    cashflowRef,
+    officeExpenseRef,
+    paymentTxRef,
+    vendorPaymentRef,
+    rentalRef,
+    ticketRef,
+    poRef,
+    directPurchaseRef,
+    deliveryRef,
+    fuelRef,
+    invoiceRef,
+    confirmationRef,
+    termynRef,
+    deliveryOrderRef,
+  ] = await Promise.all([
+    Cashflow.exists({ proofUrl: url }),
+    OfficeExpense.exists({ proofUrls: url }),
+    PaymentTransaction.exists({
+      $or: [{ proofOfTransferUrl: url }, { additionalProofUrls: url }],
+    }),
+    VendorInvoicePayment.exists({ proofOfTransferUrl: url }),
+    EquipmentRental.exists({ proofOfPaymentUrl: url }),
+    Ticket.exists({
+      $or: [
+        { paymentProofUrl: url },
+        { purchaseReceiptUrl: url },
+        { transferReceiptUrl: url },
+        { deliveryReceiptUrl: url },
+        { deliveryOrderReceiptUrl: url },
+        { receiptUrls: url },
+      ],
+    }),
+    PurchaseOrder.exists({
+      $or: [{ paymentReceiptUrl: url }, { vendorInvoiceUrl: url }],
+    }),
+    DirectStockPurchase.exists({ vendorInvoiceUrl: url }),
+    MaterialDelivery.exists({ proofUrl: url }),
+    VehicleFuelRequest.exists({
+      $or: [
+        { transferProofUrl: url },
+        { beforeFillingPhotoUrl: url },
+        { afterFillingPhotoUrl: url },
+        { receiptPhotoUrl: url },
+      ],
+    }),
+    Invoice.exists({ documentUrl: url }),
+    OrderConfirmation.exists({ proofOfTransferUrl: url }),
+    SubkonTermyn.exists({ paymentProofUrl: url }),
+    DeliveryOrder.exists({
+      $or: [{ deliveryReceiptUrl: url }, { arrivalPhotoUrl: url }],
+    }),
+  ]);
+
+  return Boolean(
+    cashflowRef ||
+      officeExpenseRef ||
+      paymentTxRef ||
+      vendorPaymentRef ||
+      rentalRef ||
+      ticketRef ||
+      poRef ||
+      directPurchaseRef ||
+      deliveryRef ||
+      fuelRef ||
+      invoiceRef ||
+      confirmationRef ||
+      termynRef ||
+      deliveryOrderRef,
+  );
+}
+
+export async function replaceVendorInvoicePaymentProof(
+  formData: FormData,
+): Promise<{ success: boolean; message: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan login terlebih dahulu." };
+  }
+  if (!canBillAndPayVendorContracts(session.user.role)) {
+    return {
+      success: false,
+      message:
+        "Hanya Keuangan, Administrasi, atau Direksi yang dapat mengganti bukti pembayaran.",
+    };
+  }
+
+  if (!(formData instanceof FormData)) {
+    return { success: false, message: "Data unggahan tidak valid." };
+  }
+
+  const rawInvoiceId = formData.get("invoiceId");
+  const rawPaymentId = formData.get("paymentId");
+  const rawProof = formData.get("proof");
+
+  const invoiceId =
+    typeof rawInvoiceId === "string" ? rawInvoiceId.trim() : "";
+  const paymentId =
+    typeof rawPaymentId === "string" ? rawPaymentId.trim() : "";
+
+  if (
+    !invoiceId ||
+    invoiceId.length > 191 ||
+    !paymentId ||
+    paymentId.length > 191
+  ) {
+    return {
+      success: false,
+      message: "Referensi tagihan dan pembayaran vendor tidak valid.",
+    };
+  }
+
+  if (
+    !(rawProof instanceof File) ||
+    rawProof.size < 1 ||
+    rawProof.size > 5 * 1024 * 1024
+  ) {
+    return {
+      success: false,
+      message: "Pilih file bukti (PDF/JPG/PNG/WEBP) maksimal 5 MB.",
+    };
+  }
+
+  const normalizedFile = normalizeFinancePaymentProofFile(rawProof);
+  if (!normalizedFile) {
+    return {
+      success: false,
+      message: "Format file bukti harus PDF, JPG, PNG, atau WEBP.",
+    };
+  }
+
+  let uploadedProofUrl: string | null = null;
+  try {
+    const mongoose = await connectToMongoDB();
+
+    const [existingInvoice, existingPayment] = await Promise.all([
+      VendorInvoice.findById(invoiceId).select({ _id: 1 }).lean(),
+      VendorInvoicePayment.findOne({
+        _id: paymentId,
+        vendorInvoiceId: invoiceId,
+      })
+        .select({ _id: 1 })
+        .lean(),
+    ]);
+    if (!existingInvoice || !existingPayment) {
+      return {
+        success: false,
+        message: "Data pembayaran tagihan vendor tidak ditemukan.",
+      };
+    }
+
+    uploadedProofUrl = await uploadCashflowProof(normalizedFile);
+    if (!isFinanceCashflowProofUrl(uploadedProofUrl)) {
+      throw new Error("URL bukti pembayaran yang diunggah tidak valid.");
+    }
+    const nextProofUrl = uploadedProofUrl;
+
+    const result = await mongoose.connection.transaction(
+      async (mongoSession) => {
+        const [invoice, payment] = await Promise.all([
+          VendorInvoice.findById(invoiceId)
+            .session(mongoSession)
+            .select({ _id: 1 })
+            .lean(),
+          VendorInvoicePayment.findOne({
+            _id: paymentId,
+            vendorInvoiceId: invoiceId,
+          })
+            .session(mongoSession)
+            .select({ _id: 1, proofOfTransferUrl: 1, cashflowId: 1 })
+            .lean(),
+        ]);
+        if (!invoice || !payment) {
+          throw new Error("Data pembayaran tagihan vendor tidak ditemukan.");
+        }
+
+        const oldProofUrl =
+          typeof payment.proofOfTransferUrl === "string" &&
+          payment.proofOfTransferUrl.trim()
+            ? payment.proofOfTransferUrl.trim()
+            : null;
+        const cashflowId =
+          typeof payment.cashflowId === "string" && payment.cashflowId.trim()
+            ? payment.cashflowId.trim()
+            : null;
+
+        const updatedPayment = await VendorInvoicePayment.updateOne(
+          { _id: paymentId, vendorInvoiceId: invoiceId },
+          { $set: { proofOfTransferUrl: nextProofUrl } },
+          { session: mongoSession },
+        );
+        if (updatedPayment.matchedCount !== 1) {
+          throw new Error("Gagal memperbarui bukti pembayaran tagihan vendor.");
+        }
+
+        if (cashflowId) {
+          await Cashflow.updateOne(
+            { _id: cashflowId },
+            { $set: { proofUrl: nextProofUrl } },
+            { session: mongoSession },
+          );
+        }
+
+        const deliveries = await MaterialDelivery.find({
+          vendorInvoiceId: invoiceId,
+        })
+          .session(mongoSession)
+          .select({ projectId: 1 })
+          .lean();
+        const projectIds = Array.from(
+          new Set(
+            deliveries
+              .map((delivery) => delivery.projectId)
+              .filter((id): id is string => Boolean(id)),
+          ),
+        );
+
+        return { oldProofUrl, projectIds };
+      },
+    );
+
+    if (
+      result.oldProofUrl &&
+      result.oldProofUrl !== nextProofUrl &&
+      !isLegacySharedProofUrl(result.oldProofUrl)
+    ) {
+      const stillReferenced = await isProofUrlReferencedInDb(
+        result.oldProofUrl,
+      ).catch(() => true);
+      if (!stillReferenced) {
+        await removeUploadedCashflowProof(result.oldProofUrl).catch(
+          () => undefined,
+        );
+      }
+    }
+
+    revalidatePath("/apps/finance");
+    revalidatePath("/apps/logistics");
+    revalidatePath("/apps/tickets");
+    revalidatePath("/apps/projects");
+    for (const projectId of result.projectIds) {
+      revalidatePath(`/apps/projects/${projectId}`);
+    }
+
+    return {
+      success: true,
+      message: "Bukti pembayaran tagihan vendor berhasil diperbarui.",
+    };
+  } catch (error) {
+    if (uploadedProofUrl) {
+      await removeUploadedCashflowProof(uploadedProofUrl).catch(
+        () => undefined,
+      );
+    }
+    console.error("Replace vendor invoice payment proof error:", error);
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryConfigurationError ||
+      error instanceof CloudinaryPrivatePdfValidationError
+    ) {
+      return { success: false, message: error.message };
+    }
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Gagal memperbarui bukti pembayaran tagihan vendor.",
     };
   }
 }

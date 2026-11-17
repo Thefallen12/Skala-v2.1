@@ -58,7 +58,11 @@ import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPr
 import VehicleTripLogTable from "@/app/components/apps/logistics/VehicleTripLogTable";
 import RentalBillingQueue from "@/app/components/apps/finance/RentalBillingQueue";
 import VendorContractBillingPanel from "@/app/components/apps/finance/VendorContractBillingPanel";
-import type { RentalItemRow } from "@/app/actions/rentals";
+import { replaceVendorInvoicePaymentProof } from "@/app/actions/material-contracts";
+import {
+  replaceRentalPaymentProof,
+  type RentalItemRow,
+} from "@/app/actions/rentals";
 import type {
   MaterialContractRow,
   MaterialDeliveryRow,
@@ -315,6 +319,7 @@ type FinanceHistoryTransaction = {
   proofEditDisabledUrls: string[];
   paidAt: string | null;
   canEditProof?: boolean;
+  vendorInvoicePaymentId?: string;
 };
 
 type FinanceTermyn = {
@@ -959,6 +964,7 @@ export default function FinanceHub({
         title: `Material Alam · ${invoice.vendorName} (${invoice.materialType})`,
         targetKind: "vendor-invoice" as const,
         targetId: invoice.id,
+        vendorInvoicePaymentId: payment.id,
         paymentType: payment.paymentType,
         amount: payment.amount,
         transferDestination: payment.transferDestination,
@@ -966,7 +972,7 @@ export default function FinanceHub({
         additionalProofUrls: [],
         proofEditDisabledUrls: [],
         paidAt: payment.paidAt,
-        canEditProof: false,
+        canEditProof: true,
       })),
     ),
     ...rentals
@@ -992,7 +998,7 @@ export default function FinanceHub({
         additionalProofUrls: [],
         proofEditDisabledUrls: [],
         paidAt: r.paidAt ?? r.createdAt,
-        canEditProof: false,
+        canEditProof: true,
       })),
   ].sort(
     (a, b) =>
@@ -1491,10 +1497,25 @@ export default function FinanceHub({
     label: string,
     proofIndex: number,
     canEdit: boolean,
+    onCustomReplace?: (proofUrl: string) => void,
   ) => {
     if (!url) {
       return <span className="text-muted-foreground">Tidak ada bukti</span>;
     }
+
+    const triggerReplacement = () => {
+      if (onCustomReplace) {
+        onCustomReplace(url);
+        return;
+      }
+      setReplacingProofTarget({
+        paymentTransactionId,
+        existingProofUrl: url,
+        proofIndex,
+        label,
+        buttonLabel: isImageReceipt(url) ? "Ganti Bukti" : "Unggah Ulang",
+      });
+    };
 
     if (isImageReceipt(url)) {
       if (unavailableProofUrls.includes(url)) {
@@ -1515,13 +1536,7 @@ export default function FinanceHub({
                 className="h-7 gap-1.5 px-2.5 text-xs"
                 onClick={(event) => {
                   event.stopPropagation();
-                  setReplacingProofTarget({
-                    paymentTransactionId,
-                    existingProofUrl: url,
-                    proofIndex,
-                    label,
-                    buttonLabel: "Ganti Bukti",
-                  });
+                  triggerReplacement();
                 }}
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
@@ -1555,13 +1570,7 @@ export default function FinanceHub({
               className="h-7 gap-1.5 px-2.5 text-xs"
               onClick={(event) => {
                 event.stopPropagation();
-                setReplacingProofTarget({
-                  paymentTransactionId,
-                  existingProofUrl: url,
-                  proofIndex,
-                  label,
-                  buttonLabel: "Ganti Bukti",
-                });
+                triggerReplacement();
               }}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
@@ -1590,27 +1599,23 @@ export default function FinanceHub({
             Buka Dokumen
           </a>
         </Button>
-        {url.startsWith("/api/tickets/receipts/") && canEdit && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1.5 px-2.5 text-xs"
-            onClick={(event) => {
-              event.stopPropagation();
-              setReplacingProofTarget({
-                paymentTransactionId,
-                existingProofUrl: url,
-                proofIndex,
-                label,
-                buttonLabel: "Unggah Ulang",
-              });
-            }}
-          >
-            <Pencil className="size-3.5" aria-hidden="true" />
-            Unggah Ulang
-          </Button>
-        )}
+        {(Boolean(onCustomReplace) ||
+          url.startsWith("/api/tickets/receipts/")) &&
+          canEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                triggerReplacement();
+              }}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              {onCustomReplace ? "Ganti Bukti" : "Unggah Ulang"}
+            </Button>
+          )}
       </div>
     );
   };
@@ -1621,6 +1626,7 @@ export default function FinanceHub({
     additionalUrls: string[],
     editDisabledUrls: string[],
     label: string,
+    onCustomReplace?: (proofUrl: string) => void,
   ) => {
     const urls = [url, ...additionalUrls]
       .map((proofUrl, index) => ({ proofUrl, index }))
@@ -1641,11 +1647,58 @@ export default function FinanceHub({
               urls.length > 1 ? `${label} ${index + 1}` : label,
               index,
               canOperateFinance && !editDisabledUrls.includes(proofUrl),
+              onCustomReplace,
             )}
           </div>
         ))}
       </div>
     );
+  };
+
+  const buildHistoryProofReplacement = (
+    payment: FinanceHistoryTransaction,
+  ): ((proofUrl: string) => void) | undefined => {
+    if (payment.targetKind === "vendor-invoice" && payment.vendorInvoicePaymentId) {
+      const invoiceId = payment.targetId;
+      const paymentId = payment.vendorInvoicePaymentId;
+      return (proofUrl: string) => {
+        setReplacingProofTarget({
+          targetKey: `vendor-invoice-${invoiceId}-${paymentId}-${proofUrl}`,
+          existingProofUrl: proofUrl,
+          label: `Bukti transfer ${payment.reference}`,
+          buttonLabel: "Ganti Bukti",
+          allowAllProofFormats: true,
+          onSubmitFile: async (file) => {
+            const formData = new FormData();
+            formData.set("invoiceId", invoiceId);
+            formData.set("paymentId", paymentId);
+            formData.set("proof", file);
+            return replaceVendorInvoicePaymentProof(formData);
+          },
+        });
+      };
+    }
+
+    if (payment.targetKind === "rental") {
+      const rentalId = payment.targetId;
+      return (proofUrl: string) => {
+        setReplacingProofTarget({
+          targetKey: `rental-${rentalId}-${proofUrl}`,
+          existingProofUrl: proofUrl,
+          label: `Bukti bayar ${payment.title}`,
+          buttonLabel: "Ganti Bukti",
+          allowAllProofFormats: true,
+          onSubmitFile: async (file) => {
+            const formData = new FormData();
+            formData.set("rentalId", rentalId);
+            formData.set("proof", file);
+            return replaceRentalPaymentProof(formData);
+          },
+        });
+      };
+    }
+
+    return undefined;
   };
 
   const navigateFromDashboard = (
@@ -2138,7 +2191,7 @@ export default function FinanceHub({
                                     </Badge>
                                     {expense.proofUrls.map((url, index) => (
                                       <Button
-                                        key={url}
+                                        key={`${url}-${index}`}
                                         type="button"
                                         variant="outline"
                                         size="sm"
@@ -3007,6 +3060,7 @@ export default function FinanceHub({
                               ]
                             : (payment.proofEditDisabledUrls ?? []),
                           `Bukti transfer ${payment.reference}`,
+                          buildHistoryProofReplacement(payment),
                         )}
                       </div>
                     </div>
@@ -3086,6 +3140,7 @@ export default function FinanceHub({
                                   ]
                                 : (payment.proofEditDisabledUrls ?? []),
                               `Bukti transfer ${payment.reference}`,
+                              buildHistoryProofReplacement(payment),
                             )}
                           </TableCell>
                         </TableRow>
@@ -3661,6 +3716,7 @@ export default function FinanceHub({
               role === UserRole.DIRECTOR ||
               role === UserRole.DEPUTY_DIRECTOR
             }
+            onPreviewProof={(url, label) => setReceiptPreview({ url, label })}
           />
         </TabsContent>
           </Tabs>
@@ -4991,54 +5047,75 @@ export default function FinanceHub({
         }
       >
         {receiptPreview && (
-          <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-            {isImageReceipt(receiptPreview.url) &&
-            unavailableProofUrls.includes(receiptPreview.url) ? (
-              <p className="p-8 text-sm text-muted-foreground" role="status">
-                Foto bukti tidak dapat dimuat. File mungkin sudah tidak
-                tersedia di penyimpanan.
+          <div className="space-y-3">
+            {/\/file\.(?:jpe?g|png|webp|pdf)(?:[?#]|$)/i.test(
+              receiptPreview.url,
+            ) && (
+              <p
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200"
+                role="status"
+              >
+                Bukti ini merupakan unggahan lama sebelum sistem nama UUID aktif
+                sehingga file pada penyimpanan bersama dapat tertimpa. Gunakan
+                tombol Edit / Ganti Bukti pada transaksi terkait untuk
+                mengunggah ulang foto asli yang unik.
               </p>
-            ) : isImageReceipt(receiptPreview.url) ? (
-              <Image
-                key={receiptPreview.url}
-                src={paymentReceiptHref(receiptPreview.url)}
-                alt={receiptPreview.label}
-                width={1200}
-                height={900}
-                className="max-h-[65vh] max-w-full object-contain"
-                unoptimized
-                onError={() => {
-                  setUnavailableProofUrls((current) =>
-                    current.includes(receiptPreview.url)
-                      ? current
-                      : [...current, receiptPreview.url],
-                  );
-                }}
-              />
-            ) : isPdfReceipt(receiptPreview.url) ? (
-              <iframe
-                key={receiptPreview.url}
-                src={paymentReceiptHref(receiptPreview.url)}
-                title={`Pratinjau ${receiptPreview.label}`}
-                className="h-[65vh] w-full"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-3 p-8 text-center">
-                <FileText className="size-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Pratinjau tidak tersedia untuk jenis file ini.
-                </p>
-              </div>
             )}
+            <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+              {isImageReceipt(receiptPreview.url) &&
+              unavailableProofUrls.includes(receiptPreview.url) ? (
+                <p className="p-8 text-sm text-muted-foreground" role="status">
+                  Foto bukti tidak dapat dimuat. File mungkin sudah tidak
+                  tersedia di penyimpanan.
+                </p>
+              ) : isImageReceipt(receiptPreview.url) ? (
+                <Image
+                  key={receiptPreview.url}
+                  src={paymentReceiptHref(receiptPreview.url)}
+                  alt={receiptPreview.label}
+                  width={1200}
+                  height={900}
+                  className="max-h-[65vh] max-w-full object-contain"
+                  unoptimized
+                  onError={() => {
+                    setUnavailableProofUrls((current) =>
+                      current.includes(receiptPreview.url)
+                        ? current
+                        : [...current, receiptPreview.url],
+                    );
+                  }}
+                />
+              ) : isPdfReceipt(receiptPreview.url) ? (
+                <iframe
+                  key={receiptPreview.url}
+                  src={paymentReceiptHref(receiptPreview.url)}
+                  title={`Pratinjau ${receiptPreview.label}`}
+                  className="h-[65vh] w-full"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-3 p-8 text-center">
+                  <FileText className="size-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Pratinjau tidak tersedia untuk jenis file ini.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </GlobalModal>
       <FinancePaymentProofReplacement
+        key={
+          replacingProofTarget?.targetKey ??
+          `${replacingProofTarget?.paymentTransactionId ?? ""}-${replacingProofTarget?.proofIndex ?? 0}-${replacingProofTarget?.existingProofUrl ?? ""}`
+        }
         paymentTransactionId={replacingProofTarget?.paymentTransactionId ?? ""}
         existingProofUrl={replacingProofTarget?.existingProofUrl ?? ""}
         proofIndex={replacingProofTarget?.proofIndex ?? 0}
         label={replacingProofTarget?.label ?? "Bukti pembayaran"}
         buttonLabel={replacingProofTarget?.buttonLabel}
+        allowAllProofFormats={replacingProofTarget?.allowAllProofFormats}
+        onSubmitFile={replacingProofTarget?.onSubmitFile}
         open={replacingProofTarget !== null}
         onOpenChange={(open) => {
           if (!open) setReplacingProofTarget(null);

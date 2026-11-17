@@ -1265,7 +1265,24 @@ export default async function FinancePage({
           ...documentSignoffInvoices.map((document) => ({
             id: document.id,
             kind: "INVOICE" as const,
-            number: document.invoiceNumber ?? "Tanpa Nomor",
+            number:
+              document.invoiceNumber?.trim() ||
+              (document.poNumber ? `Nota ${document.poNumber}` : "Tanpa Nomor"),
+            subtitle:
+              [
+                document.vendorName,
+                document.poNumber,
+                document.grandTotal != null
+                  ? new Intl.NumberFormat("id-ID", {
+                      style: "currency",
+                      currency: "IDR",
+                      maximumFractionDigits: 0,
+                    }).format(document.grandTotal)
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || null,
+            attachmentUrl: document.documentUrl,
             action:
               session.user.role === UserRole.FINANCE ||
               (session.user.role === UserRole.DEPUTY_DIRECTOR &&
@@ -1282,6 +1299,20 @@ export default async function FinancePage({
             id: document.id,
             kind: "KO" as const,
             number: document.koNumber,
+            subtitle:
+              [
+                document.vendorName,
+                document.poNumber,
+                document.paymentAmount != null
+                  ? new Intl.NumberFormat("id-ID", {
+                      style: "currency",
+                      currency: "IDR",
+                      maximumFractionDigits: 0,
+                    }).format(document.paymentAmount)
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || null,
             action: "acknowledge" as const,
             signedByName: document.signedBy?.name ?? null,
             signedAt: document.signedAt?.toISOString() ?? null,

@@ -13,11 +13,14 @@ import {
 } from "@/lib/finance-proof-client";
 
 export type ReplacingProofTarget = {
-  paymentTransactionId: string;
-  existingProofUrl: string;
-  proofIndex: number;
+  paymentTransactionId?: string;
+  existingProofUrl?: string;
+  proofIndex?: number;
   label: string;
   buttonLabel?: string;
+  targetKey?: string;
+  allowAllProofFormats?: boolean;
+  onSubmitFile?: (file: File) => Promise<{ success: boolean; message: string }>;
 };
 
 export default function FinancePaymentProofReplacement({
@@ -30,8 +33,10 @@ export default function FinancePaymentProofReplacement({
   open: controlledOpen,
   onOpenChange,
   showTrigger = true,
+  onSubmitFile,
+  allowAllProofFormats,
 }: {
-  paymentTransactionId: string;
+  paymentTransactionId?: string;
   existingProofUrl?: string;
   proofIndex?: number;
   label: string;
@@ -40,6 +45,8 @@ export default function FinancePaymentProofReplacement({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   showTrigger?: boolean;
+  onSubmitFile?: (file: File) => Promise<{ success: boolean; message: string }>;
+  allowAllProofFormats?: boolean;
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -49,6 +56,8 @@ export default function FinancePaymentProofReplacement({
 
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
+  const allowAllFormats = allowAllProofFormats ?? buttonLabel !== "Edit";
+  const isImageMode = !allowAllFormats;
 
   const setOpenState = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -64,10 +73,17 @@ export default function FinancePaymentProofReplacement({
   const submitReplacement = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!proofFile) {
-      setMessage("Pilih foto asli yang akan menggantikan bukti ini.");
+      setMessage(
+        isImageMode
+          ? "Pilih foto asli yang akan menggantikan bukti ini."
+          : "Pilih berkas pengganti yang akan menggantikan bukti ini.",
+      );
       return;
     }
-    if (!existingProofUrl || proofIndex === undefined) {
+    if (
+      !onSubmitFile &&
+      (!paymentTransactionId || !existingProofUrl || proofIndex === undefined)
+    ) {
       setMessage("Bukti ini tidak dapat diedit dari tampilan ini.");
       return;
     }
@@ -76,12 +92,14 @@ export default function FinancePaymentProofReplacement({
     setMessage("");
     startTransition(async () => {
       try {
-        const result = await replaceFinancePaymentProof(
-          paymentTransactionId,
-          existingProofUrl,
-          proofIndex,
-          selectedFile,
-        );
+        const result = onSubmitFile
+          ? await onSubmitFile(selectedFile)
+          : await replaceFinancePaymentProof(
+              paymentTransactionId ?? "",
+              existingProofUrl ?? "",
+              proofIndex ?? 0,
+              selectedFile,
+            );
         if (!result.success) {
           setMessage(result.message);
           toast.error(result.message);
@@ -99,8 +117,6 @@ export default function FinancePaymentProofReplacement({
       }
     });
   };
-
-  const isImageMode = buttonLabel === "Edit";
 
   return (
     <>

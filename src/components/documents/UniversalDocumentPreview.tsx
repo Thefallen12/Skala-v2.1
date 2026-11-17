@@ -41,6 +41,7 @@ export default function UniversalDocumentPreview({
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
   const [printError, setPrintError] = useState("");
   const previewSrc = `${src}${src.includes("?") ? "&" : "?"}format=html`;
+  const downloadSrc = `${src}${src.includes("?") ? "&" : "?"}download=1`;
   const previewScale = minimalToolbar ? fitScale : zoom / 100;
   const previewSize = {
     width: A4_WIDTH_PX * previewScale,
@@ -209,7 +210,7 @@ export default function UniversalDocumentPreview({
               variant="secondary"
               onClick={() => {
                 const link = document.createElement("a");
-                link.href = src;
+                link.href = downloadSrc;
                 link.download = `${documentNumber}.pdf`;
                 link.click();
               }}
@@ -257,6 +258,23 @@ export default function UniversalDocumentPreview({
               src={previewSrc}
               scrolling="no"
               onLoad={() => {
+                try {
+                  const frameDoc = previewFrameRef.current?.contentDocument;
+                  const contentType = frameDoc?.contentType ?? "";
+                  if (contentType.includes("json")) {
+                    const rawText = frameDoc?.body?.textContent ?? "";
+                    const parsed = rawText
+                      ? (JSON.parse(rawText) as { message?: string })
+                      : null;
+                    setLoadedPreviewSrc(null);
+                    setPrintError(
+                      parsed?.message || "Pratinjau dokumen tidak dapat dimuat.",
+                    );
+                    return;
+                  }
+                } catch {
+                  // Cross-origin or non-JSON frame content can render normally.
+                }
                 setLoadedPreviewSrc(previewSrc);
                 setPrintError("");
                 resetPreviewScroll();
@@ -284,7 +302,7 @@ export default function UniversalDocumentPreview({
             className="h-8 gap-1.5 bg-orange-500 px-2.5 text-xs text-white hover:bg-orange-600 sm:h-9 sm:px-3 sm:text-sm"
             onClick={() => {
               const link = document.createElement("a");
-              link.href = src;
+              link.href = downloadSrc;
               link.download = `${documentNumber}.pdf`;
               link.click();
             }}

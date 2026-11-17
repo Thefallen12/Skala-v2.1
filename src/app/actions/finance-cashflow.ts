@@ -8,10 +8,23 @@ import { connectToMongoDB } from "@/lib/mongoose";
 import Cashflow from "@/models/cashflow";
 import DirectStockPurchase from "@/models/direct-stock-purchase";
 import FinanceAccount from "@/models/finance-account";
+import OfficeExpense from "@/models/office-expense";
 import PaymentTransaction from "@/models/payment-transaction";
 import Project from "@/models/project";
 import PurchaseOrder from "@/models/purchase-order";
 import Ticket from "@/models/ticket";
+import {
+  DeliveryOrder,
+  EquipmentRental,
+  Invoice,
+  MaterialDelivery,
+  OrderConfirmation,
+  SubkonContract,
+  SubkonTermyn,
+  VehicleFuelRequest,
+  VendorInvoice,
+  VendorInvoicePayment,
+} from "@/models/finance-records";
 import {
   CloudinaryConfigurationError,
   CloudinaryPhotoValidationError,
@@ -757,4 +770,330 @@ export async function transferBetweenFinanceAccounts(
 
   revalidatePath("/apps/finance");
   return { success: true, message: "Transfer antar buku berhasil dicatat." };
+}
+
+async function isProofUrlStillReferenced(url: string): Promise<boolean> {
+  try {
+    const refs = await Promise.all([
+      Cashflow.exists({ proofUrl: url }),
+      OfficeExpense.exists({ proofUrls: url }),
+      PaymentTransaction.exists({
+        $or: [{ proofOfTransferUrl: url }, { additionalProofUrls: url }],
+      }),
+      VendorInvoicePayment.exists({ proofOfTransferUrl: url }),
+      VendorInvoice.exists({
+        $or: [
+          { proofUrl: url },
+          { proofOfTransferUrl: url },
+          { documentUrl: url },
+        ],
+      }),
+      EquipmentRental.exists({ proofOfPaymentUrl: url }),
+      OrderConfirmation.exists({ proofOfTransferUrl: url }),
+      PurchaseOrder.exists({
+        $or: [{ paymentReceiptUrl: url }, { vendorInvoiceUrl: url }],
+      }),
+      DirectStockPurchase.exists({
+        $or: [{ vendorInvoiceUrl: url }, { arrivalPhotoUrl: url }],
+      }),
+      Ticket.exists({
+        $or: [
+          { attachmentUrl: url },
+          { receiptUrls: url },
+          { paymentProofUrl: url },
+          { purchaseReceiptUrl: url },
+          { transferReceiptUrl: url },
+          { deliveryReceiptUrl: url },
+          { deliveryOrderReceiptUrl: url },
+        ],
+      }),
+      VehicleFuelRequest.exists({
+        $or: [
+          { transferProofUrl: url },
+          { beforeFillingPhotoUrl: url },
+          { afterFillingPhotoUrl: url },
+          { receiptPhotoUrl: url },
+        ],
+      }),
+      MaterialDelivery.exists({ proofUrl: url }),
+      SubkonTermyn.exists({ paymentProofUrl: url }),
+      SubkonContract.exists({ retentionReleaseProofUrl: url }),
+      Invoice.exists({ documentUrl: url }),
+      DeliveryOrder.exists({
+        $or: [{ deliveryReceiptUrl: url }, { arrivalPhotoUrl: url }],
+      }),
+    ]);
+    return refs.some(Boolean);
+  } catch (error) {
+    console.error("Checking old cashflow proof references failed:", error);
+    return true;
+  }
+}
+
+async function removeProofAssetSafely(url: string): Promise<void> {
+  if (url.startsWith("/api/tickets/receipts/")) {
+    try {
+      await removeTicketReceipt(url);
+    } catch (error) {
+      console.error("Removing unreferenced ticket receipt failed:", error);
+    }
+    return;
+  }
+  await removeUploadedCashflowProof(url);
+}
+
+/**
+ * Replaces the uploaded proof file for a Cashflow record and keeps linked
+ * transfer-group, OfficeExpense, PaymentTransaction, OrderConfirmation,
+ * EquipmentRental, and VendorInvoicePayment records synchronized.
+ */
+export async function replaceCashflowProof(
+  formData: FormData,
+): Promise<FinanceActionResult> {
+  const session = await auth();
+  if (!session?.user?.id || !isFinanceOperator(session.user.role)) {
+    return fail(
+      "Hanya Keuangan atau pimpinan berwenang yang dapat mengganti bukti transaksi.",
+    );
+  }
+  if (!(formData instanceof FormData)) {
+    return fail("Permintaan penggantian bukti tidak valid.");
+  }
+  const rawCashflowId = formData.get("cashflowId");
+  const rawProof = formData.get("proof");
+  if (!isText(rawCashflowId, 191)) {
+    return fail("ID catatan Buku Kas tidak valid.");
+  }
+  const cashflowId = rawCashflowId.trim();
+  if (!isValidFinanceProofFile(rawProof)) {
+    return fail(
+      "Data tidak valid. Bukti pengganti harus PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
+    );
+  }
+
+  let existingCashflow: { _id: unknown } | null = null;
+  try {
+    await connectToMongoDB();
+    existingCashflow = await Cashflow.findById(cashflowId)
+      .select({ _id: 1 })
+      .lean();
+  } catch (error) {
+    console.error("Lookup cashflow before proof upload failed:", error);
+    return fail("Gagal memeriksa catatan Buku Kas. Silakan coba kembali.");
+  }
+  if (!existingCashflow) {
+    return fail("Catatan Buku Kas tidak ditemukan.");
+  }
+
+  let newProofUrl: string;
+  try {
+    newProofUrl = await uploadCashflowProof(rawProof);
+  } catch (error) {
+    console.error("Replace cashflow proof upload failed:", error);
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryConfigurationError ||
+      error instanceof CloudinaryPrivatePdfValidationError
+    ) {
+      return fail(error.message);
+    }
+    return fail("Bukti transaksi pengganti gagal diunggah. Silakan coba kembali.");
+  }
+
+  const oldProofUrls = new Set<string>();
+  let syncedPaymentTransaction = false;
+
+  try {
+    const mongoose = await connectToMongoDB();
+    await mongoose.connection.transaction(async (transactionSession) => {
+      const target = await Cashflow.findById(cashflowId)
+        .select({
+          _id: 1,
+          proofUrl: 1,
+          transferGroupId: 1,
+          paymentTransactionId: 1,
+          equipmentRentalId: 1,
+        })
+        .session(transactionSession)
+        .lean();
+      if (!target) {
+        throw new Error("Catatan Buku Kas tidak ditemukan.");
+      }
+      if (typeof target.proofUrl === "string" && target.proofUrl) {
+        oldProofUrls.add(target.proofUrl);
+      }
+
+      if (target.transferGroupId) {
+        const groupRows = await Cashflow.find({
+          transferGroupId: target.transferGroupId,
+        })
+          .select({ _id: 1, proofUrl: 1 })
+          .session(transactionSession)
+          .lean();
+        for (const row of groupRows) {
+          if (typeof row.proofUrl === "string" && row.proofUrl) {
+            oldProofUrls.add(row.proofUrl);
+          }
+        }
+        await Cashflow.updateMany(
+          { transferGroupId: target.transferGroupId },
+          { $set: { proofUrl: newProofUrl } },
+          { session: transactionSession },
+        );
+      } else {
+        const cashflowUpdate = await Cashflow.updateOne(
+          { _id: target._id },
+          { $set: { proofUrl: newProofUrl } },
+          { session: transactionSession },
+        );
+        if (cashflowUpdate.matchedCount !== 1) {
+          throw new Error("Catatan Buku Kas tidak ditemukan.");
+        }
+      }
+
+      const linkedExpense = await OfficeExpense.findOne({
+        cashflowId: String(target._id),
+      })
+        .select({ _id: 1, proofUrls: 1 })
+        .session(transactionSession)
+        .lean();
+      if (linkedExpense) {
+        const currentProofUrls = Array.isArray(linkedExpense.proofUrls)
+          ? linkedExpense.proofUrls
+          : [];
+        if (currentProofUrls.length === 0) {
+          await OfficeExpense.updateOne(
+            { _id: linkedExpense._id },
+            { $set: { proofUrls: [newProofUrl] } },
+            { session: transactionSession },
+          );
+        } else if (target.proofUrl && currentProofUrls[0] === target.proofUrl) {
+          oldProofUrls.add(currentProofUrls[0]);
+          await OfficeExpense.updateOne(
+            { _id: linkedExpense._id },
+            { $set: { "proofUrls.0": newProofUrl } },
+            { session: transactionSession },
+          );
+        }
+      }
+
+      if (target.paymentTransactionId) {
+        const linkedPayment = await PaymentTransaction.findById(
+          target.paymentTransactionId,
+        )
+          .select({ _id: 1, proofOfTransferUrl: 1 })
+          .session(transactionSession)
+          .lean();
+        if (linkedPayment) {
+          if (
+            typeof linkedPayment.proofOfTransferUrl === "string" &&
+            linkedPayment.proofOfTransferUrl
+          ) {
+            oldProofUrls.add(linkedPayment.proofOfTransferUrl);
+          }
+          await PaymentTransaction.updateOne(
+            { _id: linkedPayment._id },
+            { $set: { proofOfTransferUrl: newProofUrl } },
+            { session: transactionSession },
+          );
+          syncedPaymentTransaction = true;
+        }
+        const linkedConfirmations = await OrderConfirmation.find({
+          paymentTransactionId: target.paymentTransactionId,
+        })
+          .select({ _id: 1, proofOfTransferUrl: 1 })
+          .session(transactionSession)
+          .lean();
+        for (const confirmation of linkedConfirmations) {
+          const oldConfirmationProof = (
+            confirmation as { proofOfTransferUrl?: string | null }
+          ).proofOfTransferUrl;
+          if (typeof oldConfirmationProof === "string" && oldConfirmationProof) {
+            oldProofUrls.add(oldConfirmationProof);
+          }
+        }
+        await OrderConfirmation.updateMany(
+          { paymentTransactionId: target.paymentTransactionId },
+          { $set: { proofOfTransferUrl: newProofUrl } },
+          { session: transactionSession },
+        );
+      }
+
+      const rentalFilter = target.equipmentRentalId
+        ? {
+            $or: [
+              { _id: target.equipmentRentalId },
+              { cashflowId: String(target._id) },
+            ],
+          }
+        : { cashflowId: String(target._id) };
+      const linkedRentals = await EquipmentRental.find(rentalFilter)
+        .select({ _id: 1, proofOfPaymentUrl: 1 })
+        .session(transactionSession)
+        .lean();
+      if (linkedRentals.length > 0) {
+        for (const rental of linkedRentals) {
+          if (
+            typeof rental.proofOfPaymentUrl === "string" &&
+            rental.proofOfPaymentUrl
+          ) {
+            oldProofUrls.add(rental.proofOfPaymentUrl);
+          }
+        }
+        await EquipmentRental.updateMany(
+          rentalFilter,
+          { $set: { proofOfPaymentUrl: newProofUrl, updatedAt: new Date() } },
+          { session: transactionSession },
+        );
+      }
+
+      const linkedVendorPayments = await VendorInvoicePayment.find({
+        cashflowId: String(target._id),
+      })
+        .select({ _id: 1, proofOfTransferUrl: 1 })
+        .session(transactionSession)
+        .lean();
+      if (linkedVendorPayments.length > 0) {
+        for (const viPayment of linkedVendorPayments) {
+          if (
+            typeof viPayment.proofOfTransferUrl === "string" &&
+            viPayment.proofOfTransferUrl
+          ) {
+            oldProofUrls.add(viPayment.proofOfTransferUrl);
+          }
+        }
+        await VendorInvoicePayment.updateMany(
+          { cashflowId: String(target._id) },
+          { $set: { proofOfTransferUrl: newProofUrl } },
+          { session: transactionSession },
+        );
+      }
+    });
+  } catch (error) {
+    console.error("Replacing cashflow proof failed:", error);
+    await removeProofAssetSafely(newProofUrl);
+    return fail(
+      error instanceof Error && error.message.includes("tidak ditemukan")
+        ? error.message
+        : "Bukti transaksi gagal diperbarui. Silakan coba kembali.",
+    );
+  }
+
+  for (const oldUrl of oldProofUrls) {
+    if (!oldUrl || oldUrl === newProofUrl) continue;
+    const stillReferenced = await isProofUrlStillReferenced(oldUrl);
+    if (!stillReferenced) {
+      await removeProofAssetSafely(oldUrl);
+    }
+  }
+
+  revalidatePath("/apps/finance");
+  if (syncedPaymentTransaction) {
+    revalidatePath("/apps/tickets");
+    revalidatePath("/apps/orders");
+  }
+  return {
+    success: true,
+    message: "Bukti transaksi Buku Kas berhasil diperbarui.",
+  };
 }

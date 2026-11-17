@@ -20,7 +20,11 @@ import {
   UserRole,
 } from "@prisma/client";
 import { auth } from "../../../auth";
-import { canOperateLogisticsActions } from "@/lib/user-access";
+import {
+  canOperateFinanceActions,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
+import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import { prisma } from "@/lib/prisma";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Notification from "@/models/notification";
@@ -58,6 +62,7 @@ import { removeTicketReceipt, saveTicketReceipt } from "@/lib/ticket-receipts";
 import { VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER } from "@/lib/vehicle-fuel";
 import { isPurchaseOrderInvoiceUrl } from "@/lib/purchase-order-invoices";
 import {
+  CloudinaryConfigurationError,
   CloudinaryPhotoValidationError,
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
@@ -1240,6 +1245,317 @@ export async function submitPurchaseOrderInvoice(
       error instanceof Error
         ? error.message
         : "Invoice/bon gagal dikirim ke Keuangan. Silakan coba kembali.",
+    );
+  }
+}
+
+async function removePurchaseOrderInvoiceAsset(url: string): Promise<void> {
+  const normalizedPath = url.split(/[?#]/, 1)[0].toLowerCase();
+  if (url.includes("/raw/upload/") || normalizedPath.endsWith(".pdf")) {
+    await removeCloudinaryRawFile(url);
+    return;
+  }
+  await removeCloudinaryPhoto(url);
+}
+
+async function isPurchaseOrderInvoiceAssetReferencedInDb(
+  url: string,
+): Promise<boolean> {
+  try {
+    const counts = await Promise.all([
+      prisma.purchaseOrder.count({
+        where: { OR: [{ vendorInvoiceUrl: url }, { paymentReceiptUrl: url }] },
+      }),
+      prisma.invoice.count({ where: { documentUrl: url } }),
+      prisma.ticket.count({
+        where: {
+          OR: [
+            { purchaseReceiptUrl: url },
+            { transferReceiptUrl: url },
+            { deliveryReceiptUrl: url },
+            { deliveryOrderReceiptUrl: url },
+            { attachmentUrl: url },
+            { paymentProofUrl: url },
+            { receiptUrls: { has: url } },
+          ],
+        },
+      }),
+      prisma.directStockPurchase.count({
+        where: {
+          OR: [
+            { vendorInvoiceUrl: url },
+            { arrivalPhotoUrl: url },
+            { receivedPhotos: { has: url } },
+          ],
+        },
+      }),
+      prisma.paymentTransaction.count({
+        where: {
+          OR: [
+            { proofOfTransferUrl: url },
+            { additionalProofUrls: { has: url } },
+          ],
+        },
+      }),
+      prisma.cashflow.count({ where: { proofUrl: url } }),
+      prisma.officeExpense.count({ where: { proofUrls: { has: url } } }),
+      prisma.orderConfirmation.count({ where: { proofOfTransferUrl: url } }),
+      prisma.vendorInvoicePayment.count({ where: { proofOfTransferUrl: url } }),
+      prisma.equipmentRental.count({ where: { proofOfPaymentUrl: url } }),
+      prisma.materialDelivery.count({ where: { proofUrl: url } }),
+      prisma.vehicleFuelRequest.count({
+        where: {
+          OR: [
+            { transferProofUrl: url },
+            { beforeFillingPhotoUrl: url },
+            { afterFillingPhotoUrl: url },
+            { receiptPhotoUrl: url },
+          ],
+        },
+      }),
+      prisma.subkonTermyn.count({ where: { paymentProofUrl: url } }),
+      prisma.subkonContract.count({ where: { retentionReleaseProofUrl: url } }),
+      prisma.deliveryOrder.count({
+        where: {
+          OR: [
+            { deliveryReceiptUrl: url },
+            { arrivalPhotoUrl: url },
+            { receiptPhotos: { some: { url } } },
+          ],
+        },
+      }),
+    ]);
+    return counts.some((count) => count > 0);
+  } catch (error) {
+    console.error("Checking remaining PO invoice DB references failed:", error);
+    return true;
+  }
+}
+
+export async function replacePurchaseOrderInvoice(
+  publicCode: string,
+  file: File,
+): Promise<OrderActionResult> {
+  const session = await auth();
+  if (
+    !session?.user?.id ||
+    (!canOperateLogisticsActions(session.user.role) &&
+      !canOperateFinanceActions(session.user.role))
+  ) {
+    return fail(
+      "Hanya Logistik, Keuangan, Administrasi, atau Direksi yang dapat mengganti invoice/bon PO.",
+    );
+  }
+  if (
+    !validPublicCode(publicCode) ||
+    !(file instanceof File) ||
+    file.size < 1 ||
+    file.size > 5 * 1024 * 1024
+  ) {
+    return fail(
+      "Pilih berkas invoice/bon pengganti (PDF, JPG, PNG, atau WEBP) maksimal 5 MB.",
+    );
+  }
+
+  const normalizedFile = normalizeFinancePaymentProofFile(file);
+  if (!normalizedFile) {
+    return fail(
+      "File invoice/bon harus berformat PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
+    );
+  }
+
+  const orderBeforeUpload = await prisma.purchaseOrder.findUnique({
+    where: { publicCode },
+    select: {
+      id: true,
+      status: true,
+      vendorInvoiceUrl: true,
+      invoices: { select: { id: true, documentUrl: true } },
+    },
+  });
+  if (!orderBeforeUpload) {
+    return fail("Purchase Order tidak ditemukan.");
+  }
+  if (orderBeforeUpload.status !== POStatus.APPROVED) {
+    return fail("PO harus disetujui Direktur sebelum invoice/bon dapat diganti.");
+  }
+  const hasExistingInvoice =
+    Boolean(orderBeforeUpload.vendorInvoiceUrl?.trim()) ||
+    orderBeforeUpload.invoices.length > 0;
+  if (!hasExistingInvoice) {
+    return fail("PO ini belum memiliki invoice/bon untuk diganti.");
+  }
+
+  let documentUrl = "";
+  try {
+    if (normalizedFile.type === "application/pdf") {
+      const extension = normalizedFile.name.split(".").at(-1)?.toLowerCase();
+      const pdfFile =
+        extension === "pdf"
+          ? normalizedFile
+          : new File(
+              [normalizedFile],
+              `${normalizedFile.name || "invoice"}.pdf`,
+              {
+                type: "application/pdf",
+                lastModified: normalizedFile.lastModified,
+              },
+            );
+      documentUrl = await uploadCloudinaryRawFile(
+        pdfFile,
+        PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
+        ["pdf"],
+        5 * 1024 * 1024,
+      );
+    } else {
+      documentUrl = (
+        await uploadCloudinaryPhoto(
+          normalizedFile,
+          PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
+          5 * 1024 * 1024,
+        )
+      ).secureUrl;
+    }
+
+    if (!isPurchaseOrderInvoiceUrl(documentUrl)) {
+      throw new Error("URL invoice/bon yang diunggah tidak valid.");
+    }
+
+    const updated = await prisma.$transaction(async (transaction) => {
+      const order = await transaction.purchaseOrder.findUnique({
+        where: { publicCode },
+        select: {
+          id: true,
+          poNumber: true,
+          status: true,
+          ticketId: true,
+          vendorInvoiceUrl: true,
+          invoices: {
+            select: { id: true, documentUrl: true },
+          },
+          ticket: {
+            select: {
+              id: true,
+              purchaseReceiptUrl: true,
+            },
+          },
+        },
+      });
+      if (!order) {
+        throw new Error("Purchase Order tidak ditemukan.");
+      }
+      if (order.status !== POStatus.APPROVED) {
+        throw new Error(
+          "PO harus disetujui Direktur sebelum invoice/bon dapat diganti.",
+        );
+      }
+      if (!order.vendorInvoiceUrl?.trim() && order.invoices.length === 0) {
+        throw new Error("PO ini belum memiliki invoice/bon untuk diganti.");
+      }
+
+      const previousUrls = new Set<string>();
+      if (order.vendorInvoiceUrl?.trim()) {
+        previousUrls.add(order.vendorInvoiceUrl.trim());
+      }
+      for (const inv of order.invoices) {
+        if (inv.documentUrl?.trim()) {
+          previousUrls.add(inv.documentUrl.trim());
+        }
+      }
+
+      await transaction.purchaseOrder.update({
+        where: { id: order.id },
+        data: {
+          vendorInvoiceUrl: documentUrl,
+          vendorInvoiceUploadedAt: new Date(),
+          vendorInvoiceUploadedById: session.user.id,
+        },
+      });
+
+      if (order.invoices.length > 0) {
+        await transaction.invoice.updateMany({
+          where: { poId: order.id },
+          data: { documentUrl },
+        });
+      }
+
+      if (order.ticketId && order.ticket) {
+        const currentReceiptUrl = order.ticket.purchaseReceiptUrl?.trim() ?? "";
+        if (currentReceiptUrl && previousUrls.has(currentReceiptUrl)) {
+          await transaction.ticket.update({
+            where: { id: order.ticket.id },
+            data: { purchaseReceiptUrl: documentUrl },
+          });
+        }
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: order.ticket.id,
+            userId: session.user.id,
+            action: "LOGISTICS_PO_INVOICE_REPLACED",
+            notes: `Berkas invoice/bon untuk PO ${order.poNumber} diperbarui.`,
+          },
+        });
+      }
+
+      return {
+        poNumber: order.poNumber,
+        invoiceId: order.invoices[0]?.id,
+        previousUrls: [...previousUrls],
+      };
+    });
+
+    for (const oldUrl of updated.previousUrls) {
+      if (!oldUrl || oldUrl === documentUrl || !isPurchaseOrderInvoiceUrl(oldUrl)) {
+        continue;
+      }
+      const stillReferenced =
+        await isPurchaseOrderInvoiceAssetReferencedInDb(oldUrl);
+      if (!stillReferenced) {
+        try {
+          await removePurchaseOrderInvoiceAsset(oldUrl);
+        } catch (cleanupError) {
+          console.error(
+            "Removing unreferenced previous PO invoice failed:",
+            cleanupError,
+          );
+        }
+      }
+    }
+
+    revalidatePath("/apps/logistics");
+    revalidatePath("/apps/finance");
+    revalidatePath("/apps/tickets");
+    revalidatePath("/apps/orders");
+    revalidatePath(`/d/${publicCode}`);
+    return {
+      success: true,
+      message: `Berkas invoice/bon PO ${updated.poNumber} berhasil diperbarui.`,
+      ...(updated.invoiceId ? { invoiceId: updated.invoiceId } : {}),
+    };
+  } catch (error) {
+    if (documentUrl) {
+      try {
+        await removePurchaseOrderInvoiceAsset(documentUrl);
+      } catch (cleanupError) {
+        console.error(
+          "Removing unattached replacement PO invoice failed:",
+          cleanupError,
+        );
+      }
+    }
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryRawFileValidationError ||
+      error instanceof CloudinaryConfigurationError
+    ) {
+      return fail(error.message);
+    }
+    console.error("Purchase order invoice replacement failed:", error);
+    return fail(
+      error instanceof Error
+        ? error.message
+        : "Invoice/bon gagal diperbarui. Silakan coba kembali.",
     );
   }
 }

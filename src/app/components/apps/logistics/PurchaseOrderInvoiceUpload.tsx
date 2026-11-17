@@ -2,17 +2,20 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, FileText, Send, Upload } from "lucide-react";
+import { ExternalLink, FilePenLine, FileText, Send, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { POPaymentMethod } from "@prisma/client";
 import {
   markPurchaseOrderSentToVendor,
+  replacePurchaseOrderInvoice,
   submitPurchaseOrderInvoice,
 } from "@/app/actions/orders";
+import { compressFieldImageFile } from "@/lib/image-compression-client";
 import InvoiceDetailsFields, {
   type InvoiceDraft,
 } from "@/app/components/apps/logistics/InvoiceDetailsFields";
 import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
+import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/file-dropzone";
@@ -70,6 +73,8 @@ export default function PurchaseOrderInvoiceUpload({
   open,
   onOpenChange,
   hideTrigger = false,
+  mode,
+  canReplace = true,
 }: {
   publicCode: string;
   invoiceUrl: string | null;
@@ -87,9 +92,12 @@ export default function PurchaseOrderInvoiceUpload({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   hideTrigger?: boolean;
+  mode?: "submit" | "replace";
+  canReplace?: boolean;
 }) {
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
+  const [invoicePreviewOpen, setInvoicePreviewOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
   const isControlled = open !== undefined;
@@ -100,6 +108,7 @@ export default function PurchaseOrderInvoiceUpload({
     }
     onOpenChange?.(next);
   };
+  const isReplaceMode = mode === "replace" || Boolean(invoiceUrl);
 
   const markPoSent = async () => {
     setIsPending(true);
@@ -120,6 +129,76 @@ export default function PurchaseOrderInvoiceUpload({
   };
 
   if (!hideTrigger) {
+    if (invoiceUrl) {
+      return (
+        <>
+          <div className="flex items-start gap-1.5">
+            <div className="flex w-10 flex-col items-center">
+              <ActionIconButton
+                label="Lihat invoice vendor"
+                tooltip="Lihat Nota"
+                icon={ExternalLink}
+                href={invoiceUrl}
+                target="_blank"
+                rel="noreferrer"
+              />
+            </div>
+            {invoiceId && (
+              <div className="flex w-10 flex-col items-center">
+                <ActionIconButton
+                  label="Pratinjau invoice"
+                  tooltip="Pratinjau Invoice"
+                  icon={FileText}
+                  onClick={() => setInvoicePreviewOpen(true)}
+                />
+              </div>
+            )}
+            {canReplace && (
+              <div className="flex w-10 flex-col items-center">
+                <ActionIconButton
+                  label="Ganti Foto/PDF Nota"
+                  tooltip="Ganti Nota"
+                  icon={FilePenLine}
+                  disabled={isPending}
+                  onClick={() => setResolvedOpen(true)}
+                />
+              </div>
+            )}
+          </div>
+          {invoiceId && (
+            <GlobalModal
+              isOpen={invoicePreviewOpen}
+              onClose={() => setInvoicePreviewOpen(false)}
+              title="Pratinjau Invoice"
+              description="Pratinjau dokumen invoice resmi PO."
+              hideHeader
+              footerNote=""
+              bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden"
+              className="sm:max-w-3xl"
+            >
+              <UniversalDocumentPreview
+                title="Pratinjau Invoice"
+                documentNumber="INVOICE"
+                src={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(invoiceId)}`}
+                minimalToolbar
+                onClose={() => setInvoicePreviewOpen(false)}
+              />
+            </GlobalModal>
+          )}
+          {canReplace && (
+            <ReplacePurchaseOrderInvoiceModal
+              publicCode={publicCode}
+              currentInvoiceUrl={invoiceUrl}
+              open={resolvedOpen}
+              onOpenChange={setResolvedOpen}
+              isPending={isPending}
+              setIsPending={setIsPending}
+            />
+          )}
+        </>
+      );
+    }
+
     if (!vendorPoSentAt) {
       return (
         <div className="flex min-w-0 flex-col items-center">
@@ -139,35 +218,6 @@ export default function PurchaseOrderInvoiceUpload({
       );
     }
 
-    if (invoiceUrl) {
-      return (
-        <div className="flex items-start gap-1.5">
-          <div className="flex w-10 flex-col items-center">
-            <ActionIconButton
-              label="Lihat invoice vendor"
-              tooltip="Lihat Nota"
-              icon={ExternalLink}
-              href={invoiceUrl}
-              target="_blank"
-              rel="noreferrer"
-            />
-          </div>
-          {invoiceId && (
-            <div className="flex w-10 flex-col items-center">
-              <ActionIconButton
-                label="Cetak invoice"
-                tooltip="Cetak Invoice"
-                icon={FileText}
-                href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(invoiceId)}`}
-                target="_blank"
-                rel="noreferrer"
-              />
-            </div>
-          )}
-        </div>
-      );
-    }
-
     if (ticketLinked) {
       return (
         <p className="type-p3 min-w-0 break-words text-muted-foreground">
@@ -175,6 +225,20 @@ export default function PurchaseOrderInvoiceUpload({
         </p>
       );
     }
+  }
+
+  if (isReplaceMode) {
+    if (!canReplace) return null;
+    return (
+      <ReplacePurchaseOrderInvoiceModal
+        publicCode={publicCode}
+        currentInvoiceUrl={invoiceUrl}
+        open={resolvedOpen}
+        onOpenChange={setResolvedOpen}
+        isPending={isPending}
+        setIsPending={setIsPending}
+      />
+    );
   }
 
   return (
@@ -328,6 +392,182 @@ function PurchaseOrderInvoiceFormBody({
           label="Unggah Berkas Invoice"
           hint="PDF, JPG, PNG, atau WEBP; maksimal 5 MB."
           onFilesChange={setInvoiceFiles}
+          onError={(err) => toast.error(err)}
+        />
+      </div>
+    </form>
+  );
+}
+
+function ReplacePurchaseOrderInvoiceModal({
+  publicCode,
+  currentInvoiceUrl,
+  open,
+  onOpenChange,
+  isPending,
+  setIsPending,
+}: {
+  publicCode: string;
+  currentInvoiceUrl: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isPending: boolean;
+  setIsPending: (pending: boolean) => void;
+}) {
+  return (
+    <GlobalModal
+      isOpen={open}
+      onClose={() => {
+        if (!isPending) onOpenChange(false);
+      }}
+      onOpenChange={(next) => {
+        if (!isPending) onOpenChange(next);
+      }}
+      title="Ganti Foto / PDF Nota"
+      description="Unggah berkas invoice/bon baru untuk menggantikan berkas sebelumnya tanpa mengubah rincian atau nominal tagihan."
+      className="sm:max-w-xl"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            Batal
+          </Button>
+          <Button
+            form={`replace-purchase-order-invoice-form-${publicCode}`}
+            type="submit"
+            disabled={isPending}
+          >
+            {isPending ? "Menyimpan..." : "Simpan Nota Baru"}
+          </Button>
+        </>
+      }
+    >
+      <ReplacePurchaseOrderInvoiceFormBody
+        key={`replace:${publicCode}:${open ? "open" : "closed"}`}
+        publicCode={publicCode}
+        currentInvoiceUrl={currentInvoiceUrl}
+        isPending={isPending}
+        setIsPending={setIsPending}
+        onClose={() => onOpenChange(false)}
+      />
+    </GlobalModal>
+  );
+}
+
+function ReplacePurchaseOrderInvoiceFormBody({
+  publicCode,
+  currentInvoiceUrl,
+  isPending,
+  setIsPending,
+  onClose,
+}: {
+  publicCode: string;
+  currentInvoiceUrl: string | null;
+  isPending: boolean;
+  setIsPending: (pending: boolean) => void;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
+  const [isPreparing, setIsPreparing] = useState(false);
+
+  const handleFilesChange = async (files: File[]) => {
+    const rawFile = files[0];
+    if (!rawFile) {
+      setInvoiceFiles([]);
+      return;
+    }
+    setIsPreparing(true);
+    try {
+      const prepared = await compressFieldImageFile(rawFile, {
+        allowPdfPassthrough: true,
+      });
+      setInvoiceFiles([prepared]);
+    } catch (error) {
+      setInvoiceFiles([]);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Berkas invoice/bon tidak dapat diproses.",
+      );
+    } finally {
+      setIsPreparing(false);
+    }
+  };
+
+  const submitReplacement = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isPreparing || isPending) return;
+    const invoiceFile = invoiceFiles[0] ?? null;
+    if (!invoiceFile) {
+      toast.error("Pilih berkas invoice/bon pengganti terlebih dahulu.");
+      return;
+    }
+    setIsPending(true);
+    try {
+      const response = await replacePurchaseOrderInvoice(
+        publicCode,
+        invoiceFile,
+      );
+      if (response.success) {
+        toast.success(response.message);
+        onClose();
+        router.refresh();
+      } else {
+        toast.error(response.message);
+      }
+    } catch (error) {
+      console.error("Purchase order invoice replacement failed:", error);
+      toast.error(
+        "Berkas invoice/bon gagal diperbarui. Silakan coba kembali.",
+      );
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <form
+      id={`replace-purchase-order-invoice-form-${publicCode}`}
+      className="space-y-4"
+      onSubmit={submitReplacement}
+    >
+      {currentInvoiceUrl && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3.5 py-2.5">
+          <p className="type-p3 text-muted-foreground">
+            Berkas nota saat ini akan diganti dengan berkas baru.
+          </p>
+          <Button type="button" size="sm" variant="outline" asChild>
+            <a href={currentInvoiceUrl} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              Lihat Nota Lama
+            </a>
+          </Button>
+        </div>
+      )}
+      <div className="space-y-2 rounded-lg border border-border p-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="type-p2 font-semibold text-foreground">
+            Berkas Invoice / Bon Pengganti
+          </p>
+          {invoiceFiles[0] ? <InvoiceFilePreview file={invoiceFiles[0]} /> : null}
+        </div>
+        <FileDropzone
+          accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+          capture="environment"
+          maxFiles={1}
+          maxSizeMb={5}
+          files={invoiceFiles}
+          disabled={isPending || isPreparing}
+          label={isPreparing ? "Memproses berkas..." : "Unggah Berkas Nota Baru"}
+          hint="PDF, JPG, PNG, atau WEBP; maksimal 5 MB."
+          onFilesChange={(files) => {
+            void handleFilesChange(files);
+          }}
           onError={(err) => toast.error(err)}
         />
       </div>

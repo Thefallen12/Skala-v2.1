@@ -30,7 +30,18 @@ export async function GET(
   }
   const receiptUrl =
     cloudinaryPdfUrl ?? `/api/tickets/receipts/${fileName}`;
-  const [ticket, deliveryOrder, vehicleFuelRequest, payment] = await Promise.all([
+  const [
+    ticket,
+    deliveryOrder,
+    vehicleFuelRequest,
+    payment,
+    cashflow,
+    officeExpense,
+    materialDelivery,
+    subkonTermyn,
+    vendorInvoicePayment,
+    equipmentRental,
+  ] = await Promise.all([
     prisma.ticket.findFirst({
       where: {
         OR: [
@@ -126,12 +137,62 @@ export async function GET(
         },
       },
     }),
+    prisma.cashflow.findFirst({
+      where: { proofUrl: receiptUrl },
+      select: { id: true, recordedBy: true },
+    }),
+    prisma.officeExpense.findFirst({
+      where: { proofUrls: { has: receiptUrl } },
+      select: { id: true, recipientId: true, recordedBy: true },
+    }),
+    prisma.materialDelivery.findFirst({
+      where: { proofUrl: receiptUrl },
+      select: { id: true, receivedById: true, project: { select: { fieldPicId: true } } },
+    }),
+    prisma.subkonTermyn.findFirst({
+      where: { paymentProofUrl: receiptUrl },
+      select: { id: true, createdById: true },
+    }),
+    prisma.vendorInvoicePayment.findFirst({
+      where: { proofOfTransferUrl: receiptUrl },
+      select: { id: true, processedById: true },
+    }),
+    prisma.equipmentRental.findFirst({
+      where: { proofOfPaymentUrl: receiptUrl },
+      select: {
+        id: true,
+        createdById: true,
+        billingSubmittedById: true,
+        paidById: true,
+      },
+    }),
   ]);
-  if (!ticket && !deliveryOrder && !vehicleFuelRequest && !payment) {
+  if (
+    !ticket &&
+    !deliveryOrder &&
+    !vehicleFuelRequest &&
+    !payment &&
+    !cashflow &&
+    !officeExpense &&
+    !materialDelivery &&
+    !subkonTermyn &&
+    !vendorInvoicePayment &&
+    !equipmentRental
+  ) {
     return new Response("Not found", { status: 404 });
   }
 
   const role = session.user.role;
+  const canReadFinanceAsset =
+    role === UserRole.FINANCE ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.ADMINISTRATIONS;
+  const canReadLogisticsAsset =
+    role === UserRole.LOGISTICS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.ADMINISTRATIONS;
   const paymentTicket =
     payment?.ticket ??
     payment?.po?.ticket ??
@@ -197,7 +258,30 @@ export async function GET(
       role === UserRole.MOVER) ||
     ((role === UserRole.FINANCE || role === UserRole.LOGISTICS) &&
       vehicleFuelRequest !== null) ||
-    deliveryOrderIsVisibleToLogistics;
+    deliveryOrderIsVisibleToLogistics ||
+    (Boolean(cashflow) &&
+      (canReadFinanceAsset || cashflow?.recordedBy === session.user.id)) ||
+    (Boolean(officeExpense) &&
+      (canReadFinanceAsset ||
+        officeExpense?.recipientId === session.user.id ||
+        officeExpense?.recordedBy === session.user.id)) ||
+    (Boolean(materialDelivery) &&
+      (canReadFinanceAsset ||
+        canReadLogisticsAsset ||
+        materialDelivery?.receivedById === session.user.id ||
+        materialDelivery?.project.fieldPicId === session.user.id)) ||
+    (Boolean(subkonTermyn) &&
+      (canReadFinanceAsset || subkonTermyn?.createdById === session.user.id)) ||
+    (Boolean(vendorInvoicePayment) &&
+      (canReadFinanceAsset ||
+        canReadLogisticsAsset ||
+        vendorInvoicePayment?.processedById === session.user.id)) ||
+    (Boolean(equipmentRental) &&
+      (canReadFinanceAsset ||
+        canReadLogisticsAsset ||
+        equipmentRental?.createdById === session.user.id ||
+        equipmentRental?.billingSubmittedById === session.user.id ||
+        equipmentRental?.paidById === session.user.id));
   if (!hasAccess) {
     return new Response("Forbidden", { status: 403 });
   }

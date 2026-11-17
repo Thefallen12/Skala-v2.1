@@ -1000,30 +1000,64 @@ async function loadFinancePageMongooseDataImpl(
       .select({ _id: 1, name: 1 })
       .lean(),
   );
-  const hydratedInvoices = signoffInvoiceRows.map((invoice) => ({
-    id: String(invoice._id),
-    invoiceNumber: invoice.invoiceNumber,
-    signedBy: invoice.signedById
-      ? invoiceSignerById.get(invoice.signedById) ?? null
-      : null,
-    signedAt: invoice.signedAt ?? null,
-    acknowledgedBy: invoice.acknowledgedById
-      ? invoiceSignerById.get(invoice.acknowledgedById) ?? null
-      : null,
-    acknowledgedAt: invoice.acknowledgedAt ?? null,
-  }));
-  const hydratedConfirmations = signoffConfirmationRows.map((confirmation) => ({
-    id: String(confirmation._id),
-    koNumber: confirmation.koNumber,
-    signedBy: confirmation.signedById
-      ? confirmationSignerById.get(confirmation.signedById) ?? null
-      : null,
-    signedAt: confirmation.signedAt ?? null,
-    acknowledgedBy: confirmation.acknowledgedById
-      ? confirmationSignerById.get(confirmation.acknowledgedById) ?? null
-      : null,
-    acknowledgedAt: confirmation.acknowledgedAt ?? null,
-  }));
+  const signoffPoIds = [
+    ...new Set(
+      [
+        ...signoffInvoiceRows.map((invoice) => invoice.poId),
+        ...signoffConfirmationRows.map((confirmation) => confirmation.poId),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const signoffPoById = byId(
+    signoffPoIds.length
+      ? await PurchaseOrder.find({ _id: { $in: signoffPoIds } })
+          .select({ _id: 1, poNumber: 1, vendorName: 1 })
+          .lean()
+      : [],
+  );
+  const hydratedInvoices = signoffInvoiceRows.map((invoice) => {
+    const linkedPo = invoice.poId ? signoffPoById.get(invoice.poId) : undefined;
+    return {
+      id: String(invoice._id),
+      invoiceNumber: invoice.invoiceNumber ?? null,
+      vendorName: invoice.vendorName ?? linkedPo?.vendorName ?? null,
+      poNumber: linkedPo?.poNumber ?? null,
+      grandTotal:
+        typeof invoice.grandTotal === "number" ? invoice.grandTotal : null,
+      documentUrl: invoice.documentUrl ?? null,
+      signedBy: invoice.signedById
+        ? invoiceSignerById.get(invoice.signedById) ?? null
+        : null,
+      signedAt: invoice.signedAt ?? null,
+      acknowledgedBy: invoice.acknowledgedById
+        ? invoiceSignerById.get(invoice.acknowledgedById) ?? null
+        : null,
+      acknowledgedAt: invoice.acknowledgedAt ?? null,
+    };
+  });
+  const hydratedConfirmations = signoffConfirmationRows.map((confirmation) => {
+    const linkedPo = confirmation.poId
+      ? signoffPoById.get(confirmation.poId)
+      : undefined;
+    return {
+      id: String(confirmation._id),
+      koNumber: confirmation.koNumber,
+      vendorName: linkedPo?.vendorName ?? null,
+      poNumber: linkedPo?.poNumber ?? null,
+      paymentAmount:
+        typeof confirmation.paymentAmount === "number"
+          ? confirmation.paymentAmount
+          : null,
+      signedBy: confirmation.signedById
+        ? confirmationSignerById.get(confirmation.signedById) ?? null
+        : null,
+      signedAt: confirmation.signedAt ?? null,
+      acknowledgedBy: confirmation.acknowledgedById
+        ? confirmationSignerById.get(confirmation.acknowledgedById) ?? null
+        : null,
+      acknowledgedAt: confirmation.acknowledgedAt ?? null,
+    };
+  });
   const rentalProjectById = byId(rentalProjects);
   const hydratedRentals = rentalRows.map((rental) => ({
     ...rental,

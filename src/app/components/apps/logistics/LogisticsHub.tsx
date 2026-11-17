@@ -30,7 +30,10 @@ import {
   createEquipmentMaster,
 } from "@/app/actions/construction";
 import { issueOperationalDocument } from "@/app/actions/documents";
-import { canOperateLogisticsActions } from "@/lib/user-access";
+import {
+  canOperateFinanceActions,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
 import {
   approvePurchaseOrder,
   markPurchaseOrderSentToVendor,
@@ -39,6 +42,7 @@ import {
 } from "@/app/actions/orders";
 import { getJakartaDateKey } from "@/lib/habit-date";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
 import DocumentSignoffQueue, {
   type DocumentSignoffTask,
@@ -220,14 +224,14 @@ type EquipmentMasterRow = {
 };
 
 type DocumentSelection = {
-  kind: "po" | "do";
+  kind: "po" | "do" | "invoice";
   code: string;
   number: string;
   executiveApproval: string;
 } | null;
 
 type PoModalAction = {
-  mode: "invoice" | "receipt";
+  mode: "invoice" | "replace-invoice" | "receipt";
   order: HubPurchaseOrder;
 } | null;
 
@@ -240,6 +244,7 @@ function PurchaseOrderRowCard({
   onApprovePo,
   onMarkPoSent,
   onOpenInvoiceModal,
+  onOpenReplaceInvoiceModal,
   onOpenReceiptModal,
   onPreviewDocument,
 }: {
@@ -251,9 +256,13 @@ function PurchaseOrderRowCard({
   onApprovePo: (publicCode: string) => void;
   onMarkPoSent: (publicCode: string) => void;
   onOpenInvoiceModal: (order: HubPurchaseOrder) => void;
+  onOpenReplaceInvoiceModal: (order: HubPurchaseOrder) => void;
   onOpenReceiptModal: (order: HubPurchaseOrder) => void;
   onPreviewDocument: (selection: NonNullable<DocumentSelection>) => void;
 }) {
+  const canOperateLogistics = canOperateLogisticsActions(role);
+  const canManageInvoice =
+    canOperateLogistics || canOperateFinanceActions(role);
   return (
     <article className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3.5 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 flex-1 flex-col items-start space-y-1">
@@ -384,67 +393,82 @@ function PurchaseOrderRowCard({
           </>
         ) : (
           <>
-            {canOperateLogisticsActions(role) && (
-              <>
-                {!order.vendorPoSentAt ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={isPending}
-                    onClick={() => onMarkPoSent(order.publicCode)}
-                  >
-                    <Send className="size-3.5" aria-hidden="true" />
-                    Kirim Vendor
-                  </Button>
-                ) : order.vendorInvoiceUrl ? (
-                  <>
+            {order.vendorInvoiceUrl ? (
+              canManageInvoice && (
+                <>
+                  <ActionIconButton
+                    label="Lihat invoice vendor"
+                    tooltip="Lihat Nota"
+                    icon={ExternalLink}
+                    href={order.vendorInvoiceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  />
+                  {order.invoiceId && (
                     <ActionIconButton
-                      label="Lihat invoice vendor"
-                      tooltip="Lihat Nota"
-                      icon={ExternalLink}
-                      href={order.vendorInvoiceUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                      label="Pratinjau invoice"
+                      tooltip="Pratinjau Invoice"
+                      icon={FileText}
+                      onClick={() =>
+                        onPreviewDocument({
+                          kind: "invoice",
+                          code: order.invoiceId!,
+                          number: `Invoice ${order.poNumber}`,
+                          executiveApproval: `Invoice Vendor · PO ${order.poNumber}`,
+                        })
+                      }
                     />
-                    {order.invoiceId && (
-                      <ActionIconButton
-                        label="Cetak invoice"
-                        tooltip="Cetak Invoice"
-                        icon={FileText}
-                        href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(order.invoiceId)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      />
-                    )}
-                  </>
-                ) : !order.paidAt ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
+                  )}
+                  <ActionIconButton
+                    label="Ganti Foto/PDF Nota"
+                    tooltip="Ganti Nota"
+                    icon={FilePenLine}
                     disabled={isPending}
-                    onClick={() => onOpenInvoiceModal(order)}
-                  >
-                    <Upload className="size-3.5" aria-hidden="true" />
-                    Unggah Nota
-                  </Button>
-                ) : null}
+                    onClick={() => onOpenReplaceInvoiceModal(order)}
+                  />
+                </>
+              )
+            ) : canOperateLogistics ? (
+              !order.vendorPoSentAt ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() => onMarkPoSent(order.publicCode)}
+                >
+                  <Send className="size-3.5" aria-hidden="true" />
+                  Kirim Vendor
+                </Button>
+              ) : !order.paidAt ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() => onOpenInvoiceModal(order)}
+                >
+                  <Upload className="size-3.5" aria-hidden="true" />
+                  Unggah Nota
+                </Button>
+              ) : null
+            ) : null}
 
-                {!order.ticketId && order.paidAt && !order.receivedAt && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outlinesuccess"
-                    disabled={isPending}
-                    onClick={() => onOpenReceiptModal(order)}
-                  >
-                    <PackageCheck className="size-3.5" aria-hidden="true" />
-                    Terima Barang
-                  </Button>
-                )}
-              </>
-            )}
+            {canOperateLogistics &&
+              !order.ticketId &&
+              order.paidAt &&
+              !order.receivedAt && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outlinesuccess"
+                  disabled={isPending}
+                  onClick={() => onOpenReceiptModal(order)}
+                >
+                  <PackageCheck className="size-3.5" aria-hidden="true" />
+                  Terima Barang
+                </Button>
+              )}
 
             <ActionIconButton
               label="Preview PO Terbit"
@@ -1136,6 +1160,12 @@ export default function LogisticsHub({
                       onOpenInvoiceModal={(target) =>
                         setActivePoAction({ mode: "invoice", order: target })
                       }
+                      onOpenReplaceInvoiceModal={(target) =>
+                        setActivePoAction({
+                          mode: "replace-invoice",
+                          order: target,
+                        })
+                      }
                       onOpenReceiptModal={(target) =>
                         setActivePoAction({ mode: "receipt", order: target })
                       }
@@ -1496,11 +1526,18 @@ export default function LogisticsHub({
       </TabsContent>
 
       {/* HOISTED SINGLE PO ACTION CONTROLLERS (ZERO components inside PO rows!) */}
-      {activePoAction?.mode === "invoice" && (
+      {(activePoAction?.mode === "invoice" ||
+        activePoAction?.mode === "replace-invoice") && (
         <PurchaseOrderInvoiceUpload
-          key={`po-inv:${activePoAction.order.publicCode}`}
+          key={`po-inv:${activePoAction.mode}:${activePoAction.order.publicCode}`}
           open
           hideTrigger
+          mode={
+            activePoAction.mode === "replace-invoice" ? "replace" : "submit"
+          }
+          canReplace={
+            canOperateLogistics || canOperateFinanceActions(role)
+          }
           onOpenChange={(isOpen) => {
             if (!isOpen) setActivePoAction(null);
           }}
@@ -1552,27 +1589,24 @@ export default function LogisticsHub({
             ? `${selection.executiveApproval} · Dokumen resmi`
             : "Pratinjau dokumen resmi PO/DO."
         }
+        hideHeader
+        footerNote=""
+        bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden"
         className="sm:max-w-3xl"
-        footer={
-          selection ? (
-            <Button type="button" variant="outline" onClick={() => setSelection(null)}>
-              Tutup
-            </Button>
-          ) : undefined
-        }
       >
         {selection && (
-          <div className="space-y-3">
-            <p className="type-p2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-800 dark:text-emerald-200">
-              {selection.executiveApproval}. Informasi persetujuan dan QR
-              verifikasi ditampilkan pada dokumen.
-            </p>
-            <iframe
-              title={`Pratinjau dokumen ${selection.number}`}
-              src={`/api/documents/transactions?kind=${selection.kind.toUpperCase()}&publicCode=${encodeURIComponent(selection.code)}&format=html`}
-              className="h-[70vh] w-full rounded-lg border"
-            />
-          </div>
+          <UniversalDocumentPreview
+            title={`Pratinjau dokumen ${selection.number}`}
+            documentNumber={selection.number}
+            toolbarLabel={selection.executiveApproval}
+            minimalToolbar
+            src={
+              selection.kind === "invoice"
+                ? `/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(selection.code)}`
+                : `/api/documents/transactions?kind=${selection.kind.toUpperCase()}&publicCode=${encodeURIComponent(selection.code)}`
+            }
+            onClose={() => setSelection(null)}
+          />
         )}
       </GlobalModal>
 

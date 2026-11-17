@@ -11,6 +11,7 @@ import {
   Layers,
   ListChecks,
   Loader2,
+  Pencil,
   Receipt,
   Search,
   Ticket as TicketIcon,
@@ -20,7 +21,9 @@ import {
   createVendorInvoiceFromDeliveries,
   getUnbilledDeliveriesForContract,
   payVendorInvoice,
+  replaceVendorInvoicePaymentProof,
 } from "@/app/actions/material-contracts";
+import FinancePaymentProofReplacement from "@/app/components/apps/finance/FinancePaymentProofReplacement";
 import {
   formatMaterialVolume,
   roundMaterialNumber,
@@ -134,16 +137,21 @@ export default function VendorContractBillingPanel({
     title: string;
     url: string;
   } | null>(null);
+  const [replacingPayment, setReplacingPayment] = useState<{
+    invoiceId: string;
+    invoiceNumber: string;
+    paymentId: string;
+    proofUrl: string;
+  } | null>(null);
   const [feedback, setFeedback] = useState<{
     text: string;
     isError: boolean;
   } | null>(null);
 
-  const resolvedDetailInvoice =
-    detailInvoice ??
-    (initialInvoiceId
-      ? vendorInvoices.find((inv) => inv.id === initialInvoiceId) ?? null
-      : null);
+  const activeDetailInvoiceId = detailInvoice?.id ?? initialInvoiceId ?? null;
+  const resolvedDetailInvoice = activeDetailInvoiceId
+    ? vendorInvoices.find((inv) => inv.id === activeDetailInvoiceId) ?? detailInvoice
+    : null;
 
   const openProof = (url: string, title: string) => {
     if (onPreviewProof) {
@@ -1279,20 +1287,40 @@ export default function VendorContractBillingPanel({
                           {payment.processedByName}
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          openProof(
-                            payment.proofOfTransferUrl,
-                            `Bukti Pembayaran ${resolvedDetailInvoice.invoiceNumber}`,
-                          )
-                        }
-                      >
-                        <Eye className="size-3.5" aria-hidden="true" />
-                        Bukti Transfer
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            openProof(
+                              payment.proofOfTransferUrl,
+                              `Bukti Pembayaran ${resolvedDetailInvoice.invoiceNumber}`,
+                            )
+                          }
+                        >
+                          <Eye className="size-3.5" aria-hidden="true" />
+                          Bukti Transfer
+                        </Button>
+                        {canManage && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setReplacingPayment({
+                                invoiceId: resolvedDetailInvoice.id,
+                                invoiceNumber: resolvedDetailInvoice.invoiceNumber,
+                                paymentId: payment.id,
+                                proofUrl: payment.proofOfTransferUrl,
+                              })
+                            }
+                          >
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                            Ganti Bukti
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1370,6 +1398,48 @@ export default function VendorContractBillingPanel({
       <MaterialDeliveryProofModal
         preview={localPreview}
         onClose={() => setLocalPreview(null)}
+      />
+
+      <FinancePaymentProofReplacement
+        key={
+          replacingPayment
+            ? `${replacingPayment.invoiceId}-${replacingPayment.paymentId}-${replacingPayment.proofUrl}`
+            : "none"
+        }
+        existingProofUrl={replacingPayment?.proofUrl}
+        label={
+          replacingPayment
+            ? `bukti pembayaran ${replacingPayment.invoiceNumber}`
+            : "bukti pembayaran tagihan vendor"
+        }
+        buttonLabel="Ganti Bukti"
+        allowAllProofFormats
+        open={replacingPayment !== null}
+        onOpenChange={(open) => {
+          if (!open) setReplacingPayment(null);
+        }}
+        showTrigger={false}
+        onSubmitFile={async (file) => {
+          if (!replacingPayment) {
+            return {
+              success: false,
+              message: "Data pembayaran tidak ditemukan.",
+            };
+          }
+          const formData = new FormData();
+          formData.set("invoiceId", replacingPayment.invoiceId);
+          formData.set("paymentId", replacingPayment.paymentId);
+          formData.set("proof", file);
+          return replaceVendorInvoicePaymentProof(formData);
+        }}
+        onSaved={() => {
+          setReplacingPayment(null);
+          setFeedback({
+            text: "Bukti pembayaran tagihan vendor berhasil diperbarui.",
+            isError: false,
+          });
+          router.refresh();
+        }}
       />
     </div>
   );

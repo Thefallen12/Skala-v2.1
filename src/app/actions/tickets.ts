@@ -95,6 +95,7 @@ import { acquireMongoTransactionLock } from "@/lib/mongo-transaction-lock";
 import {
   CloudinaryPhotoValidationError,
   CloudinaryConfigurationError,
+  isCloudinaryPhotoUrl,
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
@@ -110,6 +111,7 @@ import {
 } from "@/lib/ticket-receipts";
 import { VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER } from "@/lib/vehicle-fuel";
 import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
+import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
 import {
   getFinancePaymentProofMimeType,
   normalizeFinancePaymentProofFile,
@@ -1660,6 +1662,314 @@ export async function submitDirectStockPurchaseInvoice(
   return {
     success: true,
     message: "Invoice/bon berhasil dilampirkan dan dikirim ke antrean Keuangan.",
+  };
+}
+
+async function removeDirectPurchaseInvoiceAsset(url: string): Promise<void> {
+  const normalizedPath = url.split(/[?#]/, 1)[0].toLowerCase();
+  if (url.includes("/raw/upload/") || normalizedPath.endsWith(".pdf")) {
+    await removeCloudinaryRawFile(url);
+    return;
+  }
+  await removeCloudinaryPhoto(url);
+}
+
+async function isInvoiceAssetReferencedInDb(url: string): Promise<boolean> {
+  try {
+    const counts = await Promise.all([
+      prisma.purchaseOrder.count({
+        where: { OR: [{ vendorInvoiceUrl: url }, { paymentReceiptUrl: url }] },
+      }),
+      prisma.invoice.count({ where: { documentUrl: url } }),
+      prisma.ticket.count({
+        where: {
+          OR: [
+            { purchaseReceiptUrl: url },
+            { transferReceiptUrl: url },
+            { deliveryReceiptUrl: url },
+            { deliveryOrderReceiptUrl: url },
+            { attachmentUrl: url },
+            { paymentProofUrl: url },
+            { receiptUrls: { has: url } },
+          ],
+        },
+      }),
+      prisma.directStockPurchase.count({
+        where: {
+          OR: [
+            { vendorInvoiceUrl: url },
+            { arrivalPhotoUrl: url },
+            { receivedPhotos: { has: url } },
+          ],
+        },
+      }),
+      prisma.paymentTransaction.count({
+        where: {
+          OR: [
+            { proofOfTransferUrl: url },
+            { additionalProofUrls: { has: url } },
+          ],
+        },
+      }),
+      prisma.cashflow.count({ where: { proofUrl: url } }),
+      prisma.officeExpense.count({ where: { proofUrls: { has: url } } }),
+      prisma.orderConfirmation.count({ where: { proofOfTransferUrl: url } }),
+      prisma.vendorInvoicePayment.count({ where: { proofOfTransferUrl: url } }),
+      prisma.equipmentRental.count({ where: { proofOfPaymentUrl: url } }),
+      prisma.materialDelivery.count({ where: { proofUrl: url } }),
+      prisma.vehicleFuelRequest.count({
+        where: {
+          OR: [
+            { transferProofUrl: url },
+            { beforeFillingPhotoUrl: url },
+            { afterFillingPhotoUrl: url },
+            { receiptPhotoUrl: url },
+          ],
+        },
+      }),
+      prisma.subkonTermyn.count({ where: { paymentProofUrl: url } }),
+      prisma.subkonContract.count({ where: { retentionReleaseProofUrl: url } }),
+      prisma.deliveryOrder.count({
+        where: {
+          OR: [
+            { deliveryReceiptUrl: url },
+            { arrivalPhotoUrl: url },
+            { receiptPhotos: { some: { url } } },
+          ],
+        },
+      }),
+    ]);
+    return counts.some((count) => count > 0);
+  } catch (error) {
+    console.error("Checking remaining direct purchase invoice DB references failed:", error);
+    return true;
+  }
+}
+
+export async function replaceDirectStockPurchaseInvoice(
+  formData: FormData,
+): Promise<DirectStockPurchaseActionResult> {
+  const session = await auth();
+  if (
+    !session?.user?.id ||
+    (!canOperateLogisticsActions(session.user.role) &&
+      !canOperateFinanceActions(session.user.role))
+  ) {
+    return directPurchaseFailure(
+      "Hanya Logistik, Keuangan, Administrasi, atau Direksi yang dapat mengganti invoice/bon pembelian.",
+    );
+  }
+  if (!(formData instanceof FormData)) {
+    return directPurchaseFailure("Permintaan penggantian invoice/bon tidak valid.");
+  }
+
+  const rawPurchaseId = formData.get("purchaseId");
+  const rawFile = formData.get("invoicePhoto") ?? formData.get("file");
+  if (
+    typeof rawPurchaseId !== "string" ||
+    !rawPurchaseId.trim() ||
+    !(rawFile instanceof File) ||
+    rawFile.size < 1 ||
+    rawFile.size > 5 * 1024 * 1024
+  ) {
+    return directPurchaseFailure(
+      "File invoice/bon tidak valid. Pilih berkas PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
+    );
+  }
+  const purchaseId = rawPurchaseId.trim();
+  const normalizedFile = normalizeFinancePaymentProofFile(rawFile);
+  if (!normalizedFile) {
+    return directPurchaseFailure(
+      "Format invoice/bon harus PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
+    );
+  }
+
+  let uploadedDocumentUrl: string | null = null;
+  let invoiceReplaced = false;
+  let oldInvoiceUrlToCheck: string | null = null;
+  let updatedPurchaseNumber: string | undefined;
+
+  try {
+    const purchaseBeforeUpload = await prisma.directStockPurchase.findUnique({
+      where: { id: purchaseId },
+      select: {
+        isApprovedByDirector: true,
+        vendorInvoiceUrl: true,
+      },
+    });
+    if (!purchaseBeforeUpload) {
+      throw new Error("Pembelian langsung tidak ditemukan.");
+    }
+    if (!purchaseBeforeUpload.isApprovedByDirector) {
+      throw new Error(
+        "Pembelian harus disetujui Direktur sebelum invoice/bon dapat diganti.",
+      );
+    }
+    if (!purchaseBeforeUpload.vendorInvoiceUrl?.trim()) {
+      throw new Error("Pembelian ini belum memiliki invoice/bon untuk diganti.");
+    }
+
+    let documentUrl = "";
+    if (normalizedFile.type === "application/pdf") {
+      const extension = normalizedFile.name.split(".").at(-1)?.toLowerCase();
+      const pdfFile =
+        extension === "pdf"
+          ? normalizedFile
+          : new File(
+              [normalizedFile],
+              `${normalizedFile.name || "invoice"}.pdf`,
+              {
+                type: "application/pdf",
+                lastModified: normalizedFile.lastModified,
+              },
+            );
+      documentUrl = await uploadCloudinaryRawFile(
+        pdfFile,
+        PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
+        ["pdf"],
+        5 * 1024 * 1024,
+      );
+    } else {
+      documentUrl = (
+        await uploadCloudinaryPhoto(
+          normalizedFile,
+          PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
+          5 * 1024 * 1024,
+        )
+      ).secureUrl;
+    }
+    uploadedDocumentUrl = documentUrl;
+    if (!isPurchaseOrderInvoiceUrl(documentUrl)) {
+      throw new Error("URL invoice/bon yang diunggah tidak valid.");
+    }
+
+    const txResult = await prisma.$transaction(async (transaction) => {
+      const purchase = await transaction.directStockPurchase.findUnique({
+        where: { id: purchaseId },
+        select: {
+          id: true,
+          purchaseNumber: true,
+          isApprovedByDirector: true,
+          vendorInvoiceUrl: true,
+          ticketId: true,
+          ticket: {
+            select: {
+              id: true,
+              purchaseReceiptUrl: true,
+            },
+          },
+        },
+      });
+      if (!purchase) throw new Error("Pembelian langsung tidak ditemukan.");
+      if (!purchase.isApprovedByDirector) {
+        throw new Error(
+          "Pembelian harus disetujui Direktur sebelum invoice/bon dapat diganti.",
+        );
+      }
+      const previousInvoiceUrl = purchase.vendorInvoiceUrl?.trim() ?? "";
+      if (!previousInvoiceUrl) {
+        throw new Error("Pembelian ini belum memiliki invoice/bon untuk diganti.");
+      }
+
+      const updated = await transaction.directStockPurchase.updateMany({
+        where: {
+          id: purchase.id,
+          isApprovedByDirector: true,
+          vendorInvoiceUrl: purchase.vendorInvoiceUrl,
+        },
+        data: {
+          vendorInvoiceUrl: documentUrl,
+          vendorInvoiceUploadedById: session.user.id,
+          vendorInvoiceUploadedAt: new Date(),
+        },
+      });
+      if (updated.count !== 1) {
+        throw new Error(
+          "Status pembelian berubah. Muat ulang sebelum mengganti invoice/bon.",
+        );
+      }
+
+      if (purchase.ticketId && purchase.ticket) {
+        if (purchase.ticket.purchaseReceiptUrl?.trim() === previousInvoiceUrl) {
+          await transaction.ticket.update({
+            where: { id: purchase.ticket.id },
+            data: { purchaseReceiptUrl: documentUrl },
+          });
+        }
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: purchase.ticket.id,
+            userId: session.user.id,
+            action: "LOGISTICS_DIRECT_PURCHASE_INVOICE_REPLACED",
+            notes: `Berkas invoice/bon pembelian langsung ${purchase.purchaseNumber} diperbarui.`,
+          },
+        });
+      }
+
+      return {
+        purchaseNumber: purchase.purchaseNumber,
+        previousInvoiceUrl,
+      };
+    });
+
+    invoiceReplaced = true;
+    updatedPurchaseNumber = txResult.purchaseNumber;
+    oldInvoiceUrlToCheck = txResult.previousInvoiceUrl;
+  } catch (error) {
+    console.error("Direct stock purchase invoice replacement failed:", error);
+    if (uploadedDocumentUrl && !invoiceReplaced) {
+      try {
+        await removeDirectPurchaseInvoiceAsset(uploadedDocumentUrl);
+      } catch (cleanupError) {
+        console.error(
+          "Failed to clean up unattached replacement direct purchase invoice:",
+          cleanupError,
+        );
+      }
+    }
+    return directPurchaseFailure(
+      error instanceof CloudinaryPhotoValidationError ||
+        error instanceof CloudinaryRawFileValidationError ||
+        error instanceof CloudinaryConfigurationError ||
+        (error instanceof Error &&
+          (error.message === "Pembelian langsung tidak ditemukan." ||
+            error.message === "Pembelian ini belum memiliki invoice/bon untuk diganti." ||
+            error.message ===
+              "Pembelian harus disetujui Direktur sebelum invoice/bon dapat diganti." ||
+            error.message.startsWith("Status pembelian berubah.") ||
+            error.message === "URL invoice/bon yang diunggah tidak valid."))
+        ? error.message
+        : "Invoice/bon gagal diperbarui. Muat ulang dan coba kembali.",
+    );
+  }
+
+  if (
+    oldInvoiceUrlToCheck &&
+    oldInvoiceUrlToCheck !== uploadedDocumentUrl &&
+    isPurchaseOrderInvoiceUrl(oldInvoiceUrlToCheck)
+  ) {
+    const stillReferenced = await isInvoiceAssetReferencedInDb(oldInvoiceUrlToCheck);
+    if (!stillReferenced) {
+      try {
+        await removeDirectPurchaseInvoiceAsset(oldInvoiceUrlToCheck);
+      } catch (cleanupError) {
+        console.error(
+          "Failed to remove unreferenced old direct purchase invoice:",
+          cleanupError,
+        );
+      }
+    }
+  }
+
+  revalidatePath("/apps/logistics");
+  revalidatePath("/apps/logistics/stock");
+  revalidatePath("/apps/finance");
+  revalidatePath("/apps/tickets");
+  return {
+    success: true,
+    message: `Invoice/bon pembelian ${updatedPurchaseNumber ?? ""} berhasil diperbarui.`,
+    purchaseNumber: updatedPurchaseNumber,
   };
 }
 
@@ -8107,10 +8417,18 @@ export async function replaceFinancePaymentProof(
   }
   const normalizedFile =
     file instanceof File ? normalizeFinancePaymentProofFile(file) : null;
+  const isReplaceableExistingProofUrl =
+    typeof existingProofUrl === "string" &&
+    existingProofUrl.length > 0 &&
+    existingProofUrl.length <= 2048 &&
+    (isFinancePaymentProofUrl(existingProofUrl) ||
+      isFinanceCashflowProofUrl(existingProofUrl) ||
+      isCloudinaryPhotoUrl(existingProofUrl) ||
+      /^\/api\/tickets\/receipts\/[A-Za-z0-9_.-]+$/i.test(existingProofUrl));
   if (
     !isBoundedText(paymentTransactionId, 191) ||
     !paymentTransactionId.trim() ||
-    !isFinancePaymentProofUrl(existingProofUrl) ||
+    !isReplaceableExistingProofUrl ||
     !Number.isInteger(proofIndex) ||
     proofIndex < 0 ||
     proofIndex > 4 ||

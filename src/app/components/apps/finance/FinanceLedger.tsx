@@ -18,7 +18,10 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
-import { createFinanceAccount } from "@/app/actions/finance-cashflow";
+import {
+  createFinanceAccount,
+  replaceCashflowProof,
+} from "@/app/actions/finance-cashflow";
 import FinancePaymentProofReplacement, {
   type ReplacingProofTarget,
 } from "@/app/components/apps/finance/FinancePaymentProofReplacement";
@@ -113,6 +116,16 @@ const formatDateTime = (iso: string) =>
 const isImageUrl = (url: string) =>
   /\.(?:jpe?g|png|webp)$/i.test(url.split(/[?#]/, 1)[0]);
 
+const isLegacySharedProofUrl = (url: string | null) =>
+  Boolean(url && /\/file\.(?:jpe?g|png|webp|pdf)(?:[?#]|$)/i.test(url));
+
+const isCashflowProofFolderUrl = (url: string | null) =>
+  Boolean(url && url.includes("cashflow_proofs/"));
+
+const isPdfProofUrl = (url: string) =>
+  /\.pdf(?:[?#]|$)/i.test(url.split(/[?#]/, 1)[0]) ||
+  url.startsWith("/api/tickets/receipts/");
+
 const paymentMethodLabel = (
   method: "TRANSFER" | "CASH" | "DEPOSIT" | string | null,
 ) => {
@@ -156,6 +169,7 @@ const getAccountIcon = (accountName: string) => {
 
 type UnifiedLedgerRow = {
   id: string;
+  cashflowId: string | null;
   createdAt: string;
   direction: "IN" | "OUT";
   badgeLabel: string;
@@ -246,6 +260,7 @@ export default function FinanceLedger({
 
       return {
         id: `cf-${cf.id}`,
+        cashflowId: cf.id,
         createdAt: cf.createdAt,
         direction: cf.type,
         badgeLabel,
@@ -274,6 +289,7 @@ export default function FinanceLedger({
 
     const histRows: UnifiedLedgerRow[] = historicalPayments.map((hp) => ({
       id: `hp-${hp.id}`,
+      cashflowId: null,
       createdAt: hp.paidAt,
       direction: "OUT" as const,
       badgeLabel: `${hp.category} (${paymentTypeLabel(hp.paymentType)})`,
@@ -368,20 +384,90 @@ export default function FinanceLedger({
   };
 
   const renderProofAction = (row: UnifiedLedgerRow) => {
-    const { proofUrl, rawProofUrl, description, paymentTransactionId, proofEditDisabledUrls } = row;
-    if (!proofUrl) {
+    const {
+      proofUrl,
+      rawProofUrl,
+      description,
+      cashflowId,
+      paymentTransactionId,
+      proofEditDisabledUrls,
+    } = row;
+    if (!proofUrl || !rawProofUrl) {
+      if (canEditProof && cashflowId) {
+        return (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setReplacingProofTarget({
+                targetKey: `cf:${cashflowId}`,
+                label: description,
+                buttonLabel: "Ganti",
+                allowAllProofFormats: true,
+                onSubmitFile: async (file) => {
+                  const formData = new FormData();
+                  formData.set("cashflowId", cashflowId);
+                  formData.set("proof", file);
+                  return replaceCashflowProof(formData);
+                },
+              })
+            }
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Unggah Bukti
+          </Button>
+        );
+      }
       return <span className="type-p3 text-muted-foreground">—</span>;
     }
+
     const isImage = isImageUrl(proofUrl);
-    const canReplace =
+    const isLegacySharedProof = isLegacySharedProofUrl(rawProofUrl);
+    const isEditableCashflowFolder = isCashflowProofFolderUrl(rawProofUrl);
+    const isProofEditDisabled = proofEditDisabledUrls.includes(rawProofUrl);
+
+    const canReplaceViaPaymentTransaction =
       canEditProof &&
       Boolean(paymentTransactionId) &&
-      Boolean(rawProofUrl) &&
-      !proofEditDisabledUrls.includes(rawProofUrl!) &&
-      (isImage || rawProofUrl!.startsWith("/api/tickets/receipts/"));
+      !isProofEditDisabled &&
+      !isLegacySharedProof &&
+      !isEditableCashflowFolder &&
+      (isImage || isPdfProofUrl(rawProofUrl));
+
+    const canReplaceViaCashflow =
+      canEditProof &&
+      Boolean(cashflowId) &&
+      (!paymentTransactionId ||
+        isLegacySharedProof ||
+        isEditableCashflowFolder);
+
+    const openCashflowReplacement = () => {
+      if (!cashflowId) return;
+      setReplacingProofTarget({
+        targetKey: `cf:${cashflowId}`,
+        label: description,
+        buttonLabel: isImage ? "Edit" : "Ganti",
+        allowAllProofFormats: true,
+        onSubmitFile: async (file) => {
+          const formData = new FormData();
+          formData.set("cashflowId", cashflowId);
+          formData.set("proof", file);
+          return replaceCashflowProof(formData);
+        },
+      });
+    };
 
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {isLegacySharedProof && (
+          <Badge
+            variant="outlineWarning"
+            title="URL bukti lama (/file.*) berpotensi tertukar dengan transaksi lain — disarankan diganti"
+          >
+            Bukti Lama
+          </Badge>
+        )}
         {isImage ? (
           <Button
             type="button"
@@ -400,13 +486,14 @@ export default function FinanceLedger({
             </a>
           </Button>
         )}
-        {canReplace && paymentTransactionId && rawProofUrl && (
+        {canReplaceViaPaymentTransaction && paymentTransactionId ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() =>
               setReplacingProofTarget({
+                targetKey: `pt:${paymentTransactionId}:0`,
                 paymentTransactionId,
                 existingProofUrl: rawProofUrl,
                 proofIndex: 0,
@@ -418,7 +505,27 @@ export default function FinanceLedger({
             <Pencil className="size-3.5" aria-hidden="true" />
             {isImage ? "Edit" : "Ganti"}
           </Button>
-        )}
+        ) : canReplaceViaCashflow ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={
+              isLegacySharedProof
+                ? "border-amber-500/60 text-amber-700 hover:bg-amber-50 dark:text-amber-400"
+                : undefined
+            }
+            title={
+              isLegacySharedProof
+                ? "Ganti bukti lama (/file.*) dengan berkas transaksi yang benar"
+                : undefined
+            }
+            onClick={openCashflowReplacement}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            {isImage ? "Edit" : "Ganti"}
+          </Button>
+        ) : null}
       </div>
     );
   };
@@ -913,7 +1020,8 @@ export default function FinanceLedger({
       <FinancePaymentProofReplacement
         key={
           replacingProofTarget
-            ? `${replacingProofTarget.paymentTransactionId}:${replacingProofTarget.proofIndex}`
+            ? (replacingProofTarget.targetKey ??
+              `${replacingProofTarget.paymentTransactionId ?? ""}:${replacingProofTarget.proofIndex ?? 0}`)
             : "ledger-proof-replace-closed"
         }
         open={replacingProofTarget !== null}
@@ -921,11 +1029,13 @@ export default function FinanceLedger({
           if (!open) setReplacingProofTarget(null);
         }}
         showTrigger={false}
-        paymentTransactionId={replacingProofTarget?.paymentTransactionId ?? ""}
+        paymentTransactionId={replacingProofTarget?.paymentTransactionId}
         existingProofUrl={replacingProofTarget?.existingProofUrl}
         proofIndex={replacingProofTarget?.proofIndex}
         label={replacingProofTarget?.label ?? ""}
         buttonLabel={replacingProofTarget?.buttonLabel ?? "Edit"}
+        allowAllProofFormats={replacingProofTarget?.allowAllProofFormats}
+        onSubmitFile={replacingProofTarget?.onSubmitFile}
         onSaved={() => {
           setReplacingProofTarget(null);
           router.refresh();

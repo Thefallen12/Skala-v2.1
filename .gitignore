@@ -60,3 +60,9 @@ next-env.d.ts
 /agency-agents-app/
 /agency-agents/
 
+
+# Ignore semua jenis file .env
+.env
+.env.*
+*.env
+!.env.example
