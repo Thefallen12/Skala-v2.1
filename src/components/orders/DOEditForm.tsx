@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { Plus, Printer, QrCode, Save, Trash2 } from "lucide-react";
 import { DODeliveryMethod, DOStatus } from "@prisma/client";
@@ -13,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GlobalModal } from "@/components/ui/global-modal";
@@ -210,6 +213,20 @@ export default function DOEditForm({
   const submit = form.handleSubmit(
     async (values) => {
       if (!canEdit) return;
+      if (
+        values.deliveryMethod === DODeliveryMethod.EXPEDITION &&
+        publicCode &&
+        canReceiveMaterial &&
+        values.status === DOStatus.DELIVERED &&
+        !arrivalPhotoUrl &&
+        !arrivalPhotoFile
+      ) {
+        const msg = "Foto material tiba wajib diunggah sebelum status diubah menjadi Material tiba di gudang.";
+        setIsError(true);
+        setMessage(msg);
+        toast.error(msg);
+        return;
+      }
       setMessage("");
       setIsSaving(true);
       try {
@@ -249,14 +266,19 @@ export default function DOEditForm({
         setIsError(!result.success);
         setMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           if (publicCode) router.back();
           else if (result.publicCode) router.replace(`/d/${result.publicCode}`);
           else router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Delivery Order edit failed:", error);
         setIsError(true);
-        setMessage("DO gagal disimpan. Periksa koneksi lalu coba kembali.");
+        const errMsg = "DO gagal disimpan. Periksa koneksi lalu coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       } finally {
         setIsSaving(false);
       }
@@ -270,8 +292,27 @@ export default function DOEditForm({
           ? firstError.message
           : "Mohon lengkapi seluruh data wajib sebelum menyimpan.";
       setMessage(errorMsg);
+      toast.error(errorMsg);
     },
   );
+
+  const ticketComboboxOptions = ticketOptions.map((ticket) => ({
+    value: ticket.id,
+    label: `${ticket.ticketNumber} — ${ticket.projectName || ticket.title}`,
+    description: ticket.title,
+  }));
+
+  const vehicleComboboxOptions = availableVehicles.map((vehicle) => ({
+    value: vehicle.id,
+    label: `${vehicle.plateNumber} · ${vehicle.vehicleType}`,
+    description: [
+      vehicle.brand,
+      vehicle.modelName,
+      `${vehicle.currentKilometer} km`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  }));
 
   return (
     <form onSubmit={submit} className="order-editor-print-area space-y-6">
@@ -279,10 +320,10 @@ export default function DOEditForm({
       <Card className="space-y-5 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="type-h2 text-foreground">
               {publicCode ? `Delivery Order · ${doNumber}` : "1. Informasi Pengiriman & Kendaraan"}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-p3 mt-0.5 text-muted-foreground">
               {ticketNumber
                 ? `Referensi tiket ${ticketNumber}`
                 : poNumber
@@ -334,8 +375,13 @@ export default function DOEditForm({
                 name="ticketId"
                 rules={{ required: "Pilih tiket material sebagai referensi DO." }}
                 render={({ field }) => (
-                  <Select
-                    value={field.value || undefined}
+                  <Combobox
+                    id="do-ticket"
+                    options={ticketComboboxOptions}
+                    value={field.value}
+                    placeholder="Pilih nomor tiket"
+                    searchPlaceholder="Cari nomor tiket atau proyek..."
+                    emptyText="Tidak ada tiket material yang siap dikirim."
                     onValueChange={(value) => {
                       field.onChange(value);
                       const selected = ticketOptions.find(
@@ -357,18 +403,7 @@ export default function DOEditForm({
                         }
                       }
                     }}
-                  >
-                    <SelectTrigger id="do-ticket">
-                      <SelectValue placeholder="Pilih nomor tiket" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ticketOptions.map((ticket) => (
-                        <SelectItem key={ticket.id} value={ticket.id}>
-                          {ticket.ticketNumber} — {ticket.projectName || ticket.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 )}
               />
               {form.formState.errors.ticketId?.message && (
@@ -509,8 +544,13 @@ export default function DOEditForm({
                     },
                   }}
                   render={({ field }) => (
-                    <Select
-                      value={field.value || undefined}
+                    <Combobox
+                      id="do-vehicle"
+                      options={vehicleComboboxOptions}
+                      value={field.value}
+                      placeholder="Pilih kendaraan tersedia"
+                      searchPlaceholder="Cari plat nomor atau jenis kendaraan..."
+                      emptyText="Belum ada kendaraan tersedia."
                       onValueChange={(selectedVehicleId) => {
                         field.onChange(selectedVehicleId);
                         form.setValue(
@@ -520,21 +560,7 @@ export default function DOEditForm({
                           )?.plateNumber ?? "",
                         );
                       }}
-                    >
-                      <SelectTrigger id="do-vehicle">
-                        <SelectValue placeholder="Pilih kendaraan tersedia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableVehicles.map((vehicle) => (
-                          <SelectItem key={vehicle.id} value={vehicle.id}>
-                            {vehicle.plateNumber} · {vehicle.vehicleType}
-                            {vehicle.brand ? ` · ${vehicle.brand}` : ""}
-                            {vehicle.modelName ? ` ${vehicle.modelName}` : ""}
-                            {` · ${vehicle.currentKilometer} km`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   )}
                 />
               )}
@@ -646,18 +672,16 @@ export default function DOEditForm({
                   </p>
                 </div>
                 {!arrivalPhotoUrl && canReceiveMaterial && (
-                  <Input
+                  <FileDropzone
                     id="do-arrival-photo"
-                    type="file"
                     accept="image/jpeg,image/png,image/webp"
                     capture="environment"
-                    required={
-                      canReceiveMaterial &&
-                      watchedForm.status === DOStatus.DELIVERED
-                    }
-                    onChange={(event) =>
-                      setArrivalPhotoFile(event.target.files?.[0] ?? null)
-                    }
+                    maxSizeMb={5}
+                    files={arrivalPhotoFile ? [arrivalPhotoFile] : []}
+                    onFilesChange={(files) => setArrivalPhotoFile(files[0] ?? null)}
+                    onError={(errorMessage) => toast.error(errorMessage)}
+                    label="Unggah Foto Material Tiba"
+                    hint="Format JPG, PNG, atau WEBP (maks. 5 MB)"
                   />
                 )}
                 {arrivalPhotoFile && (
@@ -711,34 +735,129 @@ export default function DOEditForm({
       <Card className="space-y-4 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">2. Item Pengiriman</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="type-h2 text-foreground">2. Item Pengiriman</h2>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
               Jumlah terkirim tidak dapat melebihi jumlah yang dipesan.
             </p>
           </div>
           {canEdit && (
             <Button
               type="button"
+              size="sm"
               variant="outline"
               onClick={() =>
                 append({ itemName: "", qtyOrdered: 1, qtyDelivered: 0, unit: "pcs", remarks: "" })
               }
             >
-              <Plus className="mr-2 h-4 w-4" /> Tambah item
+              <Plus className="mr-1.5 size-4" aria-hidden="true" /> Tambah Item
             </Button>
           )}
         </div>
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <Table className="min-w-[680px]">
+
+        {/* Editor kartu untuk mobile / APK */}
+        <div className="space-y-3 md:hidden">
+          {fields.map((field, index) => (
+            <div
+              key={field.fieldId}
+              className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="type-p3 font-semibold text-muted-foreground">
+                  Item #{index + 1}
+                </span>
+                {canEdit && (
+                  <ActionIconButton
+                    type="button"
+                    label={`Hapus item baris ${index + 1}`}
+                    tooltip={`Hapus item baris ${index + 1}`}
+                    icon={Trash2}
+                    className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    disabled={fields.length <= 1}
+                    onClick={() => remove(index)}
+                  />
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`do-m-name-${index}`}>Nama barang</Label>
+                <Input
+                  id={`do-m-name-${index}`}
+                  readOnly={!publicCode && Boolean(selectedTicket)}
+                  {...form.register(`items.${index}.itemName`, {
+                    required: "Nama barang wajib diisi.",
+                    maxLength: 180,
+                  })}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`do-m-ord-${index}`}>Dipesan</Label>
+                  <Input
+                    id={`do-m-ord-${index}`}
+                    type="number"
+                    min="0.01"
+                    step="any"
+                    readOnly={!publicCode && Boolean(selectedTicket)}
+                    {...form.register(`items.${index}.qtyOrdered`, {
+                      valueAsNumber: true,
+                      required: true,
+                      min: 0.01,
+                    })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`do-m-del-${index}`}>Dikirim</Label>
+                  <Input
+                    id={`do-m-del-${index}`}
+                    type="number"
+                    min="0"
+                    max={watchedItems[index]?.qtyOrdered ?? undefined}
+                    step="any"
+                    {...form.register(`items.${index}.qtyDelivered`, {
+                      valueAsNumber: true,
+                      required: true,
+                      min: 0,
+                      validate: (value) =>
+                        value <= Number(watchedItems[index]?.qtyOrdered) ||
+                        "Qty dikirim tidak boleh melebihi qty dipesan.",
+                    })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`do-m-unit-${index}`}>Satuan</Label>
+                  <Input
+                    id={`do-m-unit-${index}`}
+                    readOnly={!publicCode && Boolean(selectedTicket)}
+                    {...form.register(`items.${index}.unit`, {
+                      required: "Satuan wajib diisi.",
+                      maxLength: 40,
+                    })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`do-m-rem-${index}`}>Catatan kondisi</Label>
+                <Input
+                  id={`do-m-rem-${index}`}
+                  placeholder="Kondisi barang saat diterima"
+                  {...form.register(`items.${index}.remarks`, { maxLength: 1000 })}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabel untuk tablet / desktop */}
+        <div className="hidden overflow-x-auto md:block">
+          <Table pagination={false}>
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[180px]">Nama barang</TableHead>
-                <TableHead className="w-36 min-w-[110px]">Qty dipesan</TableHead>
-                <TableHead className="w-36 min-w-[110px]">Qty dikirim</TableHead>
-                <TableHead className="w-24 min-w-[90px]">Satuan</TableHead>
+                <TableHead className="w-32">Qty dipesan</TableHead>
+                <TableHead className="w-32">Qty dikirim</TableHead>
+                <TableHead className="w-24">Satuan</TableHead>
                 <TableHead className="min-w-[160px]">Catatan kondisi</TableHead>
                 {canEdit && (
-                  <TableHead className="w-16"><span className="sr-only">Aksi</span></TableHead>
+                  <TableHead className="w-16 text-right"><span className="sr-only">Aksi</span></TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -808,7 +927,7 @@ export default function DOEditForm({
                     />
                   </TableCell>
                   {canEdit && (
-                    <TableCell>
+                    <TableCell className="text-right">
                       <ActionIconButton
                         type="button"
                         label={`Hapus item baris ${index + 1}`}
@@ -830,7 +949,7 @@ export default function DOEditForm({
 
       {showQr && (
         <Card className="flex flex-col items-center gap-3 p-5 text-center">
-          <h2 className="font-semibold">QR Dokumen Delivery Order</h2>
+          <h2 className="type-h3 text-foreground">QR Dokumen Delivery Order</h2>
           {qrDataUrl ? (
             <Image
               src={qrDataUrl}
@@ -840,18 +959,18 @@ export default function DOEditForm({
               unoptimized
             />
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-p2 text-muted-foreground">
               {!publicCode
                 ? "Simpan DO untuk membuat URL samaran dan QR code."
                 : "URL publik aplikasi belum dikonfigurasi. Atur NEXT_PUBLIC_APP_URL untuk membuat QR yang dapat dipindai."}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="type-p3 text-muted-foreground">
             Pindai QR untuk membuka tampilan dokumen Delivery Order.
           </p>
           {publicCode && (
             <a
-              className="text-xs font-medium text-primary underline underline-offset-4"
+              className="type-p3 font-medium text-primary underline underline-offset-4"
               href={`/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(publicCode)}&format=html`}
               rel="noreferrer"
               target="_blank"
@@ -864,7 +983,7 @@ export default function DOEditForm({
 
       {message && (
         <p
-          className={`text-sm ${isError ? "text-destructive" : "text-emerald-700"}`}
+          className={`type-p2 ${isError ? "text-destructive" : "text-emerald-700 dark:text-emerald-300"}`}
           role={isError ? "alert" : "status"}
         >
           {message}

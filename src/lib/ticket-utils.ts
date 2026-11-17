@@ -33,13 +33,16 @@ export async function syncTicketStatus(
   const nonContractItems = items.filter(
     (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
   );
+  const contractItems = items.filter(
+    (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+  );
   const isShippingCostTicket =
-    items.length === 0 &&
     ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
 
   const needsDeliveryOrders =
     isShippingCostTicket ||
-    (requestedStatus === TicketStatus.COMPLETED && nonContractItems.length > 0);
+    (requestedStatus === TicketStatus.COMPLETED &&
+      (nonContractItems.length > 0 || contractItems.length > 0));
   const deliveryOrders = needsDeliveryOrders
     ? await transaction.deliveryOrder.findMany({
         where: { ticketId },
@@ -47,24 +50,37 @@ export async function syncTicketStatus(
       })
     : [];
 
+  const allNonContractItemsHaveDO =
+    nonContractItems.length > 0 &&
+    nonContractItems.every(
+      (item) =>
+        item.status === FulfillmentStatus.PROCESSED_TO_DO &&
+        item.doItemId !== null,
+    );
+  const allContractItemsFulfilled =
+    contractItems.length > 0 &&
+    contractItems.every(
+      (item) => item.status === FulfillmentStatus.PROCESSED_TO_DO,
+    );
   const allItemsHaveDeliveryOrders = isShippingCostTicket
-    ? deliveryOrders.length > 0
-    : nonContractItems.length > 0 &&
-      nonContractItems.every(
-        (item) =>
-          item.status === FulfillmentStatus.PROCESSED_TO_DO &&
-          item.doItemId !== null,
-      );
+    ? deliveryOrders.length > 0 || allNonContractItemsHaveDO
+    : nonContractItems.length > 0
+      ? allNonContractItemsHaveDO
+      : allContractItemsFulfilled;
   const allItemsProcessedToDo = isShippingCostTicket
-    ? deliveryOrders.length > 0
+    ? deliveryOrders.length > 0 &&
+      (items.length === 0 ||
+        items.every((item) => item.status === FulfillmentStatus.PROCESSED_TO_DO))
     : items.length > 0 &&
       items.every((item) => item.status === FulfillmentStatus.PROCESSED_TO_DO);
 
   let nextStatus = ticket.status;
 
   if (
-    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-      ticket.status === TicketStatus.PROCESSED_FINANCE) &&
+    (ticket.status === TicketStatus.APPROVED_DIR ||
+      ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE ||
+      ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT) &&
     allItemsHaveDeliveryOrders &&
     (requestedStatus === TicketStatus.ASSIGNED_TO_MOVER ||
       requestedStatus === TicketStatus.IN_TRANSIT)
@@ -78,10 +94,12 @@ export async function syncTicketStatus(
     nextStatus = TicketStatus.IN_TRANSIT;
   } else if (
     requestedStatus === TicketStatus.COMPLETED &&
-    (ticket.status === TicketStatus.IN_TRANSIT ||
+    (ticket.status === TicketStatus.APPROVED_DIR ||
+      ticket.status === TicketStatus.IN_TRANSIT ||
       ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
       ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-      ticket.status === TicketStatus.PROCESSED_FINANCE) &&
+      ticket.status === TicketStatus.PROCESSED_FINANCE ||
+      ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT) &&
     allItemsProcessedToDo
   ) {
     if (

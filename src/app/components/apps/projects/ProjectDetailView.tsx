@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useMemo, useEffect } from "react";
-import Image from "next/image";
+import React, { useState, useTransition, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -9,27 +8,20 @@ import type { ApexOptions } from "apexcharts";
 import {
   Calculator,
   AlertTriangle,
-  ArrowLeft,
   BookmarkCheck,
   Calendar,
   CalendarDays,
   Camera,
   CheckCircle2,
   Sparkles,
-  ChevronDown,
-  ChevronRight,
   ClipboardList,
   Coins,
-  Columns,
   Copy,
   Download,
   Ellipsis,
-  ExternalLink,
-  FileDown,
   FileText,
   Globe,
   HardHat,
-  HelpCircle,
   ImageIcon,
   LayoutTemplate,
   MapPin,
@@ -40,18 +32,38 @@ import {
   Plus,
   Printer,
   RefreshCw,
-  Share2,
+  Send,
+  ShieldCheck,
   ShoppingCart,
   Trash2,
   User,
   WalletCards,
+  WifiOff,
   X,
 } from "lucide-react";
-import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
+import { toast } from "sonner";
+import { ProjectStatus, UserRole } from "@prisma/client";
 import {
   buildProjectSCurveSeries,
   calculateWeightedProjectProgress,
 } from "@/lib/project-progress";
+import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  countOfflineDailyReports,
+  flushOfflineDailyReports,
+  registerOfflineDailyReportAutoSync,
+} from "@/lib/offline-daily-report-queue";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +79,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { GlobalModal } from "@/components/ui/global-modal";
@@ -78,13 +109,15 @@ import {
   deleteProject,
   duplicateProject,
   updateProjectKanbanStatus,
-  saveProjectScheduleTask,
 } from "@/app/actions/project";
-import EditRabModal, { type EditableRabItem } from "./EditRabModal";
+import DailyProgressModal, {
+  isRunningProjectStatus,
+  submitOfflineDailyReportAction,
+} from "./DailyProgressModal";
+import EditRabModal from "./EditRabModal";
 import RapManagementModal from "./RapManagementModal";
 import ProjectScheduleGantt, { type ScheduleMilestoneItem } from "./ProjectScheduleGantt";
 import OpnameProgressModal, { type OpnameWorkPointItem } from "./OpnameProgressModal";
-import ProgressScheduleRows, { type ProgressScheduleItem } from "./ProgressScheduleRows";
 import MaterialPlanModal, { type MaterialPlanRow, type StockItemOption } from "./MaterialPlanModal";
 import AnalisaMaterialModal, { type MaterialAnalysisItem } from "./AnalisaMaterialModal";
 import { getStandardAnalysisForWorkItem } from "@/lib/drt-rab-parser";
@@ -93,7 +126,6 @@ import CoreTeamModal from "./CoreTeamModal";
 import ProjectFundRecapTab, {
   classifyTicketFundCategory,
 } from "./ProjectFundRecapTab";
-import { applyRabAsContract, applyRapAsBudget, recordProjectOpname } from "@/app/actions/project";
 import { ProjectPrintRabView, ProjectPrintProgressView } from "./ProjectPrintViews";
 import ProjectMaterialDeliveriesCard from "./ProjectMaterialDeliveriesCard";
 import type {
@@ -124,53 +156,6 @@ function formatDateIndo(dateStr: string | null | undefined): string {
     return dateStr;
   }
 }
-
-const DEFAULT_SAMPLE_ITEMS: EditableRabItem[] = [
-  {
-    section: "A. Persiapan",
-    code: "A.1",
-    title: "Pembersihan dan bongkaran",
-    volume: 1,
-    unit: "paket",
-    unitPrice: 4500000,
-    rapPrice: 3400000,
-    startDate: "2026-10-27",
-    endDate: "2026-11-02",
-  },
-  {
-    section: "B. Lantai",
-    code: "B.1",
-    title: "Pasang keramik 60×60",
-    volume: 85,
-    unit: "m2",
-    unitPrice: 285000,
-    rapPrice: 220000,
-    startDate: "2026-11-03",
-    endDate: "2026-11-20",
-  },
-  {
-    section: "C. Dinding",
-    code: "C.1",
-    title: "Cat dinding 2 lapis",
-    volume: 240,
-    unit: "m2",
-    unitPrice: 42000,
-    rapPrice: 31000,
-    startDate: "2026-11-18",
-    endDate: "2026-12-05",
-  },
-  {
-    section: "D. Listrik",
-    code: "D.1",
-    title: "Titik lampu dan stopkontak",
-    volume: 24,
-    unit: "titik",
-    unitPrice: 350000,
-    rapPrice: 260000,
-    startDate: "2026-11-30",
-    endDate: "2026-12-20",
-  },
-];
 
 const KANBAN_STAGES: Array<{
   key: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda";
@@ -218,20 +203,33 @@ export default function ProjectDetailView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const printParam = searchParams?.get("print");
+  const actionParam = searchParams?.get("action");
   const [printDocView, setPrintDocView] = useState<"none" | "rab" | "progres">(() => {
     if (printParam === "rab") return "rab";
     if (printParam === "progres") return "progres";
     return "none";
   });
-  const [activeTab, setActiveTab] = useState("ringkasan");
+  const [activeTab, setActiveTab] = useState(() =>
+    actionParam === "daily-report" ? "lapangan" : "ringkasan",
+  );
   const [showBanner, setShowBanner] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isClientPortalOpen, setIsClientPortalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDailyProgressOpen, setIsDailyProgressOpen] = useState(
+    () => actionParam === "daily-report",
+  );
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
+  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<{
+    url: string;
+    title: string;
+    kind: "image" | "document";
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Modals for Tab RAB & Biaya (Vasco)
+  // Modals for Tab RAB & Biaya
   const [isEditRabModalOpen, setIsEditRabModalOpen] = useState(false);
   const [isOpnameModalOpen, setIsOpnameModalOpen] = useState(false);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
@@ -249,27 +247,38 @@ export default function ProjectDetailView({
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
   const [isCoreTeamModalOpen, setIsCoreTeamModalOpen] = useState(false);
   const [materialPlanList, setMaterialPlanList] = useState<MaterialPlanRow[]>([]);
+
+  const canManageProject =
+    currentUserRole === UserRole.ADMINISTRATIONS ||
+    currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.DEPUTY_DIRECTOR;
+  const canViewFinancials =
+    currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.DEPUTY_DIRECTOR ||
+    currentUserRole === UserRole.ADMINISTRATIONS ||
+    currentUserRole === UserRole.FINANCE ||
+    currentUserRole === UserRole.LOGISTICS;
+  const canSubmitDailyProgress =
+    currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.DEPUTY_DIRECTOR ||
+    currentUserRole === UserRole.ADMINISTRATIONS ||
+    currentUserRole === UserRole.KOORDINATOR ||
+    currentUserRole === UserRole.FIELD_TEAM;
   const canAccessMaterialPlanning =
     currentUserRole === UserRole.DIRECTOR ||
     currentUserRole === UserRole.ADMINISTRATIONS ||
     currentUserRole === UserRole.LOGISTICS;
   const canEditProjectRab =
-    currentUserRole === UserRole.ADMINISTRATIONS ||
-    currentUserRole === UserRole.DIRECTOR ||
-    currentUserRole === UserRole.DEPUTY_DIRECTOR ||
+    canManageProject ||
     ((currentUserRole === UserRole.FIELD_TEAM ||
       currentUserRole === UserRole.KOORDINATOR) &&
       Boolean(currentUserId) &&
       project.fieldPicId === currentUserId);
 
-  // Papan & Status Kanban integration
   const [currentKanbanKey, setCurrentKanbanKey] = useState<"tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda">(() =>
     getKanbanKeyFromProject(project.status, project.progress)
   );
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [scheduleViewMode, setScheduleViewMode] = useState<"papan" | "gantt">("gantt");
-  const [taskDragOverColumn, setTaskDragOverColumn] = useState<string | null>(null);
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [localWorkPoints, setLocalWorkPoints] = useState(project.workPoints);
   const [prevWorkPoints, setPrevWorkPoints] = useState(project.workPoints);
   const derivedKanbanKey = getKanbanKeyFromProject(project.status, project.progress);
@@ -286,79 +295,88 @@ export default function ProjectDetailView({
     setCurrentKanbanKey(derivedKanbanKey);
   }
 
+  const refreshQueueCount = useCallback(async () => {
+    const count = await countOfflineDailyReports();
+    setOfflineQueueCount(count);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void countOfflineDailyReports().then((count) => {
+      if (!cancelled) setOfflineQueueCount(count);
+    });
+    const unregister = registerOfflineDailyReportAutoSync(
+      submitOfflineDailyReportAction,
+      {
+        onSynced: (result) => {
+          void refreshQueueCount();
+          if (result.syncedCount > 0) {
+            toast.success(
+              `${result.syncedCount} laporan harian antrean berhasil disinkronkan.`,
+            );
+            requestNotificationFeedRefresh();
+            router.refresh();
+          }
+        },
+      },
+    );
+    return () => {
+      cancelled = true;
+      unregister();
+    };
+  }, [refreshQueueCount, router]);
+
+  const handleFlushOfflineQueue = async () => {
+    setIsFlushingQueue(true);
+    try {
+      const result = await flushOfflineDailyReports(submitOfflineDailyReportAction);
+      await refreshQueueCount();
+      if (result.skippedOffline) {
+        toast.warning("Perangkat masih offline. Antrean akan dikirim otomatis saat sinyal stabil.");
+      } else if (result.syncedCount > 0) {
+        toast.success(
+          `${result.syncedCount} laporan harian berhasil dikirim.`,
+        );
+        requestNotificationFeedRefresh();
+        router.refresh();
+      } else if (result.failedCount > 0 || result.remainingCount > 0) {
+        toast.warning(
+          result.results.find((r) => !r.success)?.message ||
+            "Antrean belum bisa dikirim. Pastikan koneksi internet stabil.",
+        );
+      } else {
+        toast.info("Tidak ada laporan yang menunggu antrean.");
+      }
+    } finally {
+      setIsFlushingQueue(false);
+    }
+  };
+
+  const openMediaLightbox = (url: string, title: string) => {
+    const isPdf = /\.pdf(?:[?#]|$)/i.test(url);
+    setPreviewMedia({
+      url: withLocalPhotoPreview(url),
+      title,
+      kind: isPdf ? "document" : "image",
+    });
+  };
+
   const handleStageChange = async (newKey: "tender" | "perencanaan" | "berjalan" | "hampir_selesai" | "selesai" | "ditunda") => {
+    const previousKey = currentKanbanKey;
     setCurrentKanbanKey(newKey);
     setIsUpdatingStatus(true);
     try {
       const res = await updateProjectKanbanStatus(project.id, newKey);
       if (res.success) {
+        toast.success("Tahap proyek diperbarui.");
         router.refresh();
       } else {
-        alert(res.message || "Gagal mengubah tahap proyek.");
+        setCurrentKanbanKey(previousKey);
+        toast.error(res.message || "Gagal mengubah tahap proyek.");
       }
     } finally {
       setIsUpdatingStatus(false);
     }
-  };
-
-  const handleTaskDrop = async (
-    targetCol: "belum_mulai" | "berjalan" | "selesai",
-    taskIdFromDrop?: string,
-  ) => {
-    const taskId = taskIdFromDrop || draggedTaskId;
-    if (!taskId) return;
-    const task = localWorkPoints.find((wp) => wp.id === taskId);
-    if (!task) return;
-
-    const currentProgress = task.progress ?? 0;
-    let nextProgress = 0;
-    if (targetCol === "belum_mulai") nextProgress = 0;
-    else if (targetCol === "berjalan")
-      nextProgress = currentProgress > 0 && currentProgress < 100 ? currentProgress : 50;
-    else if (targetCol === "selesai") nextProgress = 100;
-    if (nextProgress === currentProgress) {
-      setDraggedTaskId(null);
-      setTaskDragOverColumn(null);
-      return;
-    }
-
-    // Optimistic update
-    setLocalWorkPoints((prev) =>
-      prev.map((wp) => (wp.id === taskId ? { ...wp, progress: nextProgress } : wp))
-    );
-    setDraggedTaskId(null);
-    setTaskDragOverColumn(null);
-
-    // Simpan sebagai opname harian agar tabel RAB & Kurva S ikut terkorelasi
-    const targetVolume = task.proposedVolume ? Math.max(0, Number(task.proposedVolume)) || 1 : 1;
-    const today = new Date();
-    const reportDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    const res = await recordProjectOpname(project.id, {
-      reportDate,
-      isAdditional: false,
-      periodType: "DAILY",
-      notes: `Status ${task.title} dipindah lewat papan (${nextProgress}%)`,
-      items: [{ workPointId: task.id, volume: Math.round(targetVolume * (nextProgress / 100) * 1000) / 1000 }],
-    });
-    if (res.success) {
-      router.refresh();
-    } else {
-      setLocalWorkPoints(project.workPoints);
-    }
-  };
-
-  const handleApplyRabAsContract = () => {
-    startTransition(async () => {
-      const res = await applyRabAsContract(project.id);
-      if (res.success) router.refresh();
-    });
-  };
-
-  const handleApplyRapAsBudget = () => {
-    startTransition(async () => {
-      const res = await applyRapAsBudget(project.id, totalRapNumber);
-      if (res.success) router.refresh();
-    });
   };
 
   // S-Curve & Progress calculations
@@ -621,6 +639,8 @@ export default function ProjectDetailView({
 
     const opnameList: OpnameWorkPointItem[] = points.map((p) => {
       const volNum = p.proposedVolume ? Math.max(0, Number(p.proposedVolume)) : 1;
+      const itemTotal =
+        p.totalPrice ?? Number(p.approvedTotalWage ?? p.proposedTotalWage ?? 0);
       return {
         id: p.id,
         code: p.title.split(" ")[0]?.includes(".") ? p.title.split(" ")[0] : "",
@@ -630,6 +650,7 @@ export default function ProjectDetailView({
         unit: p.proposedUnit || "paket",
         completedVolume: p.completedVolume ?? 0,
         progress: p.progress ?? 0,
+        totalPrice: itemTotal,
       };
     });
 
@@ -646,21 +667,6 @@ export default function ProjectDetailView({
     hasSavedRapPlans,
     savedRapTotal,
   ]);
-
-  const scheduleItems: ProgressScheduleItem[] = useMemo(
-    () =>
-      localWorkPoints.map((p) => ({
-        id: p.id,
-        title: p.title,
-        section: p.location || "Pekerjaan Utama",
-        plannedStartDate: p.plannedStartDate,
-        targetDate: p.targetDate,
-        targetVolume: p.proposedVolume ? Math.max(0, Number(p.proposedVolume)) || 1 : 1,
-        unit: p.proposedUnit || "paket",
-        progress: p.progress ?? 0,
-      })),
-    [localWorkPoints],
-  );
 
   const profitAmount = totalRabNumber - totalRapNumber;
   const profitPercent = totalRabNumber > 0 ? ((profitAmount / totalRabNumber) * 100).toFixed(1) : "0.0";
@@ -791,7 +797,10 @@ export default function ProjectDetailView({
     startTransition(async () => {
       const res = await duplicateProject(project.id);
       if (res.success && res.newProjectId) {
+        toast.success("Proyek berhasil diduplikasi.");
         router.push("/apps/projects/" + res.newProjectId);
+      } else {
+        toast.error(res.message || "Gagal menduplikasi proyek.");
       }
     });
   };
@@ -800,7 +809,10 @@ export default function ProjectDetailView({
     startTransition(async () => {
       const res = await deleteProject(project.id);
       if (res.success) {
+        toast.success("Proyek berhasil dihapus.");
         router.push("/apps/projects");
+      } else {
+        toast.error(res.message || "Gagal menghapus proyek.");
       }
     });
   };
@@ -832,94 +844,75 @@ export default function ProjectDetailView({
   }
 
   return (
-    <div className="min-h-screen space-y-6 pb-20">
-      {/* 1. Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href="/apps/projects" className="transition hover:text-foreground">
-          Proyek
-        </Link>
-        <ChevronRight className="size-3.5" />
-        <span className="font-semibold text-foreground">Detail Proyek</span>
-      </nav>
-
-      {/* 2. Onboarding / Status Banner (dismissable) */}
-      {showBanner && (
-        <div className="relative flex flex-col items-start justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-xs sm:flex-row sm:items-center">
-          <div className="space-y-0.5">
-            <span className="text-[11px] font-semibold text-muted-foreground">
-              {project.workPoints.length === 0 ? "Langkah 2 dari 3" : "Langkah 3 dari 3"}
-            </span>
-            <p className="text-sm font-bold text-foreground">
-              {project.workPoints.length === 0 ? "Isi RAB" : "Lihat jadwal (Gantt)"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {project.workPoints.length === 0
-                ? "Tempel tabel RAB dari Excel atau isi itemnya. Progres dan biaya dihitung dari RAB."
-                : "Ketuk Tambah task untuk menyusun jadwal pekerjaan. Belum ditagih dan portal klien ada di halaman proyek yang sama."}
-            </p>
-          </div>
-          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-            {(project.workPoints.length > 0 || canEditProjectRab) && (
-              <ProjectActionButton
-                type="button"
-                label={project.workPoints.length === 0 ? "Isi RAB" : "Buka jadwal"}
-                icon={project.workPoints.length === 0 ? <ClipboardList /> : <CalendarDays />}
-                size="sm"
-                onClick={() =>
-                  project.workPoints.length === 0
-                    ? setIsEditRabModalOpen(true)
-                    : setActiveTab("papan")
-                }
-                className="h-8 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
-              />
-            )}
-            <button
-              type="button"
-              aria-label="Tutup panduan"
-              title="Tutup panduan"
-              onClick={() => setShowBanner(false)}
-              className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Header: Badges & Action Buttons */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          {/* Status Badges Row with Interactive Kanban Stage Selector */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <div className="relative inline-flex items-center">
-              <select
+    <div className="min-h-screen space-y-5 pb-20">
+      {/* 1. Header Proyek */}
+      <PageHeader
+        title={`Proyek: ${project.title}`}
+        breadcrumbs={[
+          { label: "Proyek", href: "/apps/projects" },
+          { label: "Detail Proyek" },
+        ]}
+        badge={
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageProject ? (
+              <Select
                 value={currentKanbanKey}
                 disabled={isUpdatingStatus}
-                onChange={(e) => handleStageChange(e.target.value as any)}
-                className={`rounded-md border px-2.5 py-1 text-xs font-bold transition cursor-pointer appearance-none pr-6 shadow-2xs ${
-                  KANBAN_STAGES.find((s) => s.key === currentKanbanKey)?.badgeClass || "bg-card text-foreground"
-                }`}
-                title="Pilih tahap proyek (Tersinkron langsung dengan Papan Proyek)"
+                onValueChange={(value) =>
+                  handleStageChange(
+                    value as
+                      | "tender"
+                      | "perencanaan"
+                      | "berjalan"
+                      | "hampir_selesai"
+                      | "selesai"
+                      | "ditunda",
+                  )
+                }
               >
-                {KANBAN_STAGES.map((st) => (
-                  <option key={st.key} value={st.key} className="bg-popover text-foreground">
-                    Tahap: {st.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-1.5 size-3.5 text-muted-foreground" />
-            </div>
+                <SelectTrigger
+                  aria-label="Pilih tahap proyek"
+                  className={`h-8 w-auto min-w-44 font-semibold ${
+                    KANBAN_STAGES.find((s) => s.key === currentKanbanKey)
+                      ?.badgeClass || "bg-card text-foreground"
+                  }`}
+                >
+                  <SelectValue placeholder="Pilih tahap" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KANBAN_STAGES.map((st) => (
+                    <SelectItem key={st.key} value={st.key}>
+                      Tahap: {st.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge
+                variant="outline"
+                className={
+                  KANBAN_STAGES.find((s) => s.key === currentKanbanKey)
+                    ?.badgeClass || "bg-card text-foreground"
+                }
+              >
+                Tahap:{" "}
+                {KANBAN_STAGES.find((s) => s.key === currentKanbanKey)?.label ||
+                  "Berjalan"}
+              </Badge>
+            )}
 
             <Badge
               variant="outline"
               className={
                 deviation < 0
-                  ? "bg-rose-500/10 text-rose-600 border-rose-500/30 font-semibold"
-                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-semibold"
+                  ? "border-rose-500/30 bg-rose-500/10 font-semibold text-rose-600 dark:text-rose-400"
+                  : "border-emerald-500/30 bg-emerald-500/10 font-semibold text-emerald-600 dark:text-emerald-400"
               }
             >
               {deviation < 0
-                ? "Tertinggal " + Math.abs(deviation).toLocaleString("id-ID") + "% dari rencana"
+                ? "Tertinggal " +
+                  Math.abs(deviation).toLocaleString("id-ID") +
+                  "% dari rencana"
                 : "Sesuai rencana"}
             </Badge>
 
@@ -927,132 +920,211 @@ export default function ProjectDetailView({
               {healthStatus}
             </Badge>
 
-            <span className="font-mono text-xs font-semibold text-muted-foreground">
+            <span className="type-p3 font-mono font-semibold text-muted-foreground">
               {project.code}
             </span>
           </div>
-
-          {/* Project Title */}
-          <h1 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-            Proyek: {project.title}
-          </h1>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="ml-auto flex items-center justify-end">
-          <div className="sm:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+        }
+        actions={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canSubmitDailyProgress &&
+              isRunningProjectStatus(project.status) && (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Aksi proyek"
-                  title="Aksi proyek"
-                  className="h-11 w-11"
+                  size="sm"
+                  onClick={() => setIsDailyProgressOpen(true)}
+                  className="gap-1.5 font-semibold"
                 >
-                  <Ellipsis className="size-5" />
+                  <Camera className="size-4" aria-hidden="true" />
+                  <span>Isi Progres</span>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-52">
-                <DropdownMenuItem onSelect={() => setIsEditModalOpen(true)}>
-                  <Pencil />
-                  Ubah proyek
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsClientPortalOpen(true)}>
-                  <Globe />
-                  Portal klien
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)}>
-                  <LayoutTemplate />
-                  Pasang template
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)}>
-                  <BookmarkCheck />
-                  Simpan sebagai template
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={handleDuplicate} disabled={isPending}>
-                  <Copy />
-                  Duplikat proyek
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => setIsDeleteModalOpen(true)}
-                  disabled={isPending}
-                  className="text-rose-600 focus:bg-rose-50 focus:text-rose-700 dark:focus:bg-rose-950/30"
-                >
-                  <Trash2 />
-                  Hapus proyek
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+
+            {canManageProject && (
+              <>
+                <div className="sm:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Aksi proyek"
+                        title="Aksi proyek"
+                        className="size-11"
+                      >
+                        <Ellipsis className="size-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-52">
+                      <DropdownMenuItem onSelect={() => setIsEditModalOpen(true)}>
+                        <Pencil />
+                        Ubah Proyek
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setIsClientPortalOpen(true)}>
+                        <Globe />
+                        Portal Klien
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)}>
+                        <LayoutTemplate />
+                        Simpan Template
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleDuplicate} disabled={isPending}>
+                        <Copy />
+                        Duplikat Proyek
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setIsDeleteModalOpen(true)}
+                        disabled={isPending}
+                        className="text-rose-600 focus:bg-rose-50 focus:text-rose-700 dark:focus:bg-rose-950/30"
+                      >
+                        <Trash2 />
+                        Hapus Proyek
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+                  <ProjectActionButton
+                    type="button"
+                    label="Ubah Proyek"
+                    icon={<Pencil className="size-3.5" />}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditModalOpen(true)}
+                  />
+                  <ProjectActionButton
+                    type="button"
+                    label="Portal Klien"
+                    icon={<Globe className="size-3.5 text-muted-foreground" />}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsClientPortalOpen(true)}
+                  />
+                  <ProjectActionButton
+                    type="button"
+                    label="Simpan Template"
+                    icon={<BookmarkCheck className="size-3.5 text-muted-foreground" />}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsTemplateModalOpen(true)}
+                  />
+                  <ProjectActionButton
+                    type="button"
+                    label="Duplikat"
+                    icon={<Copy className="size-3.5 text-muted-foreground" />}
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDuplicate}
+                    disabled={isPending}
+                  />
+                  <ProjectActionButton
+                    type="button"
+                    label="Hapus"
+                    icon={<Trash2 className="size-3.5" />}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsDeleteModalOpen(true)}
+                    disabled={isPending}
+                    className="border-rose-500/30 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30"
+                  />
+                </div>
+              </>
+            )}
           </div>
+        }
+      />
 
-          <div className="hidden flex-wrap justify-end gap-2 sm:flex">
-            <ProjectActionButton
-              type="button"
-              label="Ubah proyek"
-              icon={<Pencil className="size-3.5" />}
-              size="sm"
-              onClick={() => setIsEditModalOpen(true)}
-              className="h-8 gap-1.5 bg-foreground px-3 text-xs font-semibold text-background hover:bg-foreground/90"
-            />
+      {/* Offline Outbox Sync Banner */}
+      {offlineQueueCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            <div>
+              <p className="type-p2 font-semibold text-foreground">
+                Menunggu Sinyal ({offlineQueueCount} laporan)
+              </p>
+              <p className="type-p3 text-muted-foreground">
+                Laporan tersimpan aman di perangkat dan akan otomatis terkirim saat sinyal stabil.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleFlushOfflineQueue}
+            disabled={isFlushingQueue}
+            className="gap-1.5"
+          >
+            {isFlushingQueue ? (
+              <RefreshCw className="size-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Send className="size-3.5" aria-hidden="true" />
+            )}
+            <span>Kirim Antrean Sekarang</span>
+          </Button>
+        </div>
+      )}
 
-            <ProjectActionButton
+      {/* 2. Onboarding / Status Banner (dismissable) */}
+      {showBanner && (project.workPoints.length > 0 || canEditProjectRab) && (
+        <div className="relative flex flex-col items-start justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-2xs sm:flex-row sm:items-center">
+          <div className="space-y-0.5">
+            <span className="type-p3 font-semibold text-muted-foreground">
+              {project.workPoints.length === 0 ? "Langkah 2 dari 3" : "Langkah 3 dari 3"}
+            </span>
+            <p className="type-h3 text-foreground">
+              {project.workPoints.length === 0
+                ? "Isi Item Pekerjaan"
+                : "Pantau Jadwal & Laporan"}
+            </p>
+            <p className="type-p3 text-muted-foreground">
+              {project.workPoints.length === 0
+                ? "Tempel tabel RAB dari Excel atau isi itemnya. Progres dihitung dari volume pekerjaan."
+                : "Buka Papan & Jadwal untuk memperbarui target pekerjaan atau kirim laporan harian langsung."}
+            </p>
+          </div>
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+            {project.workPoints.length === 0 && canEditProjectRab ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setIsEditRabModalOpen(true)}
+                className="gap-1.5"
+              >
+                <ClipboardList className="size-4" aria-hidden="true" />
+                <span>Isi RAB</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("papan")}
+                className="gap-1.5"
+              >
+                <CalendarDays className="size-4" aria-hidden="true" />
+                <span>Buka Jadwal</span>
+              </Button>
+            )}
+            <Button
               type="button"
-              label="Portal klien"
-              icon={<Globe className="size-3.5 text-muted-foreground" />}
-              variant="outline"
-              size="sm"
-              onClick={() => setIsClientPortalOpen(true)}
-              className="h-8 gap-1.5 px-3 text-xs"
-            />
-
-            <ProjectActionButton
-              type="button"
-              label="Pasang template"
-              icon={<LayoutTemplate className="size-3.5 text-muted-foreground" />}
-              variant="outline"
-              size="sm"
-              onClick={() => setIsTemplateModalOpen(true)}
-              className="h-8 gap-1.5 px-3 text-xs"
-            />
-
-            <ProjectActionButton
-              type="button"
-              label="Simpan sebagai template"
-              icon={<BookmarkCheck className="size-3.5 text-muted-foreground" />}
-              variant="outline"
-              size="sm"
-              onClick={() => setIsTemplateModalOpen(true)}
-              className="h-8 gap-1.5 px-3 text-xs"
-            />
-
-            <ProjectActionButton
-              type="button"
-              label="Duplikat proyek"
-              icon={<Copy className="size-3.5 text-muted-foreground" />}
-              variant="outline"
-              size="sm"
-              onClick={handleDuplicate}
-              disabled={isPending}
-              className="h-8 gap-1.5 px-3 text-xs"
-            />
-
-            <ProjectActionButton
-              type="button"
-              label="Hapus proyek"
-              icon={<Trash2 className="size-3.5" />}
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDeleteModalOpen(true)}
-              disabled={isPending}
-              className="h-8 gap-1.5 border-rose-500/30 px-3 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30"
-            />
+              variant="ghost"
+              size="icon"
+              aria-label="Tutup panduan"
+              title="Tutup panduan"
+              onClick={() => setShowBanner(false)}
+              className="size-11 shrink-0 sm:size-8"
+            >
+              <X className="size-4" />
+            </Button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* 4. 6-Column Metadata Cards */}
+      {/* 3. Metadata & KPI Cards (RBAC: Financial cards hidden for FIELD_TEAM) */}
       {(() => {
         const totalRequestedFunds = (project.wageTicketPayments || []).reduce(
           (sum, p) => sum + (p.status !== "REJECTED" ? Number(p.amount || 0) : 0),
@@ -1099,78 +1171,88 @@ export default function ProjectDetailView({
           Number(project.pagu) > 0 ? Number(project.pagu) : totalRabNumber;
 
         return (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div
+            className={
+              canViewFinancials
+                ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                : "grid grid-cols-1 gap-3 sm:grid-cols-3"
+            }
+          >
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="type-p3 flex items-center gap-1.5 text-muted-foreground">
                 <MapPin className="size-3.5 shrink-0" />
                 <span>Alamat proyek</span>
               </div>
-              <p className="mt-1 line-clamp-1 text-xs font-bold text-foreground">
+              <p className="type-p2 mt-1 line-clamp-1 font-bold text-foreground">
                 {project.address || project.location || "Belum diisi"}
               </p>
             </div>
 
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="type-p3 flex items-center gap-1.5 text-muted-foreground">
                 <User className="size-3.5 shrink-0" />
                 <span>Manajer / PM</span>
               </div>
-              <p className="mt-1 line-clamp-1 text-xs font-bold text-foreground">
+              <p className="type-p2 mt-1 line-clamp-1 font-bold text-foreground">
                 {project.fieldPicName || "Belum ditentukan"}
               </p>
             </div>
 
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="type-p3 flex items-center gap-1.5 text-muted-foreground">
                 <Calendar className="size-3.5 shrink-0" />
                 <span>Jadwal Proyek</span>
               </div>
-              <p className="mt-1 text-xs font-bold text-foreground">
+              <p className="type-p2 mt-1 font-bold text-foreground">
                 {formatDateIndo(project.startDate)} – {formatDateIndo(project.endDate)}
               </p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Coins className="size-3.5 shrink-0" />
-                <span>Nilai kontrak (Pagu)</span>
-              </div>
-              <p className="mt-1 text-xs font-bold text-foreground">
-                {currency(contractValueDisplay)}
-              </p>
-              {totalRabNumber > 0 &&
-                Math.abs(totalRabNumber - contractValueDisplay) > 1 && (
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                    Total RAB: {currency(totalRabNumber)}
+            {canViewFinancials && (
+              <>
+                <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">
+                  <div className="type-p3 flex items-center gap-1.5 text-muted-foreground">
+                    <Coins className="size-3.5 shrink-0" />
+                    <span>Nilai kontrak (Pagu)</span>
+                  </div>
+                  <p className="type-p2 mt-1 font-bold tabular-nums text-foreground">
+                    {currency(contractValueDisplay)}
                   </p>
-                )}
-            </div>
+                  {totalRabNumber > 0 &&
+                    Math.abs(totalRabNumber - contractValueDisplay) > 1 && (
+                      <p className="type-p3 mt-0.5 tabular-nums text-muted-foreground">
+                        Total RAB: {currency(totalRabNumber)}
+                      </p>
+                    )}
+                </div>
 
-            <div className="rounded-xl border border-emerald-500/30 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <WalletCards className="size-3.5 shrink-0 text-emerald-500" />
-                <span className="truncate">Pengeluaran Tiket (Cair)</span>
-              </div>
-              <p className="mt-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                {currency(effectiveRealized)}
-              </p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Total pengajuan: {currency(effectiveRequested)}
-              </p>
-            </div>
+                <div className="rounded-xl border border-emerald-500/30 bg-card p-3.5 shadow-2xs">
+                  <div className="type-p3 flex items-center gap-1.5 text-muted-foreground">
+                    <WalletCards className="size-3.5 shrink-0 text-emerald-500" />
+                    <span className="truncate">Pengeluaran Tiket (Cair)</span>
+                  </div>
+                  <p className="type-p2 mt-1 font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {currency(effectiveRealized)}
+                  </p>
+                  <p className="type-p3 mt-0.5 tabular-nums text-muted-foreground">
+                    Total pengajuan: {currency(effectiveRequested)}
+                  </p>
+                </div>
 
-            <div className="rounded-xl border border-amber-500/30 bg-card p-3.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <HardHat className="size-3.5 shrink-0 text-amber-500" />
-                <span className="truncate">Upah Tukang (Tiket)</span>
-              </div>
-              <p className="mt-1 text-xs font-bold text-amber-600 dark:text-amber-400">
-                {currency(effectiveLaborRealized)}
-              </p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Pengajuan upah: {currency(effectiveLaborRequested)}
-              </p>
-            </div>
+                <div className="rounded-xl border border-amber-500/30 bg-card p-3.5 shadow-2xs">
+                  <div className="type-p3 flex items-center gap-1.5 text-muted-foreground">
+                    <HardHat className="size-3.5 shrink-0 text-amber-500" />
+                    <span className="truncate">Upah Tukang (Tiket)</span>
+                  </div>
+                  <p className="type-p2 mt-1 font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                    {currency(effectiveLaborRealized)}
+                  </p>
+                  <p className="type-p3 mt-0.5 tabular-nums text-muted-foreground">
+                    Pengajuan upah: {currency(effectiveLaborRequested)}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         );
       })()}
@@ -1178,28 +1260,32 @@ export default function ProjectDetailView({
       {/* 5. Main Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border/80 bg-muted/40 p-1">
-          <TabsTrigger value="ringkasan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="ringkasan" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
             Ringkasan
           </TabsTrigger>
-          <TabsTrigger value="papan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="papan" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
             Papan &amp; Jadwal
           </TabsTrigger>
-          <TabsTrigger value="rab" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
-            RAB &amp; biaya
+          <TabsTrigger value="rab" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
+            {canViewFinancials ? "RAB & biaya" : "Titik Kerja"}
           </TabsTrigger>
-          <TabsTrigger value="rekap-dana" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
-            Rekap dana
-          </TabsTrigger>
-          <TabsTrigger value="tagihan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
-            Tagihan
-          </TabsTrigger>
-          <TabsTrigger value="lapangan" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
+          {canViewFinancials && (
+            <TabsTrigger value="rekap-dana" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
+              Rekap dana
+            </TabsTrigger>
+          )}
+          {canViewFinancials && (
+            <TabsTrigger value="tagihan" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
+              Tagihan
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="lapangan" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
             Lapangan
           </TabsTrigger>
-          <TabsTrigger value="tim" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="tim" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
             Tim &amp; lokasi
           </TabsTrigger>
-          <TabsTrigger value="dokumen" className="shrink-0 rounded-lg px-4 py-2 text-xs font-semibold">
+          <TabsTrigger value="dokumen" className="type-p3 shrink-0 rounded-lg px-4 py-2 font-semibold">
             Dokumen
           </TabsTrigger>
         </TabsList>
@@ -1209,71 +1295,108 @@ export default function ProjectDetailView({
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="border-border/80 shadow-2xs lg:col-span-1">
               <CardHeader>
-                <CardTitle className="text-base font-bold">Aktivitas &amp; Status Lapangan</CardTitle>
-                <CardDescription className="text-xs">
+                <CardTitle className="type-h3">Aktivitas &amp; Status Lapangan</CardTitle>
+                <CardDescription className="type-p3">
                   Kondisi lapangan, progres fisik, dan aktivitas proyek saat ini.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-xl border border-border/70 bg-muted/15 p-4">
-                  <span className="text-xs font-medium text-muted-foreground">Laporan terakhir</span>
+                  <span className="type-p3 font-medium text-muted-foreground">Laporan terakhir</span>
                   {latestReport ? (
                     <div className="mt-2 space-y-2">
-                      <p className="text-2xl font-black text-foreground">
+                      <p className="type-kpi font-bold text-foreground">
                         {formatDateIndo(latestReport.reportDate)}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="type-p3 text-muted-foreground">
                         oleh <strong className="text-foreground">{project.fieldPicName || "Field Team"}</strong> · {latestReport.workersCount} pekerja
                       </p>
-                      <p className="text-xs font-medium text-foreground">
+                      <p className="type-p3 font-medium tabular-nums text-foreground">
                         Akumulasi progres proyek: {latestReport.progress ?? project.progress}%
                       </p>
                       {latestReport.photoUrls && latestReport.photoUrls.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {latestReport.photoUrls.map((photo, i) => (
-                            <a
+                            <button
                               key={i}
-                              href={photo}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={() =>
+                                openMediaLightbox(
+                                  photo,
+                                  `Foto progres · ${formatDateIndo(latestReport.reportDate)}`,
+                                )
+                              }
+                              aria-label={`Lihat foto progres ${i + 1}`}
                               className="group relative block size-16 overflow-hidden rounded-lg border border-border"
                             >
-                              <Image
-                                src={photo}
-                                alt="Progres foto"
-                                width={64}
-                                height={64}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={withLocalPhotoPreview(photo)}
+                                alt={`Progres foto ${i + 1}`}
                                 className="size-full object-cover transition group-hover:scale-105"
                               />
-                            </a>
+                            </button>
                           ))}
                         </div>
                       )}
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        {canSubmitDailyProgress &&
+                          isRunningProjectStatus(project.status) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setIsDailyProgressOpen(true)}
+                              className="gap-1.5"
+                            >
+                              <Camera className="size-3.5" aria-hidden="true" />
+                              <span>Isi Progres</span>
+                            </Button>
+                          )}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setActiveTab("lapangan")}
+                        >
+                          Buka Lapangan
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-2 space-y-2">
-                      <p className="text-lg font-bold text-foreground">
+                      <p className="type-h3 text-foreground">
                         {project.progress > 0
                           ? `Progres Opname ${project.progress.toLocaleString("id-ID")}%`
                           : "Belum ada laporan harian"}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="type-p3 text-muted-foreground">
                         PIC Lapangan:{" "}
                         <strong className="text-foreground">
                           {project.fieldPicName || "Belum ditentukan"}
                         </strong>{" "}
-                        · {project.workPoints.length} item RAB
+                        · {project.workPoints.length} item pekerjaan
                       </p>
-                      <div className="pt-1 flex flex-wrap gap-2">
-                        {project.workPoints.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {canSubmitDailyProgress &&
+                          isRunningProjectStatus(project.status) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setIsDailyProgressOpen(true)}
+                              className="gap-1.5"
+                            >
+                              <Camera className="size-3.5" aria-hidden="true" />
+                              <span>Isi Progres</span>
+                            </Button>
+                          )}
+                        {canManageProject && project.workPoints.length > 0 && (
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
                             onClick={() => setIsOpnameModalOpen(true)}
-                            className="h-7 text-[11px] font-semibold"
                           >
-                            Catat Progres Opname
+                            Catat Opname
                           </Button>
                         )}
                         <Button
@@ -1281,9 +1404,8 @@ export default function ProjectDetailView({
                           size="sm"
                           variant="ghost"
                           onClick={() => setActiveTab("lapangan")}
-                          className="h-7 text-[11px]"
                         >
-                          Buka Tab Lapangan
+                          Buka Lapangan
                         </Button>
                       </div>
                     </div>
@@ -1292,20 +1414,20 @@ export default function ProjectDetailView({
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
-                    <span className="text-[11px] text-muted-foreground">Progres Aktual</span>
-                    <p className="mt-0.5 text-lg font-extrabold text-orange-500">
+                    <span className="type-p3 text-muted-foreground">Progres Aktual</span>
+                    <p className="type-kpi mt-0.5 font-extrabold tabular-nums text-orange-500">
                       {project.progress.toLocaleString("id-ID")}%
                     </p>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="type-p3 tabular-nums text-muted-foreground">
                       Rencana hari ini: {project.startDate ? `${plannedToday.toLocaleString("id-ID")}%` : "—"}
                     </span>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-muted/10 p-3">
-                    <span className="text-[11px] text-muted-foreground">Kelompok Tani</span>
-                    <p className="mt-0.5 line-clamp-1 text-sm font-bold text-foreground">
+                    <span className="type-p3 text-muted-foreground">Kelompok Tani</span>
+                    <p className="type-p2 mt-0.5 line-clamp-1 font-bold text-foreground">
                       {project.kelompokTani || project.clientName || "—"}
                     </p>
-                    <span className="line-clamp-1 text-[10px] text-muted-foreground">
+                    <span className="type-p3 line-clamp-1 text-muted-foreground">
                       {project.jenisPekerjaan || "Pekerjaan Konstruksi"}
                     </span>
                   </div>
@@ -1314,34 +1436,34 @@ export default function ProjectDetailView({
             </Card>
 
             <Card className="border-border/80 shadow-2xs lg:col-span-2">
-              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between pb-2">
+              <CardHeader className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <CardTitle className="text-base font-bold">
+                  <CardTitle className="type-h3">
                     Kurva S — Target Rencana vs Realisasi Aktual
                   </CardTitle>
-                  <CardDescription className="text-xs">
-                    Kurva rencana dihitung dari jadwal proyek; kurva aktual ditarik otomatis dari opname RAB &amp; laporan harian.
+                  <CardDescription className="type-p3">
+                    Kurva rencana dihitung dari jadwal proyek; kurva aktual ditarik otomatis dari opname &amp; laporan harian.
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setActiveTab("rab")}
-                    className="h-8 text-xs font-semibold"
                   >
-                    Buka RAB &amp; Progres
+                    {canViewFinancials ? "Buka RAB" : "Titik Kerja"}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setActiveTab("rekap-dana")}
-                    className="h-8 text-xs font-semibold"
-                  >
-                    Buka Rekap Dana
-                  </Button>
+                  {canViewFinancials && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveTab("rekap-dana")}
+                    >
+                      Rekap Dana
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -1352,14 +1474,14 @@ export default function ProjectDetailView({
                     type="line"
                     height={230}
                   />
-                  <div className="mt-1 flex items-center justify-center gap-6 text-xs font-medium text-muted-foreground">
+                  <div className="type-p3 mt-1 flex items-center justify-center gap-6 font-medium text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="size-2 rounded-full bg-orange-500" />
-                      <span>Aktual ({project.progress.toLocaleString("id-ID")}%)</span>
+                      <span className="tabular-nums">Aktual ({project.progress.toLocaleString("id-ID")}%)</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <span className="inline-block h-0.5 w-3.5 border-t-2 border-dashed border-muted-foreground" />
-                      <span>Rencana ({project.startDate ? `${plannedToday.toLocaleString("id-ID")}%` : "—"})</span>
+                      <span className="tabular-nums">Rencana ({project.startDate ? `${plannedToday.toLocaleString("id-ID")}%` : "—"})</span>
                     </span>
                   </div>
                 </div>
@@ -1369,57 +1491,71 @@ export default function ProjectDetailView({
 
           {/* Pintasan / Quick actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-sm font-bold text-foreground">Pintasan</h3>
-            <div className="ml-auto grid w-fit grid-cols-3 justify-items-end gap-2 sm:flex sm:flex-wrap sm:justify-end">
-              <ProjectActionButton
+            <h3 className="type-h3 text-foreground">Pintasan</h3>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {canSubmitDailyProgress &&
+                isRunningProjectStatus(project.status) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsDailyProgressOpen(true)}
+                    className="gap-1.5"
+                  >
+                    <Camera className="size-3.5" aria-hidden="true" />
+                    <span>Isi Progres</span>
+                  </Button>
+                )}
+
+              <Button
                 type="button"
-                label="Laporan harian"
-                icon={<ClipboardList className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTab("lapangan")}
-                className="h-8 gap-1.5 text-xs"
-              />
+                className="gap-1.5"
+              >
+                <ClipboardList className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                <span>Laporan Harian</span>
+              </Button>
 
-              <ProjectActionButton
+              <Button
                 type="button"
-                label="Papan & Jadwal"
-                icon={<CalendarDays className="size-3.5 text-muted-foreground" />}
                 variant="outline"
                 size="sm"
                 onClick={() => setActiveTab("papan")}
-                className="h-8 gap-1.5 text-xs font-semibold"
-              />
-
-              <ProjectActionButton
-                type="button"
-                label="Quotation & Invoice"
-                icon={<FileText className="size-3.5 text-muted-foreground" />}
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveTab("tagihan")}
-                className="h-8 gap-1.5 text-xs font-semibold"
-              />
-
-              <Link
-                href="/apps/logistics?tab=warehouse"
-                aria-label="Stok"
-                title="Stok"
-                className="inline-flex size-11 items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted sm:h-8 sm:w-auto sm:min-w-0 sm:px-3"
+                className="gap-1.5"
               >
-                <Package className="size-3.5 text-muted-foreground" />
-                <span className="sr-only sm:not-sr-only">Stok</span>
-              </Link>
+                <CalendarDays className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                <span>Papan &amp; Jadwal</span>
+              </Button>
 
-              <Link
-                href="/apps/orders/new?type=po"
-                aria-label="Buat PO"
-                title="Buat PO"
-                className="inline-flex size-11 items-center justify-center gap-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-muted sm:h-8 sm:w-auto sm:min-w-0 sm:px-3"
-              >
-                <ShoppingCart className="size-3.5 text-muted-foreground" />
-                <span className="sr-only sm:not-sr-only">Buat PO</span>
-              </Link>
+              {canViewFinancials && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActiveTab("tagihan")}
+                  className="gap-1.5"
+                >
+                  <FileText className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                  <span>Tagihan</span>
+                </Button>
+              )}
+
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
+                <Link href="/apps/logistics?tab=warehouse">
+                  <Package className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                  <span>Stok</span>
+                </Link>
+              </Button>
+
+              {canViewFinancials && (
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link href="/apps/orders/new?type=po">
+                    <ShoppingCart className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                    <span>Buat PO</span>
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </TabsContent>
@@ -1429,11 +1565,13 @@ export default function ProjectDetailView({
           <Card className="border-border/80 shadow-2xs">
             <CardHeader className="flex flex-col gap-4 border-b border-border/60 pb-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
-                <CardTitle className="text-xl font-bold tracking-tight text-foreground">
-                  RAB &amp; progres
+                <CardTitle className="type-h3 text-foreground">
+                  {canViewFinancials ? "RAB & progres" : "Titik Kerja & Progres"}
                 </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Volume dan harga tiap item pekerjaan. Progres dihitung dari volume terpasang (opname), dibobot nilai RAB.
+                <CardDescription className="type-p3 text-muted-foreground">
+                  {canViewFinancials
+                    ? "Volume dan harga tiap item pekerjaan. Progres dihitung dari volume terpasang (opname), dibobot nilai RAB."
+                    : "Daftar target volume dan capaian terpasang tiap item pekerjaan lapangan."}
                 </CardDescription>
               </div>
 
@@ -1445,9 +1583,9 @@ export default function ProjectDetailView({
                         type="button"
                         variant="outline"
                         size="sm"
-                        aria-label="Aksi RAB dan progres"
-                        title="Aksi RAB dan progres"
-                        className="h-11 min-w-11 gap-2 rounded-lg px-0 sm:px-3"
+                        aria-label="Aksi item pekerjaan"
+                        title="Aksi item pekerjaan"
+                        className="min-h-11 min-w-11 gap-2 sm:min-h-8 sm:min-w-0"
                       >
                         <Ellipsis className="size-4" />
                         <span className="sr-only sm:not-sr-only">Aksi</span>
@@ -1458,22 +1596,28 @@ export default function ProjectDetailView({
                         <RefreshCw />
                         Segarkan data
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
-                        <Printer />
-                        Cetak RAB
-                      </DropdownMenuItem>
+                      {canViewFinancials && (
+                        <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
+                          <Printer />
+                          Cetak RAB
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onSelect={() => setPrintDocView("progres")}>
                         <Printer />
                         Cetak progres
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={handleExportRab}>
-                        <Download />
-                        Ekspor
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setIsOpnameModalOpen(true)}>
-                        <ClipboardList />
-                        Catat progres
-                      </DropdownMenuItem>
+                      {canViewFinancials && (
+                        <DropdownMenuItem onSelect={handleExportRab}>
+                          <Download />
+                          Ekspor CSV
+                        </DropdownMenuItem>
+                      )}
+                      {canEditProjectRab && (
+                        <DropdownMenuItem onSelect={() => setIsOpnameModalOpen(true)}>
+                          <ClipboardList />
+                          Catat opname
+                        </DropdownMenuItem>
+                      )}
                       {canEditProjectRab && (
                         <DropdownMenuItem onSelect={() => setIsEditRabModalOpen(true)}>
                           <Pencil />
@@ -1488,94 +1632,98 @@ export default function ProjectDetailView({
 
             <CardContent className="space-y-6 pt-6">
               {project.workPoints.length === 0 ? (
-                /* Empty state when no workPoints yet in DB (Image 2) */
                 <div className="space-y-6">
-                  <div className="rounded-xl border border-dashed border-border/80 bg-muted/5 p-8 text-center space-y-3">
-                    <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-                      Belum ada RAB untuk proyek ini. Isi item pekerjaan dengan volume dan harga satuan, atau tempel langsung dari Excel. Setelah itu progres dicatat per item lewat opname.
-                    </p>
-                    {canEditProjectRab && (
-                      <ProjectActionButton
-                        type="button"
-                        label="Isi RAB"
-                        icon={<ClipboardList className="size-3.5" />}
-                        onClick={() => setIsEditRabModalOpen(true)}
-                        className="h-8 gap-1.5 text-xs bg-foreground text-background hover:bg-foreground/90 font-medium rounded-lg"
-                      />
-                    )}
-                  </div>
+                  <EmptyState
+                    icon={ClipboardList}
+                    title="Belum ada item pekerjaan"
+                    description={
+                      canEditProjectRab
+                        ? "Isi item pekerjaan dengan volume dan harga satuan, atau tempel langsung dari Excel."
+                        : "Belum ada daftar item pekerjaan pada proyek ini."
+                    }
+                    action={
+                      canEditProjectRab ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => setIsEditRabModalOpen(true)}
+                          className="gap-1.5"
+                        >
+                          <ClipboardList className="size-4" aria-hidden="true" />
+                          <span>Isi RAB</span>
+                        </Button>
+                      ) : undefined
+                    }
+                  />
 
                   {canAccessMaterialPlanning && (
-                    <div className="pt-4 border-t border-border/60">
-                      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                    <div className="border-t border-border/60 pt-4">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <h4 className="text-xs font-semibold text-foreground">Rencana material</h4>
-                          <p className="text-[11px] text-muted-foreground">
+                          <h4 className="type-p2 font-semibold text-foreground">Rencana material</h4>
+                          <p className="type-p3 text-muted-foreground">
                             Kebutuhan material dibanding pemakaian dari gudang. &quot;Seharusnya&quot; dihitung dari progres.
                           </p>
                         </div>
-                        <div className="ml-auto grid w-fit grid-cols-2 justify-items-end gap-2 sm:flex sm:justify-end">
+                        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                           <ProjectActionButton
                             type="button"
-                            label="Cetak rencana material"
+                            label="Cetak material"
                             icon={<Printer className="size-3.5 text-muted-foreground" />}
                             variant="outline"
                             size="sm"
                             onClick={() => window.print()}
-                            className="h-8 gap-1.5 text-xs rounded-lg"
                           />
                           <ProjectActionButton
                             type="button"
-                            label="Isi rencana material"
+                            label="Rencana material"
                             icon={<Plus className="size-3.5 text-primary" />}
                             variant="outline"
                             size="sm"
                             onClick={() => setIsMaterialModalOpen(true)}
-                            className="h-8 gap-1.5 text-xs rounded-lg"
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground py-2">Belum ada rencana material.</p>
+                      <p className="type-p3 py-2 text-muted-foreground">Belum ada rencana material.</p>
                     </div>
                   )}
                 </div>
               ) : (
-                /* When workPoints exist in DB (Image 5) */
                 <div className="space-y-6">
                   {/* 3 Metric Cards Row */}
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
-                      <span className="text-xs font-medium text-muted-foreground">Progres</span>
-                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                      <span className="type-p3 font-medium text-muted-foreground">Progres</span>
+                      <p className="type-kpi mt-1 font-bold tabular-nums text-foreground">
                         {project.progress.toLocaleString("id-ID")}%
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="type-p3 mt-1 text-muted-foreground">
                         {project.workPoints.some((p) => (p.completedVolume ?? 0) > 0)
-                          ? "Berdasarkan volume opname terpasang"
-                          : "Belum ada opname"}
+                          ? "Berdasarkan volume terpasang"
+                          : "Belum ada realisasi volume"}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
-                      <span className="text-xs font-medium text-muted-foreground">Rencana hari ini</span>
-                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                      <span className="type-p3 font-medium text-muted-foreground">Rencana hari ini</span>
+                      <p className="type-kpi mt-1 font-bold tabular-nums text-foreground">
                         {project.startDate ? `${plannedToday.toLocaleString("id-ID")}%` : "—"}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="type-p3 mt-1 text-muted-foreground">
                         {project.startDate
                           ? (deviation < 0
                               ? "Tertinggal " + Math.abs(deviation).toLocaleString("id-ID") + "% dari rencana"
                               : "Sesuai rencana")
-                          : "Isi tanggal rencana di RAB"}
+                          : "Isi tanggal rencana proyek"}
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
-                      <span className="text-xs font-medium text-muted-foreground">Perkiraan selesai</span>
-                      <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                      <span className="type-p3 font-medium text-muted-foreground">Perkiraan selesai</span>
+                      <p className="type-kpi mt-1 font-bold text-foreground">
                         {project.endDate ? formatDateIndo(project.endDate) : "—"}
                       </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                      <p className="type-p3 mt-1 text-muted-foreground">
                         {project.reports.length > 0
                           ? `${project.reports.length} laporan progres tercatat`
                           : "Belum ada laporan progres"}
@@ -1583,555 +1731,660 @@ export default function ProjectDetailView({
                     </div>
                   </div>
 
-              {/* Status Banner */}
-              <div className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-muted/20 px-4 py-3 text-xs text-foreground">
-                <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
-                <span>
-                  Progres {project.progress.toLocaleString("id-ID")}% {deviation < 0 ? "tertinggal " + Math.abs(deviation).toLocaleString("id-ID") + "%" : "sesuai"} dari rencana {plannedToday.toLocaleString("id-ID")}% hari ini.
-                </span>
-              </div>
-
-              {/* Kurva S Chart Section (Image 1) */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-bold text-foreground">Kurva S</h3>
-                <div className="rounded-xl border border-border/70 p-4">
-                  <Chart
-                    options={sCurveOptions}
-                    series={sCurveSeries}
-                    type="line"
-                    height={280}
-                  />
-                  <div className="mt-2 flex items-center justify-center gap-6 text-xs font-medium text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="size-2 rounded-full bg-orange-500" />
-                      <span>Aktual</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="inline-block h-0.5 w-3.5 border-t-2 border-dashed border-muted-foreground" />
-                      <span>Rencana</span>
+                  {/* Status Banner */}
+                  <div className="type-p3 flex items-center gap-2.5 rounded-xl border border-border/80 bg-muted/20 px-4 py-3 text-foreground">
+                    <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="tabular-nums">
+                      Progres {project.progress.toLocaleString("id-ID")}% {deviation < 0 ? "tertinggal " + Math.abs(deviation).toLocaleString("id-ID") + "%" : "sesuai"} dari rencana {plannedToday.toLocaleString("id-ID")}% hari ini.
                     </span>
                   </div>
-                </div>
-              </div>
 
-              {/* RAB & Progres Grouped Table (Image 1 & 2) */}
-              <div
-                className="overflow-x-auto rounded-xl border border-border/80"
-                tabIndex={0}
-                aria-label="Tabel RAB dan progres; geser horizontal untuk melihat semua kolom"
-              >
-                <table className="w-full min-w-[850px] table-fixed text-left align-middle text-xs">
-                  <colgroup>
-                    <col className="w-auto min-w-[240px]" />
-                    <col className="w-24" />
-                    <col className="w-32" />
-                    <col className="w-36" />
-                    <col className="w-20" />
-                    <col className="w-28" />
-                    <col className="w-44" />
-                  </colgroup>
-                  <thead className="bg-muted/40 font-semibold text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="px-4 py-3 text-left">Uraian pekerjaan</th>
-                      <th className="px-3.5 py-3 text-right">Volume</th>
-                      <th className="px-3.5 py-3 text-right">Harga satuan</th>
-                      <th className="px-3.5 py-3 text-right">Jumlah</th>
-                      <th className="px-3.5 py-3 text-right">Bobot</th>
-                      <th className="px-3.5 py-3 text-right">Terpasang</th>
-                      <th className="px-3.5 py-3 text-left">Progres</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {rabGroups.map((group, groupIdx) => (
-                      <React.Fragment key={groupIdx}>
-                        {/* Section Header */}
-                        <tr className="bg-muted/30 font-bold text-foreground">
-                          <td colSpan={7} className="px-4 py-2.5 font-bold text-foreground">
-                            {group.sectionName}
-                          </td>
-                        </tr>
-
-                        {/* Items in section */}
-                        {group.items.map((it) => (
-                          <tr key={it.id} className="hover:bg-muted/10">
-                            <td className="px-4 py-3 text-left">
-                              <p className="font-semibold text-foreground">
-                                {it.code ? it.code + " " : ""}
-                                {it.title}
-                              </p>
-                              <button
-                                type="button"
-                                aria-label={`Isi analisa material untuk ${it.title}`}
-                                title="Isi analisa material"
-                                onClick={() => {
-                                  const parts = (it.volumeText || "1 m").trim().split(" ");
-                                  const volNum = parseFloat(parts[0]) || 1;
-                                  const unitStr = parts.slice(1).join(" ") || "m";
-                                  const existingAnalysis = itemAnalysesMap[it.id] || getStandardAnalysisForWorkItem(it.title, volNum, unitStr);
-                                  setSelectedAnalisaItem({
-                                    id: it.id,
-                                    title: (it.code ? it.code + " " : "") + it.title,
-                                    volume: volNum,
-                                    unit: unitStr,
-                                    analysis: existingAnalysis,
-                                  });
-                                  setIsAnalisaModalOpen(true);
-                                }}
-                                className="mt-0.5 inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium text-sky-600 hover:bg-sky-500/10 dark:text-sky-400 sm:min-h-0 sm:min-w-0 sm:px-0 sm:py-0 sm:hover:bg-transparent"
-                              >
-                                <Package className="size-3.5" aria-hidden="true" />
-                                <span className="sr-only sm:not-sr-only">Isi analisa material</span>
-                              </button>
-                            </td>
-                            <td className="px-3.5 py-3 text-right whitespace-nowrap text-muted-foreground">{it.volumeText}</td>
-                            <td className="px-3.5 py-3 text-right whitespace-nowrap font-mono">{currency(it.unitPrice)}</td>
-                            <td className="px-3.5 py-3 text-right whitespace-nowrap font-mono font-semibold text-foreground">
-                              {currency(it.totalPrice)}
-                            </td>
-                            <td className="px-3.5 py-3 text-right whitespace-nowrap font-mono">{it.bobot.toFixed(2)}%</td>
-                            <td className="px-3.5 py-3 text-right whitespace-nowrap text-muted-foreground">{it.terpasangText}</td>
-                            <td className="px-3.5 py-3 text-left">
-                              <div className="flex items-center gap-2">
-                                <Progress value={it.progress} className="h-2 flex-1 min-w-16" />
-                                <span className="w-8 text-right font-mono text-[11px] text-muted-foreground">
-                                  {it.progress}%
-                                </span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
-                    ))}
-
-                    {/* Summary row */}
-                    <tr className="border-t-2 border-border bg-muted/50 font-bold text-foreground">
-                      <td colSpan={3} className="px-4 py-3 font-bold text-foreground">
-                        Total RAB
-                      </td>
-                      <td className="px-3.5 py-3 text-right font-mono font-extrabold text-foreground whitespace-nowrap">
-                        {currency(totalRabNumber)}
-                      </td>
-                      <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">100%</td>
-                      <td className="px-3.5 py-3"></td>
-                      <td className="px-3.5 py-3">
-                        <div className="flex items-center gap-2">
-                          <Progress value={project.progress} className="h-2 flex-1 min-w-16" />
-                          <span className="w-8 text-right font-mono text-[11px] font-bold">
-                            {project.progress}%
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* RAP and Profit info */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/20 p-4">
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  <p>
-                    Nilai Kontrak RAB (Pagu): <strong className="text-foreground">{currency(totalRabNumber)}</strong> · RAP Proyek: <strong className="text-foreground">{currency(totalRapNumber)}</strong>
-                  </p>
-                  <p>
-                    Estimasi Keuntungan: <strong className="text-emerald-600 dark:text-emerald-400">{currency(profitAmount)} ({profitPercent}%)</strong> · Skema Jasa: <strong className="text-amber-500">Upah Borongan</strong>
-                  </p>
-                </div>
-                <ProjectActionButton
-                  type="button"
-                  label="Susun RAP bahan dan jasa borongan"
-                  icon={<Calculator className="size-3.5" />}
-                  size="sm"
-                  onClick={() => setIsRapModalOpen(true)}
-                  className="ml-auto h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-                />
-              </div>
-
-              {/* Rencana Material Section (Image 2 & 5) */}
-              {canAccessMaterialPlanning && (
-              <div className="space-y-3 border-t border-border/60 pt-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-foreground">Rencana material</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Kebutuhan material dibanding pemakaian dari gudang. &quot;Seharusnya&quot; dihitung dari progres.
-                    </p>
-                  </div>
-                  <div className="ml-auto grid w-fit grid-cols-3 justify-items-end gap-2 sm:flex sm:justify-end">
-                    <ProjectActionButton
-                      type="button"
-                      label="Cetak rencana material"
-                      icon={<Printer className="size-3.5 text-muted-foreground" />}
-                      variant="outline"
-                      size="sm"
-                      onClick={handlePrintMaterials}
-                      className="h-8 gap-1.5 px-3 text-xs"
-                    />
-                    <ProjectActionButton
-                      type="button"
-                      label="Susun bahan dan jasa RAP"
-                      icon={<Calculator className="size-3.5" />}
-                      size="sm"
-                      onClick={() => setIsRapModalOpen(true)}
-                      className="h-8 gap-1.5 px-3 text-xs bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-                    />
-                    <ProjectActionButton
-                      type="button"
-                      label="Isi rencana material"
-                      icon={<Plus className="size-3.5 text-primary" />}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedWorkPointForMaterial(undefined);
-                        setIsMaterialModalOpen(true);
-                      }}
-                      className="h-8 gap-1.5 px-3 text-xs font-semibold"
-                    />
-                  </div>
-                </div>
-
-                {effectiveMaterialPlanList.length === 0 ? (
-                  <p className="py-2 text-xs text-muted-foreground">Belum ada rencana material.</p>
-                ) : (
-                  <div
-                    className="overflow-x-auto rounded-xl border border-border/80"
-                    tabIndex={0}
-                    aria-label="Tabel rencana material; geser horizontal untuk melihat semua kolom"
-                  >
-                    <table className="w-full min-w-[860px] table-fixed text-left align-middle text-xs">
-                      <thead className="bg-[#102A4D] text-white font-semibold">
-                        <tr>
-                          <th className="px-3.5 py-2.5">Material / Bahan</th>
-                          <th className="px-3.5 py-2.5">Lingkup Pekerjaan RAB</th>
-                          <th className="px-3.5 py-2.5 text-right">Rencana Analisa</th>
-                          <th className="px-3.5 py-2.5 text-right bg-[#143560] border-x border-white/20">Bahan Aktual</th>
-                          <th className="px-3.5 py-2.5 text-center">Satuan</th>
-                          <th className="px-3.5 py-2.5 text-center">Selisih</th>
-                          <th className="px-3.5 py-2.5">Status Pemakaian</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {effectiveMaterialPlanList.map((m, idx) => {
-                          const scopeItem = project.workPoints.find((wp) => wp.id === m.scope);
-                          const planned = m.plannedQuantity ?? m.quantity ?? 0;
-                          const actual = m.actualQuantity ?? m.quantity ?? 0;
-                          const diff = actual - planned;
-                          const diffPercent = planned > 0 ? Math.round((diff / planned) * 100) : 0;
-
-                          return (
-                            <tr key={idx} className="hover:bg-muted/10">
-                              <td className="px-3.5 py-2.5">
-                                <span className="font-semibold text-foreground block">{m.materialName}</span>
-                                {m.fromAnalysis && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-primary">
-                                    <Sparkles className="size-2.5" /> Dari Analisa RAB
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-3.5 py-2.5 text-muted-foreground">
-                                {m.scope === "ALL" ? "Seluruh proyek" : (m.scopeTitle || scopeItem?.title || m.scope)}
-                              </td>
-                              <td className="px-3.5 py-2.5 text-right font-mono">
-                                {m.fromAnalysis ? (
-                                  <div>
-                                    <span className="font-medium text-foreground">
-                                      {planned.toLocaleString("id-ID", { maximumFractionDigits: 2 })}
-                                    </span>
-                                    <span className="block text-[10px] text-muted-foreground">Otomatis RAB</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </td>
-                              <td className="px-3.5 py-2.5 text-right font-mono font-bold text-foreground bg-primary/5 border-x border-primary/20">
-                                {actual.toLocaleString("id-ID", { maximumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-3.5 py-2.5 text-center font-mono font-medium text-foreground">
-                                {m.unit}
-                              </td>
-                              <td className="px-3.5 py-2.5 text-center">
-                                {m.fromAnalysis ? (
-                                  diff === 0 ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300">
-                                      <CheckCircle2 className="size-2.5" /> Sesuai
-                                    </span>
-                                  ) : diff > 0 ? (
-                                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300">
-                                      +{diff.toLocaleString("id-ID", { maximumFractionDigits: 1 })} (+{diffPercent}%)
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300">
-                                      {diff.toLocaleString("id-ID", { maximumFractionDigits: 1 })} ({diffPercent}%)
-                                    </span>
-                                  )
-                                ) : (
-                                  <span className="text-[10px] text-muted-foreground">Manual</span>
-                                )}
-                              </td>
-                              <td className="px-3.5 py-2.5">
-                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">
-                                  Tersedia di gudang
-                                </Badge>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-              )}
-            </div>
-          )}
-
-          <section className="space-y-3 border-t border-border/60 pt-6">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-foreground">RAP yang disusun</h3>
-                <p className="text-xs text-muted-foreground">
-                  Rincian bahan dan jasa borongan dari RAP tersimpan.
-                </p>
-              </div>
-              {savedRapMaterials.length === 0 && savedRapLaborPlans.length === 0 && (
-                <ProjectActionButton
-                  type="button"
-                  label="Susun RAP"
-                  icon={<Calculator className="size-3.5" />}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsRapModalOpen(true)}
-                  className="ml-auto h-8 gap-1.5 text-xs"
-                />
-              )}
-            </div>
-
-            {savedRapMaterials.length === 0 && savedRapLaborPlans.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
-                Belum ada rincian RAP tersimpan.
-              </p>
-            ) : (
-              <div
-                className="overflow-x-auto rounded-xl border border-border/80"
-                tabIndex={0}
-                aria-label="Tabel rincian RAP; geser horizontal untuk melihat semua kolom"
-              >
-                <table className="w-full min-w-[760px] text-left align-middle text-xs">
-                  <thead className="bg-muted/40 font-semibold text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="px-3.5 py-3">Jenis</th>
-                      <th className="px-3.5 py-3">Uraian</th>
-                      <th className="px-3.5 py-3 text-right">Volume RAP</th>
-                      <th className="px-3.5 py-3 text-right">Harga satuan</th>
-                      <th className="px-3.5 py-3 text-right">Jumlah RAP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {savedRapMaterials.map((material) => {
-                      const scopeTitle =
-                        material.scope === "ALL" || !material.scope
-                          ? "Seluruh proyek"
-                          : project.workPoints.find((point) => point.id === material.scope)?.title ??
-                            material.scope;
-
-                      return (
-                        <tr key={material.id} className="hover:bg-muted/10">
-                          <td className="px-3.5 py-3 text-muted-foreground">Bahan</td>
-                          <td className="px-3.5 py-3">
-                            <span className="block font-semibold text-foreground">{material.materialName}</span>
-                            {material.stockItemId && (() => {
-                              const linkedStockItem = stockItems.find(
-                                (item) => item.id === material.stockItemId,
-                              );
-                              return (
-                                <span className="block text-[11px] text-muted-foreground">
-                                  Stok: {linkedStockItem?.name ?? "Barang tidak tersedia"}
-                                  {linkedStockItem
-                                    ? ` · ${Number(linkedStockItem.stockQuantity || 0).toLocaleString("id-ID")} ${linkedStockItem.unit}`
-                                    : ""}
-                                </span>
-                              );
-                            })()}
-                            <span className="block text-[11px] text-muted-foreground">{scopeTitle}</span>
-                            {material.notes && (
-                              <span className="block text-[11px] text-muted-foreground">{material.notes}</span>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-3 text-right font-mono">
-                            {material.actualQuantity.toLocaleString("id-ID", { maximumFractionDigits: 3 })}{" "}
-                            {material.unit}
-                            {material.plannedQuantity > 0 && (
-                              <span className="block text-[10px] text-muted-foreground">
-                                RAB: {material.plannedQuantity.toLocaleString("id-ID", { maximumFractionDigits: 3 })}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">
-                            {currency(material.unitPrice)}
-                          </td>
-                          <td className="px-3.5 py-3 text-right font-mono font-semibold whitespace-nowrap">
-                            {currency(material.totalPrice)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {savedRapLaborPlans.map((labor) => {
-                      const unitPrice =
-                        Number(labor.boronganRate) > 0
-                          ? Number(labor.boronganRate)
-                          : labor.volume > 0
-                            ? Number(labor.totalBorongan) / labor.volume
-                            : 0;
-                      const lineTotal = Math.round(labor.volume * unitPrice);
-
-                      return (
-                        <tr key={labor.id} className="hover:bg-muted/10">
-                          <td className="px-3.5 py-3 text-muted-foreground">Jasa</td>
-                          <td className="px-3.5 py-3">
-                            <span className="block font-semibold text-foreground">{labor.jobName}</span>
-                            {labor.subkonName && (
-                              <span className="block text-[11px] text-muted-foreground">{labor.subkonName}</span>
-                            )}
-                            {labor.notes && (
-                              <span className="block text-[11px] text-muted-foreground">{labor.notes}</span>
-                            )}
-                          </td>
-                          <td className="px-3.5 py-3 text-right font-mono">
-                            {labor.volume.toLocaleString("id-ID", { maximumFractionDigits: 3 })} {labor.unit}
-                          </td>
-                          <td className="px-3.5 py-3 text-right font-mono whitespace-nowrap">
-                            {currency(unitPrice)}
-                          </td>
-                          <td className="px-3.5 py-3 text-right font-mono font-semibold whitespace-nowrap">
-                            {currency(lineTotal)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot className="border-t-2 border-border bg-muted/30 font-semibold">
-                    <tr>
-                      <td colSpan={4} className="px-3.5 py-2.5 text-foreground">Total bahan</td>
-                      <td className="px-3.5 py-2.5 text-right font-mono whitespace-nowrap">
-                        {currency(savedRapMaterialTotal)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan={4} className="px-3.5 py-2.5 text-foreground">Total jasa borongan</td>
-                      <td className="px-3.5 py-2.5 text-right font-mono whitespace-nowrap">
-                        {currency(savedRapLaborTotal)}
-                      </td>
-                    </tr>
-                    <tr className="border-t border-border">
-                      <td colSpan={4} className="px-3.5 py-3 text-foreground">Total RAP</td>
-                      <td className="px-3.5 py-3 text-right font-mono font-bold text-foreground whitespace-nowrap">
-                        {currency(savedRapTotal)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </section>
-        </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ===================== TAB: REKAP DANA ===================== */}
-        <TabsContent value="rekap-dana" className="space-y-6">
-          <ProjectFundRecapTab
-            projectTitle={project.title}
-            projectCode={project.code}
-            contractValue={
-              Number(project.pagu) > 0 ? Number(project.pagu) : totalRabNumber
-            }
-            tickets={project.wageTicketPayments}
-            stockItems={stockItems}
-          />
-        </TabsContent>
-
-        {/* ===================== TAB 3: TAGIHAN ===================== */}
-        <TabsContent value="tagihan" className="space-y-6">
-          <Card className="border-border/80 shadow-2xs">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Kontrak Subkon &amp; Tagihan</CardTitle>
-              <CardDescription className="text-xs">
-                Daftar kontrak kerja sama vendor dan status termin pembayaran.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {project.subkonContracts.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-sm font-semibold text-foreground">Belum ada kontrak subkon</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Buat SPK / Kontrak Subkon untuk proyek ini melalui menu administrasi konstruksi.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {project.subkonContracts.map((contract) => (
-                    <div
-                      key={contract.id}
-                      className="rounded-xl border border-border/80 bg-muted/10 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
-                        <div>
-                          <p className="text-sm font-bold text-foreground">
-                            {contract.contractNumber} · {contract.subkonName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Kontrak #{contract.contractNumber}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-extrabold text-foreground">
-                            {currency(contract.contractValue)}
-                          </p>
-                          <Badge variant="outline" className="text-[10px]">
-                            {contract.status}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="mt-3">
-                        <span className="text-[11px] font-semibold text-muted-foreground">
-                          Rincian Termin:
+                  {/* Kurva S Chart Section */}
+                  <div className="space-y-2">
+                    <h3 className="type-h3 text-foreground">Kurva S</h3>
+                    <div className="rounded-xl border border-border/70 p-4">
+                      <Chart
+                        options={sCurveOptions}
+                        series={sCurveSeries}
+                        type="line"
+                        height={280}
+                      />
+                      <div className="type-p3 mt-2 flex items-center justify-center gap-6 font-medium text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="size-2 rounded-full bg-orange-500" />
+                          <span>Aktual</span>
                         </span>
-                        <div className="mt-1.5 flex flex-wrap gap-2">
-                          {contract.termyns.map((termyn) => (
-                            <div
-                              key={termyn.id}
-                              className="rounded-lg border border-border/60 bg-card p-2 text-xs"
-                            >
-                              <span className="font-semibold text-foreground">
-                                Termin {termyn.termynNumber} ({termyn.claimedPercent}%)
-                              </span>
-                              <p className="font-mono text-muted-foreground">
-                                {currency(termyn.netAmount)}
-                              </p>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  termyn.status === "PAID"
-                                    ? "mt-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]"
-                                    : "mt-1 bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]"
-                                }
-                              >
-                                {termyn.status}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-block h-0.5 w-3.5 border-t-2 border-dashed border-muted-foreground" />
+                          <span>Rencana</span>
+                        </span>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* RAB & Progres Grouped Table */}
+                  <Table
+                    pagination={false}
+                    className={canViewFinancials ? "min-w-[850px]" : "min-w-[620px]"}
+                  >
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[240px]">Uraian pekerjaan</TableHead>
+                        <TableHead className="text-right">Volume</TableHead>
+                        {canViewFinancials && (
+                          <TableHead className="text-right">Harga satuan</TableHead>
+                        )}
+                        {canViewFinancials && (
+                          <TableHead className="text-right">Jumlah</TableHead>
+                        )}
+                        {canViewFinancials && (
+                          <TableHead className="text-right">Bobot</TableHead>
+                        )}
+                        <TableHead className="text-right">Terpasang</TableHead>
+                        <TableHead className="min-w-[160px]">Progres</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rabGroups.map((group, groupIdx) => (
+                        <React.Fragment key={groupIdx}>
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell
+                              colSpan={canViewFinancials ? 7 : 4}
+                              className="type-p2 font-bold text-foreground"
+                            >
+                              {group.sectionName}
+                            </TableCell>
+                          </TableRow>
+
+                          {group.items.map((it) => (
+                            <TableRow key={it.id}>
+                              <TableCell>
+                                <p className="type-p3 font-semibold text-foreground">
+                                  {it.code ? it.code + " " : ""}
+                                  {it.title}
+                                </p>
+                                {canAccessMaterialPlanning && (
+                                  <button
+                                    type="button"
+                                    aria-label={`Isi analisa material untuk ${it.title}`}
+                                    title="Isi analisa material"
+                                    onClick={() => {
+                                      const parts = (it.volumeText || "1 m").trim().split(" ");
+                                      const volNum = parseFloat(parts[0]) || 1;
+                                      const unitStr = parts.slice(1).join(" ") || "m";
+                                      const existingAnalysis =
+                                        itemAnalysesMap[it.id] ||
+                                        getStandardAnalysisForWorkItem(it.title, volNum, unitStr);
+                                      setSelectedAnalisaItem({
+                                        id: it.id,
+                                        title: (it.code ? it.code + " " : "") + it.title,
+                                        volume: volNum,
+                                        unit: unitStr,
+                                        analysis: existingAnalysis,
+                                      });
+                                      setIsAnalisaModalOpen(true);
+                                    }}
+                                    className="type-p3 mt-0.5 inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded px-2 py-1 font-medium text-sky-600 hover:bg-sky-500/10 dark:text-sky-400 sm:min-h-0 sm:min-w-0 sm:px-0 sm:py-0 sm:hover:bg-transparent"
+                                  >
+                                    <Package className="size-3.5" aria-hidden="true" />
+                                    <span className="sr-only sm:not-sr-only">Analisa material</span>
+                                  </button>
+                                )}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                                {it.volumeText}
+                              </TableCell>
+                              {canViewFinancials && (
+                                <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                                  {currency(it.unitPrice)}
+                                </TableCell>
+                              )}
+                              {canViewFinancials && (
+                                <TableCell className="type-p3 text-right font-mono font-semibold whitespace-nowrap tabular-nums text-foreground">
+                                  {currency(it.totalPrice)}
+                                </TableCell>
+                              )}
+                              {canViewFinancials && (
+                                <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                                  {it.bobot.toFixed(2)}%
+                                </TableCell>
+                              )}
+                              <TableCell className="type-p3 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                                {it.terpasangText}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Progress value={it.progress} className="h-2 min-w-16 flex-1" />
+                                  <span className="type-p3 w-10 text-right font-mono tabular-nums text-muted-foreground">
+                                    {it.progress}%
+                                  </span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell
+                          colSpan={canViewFinancials ? 3 : 2}
+                          className="type-p2 font-bold text-foreground"
+                        >
+                          {canViewFinancials ? "Total RAB" : "Total Progres"}
+                        </TableCell>
+                        {canViewFinancials && (
+                          <TableCell className="type-p2 text-right font-mono font-extrabold whitespace-nowrap tabular-nums text-foreground">
+                            {currency(totalRabNumber)}
+                          </TableCell>
+                        )}
+                        {canViewFinancials && (
+                          <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                            100%
+                          </TableCell>
+                        )}
+                        <TableCell />
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={project.progress} className="h-2 min-w-16 flex-1" />
+                            <span className="type-p3 w-10 text-right font-mono font-bold tabular-nums">
+                              {project.progress}%
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+
+                  {/* RAP and Profit info (Financial roles only) */}
+                  {canViewFinancials && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+                      <div className="type-p3 space-y-1 text-muted-foreground">
+                        <p>
+                          Nilai Kontrak RAB (Pagu):{" "}
+                          <strong className="tabular-nums text-foreground">
+                            {currency(totalRabNumber)}
+                          </strong>{" "}
+                          · RAP Proyek:{" "}
+                          <strong className="tabular-nums text-foreground">
+                            {currency(totalRapNumber)}
+                          </strong>
+                        </p>
+                        <p>
+                          Estimasi Keuntungan:{" "}
+                          <strong className="tabular-nums text-emerald-600 dark:text-emerald-400">
+                            {currency(profitAmount)} ({profitPercent}%)
+                          </strong>{" "}
+                          · Skema Jasa: <strong className="text-amber-500">Upah Borongan</strong>
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setIsRapModalOpen(true)}
+                        className="ml-auto gap-1.5"
+                      >
+                        <Calculator className="size-3.5" aria-hidden="true" />
+                        <span>Susun RAP</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Rencana Material Section */}
+                  {canAccessMaterialPlanning && (
+                    <div className="space-y-3 border-t border-border/60 pt-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="type-h3 text-foreground">Rencana material</h3>
+                          <p className="type-p3 text-muted-foreground">
+                            Kebutuhan material dibanding pemakaian dari gudang. &quot;Seharusnya&quot; dihitung dari progres.
+                          </p>
+                        </div>
+                        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                          <ProjectActionButton
+                            type="button"
+                            label="Cetak material"
+                            icon={<Printer className="size-3.5 text-muted-foreground" />}
+                            variant="outline"
+                            size="sm"
+                            onClick={handlePrintMaterials}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setIsRapModalOpen(true)}
+                            className="gap-1.5"
+                          >
+                            <Calculator className="size-3.5" aria-hidden="true" />
+                            <span>Susun RAP</span>
+                          </Button>
+                          <ProjectActionButton
+                            type="button"
+                            label="Rencana material"
+                            icon={<Plus className="size-3.5 text-primary" />}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWorkPointForMaterial(undefined);
+                              setIsMaterialModalOpen(true);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {effectiveMaterialPlanList.length === 0 ? (
+                        <p className="type-p3 py-2 text-muted-foreground">
+                          Belum ada rencana material.
+                        </p>
+                      ) : (
+                        <Table pagination={false} className="min-w-[860px]">
+                          <TableHeader>
+                            <TableRow className="bg-[#102A4D] hover:bg-[#102A4D]">
+                              <TableHead className="text-white">Material / Bahan</TableHead>
+                              <TableHead className="text-white">Lingkup Pekerjaan</TableHead>
+                              <TableHead className="text-right text-white">Rencana Analisa</TableHead>
+                              <TableHead className="border-x border-white/20 bg-[#143560] text-right text-white">
+                                Bahan Aktual
+                              </TableHead>
+                              <TableHead className="text-center text-white">Satuan</TableHead>
+                              <TableHead className="text-center text-white">Selisih</TableHead>
+                              <TableHead className="text-white">Status Pemakaian</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {effectiveMaterialPlanList.map((m, idx) => {
+                              const scopeItem = project.workPoints.find((wp) => wp.id === m.scope);
+                              const planned = m.plannedQuantity ?? m.quantity ?? 0;
+                              const actual = m.actualQuantity ?? m.quantity ?? 0;
+                              const diff = actual - planned;
+                              const diffPercent =
+                                planned > 0 ? Math.round((diff / planned) * 100) : 0;
+
+                              return (
+                                <TableRow key={idx}>
+                                  <TableCell>
+                                    <span className="type-p3 block font-semibold text-foreground">
+                                      {m.materialName}
+                                    </span>
+                                    {m.fromAnalysis && (
+                                      <span className="type-p3 inline-flex items-center gap-1 text-primary">
+                                        <Sparkles className="size-3" /> Dari Analisa RAB
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="type-p3 text-muted-foreground">
+                                    {m.scope === "ALL"
+                                      ? "Seluruh proyek"
+                                      : m.scopeTitle || scopeItem?.title || m.scope}
+                                  </TableCell>
+                                  <TableCell className="type-p3 text-right font-mono tabular-nums">
+                                    {m.fromAnalysis ? (
+                                      <div>
+                                        <span className="font-medium text-foreground">
+                                          {planned.toLocaleString("id-ID", {
+                                            maximumFractionDigits: 2,
+                                          })}
+                                        </span>
+                                        <span className="type-p3 block text-muted-foreground">
+                                          Otomatis RAB
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="type-p3 border-x border-primary/20 bg-primary/5 text-right font-mono font-bold tabular-nums text-foreground">
+                                    {actual.toLocaleString("id-ID", {
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </TableCell>
+                                  <TableCell className="type-p3 text-center font-mono font-medium text-foreground">
+                                    {m.unit}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {m.fromAnalysis ? (
+                                      diff === 0 ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="type-p3 border-emerald-300 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                        >
+                                          <CheckCircle2 className="size-3" /> Sesuai
+                                        </Badge>
+                                      ) : diff > 0 ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="type-p3 border-amber-300 bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                                        >
+                                          +{diff.toLocaleString("id-ID", { maximumFractionDigits: 1 })} ({diffPercent > 0 ? `+${diffPercent}` : diffPercent}%)
+                                        </Badge>
+                                      ) : (
+                                        <Badge
+                                          variant="outline"
+                                          className="type-p3 border-sky-300 bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300"
+                                        >
+                                          {diff.toLocaleString("id-ID", { maximumFractionDigits: 1 })} ({diffPercent}%)
+                                        </Badge>
+                                      )
+                                    ) : (
+                                      <span className="type-p3 text-muted-foreground">Manual</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className="type-p3 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    >
+                                      Tersedia di gudang
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {canViewFinancials && (
+                <section className="space-y-3 border-t border-border/60 pt-6">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <h3 className="type-h3 text-foreground">RAP yang disusun</h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Rincian bahan dan jasa borongan dari RAP tersimpan.
+                      </p>
+                    </div>
+                    {savedRapMaterials.length === 0 && savedRapLaborPlans.length === 0 && (
+                      <ProjectActionButton
+                        type="button"
+                        label="Susun RAP"
+                        icon={<Calculator className="size-3.5" />}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsRapModalOpen(true)}
+                      />
+                    )}
+                  </div>
+
+                  {savedRapMaterials.length === 0 && savedRapLaborPlans.length === 0 ? (
+                    <EmptyState
+                      icon={Calculator}
+                      title="Belum ada rincian RAP"
+                      description="Tambahkan rencana anggaran pelaksanaan (bahan dan jasa borongan) melalui tombol Susun RAP."
+                    />
+                  ) : (
+                    <Table pagination={false} className="min-w-[760px]">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Jenis</TableHead>
+                          <TableHead>Uraian</TableHead>
+                          <TableHead className="text-right">Volume RAP</TableHead>
+                          <TableHead className="text-right">Harga satuan</TableHead>
+                          <TableHead className="text-right">Jumlah RAP</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {savedRapMaterials.map((material) => {
+                          const scopeTitle =
+                            material.scope === "ALL" || !material.scope
+                              ? "Seluruh proyek"
+                              : project.workPoints.find((point) => point.id === material.scope)?.title ??
+                                material.scope;
+
+                          return (
+                            <TableRow key={material.id}>
+                              <TableCell className="type-p3 text-muted-foreground">Bahan</TableCell>
+                              <TableCell>
+                                <span className="type-p3 block font-semibold text-foreground">
+                                  {material.materialName}
+                                </span>
+                                {material.stockItemId && (() => {
+                                  const linkedStockItem = stockItems.find(
+                                    (item) => item.id === material.stockItemId,
+                                  );
+                                  return (
+                                    <span className="type-p3 block text-muted-foreground">
+                                      Stok: {linkedStockItem?.name ?? "Barang tidak tersedia"}
+                                      {linkedStockItem
+                                        ? ` · ${Number(linkedStockItem.stockQuantity || 0).toLocaleString("id-ID")} ${linkedStockItem.unit}`
+                                        : ""}
+                                    </span>
+                                  );
+                                })()}
+                                <span className="type-p3 block text-muted-foreground">{scopeTitle}</span>
+                                {material.notes && (
+                                  <span className="type-p3 block text-muted-foreground">{material.notes}</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right font-mono tabular-nums">
+                                {material.actualQuantity.toLocaleString("id-ID", {
+                                  maximumFractionDigits: 3,
+                                })}{" "}
+                                {material.unit}
+                                {material.plannedQuantity > 0 && (
+                                  <span className="type-p3 block text-muted-foreground">
+                                    RAB:{" "}
+                                    {material.plannedQuantity.toLocaleString("id-ID", {
+                                      maximumFractionDigits: 3,
+                                    })}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                                {currency(material.unitPrice)}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right font-mono font-semibold whitespace-nowrap tabular-nums">
+                                {currency(material.totalPrice)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {savedRapLaborPlans.map((labor) => {
+                          const unitPrice =
+                            Number(labor.boronganRate) > 0
+                              ? Number(labor.boronganRate)
+                              : labor.volume > 0
+                                ? Number(labor.totalBorongan) / labor.volume
+                                : 0;
+                          const lineTotal = Math.round(labor.volume * unitPrice);
+
+                          return (
+                            <TableRow key={labor.id}>
+                              <TableCell className="type-p3 text-muted-foreground">Jasa</TableCell>
+                              <TableCell>
+                                <span className="type-p3 block font-semibold text-foreground">
+                                  {labor.jobName}
+                                </span>
+                                {labor.subkonName && (
+                                  <span className="type-p3 block text-muted-foreground">
+                                    {labor.subkonName}
+                                  </span>
+                                )}
+                                {labor.notes && (
+                                  <span className="type-p3 block text-muted-foreground">
+                                    {labor.notes}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right font-mono tabular-nums">
+                                {labor.volume.toLocaleString("id-ID", {
+                                  maximumFractionDigits: 3,
+                                })}{" "}
+                                {labor.unit}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                                {currency(unitPrice)}
+                              </TableCell>
+                              <TableCell className="type-p3 text-right font-mono font-semibold whitespace-nowrap tabular-nums">
+                                {currency(lineTotal)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={4} className="type-p3 font-semibold text-foreground">
+                            Total bahan
+                          </TableCell>
+                          <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                            {currency(savedRapMaterialTotal)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={4} className="type-p3 font-semibold text-foreground">
+                            Total jasa borongan
+                          </TableCell>
+                          <TableCell className="type-p3 text-right font-mono whitespace-nowrap tabular-nums">
+                            {currency(savedRapLaborTotal)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell colSpan={4} className="type-p2 font-bold text-foreground">
+                            Total RAP
+                          </TableCell>
+                          <TableCell className="type-p2 text-right font-mono font-bold whitespace-nowrap tabular-nums text-foreground">
+                            {currency(savedRapTotal)}
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  )}
+                </section>
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ===================== TAB: REKAP DANA ===================== */}
+        {canViewFinancials && (
+          <TabsContent value="rekap-dana" className="space-y-6">
+            <ProjectFundRecapTab
+              projectTitle={project.title}
+              projectCode={project.code}
+              contractValue={
+                Number(project.pagu) > 0 ? Number(project.pagu) : totalRabNumber
+              }
+              tickets={project.wageTicketPayments}
+              stockItems={stockItems}
+            />
+          </TabsContent>
+        )}
+
+        {/* ===================== TAB 3: TAGIHAN ===================== */}
+        {canViewFinancials && (
+          <TabsContent value="tagihan" className="space-y-6">
+            <Card className="border-border/80 shadow-2xs">
+              <CardHeader>
+                <CardTitle className="type-h3">Kontrak Subkon &amp; Tagihan</CardTitle>
+                <CardDescription className="type-p3">
+                  Daftar kontrak kerja sama vendor dan status termin pembayaran.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {project.subkonContracts.length === 0 ? (
+                  <EmptyState
+                    icon={FileText}
+                    title="Belum ada kontrak subkon"
+                    description="Buat SPK atau kontrak subkon melalui menu administrasi konstruksi."
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    {project.subkonContracts.map((contract) => (
+                      <div
+                        key={contract.id}
+                        className="rounded-xl border border-border/80 bg-muted/10 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+                          <div>
+                            <p className="type-p2 font-bold text-foreground">
+                              {contract.contractNumber} · {contract.subkonName}
+                            </p>
+                            <p className="type-p3 text-muted-foreground">
+                              Kontrak #{contract.contractNumber}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="type-p2 font-extrabold tabular-nums text-foreground">
+                              {currency(contract.contractValue)}
+                            </p>
+                            <Badge variant="outline" className="type-p3">
+                              {contract.status}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <span className="type-p3 font-semibold text-muted-foreground">
+                            Rincian Termin:
+                          </span>
+                          <div className="mt-1.5 flex flex-wrap gap-2">
+                            {contract.termyns.map((termyn) => (
+                              <div
+                                key={termyn.id}
+                                className="rounded-lg border border-border/60 bg-card p-2.5"
+                              >
+                                <span className="type-p3 font-semibold text-foreground">
+                                  Termin {termyn.termynNumber} ({termyn.claimedPercent}%)
+                                </span>
+                                <p className="type-p3 font-mono tabular-nums text-muted-foreground">
+                                  {currency(termyn.netAmount)}
+                                </p>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    termyn.status === "PAID"
+                                      ? "type-p3 mt-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                      : "type-p3 mt-1 border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                  }
+                                >
+                                  {termyn.status}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
         {/* ===================== TAB 4: LAPANGAN ===================== */}
         <TabsContent value="lapangan" className="space-y-6">
+          {/* Primary One-Way Daily Report CTA Banner */}
+          {canSubmitDailyProgress && (
+            <Card className="border-primary/30 bg-primary/5 shadow-2xs">
+              <CardContent className="flex flex-col items-start justify-between gap-4 p-4 sm:flex-row sm:items-center">
+                <div className="space-y-1">
+                  <p className="type-h3 text-foreground">Isi Laporan Hari Ini</p>
+                  <p className="type-p3 text-muted-foreground">
+                    {isRunningProjectStatus(project.status)
+                      ? "Catat volume progres per item pekerjaan, cuaca, jumlah pekerja, catatan K3, kendala, dan dokumentasi foto."
+                      : "Proyek belum berstatus berjalan. Ubah tahap proyek ke Berjalan untuk mengirim laporan harian."}
+                  </p>
+                </div>
+                {isRunningProjectStatus(project.status) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsDailyProgressOpen(true)}
+                    className="shrink-0 gap-1.5"
+                  >
+                    <Camera className="size-4" aria-hidden="true" />
+                    <span>Isi Laporan Hari Ini</span>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <ProjectMaterialDeliveriesCard
             project={{
               id: project.id,
@@ -2143,23 +2396,37 @@ export default function ProjectDetailView({
             contractTickets={contractTickets}
             currentUserRole={currentUserRole ?? UserRole.FIELD_TEAM}
           />
+
           <Card className="border-border/80 shadow-2xs">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
               <div>
-                <CardTitle className="text-base font-bold">Laporan Harian Lapangan</CardTitle>
-                <CardDescription className="text-xs">
-                  Riwayat catatan progres, cuaca, dan dokumentasi foto harian.
+                <CardTitle className="type-h3">Laporan Harian Lapangan</CardTitle>
+                <CardDescription className="type-p3">
+                  Riwayat catatan progres, cuaca, K3, dan dokumentasi foto harian.
                 </CardDescription>
               </div>
             </CardHeader>
             <CardContent>
               {project.reports.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-sm font-semibold text-foreground">Belum ada laporan harian</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Tim lapangan dapat mengirim laporan progres harian lewat aplikasi mobile atau workstation.
-                  </p>
-                </div>
+                <EmptyState
+                  icon={Camera}
+                  title="Belum ada laporan harian"
+                  description="Kirim laporan progres fisik, cuaca, kendala, dan dokumentasi foto langsung dari proyek ini."
+                  action={
+                    canSubmitDailyProgress &&
+                    isRunningProjectStatus(project.status) ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setIsDailyProgressOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Camera className="size-4" aria-hidden="true" />
+                        <span>Isi Laporan Hari Ini</span>
+                      </Button>
+                    ) : undefined
+                  }
+                />
               ) : (
                 <div className="space-y-4">
                   {project.reports.map((report) => (
@@ -2169,33 +2436,46 @@ export default function ProjectDetailView({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
                         <div>
-                          <p className="text-sm font-bold text-foreground">
+                          <p className="type-p2 font-bold text-foreground">
                             {formatDateIndo(report.reportDate)}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="type-p3 text-muted-foreground">
                             Cuaca: {report.weather || "Cerah"} · {report.workersCount} pekerja
                           </p>
                         </div>
-                        <Badge variant="outline" className="font-mono font-semibold">
+                        <Badge variant="outline" className="type-p3 font-mono font-semibold tabular-nums">
                           Akumulasi proyek: {report.progress ?? 0}%
                         </Badge>
                       </div>
 
-                      {(report.workSummary || report.notes) && (
-                        <div className="mt-3 space-y-1">
+                      {(report.workSummary || report.notes || report.k3SafetyLog) && (
+                        <div className="mt-3 space-y-1.5">
                           {report.workSummary && (
-                            <div className="text-xs font-medium text-foreground">
+                            <div className="type-p3 font-medium text-foreground">
                               {report.workSummary.startsWith("Opname Mingguan") && (
-                                <Badge variant="outline" className="mr-2 border-sky-500/40 text-[10px] text-sky-500">Mingguan</Badge>
+                                <Badge variant="outline" className="type-p3 mr-2 border-sky-500/40 text-sky-600 dark:text-sky-400">
+                                  Mingguan
+                                </Badge>
                               )}
                               {report.workSummary.startsWith("Laporan Progres Harian") && (
-                                <Badge variant="outline" className="mr-2 border-emerald-500/40 text-[10px] text-emerald-500">Harian</Badge>
+                                <Badge variant="outline" className="type-p3 mr-2 border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
+                                  Harian
+                                </Badge>
                               )}
                               {report.workSummary}
                             </div>
                           )}
                           {report.notes && (
-                            <p className="text-xs text-muted-foreground">Catatan: {report.notes}</p>
+                            <p className="type-p3 flex items-start gap-1.5 text-muted-foreground">
+                              <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-500" aria-hidden="true" />
+                              <span>Catatan / Kendala: {report.notes}</span>
+                            </p>
+                          )}
+                          {report.k3SafetyLog && (
+                            <p className="type-p3 flex items-start gap-1.5 text-emerald-700 dark:text-emerald-400">
+                              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                              <span>K3: {report.k3SafetyLog}</span>
+                            </p>
                           )}
                         </div>
                       )}
@@ -2203,21 +2483,25 @@ export default function ProjectDetailView({
                       {report.photoUrls && report.photoUrls.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {report.photoUrls.map((photo, i) => (
-                            <a
+                            <button
                               key={i}
-                              href={photo}
-                              target="_blank"
-                              rel="noreferrer"
+                              type="button"
+                              onClick={() =>
+                                openMediaLightbox(
+                                  photo,
+                                  `Foto lapangan · ${formatDateIndo(report.reportDate)} (${i + 1})`,
+                                )
+                              }
+                              aria-label={`Lihat foto lapangan ${i + 1}`}
                               className="group relative block size-20 overflow-hidden rounded-lg border border-border"
                             >
-                              <Image
-                                src={photo}
-                                alt="Foto lapangan"
-                                width={80}
-                                height={80}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={withLocalPhotoPreview(photo)}
+                                alt={`Foto lapangan ${i + 1}`}
                                 className="size-full object-cover transition group-hover:scale-105"
                               />
-                            </a>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -2232,56 +2516,57 @@ export default function ProjectDetailView({
         {/* ===================== TAB 5: TIM & LOKASI ===================== */}
         <TabsContent value="tim" className="space-y-6">
           <Card className="border-border/80 shadow-2xs">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-0">
+            <CardHeader className="flex flex-col justify-between gap-3 pb-0 sm:flex-row sm:items-center">
               <div>
-                <CardTitle className="text-base font-bold">Tim Proyek &amp; Lokasi Geografis</CardTitle>
-                <CardDescription className="text-xs">
+                <CardTitle className="type-h3">Tim Proyek &amp; Lokasi Geografis</CardTitle>
+                <CardDescription className="type-p3">
                   Penanggung jawab lapangan (Field PIC) dan koordinat peta proyek.
                 </CardDescription>
               </div>
-              <ProjectActionButton
-                type="button"
-                label="Tim inti proyek"
-                icon={<User className="size-3.5 text-muted-foreground" />}
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCoreTeamModalOpen(true)}
-                className="ml-auto h-8 gap-1.5 text-xs rounded-lg"
-              />
+              {canManageProject && (
+                <ProjectActionButton
+                  type="button"
+                  label="Tim Inti"
+                  icon={<User className="size-3.5 text-muted-foreground" />}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCoreTeamModalOpen(true)}
+                  className="ml-auto"
+                />
+              )}
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-4">
               <div className="rounded-xl border border-border/80 bg-muted/15 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="grid size-12 place-items-center rounded-full bg-primary/10 text-primary font-bold">
+                  <div className="type-p2 grid size-12 place-items-center rounded-full bg-primary/10 font-bold text-primary">
                     {project.fieldPicName?.slice(0, 2).toUpperCase() || "PM"}
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-foreground">
+                    <p className="type-p2 font-bold text-foreground">
                       {project.fieldPicName || "Belum Ditentukan"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-p3 text-muted-foreground">
                       Field PIC / Manajer Lapangan Proyek
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border/80 bg-muted/15 p-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-border/80 bg-muted/15 p-4 sm:flex-row sm:items-center">
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Lokasi Proyek</p>
-                  <p className="mt-1 text-sm font-bold text-foreground">
+                  <p className="type-p3 font-semibold text-muted-foreground">Lokasi Proyek</p>
+                  <p className="type-p2 mt-1 font-bold text-foreground">
                     {project.location || project.address || "Belum diisi"}
                   </p>
                 </div>
-                <Link
-                  href={"/apps/projects?section=surveys&view=map&projectId=" + encodeURIComponent(project.id)}
-                  aria-label="Buka peta dan survei GIS"
-                  title="Buka peta dan survei GIS"
-                  className="ml-auto inline-flex size-11 items-center justify-center gap-1.5 rounded-lg bg-sky-600 text-xs font-semibold text-white shadow-xs hover:bg-sky-700 sm:h-8 sm:w-auto sm:min-w-0 sm:px-3"
-                >
-                  <MapPinned className="size-3.5" />
-                  <span className="sr-only sm:not-sr-only">Buka Peta &amp; Survei GIS</span>
-                </Link>
+                <Button asChild variant="outline" size="sm" className="ml-auto gap-1.5">
+                  <Link
+                    href={"/apps/projects?section=surveys&view=map&projectId=" + encodeURIComponent(project.id)}
+                  >
+                    <MapPinned className="size-3.5 text-sky-600 dark:text-sky-400" aria-hidden="true" />
+                    <span>Peta GIS</span>
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -2290,125 +2575,126 @@ export default function ProjectDetailView({
         {/* ===================== TAB 6: DOKUMEN ===================== */}
         <TabsContent value="dokumen" className="space-y-6">
           <Card className="border-border/80 shadow-2xs">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardHeader className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <div>
-                <CardTitle className="text-base font-bold text-foreground">Dokumen proyek</CardTitle>
-                <CardDescription className="text-xs">
-                  Kontrak, gambar kerja, izin dan berita acara. Unggah dan bagikan ke klien atau tim lapangan.
+                <CardTitle className="type-h3 text-foreground">Dokumen proyek</CardTitle>
+                <CardDescription className="type-p3">
+                  Kontrak, gambar kerja, izin dan berita acara proyek ini.
                 </CardDescription>
               </div>
               <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 rounded-lg px-3 text-xs font-semibold"
-                >
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
                   <Link href={`/apps/drafter?projectId=${encodeURIComponent(project.id)}`}>
-                    <FileText className="size-3.5 text-muted-foreground" />
-                    Buka Gambar Kerja (DED)
+                    <FileText className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                    <span>Gambar Kerja</span>
                   </Link>
                 </Button>
-                <ProjectActionButton
-                  type="button"
-                  label="Unggah dokumen"
-                  icon={<Paperclip className="size-3.5 text-muted-foreground" />}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsUploadDocModalOpen(true)}
-                  className="h-8 gap-1.5 px-3 text-xs font-semibold rounded-lg"
-                />
+                {canEditProjectRab && (
+                  <ProjectActionButton
+                    type="button"
+                    label="Unggah Dokumen"
+                    icon={<Paperclip className="size-3.5 text-muted-foreground" />}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsUploadDocModalOpen(true)}
+                  />
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Contract Strip */}
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/70 bg-muted/20 p-4">
-                <div className="flex flex-wrap items-center gap-6 text-xs">
+                <div className="type-p3 flex flex-wrap items-center gap-6">
                   <div>
-                    <span className="block text-[11px] text-muted-foreground">Nomor kontrak</span>
+                    <span className="type-p3 block text-muted-foreground">Nomor kontrak</span>
                     <strong className="font-semibold text-foreground">
                       {project.subkonContracts?.[0]?.contractNumber || "-"}
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[11px] text-muted-foreground">Tanggal kontrak</span>
+                    <span className="type-p3 block text-muted-foreground">Tanggal kontrak</span>
                     <strong className="font-semibold text-foreground">
                       {formatDateIndo(project.startDate)}
                     </strong>
                   </div>
                   <div>
-                    <span className="block text-[11px] text-muted-foreground">Masa pemeliharaan</span>
+                    <span className="type-p3 block text-muted-foreground">Masa pemeliharaan</span>
                     <strong className="font-semibold text-foreground">-</strong>
                   </div>
                   <div>
-                    <span className="block text-[11px] text-muted-foreground">Pemeliharaan berakhir</span>
+                    <span className="type-p3 block text-muted-foreground">Pemeliharaan berakhir</span>
                     <strong className="font-semibold text-foreground">
                       {formatDateIndo(project.endDate)}
                     </strong>
                   </div>
                 </div>
-                <ProjectActionButton
-                  type="button"
-                  label="Ubah kontrak"
-                  icon={<Pencil className="size-3" />}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditModalOpen(true)}
-                  className="ml-auto h-8 gap-1 px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                />
+                {canManageProject && (
+                  <ProjectActionButton
+                    type="button"
+                    label="Ubah Kontrak"
+                    icon={<Pencil className="size-3" />}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="ml-auto text-muted-foreground hover:text-foreground"
+                  />
+                )}
               </div>
 
               {project.blueprints.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-xs text-muted-foreground">
-                    Belum ada dokumen: unggah kontrak, gambar kerja atau izin proyek ini agar mudah ditelusuri.
-                  </p>
-                  <ProjectActionButton
-                    type="button"
-                    label="Unggah dokumen pertama"
-                    icon={<Paperclip className="size-3.5" />}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsUploadDocModalOpen(true)}
-                    className="mt-3 h-8 gap-1.5 text-xs"
-                  />
-                </div>
+                <EmptyState
+                  icon={FileText}
+                  title="Belum ada dokumen"
+                  description="Unggah kontrak, gambar kerja, atau dokumen izin proyek ini agar mudah ditelusuri."
+                  action={
+                    canEditProjectRab ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsUploadDocModalOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Paperclip className="size-3.5" aria-hidden="true" />
+                        <span>Unggah Dokumen</span>
+                      </Button>
+                    ) : undefined
+                  }
+                />
               ) : (
                 <div className="space-y-2.5">
                   {project.blueprints.map((bp) => (
                     <div
                       key={bp.id}
-                      className="flex items-center justify-between rounded-xl border border-border/80 bg-muted/10 p-3.5 transition hover:bg-muted/20"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-muted/10 p-3.5 transition hover:bg-muted/20"
                     >
                       <div className="flex items-center gap-3">
                         <div className="grid size-9 place-items-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
                           <FileText className="size-4" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-foreground">
+                          <p className="type-p3 font-bold text-foreground">
                             {bp.drawingNumber ? bp.drawingNumber + " · " : ""}
                             {bp.title}
                           </p>
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="type-p3 text-muted-foreground">
                             {bp.category} · Oleh {bp.drafterName}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="type-p3">
                           {bp.status}
                         </Badge>
-                        <a
-                          href={bp.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openMediaLightbox(bp.fileUrl, bp.title)}
                           aria-label={`Lihat ${bp.title}`}
-                          title={`Lihat ${bp.title}`}
-                          className="inline-flex size-11 items-center justify-center gap-1 rounded-lg border border-border/70 bg-card text-xs font-medium text-foreground hover:bg-muted sm:h-8 sm:w-auto sm:min-w-0 sm:px-2.5"
                         >
-                          <ExternalLink className="size-3" />
-                          <span className="sr-only sm:not-sr-only">Lihat</span>
-                        </a>
+                          Lihat
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -2448,167 +2734,253 @@ export default function ProjectDetailView({
         </TabsContent>
       </Tabs>
 
-      {/* Edit Project Modal */}
-      <ProjectFormModal
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        project={{
-          id: project.id,
-          code: project.code,
-          title: project.title,
-          kelompokTani: project.kelompokTani,
-          address: project.address,
-          jenisPekerjaan: project.jenisPekerjaan,
-          location: project.location,
-          priority: project.priority,
-          progress: project.progress,
-          pagu: project.pagu,
-          budget: project.budget,
-          landArea: project.landArea,
-          fieldPicId: project.fieldPicId,
-          startDate: project.startDate,
-          endDate: project.endDate,
-          vendor: project.vendor,
-          clientName: project.clientName,
-        }}
-        fieldTeamUsers={fieldTeamUsers}
-        
-      />
+      {/* Edit Project Modal (Admin only) */}
+      {canManageProject && (
+        <ProjectFormModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          project={{
+            id: project.id,
+            code: project.code,
+            title: project.title,
+            kelompokTani: project.kelompokTani,
+            address: project.address,
+            jenisPekerjaan: project.jenisPekerjaan,
+            location: project.location,
+            priority: project.priority,
+            progress: project.progress,
+            pagu: project.pagu,
+            budget: project.budget,
+            landArea: project.landArea,
+            fieldPicId: project.fieldPicId,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            vendor: project.vendor,
+            clientName: project.clientName,
+          }}
+          fieldTeamUsers={fieldTeamUsers}
+        />
+      )}
 
       {/* Client Portal Modal */}
-      <GlobalModal
-        isOpen={isClientPortalOpen}
-        onClose={() => setIsClientPortalOpen(false)}
-        title="Portal Klien"
-        description="Bagikan tautan ini kepada klien untuk memantau progres dan dokumentasi foto proyek secara langsung."
-      >
-        <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-muted/30 p-3.5">
-            <span className="text-[11px] font-semibold text-muted-foreground">
-              Tautan Publik Klien:
-            </span>
-            <div className="mt-1.5 flex items-center gap-2">
-              <input
-                readOnly
-                value={typeof window !== "undefined" ? window.location.origin + "/verify/" + project.code : ""}
-                className="w-full rounded-md border border-border bg-background px-3 py-1.5 font-mono text-xs text-foreground"
-              />
-              <ProjectActionButton
-                type="button"
-                label="Salin tautan portal klien"
-                icon={<Copy className="size-3.5" />}
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.origin + "/verify/" + project.code);
-                  alert("Tautan portal klien berhasil disalin!");
-                }}
-                className="h-8 shrink-0 text-xs"
-              />
+      {canManageProject && (
+        <GlobalModal
+          isOpen={isClientPortalOpen}
+          onClose={() => setIsClientPortalOpen(false)}
+          mobileBehavior="sheet"
+          title="Portal Klien"
+          description="Bagikan tautan ini kepada klien untuk memantau progres dan dokumentasi foto proyek secara langsung."
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-muted/30 p-3.5">
+              <span className="type-p3 font-semibold text-muted-foreground">
+                Tautan Publik Klien:
+              </span>
+              <div className="mt-1.5 flex items-center gap-2">
+                <Input
+                  readOnly
+                  value={
+                    typeof window !== "undefined"
+                      ? window.location.origin + "/verify/" + project.code
+                      : ""
+                  }
+                  className="font-mono"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(
+                      window.location.origin + "/verify/" + project.code,
+                    );
+                    toast.success("Tautan portal klien berhasil disalin.");
+                  }}
+                  className="shrink-0 gap-1.5"
+                >
+                  <Copy className="size-3.5" aria-hidden="true" />
+                  <span>Salin Tautan</span>
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </GlobalModal>
+        </GlobalModal>
+      )}
 
       {/* Template Modal */}
-      <GlobalModal
-        isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
-        title="Template Proyek"
-        description="Gunakan standar template proyek untuk mempercepat pembuatan proyek serupa di masa depan."
-      >
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Template ini mencakup struktur titik kerja umum, pembagian bobot upah, dan checklist survei standar.
-          </p>
-          <Button
-            type="button"
-            className="min-h-11 w-full gap-2 text-xs font-semibold"
-            onClick={() => {
-              alert("Template berhasil disimpan!");
-              setIsTemplateModalOpen(false);
-            }}
-          >
-            <BookmarkCheck className="size-4" />
-            Simpan Struktur Proyek Ini Sebagai Template
-          </Button>
-        </div>
-      </GlobalModal>
+      {canManageProject && (
+        <GlobalModal
+          isOpen={isTemplateModalOpen}
+          onClose={() => setIsTemplateModalOpen(false)}
+          mobileBehavior="sheet"
+          title="Template Proyek"
+          description="Gunakan standar template proyek untuk mempercepat pembuatan proyek serupa di masa depan."
+        >
+          <div className="space-y-3">
+            <p className="type-p3 text-muted-foreground">
+              Template ini mencakup struktur titik kerja umum, pembagian bobot upah, dan checklist survei standar.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="w-full gap-2"
+              onClick={() => {
+                toast.success("Template proyek berhasil disimpan.");
+                setIsTemplateModalOpen(false);
+              }}
+            >
+              <BookmarkCheck className="size-4" aria-hidden="true" />
+              <span>Simpan Template</span>
+            </Button>
+          </div>
+        </GlobalModal>
+      )}
 
-      {/* Delete Confirmation Modal */}
-      <GlobalModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Hapus Proyek"
-        description={"Apakah Anda yakin ingin menghapus proyek " + project.title + " (" + project.code + ")?"}
-      >
-        <div className="flex justify-end gap-2 pt-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setIsDeleteModalOpen(false)}
-            className="min-h-11 sm:min-h-8"
-          >
-            Batal
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={handleDelete}
-            disabled={isPending}
-            className="min-h-11 sm:min-h-8"
-          >
-            {isPending ? "Menghapus..." : "Ya, Hapus Proyek"}
-          </Button>
-        </div>
-      </GlobalModal>
+      {/* Delete Confirmation Dialog */}
+      {canManageProject && (
+        <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Hapus Proyek?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Apakah Anda yakin ingin menghapus proyek{" "}
+                <strong>{project.title}</strong> ({project.code})? Tindakan ini tidak dapat dibatalkan.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isPending ? "Menghapus..." : "Hapus Proyek"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
-      {/* Modal: Ubah RAB (Vasco Image 4) */}
-      <EditRabModal
-        open={isEditRabModalOpen}
-        onClose={() => setIsEditRabModalOpen(false)}
-        projectId={project.id}
-        initialItems={
-          project.workPoints.length > 0
-            ? project.workPoints.map((pt) => {
-                const parts = pt.title.split(" ");
-                const code = parts[0]?.includes(".") ? parts[0] : "";
-                const title = code ? parts.slice(1).join(" ") : pt.title;
-                const itemVol = pt.proposedVolume ? Math.max(1, Number(pt.proposedVolume)) : 1;
-                const total = Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0);
-                const unitPrice = pt.proposedUnitPrice && Number(pt.proposedUnitPrice) > 0
-                  ? Math.round(Number(pt.proposedUnitPrice))
-                  : (itemVol > 0 ? Math.round(total / itemVol) : total);
-                return {
-                  id: pt.id,
-                  section: pt.location || "A. Persiapan",
-                  code,
-                  title,
-                  volume: itemVol,
-                  unit: pt.proposedUnit || "paket",
-                  unitPrice,
-                  rapPrice: 0, // "kecuali harga RAP"
-                  startDate: pt.plannedStartDate ? pt.plannedStartDate.slice(0, 10) : "",
-                  endDate: pt.targetDate ? pt.targetDate.slice(0, 10) : "",
-                };
-              })
-            : []
+      {/* Unified One-Way Daily Progress Modal */}
+      {canSubmitDailyProgress && (
+        <DailyProgressModal
+          open={isDailyProgressOpen}
+          onOpenChange={(open) => {
+            setIsDailyProgressOpen(open);
+            if (!open && searchParams?.get("action") === "daily-report") {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("action");
+              const nextQuery = params.toString();
+              window.history.replaceState(
+                null,
+                "",
+                nextQuery
+                  ? `/apps/projects/${project.id}?${nextQuery}`
+                  : `/apps/projects/${project.id}`,
+              );
+            }
+          }}
+          lockedProject={project}
+          onSuccess={() => router.refresh()}
+          onQueueChange={setOfflineQueueCount}
+        />
+      )}
+
+      {/* In-App Photo & Document Lightbox Modal (zero target="_blank") */}
+      <GlobalModal
+        isOpen={previewMedia !== null}
+        onClose={() => setPreviewMedia(null)}
+        mobileBehavior="dialog"
+        icon={<ImageIcon className="size-4" aria-hidden="true" />}
+        title={previewMedia?.title ?? "Pratinjau Media"}
+        className="max-w-3xl"
+        footer={
+          previewMedia ? (
+            <div className="flex w-full items-center justify-between gap-2">
+              <Button asChild variant="outline" size="sm">
+                <a href={photoDownloadHref(previewMedia.url)} download>
+                  <Download className="size-3.5" aria-hidden="true" />
+                  Unduh Berkas
+                </a>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setPreviewMedia(null)}
+              >
+                Tutup
+              </Button>
+            </div>
+          ) : undefined
         }
-        onSuccess={() => router.refresh()}
-      />
+      >
+        {previewMedia &&
+          (previewMedia.kind === "image" ? (
+            <div className="flex max-h-[70dvh] items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/20 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={previewMedia.url}
+                alt={previewMedia.title}
+                className="max-h-[65dvh] w-auto rounded-lg object-contain"
+              />
+            </div>
+          ) : (
+            <iframe
+              src={previewMedia.url}
+              title={previewMedia.title}
+              className="h-[65dvh] w-full rounded-xl border border-border bg-background"
+            />
+          ))}
+      </GlobalModal>
 
-      {/* Modal: Catat Progres Opname (Vasco Image 3) */}
-      <OpnameProgressModal
-        open={isOpnameModalOpen}
-        onClose={() => setIsOpnameModalOpen(false)}
-        projectId={project.id}
-        overallProgress={project.progress}
-        items={opnameWorkPointItems}
-        onSuccess={() => router.refresh()}
-      />
+      {/* Modal: Ubah RAB */}
+      {canEditProjectRab && (
+        <EditRabModal
+          open={isEditRabModalOpen}
+          onClose={() => setIsEditRabModalOpen(false)}
+          projectId={project.id}
+          initialItems={
+            project.workPoints.length > 0
+              ? project.workPoints.map((pt) => {
+                  const parts = pt.title.split(" ");
+                  const code = parts[0]?.includes(".") ? parts[0] : "";
+                  const title = code ? parts.slice(1).join(" ") : pt.title;
+                  const itemVol = pt.proposedVolume ? Math.max(1, Number(pt.proposedVolume)) : 1;
+                  const total = Number(pt.approvedTotalWage ?? pt.proposedTotalWage ?? 0);
+                  const unitPrice = pt.proposedUnitPrice && Number(pt.proposedUnitPrice) > 0
+                    ? Math.round(Number(pt.proposedUnitPrice))
+                    : (itemVol > 0 ? Math.round(total / itemVol) : total);
+                  return {
+                    id: pt.id,
+                    section: pt.location || "A. Persiapan",
+                    code,
+                    title,
+                    volume: itemVol,
+                    unit: pt.proposedUnit || "paket",
+                    unitPrice,
+                    rapPrice: 0,
+                    startDate: pt.plannedStartDate ? pt.plannedStartDate.slice(0, 10) : "",
+                    endDate: pt.targetDate ? pt.targetDate.slice(0, 10) : "",
+                  };
+                })
+              : []
+          }
+          onSuccess={() => router.refresh()}
+        />
+      )}
 
-      {/* Modal: Rencana Material (Vasco Image 5) */}
+      {/* Modal: Catat Progres Opname */}
+      {canEditProjectRab && (
+        <OpnameProgressModal
+          open={isOpnameModalOpen}
+          onClose={() => setIsOpnameModalOpen(false)}
+          projectId={project.id}
+          overallProgress={project.progress}
+          items={opnameWorkPointItems}
+          onSuccess={() => router.refresh()}
+        />
+      )}
+
+      {/* Modal: Rencana Material */}
       {canAccessMaterialPlanning && (
         <MaterialPlanModal
           open={isMaterialModalOpen}
@@ -2627,50 +2999,58 @@ export default function ProjectDetailView({
         />
       )}
 
-      {/* Modal: Analisa Material Per Item (Vasco Image) */}
-      <AnalisaMaterialModal
-        isOpen={isAnalisaModalOpen}
-        onClose={() => setIsAnalisaModalOpen(false)}
-        itemTitle={selectedAnalisaItem?.title || ""}
-        itemVolume={selectedAnalisaItem?.volume || 1}
-        itemUnit={selectedAnalisaItem?.unit || "m"}
-        initialMaterials={selectedAnalisaItem?.analysis}
-        onSave={(updatedMaterials) => {
-          if (selectedAnalisaItem?.id) {
-            handleSaveAnalisaMaterial(selectedAnalisaItem.id, updatedMaterials);
-          }
-        }}
-      />
+      {/* Modal: Analisa Material Per Item */}
+      {canAccessMaterialPlanning && (
+        <AnalisaMaterialModal
+          isOpen={isAnalisaModalOpen}
+          onClose={() => setIsAnalisaModalOpen(false)}
+          itemTitle={selectedAnalisaItem?.title || ""}
+          itemVolume={selectedAnalisaItem?.volume || 1}
+          itemUnit={selectedAnalisaItem?.unit || "m"}
+          initialMaterials={selectedAnalisaItem?.analysis}
+          onSave={(updatedMaterials) => {
+            if (selectedAnalisaItem?.id) {
+              handleSaveAnalisaMaterial(selectedAnalisaItem.id, updatedMaterials);
+            }
+          }}
+        />
+      )}
 
-      {/* Modal: Penyusunan RAP (Bahan dari Upload RAB & Jasa Borongan) */}
-      <RapManagementModal
-        isOpen={isRapModalOpen}
-        onClose={() => setIsRapModalOpen(false)}
-        projectId={project.id}
-        projectTitle={project.title}
-        paguRab={totalRabNumber}
-        stockItems={stockItems}
-        onSuccess={() => router.refresh()}
-      />
+      {/* Modal: Penyusunan RAP */}
+      {canViewFinancials && (
+        <RapManagementModal
+          isOpen={isRapModalOpen}
+          onClose={() => setIsRapModalOpen(false)}
+          projectId={project.id}
+          projectTitle={project.title}
+          paguRab={totalRabNumber}
+          stockItems={stockItems}
+          onSuccess={() => router.refresh()}
+        />
+      )}
 
-      {/* Modal: Unggah Dokumen (Vasco Image 6) */}
-      <UploadDocumentModal
-        isOpen={isUploadDocModalOpen}
-        onClose={() => setIsUploadDocModalOpen(false)}
-        projectId={project.id}
-        onSuccess={() => router.refresh()}
-      />
+      {/* Modal: Unggah Dokumen */}
+      {canEditProjectRab && (
+        <UploadDocumentModal
+          isOpen={isUploadDocModalOpen}
+          onClose={() => setIsUploadDocModalOpen(false)}
+          projectId={project.id}
+          onSuccess={() => router.refresh()}
+        />
+      )}
 
-      {/* Modal: Tim Inti Proyek (Vasco Image 8) */}
-      <CoreTeamModal
-        isOpen={isCoreTeamModalOpen}
-        onClose={() => setIsCoreTeamModalOpen(false)}
-        projectId={project.id}
-        currentPicId={project.fieldPicId}
-        currentPicName={project.fieldPicName}
-        availableUsers={fieldTeamUsers.map((u) => ({ id: u.id, name: u.name }))}
-        onSuccess={() => router.refresh()}
-      />
+      {/* Modal: Tim Inti Proyek */}
+      {canManageProject && (
+        <CoreTeamModal
+          isOpen={isCoreTeamModalOpen}
+          onClose={() => setIsCoreTeamModalOpen(false)}
+          projectId={project.id}
+          currentPicId={project.fieldPicId}
+          currentPicName={project.fieldPicName}
+          availableUsers={fieldTeamUsers.map((u) => ({ id: u.id, name: u.name }))}
+          onSuccess={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }

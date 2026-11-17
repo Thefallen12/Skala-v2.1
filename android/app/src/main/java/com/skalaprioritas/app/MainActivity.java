@@ -23,6 +23,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
@@ -76,55 +77,6 @@ public class MainActivity extends BridgeActivity {
     private volatile String pendingNotificationActionId = null;
     private volatile String pendingNotificationActionUrl = null;
 
-    private static final String APP_INJECTED_CSS =
-        ":root {" +
-        "  --app-safe-top: env(safe-area-inset-top, 24px);" +
-        "  --app-safe-bottom: env(safe-area-inset-bottom, 16px);" +
-        "}" +
-        "html, body {" +
-        "  width: 100% !important;" +
-        "  max-width: 100vw !important;" +
-        "  overflow-x: hidden !important;" +
-        "  -webkit-text-size-adjust: 100% !important;" +
-        "}" +
-        ".page-wrapper {" +
-        "  margin-left: 0 !important;" +
-        "  width: 100% !important;" +
-        "  max-width: 100vw !important;" +
-        "  min-width: 0 !important;" +
-        "}" +
-        ".body-wrapper {" +
-        "  margin-left: 0 !important;" +
-        "  width: 100% !important;" +
-        "  max-width: 100vw !important;" +
-        "  min-width: 0 !important;" +
-        "}" +
-        ".body-wrapper > header {" +
-        "  padding-top: max(env(safe-area-inset-top, 0px), 12px) !important;" +
-        "}" +
-        ".container {" +
-        "  width: 100% !important;" +
-        "  max-width: 100vw !important;" +
-        "  padding-left: 12px !important;" +
-        "  padding-right: 12px !important;" +
-        "  padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px) !important;" +
-        "}" +
-        "/* Mobile User: optimalkan seluruh button & kontrol sentuh di Android */" +
-        "button, [role=\"button\"], input[type=\"button\"], input[type=\"submit\"], .btn {" +
-        "  min-height: 44px !important;" +
-        "  touch-action: manipulation !important;" +
-        "  -webkit-tap-highlight-color: transparent !important;" +
-        "  user-select: none !important;" +
-        "}" +
-        "button:active, [role=\"button\"]:active {" +
-        "  transform: scale(0.97) !important;" +
-        "  transition: transform 0.08s ease !important;" +
-        "}" +
-        "@media (max-width: 1280px) {" +
-        "  .page-wrapper { margin-left: 0 !important; }" +
-        "  .body-wrapper { margin-left: 0 !important; }" +
-        "}";
-
     public static boolean isActivityInForeground() {
         return activityInForeground;
     }
@@ -167,6 +119,7 @@ public class MainActivity extends BridgeActivity {
         scheduleBackgroundNotificationSync();
         extractPendingNotificationFromIntent(getIntent());
         configureWebView();
+        configureBackNavigationFallback();
     }
 
     @Override
@@ -276,8 +229,8 @@ public class MainActivity extends BridgeActivity {
 
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
-        settings.setSupportZoom(true);
-        settings.setBuiltInZoomControls(true);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setGeolocationEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
@@ -326,19 +279,34 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                injectMobileCss(view);
                 injectNativeAppInfo(view);
                 injectPermissionsSnapshot(view);
                 dispatchPendingNotificationToWebView();
             }
         });
+    }
 
-        // Pastikan pemuatan awal dimulai sesudah addJavascriptInterface & client terpasang
-        String initialAppUrl = bridge.getAppUrl();
-        if (initialAppUrl != null && !initialAppUrl.isEmpty()) {
-            webView.stopLoading();
-            webView.loadUrl(initialAppUrl);
+    /**
+     * AppPlugin (@capacitor/app) mendaftarkan OnBackPressedCallback saat super.onCreate().
+     * Karena OnBackPressedDispatcher mengeksekusi callback secara LIFO, MainActivity hanya
+     * memasang fallback jika plugin App tidak termuat agar event backButton tetap sampai ke web.
+     */
+    private void configureBackNavigationFallback() {
+        if (bridge != null && bridge.getPlugin("App") != null) {
+            return;
         }
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                WebView webView = bridge != null ? bridge.getWebView() : null;
+                if (webView != null && webView.canGoBack()) {
+                    webView.goBack();
+                    return;
+                }
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+            }
+        });
     }
 
     @Override
@@ -1186,25 +1154,5 @@ public class MainActivity extends BridgeActivity {
                 startApkUpdateInternal(lastUrl);
             });
         }
-    }
-
-    private void injectMobileCss(WebView view) {
-        String js = "(function() {" +
-            "  var existing = document.getElementById('skala-mobile-injected-css');" +
-            "  if (!existing) {" +
-            "    var style = document.createElement('style');" +
-            "    style.id = 'skala-mobile-injected-css';" +
-            "    style.innerHTML = `" + APP_INJECTED_CSS + "`;" +
-            "    document.head.appendChild(style);" +
-            "  }" +
-            "  var meta = document.querySelector('meta[name=\"viewport\"]');" +
-            "  if (!meta) {" +
-            "    meta = document.createElement('meta');" +
-            "    meta.name = 'viewport';" +
-            "    document.head.appendChild(meta);" +
-            "  }" +
-            "  meta.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';" +
-            "})();";
-        view.evaluateJavascript(js, null);
     }
 }

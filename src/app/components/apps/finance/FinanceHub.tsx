@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { toast } from "sonner";
 import { reviewPurchaseOrder } from "@/app/actions/orders";
 import {
   FINANCE_PROOF_ACCEPT_ALL,
@@ -31,12 +32,15 @@ import FinanceDashboard, {
 } from "@/app/components/apps/finance/FinanceDashboard";
 import PaymentModal, {
   type PaymentModalTarget,
+  type PaymentPoSummaryOption,
   type PaymentVendorBankOption,
 } from "@/app/components/apps/finance/PaymentModal";
 import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
-import FinancePaymentProofReplacement from "@/app/components/apps/finance/FinancePaymentProofReplacement";
+import FinancePaymentProofReplacement, {
+  type ReplacingProofTarget,
+} from "@/app/components/apps/finance/FinancePaymentProofReplacement";
 import OfficeExpenseModal from "@/app/components/apps/finance/OfficeExpenseModal";
 import EditOfficeExpenseModal from "@/app/components/apps/finance/EditOfficeExpenseModal";
 import FinanceLedger, {
@@ -57,11 +61,12 @@ import VendorContractBillingPanel from "@/app/components/apps/finance/VendorCont
 import type { RentalItemRow } from "@/app/actions/rentals";
 import type {
   MaterialContractRow,
+  MaterialDeliveryRow,
   VendorInvoiceRow,
 } from "@/lib/material-contracts";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { getFieldCostLabel } from "@/lib/ticket-field-costs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +75,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -79,9 +85,16 @@ import {
   TableRow,
   TablePaginationControls,
 } from "@/components/ui/table";
-import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Input } from "@/components/ui/input";
 import { FormLabel, Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   GlobalModal,
 } from "@/components/ui/global-modal";
@@ -94,11 +107,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   photoDownloadHref,
   withLocalPhotoPreview,
@@ -116,17 +124,23 @@ import {
   UserRole,
 } from "@prisma/client";
 import {
+  AlertTriangle,
   Download,
   ExternalLink,
   Eye,
   FileCheck2,
+  FileSpreadsheet,
   FileText,
   Fuel,
   History,
+  Home,
+  Landmark,
+  Layers,
   Plus,
   Pencil,
   ReceiptText,
   Search,
+  Truck,
   Wallet,
 } from "lucide-react";
 
@@ -212,8 +226,24 @@ type PaymentTransaction = {
   paidAt: string | null;
 };
 
+type FinanceTicketRentalDetails = {
+  rentalType: string | null;
+  usageScope: string | null;
+  assetName: string | null;
+  propertyAddress: string | null;
+  landlordName: string | null;
+  landlordPhone: string | null;
+  occupantCount: number | null;
+  codeOrPlate: string | null;
+  periodType: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  duration: number | null;
+};
+
 type FinanceTicket = {
   id: string;
+  status: string;
   ticketType?: string | null;
   ticketNumber: string;
   title: string;
@@ -221,6 +251,11 @@ type FinanceTicket = {
   hasApprovedPo?: boolean;
   poNumber?: string | null;
   totalAmount: string | null;
+  aggregatedPoTotalAmount?: string | null;
+  poSummaries?: PaymentPoSummaryOption[];
+  itemsSummary?: Array<{ itemName: string; quantity: number; unit: string }>;
+  deliveryOrderCount?: number;
+  rentalDetails?: FinanceTicketRentalDetails | null;
   purchaseReceiptUrl: string | null;
   receiptUrls: string[];
   requesterName: string;
@@ -229,6 +264,7 @@ type FinanceTicket = {
   accountNumber: string | null;
   transferDestination: string | null;
   requestCategory: TicketRequestCategory | null;
+  fieldCategory?: string | null;
   requestPaymentMethod: POPaymentMethod | null;
   requestPaymentDescription: string | null;
   vendorBankName: string | null;
@@ -265,15 +301,19 @@ type FinanceHistoryTransaction = {
   id: string;
   reference: string;
   title: string;
-  targetKind: FinancePaymentRow["kind"];
+  targetKind:
+    | FinancePaymentRow["kind"]
+    | "vendor-invoice"
+    | "rental";
   targetId: string;
-  paymentType: PaymentType;
+  paymentType: PaymentType | string;
   amount: number;
   transferDestination: string;
   proofOfTransferUrl: string | null;
   additionalProofUrls: string[];
   proofEditDisabledUrls: string[];
   paidAt: string | null;
+  canEditProof?: boolean;
 };
 
 type FinanceTermyn = {
@@ -328,6 +368,10 @@ type Selection =
 
 type FinancePaymentRow = PaymentModalTarget & {
   kind: "ticket" | "standalone-po" | "direct-purchase";
+  itemsSummary?: Array<{ itemName: string; quantity: number; unit: string }>;
+  deliveryOrderCount?: number;
+  ticketStatus?: string;
+  fieldCategoryLabel?: string;
 };
 
 const internalFundingCategories = [
@@ -355,36 +399,35 @@ function FinanceAccountField({
   id,
   accounts,
   disabled,
-  required = true,
 }: {
   id: string;
   accounts: FinanceAccountOption[];
   disabled: boolean;
-  required?: boolean;
 }) {
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>Dibayar Dari (Buku Bank/Kas)</Label>
-      <select
-        id={id}
-        name="financeAccountId"
-        required={required}
-        defaultValue=""
+      <Label htmlFor={id}>Sumber Kas / Bank</Label>
+      <input type="hidden" name="financeAccountId" value={selectedAccountId} />
+      <Select
+        value={selectedAccountId}
+        onValueChange={setSelectedAccountId}
         disabled={disabled || accounts.length === 0}
-        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
       >
-        <option value="" disabled>
-          Pilih akun sumber pembayaran
-        </option>
-        {accounts.map((account) => (
-          <option key={account.id} value={account.id}>
-            {account.accountName} · {currency(account.balance)}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Pilih akun sumber" />
+        </SelectTrigger>
+        <SelectContent>
+          {accounts.map((account) => (
+            <SelectItem key={account.id} value={account.id}>
+              {account.accountName} · {currency(account.balance)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {accounts.length === 0 && (
-        <p className="text-sm text-destructive" role="alert">
-          Buat buku bank/kas terlebih dahulu di tab Buku Kas &amp; Arus Dana.
+        <p className="type-p2 text-destructive" role="alert">
+          Buat buku bank/kas terlebih dahulu di tab Buku Kas.
         </p>
       )}
     </div>
@@ -415,6 +458,7 @@ export default function FinanceHub({
   role,
   initialTab,
   initialOpenSheet,
+  initialOpenInvoice,
   dashboardMonths,
   financeAccounts,
   officeExpenses,
@@ -433,6 +477,7 @@ export default function FinanceHub({
   directorSignerName,
   rentals = [],
   materialContracts = [],
+  materialDeliveries = [],
   vendorInvoices = [],
 }: {
   purchaseOrders: FinanceOrder[];
@@ -448,6 +493,7 @@ export default function FinanceHub({
   role: UserRole;
   initialTab?: string;
   initialOpenSheet?: string;
+  initialOpenInvoice?: string;
   dashboardMonths: FinanceDashboardMonth[];
   financeAccounts: FinanceAccountOption[];
   officeExpenses: FinanceOfficeExpense[];
@@ -466,6 +512,7 @@ export default function FinanceHub({
   directorSignerName?: string;
   rentals?: RentalItemRow[];
   materialContracts?: MaterialContractRow[];
+  materialDeliveries?: MaterialDeliveryRow[];
   vendorInvoices?: VendorInvoiceRow[];
 }) {
   const router = useRouter();
@@ -533,6 +580,12 @@ export default function FinanceHub({
     label: string;
     url: string;
   } | null>(null);
+  const [replacingProofTarget, setReplacingProofTarget] =
+    useState<ReplacingProofTarget | null>(null);
+  const [selectedTicketPoId, setSelectedTicketPoId] = useState("");
+  const [focusedVendorInvoiceId, setFocusedVendorInvoiceId] = useState<
+    string | null
+  >(initialOpenInvoice ?? null);
   const [unavailableProofUrls, setUnavailableProofUrls] = useState<string[]>([]);
   const [reviewSearch, setReviewSearch] = useState("");
   const [paymentQueueSearch, setPaymentQueueSearch] = useState("");
@@ -590,6 +643,14 @@ export default function FinanceHub({
     selection?.kind === "ticket"
       ? tickets.find((ticket) => ticket.id === selection.id)
       : undefined;
+  const activeTicketPoSummaries = activeTicket?.poSummaries ?? [];
+  const selectedTicketPo =
+    activeTicket && activeTicketPoSummaries.length > 0
+      ? activeTicketPoSummaries.find((po) => po.id === selectedTicketPoId) ??
+        activeTicketPoSummaries.find((po) => !po.isPaid && po.hasInvoice) ??
+        activeTicketPoSummaries.find((po) => !po.isPaid) ??
+        activeTicketPoSummaries[0]
+      : null;
   const previewOrder = activeOrder ?? activeStandaloneOrder;
   const paymentHistory =
     activeTicket?.paymentTransactions ??
@@ -597,7 +658,9 @@ export default function FinanceHub({
     previewOrder?.paymentTransactions ??
     [];
   const paymentTotal = activeTicket
-    ? Number(activeTicket.totalAmount ?? 0)
+    ? selectedTicketPo
+      ? selectedTicketPo.totalAmount
+      : Number(activeTicket.aggregatedPoTotalAmount ?? activeTicket.totalAmount ?? 0)
     : activeDirectPurchase
       ? Number(activeDirectPurchase.totalAmount)
       : Math.round(
@@ -608,11 +671,14 @@ export default function FinanceHub({
             ) * (previewOrder?.includeTax ? 1.11 : 1)) *
             100,
         ) / 100;
-  const paidAmount = paymentHistory.reduce(
-    (sum, payment) => sum + payment.amount,
-    0,
-  );
-  const isFirstPayment = paymentHistory.length === 0;
+  const paidAmount = activeTicket
+    ? selectedTicketPo
+      ? selectedTicketPo.paidAmount
+      : paymentHistory.reduce((sum, payment) => sum + payment.amount, 0)
+    : paymentHistory.reduce((sum, payment) => sum + payment.amount, 0);
+  const isFirstPayment = activeTicket && selectedTicketPo
+    ? selectedTicketPo.paidAmount <= 0
+    : paymentHistory.length === 0;
   const currentPaymentType =
     !isFirstPayment && paymentType === PaymentType.DOWN_PAYMENT
       ? PaymentType.FULL_PAYMENT
@@ -631,46 +697,83 @@ export default function FinanceHub({
       : "BELUM DIBAYAR";
   const paymentRows: FinancePaymentRow[] = [
     ...tickets.map((ticket) => {
-      const grandTotal = Number(ticket.totalAmount ?? 0);
+      const poSummaries = ticket.poSummaries ?? [];
+      const grandTotal = Number(
+        ticket.aggregatedPoTotalAmount ?? ticket.totalAmount ?? 0,
+      );
       const paidTicketAmount = ticket.paymentTransactions.reduce(
         (total, payment) => total + payment.amount,
         0,
       );
-      const needsInvoice =
-        (ticket.type === TicketType.MATERIAL || Boolean(ticket.hasApprovedPo)) &&
-        !ticket.purchaseReceiptUrl;
-      const ticketVendorAccounts = toPaymentVendorBankOptions(
-        ticket.vendorBankAccounts,
-        ticket.vendorAccountName ?? ticket.recipientName ?? ticket.requesterName,
-      );
+      const hasInvoice =
+        poSummaries.length > 1
+          ? poSummaries.every((po) => po.isPaid) ||
+            poSummaries.some((po) => !po.isPaid && po.hasInvoice)
+          : poSummaries.length === 1
+            ? poSummaries[0].isPaid ||
+              poSummaries[0].hasInvoice ||
+              Boolean(ticket.purchaseReceiptUrl)
+            : !(
+                (ticket.type === TicketType.MATERIAL ||
+                  Boolean(ticket.hasApprovedPo)) &&
+                !ticket.purchaseReceiptUrl
+              );
+      const prioritizedPo =
+        poSummaries.find((po) => !po.isPaid && po.hasInvoice) ??
+        poSummaries.find((po) => !po.isPaid) ??
+        poSummaries[0] ??
+        null;
+      const ticketVendorAccounts =
+        prioritizedPo && prioritizedPo.vendorBankAccounts.length > 0
+          ? prioritizedPo.vendorBankAccounts
+          : toPaymentVendorBankOptions(
+              ticket.vendorBankAccounts,
+              ticket.vendorAccountName ??
+                ticket.recipientName ??
+                ticket.requesterName,
+            );
       const ticketVendorBankDestination =
+        prioritizedPo?.transferDestination ??
         formatVendorTransferDestination({
           bankName: ticket.vendorBankName,
           accountNumber: ticket.vendorAccountNumber,
           accountName: ticket.vendorAccountName,
-        }) ||
-        ticketVendorAccounts[0]?.destination ||
+        }) ??
+        ticketVendorAccounts[0]?.destination ??
         "";
+      const referenceLabel =
+        poSummaries.length > 1
+          ? `${ticket.ticketNumber} (${poSummaries.length} PO)`
+          : ticket.poNumber
+            ? `${ticket.ticketNumber} (${ticket.poNumber})`
+            : ticket.ticketNumber;
       return {
         id: ticket.id,
         kind: "ticket" as const,
-        reference: ticket.poNumber
-          ? `${ticket.ticketNumber} (${ticket.poNumber})`
-          : ticket.ticketNumber,
+        reference: referenceLabel,
         title: ticket.title,
         grandTotal,
         paidAmount: paidTicketAmount,
-        isFirstPayment: ticket.paymentTransactions.length === 0,
+        isFirstPayment: prioritizedPo
+          ? prioritizedPo.paidAmount <= 0
+          : ticket.paymentTransactions.length === 0,
         transferDestination:
-          ticket.transferDestination ?? ticketVendorBankDestination,
+          prioritizedPo?.transferDestination ??
+          ticket.transferDestination ??
+          ticketVendorBankDestination,
         vendorBankDestination: ticketVendorBankDestination,
         vendorBankAccounts: ticketVendorAccounts,
+        poSummaries,
+        itemsSummary: ticket.itemsSummary,
+        deliveryOrderCount: ticket.deliveryOrderCount,
+        fieldCategoryLabel: getFieldCostLabel(ticket.fieldCategory) ?? undefined,
+        ticketStatus: ticket.status,
         isInternalFunding: internalFundingCategories.some(
           (category) => category === ticket.requestCategory,
         ),
         requesterName: ticket.requesterName,
         receiptUrls: ticket.receiptUrls,
-        hasInvoice: !needsInvoice,
+        hasInvoice,
         needsNominalInput:
           !(Number.isFinite(grandTotal) && grandTotal > 0) &&
           paidTicketAmount === 0,
@@ -762,6 +865,24 @@ export default function FinanceHub({
       row.grandTotal - row.paidAmount > 0.005,
   );
   const pendingPaymentCount = pendingPaymentRows.length;
+  const unpaidVendorInvoices = vendorInvoices.filter(
+    (invoice) => invoice.status !== "PAID",
+  );
+  const unbilledMaterialDosCount = materialContracts.reduce(
+    (sum, contract) => sum + contract.unbilledDeliveriesCount,
+    0,
+  );
+  const unbilledMaterialEstimateAmount = materialContracts.reduce(
+    (sum, contract) => sum + contract.unbilledEstimatedAmount,
+    0,
+  );
+  const unpaidVendorInvoiceAmount = unpaidVendorInvoices.reduce(
+    (sum, invoice) => sum + invoice.remainingAmount,
+    0,
+  );
+  const materialAlamBadgeCount =
+    unpaidVendorInvoices.length + unbilledMaterialDosCount;
+
   const normalizedReviewSearch = reviewSearch.trim().toLocaleLowerCase("id-ID");
   const filteredReviewOrders = normalizedReviewSearch
     ? purchaseOrders.filter((order) =>
@@ -790,6 +911,9 @@ export default function FinanceHub({
           String(Math.max(0, row.grandTotal - row.paidAmount)),
           currency(Math.max(0, row.grandTotal - row.paidAmount)),
           row.transferDestination,
+          row.fieldCategoryLabel ?? "",
+          ...(row.poSummaries?.map((po) => `${po.poNumber} ${po.vendorName}`) ?? []),
+          ...(row.itemsSummary?.map((item) => item.itemName) ?? []),
         ].some((value) =>
           value.toLocaleLowerCase("id-ID").includes(normalizedPaymentQueueSearch),
         ),
@@ -803,6 +927,7 @@ export default function FinanceHub({
         title: `PO · ${order.vendorName}`,
         targetKind: "standalone-po" as const,
         targetId: order.publicCode,
+        canEditProof: true,
       })),
     ),
     ...directPurchases.flatMap((purchase) =>
@@ -812,6 +937,7 @@ export default function FinanceHub({
         title: `Pembelian langsung · ${purchase.vendorName}`,
         targetKind: "direct-purchase" as const,
         targetId: purchase.id,
+        canEditProof: true,
       })),
     ),
     ...tickets.flatMap((ticket) =>
@@ -821,8 +947,51 @@ export default function FinanceHub({
         title: ticket.title,
         targetKind: "ticket" as const,
         targetId: ticket.id,
+        canEditProof: true,
       })),
     ),
+    ...vendorInvoices.flatMap((invoice) =>
+      invoice.payments.map((payment) => ({
+        id: `vi-pay-${payment.id}`,
+        reference: invoice.invoiceNumber,
+        title: `Material Alam · ${invoice.vendorName} (${invoice.materialType})`,
+        targetKind: "vendor-invoice" as const,
+        targetId: invoice.id,
+        paymentType: payment.paymentType,
+        amount: payment.amount,
+        transferDestination: payment.transferDestination,
+        proofOfTransferUrl: payment.proofOfTransferUrl,
+        additionalProofUrls: [],
+        proofEditDisabledUrls: [],
+        paidAt: payment.paidAt,
+        canEditProof: false,
+      })),
+    ),
+    ...rentals
+      .filter((r) => r.paymentStatus === "PAID" && Boolean(r.proofOfPaymentUrl))
+      .map((r) => ({
+        id: `rental-pay-${r.id}`,
+        reference:
+          r.type === "HOUSE"
+            ? "Sewa Rumah"
+            : r.type === "VEHICLE"
+              ? "Sewa Kendaraan"
+              : "Sewa Alat",
+        title: `${r.name} · ${r.landlordName || r.vendorName}`,
+        targetKind: "rental" as const,
+        targetId: r.id,
+        paymentType: PaymentType.FULL_PAYMENT,
+        amount: Number(r.totalCost) || 0,
+        transferDestination:
+          [r.paymentBankName, r.paymentAccountNumber, r.paymentAccountName]
+            .filter(Boolean)
+            .join(" · ") || r.vendorName,
+        proofOfTransferUrl: r.proofOfPaymentUrl,
+        additionalProofUrls: [],
+        proofEditDisabledUrls: [],
+        paidAt: r.paidAt ?? r.createdAt,
+        canEditProof: false,
+      })),
   ].sort(
     (a, b) =>
       (b.paidAt ? new Date(b.paidAt).getTime() : 0) -
@@ -876,12 +1045,34 @@ export default function FinanceHub({
     : null;
 
   const openPaymentHistory = (row: FinancePaymentRow) => {
+    setSelectedTicketPoId("");
     setSelection(
       row.kind === "ticket"
         ? { kind: "ticket", id: row.id }
         : row.kind === "standalone-po"
           ? { kind: "standalone-po", id: row.id }
           : { kind: "direct-purchase", id: row.id },
+    );
+  };
+
+  const openHistoryRowTarget = (payment: FinanceHistoryTransaction) => {
+    if (payment.targetKind === "vendor-invoice") {
+      setFocusedVendorInvoiceId(payment.targetId);
+      setActiveTab("vendor-contracts");
+      return;
+    }
+    if (payment.targetKind === "rental") {
+      setActiveTab("operations");
+      setOperationsTab("rentals");
+      return;
+    }
+    setSelectedTicketPoId("");
+    setSelection(
+      payment.targetKind === "ticket"
+        ? { kind: "ticket", id: payment.targetId }
+        : payment.targetKind === "standalone-po"
+          ? { kind: "standalone-po", id: payment.targetId }
+          : { kind: "direct-purchase", id: payment.targetId },
     );
   };
 
@@ -892,12 +1083,17 @@ export default function FinanceHub({
         const result = await reviewPurchaseOrder(publicCode);
         setMessage(result.message);
         if (result.success) {
+          toast.success(result.message || "PO ditandai sudah diperiksa.");
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Finance PO review failed:", error);
-        setMessage("Pemeriksaan PO gagal. Silakan coba kembali.");
+        const errMsg = "Pemeriksaan PO gagal. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -931,11 +1127,10 @@ export default function FinanceHub({
       financeNote: String(data.get("financeNote") ?? ""),
       ...(transferProof ? { transferProof } : {}),
     };
-    if (
-      approve &&
-      !financeAccountId
-    ) {
-      setMessage("Pilih buku kas/bank sumber dana BBM terlebih dahulu.");
+    if (approve && !financeAccountId) {
+      const errMsg = "Pilih buku kas/bank sumber dana BBM terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     if (
@@ -943,7 +1138,9 @@ export default function FinanceHub({
       disbursementMethod === POPaymentMethod.TRANSFER &&
       !input.transferProof
     ) {
-      setMessage("Bukti transfer wajib diunggah sebelum pencairan dicatat.");
+      const errMsg = "Bukti transfer wajib diunggah sebelum pencairan dicatat.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
 
@@ -957,6 +1154,7 @@ export default function FinanceHub({
         );
         setMessage(result.message);
         if (result.success) {
+          toast.success(result.message || "Request BBM diproses.");
           setFuelTransferProofs((current) => {
             const next = { ...current };
             delete next[requestId];
@@ -964,10 +1162,14 @@ export default function FinanceHub({
           });
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Finance fuel request decision failed:", error);
-        setMessage("Request BBM gagal diproses. Silakan coba kembali.");
+        const errMsg = "Request BBM gagal diproses. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -988,12 +1190,17 @@ export default function FinanceHub({
         );
         setMessage(result.message);
         if (result.success) {
+          toast.success(result.message || "Rekonsiliasi BBM diselesaikan.");
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Finance fuel reconciliation failed:", error);
-        setMessage("Rekonsiliasi BBM gagal ditutup. Silakan coba kembali.");
+        const errMsg = "Rekonsiliasi BBM gagal ditutup. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -1004,7 +1211,9 @@ export default function FinanceHub({
       (!activeTicket && !activeStandaloneOrder && !activeDirectPurchase) ||
       receiptUrl.length === 0
     ) {
-      setMessage("Pilih PO/tiket dan unggah bukti pembayaran terlebih dahulu.");
+      const errMsg = "Pilih PO/tiket dan unggah bukti pembayaran terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     const formData = new FormData(event.currentTarget);
@@ -1021,7 +1230,9 @@ export default function FinanceHub({
         ? rawPaymentMethod
         : undefined;
     if (!financeAccountId) {
-      setMessage("Pilih buku kas/bank sumber pembayaran terlebih dahulu.");
+      const errMsg = "Pilih buku kas/bank sumber pembayaran terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     const amount =
@@ -1032,7 +1243,11 @@ export default function FinanceHub({
     startTransition(async () => {
       try {
         const target = activeTicket
-          ? { kind: "ticket" as const, id: activeTicket.id }
+          ? {
+              kind: "ticket" as const,
+              id: activeTicket.id,
+              ...(selectedTicketPo ? { poId: selectedTicketPo.id } : {}),
+            }
           : activeStandaloneOrder
             ? {
                 kind: "purchase-order" as const,
@@ -1065,15 +1280,20 @@ export default function FinanceHub({
               });
         setMessage(result.message);
         if (result.success) {
+          toast.success(result.message || "Pembayaran berhasil dicatat.");
           setReceiptUrl([]);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Finance ticket payment failed:", error);
-        setMessage("Pembayaran gagal diproses. Silakan coba kembali.");
+        const errMsg = "Pembayaran gagal diproses. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -1085,6 +1305,7 @@ export default function FinanceHub({
     amount: number,
     financeAccountId: string,
     paymentMethod?: POPaymentMethod,
+    poId?: string,
   ): Promise<TicketActionResult> => {
     if (!selectedPaymentRow) {
       return { success: false, message: "Tagihan tidak ditemukan." };
@@ -1109,7 +1330,11 @@ export default function FinanceHub({
     }
     const target =
       selectedPaymentRow.kind === "ticket"
-        ? { kind: "ticket" as const, id: selectedPaymentRow.id }
+        ? {
+            kind: "ticket" as const,
+            id: selectedPaymentRow.id,
+            ...(poId ? { poId } : {}),
+          }
         : selectedPaymentRow.kind === "standalone-po"
           ? { kind: "purchase-order" as const, id: selectedPaymentRow.id }
           : { kind: "direct-purchase" as const, id: selectedPaymentRow.id };
@@ -1155,9 +1380,10 @@ export default function FinanceHub({
         delete next[key];
         return next;
       });
-      setMessage(
-        error instanceof Error ? error.message : "File bukti tidak valid.",
-      );
+      const errMsg =
+        error instanceof Error ? error.message : "File bukti tidak valid.";
+      setMessage(errMsg);
+      toast.error(errMsg);
     }
   };
 
@@ -1168,14 +1394,19 @@ export default function FinanceHub({
     event.preventDefault();
     const file = termynReceipts[termynId];
     if (!file) {
-      setMessage("Pilih bukti transfer termin terlebih dahulu.");
+      const errMsg = "Pilih bukti transfer termin terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     const financeAccountId = String(
       new FormData(event.currentTarget).get("financeAccountId") ?? "",
     );
     if (!financeAccountId) {
-      setMessage("Pilih buku kas/bank sumber pembayaran termin terlebih dahulu.");
+      const errMsg =
+        "Pilih buku kas/bank sumber pembayaran termin terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     startTransition(async () => {
@@ -1187,6 +1418,7 @@ export default function FinanceHub({
         );
         setMessage(result.message);
         if (result.success) {
+          toast.success(result.message || "Termin subkon berhasil dibayar.");
           setTermynReceipts((current) => {
             const next = { ...current };
             delete next[termynId];
@@ -1194,10 +1426,14 @@ export default function FinanceHub({
           });
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Subcontract termyn payment failed:", error);
-        setMessage("Pembayaran termin gagal. Silakan coba kembali.");
+        const errMsg = "Pembayaran termin gagal. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -1209,14 +1445,19 @@ export default function FinanceHub({
     event.preventDefault();
     const file = retentionReceipts[contractId];
     if (!file) {
-      setMessage("Pilih bukti transfer retensi terlebih dahulu.");
+      const errMsg = "Pilih bukti transfer retensi terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     const financeAccountId = String(
       new FormData(event.currentTarget).get("financeAccountId") ?? "",
     );
     if (!financeAccountId) {
-      setMessage("Pilih buku kas/bank sumber pencairan retensi terlebih dahulu.");
+      const errMsg =
+        "Pilih buku kas/bank sumber pencairan retensi terlebih dahulu.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
     startTransition(async () => {
@@ -1227,10 +1468,17 @@ export default function FinanceHub({
           financeAccountId,
         );
         setMessage(result.message);
-        if (result.success) router.refresh();
+        if (result.success) {
+          toast.success(result.message || "Retensi berhasil dicairkan.");
+          router.refresh();
+        } else {
+          toast.error(result.message);
+        }
       } catch (error) {
         console.error("Subcontract retention release failed:", error);
-        setMessage("Pencairan retensi gagal. Silakan coba kembali.");
+        const errMsg = "Pencairan retensi gagal. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -1258,13 +1506,25 @@ export default function FinanceHub({
               Foto bukti tidak dapat dimuat
             </span>
             {canEdit && (
-              <FinancePaymentProofReplacement
-                paymentTransactionId={paymentTransactionId}
-                existingProofUrl={url}
-                proofIndex={proofIndex}
-                label={label}
-                onSaved={() => router.refresh()}
-              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setReplacingProofTarget({
+                    paymentTransactionId,
+                    existingProofUrl: url,
+                    proofIndex,
+                    label,
+                    buttonLabel: "Ganti Bukti",
+                  });
+                }}
+              >
+                <Pencil className="size-3.5" aria-hidden="true" />
+                Ganti Bukti
+              </Button>
             )}
           </div>
         );
@@ -1286,13 +1546,25 @@ export default function FinanceHub({
             Lihat Bukti
           </Button>
           {canEdit && (
-            <FinancePaymentProofReplacement
-              paymentTransactionId={paymentTransactionId}
-              existingProofUrl={url}
-              proofIndex={proofIndex}
-              label={label}
-              onSaved={() => router.refresh()}
-            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={(event) => {
+                event.stopPropagation();
+                setReplacingProofTarget({
+                  paymentTransactionId,
+                  existingProofUrl: url,
+                  proofIndex,
+                  label,
+                  buttonLabel: "Ganti Bukti",
+                });
+              }}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Ganti Bukti
+            </Button>
           )}
         </div>
       );
@@ -1317,14 +1589,25 @@ export default function FinanceHub({
           </a>
         </Button>
         {url.startsWith("/api/tickets/receipts/") && canEdit && (
-          <FinancePaymentProofReplacement
-            paymentTransactionId={paymentTransactionId}
-            existingProofUrl={url}
-            proofIndex={proofIndex}
-            label={label}
-            onSaved={() => router.refresh()}
-            buttonLabel="Unggah Ulang"
-          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-xs"
+            onClick={(event) => {
+              event.stopPropagation();
+              setReplacingProofTarget({
+                paymentTransactionId,
+                existingProofUrl: url,
+                proofIndex,
+                label,
+                buttonLabel: "Unggah Ulang",
+              });
+            }}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Unggah Ulang
+          </Button>
         )}
       </div>
     );
@@ -1393,22 +1676,79 @@ export default function FinanceHub({
     setLedgerFundMode("transfer");
   };
 
-  const reportPayables = pendingPaymentRows.map((row) => ({
-    id: `${row.kind}-${row.id}`,
-    reference: row.reference,
-    title: row.title,
-    vendorOrRequester: row.requesterName ?? row.title,
-    sourceLabel:
-      row.kind === "ticket"
-        ? "Tiket & Permintaan"
-        : row.kind === "standalone-po"
-          ? "Purchase Order (PO)"
-          : "Belanja Material Langsung",
-    grandTotal: row.grandTotal,
-    paidAmount: row.paidAmount,
-    remainingAmount: Math.max(0, row.grandTotal - row.paidAmount),
-    transferDestination: row.transferDestination,
-  }));
+  const ticketIdSet = new Set(tickets.map((t) => t.id));
+  const standalonePendingRentals = rentals.filter(
+    (rental) =>
+      rental.paymentStatus !== "PAID" &&
+      (!rental.sourceTicketId || !ticketIdSet.has(rental.sourceTicketId)) &&
+      Number(rental.totalCost) > 0,
+  );
+  const totalOutstandingAmount =
+    pendingPaymentRows.reduce(
+      (total, row) => total + Math.max(0, row.grandTotal - row.paidAmount),
+      0,
+    ) +
+    unpaidVendorInvoiceAmount +
+    standalonePendingRentals.reduce(
+      (total, rental) => total + Math.max(0, Number(rental.totalCost) || 0),
+      0,
+    );
+
+  const reportPayables = [
+    ...pendingPaymentRows.map((row) => ({
+      id: `${row.kind}-${row.id}`,
+      reference: row.reference,
+      title: row.title,
+      vendorOrRequester: row.requesterName ?? row.title,
+      sourceLabel:
+        row.kind === "ticket"
+          ? "Tiket & Permintaan"
+          : row.kind === "standalone-po"
+            ? "Purchase Order (PO)"
+            : "Belanja Material Langsung",
+      grandTotal: row.grandTotal,
+      paidAmount: row.paidAmount,
+      remainingAmount: Math.max(0, row.grandTotal - row.paidAmount),
+      transferDestination: row.transferDestination,
+    })),
+    ...unpaidVendorInvoices.map((invoice) => ({
+      id: `vendor-invoice-${invoice.id}`,
+      reference: invoice.invoiceNumber,
+      title: `Material Alam · ${invoice.materialType}`,
+      vendorOrRequester: invoice.vendorName,
+      sourceLabel: "Kontrak Material Alam",
+      grandTotal: invoice.grandTotal,
+      paidAmount: invoice.paidAmount,
+      remainingAmount: Math.max(0, invoice.remainingAmount),
+      transferDestination:
+        invoice.vendorBankAccounts.find((b) => b.isPrimary)?.destination ??
+        invoice.vendorBankAccounts[0]?.destination ??
+        invoice.vendorName,
+    })),
+    ...standalonePendingRentals.map((rental) => ({
+      id: `rental-${rental.id}`,
+      reference:
+        rental.type === "HOUSE"
+          ? "Sewa Rumah"
+          : rental.type === "VEHICLE"
+            ? "Sewa Kendaraan"
+            : "Sewa Alat",
+      title: rental.name,
+      vendorOrRequester: rental.landlordName || rental.vendorName,
+      sourceLabel: "Tagihan Sewa",
+      grandTotal: Number(rental.totalCost) || 0,
+      paidAmount: 0,
+      remainingAmount: Math.max(0, Number(rental.totalCost) || 0),
+      transferDestination:
+        [
+          rental.paymentBankName,
+          rental.paymentAccountNumber,
+          rental.paymentAccountName,
+        ]
+          .filter(Boolean)
+          .join(" · ") || rental.vendorName,
+    })),
+  ];
 
   const existingTxIds = new Set(dashboardTransactions.map((tx) => tx.id));
   const extraIncomingFromCashflows: FinanceDashboardTransaction[] = cashflows
@@ -1449,11 +1789,7 @@ export default function FinanceHub({
       <FinanceDashboard
         reviewCount={purchaseOrders.length}
         pendingPaymentCount={pendingPaymentCount}
-        outstandingAmount={pendingPaymentRows.reduce(
-          (total, row) =>
-            total + Math.max(0, row.grandTotal - row.paidAmount),
-          0,
-        )}
+        outstandingAmount={totalOutstandingAmount}
         months={dashboardMonths}
         accounts={financeAccounts}
         transactions={allDashboardTransactions}
@@ -1490,14 +1826,15 @@ export default function FinanceHub({
         <div
           role="tablist"
           aria-label="Navigasi Tahapan Finance Hub"
-          className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4"
+          className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 sm:overflow-visible sm:pb-0"
         >
           {(
             [
               {
                 value: "check",
                 title: "Periksa PO",
-                subtitle: "Verifikasi draft PO & pajak",
+                subtitle: "Verifikasi draft PO",
+                icon: FileCheck2,
                 count: `${purchaseOrders.length} PO`,
                 badgeVariant:
                   purchaseOrders.length > 0
@@ -1507,7 +1844,8 @@ export default function FinanceHub({
               {
                 value: "payment",
                 title: "Antrean Bayar",
-                subtitle: "Eksekusi tagihan PO & tiket",
+                subtitle: "Tagihan PO & tiket",
+                icon: Wallet,
                 count: `${pendingPaymentCount} Tagihan`,
                 badgeVariant:
                   pendingPaymentCount > 0
@@ -1516,28 +1854,28 @@ export default function FinanceHub({
               },
               {
                 value: "vendor-contracts",
-                title: "Tagihan Kontrak Vendor",
-                subtitle: "Rekap DO pasir, batu & curah",
-                count: `${
-                  vendorInvoices.filter((invoice) => invoice.status !== "PAID")
-                    .length
-                } Tagihan`,
+                title: "Material Alam",
+                subtitle: "DO & invoice supplier",
+                icon: Truck,
+                count: `${materialAlamBadgeCount} Tagihan`,
                 badgeVariant:
-                  vendorInvoices.some((invoice) => invoice.status !== "PAID")
+                  materialAlamBadgeCount > 0
                     ? ("warning" as const)
                     : ("outline" as const),
               },
               {
                 value: "ledger",
-                title: "Buku Kas & Mutasi",
-                subtitle: "Saldo rekening & arus dana",
+                title: "Buku Kas",
+                subtitle: "Saldo & mutasi kas",
+                icon: Landmark,
                 count: `${financeAccounts.length} Akun`,
                 badgeVariant: "outline" as const,
               },
               {
                 value: "history",
-                title: "Riwayat Bukti",
-                subtitle: "Arsip bukti transfer lunas",
+                title: "Riwayat",
+                subtitle: "Arsip bukti transfer",
+                icon: History,
                 count: `${paymentHistoryRows.length} Bukti`,
                 badgeVariant: "outline" as const,
               },
@@ -1546,7 +1884,8 @@ export default function FinanceHub({
                     {
                       value: "office-expense",
                       title: "Kas Kantor",
-                      subtitle: "Gaji, kasbon & reimburse",
+                      subtitle: "Gaji & operasional",
+                      icon: ReceiptText,
                       count: `${officeExpenses.length} Data`,
                       badgeVariant: "outline" as const,
                     },
@@ -1554,41 +1893,49 @@ export default function FinanceHub({
                 : []),
               {
                 value: "operations",
-                title: "Subkon & BBM",
-                subtitle: "Termin subkon & klaim BBM",
-                count: `${termyns.length + vehicleTripLogs.length + vehicleFuelRequests.length} Item`,
+                title: "Subkon & Sewa",
+                subtitle: "Sewa, subkon & BBM",
+                icon: Layers,
+                count: `${
+                  rentals.filter((r) => r.paymentStatus === "PENDING_PAYMENT")
+                    .length +
+                  termyns.length +
+                  vehicleTripLogs.length +
+                  vehicleFuelRequests.length
+                } Item`,
                 badgeVariant: "outline" as const,
               },
             ] as const
-          ).map((item, idx) => {
+          ).map((item) => {
             const isActive = activeTab === item.value;
-            const stepNum = String(idx + 1).padStart(2, "0");
+            const TabIcon = item.icon;
             return (
               <button
                 key={item.value}
                 type="button"
                 role="tab"
+                suppressHydrationWarning
                 aria-selected={isActive}
                 onClick={() => setActiveTab(item.value)}
-                className={`group flex flex-col justify-between gap-2 rounded-xl border p-3.5 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
+                className={`group flex min-w-[148px] shrink-0 flex-col justify-between gap-1.5 rounded-xl border p-2.5 text-left transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-w-0 sm:p-3 ${
                   isActive
                     ? "border-primary bg-primary/10 shadow-xs"
                     : "border-border/80 bg-card hover:border-primary/40 hover:bg-muted/20"
                 }`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-1.5">
                     <span
-                      className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                      className={`inline-flex size-6 shrink-0 items-center justify-center rounded-md ${
                         isActive
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground group-hover:text-foreground"
                       }`}
                     >
-                      {stepNum}
+                      <TabIcon className="size-3.5" aria-hidden="true" />
                     </span>
                     <span
-                      className={`truncate text-xs font-bold tracking-wide uppercase ${
+                      className={`type-p2 truncate font-semibold ${
                         isActive ? "text-primary" : "text-foreground"
                       }`}
                     >
@@ -1597,12 +1944,12 @@ export default function FinanceHub({
                   </div>
                   <Badge
                     variant={isActive ? "default" : item.badgeVariant}
-                    className="shrink-0 px-1.5 py-0 text-[10px] tabular-nums"
+                    className="type-p3 shrink-0 px-1.5 py-0 tabular-nums"
                   >
                     {item.count}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-1">
+                <p className="type-p3 hidden line-clamp-1 text-muted-foreground sm:block">
                   {item.subtitle}
                 </p>
               </button>
@@ -1621,6 +1968,7 @@ export default function FinanceHub({
                 role === UserRole.FINANCE ||
                 role === UserRole.ADMINISTRATIONS
               }
+              canEditProof={role === UserRole.FINANCE}
               fundMode={ledgerFundMode}
               onFundModeChange={setLedgerFundMode}
               typeFilter={ledgerTypeFilter}
@@ -1635,8 +1983,10 @@ export default function FinanceHub({
             <Card>
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
-                  <CardTitle>Pengeluaran Kantor &amp; Operasional</CardTitle>
-                  <p className="text-sm text-muted-foreground">
+                  <CardTitle className="type-h3">
+                    Pengeluaran Kantor &amp; Operasional
+                  </CardTitle>
+                  <p className="type-p2 text-muted-foreground">
                     Riwayat gaji, kasbon, dan reimbursement yang dipotong dari
                     akun kas/bank.
                   </p>
@@ -1646,54 +1996,54 @@ export default function FinanceHub({
                   onClick={() => setOfficeExpenseOpen(true)}
                 >
                   <Plus className="mr-2 size-4" aria-hidden="true" />
-                  Catat Pengeluaran Internal
+                  Catat Pengeluaran
                 </Button>
               </CardHeader>
               <CardContent className="space-y-6">
                 <section className="space-y-3">
                   <div className="space-y-1">
-                    <h3 className="font-semibold">
+                    <h3 className="type-h3 font-semibold">
                       Rekap Penggunaan Dana per Pengguna
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="type-p2 text-muted-foreground">
                       Pembayaran OPS dan reimbursement, serta gaji dan
                       kasbon/ambilan. Request gudang dan material tidak
                       termasuk.
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-p3 text-muted-foreground">
                       Reimbursement dihitung dari tiket yang dibayar; catatan
                       reimbursement di Pengeluaran Kantor tidak dihitung ulang.
                     </p>
                   </div>
                   {fundUsageSummary.length === 0 ? (
-                    <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                      Belum ada pembayaran OPS, reimbursement, gaji, atau
-                      kasbon/ambilan yang tercatat.
-                    </p>
+                    <EmptyState
+                      title="Belum ada rekap penggunaan dana"
+                      description="Belum ada pembayaran OPS, reimbursement, gaji, atau kasbon/ambilan yang tercatat."
+                    />
                   ) : (
-                    <NativeDataTable itemLabel="rekap penggunaan dana">
-                      <table className="app-data-table w-full min-w-[620px] text-left text-sm">
-                        <thead>
-                          <tr className="border-b text-muted-foreground">
-                            <th className="py-2 pr-3">Pengguna / Jenis Request</th>
-                            <th className="py-2 text-right">
+                    <div className="overflow-x-auto rounded-lg border">
+                      <Table pagination={false}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Pengguna / Jenis Request</TableHead>
+                            <TableHead className="text-right">
                               Total Dibayarkan
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {fundUsageSummary.map((user) => (
-                            <tr key={user.userId} className="border-b last:border-0">
-                              <td className="py-3 pr-3">
+                            <TableRow key={user.userId}>
+                              <TableCell className="py-3">
                                 <p className="font-medium">{user.name}</p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="type-p3 text-muted-foreground">
                                   {user.role.replaceAll("_", " ")}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                   {user.categories.map((category) => (
                                     <span
                                       key={category.type}
-                                      className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs"
+                                      className="type-p3 inline-flex items-center rounded-md bg-muted px-2 py-1"
                                     >
                                       {category.type === "OPS"
                                         ? "OPS"
@@ -1705,122 +2055,131 @@ export default function FinanceHub({
                                     </span>
                                   ))}
                                 </div>
-                              </td>
-                              <td className="py-3 text-right font-semibold tabular-nums">
+                              </TableCell>
+                              <TableCell className="py-3 text-right font-semibold tabular-nums">
                                 {currency(user.totalAmount)}
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
-                    </NativeDataTable>
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </section>
 
                 <section className="space-y-3 border-t pt-6">
-                  <h3 className="font-semibold">
+                  <h3 className="type-h3 font-semibold">
                     Riwayat Pengeluaran Kantor &amp; Operasional
                   </h3>
                   {officeExpenses.length === 0 ? (
-                    <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                      Belum ada pengeluaran kantor atau operasional yang dicatat.
-                    </p>
+                    <EmptyState
+                      title="Belum ada pengeluaran kantor"
+                      description="Belum ada pengeluaran kantor atau operasional yang dicatat."
+                    />
                   ) : (
-                  <NativeDataTable itemLabel="pengeluaran" pageSize={10}>
-                    <table className="app-data-table w-full min-w-[850px] text-left text-sm">
-                      <thead>
-                        <tr className="border-b text-muted-foreground">
-                          <th className="py-2 pr-3">Tanggal</th>
-                          <th className="py-2 pr-3">Penerima</th>
-                          <th className="py-2 pr-3">Tipe</th>
-                          <th className="py-2 pr-3 text-right">Nominal</th>
-                          <th className="py-2 pr-3">Sumber Akun</th>
-                          <th className="py-2 pr-3">Status Bukti</th>
-                          <th className="py-2 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {officeExpenses.map((expense) => {
-                          const typeLabel =
-                            expenseTypeLabels[
-                              expense.expenseType as keyof typeof expenseTypeLabels
-                            ] ?? expense.expenseType;
-                          return (
-                            <tr key={expense.id} className="border-b last:border-0">
-                              <td className="py-2 pr-3">
-                                {new Date(expense.createdAt).toLocaleDateString(
-                                  "id-ID",
-                                  { dateStyle: "medium" },
-                                )}
-                              </td>
-                              <td className="py-2 pr-3">
-                                <p className="font-medium">{expense.recipientName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {expense.recipientRole.replaceAll("_", " ")}
-                                </p>
-                              </td>
-                              <td className="py-2 pr-3">
-                                <p>{typeLabel}</p>
-                                <p className="max-w-56 truncate text-xs text-muted-foreground">
-                                  {expense.description}
-                                </p>
-                              </td>
-                              <td className="py-2 pr-3 text-right font-semibold">
-                                {currency(expense.amount)}
-                              </td>
-                              <td className="py-2 pr-3">
-                                <p>{expense.account.accountName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {expense.paymentMethod === "CASH"
-                                    ? "Cash"
-                                    : "Transfer"}
-                                </p>
-                              </td>
-                              <td className="py-2 pr-3">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <Badge variant="success">
-                                    Lengkap · {expense.proofUrls.length} bukti
-                                  </Badge>
-                                  {expense.proofUrls.map((url, index) => (
+                    <div className="overflow-x-auto rounded-lg border">
+                      <Table itemLabel="pengeluaran" pageSize={10}>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tanggal</TableHead>
+                            <TableHead>Penerima</TableHead>
+                            <TableHead>Tipe</TableHead>
+                            <TableHead className="text-right">Nominal</TableHead>
+                            <TableHead>Sumber Akun</TableHead>
+                            <TableHead>Status Bukti</TableHead>
+                            <TableHead className="text-right">Aksi</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {officeExpenses.map((expense) => {
+                            const typeLabel =
+                              expenseTypeLabels[
+                                expense.expenseType as keyof typeof expenseTypeLabels
+                              ] ?? expense.expenseType;
+                            return (
+                              <TableRow key={expense.id}>
+                                <TableCell>
+                                  {new Date(expense.createdAt).toLocaleDateString(
+                                    "id-ID",
+                                    { dateStyle: "medium" },
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <p className="font-medium">
+                                    {expense.recipientName}
+                                  </p>
+                                  <p className="type-p3 text-muted-foreground">
+                                    {expense.recipientRole.replaceAll("_", " ")}
+                                  </p>
+                                </TableCell>
+                                <TableCell>
+                                  <p>{typeLabel}</p>
+                                  <p className="type-p3 max-w-56 truncate text-muted-foreground">
+                                    {expense.description}
+                                  </p>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold tabular-nums">
+                                  {currency(expense.amount)}
+                                </TableCell>
+                                <TableCell>
+                                  <p>{expense.account.accountName}</p>
+                                  <p className="type-p3 text-muted-foreground">
+                                    {expense.paymentMethod === "CASH"
+                                      ? "Cash"
+                                      : "Transfer"}
+                                  </p>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <Badge variant="success">
+                                      Lengkap · {expense.proofUrls.length} bukti
+                                    </Badge>
+                                    {expense.proofUrls.map((url, index) => (
+                                      <Button
+                                        key={url}
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 gap-1.5 px-2.5 text-xs"
+                                        onClick={() =>
+                                          setReceiptPreview({
+                                            url,
+                                            label: `Bukti ${typeLabel} · ${expense.recipientName} (${index + 1})`,
+                                          })
+                                        }
+                                      >
+                                        <Eye
+                                          className="size-3.5"
+                                          aria-hidden="true"
+                                        />
+                                        Bukti {index + 1}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right whitespace-nowrap">
+                                  {canManageOfficeExpenses && (
                                     <Button
-                                      key={url}
                                       type="button"
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 gap-1.5 px-2.5 text-xs"
-                                      onClick={() =>
-                                        setReceiptPreview({
-                                          url,
-                                          label: `Bukti ${typeLabel} · ${expense.recipientName} (${index + 1})`,
-                                        })
-                                      }
+                                      className="h-7 gap-1.5 px-2.5 text-xs border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/30"
+                                      onClick={() => setEditingExpense(expense)}
                                     >
-                                      <Eye className="size-3.5" aria-hidden="true" />
-                                      Bukti {index + 1}
+                                      <Pencil
+                                        className="size-3.5"
+                                        aria-hidden="true"
+                                      />
+                                      Edit
                                     </Button>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="py-2 text-right whitespace-nowrap">
-                                {canManageOfficeExpenses && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 gap-1.5 px-2.5 text-xs border-orange-500/40 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950/30"
-                                    onClick={() => setEditingExpense(expense)}
-                                  >
-                                    <Pencil className="size-3.5" aria-hidden="true" />
-                                    Edit
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </NativeDataTable>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </section>
               </CardContent>
@@ -1832,8 +2191,10 @@ export default function FinanceHub({
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
-                <CardTitle>1. Verifikasi Purchase Order (PO Menunggu Checked By Finance)</CardTitle>
-                <p className="text-xs text-muted-foreground">
+                <CardTitle className="type-h3">
+                  Verifikasi Purchase Order (Menunggu Finance)
+                </CardTitle>
+                <p className="type-p3 text-muted-foreground">
                   Periksa rincian harga, pajak PPN 11%, dan rekening vendor sebelum PO diteruskan ke Direktur.
                 </p>
               </div>
@@ -1853,11 +2214,18 @@ export default function FinanceHub({
             </CardHeader>
             <CardContent className="space-y-3">
               {filteredReviewOrders.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  {purchaseOrders.length === 0
-                    ? "Tidak ada PO draft yang menunggu pemeriksaan Finance."
-                    : "Tidak ada PO yang cocok dengan pencarian."}
-                </p>
+                <EmptyState
+                  title={
+                    purchaseOrders.length === 0
+                      ? "Tidak ada PO draft"
+                      : "PO tidak ditemukan"
+                  }
+                  description={
+                    purchaseOrders.length === 0
+                      ? "Belum ada PO draft yang menunggu pemeriksaan Finance."
+                      : "Tidak ada PO yang cocok dengan kata kunci pencarian."
+                  }
+                />
               ) : (
                 <>
                   {/* Mobile Card View (< 768px) */}
@@ -1874,56 +2242,57 @@ export default function FinanceHub({
                       return (
                         <div
                           key={order.publicCode}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            setMessage("");
-                            setSelection({ kind: "po", id: order.publicCode });
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              setSelection({ kind: "po", id: order.publicCode });
-                            }
-                          }}
-                          className="cursor-pointer space-y-2 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
+                          className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-mono text-xs font-bold text-primary">
-                                {order.poNumber}
-                              </p>
-                              <p className="mt-0.5 text-sm font-semibold text-foreground">
-                                {order.vendorName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {order.paymentMethod === "CASH"
-                                  ? "Tunai (Cash)"
-                                  : `Transfer${order.paymentBankName ? ` · ${order.paymentBankName}` : ""}`}
-                              </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMessage("");
+                              setSelection({
+                                kind: "po",
+                                id: order.publicCode,
+                              });
+                            }}
+                            className="w-full space-y-2 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-mono text-xs font-bold text-primary">
+                                  {order.poNumber}
+                                </p>
+                                <p className="type-p2 mt-0.5 font-semibold text-foreground">
+                                  {order.vendorName}
+                                </p>
+                                <p className="type-p3 text-muted-foreground">
+                                  {order.paymentMethod === "CASH"
+                                    ? "Tunai (Cash)"
+                                    : `Transfer${order.paymentBankName ? ` · ${order.paymentBankName}` : ""}`}
+                                </p>
+                              </div>
+                              <Badge variant="outline" className="shrink-0">
+                                {order.items.length} item
+                              </Badge>
                             </div>
-                            <Badge variant="outline" className="shrink-0">
-                              {order.items.length} item
-                            </Badge>
-                          </div>
 
-                          <div className="flex items-center justify-between rounded-md bg-muted/30 p-2 text-xs">
-                            <span className="text-muted-foreground">
-                              {new Date(order.createdAt).toLocaleDateString("id-ID", {
-                                dateStyle: "medium",
-                              })}
-                            </span>
-                            <div className="text-right">
-                              <span className="font-mono font-bold text-foreground tabular-nums">
-                                {currency(poGrandTotal)}
+                            <div className="type-p3 flex items-center justify-between rounded-md bg-muted/30 p-2">
+                              <span className="text-muted-foreground">
+                                {new Date(order.createdAt).toLocaleDateString(
+                                  "id-ID",
+                                  { dateStyle: "medium" },
+                                )}
                               </span>
-                              {order.includeTax && (
-                                <span className="block text-[10px] text-muted-foreground">
-                                  Termasuk PPN 11%
+                              <div className="text-right">
+                                <span className="font-mono font-bold text-foreground tabular-nums">
+                                  {currency(poGrandTotal)}
                                 </span>
-                              )}
+                                {order.includeTax && (
+                                  <span className="type-p3 block text-muted-foreground">
+                                    Termasuk PPN 11%
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          </button>
 
                           <div className="flex justify-end pt-1">
                             {role === UserRole.FINANCE && !order.paidAt ? (
@@ -1932,12 +2301,12 @@ export default function FinanceHub({
                                 size="sm"
                                 className="h-8 gap-1.5 text-xs"
                                 disabled={isPending}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  runReview(order.publicCode);
-                                }}
+                                onClick={() => runReview(order.publicCode)}
                               >
-                                <FileCheck2 className="size-3.5" aria-hidden="true" />
+                                <FileCheck2
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
                                 Tandai Diperiksa
                               </Button>
                             ) : (
@@ -1946,8 +2315,7 @@ export default function FinanceHub({
                                 variant="outline"
                                 size="sm"
                                 className="h-8 gap-1.5 text-xs"
-                                onClick={(event) => {
-                                  event.stopPropagation();
+                                onClick={() => {
                                   setMessage("");
                                   setSelection({
                                     kind: "po",
@@ -1967,122 +2335,136 @@ export default function FinanceHub({
 
                   {/* Desktop Table View (>= 768px) */}
                   <div className="hidden overflow-x-auto rounded-lg border md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nomor PO</TableHead>
-                        <TableHead>Vendor &amp; Metode</TableHead>
-                        <TableHead>Tanggal</TableHead>
-                        <TableHead>Jumlah Item</TableHead>
-                        <TableHead className="text-right">Total Nilai PO</TableHead>
-                        <TableHead className="text-right">Aksi Pemeriksaan</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredReviewOrders.map((order) => {
-                        const subtotal = order.items.reduce(
-                          (sum, item) => sum + item.totalPrice,
-                          0,
-                        );
-                        const poGrandTotal =
-                          Math.round(
-                            subtotal * (order.includeTax ? 1.11 : 1) * 100,
-                          ) / 100;
-                        return (
-                          <TableRow
-                            key={order.publicCode}
-                            className="cursor-pointer"
-                            tabIndex={0}
-                            onClick={() => {
-                              setMessage("");
-                              setSelection({ kind: "po", id: order.publicCode });
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                setSelection({ kind: "po", id: order.publicCode });
-                              }
-                            }}
-                          >
-                            <TableCell className="font-semibold">
-                              {order.poNumber}
-                            </TableCell>
-                            <TableCell>
-                              <div className="font-medium text-foreground">
-                                {order.vendorName}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {order.paymentMethod === "CASH"
-                                  ? "Tunai (Cash)"
-                                  : `Transfer${order.paymentBankName ? ` · ${order.paymentBankName}` : ""}`}
-                              </div>
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                              {new Date(order.createdAt).toLocaleDateString("id-ID", {
-                                dateStyle: "medium",
-                              })}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {order.items.length} item
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold tabular-nums">
-                              {currency(poGrandTotal)}
-                              {order.includeTax && (
-                                <span className="block text-[10px] font-normal text-muted-foreground">
-                                  Termasuk PPN 11%
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {role === UserRole.FINANCE && !order.paidAt ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="h-8 gap-1.5 text-xs"
-                                  disabled={isPending}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    runReview(order.publicCode);
-                                  }}
-                                >
-                                  <FileCheck2
-                                    className="size-3.5"
-                                    aria-hidden="true"
-                                  />
-                                  Tandai Diperiksa
-                                </Button>
-                              ) : (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5 text-xs"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setMessage("");
-                                    setSelection({
-                                      kind: "po",
-                                      id: order.publicCode,
-                                    });
-                                  }}
-                                >
-                                  <Eye className="size-3.5" aria-hidden="true" />
-                                  Lihat PO
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nomor PO</TableHead>
+                          <TableHead>Vendor &amp; Metode</TableHead>
+                          <TableHead>Tanggal</TableHead>
+                          <TableHead>Jumlah Item</TableHead>
+                          <TableHead className="text-right">
+                            Total Nilai PO
+                          </TableHead>
+                          <TableHead className="text-right">
+                            Aksi Pemeriksaan
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredReviewOrders.map((order) => {
+                          const subtotal = order.items.reduce(
+                            (sum, item) => sum + item.totalPrice,
+                            0,
+                          );
+                          const poGrandTotal =
+                            Math.round(
+                              subtotal * (order.includeTax ? 1.11 : 1) * 100,
+                            ) / 100;
+                          return (
+                            <TableRow
+                              key={order.publicCode}
+                              className="cursor-pointer"
+                              tabIndex={0}
+                              onClick={() => {
+                                setMessage("");
+                                setSelection({
+                                  kind: "po",
+                                  id: order.publicCode,
+                                });
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  setSelection({
+                                    kind: "po",
+                                    id: order.publicCode,
+                                  });
+                                }
+                              }}
+                            >
+                              <TableCell className="font-semibold">
+                                {order.poNumber}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-medium text-foreground">
+                                  {order.vendorName}
+                                </div>
+                                <div className="type-p3 text-muted-foreground">
+                                  {order.paymentMethod === "CASH"
+                                    ? "Tunai (Cash)"
+                                    : `Transfer${order.paymentBankName ? ` · ${order.paymentBankName}` : ""}`}
+                                </div>
+                              </TableCell>
+                              <TableCell className="type-p3 whitespace-nowrap text-muted-foreground">
+                                {new Date(order.createdAt).toLocaleDateString(
+                                  "id-ID",
+                                  { dateStyle: "medium" },
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {order.items.length} item
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold tabular-nums">
+                                {currency(poGrandTotal)}
+                                {order.includeTax && (
+                                  <span className="type-p3 block font-normal text-muted-foreground">
+                                    Termasuk PPN 11%
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {role === UserRole.FINANCE && !order.paidAt ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs"
+                                    disabled={isPending}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      runReview(order.publicCode);
+                                    }}
+                                  >
+                                    <FileCheck2
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Tandai Diperiksa
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setMessage("");
+                                      setSelection({
+                                        kind: "po",
+                                        id: order.publicCode,
+                                      });
+                                    }}
+                                  >
+                                    <Eye
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Lihat PO
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </>
               )}
-              <p className="text-xs text-muted-foreground">
-                Klik baris PO untuk melihat dokumen lengkap. Pembelian langsung dan tiket biaya yang sudah disetujui Direktur masuk ke tab <strong>2. Antrean Bayar</strong>.
+              <p className="type-p3 text-muted-foreground">
+                Klik baris PO untuk melihat dokumen lengkap. Pembelian langsung dan tiket biaya yang sudah disetujui Direktur masuk ke tab <strong>Antrean Bayar</strong>.
               </p>
             </CardContent>
           </Card>
@@ -2093,9 +2475,11 @@ export default function FinanceHub({
             <Card>
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
-                  <CardTitle>2. Antrean Pembayaran Tagihan &amp; Pengajuan Disetujui</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Klik baris untuk melihat rincian tagihan, atau klik <strong>Bayar Tagihan</strong> untuk mencatat bukti pembayaran.
+                  <CardTitle className="type-h3">
+                    Antrean Pembayaran Tagihan &amp; Pengajuan
+                  </CardTitle>
+                  <p className="type-p3 text-muted-foreground">
+                    Klik baris untuk melihat rincian tagihan &amp; multi-PO, atau klik <strong>Bayar Tagihan</strong> untuk mencatat bukti pembayaran.
                   </p>
                 </div>
                 <div className="relative w-full sm:max-w-xs">
@@ -2106,230 +2490,117 @@ export default function FinanceHub({
                   <Input
                     value={paymentQueueSearch}
                     onChange={(event) => setPaymentQueueSearch(event.target.value)}
-                    placeholder="Cari tagihan atau vendor..."
+                    placeholder="Cari tagihan, PO, item, atau vendor..."
                     aria-label="Cari antrean pembayaran"
                     className="pl-9"
                   />
                 </div>
               </CardHeader>
-              <CardContent>
-              {/* Mobile Card View (< 768px) */}
-              <div className="space-y-2.5 md:hidden">
-                {filteredPendingPaymentRows.map((row) => {
-                  const balance =
-                    Math.round((row.grandTotal - row.paidAmount) * 100) / 100;
-                  const outstanding = Math.max(0, balance);
-                  const waitingInvoice = row.hasInvoice === false;
-                  const needsNominal = Boolean(row.needsNominalInput);
-                  return (
-                    <div
-                      key={`${row.kind}:${row.id}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openPaymentHistory(row)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openPaymentHistory(row);
-                        }
-                      }}
-                      className="cursor-pointer space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-mono text-xs font-bold text-primary">
-                            {row.reference}
-                          </p>
-                          <p className="mt-0.5 text-sm font-semibold text-foreground">
-                            {row.title}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {row.transferDestination ||
-                              "Klik kartu untuk melihat tujuan rekening"}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={
-                            waitingInvoice || needsNominal
-                              ? "warning"
-                              : balance <= 0
-                                ? "success"
-                                : row.paidAmount > 0
-                                  ? "warning"
-                                  : "error"
-                          }
-                          className="shrink-0"
-                        >
-                          {waitingInvoice
-                            ? "MENUNGGU INVOICE"
-                            : needsNominal
-                              ? "BELUM ADA NOMINAL"
-                              : balance <= 0
-                                ? "LUNAS"
-                                : row.paidAmount > 0
-                                  ? "SEBAGIAN"
-                                  : "BELUM DIBAYAR"}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-xs">
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Tagihan</span>
-                          <p className="font-semibold tabular-nums">
-                            {needsNominal ? "—" : currency(row.grandTotal)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Terbayar</span>
-                          <p className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {currency(row.paidAmount)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Sisa</span>
-                          <p className="font-bold tabular-nums text-rose-600 dark:text-rose-400">
-                            {needsNominal ? "—" : currency(outstanding)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end pt-0.5">
-                        {(outstanding > 0 || needsNominal) &&
-                        role === UserRole.FINANCE ? (
-                          waitingInvoice ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs"
-                              disabled={isPending}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openPaymentHistory(row);
-                              }}
-                            >
-                              <Eye className="size-3.5" aria-hidden="true" />
-                              Menunggu Invoice
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs"
-                              disabled={isPending}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setPaymentModalSelection({
-                                  kind: row.kind,
-                                  id: row.id,
-                                });
-                              }}
-                            >
-                              <Wallet className="size-3.5" aria-hidden="true" />
-                              Bayar Tagihan
-                            </Button>
-                          )
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5 text-xs"
-                            disabled={isPending}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openPaymentHistory(row);
-                            }}
-                          >
-                            <Eye className="size-3.5" aria-hidden="true" />
-                            Rincian
-                          </Button>
-                        )}
+              <CardContent className="space-y-3">
+                {materialAlamBadgeCount > 0 && (
+                  <div className="flex flex-col gap-2.5 rounded-xl border border-amber-500/40 bg-amber-50/70 p-3.5 sm:flex-row sm:items-center sm:justify-between dark:bg-amber-950/20">
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle
+                        className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                        aria-hidden="true"
+                      />
+                      <div className="space-y-0.5">
+                        <p className="type-p2 font-semibold text-foreground">
+                          Terdapat {materialAlamBadgeCount} tagihan Material Alam / DO siap diproses
+                        </p>
+                        <p className="type-p3 text-muted-foreground">
+                          {unpaidVendorInvoices.length > 0
+                            ? `${unpaidVendorInvoices.length} invoice supplier (${currency(unpaidVendorInvoiceAmount)})`
+                            : "0 invoice belum lunas"}
+                          {" · "}
+                          {unbilledMaterialDosCount > 0
+                            ? `${unbilledMaterialDosCount} Surat Jalan (est. ${currency(unbilledMaterialEstimateAmount)}) menunggu invoice/bayar`
+                            : "semua DO sudah ditagihkan"}
+                        </p>
                       </div>
                     </div>
-                  );
-                })}
-                {filteredPendingPaymentRows.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-                    {pendingPaymentRows.length === 0
-                      ? "Tidak ada tagihan yang menunggu pembayaran."
-                      : "Tidak ada tagihan yang cocok dengan pencarian."}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => setActiveTab("vendor-contracts")}
+                    >
+                      Buka Tagihan Material
+                    </Button>
                   </div>
                 )}
-              </div>
 
-              {/* Desktop Table View (>= 768px) */}
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nomor Ref &amp; Keperluan</TableHead>
-                      <TableHead>Tujuan Pembayaran / Rekening</TableHead>
-                      <TableHead className="text-right">Total Tagihan</TableHead>
-                      <TableHead className="text-right">Terbayar</TableHead>
-                      <TableHead className="text-right">Sisa Hutang</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Aksi Pembayaran</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPendingPaymentRows.map((row) => {
-                      const balance =
-                        Math.round((row.grandTotal - row.paidAmount) * 100) /
-                        100;
-                      const outstanding = Math.max(0, balance);
-                      const waitingInvoice = row.hasInvoice === false;
-                      const needsNominal = Boolean(row.needsNominalInput);
-                      return (
-                        <TableRow
-                          key={`${row.kind}:${row.id}`}
-                          className="cursor-pointer"
-                          tabIndex={0}
+                {/* Mobile Card View (< 768px) */}
+                <div className="space-y-2.5 md:hidden">
+                  {filteredPendingPaymentRows.map((row) => {
+                    const balance =
+                      Math.round((row.grandTotal - row.paidAmount) * 100) / 100;
+                    const outstanding = Math.max(0, balance);
+                    const waitingInvoice = row.hasInvoice === false;
+                    const needsNominal = Boolean(row.needsNominalInput);
+                    const multiPoCount = row.poSummaries?.length ?? 0;
+                    const unpaidPoCount =
+                      row.poSummaries?.filter((po) => !po.isPaid).length ?? 0;
+                    return (
+                      <div
+                        key={`${row.kind}:${row.id}`}
+                        className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
+                      >
+                        <button
+                          type="button"
                           onClick={() => openPaymentHistory(row)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              openPaymentHistory(row);
-                            }
-                          }}
+                          className="w-full space-y-2.5 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                         >
-                          <TableCell>
-                            <span className="font-semibold text-foreground">
-                              {row.reference}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {row.title}
-                            </span>
-                          </TableCell>
-                          <TableCell className="max-w-xs text-xs text-muted-foreground">
-                            {row.transferDestination || (
-                              <span className="italic">
-                                Klik baris untuk melihat tujuan
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {needsNominal ? (
-                              <span className="italic text-muted-foreground">
-                                Belum ditetapkan
-                              </span>
-                            ) : (
-                              currency(row.grandTotal)
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {currency(row.paidAmount)}
-                          </TableCell>
-                          <TableCell className="text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
-                            {needsNominal ? (
-                              <span className="font-normal italic text-muted-foreground">
-                                Belum ditetapkan
-                              </span>
-                            ) : (
-                              currency(outstanding)
-                            )}
-                          </TableCell>
-                          <TableCell>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-mono text-xs font-bold text-primary">
+                                {row.reference}
+                              </p>
+                              <p className="type-p2 mt-0.5 font-semibold text-foreground">
+                                {row.title}
+                              </p>
+                              <p className="type-p3 mt-0.5 text-muted-foreground">
+                                {row.transferDestination ||
+                                  "Ketuk kartu untuk melihat tujuan rekening"}
+                              </p>
+                              {(row.fieldCategoryLabel ||
+                                multiPoCount > 1 ||
+                                (row.deliveryOrderCount ?? 0) > 0 ||
+                                (row.itemsSummary?.length ?? 0) > 0) && (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {row.fieldCategoryLabel && (
+                                    <Badge variant="outline" className="type-p3">
+                                      {row.fieldCategoryLabel}
+                                    </Badge>
+                                  )}
+                                  {multiPoCount > 1 && (
+                                    <Badge variant="outline" className="type-p3">
+                                      {unpaidPoCount}/{multiPoCount} PO aktif
+                                    </Badge>
+                                  )}
+                                  {(row.deliveryOrderCount ?? 0) > 0 && (
+                                    <Badge variant="outline" className="type-p3">
+                                      {row.deliveryOrderCount} DO Material Alam
+                                    </Badge>
+                                  )}
+                                  {(row.itemsSummary?.length ?? 0) > 0 && (
+                                    <span className="type-p3 text-muted-foreground">
+                                      {row.itemsSummary!
+                                        .slice(0, 2)
+                                        .map(
+                                          (item) =>
+                                            `${item.itemName} (${item.quantity} ${item.unit})`,
+                                        )
+                                        .join(", ")}
+                                      {row.itemsSummary!.length > 2
+                                        ? ` +${row.itemsSummary!.length - 2} item`
+                                        : ""}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                             <Badge
                               variant={
                                 waitingInvoice || needsNominal
@@ -2340,22 +2611,285 @@ export default function FinanceHub({
                                       ? "warning"
                                       : "error"
                               }
+                              className="shrink-0"
                             >
                               {waitingInvoice
-                                ? "MENUNGGU INVOICE LOGISTIK"
+                                ? "MENUNGGU INVOICE"
                                 : needsNominal
                                   ? "BELUM ADA NOMINAL"
                                   : balance <= 0
                                     ? "LUNAS"
                                     : row.paidAmount > 0
-                                      ? "DIBAYAR SEBAGIAN"
+                                      ? "SEBAGIAN"
                                       : "BELUM DIBAYAR"}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {(outstanding > 0 || needsNominal) &&
-                            role === UserRole.FINANCE ? (
-                              waitingInvoice ? (
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2">
+                            <div>
+                              <span className="type-p3 text-muted-foreground">
+                                Tagihan
+                              </span>
+                              <p className="type-p2 font-semibold tabular-nums">
+                                {needsNominal ? "—" : currency(row.grandTotal)}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="type-p3 text-muted-foreground">
+                                Terbayar
+                              </span>
+                              <p className="type-p2 font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                {currency(row.paidAmount)}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="type-p3 text-muted-foreground">
+                                Sisa
+                              </span>
+                              <p className="type-p2 font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                                {needsNominal ? "—" : currency(outstanding)}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+
+                        <div className="flex justify-end pt-0.5">
+                          {(outstanding > 0 || needsNominal) &&
+                          role === UserRole.FINANCE ? (
+                            waitingInvoice ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                disabled={isPending}
+                                onClick={() => openPaymentHistory(row)}
+                              >
+                                <Eye className="size-3.5" aria-hidden="true" />
+                                Menunggu Invoice
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 gap-1.5 text-xs"
+                                disabled={isPending}
+                                onClick={() =>
+                                  setPaymentModalSelection({
+                                    kind: row.kind,
+                                    id: row.id,
+                                  })
+                                }
+                              >
+                                <Wallet className="size-3.5" aria-hidden="true" />
+                                Bayar Tagihan
+                              </Button>
+                            )
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              disabled={isPending}
+                              onClick={() => openPaymentHistory(row)}
+                            >
+                              <Eye className="size-3.5" aria-hidden="true" />
+                              Rincian
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filteredPendingPaymentRows.length === 0 && (
+                    <EmptyState
+                      title={
+                        pendingPaymentRows.length === 0
+                          ? "Antrean bayar kosong"
+                          : "Tagihan tidak ditemukan"
+                      }
+                      description={
+                        pendingPaymentRows.length === 0
+                          ? "Tidak ada tagihan yang menunggu pembayaran."
+                          : "Tidak ada tagihan yang cocok dengan pencarian."
+                      }
+                    />
+                  )}
+                </div>
+
+                {/* Desktop Table View (>= 768px) */}
+                <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nomor Ref &amp; Keperluan</TableHead>
+                        <TableHead>Tujuan Pembayaran / Rekening</TableHead>
+                        <TableHead className="text-right">Total Tagihan</TableHead>
+                        <TableHead className="text-right">Terbayar</TableHead>
+                        <TableHead className="text-right">Sisa Hutang</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Aksi Pembayaran</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPendingPaymentRows.map((row) => {
+                        const balance =
+                          Math.round((row.grandTotal - row.paidAmount) * 100) /
+                          100;
+                        const outstanding = Math.max(0, balance);
+                        const waitingInvoice = row.hasInvoice === false;
+                        const needsNominal = Boolean(row.needsNominalInput);
+                        const multiPoCount = row.poSummaries?.length ?? 0;
+                        return (
+                          <TableRow
+                            key={`${row.kind}:${row.id}`}
+                            className="cursor-pointer"
+                            tabIndex={0}
+                            onClick={() => openPaymentHistory(row)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openPaymentHistory(row);
+                              }
+                            }}
+                          >
+                            <TableCell>
+                              <span className="font-semibold text-foreground">
+                                {row.reference}
+                              </span>
+                              <span className="type-p3 block text-muted-foreground">
+                                {row.title}
+                              </span>
+                              {(row.fieldCategoryLabel ||
+                                multiPoCount > 1 ||
+                                (row.deliveryOrderCount ?? 0) > 0 ||
+                                (row.itemsSummary?.length ?? 0) > 0) && (
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  {row.fieldCategoryLabel && (
+                                    <Badge variant="outline" className="type-p3">
+                                      {row.fieldCategoryLabel}
+                                    </Badge>
+                                  )}
+                                  {multiPoCount > 1 && (
+                                    <Badge variant="outline" className="type-p3">
+                                      {row.poSummaries!.filter((po) => !po.isPaid).length}
+                                      /{multiPoCount} PO aktif
+                                    </Badge>
+                                  )}
+                                  {(row.deliveryOrderCount ?? 0) > 0 && (
+                                    <Badge variant="outline" className="type-p3">
+                                      {row.deliveryOrderCount} DO Material Alam
+                                    </Badge>
+                                  )}
+                                  {(row.itemsSummary?.length ?? 0) > 0 && (
+                                    <span className="type-p3 text-muted-foreground">
+                                      {row.itemsSummary!
+                                        .slice(0, 2)
+                                        .map(
+                                          (item) =>
+                                            `${item.itemName} (${item.quantity} ${item.unit})`,
+                                        )
+                                        .join(", ")}
+                                      {row.itemsSummary!.length > 2
+                                        ? ` +${row.itemsSummary!.length - 2}`
+                                        : ""}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="type-p3 max-w-xs text-muted-foreground">
+                              {row.transferDestination || (
+                                <span className="italic">
+                                  Klik baris untuk melihat tujuan
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {needsNominal ? (
+                                <span className="italic text-muted-foreground">
+                                  Belum ditetapkan
+                                </span>
+                              ) : (
+                                currency(row.grandTotal)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                              {currency(row.paidAmount)}
+                            </TableCell>
+                            <TableCell className="text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                              {needsNominal ? (
+                                <span className="font-normal italic text-muted-foreground">
+                                  Belum ditetapkan
+                                </span>
+                              ) : (
+                                currency(outstanding)
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  waitingInvoice || needsNominal
+                                    ? "warning"
+                                    : balance <= 0
+                                      ? "success"
+                                      : row.paidAmount > 0
+                                        ? "warning"
+                                        : "error"
+                                }
+                              >
+                                {waitingInvoice
+                                  ? "MENUNGGU INVOICE LOGISTIK"
+                                  : needsNominal
+                                    ? "BELUM ADA NOMINAL"
+                                    : balance <= 0
+                                      ? "LUNAS"
+                                      : row.paidAmount > 0
+                                        ? "DIBAYAR SEBAGIAN"
+                                        : "BELUM DIBAYAR"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {(outstanding > 0 || needsNominal) &&
+                              role === UserRole.FINANCE ? (
+                                waitingInvoice ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs"
+                                    disabled={isPending}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openPaymentHistory(row);
+                                    }}
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Menunggu Invoice
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs"
+                                    disabled={isPending}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setPaymentModalSelection({
+                                        kind: row.kind,
+                                        id: row.id,
+                                      });
+                                    }}
+                                  >
+                                    <Wallet
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Bayar Tagihan
+                                  </Button>
+                                )
+                              ) : (
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -2368,64 +2902,28 @@ export default function FinanceHub({
                                   }}
                                 >
                                   <Eye className="size-3.5" aria-hidden="true" />
-                                  Menunggu Invoice
+                                  Rincian
                                 </Button>
-                              ) : (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="h-8 gap-1.5 text-xs"
-                                  disabled={isPending}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setPaymentModalSelection({
-                                      kind: row.kind,
-                                      id: row.id,
-                                    });
-                                  }}
-                                >
-                                  <Wallet
-                                    className="size-3.5"
-                                    aria-hidden="true"
-                                  />
-                                  Bayar Tagihan
-                                </Button>
-                              )
-                            ) : (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 gap-1.5 text-xs"
-                                disabled={isPending}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openPaymentHistory(row);
-                                }}
-                              >
-                                <Eye className="size-3.5" aria-hidden="true" />
-                                Rincian
-                              </Button>
-                            )}
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {filteredPendingPaymentRows.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={7}
+                            className="py-10 text-center text-muted-foreground"
+                          >
+                            {pendingPaymentRows.length === 0
+                              ? "Tidak ada tagihan yang menunggu pembayaran."
+                              : "Tidak ada tagihan yang cocok dengan pencarian."}
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                    {filteredPendingPaymentRows.length === 0 && (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="py-10 text-center text-muted-foreground"
-                        >
-                          {pendingPaymentRows.length === 0
-                            ? "Tidak ada tagihan yang menunggu pembayaran."
-                            : "Tidak ada tagihan yang cocok dengan pencarian."}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2434,201 +2932,185 @@ export default function FinanceHub({
         <div id="finance-history-tab">
           <TabsContent value="history">
             <Card>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>Riwayat & Bukti Transfer</CardTitle>
-              <div className="relative w-full sm:max-w-xs">
-                <Search
-                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  value={paymentHistorySearch}
-                  onChange={(event) => {
-                    setPaymentHistorySearch(event.target.value);
-                    setPaymentHistoryPage(1);
-                  }}
-                  placeholder="Cari transaksi..."
-                  aria-label="Cari riwayat pembayaran"
-                  className="pl-9"
-                />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Mobile Card View (< 768px) */}
-              <div className="space-y-2.5 md:hidden">
-                {paymentHistoryPageRows.map((payment) => (
-                  <div
-                    key={payment.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() =>
-                      setSelection(
-                        payment.targetKind === "ticket"
-                          ? { kind: "ticket", id: payment.targetId }
-                          : payment.targetKind === "standalone-po"
-                            ? { kind: "standalone-po", id: payment.targetId }
-                            : { kind: "direct-purchase", id: payment.targetId },
-                      )
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setSelection(
-                          payment.targetKind === "ticket"
-                            ? { kind: "ticket", id: payment.targetId }
-                            : payment.targetKind === "standalone-po"
-                              ? { kind: "standalone-po", id: payment.targetId }
-                              : {
-                                  kind: "direct-purchase",
-                                  id: payment.targetId,
-                                },
-                        );
-                      }
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="type-h3">Riwayat &amp; Bukti Transfer</CardTitle>
+                <div className="relative w-full sm:max-w-xs">
+                  <Search
+                    className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    value={paymentHistorySearch}
+                    onChange={(event) => {
+                      setPaymentHistorySearch(event.target.value);
+                      setPaymentHistoryPage(1);
                     }}
-                    className="cursor-pointer space-y-2 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-mono text-xs font-bold text-primary">
-                          {payment.reference}
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold text-foreground">
-                          {payment.title}
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="shrink-0">
-                        {payment.paymentType === PaymentType.DOWN_PAYMENT
-                          ? "DP"
-                          : payment.paymentType === PaymentType.PROGRESS_PAYMENT
-                            ? "Termin"
-                            : "Pelunasan"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        {payment.paidAt
-                          ? new Date(payment.paidAt).toLocaleString("id-ID")
-                          : "—"}
-                      </span>
-                      <span className="font-mono text-sm font-bold text-foreground tabular-nums">
-                        {currency(payment.amount)}
-                      </span>
-                    </div>
-                    <div className="pt-1">
-                      {renderPaymentProof(
-                        payment.id,
-                        payment.proofOfTransferUrl,
-                        payment.additionalProofUrls ?? [],
-                        payment.proofEditDisabledUrls ?? [],
-                        `Bukti transfer ${payment.reference}`,
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {filteredPaymentHistoryRows.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-                    {paymentHistoryRows.length === 0
-                      ? "Belum ada transaksi pembayaran berhasil."
-                      : "Tidak ada transaksi yang cocok dengan pencarian."}
-                  </div>
-                )}
-              </div>
-
-              {/* Desktop Table View (>= 768px) */}
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table pagination={false}>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Nomor Ref</TableHead>
-                      <TableHead>Transaksi</TableHead>
-                      <TableHead>Jenis</TableHead>
-                      <TableHead>Jumlah</TableHead>
-                      <TableHead>Bukti Transfer</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentHistoryPageRows.map((payment) => (
-                      <TableRow
-                        key={payment.id}
-                        className="cursor-pointer"
-                        tabIndex={0}
-                        onClick={() =>
-                          setSelection(
-                            payment.targetKind === "ticket"
-                              ? { kind: "ticket", id: payment.targetId }
-                              : payment.targetKind === "standalone-po"
-                                ? { kind: "standalone-po", id: payment.targetId }
-                                : { kind: "direct-purchase", id: payment.targetId },
-                          )
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setSelection(
-                              payment.targetKind === "ticket"
-                                ? { kind: "ticket", id: payment.targetId }
-                                : payment.targetKind === "standalone-po"
-                                  ? { kind: "standalone-po", id: payment.targetId }
-                                  : {
-                                      kind: "direct-purchase",
-                                      id: payment.targetId,
-                                    },
-                            );
-                          }
-                        }}
+                    placeholder="Cari transaksi..."
+                    aria-label="Cari riwayat pembayaran"
+                    className="pl-9"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Mobile Card View (< 768px) */}
+                <div className="space-y-2.5 md:hidden">
+                  {paymentHistoryPageRows.map((payment) => (
+                    <div
+                      key={payment.id}
+                      className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5 transition hover:border-primary/40"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openHistoryRowTarget(payment)}
+                        className="w-full space-y-2 rounded-lg text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                       >
-                        <TableCell>
-                          {payment.paidAt
-                            ? new Date(payment.paidAt).toLocaleString("id-ID")
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          {payment.reference}
-                        </TableCell>
-                        <TableCell>{payment.title}</TableCell>
-                        <TableCell>
-                          {payment.paymentType === PaymentType.DOWN_PAYMENT
-                            ? "DP"
-                            : payment.paymentType === PaymentType.PROGRESS_PAYMENT
-                              ? "Termin"
-                              : "Pelunasan"}
-                        </TableCell>
-                        <TableCell>{currency(payment.amount)}</TableCell>
-                        <TableCell>
-                          {renderPaymentProof(
-                            payment.id,
-                            payment.proofOfTransferUrl,
-                            payment.additionalProofUrls ?? [],
-                            payment.proofEditDisabledUrls ?? [],
-                            `Bukti transfer ${payment.reference}`,
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredPaymentHistoryRows.length === 0 && (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-mono text-xs font-bold text-primary">
+                              {payment.reference}
+                            </p>
+                            <p className="type-p2 mt-0.5 font-semibold text-foreground">
+                              {payment.title}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="shrink-0">
+                            {payment.paymentType === PaymentType.DOWN_PAYMENT
+                              ? "DP"
+                              : payment.paymentType === PaymentType.PROGRESS_PAYMENT
+                                ? "Termin"
+                                : "Pelunasan"}
+                          </Badge>
+                        </div>
+                        <div className="type-p3 flex items-center justify-between text-muted-foreground">
+                          <span>
+                            {payment.paidAt
+                              ? new Date(payment.paidAt).toLocaleString("id-ID")
+                              : "—"}
+                          </span>
+                          <span className="font-mono text-sm font-bold text-foreground tabular-nums">
+                            {currency(payment.amount)}
+                          </span>
+                        </div>
+                      </button>
+                      <div className="pt-1">
+                        {renderPaymentProof(
+                          payment.id,
+                          payment.proofOfTransferUrl,
+                          payment.additionalProofUrls ?? [],
+                          payment.canEditProof === false &&
+                            payment.proofOfTransferUrl
+                            ? [
+                                payment.proofOfTransferUrl,
+                                ...(payment.proofEditDisabledUrls ?? []),
+                              ]
+                            : (payment.proofEditDisabledUrls ?? []),
+                          `Bukti transfer ${payment.reference}`,
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {filteredPaymentHistoryRows.length === 0 && (
+                    <EmptyState
+                      title={
+                        paymentHistoryRows.length === 0
+                          ? "Belum ada transaksi"
+                          : "Transaksi tidak ditemukan"
+                      }
+                      description={
+                        paymentHistoryRows.length === 0
+                          ? "Belum ada transaksi pembayaran berhasil."
+                          : "Tidak ada transaksi yang cocok dengan pencarian."
+                      }
+                    />
+                  )}
+                </div>
+
+                {/* Desktop Table View (>= 768px) */}
+                <div className="hidden overflow-x-auto rounded-lg border md:block">
+                  <Table pagination={false}>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="py-10 text-center text-muted-foreground"
-                        >
-                          {paymentHistoryRows.length === 0
-                            ? "Belum ada transaksi pembayaran berhasil."
-                            : "Tidak ada transaksi yang cocok dengan pencarian."}
-                        </TableCell>
+                        <TableHead>Tanggal</TableHead>
+                        <TableHead>Nomor Ref</TableHead>
+                        <TableHead>Transaksi</TableHead>
+                        <TableHead>Jenis</TableHead>
+                        <TableHead>Jumlah</TableHead>
+                        <TableHead>Bukti Transfer</TableHead>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              <TablePaginationControls
-                count={filteredPaymentHistoryRows.length}
-                pageSize={PAYMENT_HISTORY_PAGE_SIZE}
-                page={currentPaymentHistoryPage}
-                itemLabel="transaksi"
-                onPageChange={setPaymentHistoryPage}
-              />
-            </CardContent>
+                    </TableHeader>
+                    <TableBody>
+                      {paymentHistoryPageRows.map((payment) => (
+                        <TableRow
+                          key={payment.id}
+                          className="cursor-pointer"
+                          tabIndex={0}
+                          onClick={() => openHistoryRowTarget(payment)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              openHistoryRowTarget(payment);
+                            }
+                          }}
+                        >
+                          <TableCell>
+                            {payment.paidAt
+                              ? new Date(payment.paidAt).toLocaleString("id-ID")
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            {payment.reference}
+                          </TableCell>
+                          <TableCell>{payment.title}</TableCell>
+                          <TableCell>
+                            {payment.paymentType === PaymentType.DOWN_PAYMENT
+                              ? "DP"
+                              : payment.paymentType === PaymentType.PROGRESS_PAYMENT
+                                ? "Termin"
+                                : "Pelunasan"}
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {currency(payment.amount)}
+                          </TableCell>
+                          <TableCell>
+                            {renderPaymentProof(
+                              payment.id,
+                              payment.proofOfTransferUrl,
+                              payment.additionalProofUrls ?? [],
+                              payment.canEditProof === false &&
+                                payment.proofOfTransferUrl
+                                ? [
+                                    payment.proofOfTransferUrl,
+                                    ...(payment.proofEditDisabledUrls ?? []),
+                                  ]
+                                : (payment.proofEditDisabledUrls ?? []),
+                              `Bukti transfer ${payment.reference}`,
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {filteredPaymentHistoryRows.length === 0 && (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="py-10 text-center text-muted-foreground"
+                          >
+                            {paymentHistoryRows.length === 0
+                              ? "Belum ada transaksi pembayaran berhasil."
+                              : "Tidak ada transaksi yang cocok dengan pencarian."}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <TablePaginationControls
+                  count={filteredPaymentHistoryRows.length}
+                  pageSize={PAYMENT_HISTORY_PAGE_SIZE}
+                  page={currentPaymentHistoryPage}
+                  itemLabel="transaksi"
+                  onPageChange={setPaymentHistoryPage}
+                />
+              </CardContent>
             </Card>
           </TabsContent>
         </div>
@@ -2640,22 +3122,26 @@ export default function FinanceHub({
             className="space-y-4"
           >
             <TabsList className="flex h-auto flex-wrap justify-start gap-1">
-              <TabsTrigger value="rentals">
-                🚜 Tagihan Sewa (
+              <TabsTrigger value="rentals" className="gap-1.5">
+                <Home className="size-3.5" aria-hidden="true" />
+                Tagihan Sewa (
                 {
                   rentals.filter((r) => r.paymentStatus === "PENDING_PAYMENT")
                     .length
                 }
                 )
               </TabsTrigger>
-              <TabsTrigger value="subcontract">
-                Termin & Retensi ({termyns.length})
+              <TabsTrigger value="subcontract" className="gap-1.5">
+                <FileSpreadsheet className="size-3.5" aria-hidden="true" />
+                Termin &amp; Retensi ({termyns.length})
               </TabsTrigger>
-              <TabsTrigger value="fuel-logs">
-                Log BBM Mover ({vehicleTripLogs.length})
+              <TabsTrigger value="fuel-logs" className="gap-1.5">
+                <Truck className="size-3.5" aria-hidden="true" />
+                Log BBM ({vehicleTripLogs.length})
               </TabsTrigger>
-              <TabsTrigger value="fuel-requests">
-                Reimbursement BBM (
+              <TabsTrigger value="fuel-requests" className="gap-1.5">
+                <Fuel className="size-3.5" aria-hidden="true" />
+                Klaim BBM (
                 {
                   vehicleFuelRequests.filter(
                     (request) =>
@@ -3003,32 +3489,51 @@ export default function FinanceHub({
                         id={`fuel-account-${request.id}`}
                         accounts={financeAccounts}
                         disabled={isPending}
-                        required={false}
                       />
-                      <FormLabel className="grid gap-1 text-sm">
-                        Metode penyaluran dana
-                        <select
+                      <div className="grid gap-1.5 text-sm">
+                        <Label htmlFor={`fuel-method-${request.id}`}>
+                          Metode penyaluran dana
+                        </Label>
+                        <input
+                          type="hidden"
                           name="disbursementMethod"
                           value={
                             fuelDisbursementMethods[request.id] ??
                             POPaymentMethod.CASH
                           }
-                          onChange={(event) =>
+                        />
+                        <Select
+                          value={
+                            fuelDisbursementMethods[request.id] ??
+                            POPaymentMethod.CASH
+                          }
+                          onValueChange={(value) =>
                             setFuelDisbursementMethods((current) => ({
                               ...current,
                               [request.id]:
-                                event.target.value === POPaymentMethod.TRANSFER
+                                value === POPaymentMethod.TRANSFER
                                   ? POPaymentMethod.TRANSFER
                                   : POPaymentMethod.CASH,
                             }))
                           }
-                          className="h-10 rounded-md border bg-background px-3"
                           disabled={isPending}
                         >
-                          <option value={POPaymentMethod.CASH}>Tunai / Cash</option>
-                          <option value={POPaymentMethod.TRANSFER}>Transfer</option>
-                        </select>
-                      </FormLabel>
+                          <SelectTrigger
+                            id={`fuel-method-${request.id}`}
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={POPaymentMethod.CASH}>
+                              Tunai / Cash
+                            </SelectItem>
+                            <SelectItem value={POPaymentMethod.TRANSFER}>
+                              Transfer
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <FormLabel className="grid gap-1 text-sm">
                         {fuelDisbursementMethods[request.id] === POPaymentMethod.TRANSFER
                           ? "Tujuan transfer (bank, no. rekening, nama penerima)"
@@ -3136,9 +3641,10 @@ export default function FinanceHub({
                 </article>
               ))}
               {vehicleFuelRequests.length === 0 && (
-                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  Belum ada request dana BBM dari Mover.
-                </p>
+                <EmptyState
+                  title="Belum ada klaim BBM"
+                  description="Belum ada request dana BBM dari Mover."
+                />
               )}
             </CardContent>
           </Card>
@@ -3161,6 +3667,7 @@ export default function FinanceHub({
         <TabsContent value="vendor-contracts">
           <VendorContractBillingPanel
             contracts={materialContracts}
+            deliveries={materialDeliveries}
             vendorInvoices={vendorInvoices}
             financeAccounts={financeAccounts}
             canManage={
@@ -3169,6 +3676,8 @@ export default function FinanceHub({
               role === UserRole.DIRECTOR ||
               role === UserRole.DEPUTY_DIRECTOR
             }
+            initialInvoiceId={focusedVendorInvoiceId}
+            onInitialInvoiceHandled={() => setFocusedVendorInvoiceId(null)}
             onPreviewProof={(url, label) => setReceiptPreview({ url, label })}
           />
         </TabsContent>
@@ -3184,6 +3693,7 @@ export default function FinanceHub({
         isOpen={selection !== null}
         onClose={() => {
           setSelection(null);
+          setSelectedTicketPoId("");
           setReceiptUrl([]);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
@@ -3211,7 +3721,7 @@ export default function FinanceHub({
           previewOrder ? (
             activeOrder && role === UserRole.FINANCE && !activeOrder.paidAt ? (
               <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">
+                <span className="type-p3 text-muted-foreground">
                   PO ini menunggu pemeriksaan Finance sebelum diajukan ke Direktur.
                 </span>
                 <Button
@@ -3221,84 +3731,64 @@ export default function FinanceHub({
                   className="gap-1.5"
                 >
                   <FileCheck2 className="size-4" aria-hidden="true" />
-                  Tandai PO Diperiksa (Checked)
+                  Tandai Diperiksa
                 </Button>
               </div>
             ) : undefined
           ) : (
-          <Button
-            variant="outline"
-            type="button"
-            onClick={() => {
-              setSelection(null);
-              setReceiptUrl([]);
-              setPaymentAmount("");
-              setPaymentType(PaymentType.FULL_PAYMENT);
-              setMessage("");
-              if (initialOpenSheet) {
-                router.replace(`/apps/finance?tab=${activeTab}`, { scroll: false });
-              }
-            }}
-          >
-            Tutup
-          </Button>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setSelection(null);
+                setSelectedTicketPoId("");
+                setReceiptUrl([]);
+                setPaymentAmount("");
+                setPaymentType(PaymentType.FULL_PAYMENT);
+                setMessage("");
+                if (initialOpenSheet) {
+                  router.replace(`/apps/finance?tab=${activeTab}`, {
+                    scroll: false,
+                  });
+                }
+              }}
+            >
+              Tutup
+            </Button>
           )
         }
       >
-          <div className={previewOrder ? "flex min-h-0 flex-1 flex-col" : "space-y-4"}>
-            {previewOrder && (
-              <>
-                <UniversalDocumentPreview
-                  title={`Purchase Order ${previewOrder.poNumber}`}
-                  documentNumber={previewOrder.poNumber}
-                  src={`/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(previewOrder.publicCode)}`}
-                  toolbarLabel={`Vendor: ${previewOrder.vendorName}`}
-                  minimalToolbar
-                  onClose={() => {
-                    setSelection(null);
-                    setReceiptUrl([]);
-                    setPaymentAmount("");
-                    setPaymentType(PaymentType.FULL_PAYMENT);
-                    setMessage("");
-                    if (initialOpenSheet) {
-                      router.replace(`/apps/finance?tab=${activeTab}`, {
-                        scroll: false,
-                      });
-                    }
-                  }}
-                />
-              </>
-            )}
-            {activeStandaloneOrder && isPaymentSettled && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                <span>
-                  {activeStandaloneOrder.paidAt
-                    ? `PO ini sudah lunas pada ${new Date(activeStandaloneOrder.paidAt).toLocaleDateString("id-ID")}.`
-                    : "PO ini sudah lunas."}
-                </span>
-                {activeStandaloneOrder.paymentReceiptUrl && (
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs"
-                  >
-                    <a
-                      href={photoDownloadHref(
-                        activeStandaloneOrder.paymentReceiptUrl,
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink className="size-3.5" aria-hidden="true" />
-                      Lihat Bukti Pelunasan
-                    </a>
-                  </Button>
-                )}
-              </div>
-            )}
-            {activeStandaloneOrder?.vendorInvoiceUrl && (
-              <div>
+        <div className={previewOrder ? "flex min-h-0 flex-1 flex-col" : "space-y-4"}>
+          {previewOrder && (
+            <UniversalDocumentPreview
+              title={`Purchase Order ${previewOrder.poNumber}`}
+              documentNumber={previewOrder.poNumber}
+              src={`/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(previewOrder.publicCode)}`}
+              toolbarLabel={`Vendor: ${previewOrder.vendorName}`}
+              minimalToolbar
+              onClose={() => {
+                setSelection(null);
+                setSelectedTicketPoId("");
+                setReceiptUrl([]);
+                setPaymentAmount("");
+                setPaymentType(PaymentType.FULL_PAYMENT);
+                setMessage("");
+                if (initialOpenSheet) {
+                  router.replace(`/apps/finance?tab=${activeTab}`, {
+                    scroll: false,
+                  });
+                }
+              }}
+            />
+          )}
+          {activeStandaloneOrder && isPaymentSettled && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+              <span>
+                {activeStandaloneOrder.paidAt
+                  ? `PO ini sudah lunas pada ${new Date(activeStandaloneOrder.paidAt).toLocaleDateString("id-ID")}.`
+                  : "PO ini sudah lunas."}
+              </span>
+              {activeStandaloneOrder.paymentReceiptUrl && (
                 <Button
                   asChild
                   variant="outline"
@@ -3306,26 +3796,48 @@ export default function FinanceHub({
                   className="h-8 gap-1.5 text-xs"
                 >
                   <a
-                    href={photoDownloadHref(activeStandaloneOrder.vendorInvoiceUrl)}
+                    href={photoDownloadHref(
+                      activeStandaloneOrder.paymentReceiptUrl,
+                    )}
                     target="_blank"
                     rel="noreferrer"
                   >
                     <ExternalLink className="size-3.5" aria-hidden="true" />
-                    Lihat Invoice / Bon Vendor
+                    Lihat Bukti Pelunasan
                   </a>
                 </Button>
-              </div>
-            )}
-            {activeStandaloneOrder && !activeStandaloneOrder.vendorInvoiceUrl && (
-              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                Menunggu Logistik mengunggah invoice/bon vendor untuk PO ini.
-                Pembayaran dapat diproses setelah dokumen diunggah.
-              </p>
-            )}
-            {activeStandaloneOrder &&
-              Boolean(activeStandaloneOrder.vendorInvoiceUrl) &&
-              role === UserRole.FINANCE &&
-              !isPaymentSettled && (
+              )}
+            </div>
+          )}
+          {activeStandaloneOrder?.vendorInvoiceUrl && (
+            <div>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+              >
+                <a
+                  href={photoDownloadHref(activeStandaloneOrder.vendorInvoiceUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                  Lihat Invoice / Bon Vendor
+                </a>
+              </Button>
+            </div>
+          )}
+          {activeStandaloneOrder && !activeStandaloneOrder.vendorInvoiceUrl && (
+            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+              Menunggu Logistik mengunggah invoice/bon vendor untuk PO ini.
+              Pembayaran dapat diproses setelah dokumen diunggah.
+            </p>
+          )}
+          {activeStandaloneOrder &&
+            Boolean(activeStandaloneOrder.vendorInvoiceUrl) &&
+            role === UserRole.FINANCE &&
+            !isPaymentSettled && (
               <form className="space-y-3" onSubmit={submitPayment}>
                 <section className="space-y-2 rounded-lg border p-3 text-sm">
                   <p>
@@ -3337,35 +3849,52 @@ export default function FinanceHub({
                   </p>
                   <div className="space-y-2 pt-1">
                     <Label>Jenis pembayaran</Label>
-                    <FormLabel className="flex items-center gap-2 font-normal">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        checked={currentPaymentType === PaymentType.FULL_PAYMENT}
-                        onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
-                      />
-                      Bayar Lunas (Full Payment)
-                    </FormLabel>
-                    {isFirstPayment && (
-                      <FormLabel className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="paymentType"
-                          checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
+                    <RadioGroup
+                      value={currentPaymentType}
+                      onValueChange={(value) =>
+                        setPaymentType(value as PaymentType)
+                      }
+                      className="gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem
+                          value={PaymentType.FULL_PAYMENT}
+                          id="standalone-pay-full"
                         />
-                        Bayar Uang Muka (DP) / Sebagian
-                      </FormLabel>
-                    )}
-                    <FormLabel className="flex items-center gap-2 font-normal">
-                      <input
-                        type="radio"
-                        name="paymentType"
-                        checked={currentPaymentType === PaymentType.PROGRESS_PAYMENT}
-                        onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
-                      />
-                      Pembayaran Termin
-                    </FormLabel>
+                        <Label
+                          htmlFor="standalone-pay-full"
+                          className="font-normal"
+                        >
+                          Bayar Lunas (Full Payment)
+                        </Label>
+                      </div>
+                      {isFirstPayment && (
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem
+                            value={PaymentType.DOWN_PAYMENT}
+                            id="standalone-pay-dp"
+                          />
+                          <Label
+                            htmlFor="standalone-pay-dp"
+                            className="font-normal"
+                          >
+                            Bayar Uang Muka (DP) / Sebagian
+                          </Label>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem
+                          value={PaymentType.PROGRESS_PAYMENT}
+                          id="standalone-pay-progress"
+                        />
+                        <Label
+                          htmlFor="standalone-pay-progress"
+                          className="font-normal"
+                        >
+                          Pembayaran Termin
+                        </Label>
+                      </div>
+                    </RadioGroup>
                     <div className="space-y-2">
                       <Label htmlFor="standalone-payment-amount">
                         Nominal Pembayaran (Rp)
@@ -3436,133 +3965,164 @@ export default function FinanceHub({
                     ? "Memproses..."
                     : currentPaymentType === PaymentType.FULL_PAYMENT
                       ? "Bayar & Terima ke Gudang"
-                        : currentPaymentType === PaymentType.DOWN_PAYMENT
-                          ? "Catat Pembayaran DP"
-                          : "Catat Pembayaran Termin"}
+                      : currentPaymentType === PaymentType.DOWN_PAYMENT
+                        ? "Catat Pembayaran DP"
+                        : "Catat Pembayaran Termin"}
                 </Button>
               </form>
             )}
-            {activeDirectPurchase && (
-              <section className="space-y-3 rounded-lg border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-semibold">{activeDirectPurchase.vendorName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Dibuat {new Date(activeDirectPurchase.createdAt).toLocaleDateString("id-ID")}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={
-                      isPaymentSettled
-                        ? "success"
-                        : paidAmount > 0
-                          ? "warning"
-                          : "error"
-                    }
-                  >
-                    {paymentStatusLabel}
-                  </Badge>
-                </div>
-                <NativeDataTable itemLabel="barang">
-                  <table className="app-data-table w-full min-w-[420px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="py-2 pr-3">Barang</th>
-                        <th className="py-2 pr-3">Jumlah</th>
-                        <th className="py-2">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeDirectPurchase.items.map((item, index) => (
-                        <tr key={`${item.itemName}-${index}`} className="border-b last:border-0">
-                          <td className="py-2 pr-3">{item.itemName}</td>
-                          <td className="py-2 pr-3">{item.quantity} {item.unit}</td>
-                          <td className="py-2">{currency(item.totalPrice)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </NativeDataTable>
-                <div className="grid gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 text-xs sm:grid-cols-3">
-                  <div>
-                    <span className="text-muted-foreground">Total Tagihan</span>
-                    <strong className="mt-0.5 block text-sm tabular-nums text-foreground">
-                      {currency(paymentTotal)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Sudah Dibayar</span>
-                    <strong className="mt-0.5 block text-sm tabular-nums text-emerald-600 dark:text-emerald-400">
-                      {currency(paidAmount)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Sisa Hutang</span>
-                    <strong className="mt-0.5 block text-sm tabular-nums text-rose-600 dark:text-rose-400">
-                      {currency(remainingAmount)}
-                    </strong>
-                  </div>
-                </div>
-                {activeDirectPurchase.vendorInvoiceUrl && (
-                  <div>
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                    >
-                      <a
-                        href={photoDownloadHref(activeDirectPurchase.vendorInvoiceUrl)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <ExternalLink className="size-3.5" aria-hidden="true" />
-                        Lihat Invoice / Bon Faktur
-                      </a>
-                    </Button>
-                  </div>
-                )}
-                {!activeDirectPurchase.vendorInvoiceUrl && (
-                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                    Menunggu Logistik mengunggah invoice/bon faktur untuk
-                    pembelian langsung ini sebelum pembayaran dapat diproses.
+          {activeDirectPurchase && (
+            <section className="space-y-3 rounded-lg border p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-semibold">
+                    {activeDirectPurchase.vendorName}
                   </p>
-                )}
-                {role === UserRole.FINANCE &&
-                  activeDirectPurchase.vendorInvoiceUrl &&
-                  remainingAmount > 0 && (
-                  <form className="space-y-3 border-t pt-3" onSubmit={submitPayment}>
+                  <p className="text-sm text-muted-foreground">
+                    Dibuat{" "}
+                    {new Date(activeDirectPurchase.createdAt).toLocaleDateString(
+                      "id-ID",
+                    )}
+                  </p>
+                </div>
+                <Badge
+                  variant={
+                    isPaymentSettled
+                      ? "success"
+                      : paidAmount > 0
+                        ? "warning"
+                        : "error"
+                  }
+                >
+                  {paymentStatusLabel}
+                </Badge>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table pagination={false}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Barang</TableHead>
+                      <TableHead>Jumlah</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activeDirectPurchase.items.map((item, index) => (
+                      <TableRow key={`${item.itemName}-${index}`}>
+                        <TableCell>{item.itemName}</TableCell>
+                        <TableCell>
+                          {item.quantity} {item.unit}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {currency(item.totalPrice)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="grid gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 text-xs sm:grid-cols-3">
+                <div>
+                  <span className="type-p3 text-muted-foreground">
+                    Total Tagihan
+                  </span>
+                  <strong className="mt-0.5 block text-sm tabular-nums text-foreground">
+                    {currency(paymentTotal)}
+                  </strong>
+                </div>
+                <div>
+                  <span className="type-p3 text-muted-foreground">
+                    Sudah Dibayar
+                  </span>
+                  <strong className="mt-0.5 block text-sm tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {currency(paidAmount)}
+                  </strong>
+                </div>
+                <div>
+                  <span className="type-p3 text-muted-foreground">
+                    Sisa Hutang
+                  </span>
+                  <strong className="mt-0.5 block text-sm tabular-nums text-rose-600 dark:text-rose-400">
+                    {currency(remainingAmount)}
+                  </strong>
+                </div>
+              </div>
+              {activeDirectPurchase.vendorInvoiceUrl && (
+                <div>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                  >
+                    <a
+                      href={photoDownloadHref(
+                        activeDirectPurchase.vendorInvoiceUrl,
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                      Lihat Invoice / Bon Faktur
+                    </a>
+                  </Button>
+                </div>
+              )}
+              {!activeDirectPurchase.vendorInvoiceUrl && (
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                  Menunggu Logistik mengunggah invoice/bon faktur untuk
+                  pembelian langsung ini sebelum pembayaran dapat diproses.
+                </p>
+              )}
+              {role === UserRole.FINANCE &&
+                activeDirectPurchase.vendorInvoiceUrl &&
+                remainingAmount > 0 && (
+                  <form
+                    className="space-y-3 border-t pt-3"
+                    onSubmit={submitPayment}
+                  >
                     <section className="space-y-2 text-sm">
                       <Label>Jenis pembayaran</Label>
-                      <FormLabel className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="direct-purchase-payment-type"
-                          checked={currentPaymentType === PaymentType.FULL_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
-                        />
-                        Bayar Lunas
-                      </FormLabel>
-                      {activeDirectPurchase.paymentTransactions.length === 0 && (
-                        <FormLabel className="flex items-center gap-2 font-normal">
-                          <input
-                            type="radio"
-                            name="direct-purchase-payment-type"
-                            checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
-                            onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
+                      <RadioGroup
+                        value={currentPaymentType}
+                        onValueChange={(value) =>
+                          setPaymentType(value as PaymentType)
+                        }
+                        className="gap-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem
+                            value={PaymentType.FULL_PAYMENT}
+                            id="dp-pay-full"
                           />
-                          Uang Muka (DP)
-                        </FormLabel>
-                      )}
-                      <FormLabel className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="direct-purchase-payment-type"
-                          checked={currentPaymentType === PaymentType.PROGRESS_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
-                        />
-                        Pembayaran Termin
-                      </FormLabel>
+                          <Label htmlFor="dp-pay-full" className="font-normal">
+                            Bayar Lunas
+                          </Label>
+                        </div>
+                        {activeDirectPurchase.paymentTransactions.length === 0 && (
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem
+                              value={PaymentType.DOWN_PAYMENT}
+                              id="dp-pay-dp"
+                            />
+                            <Label htmlFor="dp-pay-dp" className="font-normal">
+                              Uang Muka (DP)
+                            </Label>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem
+                            value={PaymentType.PROGRESS_PAYMENT}
+                            id="dp-pay-progress"
+                          />
+                          <Label
+                            htmlFor="dp-pay-progress"
+                            className="font-normal"
+                          >
+                            Pembayaran Termin
+                          </Label>
+                        </div>
+                      </RadioGroup>
                       <div className="space-y-2">
                         <Label htmlFor="direct-purchase-payment-amount">
                           Nominal Pembayaran (Rp)
@@ -3615,14 +4175,17 @@ export default function FinanceHub({
                             <Label htmlFor="direct-purchase-payment-method">
                               Metode Pembayaran
                             </Label>
-                            <select
-                              key={`${activeDirectPurchase.id}:method`}
-                              id="direct-purchase-payment-method"
+                            <input
+                              type="hidden"
                               name="paymentMethod"
                               value={activeDirectMethod}
-                              onChange={(event) => {
+                            />
+                            <Select
+                              key={`${activeDirectPurchase.id}:method`}
+                              value={activeDirectMethod}
+                              onValueChange={(value) => {
                                 const nextMethod =
-                                  event.target.value === POPaymentMethod.CASH
+                                  value === POPaymentMethod.CASH
                                     ? POPaymentMethod.CASH
                                     : POPaymentMethod.TRANSFER;
                                 setDirectPurchasePaymentMethods((current) => ({
@@ -3659,15 +4222,22 @@ export default function FinanceHub({
                                 });
                               }}
                               disabled={isPending}
-                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
                             >
-                              <option value={POPaymentMethod.TRANSFER}>
-                                Transfer
-                              </option>
-                              <option value={POPaymentMethod.CASH}>
-                                Cash / Tunai
-                              </option>
-                            </select>
+                              <SelectTrigger
+                                id="direct-purchase-payment-method"
+                                className="w-full"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={POPaymentMethod.TRANSFER}>
+                                  Transfer
+                                </SelectItem>
+                                <SelectItem value={POPaymentMethod.CASH}>
+                                  Cash / Tunai
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           {activeDirectMethod === POPaymentMethod.TRANSFER &&
                             activeDirectVendorAccounts.length > 1 && (
@@ -3675,8 +4245,7 @@ export default function FinanceHub({
                                 <Label htmlFor="direct-purchase-vendor-bank">
                                   Pilih Rekening Vendor
                                 </Label>
-                                <select
-                                  id="direct-purchase-vendor-bank"
+                                <Select
                                   value={
                                     activeDirectVendorAccounts.find(
                                       (account) =>
@@ -3684,11 +4253,10 @@ export default function FinanceHub({
                                         currentDestinationValue.trim(),
                                     )?.id ?? ""
                                   }
-                                  onChange={(event) => {
+                                  onValueChange={(value) => {
                                     const picked =
                                       activeDirectVendorAccounts.find(
-                                        (account) =>
-                                          account.id === event.target.value,
+                                        (account) => account.id === value,
                                       );
                                     if (picked) {
                                       setDirectPurchaseDestinations(
@@ -3701,18 +4269,25 @@ export default function FinanceHub({
                                     }
                                   }}
                                   disabled={isPending}
-                                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
                                 >
-                                  <option value="">
-                                    Pilih rekening vendor terdaftar
-                                  </option>
-                                  {activeDirectVendorAccounts.map((account) => (
-                                    <option key={account.id} value={account.id}>
-                                      {account.label}
-                                      {account.isPrimary ? " (Utama)" : ""}
-                                    </option>
-                                  ))}
-                                </select>
+                                  <SelectTrigger
+                                    id="direct-purchase-vendor-bank"
+                                    className="w-full"
+                                  >
+                                    <SelectValue placeholder="Pilih rekening vendor terdaftar" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {activeDirectVendorAccounts.map((account) => (
+                                      <SelectItem
+                                        key={account.id}
+                                        value={account.id}
+                                      >
+                                        {account.label}
+                                        {account.isPrimary ? " (Utama)" : ""}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             )}
                           <div className="space-y-2">
@@ -3745,11 +4320,11 @@ export default function FinanceHub({
                             />
                             {activeDirectMethod === POPaymentMethod.TRANSFER &&
                               (activeDirectVendorDestination ? (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="type-p3 text-muted-foreground">
                                   Otomatis diisi dari rekening vendor terdaftar.
                                 </p>
                               ) : !currentDestinationValue.trim() ? (
-                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                <p className="type-p3 text-amber-600 dark:text-amber-400">
                                   Vendor belum memiliki nomor rekening terdaftar. Isi rekening tujuan di atas.
                                 </p>
                               ) : null)}
@@ -3792,338 +4367,591 @@ export default function FinanceHub({
                     </Button>
                   </form>
                 )}
-              </section>
-            )}
-            {activeTicket && (
-              <>
-                <div className="space-y-3 rounded-xl border border-border/80 bg-muted/15 p-4 text-sm">
-                  <div className="grid gap-2.5 sm:grid-cols-3">
-                    <div className="rounded-lg border border-border/70 bg-background/60 p-3">
-                      <span className="text-xs text-muted-foreground">
-                        Total Nilai Pengajuan
-                      </span>
-                      <strong className="mt-1 block text-base tabular-nums text-foreground">
-                        {currency(activeTicket.totalAmount)}
-                      </strong>
-                    </div>
-                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                        Total Sudah Dibayar
-                      </span>
-                      <strong className="mt-1 block text-base tabular-nums text-emerald-600 dark:text-emerald-400">
-                        {currency(paidAmount)}
-                      </strong>
-                    </div>
-                    <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
-                      <span className="text-xs text-rose-600 dark:text-rose-400">
-                        Sisa Tagihan
-                      </span>
-                      <strong className="mt-1 block text-base tabular-nums text-rose-600 dark:text-rose-400">
-                        {currency(remainingAmount)}
-                      </strong>
-                    </div>
-                  </div>
+            </section>
+          )}
+          {activeTicket &&
+            (() => {
+              const activeTicketTotalDisplay = Number(
+                activeTicket.aggregatedPoTotalAmount ??
+                  activeTicket.totalAmount ??
+                  0,
+              );
+              const activeTicketInvoiceUrl =
+                selectedTicketPo?.vendorInvoiceUrl ??
+                activeTicket.purchaseReceiptUrl;
+              const activeTicketFieldCostLabel = getFieldCostLabel(
+                activeTicket.fieldCategory,
+              );
+              const activeTicketNeedsInvoice = selectedTicketPo
+                ? !selectedTicketPo.isPaid && !selectedTicketPo.hasInvoice
+                : (activeTicket.type === TicketType.MATERIAL ||
+                    Boolean(activeTicket.hasApprovedPo)) &&
+                  !activeTicket.purchaseReceiptUrl;
+              const canShowTicketPaymentForm =
+                role === UserRole.FINANCE &&
+                !activeTicketNeedsInvoice &&
+                (selectedTicketPo
+                  ? !selectedTicketPo.isPaid && remainingAmount > 0
+                  : remainingAmount > 0 || activeTicketTotalDisplay <= 0);
 
-                  <div className="rounded-lg border border-border/70 bg-background/50 p-3 space-y-2">
-                    <p className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
-                      Tujuan Pembayaran &amp; Rekening Penerima
-                    </p>
-                    <div className="grid gap-2 text-xs sm:grid-cols-3">
-                      <div>
-                        <span className="text-muted-foreground">Nama Penerima</span>
-                        <strong className="mt-0.5 block text-foreground">
-                          {activeTicket.recipientName ?? activeTicket.requesterName}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Bank / Kas</span>
-                        <strong className="mt-0.5 block text-foreground">
-                          {activeTicket.bankName ??
-                            activeTicket.vendorBankName ??
-                            "Tidak dicantumkan"}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Nomor Rekening</span>
-                        <strong className="mt-0.5 block font-mono text-foreground">
-                          {activeTicket.accountNumber ??
-                            activeTicket.vendorAccountNumber ??
-                            "Tidak dicantumkan"}
-                        </strong>
-                      </div>
+              return (
+                <>
+                  <div className="space-y-3 rounded-xl border border-border/80 bg-muted/15 p-4 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">
+                        Status: {activeTicket.status}
+                      </Badge>
+                      {activeTicketFieldCostLabel && (
+                        <Badge variant="secondary">
+                          {activeTicketFieldCostLabel}
+                        </Badge>
+                      )}
+                      {(activeTicket.deliveryOrderCount ?? 0) > 0 && (
+                        <Badge variant="warning">
+                          {activeTicket.deliveryOrderCount} DO Material Alam
+                        </Badge>
+                      )}
+                      {activeTicketPoSummaries.length > 1 && (
+                        <Badge variant="secondary">
+                          {activeTicketPoSummaries.length} Purchase Order (Multi-PO)
+                        </Badge>
+                      )}
                     </div>
 
-                    {activeTicket.requestCategory ===
-                      TicketRequestCategory.APH && (
-                      <div className="border-t border-border/60 pt-2 text-xs space-y-1">
-                        <p>
-                          Metode Pembayaran:{" "}
-                          <strong>
-                            {activeTicket.requestPaymentMethod ===
-                            POPaymentMethod.CASH
-                              ? "Tunai (Cash)"
-                              : "Transfer"}
+                    <div className="grid gap-2.5 sm:grid-cols-3">
+                      <div className="rounded-lg border border-border/70 bg-background/60 p-3">
+                        <span className="type-p3 text-muted-foreground">
+                          {activeTicketPoSummaries.length > 1 && selectedTicketPo
+                            ? `Nilai ${selectedTicketPo.poNumber}`
+                            : "Total Nilai Pengajuan"}
+                        </span>
+                        <strong className="mt-1 block text-base tabular-nums text-foreground">
+                          {currency(
+                            selectedTicketPo
+                              ? selectedTicketPo.totalAmount
+                              : activeTicketTotalDisplay,
+                          )}
+                        </strong>
+                        {activeTicketPoSummaries.length > 1 && (
+                          <span className="type-p3 mt-0.5 block text-muted-foreground">
+                            Gabungan {activeTicketPoSummaries.length} PO:{" "}
+                            {currency(activeTicketTotalDisplay)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                        <span className="type-p3 text-emerald-600 dark:text-emerald-400">
+                          Total Sudah Dibayar
+                        </span>
+                        <strong className="mt-1 block text-base tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {currency(paidAmount)}
+                        </strong>
+                      </div>
+                      <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
+                        <span className="type-p3 text-rose-600 dark:text-rose-400">
+                          Sisa Tagihan
+                        </span>
+                        <strong className="mt-1 block text-base tabular-nums text-rose-600 dark:text-rose-400">
+                          {currency(remainingAmount)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {activeTicketPoSummaries.length > 1 && (
+                      <div className="space-y-2 rounded-lg border border-border/70 bg-background/60 p-3">
+                        <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                          Pilih PO yang Akan Dibayar / Diperiksa
+                        </p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {activeTicketPoSummaries.map((po) => {
+                            const isPicked = selectedTicketPo?.id === po.id;
+                            return (
+                              <button
+                                key={po.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTicketPoId(po.id);
+                                  setReceiptUrl([]);
+                                  setPaymentAmount("");
+                                  setPaymentType(PaymentType.FULL_PAYMENT);
+                                }}
+                                className={`flex flex-col justify-between gap-1.5 rounded-lg border p-2.5 text-left transition ${
+                                  isPicked
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border bg-background hover:border-primary/40"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-xs font-bold text-primary">
+                                    {po.poNumber}
+                                  </span>
+                                  <Badge
+                                    variant={
+                                      po.isPaid
+                                        ? "success"
+                                        : po.hasInvoice
+                                          ? "warning"
+                                          : "outline"
+                                    }
+                                    className="type-p3"
+                                  >
+                                    {po.isPaid
+                                      ? "LUNAS"
+                                      : po.hasInvoice
+                                        ? "Siap Bayar"
+                                        : "No Invoice"}
+                                  </Badge>
+                                </div>
+                                <p className="type-p2 font-medium text-foreground">
+                                  {po.vendorName}
+                                </p>
+                                <div className="type-p3 flex items-center justify-between text-muted-foreground">
+                                  <span>Total: {currency(po.totalAmount)}</span>
+                                  <span className="font-semibold text-foreground tabular-nums">
+                                    Sisa: {currency(po.remainingAmount)}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTicket.itemsSummary &&
+                      activeTicket.itemsSummary.length > 0 && (
+                        <div className="space-y-1.5 rounded-lg border border-border/70 bg-background/50 p-3">
+                          <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                            Ringkasan Item Permintaan
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeTicket.itemsSummary.map((item, idx) => (
+                              <Badge
+                                key={`${item.itemName}-${idx}`}
+                                variant="outline"
+                                className="type-p3 font-normal"
+                              >
+                                {item.itemName} · {item.quantity} {item.unit}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {activeTicket.rentalDetails && (
+                      <div className="space-y-1.5 rounded-lg border border-border/70 bg-background/50 p-3">
+                        <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                          Rincian Pengajuan Sewa
+                        </p>
+                        <div className="grid gap-2 text-xs sm:grid-cols-2">
+                          <div>
+                            <span className="text-muted-foreground">
+                              Aset / Properti
+                            </span>
+                            <strong className="block text-foreground">
+                              {activeTicket.rentalDetails.assetName || "—"}
+                              {activeTicket.rentalDetails.codeOrPlate
+                                ? ` (${activeTicket.rentalDetails.codeOrPlate})`
+                                : ""}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              Jenis &amp; Cakupan
+                            </span>
+                            <strong className="block text-foreground">
+                              {activeTicket.rentalDetails.rentalType ?? "—"}
+                              {activeTicket.rentalDetails.usageScope
+                                ? ` · ${activeTicket.rentalDetails.usageScope}`
+                                : ""}
+                            </strong>
+                          </div>
+                          {activeTicket.rentalDetails.propertyAddress && (
+                            <div className="sm:col-span-2">
+                              <span className="text-muted-foreground">
+                                Alamat Lokasi
+                              </span>
+                              <strong className="block text-foreground">
+                                {activeTicket.rentalDetails.propertyAddress}
+                              </strong>
+                            </div>
+                          )}
+                          {(activeTicket.rentalDetails.landlordName ||
+                            activeTicket.rentalDetails.landlordPhone) && (
+                            <div>
+                              <span className="text-muted-foreground">
+                                Pemilik / Landlord
+                              </span>
+                              <strong className="block text-foreground">
+                                {[
+                                  activeTicket.rentalDetails.landlordName,
+                                  activeTicket.rentalDetails.landlordPhone,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </strong>
+                            </div>
+                          )}
+                          {activeTicket.rentalDetails.occupantCount !== null && (
+                            <div>
+                              <span className="text-muted-foreground">
+                                Jumlah Penghuni
+                              </span>
+                              <strong className="block text-foreground">
+                                {activeTicket.rentalDetails.occupantCount} orang
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 rounded-lg border border-border/70 bg-background/50 p-3">
+                      <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                        Tujuan Pembayaran &amp; Rekening Penerima
+                      </p>
+                      <div className="grid gap-2 text-xs sm:grid-cols-3">
+                        <div>
+                          <span className="text-muted-foreground">
+                            Nama Penerima / Vendor
+                          </span>
+                          <strong className="mt-0.5 block text-foreground">
+                            {selectedTicketPo?.vendorName ??
+                              activeTicket.recipientName ??
+                              activeTicket.requesterName}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Bank / Kas
+                          </span>
+                          <strong className="mt-0.5 block text-foreground">
+                            {activeTicket.bankName ??
+                              activeTicket.vendorBankName ??
+                              "Lihat tujuan transfer"}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Nomor Rekening
+                          </span>
+                          <strong className="mt-0.5 block font-mono text-foreground">
+                            {activeTicket.accountNumber ??
+                              activeTicket.vendorAccountNumber ??
+                              "Lihat tujuan transfer"}
+                          </strong>
+                        </div>
+                      </div>
+                      {selectedTicketPo?.transferDestination && (
+                        <p className="type-p3 border-t border-border/60 pt-2 text-muted-foreground">
+                          Tujuan {selectedTicketPo.poNumber}:{" "}
+                          <strong className="text-foreground">
+                            {selectedTicketPo.transferDestination}
                           </strong>
                         </p>
-                        {activeTicket.requestPaymentMethod ===
-                          POPaymentMethod.TRANSFER && (
+                      )}
+
+                      {activeTicket.requestCategory ===
+                        TicketRequestCategory.APH && (
+                        <div className="space-y-1 border-t border-border/60 pt-2 text-xs">
                           <p>
-                            Tujuan Transfer:{" "}
+                            Metode Pembayaran:{" "}
                             <strong>
-                              {activeTicket.transferDestination || "—"}
+                              {activeTicket.requestPaymentMethod ===
+                              POPaymentMethod.CASH
+                                ? "Tunai (Cash)"
+                                : "Transfer"}
                             </strong>
                           </p>
-                        )}
-                        {activeTicket.requestPaymentDescription && (
-                          <p className="whitespace-pre-wrap text-muted-foreground">
-                            Keterangan: {activeTicket.requestPaymentDescription}
-                          </p>
-                        )}
+                          {activeTicket.requestPaymentMethod ===
+                            POPaymentMethod.TRANSFER && (
+                            <p>
+                              Tujuan Transfer:{" "}
+                              <strong>
+                                {activeTicket.transferDestination || "—"}
+                              </strong>
+                            </p>
+                          )}
+                          {activeTicket.requestPaymentDescription && (
+                            <p className="whitespace-pre-wrap text-muted-foreground">
+                              Keterangan:{" "}
+                              {activeTicket.requestPaymentDescription}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {activeTicketInvoiceUrl && (
+                      <div>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 text-xs"
+                        >
+                          <a
+                            href={photoDownloadHref(activeTicketInvoiceUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <ExternalLink
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                            Lihat Invoice / Bon{" "}
+                            {selectedTicketPo
+                              ? selectedTicketPo.poNumber
+                              : "Logistik"}
+                          </a>
+                        </Button>
                       </div>
                     )}
                   </div>
-
-                  {activeTicket.purchaseReceiptUrl && (
-                    <div>
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                      >
-                        <a
-                          href={photoDownloadHref(activeTicket.purchaseReceiptUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink className="size-3.5" aria-hidden="true" />
-                          Lihat Invoice / Bon dari Logistik
-                        </a>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <DocumentPdfGenerator
-                  key={`TICKET:${activeTicket.id}`}
-                  recordType="TICKET"
-                  recordId={activeTicket.id}
-                  documentNumber={activeTicket.ticketNumber}
-                  templates={documentTemplates}
-                />
-                {(activeTicket.type === TicketType.MATERIAL ||
-                  Boolean(activeTicket.hasApprovedPo)) &&
-                  !activeTicket.purchaseReceiptUrl && (
+                  <DocumentPdfGenerator
+                    key={`TICKET:${activeTicket.id}`}
+                    recordType="TICKET"
+                    recordId={activeTicket.id}
+                    documentNumber={activeTicket.ticketNumber}
+                    templates={documentTemplates}
+                  />
+                  {activeTicketNeedsInvoice && (
                     <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                      Menunggu Logistik mengunggah invoice/bon pembelian untuk
-                      tiket ini sebelum pembayaran dapat diproses.
+                      Menunggu Logistik mengunggah invoice/bon pembelian untuk{" "}
+                      {selectedTicketPo
+                        ? `PO ${selectedTicketPo.poNumber}`
+                        : "tiket ini"}{" "}
+                      sebelum pembayaran dapat diproses.
                     </p>
                   )}
-                {role === UserRole.FINANCE &&
-                  !(
-                    (activeTicket.type === TicketType.MATERIAL ||
-                      Boolean(activeTicket.hasApprovedPo)) &&
-                    !activeTicket.purchaseReceiptUrl
-                  ) && (
-                  <form className="space-y-3" onSubmit={submitPayment}>
-                    <section className="space-y-2 rounded-lg border p-3 text-sm">
-                      <Label>Jenis pembayaran</Label>
-                      <FormLabel className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="paymentType"
-                          checked={currentPaymentType === PaymentType.FULL_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.FULL_PAYMENT)}
-                        />
-                        Bayar Lunas (Full Payment)
-                      </FormLabel>
-                      {activeTicket.paymentTransactions.length === 0 && (
-                        <FormLabel className="flex items-center gap-2 font-normal">
-                          <input
-                            type="radio"
-                            name="paymentType"
-                            checked={currentPaymentType === PaymentType.DOWN_PAYMENT}
-                            onChange={() => setPaymentType(PaymentType.DOWN_PAYMENT)}
-                          />
-                          Bayar Uang Muka (DP) / Sebagian
-                        </FormLabel>
-                      )}
-                      <FormLabel className="flex items-center gap-2 font-normal">
-                        <input
-                          type="radio"
-                          name="paymentType"
-                          checked={currentPaymentType === PaymentType.PROGRESS_PAYMENT}
-                          onChange={() => setPaymentType(PaymentType.PROGRESS_PAYMENT)}
-                        />
-                        Pembayaran Termin
-                      </FormLabel>
-                      <div className="space-y-2">
-                        <Label htmlFor="ticket-payment-amount">
-                          Nominal Pembayaran (Rp)
+                  {canShowTicketPaymentForm && (
+                    <form className="space-y-3" onSubmit={submitPayment}>
+                      <section className="space-y-2 rounded-lg border p-3 text-sm">
+                        <Label>
+                          Jenis pembayaran
+                          {selectedTicketPo
+                            ? ` · ${selectedTicketPo.poNumber}`
+                            : ""}
                         </Label>
-                        <RupiahAmountInput
-                          id="ticket-payment-amount"
-                          value={
-                            currentPaymentType === PaymentType.FULL_PAYMENT &&
-                            paymentTotal > 0
-                              ? formatRupiahNumber(remainingAmount)
-                              : paymentAmount
+                        <RadioGroup
+                          value={currentPaymentType}
+                          onValueChange={(value) =>
+                            setPaymentType(value as PaymentType)
                           }
-                          onChange={setPaymentAmount}
+                          className="gap-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem
+                              value={PaymentType.FULL_PAYMENT}
+                              id="ticket-pay-full"
+                            />
+                            <Label
+                              htmlFor="ticket-pay-full"
+                              className="font-normal"
+                            >
+                              Bayar Lunas (Full Payment)
+                            </Label>
+                          </div>
+                          {isFirstPayment && (
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem
+                                value={PaymentType.DOWN_PAYMENT}
+                                id="ticket-pay-dp"
+                              />
+                              <Label
+                                htmlFor="ticket-pay-dp"
+                                className="font-normal"
+                              >
+                                Bayar Uang Muka (DP) / Sebagian
+                              </Label>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem
+                              value={PaymentType.PROGRESS_PAYMENT}
+                              id="ticket-pay-progress"
+                            />
+                            <Label
+                              htmlFor="ticket-pay-progress"
+                              className="font-normal"
+                            >
+                              Pembayaran Termin
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                        <div className="space-y-2">
+                          <Label htmlFor="ticket-payment-amount">
+                            Nominal Pembayaran (Rp)
+                          </Label>
+                          <RupiahAmountInput
+                            id="ticket-payment-amount"
+                            value={
+                              currentPaymentType === PaymentType.FULL_PAYMENT &&
+                              paymentTotal > 0
+                                ? formatRupiahNumber(remainingAmount)
+                                : paymentAmount
+                            }
+                            onChange={setPaymentAmount}
+                            required
+                            disabled={
+                              isPending ||
+                              (currentPaymentType === PaymentType.FULL_PAYMENT &&
+                                paymentTotal > 0)
+                            }
+                          />
+                        </div>
+                      </section>
+                      <div className="space-y-2">
+                        <Label htmlFor="transfer-destination">
+                          {activeTicket.requestCategory ===
+                            TicketRequestCategory.APH &&
+                          activeTicket.requestPaymentMethod ===
+                            POPaymentMethod.CASH
+                            ? "Keterangan pembayaran tunai"
+                            : "Tujuan transfer"}
+                        </Label>
+                        <Input
+                          key={`${activeTicket.id}:${selectedTicketPo?.id ?? "ticket"}`}
+                          id="transfer-destination"
+                          name="transferDestination"
+                          defaultValue={
+                            activeTicket.requestCategory ===
+                              TicketRequestCategory.APH &&
+                            activeTicket.requestPaymentMethod ===
+                              POPaymentMethod.CASH
+                              ? "Pembayaran tunai"
+                              : selectedTicketPo?.transferDestination ??
+                                activeTicket.transferDestination ??
+                                (activeTicket.vendorBankName &&
+                                activeTicket.vendorAccountNumber
+                                  ? `Ditransfer ke: ${activeTicket.vendorBankName} & ${activeTicket.vendorAccountNumber}`
+                                  : "")
+                          }
+                          placeholder={
+                            activeTicket.requestCategory ===
+                              TicketRequestCategory.APH &&
+                            activeTicket.requestPaymentMethod ===
+                              POPaymentMethod.CASH
+                              ? "Keterangan penyerahan tunai"
+                              : "Nama penerima, bank, atau nomor rekening tujuan"
+                          }
+                          maxLength={300}
                           required
-                          disabled={
-                            isPending ||
-                            (currentPaymentType === PaymentType.FULL_PAYMENT &&
-                              paymentTotal > 0)
-                          }
+                          disabled={isPending}
                         />
                       </div>
-                    </section>
-                    <div className="space-y-2">
-                      <Label htmlFor="transfer-destination">
-                        {activeTicket.requestCategory ===
-                          TicketRequestCategory.APH &&
-                        activeTicket.requestPaymentMethod ===
-                          POPaymentMethod.CASH
-                          ? "Keterangan pembayaran tunai"
-                          : "Tujuan transfer"}
-                      </Label>
-                      <Input
-                        key={activeTicket.id}
-                        id="transfer-destination"
-                        name="transferDestination"
-                        defaultValue={
-                          activeTicket.requestCategory ===
+                      <FinanceAccountField
+                        id="ticket-finance-account"
+                        accounts={financeAccounts}
+                        disabled={isPending}
+                      />
+                      <div className="space-y-2">
+                        <Label>
+                          {activeTicket.requestCategory ===
                             TicketRequestCategory.APH &&
                           activeTicket.requestPaymentMethod ===
                             POPaymentMethod.CASH
-                            ? "Pembayaran tunai"
-                            : activeTicket.transferDestination ??
-                              (activeTicket.vendorBankName &&
-                          activeTicket.vendorAccountNumber
-                            ? `Ditransfer ke: ${activeTicket.vendorBankName} & ${activeTicket.vendorAccountNumber}`
-                            : "")
+                            ? "Bukti penyerahan dana"
+                            : "Bukti transfer"}
+                        </Label>
+                        <FinancePaymentProofUpload
+                          value={receiptUrl}
+                          onChange={setReceiptUrl}
+                          multiple
+                          disabled={isPending}
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        disabled={
+                          receiptUrl.length === 0 ||
+                          financeAccounts.length === 0 ||
+                          isPending ||
+                          ((currentPaymentType !== PaymentType.FULL_PAYMENT ||
+                            paymentTotal <= 0) &&
+                            parseRupiahInput(paymentAmount) <= 0)
                         }
-                        placeholder={
-                          activeTicket.requestCategory ===
-                            TicketRequestCategory.APH &&
-                          activeTicket.requestPaymentMethod ===
-                            POPaymentMethod.CASH
-                            ? "Keterangan penyerahan tunai"
-                            : "Nama penerima, bank, atau nomor rekening tujuan"
-                        }
-                        maxLength={300}
-                        required
-                        disabled={isPending}
-                      />
-                    </div>
-                    <FinanceAccountField
-                      id="ticket-finance-account"
-                      accounts={financeAccounts}
-                      disabled={isPending}
-                    />
-                    <div className="space-y-2">
-                      <Label>
-                        {activeTicket.requestCategory ===
-                          TicketRequestCategory.APH &&
-                        activeTicket.requestPaymentMethod ===
-                          POPaymentMethod.CASH
-                          ? "Bukti penyerahan dana"
-                          : "Bukti transfer"}
-                      </Label>
-                      <FinancePaymentProofUpload
-                        value={receiptUrl}
-                        onChange={setReceiptUrl}
-                        multiple
-                        disabled={isPending}
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={
-                        receiptUrl.length === 0 ||
-                        financeAccounts.length === 0 ||
-                        isPending ||
-                        ((currentPaymentType !== PaymentType.FULL_PAYMENT ||
-                          paymentTotal <= 0) &&
-                          parseRupiahInput(paymentAmount) <= 0)
-                      }
-                    >
-                      {isPending
-                        ? "Memproses..."
-                        : currentPaymentType === PaymentType.FULL_PAYMENT
-                          ? "Selesaikan Pembayaran"
-                          : currentPaymentType === PaymentType.DOWN_PAYMENT
-                            ? "Catat Pembayaran DP"
-                            : "Catat Pembayaran Termin"}
-                    </Button>
-                  </form>
-                )}
-              </>
-            )}
-            {paymentHistory.length > 0 && (
-              <section className="space-y-2 rounded-lg border p-4">
-                <h3 className="font-semibold">Riwayat Pembayaran</h3>
-                <NativeDataTable itemLabel="pembayaran">
-                  <table className="app-data-table w-full min-w-[540px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="py-2 pr-3">Tanggal</th>
-                        <th className="py-2 pr-3">Jenis</th>
-                        <th className="py-2 pr-3">Jumlah</th>
-                        <th className="py-2 pr-3">Tujuan Transfer</th>
-                        <th className="py-2">Bukti</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paymentHistory.map((payment) => (
-                        <tr key={payment.id} className="border-b last:border-0">
-                          <td className="py-2 pr-3">
-                            {payment.paidAt
-                              ? new Date(payment.paidAt).toLocaleDateString("id-ID")
-                              : "—"}
-                          </td>
-                          <td className="py-2 pr-3">
-                            {payment.paymentType === PaymentType.DOWN_PAYMENT
-                              ? "DP"
-                              : payment.paymentType === PaymentType.PROGRESS_PAYMENT
-                                ? "Termin"
-                                : "Pelunasan"}
-                          </td>
-                          <td className="py-2 pr-3">{currency(payment.amount)}</td>
-                          <td className="py-2 pr-3">{payment.transferDestination}</td>
-                          <td className="py-2">
-                            {renderPaymentProof(
-                              payment.id,
-                              payment.proofOfTransferUrl,
-                              payment.additionalProofUrls ?? [],
-                              payment.proofEditDisabledUrls ?? [],
-                              `Bukti transfer ${payment.transferDestination}`,
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </NativeDataTable>
-                <Badge
-                  variant={
-                    isPaymentSettled
-                      ? "success"
-                      : paidAmount > 0
-                        ? "warning"
-                        : "error"
-                  }
-                >
-                  {paymentStatusLabel}
-                </Badge>
-              </section>
-            )}
-            {message && (
-              <p className="text-sm" role="status">
-                {message}
-              </p>
-            )}
-          </div>
+                      >
+                        {isPending
+                          ? "Memproses..."
+                          : currentPaymentType === PaymentType.FULL_PAYMENT
+                            ? "Selesaikan Pembayaran"
+                            : currentPaymentType === PaymentType.DOWN_PAYMENT
+                              ? "Catat Pembayaran DP"
+                              : "Catat Pembayaran Termin"}
+                      </Button>
+                    </form>
+                  )}
+                </>
+              );
+            })()}
+          {paymentHistory.length > 0 && (
+            <section className="space-y-2 rounded-lg border p-4">
+              <h3 className="type-h3 font-semibold">Riwayat Pembayaran</h3>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table pagination={false}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Jenis</TableHead>
+                      <TableHead>Jumlah</TableHead>
+                      <TableHead>Tujuan Transfer</TableHead>
+                      <TableHead>Bukti</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paymentHistory.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>
+                          {payment.paidAt
+                            ? new Date(payment.paidAt).toLocaleDateString("id-ID")
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {payment.paymentType === PaymentType.DOWN_PAYMENT
+                            ? "DP"
+                            : payment.paymentType ===
+                                PaymentType.PROGRESS_PAYMENT
+                              ? "Termin"
+                              : "Pelunasan"}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {currency(payment.amount)}
+                        </TableCell>
+                        <TableCell>{payment.transferDestination}</TableCell>
+                        <TableCell>
+                          {renderPaymentProof(
+                            payment.id,
+                            payment.proofOfTransferUrl,
+                            payment.additionalProofUrls ?? [],
+                            payment.proofEditDisabledUrls ?? [],
+                            `Bukti transfer ${payment.transferDestination}`,
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <Badge
+                variant={
+                  isPaymentSettled
+                    ? "success"
+                    : paidAmount > 0
+                      ? "warning"
+                      : "error"
+                }
+              >
+                {paymentStatusLabel}
+              </Badge>
+            </section>
+          )}
+          {message && (
+            <p className="text-sm" role="status">
+              {message}
+            </p>
+          )}
+        </div>
       </GlobalModal>
       <PaymentModal
         key={
@@ -4160,51 +4988,65 @@ export default function FinanceHub({
           ) : null
         }
       >
-          {receiptPreview && (
-            <>
-              <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-                {isImageReceipt(receiptPreview.url) &&
-                unavailableProofUrls.includes(receiptPreview.url) ? (
-                  <p className="p-8 text-sm text-muted-foreground" role="status">
-                    Foto bukti tidak dapat dimuat. File mungkin sudah tidak
-                    tersedia di penyimpanan.
-                  </p>
-                ) : isImageReceipt(receiptPreview.url) ? (
-                  <Image
-                    key={receiptPreview.url}
-                    src={paymentReceiptHref(receiptPreview.url)}
-                    alt={receiptPreview.label}
-                    width={1200}
-                    height={900}
-                    className="max-h-[65vh] max-w-full object-contain"
-                    unoptimized
-                    onError={() => {
-                      setUnavailableProofUrls((current) =>
-                        current.includes(receiptPreview.url)
-                          ? current
-                          : [...current, receiptPreview.url],
-                      );
-                    }}
-                  />
-                ) : isPdfReceipt(receiptPreview.url) ? (
-                  <iframe
-                    key={receiptPreview.url}
-                    src={paymentReceiptHref(receiptPreview.url)}
-                    title={`Pratinjau ${receiptPreview.label}`}
-                    className="h-[65vh] w-full"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-3 p-8 text-center">
-                    <FileText className="size-12 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Pratinjau tidak tersedia untuk jenis file ini.
-                    </p>
-                  </div>
-                )}
+        {receiptPreview && (
+          <div className="flex min-h-56 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+            {isImageReceipt(receiptPreview.url) &&
+            unavailableProofUrls.includes(receiptPreview.url) ? (
+              <p className="p-8 text-sm text-muted-foreground" role="status">
+                Foto bukti tidak dapat dimuat. File mungkin sudah tidak
+                tersedia di penyimpanan.
+              </p>
+            ) : isImageReceipt(receiptPreview.url) ? (
+              <Image
+                key={receiptPreview.url}
+                src={paymentReceiptHref(receiptPreview.url)}
+                alt={receiptPreview.label}
+                width={1200}
+                height={900}
+                className="max-h-[65vh] max-w-full object-contain"
+                unoptimized
+                onError={() => {
+                  setUnavailableProofUrls((current) =>
+                    current.includes(receiptPreview.url)
+                      ? current
+                      : [...current, receiptPreview.url],
+                  );
+                }}
+              />
+            ) : isPdfReceipt(receiptPreview.url) ? (
+              <iframe
+                key={receiptPreview.url}
+                src={paymentReceiptHref(receiptPreview.url)}
+                title={`Pratinjau ${receiptPreview.label}`}
+                className="h-[65vh] w-full"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 p-8 text-center">
+                <FileText className="size-12 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Pratinjau tidak tersedia untuk jenis file ini.
+                </p>
               </div>
-            </>
-          )}
+            )}
+          </div>
+        )}
       </GlobalModal>
+      <FinancePaymentProofReplacement
+        paymentTransactionId={replacingProofTarget?.paymentTransactionId ?? ""}
+        existingProofUrl={replacingProofTarget?.existingProofUrl ?? ""}
+        proofIndex={replacingProofTarget?.proofIndex ?? 0}
+        label={replacingProofTarget?.label ?? "Bukti pembayaran"}
+        buttonLabel={replacingProofTarget?.buttonLabel}
+        open={replacingProofTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setReplacingProofTarget(null);
+        }}
+        showTrigger={false}
+        onSaved={() => {
+          setReplacingProofTarget(null);
+          router.refresh();
+        }}
+      />
       {canManageOfficeExpenses && officeExpenseOpen && (
         <OfficeExpenseModal
           open

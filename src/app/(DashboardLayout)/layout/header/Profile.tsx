@@ -9,6 +9,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { logout } from '@/app/actions/auth'
 import { UserRole } from '@prisma/client'
 import { SETTINGS_MENU_ROLES } from '@/lib/config/menus'
+import { ANDROID_APK } from '@/lib/apk-config'
+import { handleApkLinkClick } from '@/lib/apk-update-client'
+import { openDevicePermissionsDialog } from '@/lib/native-bridge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,19 +37,31 @@ const Profile = ({
   profilePhotoUrl,
   userName,
   userRole,
+  allowedMenuKeys,
+  androidDownloadUrl,
 }: {
   canManageUsers: boolean;
   profilePhotoUrl: string | null;
   userName: string;
   userRole: UserRole;
+  allowedMenuKeys?: string[];
+  androidDownloadUrl?: string | null;
 }) => {
+  const canOpenSettings =
+    SETTINGS_MENU_ROLES.includes(userRole) &&
+    (!allowedMenuKeys || allowedMenuKeys.includes('settings'))
+  const canOpenNotes = !allowedMenuKeys || allowedMenuKeys.includes('notes')
+
   return (
-    <div className='relative group/menu shrink-0 border-l border-border pl-3 sm:pl-4'>
+    <div className='relative group/menu shrink-0 border-l border-border pl-2 sm:pl-4'>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <span className='flex cursor-pointer items-center gap-3 rounded-xl px-2 py-1 text-foreground transition hover:bg-accent'>
+          <button
+            type='button'
+            suppressHydrationWarning
+            className='flex cursor-pointer items-center gap-2 rounded-xl px-1.5 py-1 text-left text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-3 sm:px-2'>
             <Avatar className='size-[35px] border border-border'>
-              <AvatarImage src={profilePhotoUrl ?? undefined} alt='' />
+              <AvatarImage src={profilePhotoUrl ?? undefined} alt='' className='object-cover' />
               <AvatarFallback className='text-xs font-semibold'>
                 {userName
                   .trim()
@@ -57,13 +72,16 @@ const Profile = ({
                   .toUpperCase() || '?'}
               </AvatarFallback>
             </Avatar>
+            <span className='sr-only xl:hidden'>
+              Menu profil {userName} ({roleLabels[userRole]})
+            </span>
             <span className='hidden min-w-0 flex-col text-left xl:flex'>
               <span className='max-w-40 truncate text-sm font-semibold text-foreground'>
                 {userName}
               </span>
               <span className='text-xs text-muted-foreground'>{roleLabels[userRole]}</span>
             </span>
-          </span>
+          </button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
@@ -95,11 +113,11 @@ const Profile = ({
                 </DropdownMenuItem>
               )}
               {profileData.profileDD
-                .filter(
-                  (item) =>
-                    item.url !== '/apps/settings' ||
-                    SETTINGS_MENU_ROLES.includes(userRole),
-                )
+                .filter((item) => {
+                  if (item.url === '/apps/settings') return canOpenSettings
+                  if (item.url === '/apps/notes') return canOpenNotes
+                  return true
+                })
                 .map((item, index) => (
                   <DropdownMenuItem key={index} asChild>
                     <Link
@@ -110,11 +128,46 @@ const Profile = ({
                           icon={item.icon}
                           className='text-base text-muted-foreground group-hover/link:text-accent-foreground'
                         />
-                        <span>{item.title}</span>
+                        <span>
+                          {item.url === '/apps/settings' ? 'Pengaturan Sistem' : item.title}
+                        </span>
                       </div>
                     </Link>
                   </DropdownMenuItem>
                 ))}
+              <DropdownMenuItem
+                onSelect={() => openDevicePermissionsDialog()}
+                className='px-3 py-1.5 flex items-center group/link w-full cursor-pointer text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground'>
+                <div className='flex items-center gap-2.5 w-full'>
+                  <Icon
+                    icon='tabler:bell-cog'
+                    className='text-base text-muted-foreground group-hover/link:text-accent-foreground'
+                  />
+                  <span>Izin &amp; Suara Notifikasi</span>
+                </div>
+              </DropdownMenuItem>
+              {androidDownloadUrl && (
+                <DropdownMenuItem asChild>
+                  <a
+                    href={androidDownloadUrl}
+                    download={ANDROID_APK.fileName}
+                    onClick={(event) => {
+                      handleApkLinkClick(event, androidDownloadUrl)
+                    }}
+                    className='px-3 py-1.5 flex items-center justify-between group/link w-full text-xs text-primary hover:bg-accent hover:text-accent-foreground'>
+                    <span className='flex items-center gap-2.5'>
+                      <Icon
+                        icon='tabler:device-mobile-down'
+                        className='text-base text-primary'
+                      />
+                      <span className='font-medium'>Unduh APK Android</span>
+                    </span>
+                    <span className='rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary'>
+                      {ANDROID_APK.label}
+                    </span>
+                  </a>
+                </DropdownMenuItem>
+              )}
             </div>
           </SimpleBar>
 

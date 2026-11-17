@@ -12,27 +12,29 @@ import {
   ListFilter,
   TriangleAlert,
 } from "lucide-react";
-import CardBox from "@/app/components/shared/CardBox";
-import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   TicketFieldCategory,
   TicketRequestCategory,
   TicketStatus,
 } from "@prisma/client";
+import CardBox from "@/app/components/shared/CardBox";
+import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { categoryForTicket, getCountableTickets } from "./ticket-statistics";
+import { FIELD_COST_LABELS } from "@/lib/ticket-field-costs";
 
 const statusLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Draft",
-  PENDING_DIRECTOR: "Menunggu persetujuan Direktur",
-  PENDING_LOGISTIK: "Menunggu diproses Logistik",
+  PENDING_DIRECTOR: "Menunggu Direktur",
+  PENDING_LOGISTIK: "Menunggu Logistik",
   APPROVED_DIR: "Disetujui Direktur",
   PROCESSED_FINANCE: "Diproses Finance",
   PROCESSED_LOGISTIC: "Diproses Logistik",
   ASSIGNED_TO_MOVER: "Ditugaskan ke Mover",
-  IN_TRANSIT: "Dalam perjalanan (ekspedisi)",
-  WAITING_FINANCE_PAYMENT: "Menunggu pembayaran Finance",
+  IN_TRANSIT: "Dalam Perjalanan",
+  WAITING_FINANCE_PAYMENT: "Menunggu Finance",
   COMPLETED: "Selesai",
   REJECTED: "Ditolak",
 };
@@ -60,9 +62,9 @@ const activityLabels: Record<string, string> = {
   APPROVED_BY_DIR: "Disetujui Direktur",
   LOGISTICS_READY_WAREHOUSE: "Stok gudang siap",
   LOGISTICS_BUY_STORE: "Pembelian diteruskan",
-  LOGISTICS_PO_CREATED: "PO dibuat; menunggu persetujuan",
+  LOGISTICS_PO_CREATED: "PO dibuat",
   FINANCE_PAYMENT_COMPLETED: "Pembayaran selesai",
-  MOVER_DELIVERY_COMPLETED: "Barang diterima di lapangan",
+  MOVER_DELIVERY_COMPLETED: "Barang diterima",
   COMPLETED: "Pemrosesan selesai",
 };
 
@@ -70,7 +72,6 @@ function relativeTimeLabel(createdAt: string, now: Date | null) {
   if (!now) {
     return `${createdAt.slice(0, 16).replace("T", " ")} UTC`;
   }
-
   return formatDistanceStrict(new Date(createdAt), now, {
     addSuffix: true,
     locale: id,
@@ -81,19 +82,19 @@ const statuses = Object.values(TicketStatus);
 const requestCategories = [
   {
     value: TicketRequestCategory.OPS,
-    label: "Operasional (OPS)",
+    label: "Operasional",
     color: "bg-primary",
     textColor: "text-primary",
   },
   {
     value: TicketRequestCategory.MATERIAL,
-    label: "Belanja Material",
+    label: "Material",
     color: "bg-info",
     textColor: "text-info",
   },
   {
     value: TicketRequestCategory.WAREHOUSE,
-    label: "Permintaan Material dari Gudang",
+    label: "Stok Gudang",
     color: "bg-secondary",
     textColor: "text-secondary",
   },
@@ -105,7 +106,7 @@ const requestCategories = [
   },
   {
     value: TicketRequestCategory.FIELD,
-    label: "Kebutuhan Tim Lapangan",
+    label: "Lapangan",
     color: "bg-warning",
     textColor: "text-warning",
   },
@@ -123,7 +124,7 @@ const requestCategories = [
   },
   {
     value: TicketRequestCategory.KASBON,
-    label: "Kasbon / Ambilan",
+    label: "Kasbon",
     color: "bg-warning",
     textColor: "text-warning",
   },
@@ -135,7 +136,7 @@ const requestCategories = [
   },
   {
     value: TicketRequestCategory.SHIPPING_COST,
-    label: "Pengiriman Barang PO",
+    label: "Pengiriman PO",
     color: "bg-info",
     textColor: "text-info",
   },
@@ -144,20 +145,20 @@ const requestCategories = [
 const requestCategoryLabels: Record<TicketRequestCategory, string> = {
   OPS: "Operasional (OPS)",
   MATERIAL: "Belanja Material",
-  WAREHOUSE: "Permintaan Material dari Gudang",
+  WAREHOUSE: "Material Gudang",
   OFFICE: "Belanja Kantor",
-  FIELD: "Kebutuhan Tim Lapangan",
+  FIELD: "Kebutuhan Lapangan",
   APH: "APH",
   REIMBURSEMENT: "Reimbursement",
   KASBON: "Kasbon / Ambilan",
   OPERATING_EXPENSE: "Biaya Operasional",
-  SHIPPING_COST: "Pengiriman Barang PO",
+  SHIPPING_COST: "Pengiriman PO",
 };
 
 const fieldCategoryLabels: Record<TicketFieldCategory, string> = {
-  HAULING: "Upah Langsir",
-  LABOR: "Upah Tukang",
-  DIRECT_STORE: "Belanja Langsung ke Toko",
+  HAULING: FIELD_COST_LABELS.HAULING,
+  LABOR: FIELD_COST_LABELS.LABOR,
+  DIRECT_STORE: "Belanja Langsung",
 };
 
 function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
@@ -183,9 +184,9 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
   return (
     <CardBox className="ticket-status-panel h-full overflow-hidden">
       <div className="border-b border-border px-5 py-4">
-        <h3 className="font-semibold">Distribusi Status Tiket</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ringkasan status selain tiket yang ditolak, dirinci menurut jenis permintaan
+        <h3 className="type-h3 text-foreground">Distribusi Status</h3>
+        <p className="type-p3 mt-1 text-muted-foreground">
+          Ringkasan status berdasarkan jenis permintaan
         </p>
       </div>
       <div className="max-h-[440px] space-y-4 overflow-y-auto p-5">
@@ -196,7 +197,7 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
                 <Badge variant={statusVariants[status]}>
                   {statusLabels[status]}
                 </Badge>
-                <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                <span className="type-p2 font-semibold tabular-nums text-muted-foreground">
                   {count}
                 </span>
               </div>
@@ -204,10 +205,7 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
                 role="img"
                 aria-label={`${statusLabels[status]}: ${byCategory
                   .filter((category) => category.count > 0)
-                  .map(
-                    (category) =>
-                      `${category.label} ${category.count}`,
-                  )
+                  .map((category) => `${category.label} ${category.count}`)
                   .join(", ")}`}
                 className="flex h-2 overflow-hidden rounded-full bg-muted"
               >
@@ -227,7 +225,7 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
                   .map((category) => (
                     <li
                       key={category.value}
-                      className={`text-xs ${category.textColor}`}
+                      className={`type-p3 ${category.textColor}`}
                     >
                       {category.label}: {category.count}
                     </li>
@@ -236,9 +234,11 @@ function TicketStatusDistribution({ tickets }: { tickets: TicketRow[] }) {
             </div>
           ))
         ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            Belum ada tiket untuk ditampilkan.
-          </p>
+          <EmptyState
+            variant="inline"
+            title="Belum ada data"
+            description="Belum ada tiket untuk dirangkum."
+          />
         )}
       </div>
     </CardBox>
@@ -267,8 +267,7 @@ function RecentTicketActivity({
     )
     .sort(
       (left, right) =>
-        new Date(right.createdAt).getTime() -
-        new Date(left.createdAt).getTime(),
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
     )
     .slice(0, 6);
 
@@ -276,9 +275,9 @@ function RecentTicketActivity({
     <CardBox className="ticket-activity-panel h-full overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
-          <h3 className="font-semibold">Aktivitas Terbaru</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Perubahan alur tiket terbaru
+          <h3 className="type-h3 text-foreground">Aktivitas Terbaru</h3>
+          <p className="type-p3 mt-1 text-muted-foreground">
+            Perubahan alur tiket terkini
           </p>
         </div>
         <Activity className="size-5 text-muted-foreground" aria-hidden="true" />
@@ -293,27 +292,29 @@ function RecentTicketActivity({
               className="w-full px-5 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
             >
               <span className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-                <span className="text-sm font-medium">
+                <span className="type-p2 font-medium text-foreground">
                   {activity.title}
                   <span className="ml-2 font-normal text-muted-foreground">
                     {activity.ticketNumber}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="type-p3 shrink-0 text-muted-foreground">
                   <time dateTime={activity.createdAt}>
                     {relativeTimeLabel(activity.createdAt, now)}
                   </time>
                 </span>
               </span>
-              <span className="mt-1 block text-xs text-muted-foreground">
+              <span className="type-p3 mt-1 block text-muted-foreground">
                 {activity.notes || `Diperbarui oleh ${activity.userName}`}
               </span>
             </button>
           ))
         ) : (
-          <p className="p-5 text-sm text-muted-foreground">
-            Belum ada aktivitas tiket.
-          </p>
+          <EmptyState
+            variant="inline"
+            title="Belum ada aktivitas"
+            description="Belum ada perubahan alur tiket."
+          />
         )}
       </div>
     </CardBox>
@@ -337,7 +338,6 @@ export default function TicketOverviewPanels({
     const updateNow = () => setNow(new Date());
     updateNow();
     const intervalId = window.setInterval(updateNow, 60_000);
-
     return () => window.clearInterval(intervalId);
   }, []);
 
@@ -345,8 +345,7 @@ export default function TicketOverviewPanels({
     .slice()
     .sort(
       (left, right) =>
-        new Date(left.createdAt).getTime() -
-        new Date(right.createdAt).getTime(),
+        new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
     )
     .slice(0, 4);
 
@@ -367,9 +366,7 @@ export default function TicketOverviewPanels({
       ticket.ticketNumber,
       ticket.title,
       requestCategoryLabels[categoryForTicket(ticket)],
-      ticket.fieldCategory
-        ? fieldCategoryLabels[ticket.fieldCategory]
-        : "",
+      ticket.fieldCategory ? fieldCategoryLabels[ticket.fieldCategory] : "",
       statusLabels[ticket.status],
       ticket.priority,
       ticket.requester.name,
@@ -383,10 +380,7 @@ export default function TicketOverviewPanels({
       const safeValue = /^[\s]*[=+\-@]/.test(value) ? `'${value}` : value;
       return `"${safeValue.replace(/"/g, '""')}"`;
     };
-    const csv = [
-      headers,
-      ...rows,
-    ]
+    const csv = [headers, ...rows]
       .map((row) => row.map(escapeCsvValue).join(","))
       .join("\r\n");
     const blob = new Blob(["\uFEFF", csv], {
@@ -416,13 +410,13 @@ export default function TicketOverviewPanels({
         <CardBox className="ticket-alert-panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <div>
-              <h3 className="font-semibold">Peringatan Tiket</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tiket yang menunggu tindakan role Anda
+              <h3 className="type-h3 text-foreground">Peringatan Tiket</h3>
+              <p className="type-p3 mt-1 text-muted-foreground">
+                Tiket menunggu tindakan role Anda
               </p>
             </div>
             <span
-              className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold ${
+              className={`type-p3 flex size-7 items-center justify-center rounded-full font-semibold ${
                 actionRequired.length > 0
                   ? "bg-destructive text-white"
                   : "bg-success/10 text-success"
@@ -441,18 +435,18 @@ export default function TicketOverviewPanels({
                   className="flex w-full items-start justify-between gap-4 bg-warning/10 px-4 py-3 text-left transition-colors hover:bg-warning/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                 >
                   <span className="min-w-0">
-                    <span className="flex items-center gap-2 text-sm font-medium">
+                    <span className="type-p2 flex items-center gap-2 font-medium text-foreground">
                       <TriangleAlert
                         className="size-4 shrink-0 text-warning"
                         aria-hidden="true"
                       />
                       <span className="truncate">{ticket.title}</span>
                     </span>
-                    <span className="mt-1 block pl-6 text-xs text-muted-foreground">
+                    <span className="type-p3 mt-1 block pl-6 text-muted-foreground">
                       {ticket.ticketNumber} · {statusLabels[ticket.status]}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span className="type-p3 shrink-0 text-muted-foreground">
                     <time dateTime={ticket.createdAt}>
                       {relativeTimeLabel(ticket.createdAt, now)}
                     </time>
@@ -460,22 +454,23 @@ export default function TicketOverviewPanels({
                 </button>
               ))
             ) : (
-              <p className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
+              <p className="type-p2 flex items-center gap-2 p-5 text-muted-foreground">
                 <CheckCircle2
                   className="size-4 text-success"
                   aria-hidden="true"
                 />
-                Tidak ada tiket yang memerlukan tindakan saat ini.
+                Tidak ada antrean tertunda.
               </p>
             )}
             {actionRequired.length > alerts.length && (
               <Button
                 type="button"
                 variant="ghost"
+                size="sm"
                 className="w-full rounded-none"
                 onClick={() => onFilter("ACTION_REQUIRED")}
               >
-                Lihat semua {actionRequired.length} tiket menunggu
+                Lihat Semua ({actionRequired.length})
               </Button>
             )}
           </div>
@@ -483,79 +478,68 @@ export default function TicketOverviewPanels({
 
         <CardBox className="ticket-quick-panel overflow-hidden">
           <div className="border-b border-border px-5 py-4">
-            <h3 className="font-semibold">Tindakan Cepat</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Buka daftar yang relevan dengan satu klik
+            <h3 className="type-h3 text-foreground">Tindakan Cepat</h3>
+            <p className="type-p3 mt-1 text-muted-foreground">
+              Saring antrean tiket dengan satu klik
             </p>
           </div>
           <div className="grid gap-2 p-4 sm:grid-cols-2">
             <Button
               type="button"
               variant="outline"
-              className="h-auto min-h-10 w-full min-w-0 justify-start whitespace-normal py-2 text-left leading-snug"
+              size="sm"
+              className="justify-start"
               onClick={() => onFilter("ACTION_REQUIRED")}
             >
               <BellRing className="size-4 shrink-0 text-warning" aria-hidden="true" />
-              <span className="min-w-0 whitespace-normal text-left">
-                <span className="hidden sm:inline">Tiket menunggu tindakan</span>
-                <span className="sm:hidden">Menunggu</span>
-              </span>
+              Menunggu
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-auto min-h-10 w-full min-w-0 justify-start whitespace-normal py-2 text-left leading-snug"
+              size="sm"
+              className="justify-start"
               onClick={() => onFilter(TicketStatus.DRAFT)}
             >
               <FilePlus2 className="size-4 shrink-0 text-primary" aria-hidden="true" />
-              <span className="min-w-0 whitespace-normal text-left">
-                <span className="hidden sm:inline">Draft tiket</span>
-                <span className="sm:hidden">Draft</span>
-              </span>
+              Draft
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-auto min-h-10 w-full min-w-0 justify-start whitespace-normal py-2 text-left leading-snug"
+              size="sm"
+              className="justify-start"
               onClick={() => onFilter(TicketStatus.COMPLETED)}
             >
               <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden="true" />
-              <span className="min-w-0 whitespace-normal text-left">
-                <span className="hidden sm:inline">Tiket selesai</span>
-                <span className="sm:hidden">Selesai</span>
-              </span>
+              Selesai
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-auto min-h-10 w-full min-w-0 justify-start whitespace-normal py-2 text-left leading-snug"
+              size="sm"
+              className="justify-start"
               onClick={() => {
                 onFilter("ALL");
                 onSelectTicket("");
               }}
             >
               <ListFilter className="size-4 shrink-0" aria-hidden="true" />
-              <span className="min-w-0 whitespace-normal text-left">
-                <span className="hidden sm:inline">Semua tiket</span>
-                <span className="sm:hidden">Semua</span>
-              </span>
+              Semua
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-auto min-h-10 w-full min-w-0 justify-start whitespace-normal py-2 text-left leading-snug sm:col-span-2"
+              size="sm"
+              className="justify-start sm:col-span-2"
               onClick={downloadReport}
             >
               <Download className="size-4 shrink-0 text-primary" aria-hidden="true" />
-              <span className="min-w-0 whitespace-normal text-left">
-                <span className="hidden sm:inline">Generate Report</span>
-                <span className="sm:hidden">Report</span>
-              </span>
+              Unduh CSV
             </Button>
           </div>
         </CardBox>
       </div>
-
     </div>
   );
 }

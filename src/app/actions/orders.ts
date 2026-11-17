@@ -25,6 +25,7 @@ import { connectToMongoDB } from "@/lib/mongoose";
 import Notification from "@/models/notification";
 import PurchaseOrder from "@/models/purchase-order";
 import User from "@/models/user";
+import { DeliveryOrder as MongoDeliveryOrder } from "@/models/finance-records";
 import { resolveVendorBankAccount } from "@/lib/vendor-bank-accounts";
 import {
   generateAvailablePublicCode,
@@ -123,6 +124,7 @@ type PurchaseOrderInput = {
 type DeliveryOrderInput = {
   doNumber?: string;
   ticketId?: string;
+  moverAssigneeId?: string;
   vehicleId?: string;
   deliveryMethod?: DODeliveryMethod;
   vehicleDocumentNumber?: string;
@@ -994,8 +996,8 @@ export async function submitPurchaseOrderInvoice(
       },
     },
   });
-  if (!orderBeforeUpload || orderBeforeUpload.ticketId) {
-    return fail("PO mandiri tidak ditemukan.");
+  if (!orderBeforeUpload) {
+    return fail("Purchase Order tidak ditemukan.");
   }
   if (orderBeforeUpload.status !== POStatus.APPROVED) {
     return fail("PO harus disetujui Direktur sebelum invoice dikirim.");
@@ -1073,7 +1075,14 @@ export async function submitPurchaseOrderInvoice(
             select: { id: true },
             take: 1,
           },
-          ticket: { select: { projectId: true } },
+          ticket: {
+            select: {
+              id: true,
+              projectId: true,
+              status: true,
+              purchaseReceiptUrl: true,
+            },
+          },
           paymentTransactions: {
             where: { status: PaymentStatus.PAID },
             select: { id: true },
@@ -1081,8 +1090,8 @@ export async function submitPurchaseOrderInvoice(
           },
         },
       });
-      if (!order || order.ticketId) {
-        throw new Error("PO mandiri tidak ditemukan.");
+      if (!order) {
+        throw new Error("Purchase Order tidak ditemukan.");
       }
       if (order.status !== POStatus.APPROVED) {
         throw new Error("PO harus disetujui Direktur sebelum invoice dikirim.");
@@ -1161,6 +1170,33 @@ export async function submitPurchaseOrderInvoice(
         },
         select: { id: true },
       });
+      if (order.ticketId && order.ticket) {
+        const syncableStatuses: TicketStatus[] = [
+          TicketStatus.APPROVED_DIR,
+          TicketStatus.PROCESSED_LOGISTIC,
+          TicketStatus.PROCESSED_FINANCE,
+        ];
+        await transaction.ticket.update({
+          where: { id: order.ticket.id },
+          data: {
+            ...(order.ticket.purchaseReceiptUrl
+              ? {}
+              : { purchaseReceiptUrl: parsed.data.documentUrl }),
+            ...(syncableStatuses.includes(order.ticket.status)
+              ? { status: TicketStatus.WAITING_FINANCE_PAYMENT }
+              : {}),
+          },
+        });
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: order.ticket.id,
+            userId: session.user.id,
+            action: "LOGISTICS_PO_INVOICE_SUBMITTED",
+            notes: `Invoice/bon untuk PO ${order.poNumber} berhasil dikirim Logistik ke Keuangan.`,
+          },
+        });
+      }
       await sendNotification({
         roleTarget: UserRole.FINANCE,
         title: "Invoice PO Siap Dibayar",
@@ -1174,6 +1210,7 @@ export async function submitPurchaseOrderInvoice(
 
     revalidatePath("/apps/logistics");
     revalidatePath("/apps/finance");
+    revalidatePath("/apps/tickets");
     return {
       success: true,
       message: `Invoice/bon PO ${updated.poNumber} berhasil dikirim ke Keuangan.`,
@@ -1486,8 +1523,12 @@ export async function createDeliveryOrder(
   if (!input) {
     return fail("Data Delivery Order tidak valid.");
   }
+  const requestedMoverId = input.moverAssigneeId?.trim() || undefined;
   if (input.ticketId !== undefined && !isText(input.ticketId, 64)) {
     return fail("ID tiket referensi tidak valid.");
+  }
+  if (input.moverAssigneeId !== undefined && input.moverAssigneeId.trim().length > 64) {
+    return fail("ID Mover tidak valid.");
   }
   if (!Object.values(DOStatus).includes(input.status)) {
     return fail("Status Delivery Order tidak valid.");
@@ -1618,13 +1659,67 @@ export async function createDeliveryOrder(
           "Tiket harus memiliki persetujuan eksekutif sebelum DO diterbitkan.",
         );
       }
+      const normalize = normalizeTicketStockValue;
+      const existingTicketDos = ticket
+        ? await transaction.deliveryOrder.findMany({
+            where: {
+              ticketId: ticket.id,
+              status: { not: DOStatus.RETURNED },
+            },
+            select: {
+              items: {
+                select: {
+                  itemName: true,
+                  unit: true,
+                  qtyDelivered: true,
+                },
+              },
+            },
+          })
+        : [];
+      const deliveredQtyPoolByKey = new Map<string, number>();
+      for (const existingDo of existingTicketDos) {
+        for (const doItem of existingDo.items) {
+          const key = `${normalize(doItem.itemName)}::${normalize(doItem.unit)}`;
+          deliveredQtyPoolByKey.set(
+            key,
+            (deliveredQtyPoolByKey.get(key) ?? 0) + Number(doItem.qtyDelivered ?? 0),
+          );
+        }
+      }
+      const itemDeliveryProgress = new Map<
+        string,
+        { previouslyDelivered: number; remainingQty: number }
+      >();
+      if (ticket) {
+        for (const item of ticket.items) {
+          if (item.categoryHint === TicketCategoryHint.CONTRACT) {
+            continue;
+          }
+          const key = `${normalize(item.itemName)}::${normalize(item.unit)}`;
+          const poolRemaining = deliveredQtyPoolByKey.get(key) ?? 0;
+          const allocatedDelivered = Math.min(item.quantity, poolRemaining);
+          deliveredQtyPoolByKey.set(key, Math.max(0, poolRemaining - allocatedDelivered));
+          itemDeliveryProgress.set(item.id, {
+            previouslyDelivered: allocatedDelivered,
+            remainingQty: Math.max(0, item.quantity - allocatedDelivered),
+          });
+        }
+      }
+
       const eligibleTicketItems = ticket
-        ? ticket.items.filter(
-          (item) =>
-            item.categoryHint !== TicketCategoryHint.CONTRACT &&
-            item.doItemId === null &&
-            item.status !== FulfillmentStatus.PROCESSED_TO_DO,
-        )
+        ? ticket.items.filter((item) => {
+            if (item.categoryHint === TicketCategoryHint.CONTRACT) {
+              return false;
+            }
+            const progress = itemDeliveryProgress.get(item.id);
+            const remainingQty = progress?.remainingQty ?? item.quantity;
+            return (
+              (item.doItemId === null &&
+                item.status !== FulfillmentStatus.PROCESSED_TO_DO) ||
+              remainingQty > 0
+            );
+          })
         : [];
       if (
         ticket &&
@@ -1640,33 +1735,53 @@ export async function createDeliveryOrder(
         const existingOrder = await transaction.deliveryOrder.findFirst({
           where: { ticketId: ticket.id },
           orderBy: { createdAt: "desc" },
-          select: { publicCode: true, doNumber: true },
+          select: { id: true, publicCode: true, doNumber: true },
         });
         if (
           existingOrder &&
           (ticket.items.length === 0 || eligibleTicketItems.length === 0)
         ) {
           return {
+            id: existingOrder.id,
             code: existingOrder.publicCode,
             doNumber: existingOrder.doNumber,
             alreadyExists: true,
+            moverAssigneeId: null as string | null,
           };
         }
       }
       if (ticket && ticket.items.length > 0 && eligibleTicketItems.length === 0) {
         throw new Error("Semua item tiket sudah memiliki Delivery Order.");
       }
-      if (
-        ticket &&
-        ticket.status !== TicketStatus.PROCESSED_LOGISTIC &&
-        ticket.status !== TicketStatus.PROCESSED_FINANCE &&
-        ticket.status !== TicketStatus.ASSIGNED_TO_MOVER &&
-        ticket.status !== TicketStatus.IN_TRANSIT
-      ) {
+      const allowedDeliveryTicketStatuses: TicketStatus[] = [
+        TicketStatus.APPROVED_DIR,
+        TicketStatus.PROCESSED_LOGISTIC,
+        TicketStatus.PROCESSED_FINANCE,
+        TicketStatus.WAITING_FINANCE_PAYMENT,
+        TicketStatus.ASSIGNED_TO_MOVER,
+        TicketStatus.IN_TRANSIT,
+      ];
+      if (ticket && !allowedDeliveryTicketStatuses.includes(ticket.status)) {
         throw new Error(
           "Tiket belum siap atau sudah selesai untuk diterbitkan DO.",
         );
       }
+      const assignedMover = requestedMoverId
+        ? await transaction.user.findUnique({
+            where: { id: requestedMoverId },
+            select: { id: true, name: true, role: true, isActive: true },
+          })
+        : null;
+      if (
+        requestedMoverId &&
+        (!assignedMover?.isActive || assignedMover.role !== UserRole.MOVER)
+      ) {
+        throw new Error("Akun Mover yang dipilih tidak aktif atau tidak valid.");
+      }
+      const resolvedMoverId =
+        assignedMover?.id ?? ticket?.moverAssignee?.id ?? null;
+      const resolvedMoverName =
+        assignedMover?.name ?? ticket?.moverAssignee?.name ?? null;
       const purchaseOrder = input.poPublicCode
         ? await transaction.purchaseOrder.findUnique({
           where: { publicCode: input.poPublicCode },
@@ -1714,7 +1829,6 @@ export async function createDeliveryOrder(
           "Kendaraan tidak tersedia atau KM awal belum diinisialisasi.",
         );
       }
-      const normalize = normalizeTicketStockValue;
       const remainingEligibleTicketItems = [...eligibleTicketItems];
       const matchedItems = input.items.map((orderItem, index) => {
         if (!ticket) {
@@ -1767,7 +1881,7 @@ export async function createDeliveryOrder(
       ) {
         const processedItems = ticket.items.filter(
           (item) =>
-            item.doItemId !== null ||
+            item.doItemId !== null &&
             item.status === FulfillmentStatus.PROCESSED_TO_DO,
         );
         for (const { orderItem, ticketItem } of matchedItems) {
@@ -1779,17 +1893,24 @@ export async function createDeliveryOrder(
             );
             throw new Error(
               alreadyProcessed
-                ? `Item "${orderItem.itemName.trim()}" sudah pernah diproses ke Delivery Order lain.`
+                ? `Item "${orderItem.itemName.trim()}" sudah pernah diproses penuh ke Delivery Order lain.`
                 : "Item DO harus sesuai dengan item yang belum diproses pada tiket referensi.",
             );
           }
+          const progress = itemDeliveryProgress.get(ticketItem.id);
+          const remainingQty = progress?.remainingQty ?? ticketItem.quantity;
           if (
-            orderItem.itemName.trim() !== ticketItem.itemName ||
-            orderItem.qtyOrdered !== ticketItem.quantity ||
-            orderItem.unit.trim() !== ticketItem.unit
+            normalize(orderItem.itemName) !== normalize(ticketItem.itemName) ||
+            normalize(orderItem.unit) !== normalize(ticketItem.unit) ||
+            orderItem.qtyOrdered <= 0 ||
+            orderItem.qtyOrdered > remainingQty ||
+            orderItem.qtyDelivered < 0 ||
+            orderItem.qtyDelivered > orderItem.qtyOrdered
           ) {
             throw new Error(
-              "Item DO harus sesuai dengan item pada tiket referensi.",
+              orderItem.qtyOrdered > remainingQty
+                ? `Jumlah barang "${ticketItem.itemName}" (${orderItem.qtyOrdered}) melebihi sisa kebutuhan (${remainingQty}).`
+                : "Item DO harus sesuai dengan item pada tiket referensi.",
             );
           }
         }
@@ -1927,11 +2048,22 @@ export async function createDeliveryOrder(
         }
       }
 
+      const matchedPoIds = [
+        ...new Set(
+          matchedItems
+            .map((entry) => entry.ticketItem?.poItem?.po?.id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
       const deliveryOrder = await transaction.deliveryOrder.create({
         data: {
           publicCode: code,
           doNumber,
-          poId: purchaseOrder?.id ?? ticket?.purchaseOrders[0]?.id,
+          poId:
+            purchaseOrder?.id ??
+            (matchedPoIds.length === 1
+              ? matchedPoIds[0]
+              : ticket?.purchaseOrders[0]?.id),
           ticketId: ticket?.id,
           createdById: session.user.id,
           deliveryMethod,
@@ -1942,7 +2074,7 @@ export async function createDeliveryOrder(
           driverName:
             isExpedition
               ? input.driverName!.trim()
-              : ticket?.moverAssignee?.name ?? input.driverName?.trim() ?? null,
+              : resolvedMoverName ?? input.driverName?.trim() ?? null,
           vehiclePlate:
             selectedVehicle?.plateNumber ??
             (input.vehiclePlate?.trim() || null),
@@ -2021,14 +2153,28 @@ export async function createDeliveryOrder(
       if (ticket) {
         for (const entry of matchedItems) {
           if (entry.ticketItem && entry.orderItem.qtyDelivered > 0) {
+            const progress = itemDeliveryProgress.get(entry.ticketItem.id);
+            const previouslyDelivered = progress?.previouslyDelivered ?? 0;
+            const totalDeliveredAfter =
+              previouslyDelivered + entry.orderItem.qtyDelivered;
+            const fullyFulfilledToDo =
+              totalDeliveredAfter >= entry.ticketItem.quantity;
             await transaction.ticketItem.update({
               where: { id: entry.ticketItem.id },
               data: {
                 doItemId: entry.id,
-                status: FulfillmentStatus.PROCESSED_TO_DO,
+                ...(fullyFulfilledToDo
+                  ? { status: FulfillmentStatus.PROCESSED_TO_DO }
+                  : {}),
               },
             });
           }
+        }
+        if (resolvedMoverId && !isExpedition && !ticket.moverAssignee?.id) {
+          await transaction.ticket.update({
+            where: { id: ticket.id },
+            data: { moverAssigneeId: resolvedMoverId },
+          });
         }
         await syncTicketStatus(
           transaction,
@@ -2048,8 +2194,8 @@ export async function createDeliveryOrder(
         });
         if (!isExpedition) {
           await sendNotification({
-            ...(ticket.moverAssignee?.id
-              ? { userId: ticket.moverAssignee.id }
+            ...(resolvedMoverId
+              ? { userId: resolvedMoverId }
               : { roleTarget: UserRole.MOVER }),
             title: "Tugas Pengiriman DO Baru",
             message: `${ticket.ticketNumber} · DO ${doNumber} (${ticket.title}) siap Anda kirim ke lokasi.`,
@@ -2062,7 +2208,7 @@ export async function createDeliveryOrder(
           await sendNotification({
             userId: ticket.requesterId,
             title: "DO Pengiriman Diterbitkan",
-            message: `${ticket.ticketNumber} · DO ${doNumber} telah diterbitkan (${isExpedition ? "ekspedisi" : ticket.moverAssignee ? `Mover: ${ticket.moverAssignee.name}` : "Mover internal"}).`,
+            message: `${ticket.ticketNumber} · DO ${doNumber} telah diterbitkan (${isExpedition ? "ekspedisi" : resolvedMoverName ? `Mover: ${resolvedMoverName}` : "Mover internal"}).`,
             actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticket.id)}`,
             type: NotificationType.INFO,
             database: transaction,
@@ -2070,7 +2216,9 @@ export async function createDeliveryOrder(
         }
       } else if (!isExpedition) {
         await sendNotification({
-          roleTarget: UserRole.MOVER,
+          ...(resolvedMoverId
+            ? { userId: resolvedMoverId }
+            : { roleTarget: UserRole.MOVER }),
           title: "Tugas Pengiriman DO Baru",
           message: `DO ${doNumber} telah diterbitkan Logistik dan siap dikirim oleh Mover.`,
           actionUrl: "/apps/logistics",
@@ -2078,8 +2226,21 @@ export async function createDeliveryOrder(
           database: transaction,
         });
       }
-      return { code, doNumber, alreadyExists: false };
+      return {
+        id: deliveryOrder.id,
+        code,
+        doNumber,
+        alreadyExists: false,
+        moverAssigneeId: resolvedMoverId,
+      };
     });
+    if (!created.alreadyExists && created.moverAssigneeId && created.id) {
+      await connectToMongoDB();
+      await MongoDeliveryOrder.updateOne(
+        { _id: created.id },
+        { $set: { moverAssigneeId: created.moverAssigneeId } },
+      );
+    }
     revalidatePath(`/d/${created.code}`);
     revalidatePath("/apps/orders");
     revalidatePath("/apps/logistics");
@@ -2675,6 +2836,27 @@ export async function updateDeliveryOrder(
       if (
         existingOrder.deliveryMethod ===
         DODeliveryMethod.EXPEDITION &&
+        input.status === DOStatus.IN_TRANSIT &&
+        existingOrder.ticket
+      ) {
+        await syncTicketStatus(
+          transaction,
+          existingOrder.ticket.id,
+          TicketStatus.IN_TRANSIT,
+        );
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: existingOrder.ticket.id,
+            userId: session.user.id,
+            action: "EXPEDITION_DELIVERY_IN_TRANSIT",
+            notes: `DO ekspedisi ${normalizedDoNumber} berstatus Dalam Pengiriman.`,
+          },
+        });
+      }
+      if (
+        existingOrder.deliveryMethod ===
+        DODeliveryMethod.EXPEDITION &&
         input.status === DOStatus.DELIVERED &&
         existingOrder.ticket
       ) {
@@ -2745,6 +2927,14 @@ export async function startMoverDeliveryOrder(
   }
 
   try {
+    await connectToMongoDB();
+    const mongoOrderMeta = await MongoDeliveryOrder.findOne({ publicCode })
+      .select({ moverAssigneeId: 1 })
+      .lean();
+    const doMoverAssigneeId =
+      typeof mongoOrderMeta?.moverAssigneeId === "string"
+        ? mongoOrderMeta.moverAssigneeId
+        : null;
     const result = await prisma.$transaction(async (transaction) => {
       const reference = await transaction.deliveryOrder.findUnique({
         where: { publicCode },
@@ -2776,9 +2966,11 @@ export async function startMoverDeliveryOrder(
         },
       });
       if (!order) throw new Error("Delivery Order tidak ditemukan.");
+      const assignedMoverId =
+        doMoverAssigneeId ?? order.ticket?.moverAssigneeId ?? null;
       const isAssigned =
-        order.ticket?.moverAssigneeId === session.user.id ||
-        (!order.ticket?.moverAssigneeId &&
+        assignedMoverId === session.user.id ||
+        (!assignedMoverId &&
           Boolean(session.user.name) &&
           order.driverName === session.user.name);
       if (!isAssigned) {
@@ -2953,6 +3145,14 @@ export async function submitMoverDeliveryProofs(
 
   let proofsCommitted = false;
   try {
+    await connectToMongoDB();
+    const mongoOrderMeta = await MongoDeliveryOrder.findOne({ publicCode })
+      .select({ moverAssigneeId: 1 })
+      .lean();
+    const doMoverAssigneeId =
+      typeof mongoOrderMeta?.moverAssigneeId === "string"
+        ? mongoOrderMeta.moverAssigneeId
+        : null;
     const result = await prisma.$transaction(async (transaction) => {
       const reference = await transaction.deliveryOrder.findUnique({
         where: { publicCode },
@@ -2992,9 +3192,11 @@ export async function submitMoverDeliveryProofs(
         },
       });
       if (!order) throw new Error("Delivery Order tidak ditemukan.");
+      const assignedMoverId =
+        doMoverAssigneeId ?? order.ticket?.moverAssigneeId ?? null;
       const isAssigned =
-        order.ticket?.moverAssigneeId === session.user.id ||
-        (!order.ticket?.moverAssigneeId &&
+        assignedMoverId === session.user.id ||
+        (!assignedMoverId &&
           Boolean(session.user.name) &&
           order.driverName === session.user.name);
       if (!isAssigned) {
@@ -3293,12 +3495,19 @@ export async function receiveExpeditionDeliveryOrder(
           },
         },
       });
+      const blockedTicketStatuses: TicketStatus[] = [
+        TicketStatus.DRAFT,
+        TicketStatus.PENDING_DIRECTOR,
+        TicketStatus.REJECTED,
+        TicketStatus.COMPLETED,
+      ];
       if (
         !deliveryOrder ||
+        !deliveryOrder.ticket ||
         deliveryOrder.deliveryMethod !== DODeliveryMethod.EXPEDITION ||
         deliveryOrder.status !== DOStatus.IN_TRANSIT ||
         deliveryOrder.receivedAt ||
-        deliveryOrder.ticket?.status !== TicketStatus.IN_TRANSIT
+        blockedTicketStatuses.includes(deliveryOrder.ticket.status)
       ) {
         throw new Error(
           "Delivery Order tidak ditemukan, bukan ekspedisi, atau tidak lagi dalam perjalanan.",

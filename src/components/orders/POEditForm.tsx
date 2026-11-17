@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { ArrowLeft, Check, Download, Plus, Printer, Save, Trash2 } from "lucide-react";
 import { POPaymentMethod, type POStatus } from "@prisma/client";
@@ -65,7 +66,7 @@ type POFormValues = {
 const emptyItems: PurchaseOrderItemInput[] = [];
 
 const statusLabels: Record<POStatus, string> = {
-  DRAFT: "Draft",
+  DRAFT: "Draf",
   PENDING_FINANCE_REVIEW: "Menunggu pemeriksaan Keuangan",
   PENDING_APPROVAL: "Menunggu persetujuan",
   APPROVED: "Disetujui",
@@ -191,14 +192,19 @@ export default function POEditForm({
       setIsError(!result.success);
       setMessage(result.message);
       if (result.success) {
+        toast.success(result.message);
         if (publicCode) router.back();
         else if (result.publicCode) router.replace(`/d/${result.publicCode}`);
         else router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Purchase Order edit failed:", error);
       setIsError(true);
-      setMessage("PO gagal disimpan. Periksa koneksi lalu coba kembali.");
+      const errMsg = "PO gagal disimpan. Periksa koneksi lalu coba kembali.";
+      setMessage(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -213,15 +219,20 @@ export default function POEditForm({
       setIsError(!result.success);
       setMessage(result.message);
       if (result.success) {
+        toast.success(result.message);
         setCurrentStatus("PENDING_APPROVAL");
         setCurrentReviewer(result.actorName ?? "Manager Keuangan");
         setCurrentReviewTime(new Date().toLocaleString("id-ID"));
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Purchase Order finance review failed:", error);
       setIsError(true);
-      setMessage("Pemeriksaan PO gagal. Silakan coba kembali.");
+      const errMsg = "Pemeriksaan PO gagal. Silakan coba kembali.";
+      setMessage(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -231,7 +242,9 @@ export default function POEditForm({
     const isValid = await form.trigger();
     if (!isValid) {
       setIsError(true);
-      setMessage("Lengkapi data PO sebelum mengajukan ke Keuangan.");
+      const errMsg = "Lengkapi data PO sebelum mengajukan ke Keuangan.";
+      setMessage(errMsg);
+      toast.error(errMsg);
       return;
     }
 
@@ -244,13 +257,16 @@ export default function POEditForm({
         if (!saved.success) {
           setIsError(true);
           setMessage(saved.message);
+          toast.error(saved.message);
           return;
         }
       } else {
         const created = await createPurchaseOrder(form.getValues());
         if (!created.success || !created.publicCode) {
           setIsError(true);
-          setMessage(created.message || "Gagal membuat PO.");
+          const errMsg = created.message || "Gagal membuat PO.";
+          setMessage(errMsg);
+          toast.error(errMsg);
           return;
         }
         targetPublicCode = created.publicCode;
@@ -260,17 +276,22 @@ export default function POEditForm({
       setIsError(!result.success);
       setMessage(result.message);
       if (result.success) {
+        toast.success(result.message);
         setCurrentStatus("PENDING_FINANCE_REVIEW");
         if (!publicCode && targetPublicCode) {
           router.replace(`/d/${targetPublicCode}`);
         } else {
           router.refresh();
         }
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Purchase Order submission failed:", error);
       setIsError(true);
-      setMessage("PO gagal diajukan ke Keuangan. Silakan coba kembali.");
+      const errMsg = "PO gagal diajukan ke Keuangan. Silakan coba kembali.";
+      setMessage(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -285,16 +306,21 @@ export default function POEditForm({
       setIsError(!result.success);
       setMessage(result.message);
       if (result.success) {
+        toast.success(result.message);
         setCurrentStatus("APPROVED");
         setCurrentQr(result.qrDataUrl ?? null);
         setCurrentApprover(result.actorName ?? "Direktur");
         setCurrentApprovalTime(new Date().toLocaleString("id-ID"));
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Purchase Order approval failed:", error);
       setIsError(true);
-      setMessage("Persetujuan PO gagal. Silakan coba kembali.");
+      const errMsg = "Persetujuan PO gagal. Silakan coba kembali.";
+      setMessage(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -311,16 +337,21 @@ export default function POEditForm({
       setIsError(!result.success);
       setMessage(result.message);
       if (result.success) {
+        toast.success(result.message);
         setIsDeleteDialogOpen(false);
         router.replace(
           canApprove ? "/apps/approvals" : "/apps/logistics?tab=documents",
         );
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Purchase Order deletion failed:", error);
       setIsError(true);
-      setMessage("Purchase Order gagal dihapus. Silakan coba kembali.");
+      const errMsg = "Purchase Order gagal dihapus. Silakan coba kembali.";
+      setMessage(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -332,10 +363,10 @@ export default function POEditForm({
       <Card className="space-y-5 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="type-h2 text-foreground">
               {publicCode ? `Purchase Order · ${poNumber}` : "1. Informasi Vendor & Pembayaran"}
             </h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="type-p3 mt-0.5 text-muted-foreground">
               Lengkapi identitas vendor, metode pembayaran, dan termin pengadaan material.
             </p>
           </div>
@@ -475,32 +506,127 @@ export default function POEditForm({
       <Card className="space-y-4 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">2. Rincian Material & Harga</h2>
-            <p className="text-xs text-muted-foreground">
+            <h2 className="type-h2 text-foreground">2. Rincian Material &amp; Harga</h2>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
               Subtotal dan pajak dihitung otomatis dari jumlah serta harga satuan.
             </p>
           </div>
           <Button
             type="button"
+            size="sm"
             variant="outline"
             disabled={!isEditable}
             onClick={() =>
               append({ itemName: "", quantity: 1, unit: "pcs", unitPrice: 0 })
             }
           >
-            <Plus className="mr-2 h-4 w-4" /> Tambah item material
+            <Plus className="mr-1.5 size-4" aria-hidden="true" /> Tambah Item
           </Button>
         </div>
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          <Table className="min-w-[640px]">
+
+        {/* Editor kartu untuk mobile / APK */}
+        <div className="space-y-3 md:hidden">
+          {fields.map((field, index) => {
+            const lineSubtotal =
+              (Number(watchedItems[index]?.quantity) || 0) *
+              (Number(watchedItems[index]?.unitPrice) || 0);
+            return (
+              <div
+                key={field.id}
+                className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="type-p3 font-semibold text-muted-foreground">
+                    Item #{index + 1}
+                  </span>
+                  <ActionIconButton
+                    type="button"
+                    label={`Hapus item baris ${index + 1}`}
+                    tooltip={`Hapus item baris ${index + 1}`}
+                    icon={Trash2}
+                    className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    disabled={!isEditable || fields.length <= 1}
+                    onClick={() => remove(index)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`po-m-name-${index}`}>Nama barang</Label>
+                  <Input
+                    id={`po-m-name-${index}`}
+                    disabled={!isEditable}
+                    {...form.register(`items.${index}.itemName`, {
+                      required: "Nama barang wajib diisi.",
+                      maxLength: 180,
+                    })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`po-m-qty-${index}`}>Qty</Label>
+                    <Input
+                      id={`po-m-qty-${index}`}
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      disabled={!isEditable}
+                      {...form.register(`items.${index}.quantity`, {
+                        valueAsNumber: true,
+                        required: true,
+                        min: 0.01,
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`po-m-unit-${index}`}>Satuan</Label>
+                    <Input
+                      id={`po-m-unit-${index}`}
+                      disabled={!isEditable}
+                      {...form.register(`items.${index}.unit`, {
+                        required: true,
+                        maxLength: 40,
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 items-end gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`po-m-price-${index}`}>Harga satuan</Label>
+                    <Input
+                      id={`po-m-price-${index}`}
+                      type="number"
+                      min="0"
+                      step="any"
+                      disabled={!isEditable}
+                      {...form.register(`items.${index}.unitPrice`, {
+                        valueAsNumber: true,
+                        required: true,
+                        min: 0,
+                      })}
+                    />
+                  </div>
+                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-right">
+                    <span className="type-p3 block text-muted-foreground">Subtotal</span>
+                    <span className="type-p2 font-semibold tabular-nums text-foreground">
+                      {currency(lineSubtotal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Tabel untuk tablet / desktop */}
+        <div className="hidden overflow-x-auto md:block">
+          <Table pagination={false}>
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[200px]">Nama barang</TableHead>
-                <TableHead className="w-28 min-w-[96px]">Qty</TableHead>
-                <TableHead className="w-32 min-w-[100px]">Satuan</TableHead>
-                <TableHead className="w-44 min-w-[140px]">Harga satuan</TableHead>
-                <TableHead className="w-44 min-w-[130px] text-right">Subtotal</TableHead>
-                <TableHead className="w-16"><span className="sr-only">Aksi</span></TableHead>
+                <TableHead className="w-28">Qty</TableHead>
+                <TableHead className="w-32">Satuan</TableHead>
+                <TableHead className="w-44">Harga satuan</TableHead>
+                <TableHead className="w-44 text-right">Subtotal</TableHead>
+                <TableHead className="w-16 text-right"><span className="sr-only">Aksi</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -554,13 +680,13 @@ export default function POEditForm({
                       })}
                     />
                   </TableCell>
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="type-p2 text-right font-medium tabular-nums">
                     {currency(
                       (Number(watchedItems[index]?.quantity) || 0) *
                         (Number(watchedItems[index]?.unitPrice) || 0),
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     <ActionIconButton
                       type="button"
                       label={`Hapus item baris ${index + 1}`}
@@ -576,7 +702,7 @@ export default function POEditForm({
             </TableBody>
           </Table>
         </div>
-        <div className="ml-auto w-full max-w-sm space-y-3 border-t pt-4 text-sm">
+        <div className="type-p2 ml-auto w-full max-w-sm space-y-3 border-t border-border pt-4">
           {isEditable && (
             <div className="flex items-center justify-between gap-4">
               <Label htmlFor="po-include-tax">Kenakan PPN 11%</Label>
@@ -594,18 +720,18 @@ export default function POEditForm({
             </div>
           )}
           <div className="grid grid-cols-2 gap-2">
-            <span>Subtotal</span><span className="text-right">{currency(subtotal)}</span>
+            <span>Subtotal</span><span className="text-right tabular-nums">{currency(subtotal)}</span>
             <span>PPN (11%) {watchedForm.includeTax ? "" : "(tidak dikenakan)"}</span>
-            <span className="text-right">{watchedForm.includeTax ? currency(tax) : "—"}</span>
-          <strong className="text-base">Grand Total</strong>
-          <strong className="text-right text-base">{currency(subtotal + tax)}</strong>
+            <span className="text-right tabular-nums">{watchedForm.includeTax ? currency(tax) : "—"}</span>
+            <strong className="type-h3">Total Akhir</strong>
+            <strong className="type-kpi text-right">{currency(subtotal + tax)}</strong>
           </div>
         </div>
       </Card>
 
       {currentStatus === "APPROVED" && (
         <Card className="flex flex-col items-center gap-3 p-5 text-center">
-          <h2 className="font-semibold">PO disetujui · {currentApprover}</h2>
+          <h2 className="type-h3 text-foreground">PO disetujui · {currentApprover}</h2>
           {currentQr ? (
             <Image
               src={currentQr}
@@ -615,11 +741,11 @@ export default function POEditForm({
               unoptimized
             />
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="type-p2 text-muted-foreground">
               QR verifikasi belum tersedia. Muat ulang halaman untuk mencoba kembali.
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="type-p3 text-muted-foreground">
             {currentApprovalTime ? `Disetujui pada ${currentApprovalTime}. ` : ""}
             Verifikasi publik tersedia melalui QR ini.
           </p>
@@ -628,7 +754,7 @@ export default function POEditForm({
 
       {message && (
         <p
-          className={`text-sm ${isError ? "text-destructive" : "text-emerald-700"}`}
+          className={`type-p2 ${isError ? "text-destructive" : "text-emerald-700 dark:text-emerald-300"}`}
           role={isError ? "alert" : "status"}
         >
           {message}
@@ -647,7 +773,7 @@ export default function POEditForm({
               else router.push("/");
             }}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 size-4" aria-hidden="true" />
             Kembali
           </Button>
         )}
@@ -657,12 +783,12 @@ export default function POEditForm({
             variant={currentStatus === "DRAFT" ? "outline" : "default"}
             disabled={isSaving}
           >
-            <Save className="mr-2 h-4 w-4" />
+            <Save className="mr-2 size-4" aria-hidden="true" />
             {isSaving
               ? "Menyimpan..."
               : publicCode
                 ? "Simpan Perubahan"
-                : "Simpan sebagai Draft"}
+                : "Simpan Draf"}
           </Button>
         )}
         {isEditable && currentStatus === "DRAFT" && (
@@ -671,26 +797,26 @@ export default function POEditForm({
             disabled={isSaving}
             onClick={handleSubmitForFinanceReview}
           >
-            <Check className="mr-2 h-4 w-4" />
+            <Check className="mr-2 size-4" aria-hidden="true" />
             {isSaving
               ? "Mengajukan..."
               : publicCode
-                ? "Simpan & Ajukan ke Keuangan"
-                : "Buat & Ajukan ke Keuangan"}
+                ? "Ajukan ke Keuangan"
+                : "Buat & Ajukan"}
           </Button>
         )}
         {canReview &&
           (currentStatus === "DRAFT" ||
             currentStatus === "PENDING_FINANCE_REVIEW") && (
           <Button type="button" disabled={isSaving} onClick={handleReview}>
-            <Check className="mr-2 h-4 w-4" />
-            Verifikasi PO (Keuangan)
+            <Check className="mr-2 size-4" aria-hidden="true" />
+            Verifikasi PO
           </Button>
         )}
         {canApprove && currentStatus === "PENDING_APPROVAL" && (
           <Button type="button" disabled={isSaving} onClick={handleApproval}>
-            <Check className="mr-2 h-4 w-4" />
-            Setujui PO (Direktur)
+            <Check className="mr-2 size-4" aria-hidden="true" />
+            Setujui PO
           </Button>
         )}
         {publicCode && (
@@ -699,7 +825,7 @@ export default function POEditForm({
             variant="outline"
             onClick={() => setIsPdfPreviewOpen(true)}
           >
-            <Printer className="mr-2 h-4 w-4" /> Pratinjau / Cetak PDF
+            <Printer className="mr-2 size-4" aria-hidden="true" /> Pratinjau PDF
           </Button>
         )}
         {publicCode &&
@@ -712,7 +838,7 @@ export default function POEditForm({
             onClick={() => setIsDeleteDialogOpen(true)}
           >
             <Trash2 className="mr-2 size-4" aria-hidden="true" />
-            {currentStatus === "DRAFT" ? "Hapus Draft" : "Hapus PO"}
+            {currentStatus === "DRAFT" ? "Hapus Draf" : "Hapus PO"}
           </Button>
         )}
       </div>
@@ -733,8 +859,8 @@ export default function POEditForm({
                     href={`/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(publicCode)}`}
                     download
                   >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download PDF
+                    <Download className="mr-2 size-4" aria-hidden="true" />
+                    Unduh PDF
                   </a>
                 </Button>
               )}

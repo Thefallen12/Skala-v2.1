@@ -1,10 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, HelpCircle, Trash2, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Loader2, Plus, Trash2, Users } from "lucide-react";
+import { toast } from "sonner";
 import { updateProjectCoreTeam } from "@/app/actions/project";
+import { Button } from "@/components/ui/button";
+import { GlobalModal } from "@/components/ui/global-modal";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface TeamMemberRow {
   id: string;
@@ -29,7 +38,6 @@ export default function CoreTeamModal({
   onClose,
   projectId,
   currentPicId,
-  currentPicName,
   availableUsers = [
     { id: "cmvxfnz6c_angga", name: "Angga Okta Pratama" },
     { id: "cmvxfnz6c_bambang", name: "Bambang Gunawan" },
@@ -37,27 +45,23 @@ export default function CoreTeamModal({
   ],
   onSuccess,
 }: CoreTeamModalProps) {
-  const [members, setMembers] = useState<TeamMemberRow[]>(() => {
-    return [
-      {
-        id: "1",
-        role: "Manajer proyek",
-        userId: currentPicId || availableUsers[0]?.id || "",
-        phone: "",
-      },
-      {
-        id: "2",
-        role: "Site manager",
-        userId: "custom",
-        customName: "mis. Pak Joko",
-        phone: "",
-      },
-    ];
-  });
+  const [members, setMembers] = useState<TeamMemberRow[]>(() => [
+    {
+      id: "1",
+      role: "Manajer proyek",
+      userId: currentPicId || availableUsers[0]?.id || "custom",
+      phone: "",
+    },
+    {
+      id: "2",
+      role: "Site manager",
+      userId: "custom",
+      customName: "",
+      phone: "",
+    },
+  ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  if (!isOpen) return null;
 
   const handleAddMember = () => {
     setMembers((prev) => [
@@ -72,154 +76,166 @@ export default function CoreTeamModal({
   };
 
   const handleRemoveMember = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    setMembers((prev) => prev.filter((member) => member.id !== id));
   };
 
-  const handleUpdate = (id: string, field: keyof TeamMemberRow, value: string) => {
+  const handleUpdate = (
+    id: string,
+    field: keyof TeamMemberRow,
+    value: string,
+  ) => {
     setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, [field]: value } : m))
+      prev.map((member) =>
+        member.id === id ? { ...member, [field]: value } : member,
+      ),
     );
   };
 
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
-      // Find the first PM to set as fieldPicId
-      const pm = members.find((m) => m.role.toLowerCase().includes("manajer"));
-      const picId = pm && pm.userId !== "custom" ? pm.userId : availableUsers[0]?.id || "";
+      const pm = members.find((member) =>
+        member.role.toLowerCase().includes("manajer"),
+      );
+      const picId =
+        pm && pm.userId !== "custom" ? pm.userId : availableUsers[0]?.id || "";
       const res = await updateProjectCoreTeam(projectId, picId);
       if (res.success) {
+        toast.success(res.message || "Tim inti proyek diperbarui.");
         onSuccess?.();
         onClose();
+      } else {
+        toast.error(res.message || "Tim inti gagal diperbarui.");
       }
+    } catch {
+      toast.error("Terjadi kesalahan saat menyimpan tim inti.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card text-card-foreground shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border/60 p-5 pb-4">
-          <div>
-            <h3 className="text-base font-semibold text-foreground">Tim inti proyek</h3>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Tulis tugas tiap orang di proyek ini, lalu pilih orang yang punya akun Vasco atau tulis
-              nama dan nomornya. Daftar ini tidak memberi akses apa pun. Manajer proyek pertama juga
-              tampil sebagai PM proyek.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-              <HelpCircle className="size-3.5" />
-              <span>Panduan</span>
-            </span>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Member rows */}
-        <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-          {members.map((m) => (
-            <div
-              key={m.id}
-              className="flex flex-col gap-2 rounded-xl border border-border/70 p-3 bg-muted/10"
-            >
-              <div className="flex items-center gap-2">
-                <Input
-                  type="text"
-                  value={m.role}
-                  onChange={(e) => handleUpdate(m.id, "role", e.target.value)}
-                  placeholder="Peran / Tugas"
-                  className="h-9 w-36 text-xs"
-                />
-
-                <select
-                  value={m.userId}
-                  onChange={(e) => handleUpdate(m.id, "userId", e.target.value)}
-                  className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden"
-                >
-                  {availableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                  <option value="custom">Tulis nama sendiri</option>
-                </select>
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemoveMember(m.id)}
-                  className="size-8 text-muted-foreground hover:text-destructive shrink-0"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {m.userId === "custom" && (
-                  <Input
-                    type="text"
-                    value={m.customName || ""}
-                    onChange={(e) => handleUpdate(m.id, "customName", e.target.value)}
-                    placeholder="mis. Pak Joko"
-                    className="h-9 flex-1 text-xs"
-                  />
-                )}
-                <Input
-                  type="text"
-                  value={m.phone || ""}
-                  onChange={(e) => handleUpdate(m.id, "phone", e.target.value)}
-                  placeholder="Telepon / WA"
-                  className="h-9 flex-1 text-xs"
-                />
-              </div>
-            </div>
-          ))}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddMember}
-            className="h-8 gap-1.5 text-xs rounded-lg mt-1"
-          >
-            <Plus className="size-3.5" />
-            <span>Tambah orang</span>
-          </Button>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-border/60 bg-muted/10 p-4">
+    <GlobalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileBehavior="sheet"
+      icon={<Users className="size-4" aria-hidden="true" />}
+      title="Tim Inti Proyek"
+      description="Tentukan peran tiap anggota di proyek ini. Manajer proyek pertama tampil sebagai PIC proyek."
+      className="max-w-lg"
+      footer={
+        <>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={onClose}
-            className="h-9 px-4 text-xs rounded-lg"
+            disabled={isSubmitting}
           >
             Batal
           </Button>
           <Button
             type="button"
-            variant="default"
             size="sm"
-            onClick={handleSave}
+            onClick={() => void handleSave()}
             disabled={isSubmitting}
-            className="h-9 px-4 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium"
           >
-            {isSubmitting ? "Menyimpan..." : "Simpan"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Menyimpan...
+              </>
+            ) : (
+              "Simpan"
+            )}
           </Button>
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {members.map((member) => (
+          <div
+            key={member.id}
+            className="flex flex-col gap-2.5 rounded-xl border border-border bg-muted/20 p-3"
+          >
+            <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+              <Input
+                type="text"
+                value={member.role}
+                onChange={(event) =>
+                  handleUpdate(member.id, "role", event.target.value)
+                }
+                placeholder="Peran / Tugas"
+                className="sm:w-40"
+              />
+
+              <Select
+                value={member.userId || "custom"}
+                onValueChange={(value) =>
+                  handleUpdate(member.id, "userId", value)
+                }
+              >
+                <SelectTrigger className="min-w-[160px] flex-1">
+                  <SelectValue placeholder="Pilih anggota" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Tulis nama sendiri</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Hapus anggota"
+                onClick={() => handleRemoveMember(member.id)}
+                className="shrink-0 text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {member.userId === "custom" && (
+                <Input
+                  type="text"
+                  value={member.customName || ""}
+                  onChange={(event) =>
+                    handleUpdate(member.id, "customName", event.target.value)
+                  }
+                  placeholder="mis. Pak Joko"
+                  className="flex-1"
+                />
+              )}
+              <Input
+                type="text"
+                value={member.phone || ""}
+                onChange={(event) =>
+                  handleUpdate(member.id, "phone", event.target.value)
+                }
+                placeholder="Telepon / WhatsApp"
+                className="flex-1"
+              />
+            </div>
+          </div>
+        ))}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddMember}
+          className="gap-1.5"
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Tambah Anggota
+        </Button>
       </div>
-    </div>
+    </GlobalModal>
   );
 }

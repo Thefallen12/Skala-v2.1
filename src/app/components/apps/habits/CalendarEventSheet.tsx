@@ -2,15 +2,27 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   CalendarEventFormat,
   CalendarEventType,
 } from "@prisma/client";
 import { createWorkspaceEvent } from "@/app/actions/habit-workspace";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
-import { FormLabel, Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { GlobalModal } from "@/components/ui/global-modal";
 
 type ProjectOption = { id: string; code: string; name: string };
@@ -36,59 +48,102 @@ export default function CalendarEventSheet({
   members: MemberOption[];
 }) {
   const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [eventType, setEventType] = useState<string>(CalendarEventType.MEETING);
+  const [projectId, setProjectId] = useState("");
   const [allDay, setAllDay] = useState(false);
-  const [message, setMessage] = useState("");
+  const [startsDate, setStartsDate] = useState(selectedDate);
+  const [endsDate, setEndsDate] = useState(selectedDate);
+  const [startsTime, setStartsTime] = useState("09:00");
+  const [endsTime, setEndsTime] = useState("10:00");
+  const [formatMode, setFormatMode] = useState<string>(CalendarEventFormat.HYBRID);
+  const [reminderMinutes, setReminderMinutes] = useState("15");
+  const [location, setLocation] = useState("");
+  const [meetingUrl, setMeetingUrl] = useState("");
+  const [participantIds, setParticipantIds] = useState<string[]>([]);
+  const [description, setDescription] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const resetForm = (nextDate = selectedDate) => {
+    setTitle("");
+    setEventType(CalendarEventType.MEETING);
+    setProjectId("");
+    setAllDay(false);
+    setStartsDate(nextDate);
+    setEndsDate(nextDate);
+    setStartsTime("09:00");
+    setEndsTime("10:00");
+    setFormatMode(CalendarEventFormat.HYBRID);
+    setReminderMinutes("15");
+    setLocation("");
+    setMeetingUrl("");
+    setParticipantIds([]);
+    setDescription("");
+  };
+
+  const toggleParticipant = (memberId: string, checked: boolean) => {
+    setParticipantIds((current) =>
+      checked
+        ? current.includes(memberId)
+          ? current
+          : [...current, memberId]
+        : current.filter((id) => id !== memberId),
+    );
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    const startsDate = String(data.get("startsDate") ?? "");
-    const endsDate = String(data.get("endsDate") ?? "");
-    const startsTime = String(data.get("startsTime") ?? "");
-    const endsTime = String(data.get("endsTime") ?? "");
+    const effectiveStartsDate = startsDate || selectedDate;
+    const effectiveEndsDate = endsDate || effectiveStartsDate;
     const startsAt = parseJakartaDateTime(
-      `${startsDate}T${allDay ? "00:00" : startsTime}`,
+      `${effectiveStartsDate}T${allDay ? "00:00" : startsTime}`,
     );
     const endsAt = parseJakartaDateTime(
-      `${endsDate}T${allDay ? "23:59" : endsTime}`,
+      `${effectiveEndsDate}T${allDay ? "23:59" : endsTime}`,
     );
     if (!startsAt || !endsAt || endsAt <= startsAt) {
-      setMessage("Periksa kembali tanggal dan jam mulai/selesai agenda.");
+      toast.error("Periksa kembali tanggal dan jam mulai/selesai agenda.");
       return;
     }
 
-    const reminderValue = String(data.get("reminderMinutes") ?? "");
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await createWorkspaceEvent({
-          title: String(data.get("title") ?? ""),
-          description: String(data.get("description") ?? ""),
-          type: String(data.get("type") ?? ""),
-          format: String(data.get("format") ?? ""),
+          title,
+          description,
+          type: eventType,
+          format: formatMode,
           allDay,
-          projectId: String(data.get("projectId") ?? ""),
-          meetingUrl: String(data.get("meetingUrl") ?? ""),
-          location: String(data.get("location") ?? ""),
-          reminderMinutes: reminderValue ? Number(reminderValue) : null,
-          participantIds: data.getAll("participantIds").map(String),
+          projectId,
+          meetingUrl,
+          location,
+          reminderMinutes: reminderMinutes && reminderMinutes !== "NONE" ? Number(reminderMinutes) : null,
+          participantIds,
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
         });
-        setMessage(result.message);
-        if (!result.success) return;
-        form.reset();
-        setAllDay(false);
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+        toast.success(result.message);
+        resetForm(selectedDate);
         onOpenChange(false);
         router.refresh();
       } catch (error) {
         console.error("Calendar event creation failed:", error);
-        setMessage("Agenda gagal disimpan. Silakan coba kembali.");
+        toast.error("Agenda gagal disimpan. Silakan coba kembali.");
       }
     });
   };
+
+  const projectOptions = [
+    { value: "", label: "Umum / Non-Proyek" },
+    ...projects.map((project) => ({
+      value: project.id,
+      label: `${project.code} — ${project.name}`,
+    })),
+  ];
 
   return (
     <GlobalModal
@@ -96,8 +151,7 @@ export default function CalendarEventSheet({
       onClose={() => {
         if (isPending) return;
         onOpenChange(false);
-        setMessage("");
-        setAllDay(false);
+        resetForm(selectedDate);
       }}
       title="Tambah Jadwal atau Rapat"
       description="Jadwal ini otomatis tersinkronisasi dengan Kalender Proyek dan Tugas Harian."
@@ -109,8 +163,7 @@ export default function CalendarEventSheet({
             variant="outline"
             onClick={() => {
               onOpenChange(false);
-              setMessage("");
-              setAllDay(false);
+              resetForm(selectedDate);
             }}
             disabled={isPending}
           >
@@ -128,29 +181,16 @@ export default function CalendarEventSheet({
         onSubmit={submit}
         key={`${open}:${selectedDate}`}
       >
-        {message && (
-          <p
-            role={message.includes("berhasil") ? "status" : "alert"}
-            className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-              message.includes("berhasil")
-                ? "border-success/30 bg-success/10 text-success"
-                : "border-destructive/30 bg-destructive/10 text-destructive"
-            }`}
-          >
-            {message}
-          </p>
-        )}
-
-        {/* Bagian 1: Identitas & Jenis Agenda */}
         <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5 sm:p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
+          <p className="type-p3 font-bold uppercase tracking-wider text-primary">
             1. Informasi &amp; Proyek Terkait
           </p>
           <div className="space-y-2">
             <Label htmlFor="calendar-event-title">Judul Agenda / Rapat</Label>
             <Input
               id="calendar-event-title"
-              name="title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
               placeholder="Contoh: Rapat Koordinasi Mingguan Lapangan"
               minLength={2}
               maxLength={160}
@@ -161,50 +201,47 @@ export default function CalendarEventSheet({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="calendar-event-type">Kategori Agenda</Label>
-              <select
-                id="calendar-event-type"
-                name="type"
-                defaultValue={CalendarEventType.MEETING}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              <Select
+                value={eventType}
+                onValueChange={setEventType}
                 disabled={isPending}
               >
-                <option value={CalendarEventType.MEETING}>Rapat Koordinasi</option>
-                <option value={CalendarEventType.PROJECT}>Pekerjaan Proyek</option>
-                <option value={CalendarEventType.DEADLINE}>Deadline / Tenggat</option>
-                <option value={CalendarEventType.DELIVERY}>Pengiriman Material</option>
-                <option value={CalendarEventType.OTHER}>Agenda Lainnya</option>
-              </select>
+                <SelectTrigger id="calendar-event-type" className="w-full bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CalendarEventType.MEETING}>Rapat Koordinasi</SelectItem>
+                  <SelectItem value={CalendarEventType.PROJECT}>Pekerjaan Proyek</SelectItem>
+                  <SelectItem value={CalendarEventType.DEADLINE}>Tenggat / Deadline</SelectItem>
+                  <SelectItem value={CalendarEventType.DELIVERY}>Pengiriman Material</SelectItem>
+                  <SelectItem value={CalendarEventType.OTHER}>Agenda Lainnya</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="calendar-event-project">Proyek Terkait</Label>
-              <select
+              <Combobox
                 id="calendar-event-project"
-                name="projectId"
-                defaultValue=""
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                options={projectOptions}
+                value={projectId}
+                onValueChange={setProjectId}
+                placeholder="Umum / Non-Proyek"
+                searchPlaceholder="Cari proyek..."
                 disabled={isPending}
-              >
-                <option value="">Umum / Non-Proyek</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.code} — {project.name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
         </div>
 
-        {/* Bagian 2: Waktu & Pengingat */}
         <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5 sm:p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">
+            <p className="type-p3 font-bold uppercase tracking-wider text-primary">
               2. Waktu Pelaksanaan (WIB)
             </p>
             <div className="flex items-center gap-2">
               <Label
                 htmlFor="calendar-event-all-day"
-                className="cursor-pointer text-xs font-medium"
+                className="type-p3 cursor-pointer font-medium"
               >
                 Sepanjang hari
               </Label>
@@ -220,20 +257,18 @@ export default function CalendarEventSheet({
             <div className="space-y-2">
               <Label htmlFor="calendar-event-start-date">Mulai</Label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px]">
-                <Input
+                <DatePicker
                   id="calendar-event-start-date"
-                  name="startsDate"
-                  type="date"
-                  defaultValue={selectedDate}
-                  required
+                  value={startsDate || selectedDate}
+                  onValueChange={setStartsDate}
                   disabled={isPending}
                 />
                 {!allDay && (
                   <Input
                     aria-label="Waktu mulai"
-                    name="startsTime"
                     type="time"
-                    defaultValue="09:00"
+                    value={startsTime}
+                    onChange={(event) => setStartsTime(event.target.value)}
                     required
                     disabled={isPending}
                   />
@@ -243,20 +278,18 @@ export default function CalendarEventSheet({
             <div className="space-y-2">
               <Label htmlFor="calendar-event-end-date">Selesai</Label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px]">
-                <Input
+                <DatePicker
                   id="calendar-event-end-date"
-                  name="endsDate"
-                  type="date"
-                  defaultValue={selectedDate}
-                  required
+                  value={endsDate || selectedDate}
+                  onValueChange={setEndsDate}
                   disabled={isPending}
                 />
                 {!allDay && (
                   <Input
                     aria-label="Waktu selesai"
-                    name="endsTime"
                     type="time"
-                    defaultValue="10:00"
+                    value={endsTime}
+                    onChange={(event) => setEndsTime(event.target.value)}
                     required
                     disabled={isPending}
                   />
@@ -267,41 +300,46 @@ export default function CalendarEventSheet({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="calendar-event-format">Format Pelaksanaan</Label>
-              <select
-                id="calendar-event-format"
-                name="format"
-                defaultValue={CalendarEventFormat.HYBRID}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              <Select
+                value={formatMode}
+                onValueChange={setFormatMode}
                 disabled={isPending}
               >
-                <option value={CalendarEventFormat.IN_PERSON}>Tatap Muka / Lapangan</option>
-                <option value={CalendarEventFormat.VIRTUAL}>Virtual / Online</option>
-                <option value={CalendarEventFormat.HYBRID}>Hybrid</option>
-              </select>
+                <SelectTrigger id="calendar-event-format" className="w-full bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={CalendarEventFormat.IN_PERSON}>Tatap Muka / Lapangan</SelectItem>
+                  <SelectItem value={CalendarEventFormat.VIRTUAL}>Virtual / Daring</SelectItem>
+                  <SelectItem value={CalendarEventFormat.HYBRID}>Hybrid</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="calendar-event-reminder">Pengingat</Label>
-              <select
-                id="calendar-event-reminder"
-                name="reminderMinutes"
-                defaultValue="15"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              <Select
+                value={reminderMinutes}
+                onValueChange={setReminderMinutes}
                 disabled={isPending}
               >
-                <option value="">Tanpa pengingat</option>
-                <option value="5">5 menit sebelumnya</option>
-                <option value="10">10 menit sebelumnya</option>
-                <option value="15">15 menit sebelumnya</option>
-                <option value="30">30 menit sebelumnya</option>
-                <option value="60">1 jam sebelumnya</option>
-              </select>
+                <SelectTrigger id="calendar-event-reminder" className="w-full bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Tanpa pengingat</SelectItem>
+                  <SelectItem value="5">5 menit sebelumnya</SelectItem>
+                  <SelectItem value="10">10 menit sebelumnya</SelectItem>
+                  <SelectItem value="15">15 menit sebelumnya</SelectItem>
+                  <SelectItem value="30">30 menit sebelumnya</SelectItem>
+                  <SelectItem value="60">1 jam sebelumnya</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
 
-        {/* Bagian 3: Lokasi, Tautan & Peserta */}
         <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5 sm:p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">
+          <p className="type-p3 font-bold uppercase tracking-wider text-primary">
             3. Lokasi, Peserta &amp; Catatan
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -309,8 +347,9 @@ export default function CalendarEventSheet({
               <Label htmlFor="calendar-event-location">Lokasi (Opsional)</Label>
               <Input
                 id="calendar-event-location"
-                name="location"
-                placeholder="Contoh: Ruang Rapat / Site Proyek"
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder="Contoh: Ruang Rapat / Lokasi Proyek"
                 maxLength={300}
                 disabled={isPending}
               />
@@ -319,7 +358,8 @@ export default function CalendarEventSheet({
               <Label htmlFor="calendar-event-url">Tautan Rapat (Opsional)</Label>
               <Input
                 id="calendar-event-url"
-                name="meetingUrl"
+                value={meetingUrl}
+                onChange={(event) => setMeetingUrl(event.target.value)}
                 type="url"
                 maxLength={500}
                 placeholder="https://meet.google.com/..."
@@ -328,36 +368,43 @@ export default function CalendarEventSheet({
             </div>
           </div>
           <fieldset className="space-y-2">
-            <legend className="text-xs font-semibold text-foreground">
+            <legend className="type-p3 font-semibold text-foreground">
               Peserta Rapat / Anggota Terlibat
             </legend>
             <div className="grid max-h-32 gap-2 overflow-y-auto rounded-lg border border-input bg-background p-3 sm:grid-cols-2">
-              {members.map((member) => (
-                <FormLabel
-                  key={member.id}
-                  className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
-                >
-                  <input
-                    type="checkbox"
-                    name="participantIds"
-                    value={member.id}
-                    disabled={isPending}
-                    className="size-3.5 accent-primary"
-                  />
-                  <span className="truncate font-medium">{member.name}</span>
-                </FormLabel>
-              ))}
+              {members.map((member) => {
+                const checked = participantIds.includes(member.id);
+                const checkboxId = `event-participant-${member.id}`;
+                return (
+                  <Label
+                    key={member.id}
+                    htmlFor={checkboxId}
+                    className="type-p3 flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 font-medium hover:bg-muted/60"
+                  >
+                    <Checkbox
+                      id={checkboxId}
+                      checked={checked}
+                      disabled={isPending}
+                      onCheckedChange={(value) =>
+                        toggleParticipant(member.id, value === true)
+                      }
+                    />
+                    <span className="truncate">{member.name}</span>
+                  </Label>
+                );
+              })}
             </div>
           </fieldset>
           <div className="space-y-2">
             <Label htmlFor="calendar-event-description">Catatan / Pokok Bahasan</Label>
-            <textarea
+            <Textarea
               id="calendar-event-description"
-              name="description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
               placeholder="Tuliskan agenda atau catatan penting..."
               maxLength={1000}
               rows={2}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="mt-0 bg-background"
               disabled={isPending}
             />
           </div>

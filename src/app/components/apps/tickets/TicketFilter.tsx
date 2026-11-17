@@ -1,8 +1,15 @@
 "use client";
 
-import { Activity, CircleCheck, ClipboardList, Clock3, Wallet } from "lucide-react";
-import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
+import {
+  Activity,
+  CircleCheck,
+  ClipboardList,
+  Clock3,
+  Wallet,
+} from "lucide-react";
 import { TicketStatus } from "@prisma/client";
+import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
+import { Badge } from "@/components/ui/badge";
 import {
   formatTicketCurrency,
   getCountableTickets,
@@ -36,7 +43,7 @@ export default function TicketFilter({
     {
       filter: "ALL",
       title: "Semua Tiket",
-      subtitle: "Total pengajuan yang tidak ditolak",
+      subtitle: "Total pengajuan aktif & selesai",
       count: countableTickets.length,
       icon: ClipboardList,
       iconStyle: "bg-primary/15 text-primary border-primary/25",
@@ -44,10 +51,10 @@ export default function TicketFilter({
     },
     {
       filter: "ACTION_REQUIRED",
-      title: "Perlu Tindakan Anda",
+      title: "Perlu Tindakan",
       subtitle:
         actionRequiredCount > 0
-          ? "Menunggu persetujuan / proses Anda"
+          ? "Menunggu proses Anda"
           : "Tidak ada antrean tertunda",
       count: actionRequiredCount,
       icon: Clock3,
@@ -66,7 +73,7 @@ export default function TicketFilter({
     },
     {
       filter: TicketStatus.COMPLETED,
-      title: "Selesai / Tuntas",
+      title: "Selesai",
       subtitle: "Barang diterima / dana cair",
       count: completedCount,
       icon: CircleCheck,
@@ -104,7 +111,7 @@ export default function TicketFilter({
               }`}
             >
               <div className="flex w-full items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground">
+                <span className="type-p3 font-semibold text-muted-foreground group-hover:text-foreground">
                   {title}
                 </span>
                 <span
@@ -115,16 +122,12 @@ export default function TicketFilter({
               </div>
               <div className="mt-2">
                 <div className="flex min-h-8 items-baseline gap-2">
-                  <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums sm:text-2xl">
-                    {count}
-                  </span>
+                  <span className="type-kpi text-foreground">{count}</span>
                   {highlight && (
-                    <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[11px] font-medium text-amber-500">
-                      Prioritas
-                    </span>
+                    <Badge variant="lightWarning">Prioritas</Badge>
                   )}
                 </div>
-                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                <p className="type-p3 mt-1 line-clamp-1 text-muted-foreground">
                   {subtitle}
                 </p>
               </div>
@@ -135,8 +138,8 @@ export default function TicketFilter({
 
       <div className="col-span-2 flex flex-col justify-between rounded-xl border border-border bg-card p-3.5 sm:p-4 lg:col-span-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-muted-foreground">
-            Total Estimasi Tiket
+          <span className="type-p3 font-semibold text-muted-foreground">
+            Total Estimasi
           </span>
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/15 text-indigo-400">
             <Wallet className="size-4" aria-hidden="true" />
@@ -144,12 +147,12 @@ export default function TicketFilter({
         </div>
         <div className="mt-2">
           <div className="flex min-h-8 items-baseline">
-            <p className="truncate text-xl font-extrabold tracking-tight text-foreground tabular-nums sm:text-2xl">
+            <p className="type-kpi truncate text-foreground">
               {formatTicketCurrency(getTotalTicketValueInCents(countableTickets))}
             </p>
           </div>
-          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-            Akumulasi tiket yang tidak ditolak
+          <p className="type-p3 mt-1 line-clamp-1 text-muted-foreground">
+            Akumulasi tiket non-tolak
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import TicketsApp from "@/app/components/apps/tickets";
 import CreateTicketModal from "@/app/components/apps/tickets/CreateTicketModal";
-import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
+import { PageHeader } from "@/components/ui/page-header";
+import type { VehicleSummary } from "@/app/actions/vehicles";
 import type { Metadata } from "next";
 import {
   PaymentStatus,
@@ -15,7 +16,7 @@ import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getTicketPageVisibilityWhere } from "@/lib/ticket-visibility";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
 import {
   loadActiveTicketMaterialContractOptions,
   loadMaterialContractsBundle,
@@ -42,11 +43,11 @@ export const metadata: Metadata = {
 
 const BCrumb = [
   {
-    to: "/",
-    title: "Beranda",
+    href: "/",
+    label: "Beranda",
   },
   {
-    title: "Tiket & Permintaan",
+    label: "Tiket & Permintaan",
   },
 ];
 
@@ -131,7 +132,7 @@ const Tickets = async ({
     session.user.id,
   );
 
-  const [tickets, projects, stockItems, vendors, movers] = await Promise.all([
+  const [tickets, projects, stockItems, vendors, vehiclesRaw] = await Promise.all([
     prisma.ticket.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -365,22 +366,61 @@ const Tickets = async ({
           },
         })
       : Promise.resolve([]),
-    Promise.resolve([]),
+    session.user.role === UserRole.LOGISTICS ||
+    session.user.role === UserRole.ADMINISTRATIONS ||
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR
+      ? prisma.vehicle.findMany({
+          orderBy: { plateNumber: "asc" },
+          select: {
+            id: true,
+            plateNumber: true,
+            vehicleType: true,
+            brand: true,
+            modelName: true,
+            currentKilometer: true,
+            odometerInitialized: true,
+            status: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
+  const movers: Array<{ id: string; name: string }> = [];
+  const vehicles: VehicleSummary[] = vehiclesRaw.map((vehicle) => ({
+    id: vehicle.id,
+    plateNumber: vehicle.plateNumber,
+    vehicleType: vehicle.vehicleType,
+    brand: vehicle.brand,
+    modelName: vehicle.modelName,
+    currentKilometer: decimalStringFromScaledInteger(vehicle.currentKilometer),
+    odometerInitialized: vehicle.odometerInitialized,
+    status:
+      vehicle.status === "AVAILABLE" ||
+      vehicle.status === "RESERVED" ||
+      vehicle.status === "IN_USE" ||
+      vehicle.status === "MAINTENANCE"
+        ? vehicle.status
+        : "MAINTENANCE",
+  }));
 
-  await connectToMongoDB();
+  const mongo = await connectToMongoDBOptional();
   const [materialContractOptions, materialContractsBundle, openContractTickets] =
     await Promise.all([
       loadActiveTicketMaterialContractOptions(),
       loadMaterialContractsBundle({ includeInvoices: false }),
       loadOpenContractDeliveryTickets(),
     ]);
-  const equipmentTickets = await EquipmentTicket.find({
-    ticketType: EQUIPMENT_REQUEST_TYPE,
-    ...getEquipmentTicketVisibilityFilter(session.user.role, session.user.id),
-  })
-    .sort({ createdAt: -1 })
-    .lean();
+  const equipmentTickets = mongo
+    ? await EquipmentTicket.find({
+        ticketType: EQUIPMENT_REQUEST_TYPE,
+        ...getEquipmentTicketVisibilityFilter(
+          session.user.role,
+          session.user.id,
+        ),
+      })
+        .sort({ createdAt: -1 })
+        .lean()
+    : [];
   const equipmentTicketIds = equipmentTickets.map((ticket) =>
     String(ticket._id),
   );
@@ -728,30 +768,30 @@ const Tickets = async ({
 
   return (
     <>
-      <div>
-        <BreadcrumbComp
-          title="Tiket & Permintaan Lapangan"
-          items={BCrumb}
-          action={
-            <CreateTicketModal
-              projects={projects}
-              requesterRole={session.user.role}
-              movers={movers}
-              defaultOpen={create === "1"}
-              stockItems={stockItems.map((item) => ({
-                ...item,
-                unitPrice: decimalStringFromScaledInteger(item.unitPrice),
-                stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
-              }))}
-              materialContracts={materialContractOptions}
-            />
-          }
-        />
-      </div>
+      <PageHeader
+        title="Tiket & Permintaan"
+        description="Buat, ajukan, dan pantau pengajuan material, sewa, serta biaya proyek."
+        breadcrumbs={BCrumb}
+        actions={
+          <CreateTicketModal
+            projects={projects}
+            requesterRole={session.user.role}
+            movers={movers}
+            defaultOpen={create === "1"}
+            stockItems={stockItems.map((item) => ({
+              ...item,
+              unitPrice: decimalStringFromScaledInteger(item.unitPrice),
+              stockQuantity: decimalStringFromScaledInteger(item.stockQuantity),
+            }))}
+            materialContracts={materialContractOptions}
+          />
+        }
+      />
       <TicketsApp
         tickets={ticketRows}
         projects={projects}
         vendors={vendors}
+        vehicles={vehicles}
         stockItems={stockItems.map((item) => ({
           id: item.id,
           sku: item.sku,

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
 import LogisticsHub from "@/app/components/apps/logistics/LogisticsHub";
 import MoverWorkspace from "@/app/components/apps/logistics/MoverWorkspace";
 import DocumentSignoffQueue from "@/app/components/apps/documents/DocumentSignoffQueue";
+import { PageHeader } from "@/components/ui/page-header";
 import type { TicketRow } from "../../types/ticket";
 import type { Prisma } from "@prisma/client";
 import {
@@ -32,6 +32,7 @@ import type {
   RentalPeriodType,
   RentalStatus,
   RentalType,
+  RentalUsageScope,
 } from "@/app/actions/rentals";
 import {
   loadActiveTicketMaterialContractOptions,
@@ -39,7 +40,8 @@ import {
   loadOpenContractDeliveryTickets,
 } from "@/lib/material-contracts-server";
 import { mapTicketMaterialDeliveries } from "@/lib/material-contracts";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
+import { EquipmentRental } from "@/models/finance-records";
 import EquipmentTicket from "@/models/ticket";
 import TicketAuditLog from "@/models/ticket-audit-log";
 import User from "@/models/user";
@@ -63,6 +65,63 @@ const logisticsRoles: UserRole[] = [
   UserRole.FINANCE,
   UserRole.FIELD_TEAM,
 ];
+
+function cleanOptionalText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function toScaledBigInt(value: unknown): bigint {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return BigInt(0);
+    return BigInt(Math.trunc(value));
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return BigInt(0);
+    try {
+      return BigInt(trimmed);
+    } catch {
+      return BigInt(0);
+    }
+  }
+  if (value && typeof value === "object" && "toString" in value) {
+    try {
+      return BigInt(String(value));
+    } catch {
+      return BigInt(0);
+    }
+  }
+  return BigInt(0);
+}
+
+function formatDateOnly(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatIsoTimestamp(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return null;
+}
 
 export default async function LogisticsPage({
   searchParams,
@@ -94,15 +153,14 @@ export default async function LogisticsPage({
 
     return (
       <main className="mx-auto w-full max-w-5xl space-y-5 p-4 md:p-6">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">
-            Konfirmasi Delivery Order
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tinjau DO yang telah ditandatangani Logistik, lalu berikan
-            konfirmasi sebagai Koordinator Lapangan.
-          </p>
-        </div>
+        <PageHeader
+          title="Konfirmasi Delivery Order"
+          description="Tinjau DO yang telah ditandatangani Logistik, lalu berikan konfirmasi sebagai Koordinator Lapangan."
+          breadcrumbs={[
+            { label: "Beranda", href: "/" },
+            { label: "Konfirmasi DO" },
+          ]}
+        />
         <DocumentSignoffQueue
           tasks={pendingDeliveryOrderAcknowledgments.map((document) => ({
             id: document.id,
@@ -116,7 +174,7 @@ export default async function LogisticsPage({
             previewUrl: `/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(document.publicCode)}`,
           }))}
           title="DO Menunggu Konfirmasi"
-          description="QR tanda tangan Logistik menunjukkan status DO dan menjadi valid setelah konfirmasi ini diselesaikan."
+          description="QR tanda tangan Logistik menjadi valid setelah konfirmasi lapangan diselesaikan."
         />
       </main>
     );
@@ -239,11 +297,12 @@ export default async function LogisticsPage({
 
     return (
       <>
-        <BreadcrumbComp
+        <PageHeader
           title="Ruang Kerja Mover"
-          items={[
-            { to: "/", title: "Beranda" },
-            { title: "Ruang Kerja Mover" },
+          description="Kelola pengiriman material, catat odometer, dan ajukan BBM langsung dari lapangan."
+          breadcrumbs={[
+            { label: "Beranda", href: "/" },
+            { label: "Ruang Kerja Mover" },
           ]}
         />
         <MoverWorkspace
@@ -256,12 +315,9 @@ export default async function LogisticsPage({
               order.departureKilometer !== null
                 ? decimalStringFromScaledInteger(order.departureKilometer)
                 : null,
-            vehicleCurrentKilometer:
-              order.vehicle
-                ? decimalStringFromScaledInteger(
-                    order.vehicle.currentKilometer,
-                  )
-                : null,
+            vehicleCurrentKilometer: order.vehicle
+              ? decimalStringFromScaledInteger(order.vehicle.currentKilometer)
+              : null,
             vehicleType: order.vehicle?.vehicleType ?? null,
             vehicleTripLog: order.vehicleTripLog
               ? {
@@ -286,12 +342,11 @@ export default async function LogisticsPage({
               estimatedDistanceKm: decimalStringFromScaledInteger(
                 request.estimatedDistanceKm,
               ),
-              tripDistanceKm:
-                order.vehicleTripLog
-                  ? decimalStringFromScaledInteger(
-                      order.vehicleTripLog.distanceKm,
-                    )
-                  : null,
+              tripDistanceKm: order.vehicleTripLog
+                ? decimalStringFromScaledInteger(
+                    order.vehicleTripLog.distanceKm,
+                  )
+                : null,
               exceptionDistanceKm: decimalStringFromScaledInteger(
                 request.exceptionDistanceKm,
               ),
@@ -315,7 +370,8 @@ export default async function LogisticsPage({
               proofSubmittedAt:
                 request.proofSubmittedAt?.toISOString() ?? null,
               doNumber: order.doNumber,
-              plateNumber: order.vehiclePlateNumber ?? order.vehiclePlate ?? "—",
+              plateNumber:
+                order.vehiclePlateNumber ?? order.vehiclePlate ?? "—",
               vehicleType: order.vehicle?.vehicleType ?? "Kendaraan",
               projectName: projectSiteName(
                 order.ticket?.project?.kelompokTani,
@@ -325,10 +381,12 @@ export default async function LogisticsPage({
               reviewerName: null,
             } satisfies VehicleFuelRequestView)),
             receiptPhotoUrls: Array.from(
-              new Set([
-                order.deliveryReceiptUrl,
-                ...order.receiptPhotos.map((photo) => photo.url),
-              ].filter((url): url is string => Boolean(url))),
+              new Set(
+                [
+                  order.deliveryReceiptUrl,
+                  ...order.receiptPhotos.map((photo) => photo.url),
+                ].filter((url): url is string => Boolean(url)),
+              ),
             ),
             projectName: projectSiteName(
               order.ticket?.project?.kelompokTani,
@@ -379,6 +437,7 @@ export default async function LogisticsPage({
             {
               status: {
                 in: [
+                  TicketStatus.APPROVED_DIR,
                   TicketStatus.PROCESSED_LOGISTIC,
                   TicketStatus.PROCESSED_FINANCE,
                   TicketStatus.ASSIGNED_TO_MOVER,
@@ -399,12 +458,17 @@ export default async function LogisticsPage({
           status: TicketStatus.WAITING_FINANCE_PAYMENT,
           OR: [
             { purchaseReceiptUrl: { not: null } },
+            { purchaseOrders: { some: { vendorInvoiceUrl: { not: null } } } },
+            { directStockPurchases: { some: {} } },
+            { items: { some: { doItemId: null, poItemId: null } } },
             { requestCategory: TicketRequestCategory.SHIPPING_COST },
           ],
         },
       ],
     };
   }
+
+  const mongo = await connectToMongoDBOptional();
 
   const [
     tickets,
@@ -421,7 +485,7 @@ export default async function LogisticsPage({
     directStockPurchases,
     vehicles,
     vehicleTripLogs,
-    equipmentRentals,
+    mongoRentals,
   ] = await Promise.all([
     prisma.ticket.findMany({
       where: {
@@ -525,7 +589,17 @@ export default async function LogisticsPage({
             status: true,
             createdAt: true,
             paidAt: true,
+            vendorInvoiceUrl: true,
+            vendorPoSentAt: true,
             includeTax: true,
+            invoices: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: {
+                id: true,
+                documentUrl: true,
+              },
+            },
             items: {
               orderBy: { id: "asc" },
               select: {
@@ -853,28 +927,134 @@ export default async function LogisticsPage({
         createdBy: { select: { name: true } },
       },
     }),
-    prisma.equipmentRental.findMany({
-      orderBy: { startDate: "desc" },
-      include: {
-        project: {
-          select: {
-            title: true,
-            kelompokTani: true,
-          },
-        },
-      },
-    }),
+    mongo
+      ? EquipmentRental.find().sort({ startDate: -1, createdAt: -1 }).lean()
+      : Promise.resolve([]),
   ]);
 
+  // Ensure any project referenced by EquipmentRental (including deleted/legacy projects) resolves cleanly
+  const projectMap = new Map(
+    projects.map((p) => [p.id, { title: p.title, kelompokTani: p.kelompokTani }]),
+  );
+  const missingRentalProjectIds = [
+    ...new Set(
+      mongoRentals
+        .map((r) => cleanOptionalText(r.projectId))
+        .filter((id): id is string => Boolean(id))
+        .filter((id) => !projectMap.has(id)),
+    ),
+  ];
+  if (mongo && missingRentalProjectIds.length > 0) {
+    const extraProjects = await Project.find({
+      _id: { $in: missingRentalProjectIds },
+    })
+      .select({ _id: 1, title: 1, kelompokTani: 1 })
+      .lean();
+    for (const project of extraProjects) {
+      projectMap.set(String(project._id), {
+        title: String(project.title ?? "-"),
+        kelompokTani: String(project.kelompokTani ?? "Proyek"),
+      });
+    }
+  }
+
+  const mappedRentals: RentalItemRow[] = mongoRentals.map((r) => {
+    const rentalType: RentalType =
+      r.type === "HOUSE"
+        ? "HOUSE"
+        : r.type === "VEHICLE"
+          ? "VEHICLE"
+          : "EQUIPMENT";
+    const projectId = cleanOptionalText(r.projectId);
+    const project = projectId ? projectMap.get(projectId) : undefined;
+    const usageScope: RentalUsageScope =
+      rentalType === "HOUSE"
+        ? "PROJECT"
+        : r.usageScope === "OPERATIONAL"
+          ? "OPERATIONAL"
+          : "PROJECT";
+
+    return {
+      id: String(r._id),
+      type: rentalType,
+      usageScope,
+      name: String(r.name ?? ""),
+      category: cleanOptionalText(r.category),
+      codeOrPlate: cleanOptionalText(r.codeOrPlate),
+      vendorName: String(r.vendorName ?? r.landlordName ?? ""),
+      vendorPhone: cleanOptionalText(r.vendorPhone ?? r.landlordPhone),
+      propertyAddress: cleanOptionalText(r.propertyAddress),
+      landlordName: cleanOptionalText(r.landlordName),
+      landlordPhone: cleanOptionalText(r.landlordPhone),
+      occupantCount:
+        typeof r.occupantCount === "number" && Number.isFinite(r.occupantCount)
+          ? r.occupantCount
+          : null,
+      rentalPeriodType:
+        r.rentalPeriodType === "WEEKLY" || r.rentalPeriodType === "MONTHLY"
+          ? r.rentalPeriodType
+          : "DAILY",
+      startDate: formatDateOnly(r.startDate),
+      endDate: formatDateOnly(r.endDate),
+      duration:
+        typeof r.duration === "number" && Number.isFinite(r.duration)
+          ? r.duration
+          : 1,
+      ratePerPeriod: decimalStringFromScaledInteger(
+        toScaledBigInt(r.ratePerPeriod),
+      ),
+      additionalCost: decimalStringFromScaledInteger(
+        toScaledBigInt(r.additionalCost),
+      ),
+      totalCost: decimalStringFromScaledInteger(toScaledBigInt(r.totalCost)),
+      status:
+        r.status === "COMPLETED" ||
+        r.status === "EXTENDED" ||
+        r.status === "CANCELLED"
+          ? (r.status as RentalStatus)
+          : "ACTIVE",
+      withOperator: rentalType === "HOUSE" ? false : Boolean(r.withOperator),
+      operatorName:
+        rentalType === "HOUSE" ? null : cleanOptionalText(r.operatorName),
+      withFuel: rentalType === "HOUSE" ? false : Boolean(r.withFuel),
+      projectId,
+      projectName: project
+        ? `${project.kelompokTani || "Proyek"} · ${project.title || "-"}`
+        : null,
+      sourceTicketId: cleanOptionalText(r.sourceTicketId),
+      cashflowId: cleanOptionalText(r.cashflowId),
+      paymentTransactionId: cleanOptionalText(r.paymentTransactionId),
+      notes: cleanOptionalText(r.notes),
+      createdByName: cleanOptionalText(r.createdByName),
+      createdAt: formatIsoTimestamp(r.createdAt) ?? new Date().toISOString(),
+      paymentStatus:
+        r.paymentStatus === "PENDING_PAYMENT" || r.paymentStatus === "PAID"
+          ? (r.paymentStatus as RentalPaymentStatus)
+          : "UNPAID",
+      billingSubmittedAt: formatIsoTimestamp(r.billingSubmittedAt),
+      billingSubmittedByName: cleanOptionalText(r.billingSubmittedByName),
+      paidAt: formatIsoTimestamp(r.paidAt),
+      paidByName: cleanOptionalText(r.paidByName),
+      proofOfPaymentUrl: cleanOptionalText(r.proofOfPaymentUrl),
+      paymentBankName: cleanOptionalText(r.paymentBankName),
+      paymentAccountNumber: cleanOptionalText(r.paymentAccountNumber),
+      paymentAccountName: cleanOptionalText(r.paymentAccountName),
+      financeNotes: cleanOptionalText(r.financeNotes),
+    };
+  });
+
   const stockPriceLookup = createStockPriceLookup(stockItems);
-  const [materialContractsBundle, materialContractOptions, openContractTickets] =
-    await Promise.all([
-      loadMaterialContractsBundle({
-        includeInvoices: false,
-      }),
-      loadActiveTicketMaterialContractOptions(),
-      loadOpenContractDeliveryTickets(),
-    ]);
+  const [
+    materialContractsBundle,
+    materialContractOptions,
+    openContractTickets,
+  ] = await Promise.all([
+    loadMaterialContractsBundle({
+      includeInvoices: true,
+    }),
+    loadActiveTicketMaterialContractOptions(),
+    loadOpenContractDeliveryTickets(),
+  ]);
 
   const ticketRows: TicketRow[] = tickets.map((ticket) => ({
     id: ticket.id,
@@ -944,17 +1124,25 @@ export default async function LogisticsPage({
       signedAt: document.signedAt.toISOString(),
       issuedAt: document.issuedAt?.toISOString() ?? null,
     })),
-    purchaseOrders: ticket.purchaseOrders.map((purchaseOrder) => ({
-      ...purchaseOrder,
-      createdAt: purchaseOrder.createdAt.toISOString(),
-      paidAt: purchaseOrder.paidAt?.toISOString() ?? null,
-    })),
+    purchaseOrders: ticket.purchaseOrders.map(
+      ({ invoices, ...purchaseOrder }) => ({
+        ...purchaseOrder,
+        createdAt: purchaseOrder.createdAt.toISOString(),
+        paidAt: purchaseOrder.paidAt?.toISOString() ?? null,
+        vendorInvoiceUrl:
+          purchaseOrder.vendorInvoiceUrl ??
+          invoices[0]?.documentUrl ??
+          null,
+        vendorPoSentAt: purchaseOrder.vendorPoSentAt?.toISOString() ?? null,
+        invoiceId: invoices[0]?.id ?? null,
+      }),
+    ),
     directStockPurchases: ticket.directStockPurchases.map((purchase) => ({
       ...purchase,
       totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
       receivedAt: purchase.receivedAt?.toISOString() ?? null,
       hasFinanceProof: purchase.paymentTransactions.some((p) =>
-        Boolean(p.proofOfTransferUrl)
+        Boolean(p.proofOfTransferUrl),
       ),
       createdAt: purchase.createdAt.toISOString(),
       vendorInvoiceUploadedAt:
@@ -970,11 +1158,16 @@ export default async function LogisticsPage({
     })),
   }));
 
-  if (session.user.role === UserRole.LOGISTICS) {
-    await connectToMongoDB();
+  if (mongo && session.user.role === UserRole.LOGISTICS) {
     const equipmentTickets = await EquipmentTicket.find({
       ticketType: EQUIPMENT_REQUEST_TYPE,
-      status: TicketStatus.PROCESSED_LOGISTIC,
+      status: {
+        $in: [
+          "PENDING_LOGISTIK",
+          "APPROVED_DIR",
+          TicketStatus.PROCESSED_LOGISTIC,
+        ],
+      },
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -1057,6 +1250,16 @@ export default async function LogisticsPage({
             ? projectsById.get(String(ticket.projectId))
             : null;
           const auditLogs = auditLogsByTicketId.get(ticketId) ?? [];
+          const resolvedEquipmentStatus: TicketRow["status"] =
+            ticket.status === "PENDING_LOGISTIK"
+              ? "PENDING_LOGISTIK"
+              : Object.values(TicketStatus).find(
+                  (value) => value === ticket.status,
+                ) ?? TicketStatus.PROCESSED_LOGISTIC;
+          const resolvedEquipmentFulfillment =
+            Object.values(TicketFulfillmentStatus).find(
+              (value) => value === ticket.fulfillmentStatus,
+            ) ?? TicketFulfillmentStatus.PENDING;
           return {
             id: ticketId,
             ticketNumber: ticket.ticketNumber,
@@ -1087,8 +1290,8 @@ export default async function LogisticsPage({
               ticket.requestPaymentDescription ?? null,
             transferDestination: ticket.transferDestination ?? null,
             priority,
-            status: TicketStatus.PROCESSED_LOGISTIC,
-            fulfillmentStatus: TicketFulfillmentStatus.PENDING,
+            status: resolvedEquipmentStatus,
+            fulfillmentStatus: resolvedEquipmentFulfillment,
             canSubmit: false,
             canRequesterEdit: false,
             totalAmount:
@@ -1137,11 +1340,12 @@ export default async function LogisticsPage({
 
   return (
     <>
-      <BreadcrumbComp
+      <PageHeader
         title="Logistik Lapangan"
-        items={[
-          { to: "/", title: "Beranda" },
-          { title: "Logistik Lapangan" },
+        description="Kelola tiket material, stok gudang, armada, kontrak material alam, dan sewa."
+        breadcrumbs={[
+          { label: "Beranda", href: "/" },
+          { label: "Logistik Lapangan" },
         ]}
       />
       <LogisticsHub
@@ -1155,8 +1359,8 @@ export default async function LogisticsPage({
         stockPurchases={directStockPurchases.map((purchase) => ({
           ...purchase,
           totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
-          hasFinanceProof: purchase.paymentTransactions.some(
-            (payment) => Boolean(payment.proofOfTransferUrl),
+          hasFinanceProof: purchase.paymentTransactions.some((payment) =>
+            Boolean(payment.proofOfTransferUrl),
           ),
           createdAt: purchase.createdAt.toISOString(),
           receivedAt: purchase.receivedAt?.toISOString() ?? null,
@@ -1172,24 +1376,26 @@ export default async function LogisticsPage({
             payment.confirmationOrderNumber &&
             payment.proofOfTransferUrl &&
             payment.po
-              ? [{
-                  id: payment.id,
-                  confirmationOrderNumber: payment.confirmationOrderNumber,
-                  paymentType: payment.paymentType,
-                  amount: Number(payment.amount),
-                  transferDestination: payment.transferDestination,
-                  proofOfTransferUrl: payment.proofOfTransferUrl,
-                  paidAt: payment.paidAt?.toISOString() ?? null,
-                  vendorSentAt: payment.vendorSentAt?.toISOString() ?? null,
-                  vendorSentBy: payment.vendorSentBy,
-                  po: {
-                    ...payment.po,
-                    items: payment.po.items.map((item) => ({
-                      ...item,
-                      quantity: Number(item.quantity),
-                    })),
+              ? [
+                  {
+                    id: payment.id,
+                    confirmationOrderNumber: payment.confirmationOrderNumber,
+                    paymentType: payment.paymentType,
+                    amount: Number(payment.amount),
+                    transferDestination: payment.transferDestination,
+                    proofOfTransferUrl: payment.proofOfTransferUrl,
+                    paidAt: payment.paidAt?.toISOString() ?? null,
+                    vendorSentAt: payment.vendorSentAt?.toISOString() ?? null,
+                    vendorSentBy: payment.vendorSentBy,
+                    po: {
+                      ...payment.po,
+                      items: payment.po.items.map((item) => ({
+                        ...item,
+                        quantity: Number(item.quantity),
+                      })),
+                    },
                   },
-                }]
+                ]
               : [],
         )}
         documentSignoffTasks={[
@@ -1308,47 +1514,12 @@ export default async function LogisticsPage({
               ? vehicle.status
               : "MAINTENANCE",
         }))}
-        rentals={equipmentRentals.map((r) => ({
-          id: r.id,
-          type: r.type as RentalType,
-          name: r.name,
-          category: r.category,
-          codeOrPlate: r.codeOrPlate,
-          vendorName: r.vendorName,
-          vendorPhone: r.vendorPhone,
-          rentalPeriodType: r.rentalPeriodType as RentalPeriodType,
-          startDate: r.startDate.toISOString().slice(0, 10),
-          endDate: r.endDate.toISOString().slice(0, 10),
-          duration: r.duration,
-          ratePerPeriod: decimalStringFromScaledInteger(r.ratePerPeriod),
-          additionalCost: decimalStringFromScaledInteger(r.additionalCost),
-          totalCost: decimalStringFromScaledInteger(r.totalCost),
-          status: r.status as RentalStatus,
-          withOperator: r.withOperator,
-          operatorName: r.operatorName,
-          withFuel: r.withFuel,
-          projectId: r.projectId,
-          projectName: r.project
-            ? `${r.project.kelompokTani} · ${r.project.title}`
-            : null,
-          notes: r.notes,
-          createdByName: r.createdByName,
-          createdAt: r.createdAt.toISOString(),
-          paymentStatus: (r.paymentStatus as RentalPaymentStatus) || "UNPAID",
-          billingSubmittedAt: r.billingSubmittedAt?.toISOString() ?? null,
-          billingSubmittedByName: r.billingSubmittedByName,
-          paidAt: r.paidAt?.toISOString() ?? null,
-          paidByName: r.paidByName,
-          proofOfPaymentUrl: r.proofOfPaymentUrl,
-          paymentBankName: r.paymentBankName,
-          paymentAccountNumber: r.paymentAccountNumber,
-          paymentAccountName: r.paymentAccountName,
-          financeNotes: r.financeNotes,
-        }))}
+        rentals={mappedRentals}
         materialContracts={materialContractsBundle.contracts}
         materialContractOptions={materialContractOptions}
         materialDeliveries={materialContractsBundle.deliveries}
         contractTickets={openContractTickets}
+        vendorInvoices={materialContractsBundle.vendorInvoices}
       />
     </>
   );

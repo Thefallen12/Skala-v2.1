@@ -14,6 +14,9 @@ const cashflowSchema = new Schema(
     accountId: { type: String, required: true },
     recordedBy: { type: String, required: true },
     paymentTransactionId: { type: String, default: null },
+    equipmentRentalId: { type: String, default: null },
+    category: { type: String, default: null },
+    expenseType: { type: String, default: null },
     transferGroupId: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
   },
@@ -23,6 +26,13 @@ const cashflowSchema = new Schema(
 cashflowSchema.index(
   { paymentTransactionId: 1 },
   { unique: true, sparse: true },
+);
+cashflowSchema.index(
+  { equipmentRentalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { equipmentRentalId: { $type: "string" } },
+  },
 );
 cashflowSchema.index({ accountId: 1, createdAt: -1 });
 

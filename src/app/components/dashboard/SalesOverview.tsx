@@ -68,17 +68,17 @@ const SalesOverview = ({
   };
 
   return (
-    <CardBox className="dashboard-enter h-full w-full overflow-hidden border-slate-200/80 bg-white/80 p-5 shadow-sm transition-shadow duration-300 hover:shadow-md dark:border-slate-700/80 dark:bg-[#1e293b]/55 sm:p-6">
+    <CardBox className="dashboard-enter h-full w-full overflow-hidden border-border bg-card p-5 text-card-foreground shadow-2xs transition-shadow duration-300 hover:shadow-sm sm:p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div>
-          <h2 className="font-bold text-slate-900 dark:text-white">
+          <h2 className="type-h2 text-foreground">
             Aktivitas Bulanan
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="type-p3 mt-1 text-muted-foreground">
             Proyek baru dan tiket masuk selama {year}
           </p>
         </div>
-        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+        <div className="type-p3 flex flex-wrap gap-4 text-muted-foreground">
           <span className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-sky-400" />
             Proyek baru

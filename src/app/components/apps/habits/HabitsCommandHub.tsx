@@ -18,6 +18,8 @@ import DailyTaskBoard from "@/app/components/apps/habits/tasks/DailyTaskBoard";
 import ProjectTimesheet from "@/app/components/apps/habits/timesheet/ProjectTimesheet";
 import WeeklySummary from "@/app/components/apps/habits/analytics/WeeklySummary";
 import CalendarEventSheet from "@/app/components/apps/habits/CalendarEventSheet";
+import { Badge } from "@/components/ui/badge";
+import { Stepper } from "@/components/ui/stepper";
 import {
   Tabs,
   TabsContent,
@@ -235,9 +237,10 @@ export default function HabitsCommandHub({
   const onTabChange = (value: string) => {
     if (!tabLabels.some((tab) => tab.value === value)) return;
     const nextTab = value as TabValue;
+    if (nextTab === activeTab) return;
     const params = new URLSearchParams(window.location.search);
     params.set("tab", nextTab);
-    router.replace(`/apps/habits?${params.toString()}`, { scroll: false });
+    router.push(`/apps/habits?${params.toString()}`, { scroll: false });
   };
 
   const openScheduleSheet = (date: string) => {
@@ -290,80 +293,56 @@ export default function HabitsCommandHub({
     timesheet: weeklyHoursTotal,
   };
 
+  const activeStepIndex = Math.max(
+    0,
+    tabLabels.findIndex((tab) => tab.value === activeTab),
+  );
+
   return (
     <div className="space-y-4">
       <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4">
-        {/* Skema Alur 4 Tahap Jadwal & Produktivitas */}
-        <div className="rounded-xl border border-border bg-card p-3 shadow-2xs sm:p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
-                Skema Kerja Tim
-              </span>
-              <span className="text-xs text-muted-foreground">
-                1. Rencanakan Agenda → 2. Eksekusi Tugas Proyek → 3. Checklist Rutinitas → 4. Catat Jam Kerja (Timesheet)
+        <div className="space-y-3 rounded-xl border border-border bg-card p-3.5 shadow-2xs sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="lightPrimary">Alur Kerja Tim</Badge>
+              <span className="type-p3 text-muted-foreground">
+                Agenda, eksekusi tugas, rutinitas SOP, hingga pencatatan jam kerja.
               </span>
             </div>
           </div>
-          <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-2 xl:grid-cols-4">
-            {tabLabels.map(({ value, step, label, subtitle, icon: Icon }) => {
-              const isActive = activeTab === value;
-              return (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  className={`flex h-auto w-full items-start justify-between gap-3 rounded-xl border p-3 text-left transition-all ${
-                    isActive
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                      : "border-border bg-background/60 text-foreground hover:border-primary/40 hover:bg-accent/50"
-                  }`}
+
+          <Stepper
+            steps={tabLabels.map(({ label, subtitle }) => ({
+              label,
+              description: subtitle,
+            }))}
+            currentStep={activeStepIndex}
+            onStepClick={(stepIndex) => {
+              const target = tabLabels[stepIndex];
+              if (target) onTabChange(target.value);
+            }}
+            className="hidden md:flex"
+          />
+
+          <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-muted/60 p-1 sm:grid-cols-2 xl:grid-cols-4">
+            {tabLabels.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center justify-between gap-2 px-3 py-2"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="type-p2 truncate font-semibold">{label}</span>
+                </span>
+                <Badge
+                  variant={activeTab === value ? "secondary" : "gray"}
+                  className="shrink-0"
                 >
-                  <div className="flex min-w-0 items-start gap-2.5">
-                    <span
-                      className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                        isActive
-                          ? "bg-white/20 text-primary-foreground"
-                          : "bg-primary/10 text-primary"
-                      }`}
-                    >
-                      <Icon className="size-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <span
-                        className={`block text-[10px] font-bold uppercase tracking-wider ${
-                          isActive
-                            ? "text-primary-foreground/80"
-                            : "text-primary"
-                        }`}
-                      >
-                        {step}
-                      </span>
-                      <span className="block truncate text-xs font-bold sm:text-sm">
-                        {label}
-                      </span>
-                      <span
-                        className={`mt-0.5 block truncate text-[11px] ${
-                          isActive
-                            ? "text-primary-foreground/80"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {subtitle}
-                      </span>
-                    </div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      isActive
-                        ? "bg-white/20 text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {tabBadges[value]}
-                  </span>
-                </TabsTrigger>
-              );
-            })}
+                  {tabBadges[value]}
+                </Badge>
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 

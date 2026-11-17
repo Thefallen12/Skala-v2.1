@@ -1,6 +1,6 @@
 {
   "workbench.startupEditor": "readme",
-  "java.configuration.updateBuildConfiguration": "interactive",
+  "java.configuration.updateBuildConfiguration": "automatic",
   "java.import.gradle.java.home": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.13.9-hotspot",
   "java.configuration.runtimes": [
     {
@@ -8,5 +8,7 @@
       "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.13.9-hotspot",
       "default": true
     }
-  ]
+  ],
+  "prisma.pinToPrisma6": true,
+  "prisma.schemaPath": "prisma/schema.prisma"
 }

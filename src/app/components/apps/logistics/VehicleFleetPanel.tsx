@@ -1,9 +1,9 @@
 "use client";
-import { FormLabel } from "@/components/ui/label"
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Gauge, Pencil, Plus, Trash2, Truck } from "lucide-react";
+import { toast } from "sonner";
 import {
   addVehicle,
   deleteVehicle,
@@ -16,28 +16,47 @@ import {
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { NativeDataTable } from "@/components/ui/native-data-table";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const statusLabels: Record<VehicleStatus, string> = {
   AVAILABLE: "Tersedia",
   RESERVED: "Ditugaskan ke DO",
-  IN_USE: "Sedang digunakan",
-  MAINTENANCE: "Dalam perawatan",
+  IN_USE: "Sedang Digunakan",
+  MAINTENANCE: "Perawatan",
 };
 
-const statusVariants: Record<VehicleStatus, string> = {
-  AVAILABLE: "bg-green-50 text-green-700",
-  RESERVED: "bg-indigo-50 text-indigo-700",
-  IN_USE: "bg-blue-50 text-blue-700",
-  MAINTENANCE: "bg-amber-50 text-amber-700",
+const statusBadgeVariant: Record<
+  VehicleStatus,
+  "lightSuccess" | "lightInfo" | "lightPrimary" | "lightWarning"
+> = {
+  AVAILABLE: "lightSuccess",
+  RESERVED: "lightInfo",
+  IN_USE: "lightPrimary",
+  MAINTENANCE: "lightWarning",
 };
 
 function isVehicleStatus(value: string): value is VehicleStatus {
@@ -46,6 +65,83 @@ function isVehicleStatus(value: string): value is VehicleStatus {
     value === "RESERVED" ||
     value === "IN_USE" ||
     value === "MAINTENANCE"
+  );
+}
+
+function VehicleMobileCard({
+  vehicle,
+  canManage,
+  isPending,
+  onEdit,
+  onEditKilometer,
+  onDelete,
+}: {
+  vehicle: VehicleSummary;
+  canManage: boolean;
+  isPending: boolean;
+  onEdit: (vehicle: VehicleSummary) => void;
+  onEditKilometer: (vehicle: VehicleSummary) => void;
+  onDelete: (vehicle: VehicleSummary) => void;
+}) {
+  return (
+    <div className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="type-p1 font-mono font-bold text-foreground">
+            {vehicle.plateNumber}
+          </p>
+          <p className="type-p3 text-muted-foreground">
+            {vehicle.vehicleType}
+            {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
+            {vehicle.brand ? ` · ${vehicle.brand}` : ""}
+          </p>
+        </div>
+        <Badge variant={statusBadgeVariant[vehicle.status]} className="shrink-0">
+          {statusLabels[vehicle.status]}
+        </Badge>
+      </div>
+      <div className="flex items-center justify-between border-t border-border/60 pt-2">
+        <span className="type-p3 tabular-nums text-muted-foreground">
+          KM:{" "}
+          {vehicle.odometerInitialized
+            ? `${vehicle.currentKilometer} km`
+            : "Belum diatur"}
+        </span>
+        {canManage ? (
+          <div className="flex items-center gap-1.5">
+            <ActionIconButton
+              type="button"
+              label={`Edit kendaraan ${vehicle.plateNumber}`}
+              tooltip="Edit Kendaraan"
+              icon={Pencil}
+              disabled={isPending}
+              onClick={() => onEdit(vehicle)}
+            />
+            <ActionIconButton
+              type="button"
+              label={`Edit KM ${vehicle.plateNumber}`}
+              tooltip="Edit Kilometer"
+              icon={Gauge}
+              disabled={isPending}
+              onClick={() => onEditKilometer(vehicle)}
+            />
+            <ActionIconButton
+              type="button"
+              label={`Hapus kendaraan ${vehicle.plateNumber}`}
+              tooltip="Hapus Kendaraan"
+              icon={Trash2}
+              className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              disabled={
+                isPending ||
+                vehicle.status === "IN_USE" ||
+                vehicle.status === "RESERVED"
+              }
+              onClick={() => onDelete(vehicle)}
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -61,27 +157,26 @@ export default function VehicleFleetPanel({
   const [editingVehicle, setEditingVehicle] = useState<VehicleSummary | null>(
     null,
   );
+  const [formStatus, setFormStatus] = useState<VehicleStatus>("AVAILABLE");
   const [kilometerVehicle, setKilometerVehicle] =
     useState<VehicleSummary | null>(null);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<VehicleSummary | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const openAddDialog = () => {
     setEditingVehicle(null);
-    setMessage("");
+    setFormStatus("AVAILABLE");
     setDialogOpen(true);
   };
 
   const openEditDialog = (vehicle: VehicleSummary) => {
     setEditingVehicle(vehicle);
-    setMessage("");
+    setFormStatus(vehicle.status);
     setDialogOpen(true);
   };
 
   const openKilometerDialog = (vehicle: VehicleSummary) => {
     setKilometerVehicle(vehicle);
-    setMessage("");
   };
 
   const submitKilometer = (event: FormEvent<HTMLFormElement>) => {
@@ -90,32 +185,29 @@ export default function VehicleFleetPanel({
 
     const formData = new FormData(event.currentTarget);
     const kilometer = Number(formData.get("kilometer"));
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await updateVehicleKilometer(
           kilometerVehicle.id,
           kilometer,
         );
-        setMessage(result.message);
-        setIsError(!result.success);
         if (result.success) {
+          toast.success(result.message);
           setKilometerVehicle(null);
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Vehicle kilometer save failed:", error);
-        setMessage("Kilometer gagal diperbarui. Silakan coba kembali.");
-        setIsError(true);
+        toast.error("Kilometer gagal diperbarui. Silakan coba kembali.");
       }
     });
   };
 
   const submitVehicle = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const status = String(formData.get("status") ?? "AVAILABLE");
+    const formData = new FormData(event.currentTarget);
     const input: VehicleInput = {
       plateNumber: String(formData.get("plateNumber") ?? ""),
       vehicleType: String(formData.get("vehicleType") ?? ""),
@@ -124,49 +216,45 @@ export default function VehicleFleetPanel({
       ...(!editingVehicle || !editingVehicle.odometerInitialized
         ? { initialKilometer: Number(formData.get("initialKilometer")) }
         : {}),
-      ...(isVehicleStatus(status) ? { status } : {}),
+      ...(editingVehicle && isVehicleStatus(formStatus)
+        ? { status: formStatus }
+        : {}),
     };
 
-    setMessage("");
     startTransition(async () => {
       try {
         const result = editingVehicle
           ? await updateVehicle(editingVehicle.id, input)
           : await addVehicle(input);
-        setMessage(result.message);
-        setIsError(!result.success);
         if (result.success) {
+          toast.success(result.message);
           setDialogOpen(false);
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Vehicle save failed:", error);
-        setMessage("Kendaraan gagal disimpan. Silakan coba kembali.");
-        setIsError(true);
+        toast.error("Kendaraan gagal disimpan. Silakan coba kembali.");
       }
     });
   };
 
-  const handleDelete = (vehicle: VehicleSummary) => {
-    if (
-      !window.confirm(
-        `Hapus kendaraan ${vehicle.plateNumber} dari daftar armada?`,
-      )
-    ) {
-      return;
-    }
-
-    setMessage("");
+  const confirmDeleteVehicle = () => {
+    if (!deleteTarget) return;
     startTransition(async () => {
       try {
-        const result = await deleteVehicle(vehicle.id);
-        setMessage(result.message);
-        setIsError(!result.success);
-        if (result.success) router.refresh();
+        const result = await deleteVehicle(deleteTarget.id);
+        if (result.success) {
+          toast.success(result.message);
+          setDeleteTarget(null);
+          router.refresh();
+        } else {
+          toast.error(result.message);
+        }
       } catch (error) {
         console.error("Vehicle deletion failed:", error);
-        setMessage("Kendaraan gagal dihapus. Silakan coba kembali.");
-        setIsError(true);
+        toast.error("Kendaraan gagal dihapus. Silakan coba kembali.");
       }
     });
   };
@@ -174,277 +262,150 @@ export default function VehicleFleetPanel({
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>Data Kendaraan & Armada</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Kelola armada, model kendaraan, dan odometer terakhir.
+            <CardTitle className="type-h2">Data Armada</CardTitle>
+            <p className="type-p2 mt-1 text-muted-foreground">
+              Kelola daftar kendaraan, model, status ketersediaan, dan odometer terakhir.
             </p>
           </div>
           {canManage && (
             <Button type="button" onClick={openAddDialog}>
-              <Plus className="size-4" />
-              Tambah Kendaraan
+              <Plus className="size-4" aria-hidden="true" />
+              + Kendaraan
             </Button>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
-          {message && (
-            <p
-              className={`rounded-md border p-3 text-sm ${
-                isError
-                  ? "border-destructive text-destructive"
-                  : "border-green-200 text-green-800"
-              }`}
-              role={isError ? "alert" : "status"}
-            >
-              {message}
-            </p>
-          )}
-          {/* Mobile Card View (< 768px) */}
-          <div className="space-y-2.5 md:hidden">
-            {vehicles.map((vehicle) => (
-              <div
-                key={vehicle.id}
-                className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-mono text-sm font-bold text-foreground">
-                      {vehicle.plateNumber}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {vehicle.vehicleType}
-                      {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
-                      {vehicle.brand ? ` · ${vehicle.brand}` : ""}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className={`shrink-0 ${statusVariants[vehicle.status]}`}>
-                    {statusLabels[vehicle.status]}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs">
-                  <span className="text-muted-foreground">
-                    KM: {vehicle.odometerInitialized ? `${vehicle.currentKilometer} km` : "Belum diatur"}
-                  </span>
-                  {canManage && (
-                    <div className="flex items-center gap-1.5">
-                      <ActionIconButton
-                        type="button"
-                        label={`Edit kendaraan ${vehicle.plateNumber}`}
-                        tooltip={`Edit kendaraan ${vehicle.plateNumber}`}
-                        icon={Pencil}
-                        disabled={isPending}
-                        onClick={() => openEditDialog(vehicle)}
-                      />
-                      <ActionIconButton
-                        type="button"
-                        label={`Edit KM ${vehicle.plateNumber}`}
-                        tooltip={`Edit kilometer ${vehicle.plateNumber}`}
-                        icon={Gauge}
-                        disabled={isPending}
-                        onClick={() => openKilometerDialog(vehicle)}
-                      />
-                      <ActionIconButton
-                        type="button"
-                        label={`Hapus kendaraan ${vehicle.plateNumber}`}
-                        tooltip={`Hapus kendaraan ${vehicle.plateNumber}`}
-                        icon={Trash2}
-                        className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                        disabled={
-                          isPending ||
-                          vehicle.status === "IN_USE" ||
-                          vehicle.status === "RESERVED"
-                        }
-                        onClick={() => handleDelete(vehicle)}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {vehicles.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-                Belum ada kendaraan terdaftar.
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Table View (>= 768px) */}
-          <div className="hidden md:block">
-          <NativeDataTable itemLabel="kendaraan">
-            <table className="app-data-table w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="p-3">Nomor Plat</th>
-                      <th className="p-3">Jenis / Model</th>
-                  <th className="p-3">Merk</th>
-                      <th className="p-3">Kilometer Saat Ini</th>
-                      <th className="p-3">Status Ketersediaan</th>
-                      <th className="p-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
+          {vehicles.length === 0 ? (
+            <EmptyState
+              icon={Truck}
+              title="Belum Ada Armada"
+              description="Tambahkan kendaraan operasional untuk penugasan pengiriman logistik."
+              action={
+                canManage ? (
+                  <Button type="button" onClick={openAddDialog}>
+                    <Plus className="size-4" aria-hidden="true" />
+                    + Kendaraan
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              <div className="space-y-2.5 md:hidden">
                 {vehicles.map((vehicle) => (
-                  <tr className="border-b" key={vehicle.id}>
-                    <td className="p-3 font-semibold">{vehicle.plateNumber}</td>
-                    <td className="p-3">
-                      {vehicle.vehicleType}
-                      {vehicle.modelName && (
-                        <span className="block text-xs text-muted-foreground">
-                          {vehicle.modelName}
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3">{vehicle.brand || "—"}</td>
-                    <td className="p-3">
-                      {vehicle.odometerInitialized
-                        ? `${vehicle.currentKilometer} km`
-                        : "Belum diatur"}
-                    </td>
-                    <td className="p-3">
-                      <Badge
-                        variant="outline"
-                        className={statusVariants[vehicle.status]}
-                      >
-                        {statusLabels[vehicle.status]}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      {canManage ? (
-                        <div className="flex justify-end gap-2">
-                          <ActionIconButton
-                            type="button"
-                            label={`Edit kendaraan ${vehicle.plateNumber}`}
-                            tooltip={`Edit kendaraan ${vehicle.plateNumber}`}
-                            icon={Pencil}
-                            disabled={isPending}
-                            onClick={() => openEditDialog(vehicle)}
-                          />
-                          <ActionIconButton
-                            type="button"
-                            label={`Edit KM ${vehicle.plateNumber}`}
-                            tooltip={`Edit kilometer ${vehicle.plateNumber}`}
-                            icon={Gauge}
-                            disabled={isPending}
-                            onClick={() => openKilometerDialog(vehicle)}
-                          />
-                          <ActionIconButton
-                            type="button"
-                            label={`Hapus kendaraan ${vehicle.plateNumber}`}
-                            tooltip={`Hapus kendaraan ${vehicle.plateNumber}`}
-                            icon={Trash2}
-                            className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                            disabled={
-                              isPending ||
-                              vehicle.status === "IN_USE" ||
-                              vehicle.status === "RESERVED"
-                            }
-                            onClick={() => handleDelete(vehicle)}
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
+                  <VehicleMobileCard
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                    canManage={canManage}
+                    isPending={isPending}
+                    onEdit={openEditDialog}
+                    onEditKilometer={openKilometerDialog}
+                    onDelete={setDeleteTarget}
+                  />
                 ))}
-                {vehicles.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="p-10 text-center text-muted-foreground"
-                    >
-                      <Truck className="mx-auto mb-2 size-7 opacity-60" />
-                      Belum ada kendaraan terdaftar.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </NativeDataTable>
-          </div>
+              </div>
+
+              <div className="hidden md:block">
+                <Table itemLabel="kendaraan">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nomor Plat</TableHead>
+                      <TableHead>Jenis / Model</TableHead>
+                      <TableHead>Merk</TableHead>
+                      <TableHead>Kilometer</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vehicles.map((vehicle) => (
+                      <TableRow key={vehicle.id}>
+                        <TableCell className="type-p2 font-mono font-semibold">
+                          {vehicle.plateNumber}
+                        </TableCell>
+                        <TableCell className="whitespace-normal">
+                          <span className="type-p2 font-medium text-foreground">
+                            {vehicle.vehicleType}
+                          </span>
+                          {vehicle.modelName && (
+                            <span className="type-p3 block text-muted-foreground">
+                              {vehicle.modelName}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p2">
+                          {vehicle.brand || "—"}
+                        </TableCell>
+                        <TableCell className="type-p2 tabular-nums">
+                          {vehicle.odometerInitialized
+                            ? `${vehicle.currentKilometer} km`
+                            : "Belum diatur"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadgeVariant[vehicle.status]}>
+                            {statusLabels[vehicle.status]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canManage ? (
+                            <div className="flex justify-end gap-1.5">
+                              <ActionIconButton
+                                type="button"
+                                label={`Edit kendaraan ${vehicle.plateNumber}`}
+                                tooltip="Edit Kendaraan"
+                                icon={Pencil}
+                                disabled={isPending}
+                                onClick={() => openEditDialog(vehicle)}
+                              />
+                              <ActionIconButton
+                                type="button"
+                                label={`Edit KM ${vehicle.plateNumber}`}
+                                tooltip="Edit Kilometer"
+                                icon={Gauge}
+                                disabled={isPending}
+                                onClick={() => openKilometerDialog(vehicle)}
+                              />
+                              <ActionIconButton
+                                type="button"
+                                label={`Hapus kendaraan ${vehicle.plateNumber}`}
+                                tooltip="Hapus Kendaraan"
+                                icon={Trash2}
+                                className="border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                disabled={
+                                  isPending ||
+                                  vehicle.status === "IN_USE" ||
+                                  vehicle.status === "RESERVED"
+                                }
+                                onClick={() => setDeleteTarget(vehicle)}
+                              />
+                            </div>
+                          ) : (
+                            <span className="type-p2 text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {canManage && <GlobalModal
-        isOpen={dialogOpen}
-        onClose={() => {
-          if (!isPending) setDialogOpen(false);
-        }}
-        title={editingVehicle ? "Edit Kendaraan" : "Tambah Kendaraan"}
-        description="Masukkan data armada untuk digunakan pada pengiriman internal."
-        className="sm:max-w-xl"
-      >
-          <form id="vehicle-form" className="mt-6 space-y-4" onSubmit={submitVehicle}>
-            <FormLabel className="grid gap-1.5 text-sm font-medium">
-              Nomor plat
-              <Input
-                name="plateNumber"
-                required
-                maxLength={20}
-                placeholder="BL 1234 AB"
-                defaultValue={editingVehicle?.plateNumber ?? ""}
-              />
-            </FormLabel>
-            <FormLabel className="grid gap-1.5 text-sm font-medium">
-              Jenis kendaraan
-              <Input
-                name="vehicleType"
-                required
-                maxLength={80}
-                placeholder="Pick-up, Truk Engkel, Dump Truck"
-                defaultValue={editingVehicle?.vehicleType ?? ""}
-              />
-            </FormLabel>
-            <FormLabel className="grid gap-1.5 text-sm font-medium">
-              Merk
-              <Input
-                name="brand"
-                maxLength={80}
-                placeholder="Toyota, Mitsubishi"
-                defaultValue={editingVehicle?.brand ?? ""}
-              />
-            </FormLabel>
-            <FormLabel className="grid gap-1.5 text-sm font-medium">
-              Model
-              <Input
-                name="modelName"
-                maxLength={80}
-                placeholder="Hilux 2.4"
-                defaultValue={editingVehicle?.modelName ?? ""}
-              />
-            </FormLabel>
-            {(!editingVehicle || !editingVehicle.odometerInitialized) && (
-              <FormLabel className="grid gap-1.5 text-sm font-medium">
-                {editingVehicle ? "Inisialisasi KM awal" : "KM awal"}
-                <Input
-                  name="initialKilometer"
-                  type="number"
-                  min="0"
-                  step="0.001"
-                  required
-                  defaultValue={editingVehicle?.currentKilometer ?? "0"}
-                />
-              </FormLabel>
-            )}
-            {editingVehicle && (
-              <FormLabel className="grid gap-1.5 text-sm font-medium">
-                Status
-                <select
-                  className="h-10 rounded-md border bg-background px-3 font-normal"
-                  name="status"
-                  defaultValue={editingVehicle.status}
-                >
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </FormLabel>
-            )}
-            <div className="flex justify-end gap-2">
+      {canManage && (
+        <GlobalModal
+          isOpen={dialogOpen}
+          onClose={() => {
+            if (!isPending) setDialogOpen(false);
+          }}
+          title={editingVehicle ? "Edit Kendaraan" : "Tambah Kendaraan"}
+          description="Masukkan data armada untuk digunakan pada pengiriman internal."
+          className="sm:max-w-xl"
+          footer={
+            <>
               <Button
                 type="button"
                 variant="outline"
@@ -456,66 +417,222 @@ export default function VehicleFleetPanel({
               <Button type="submit" form="vehicle-form" disabled={isPending}>
                 {isPending ? "Menyimpan..." : "Simpan"}
               </Button>
-            </div>
-          </form>
-      </GlobalModal>}
-      {canManage && <GlobalModal
-        isOpen={kilometerVehicle !== null}
-        onClose={() => {
-          if (!isPending) setKilometerVehicle(null);
-        }}
-        title="Edit Kilometer Kendaraan"
-        description={
-          kilometerVehicle
-            ? `Perbarui odometer terakhir untuk ${kilometerVehicle.plateNumber}.`
-            : undefined
-        }
-        className="sm:max-w-lg"
-      >
-        <form
-          id="vehicle-kilometer-form"
-          className="mt-6 space-y-4"
-          onSubmit={submitKilometer}
+            </>
+          }
         >
-          <FormLabel className="grid gap-1.5 text-sm font-medium">
-            Kilometer saat ini
-            <Input
-              name="kilometer"
-              type="number"
-              min="0"
-              max="9999999999"
-              step="0.001"
-              required
-              autoFocus
-              defaultValue={kilometerVehicle?.currentKilometer ?? "0"}
-            />
-            <span className="text-xs font-normal text-muted-foreground">
-              Gunakan titik untuk nilai desimal, contoh: 18790.4 km.
-            </span>
-          </FormLabel>
-          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-            Nilai ini menjadi acuan KM untuk pencatatan perjalanan berikutnya.
-            Kendaraan yang terikat DO aktif tidak dapat diubah.
+          <form
+            key={editingVehicle?.id ?? "new-vehicle"}
+            id="vehicle-form"
+            className="space-y-4"
+            onSubmit={submitVehicle}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="vf-plate" className="type-p2 font-medium">
+                Nomor Plat <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="vf-plate"
+                name="plateNumber"
+                required
+                maxLength={20}
+                placeholder="BL 1234 AB"
+                defaultValue={editingVehicle?.plateNumber ?? ""}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="vf-type" className="type-p2 font-medium">
+                Jenis Kendaraan <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="vf-type"
+                name="vehicleType"
+                required
+                maxLength={80}
+                placeholder="Pick-up, Truk Engkel, Dump Truck"
+                defaultValue={editingVehicle?.vehicleType ?? ""}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="vf-brand" className="type-p2 font-medium">
+                  Merk
+                </Label>
+                <Input
+                  id="vf-brand"
+                  name="brand"
+                  maxLength={80}
+                  placeholder="Toyota, Mitsubishi"
+                  defaultValue={editingVehicle?.brand ?? ""}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="vf-model" className="type-p2 font-medium">
+                  Model
+                </Label>
+                <Input
+                  id="vf-model"
+                  name="modelName"
+                  maxLength={80}
+                  placeholder="Hilux 2.4"
+                  defaultValue={editingVehicle?.modelName ?? ""}
+                />
+              </div>
+            </div>
+
+            {(!editingVehicle || !editingVehicle.odometerInitialized) && (
+              <div className="space-y-1.5">
+                <Label htmlFor="vf-km" className="type-p2 font-medium">
+                  {editingVehicle ? "Inisialisasi KM Awal" : "KM Awal"}{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="vf-km"
+                  name="initialKilometer"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  required
+                  defaultValue={editingVehicle?.currentKilometer ?? "0"}
+                />
+              </div>
+            )}
+
+            {editingVehicle && (
+              <div className="space-y-1.5">
+                <Label htmlFor="vf-status" className="type-p2 font-medium">
+                  Status Ketersediaan
+                </Label>
+                <Select
+                  value={formStatus}
+                  onValueChange={(value) => {
+                    if (isVehicleStatus(value)) setFormStatus(value);
+                  }}
+                >
+                  <SelectTrigger id="vf-status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(statusLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </form>
+        </GlobalModal>
+      )}
+
+      {canManage && (
+        <GlobalModal
+          isOpen={kilometerVehicle !== null}
+          onClose={() => {
+            if (!isPending) setKilometerVehicle(null);
+          }}
+          title="Edit Kilometer Kendaraan"
+          description={
+            kilometerVehicle
+              ? `Perbarui odometer terakhir untuk ${kilometerVehicle.plateNumber}.`
+              : undefined
+          }
+          className="sm:max-w-lg"
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => setKilometerVehicle(null)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                form="vehicle-kilometer-form"
+                disabled={isPending}
+              >
+                {isPending ? "Menyimpan..." : "Simpan KM"}
+              </Button>
+            </>
+          }
+        >
+          <form
+            key={kilometerVehicle?.id ?? "km-form"}
+            id="vehicle-kilometer-form"
+            className="space-y-4"
+            onSubmit={submitKilometer}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="vk-km" className="type-p2 font-medium">
+                Kilometer Saat Ini
+              </Label>
+              <Input
+                id="vk-km"
+                name="kilometer"
+                type="number"
+                min="0"
+                max="9999999999"
+                step="0.001"
+                required
+                autoFocus
+                defaultValue={kilometerVehicle?.currentKilometer ?? "0"}
+              />
+              <p className="type-p3 text-muted-foreground">
+                Gunakan titik untuk nilai desimal, contoh: 18790.4 km.
+              </p>
+            </div>
+            <p className="type-p3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-800 dark:text-amber-200">
+              Nilai ini menjadi acuan KM untuk pencatatan perjalanan berikutnya.
+              Kendaraan yang terikat DO aktif tidak dapat diubah.
+            </p>
+          </form>
+        </GlobalModal>
+      )}
+
+      {canManage && (
+        <GlobalModal
+          isOpen={deleteTarget !== null}
+          onClose={() => {
+            if (!isPending) setDeleteTarget(null);
+          }}
+          title="Hapus Kendaraan?"
+          description={
+            deleteTarget
+              ? `Kendaraan ${deleteTarget.plateNumber} (${deleteTarget.vehicleType}) akan dihapus dari daftar armada.`
+              : undefined
+          }
+          className="sm:max-w-md"
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={isPending}
+                onClick={confirmDeleteVehicle}
+              >
+                {isPending ? "Menghapus..." : "Hapus"}
+              </Button>
+            </>
+          }
+        >
+          <p className="type-p2 text-muted-foreground">
+            Pastikan kendaraan ini tidak memiliki tugas DO aktif.
           </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setKilometerVehicle(null)}
-            >
-              Batal
-            </Button>
-            <Button
-              type="submit"
-              form="vehicle-kilometer-form"
-              disabled={isPending}
-            >
-              {isPending ? "Menyimpan..." : "Simpan KM"}
-            </Button>
-          </div>
-        </form>
-      </GlobalModal>}
+        </GlobalModal>
+      )}
     </>
   );
 }

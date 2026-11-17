@@ -166,13 +166,13 @@ const CurrentLocation = ({
         <MapPin className="size-3.5 shrink-0 text-secondary" aria-hidden="true" />
         <div className="grid min-w-0 flex-1">
           <span
-            className="line-clamp-2 max-w-full text-[10px] leading-tight sm:line-clamp-none sm:max-w-[13rem] sm:truncate sm:text-xs"
+            className="type-p3 line-clamp-2 max-w-full leading-tight sm:line-clamp-none sm:max-w-[13rem] sm:truncate"
             title={placeName}
           >
             {placeName}
           </span>
           {coordinateParts.length === 2 && (
-            <span className="flex flex-col text-[8px] font-medium leading-tight text-muted-foreground sm:flex-row sm:gap-1 sm:text-[10px] sm:leading-normal">
+            <span className="type-p3 flex flex-col font-medium leading-tight text-muted-foreground sm:flex-row sm:gap-1 sm:leading-normal">
               <span className="whitespace-nowrap">{coordinateParts[0]}</span>
               <span className="whitespace-nowrap">{coordinateParts[1]}</span>
             </span>
@@ -188,7 +188,7 @@ const CurrentLocation = ({
           onClick={openDevicePermissionsDialog}
           title="Ketuk untuk mengatur izin lokasi"
           aria-label={`${accessibleLabel}. Ketuk untuk mengatur izin lokasi.`}
-          className="inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-left text-xs font-medium text-amber-700 transition hover:bg-amber-500/20 dark:text-amber-300 sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
+          className="type-p3 inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-left font-medium text-amber-700 transition hover:bg-amber-500/20 dark:text-amber-300 sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
         >
           {content}
         </button>
@@ -197,7 +197,7 @@ const CurrentLocation = ({
 
     return (
       <div
-        className="inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-border bg-muted px-2 py-1 text-left text-xs font-medium text-foreground sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
+        className="type-p3 inline-flex h-full min-h-14 w-full min-w-0 items-center gap-1.5 rounded-lg border border-border bg-muted px-2 py-1 text-left font-medium text-foreground sm:h-auto sm:w-auto sm:min-h-0 sm:gap-2 sm:px-3 sm:py-1.5"
         aria-label={accessibleLabel}
         aria-live="polite"
       >
@@ -211,10 +211,10 @@ const CurrentLocation = ({
       <button
         type="button"
         onClick={openDevicePermissionsDialog}
-        className="mt-1 flex min-w-0 flex-col items-end leading-tight text-right underline decoration-dotted underline-offset-2"
+        className="mt-1 flex min-w-0 flex-col items-end text-right leading-tight underline decoration-dotted underline-offset-2"
         aria-label={`${accessibleLabel}. Ketuk untuk mengatur izin lokasi.`}
       >
-        <span className="max-w-full truncate text-[9px] font-semibold text-amber-600 dark:text-amber-400 sm:text-xs">
+        <span className="type-p3 max-w-full truncate font-semibold text-amber-600 dark:text-amber-400">
           {placeName} · Izinkan
         </span>
       </button>
@@ -227,11 +227,11 @@ const CurrentLocation = ({
       aria-label={accessibleLabel}
       aria-live="polite"
     >
-      <span className="max-w-full truncate text-[9px] font-semibold text-slate-500 dark:text-slate-400 sm:text-xs">
+      <span className="type-p3 max-w-full truncate font-semibold text-muted-foreground">
         {placeName}
       </span>
       {coordinates && (
-        <span className="whitespace-nowrap text-[8px] font-medium text-slate-500 dark:text-slate-400 sm:text-[10px]">
+        <span className="type-p3 whitespace-nowrap font-medium text-muted-foreground">
           {coordinates}
         </span>
       )}

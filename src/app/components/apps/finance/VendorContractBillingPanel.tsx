@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   CheckCircle2,
   CreditCard,
@@ -12,6 +13,7 @@ import {
   Loader2,
   Receipt,
   Search,
+  Ticket as TicketIcon,
 } from "lucide-react";
 import type { POPaymentMethod, PaymentType } from "@prisma/client";
 import {
@@ -37,6 +39,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,20 +84,30 @@ const paymentTypeLabel: Record<string, string> = {
 
 export default function VendorContractBillingPanel({
   contracts,
+  deliveries = [],
   vendorInvoices,
   financeAccounts,
   canManage,
   onPreviewProof,
+  initialInvoiceId,
+  onInitialInvoiceHandled,
 }: {
   contracts: MaterialContractRow[];
+  deliveries?: MaterialDeliveryRow[];
   vendorInvoices: VendorInvoiceRow[];
   financeAccounts: FinanceAccountOption[];
   canManage: boolean;
   onPreviewProof?: (url: string, label: string) => void;
+  initialInvoiceId?: string | null;
+  onInitialInvoiceHandled?: () => void;
 }) {
   const router = useRouter();
   const [showInactiveContracts, setShowInactiveContracts] = useState(false);
   const [contractSearch, setContractSearch] = useState("");
+  const [deliveryFilter, setDeliveryFilter] = useState<
+    "UNBILLED" | "BILLED" | "ALL"
+  >("UNBILLED");
+  const [deliverySearch, setDeliverySearch] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState<"OPEN" | "PAID" | "ALL">(
     "OPEN",
   );
@@ -124,6 +138,12 @@ export default function VendorContractBillingPanel({
     text: string;
     isError: boolean;
   } | null>(null);
+
+  const resolvedDetailInvoice =
+    detailInvoice ??
+    (initialInvoiceId
+      ? vendorInvoices.find((inv) => inv.id === initialInvoiceId) ?? null
+      : null);
 
   const openProof = (url: string, title: string) => {
     if (onPreviewProof) {
@@ -171,6 +191,33 @@ export default function VendorContractBillingPanel({
     });
   }, [contracts, showInactiveContracts, contractSearch]);
 
+  const filteredDeliveries = useMemo(() => {
+    const query = deliverySearch.trim().toLowerCase();
+    return deliveries.filter((delivery) => {
+      if (deliveryFilter !== "ALL" && delivery.billingStatus !== deliveryFilter) {
+        return false;
+      }
+      if (!query) return true;
+      return (
+        delivery.doNumber.toLowerCase().includes(query) ||
+        (delivery.ticketNumber ?? "").toLowerCase().includes(query) ||
+        delivery.vendorName.toLowerCase().includes(query) ||
+        delivery.projectName.toLowerCase().includes(query) ||
+        delivery.contractNumber.toLowerCase().includes(query) ||
+        delivery.materialType.toLowerCase().includes(query)
+      );
+    });
+  }, [deliveries, deliveryFilter, deliverySearch]);
+
+  const unbilledDeliveryRowsCount = useMemo(
+    () => deliveries.filter((d) => d.billingStatus === "UNBILLED").length,
+    [deliveries],
+  );
+  const billedDeliveryRowsCount = useMemo(
+    () => deliveries.filter((d) => d.billingStatus === "BILLED").length,
+    [deliveries],
+  );
+
   const filteredInvoices = useMemo(() => {
     const query = invoiceSearch.trim().toLowerCase();
     return vendorInvoices.filter((invoice) => {
@@ -183,6 +230,9 @@ export default function VendorContractBillingPanel({
         invoice.vendorName.toLowerCase().includes(query) ||
         invoice.projectNames.some((project) =>
           project.toLowerCase().includes(query),
+        ) ||
+        invoice.deliveries.some((d) =>
+          (d.ticketNumber ?? "").toLowerCase().includes(query),
         )
       );
     });
@@ -234,14 +284,12 @@ export default function VendorContractBillingPanel({
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border/80 bg-card p-4">
-        <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
-          <FileSpreadsheet className="size-4 text-primary" />
-          Tagihan Kontrak Vendor Material Curah (Blanket PO Pasir &amp; Batu)
+        <h2 className="type-h2 flex items-center gap-2 text-foreground">
+          <FileSpreadsheet className="size-5 text-primary" aria-hidden="true" />
+          Material Alam &amp; Kontrak Curah
         </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Cocokkan daftar Surat Jalan (DO) lintas proyek berstatus UNBILLED dengan
-          tagihan fisik vendor untuk menerbitkan Tagihan Kumulatif (VendorInvoice)
-          dan memproses pembayaran DP / Termin / Pelunasan.
+        <p className="type-p3 mt-1 text-muted-foreground">
+          Cocokkan Surat Jalan (DO) lintas proyek berstatus UNBILLED dengan invoice vendor, lalu proses DP, Termin, atau Pelunasan.
         </p>
       </div>
 
@@ -249,40 +297,40 @@ export default function VendorContractBillingPanel({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-border/80 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs">
-              Kontrak Payung Aktif
+            <CardDescription className="type-p3">
+              Kontrak Aktif
             </CardDescription>
-            <CardTitle className="text-xl font-bold">
+            <CardTitle className="type-kpi">
               {activeContracts.length} Kontrak
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-amber-500/30 bg-amber-500/5 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs text-amber-700 dark:text-amber-300">
-              DO Siap Ditagih (UNBILLED)
+            <CardDescription className="type-p3 text-amber-700 dark:text-amber-300">
+              DO Siap Ditagih ({totalUnbilledDos} DO)
             </CardDescription>
-            <CardTitle className="text-xl font-bold text-amber-700 dark:text-amber-300">
-              {totalUnbilledDos} DO · {currency(totalUnbilledEstimate)}
+            <CardTitle className="type-kpi text-amber-700 dark:text-amber-300">
+              {currency(totalUnbilledEstimate)}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-rose-500/30 bg-rose-500/5 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs text-rose-700 dark:text-rose-300">
+            <CardDescription className="type-p3 text-rose-700 dark:text-rose-300">
               Tagihan Belum Lunas ({openInvoices.length})
             </CardDescription>
-            <CardTitle className="text-xl font-bold text-rose-700 dark:text-rose-300">
+            <CardTitle className="type-kpi text-rose-700 dark:text-rose-300">
               {currency(totalOutstandingAmount)}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-emerald-500/30 bg-emerald-500/5 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs text-emerald-700 dark:text-emerald-300">
-              Total Sudah Dibayar ({paidInvoices.length} Lunas)
+            <CardDescription className="type-p3 text-emerald-700 dark:text-emerald-300">
+              Sudah Dibayar ({paidInvoices.length} Lunas)
             </CardDescription>
-            <CardTitle className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+            <CardTitle className="type-kpi text-emerald-700 dark:text-emerald-300">
               {currency(totalPaidAmount)}
             </CardTitle>
           </CardHeader>
@@ -291,7 +339,7 @@ export default function VendorContractBillingPanel({
 
       {feedback && (
         <div
-          className={`rounded-lg border px-4 py-2.5 text-xs font-medium ${
+          className={`type-p2 rounded-lg border px-4 py-2.5 font-medium ${
             feedback.isError
               ? "border-destructive/40 bg-destructive/10 text-destructive"
               : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
@@ -305,17 +353,16 @@ export default function VendorContractBillingPanel({
       <Card className="border-border/80 shadow-2xs">
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2 text-sm font-bold">
-              <Layers className="size-4 text-primary" />
-              1. Kontrak Material Vendor — Buat Tagihan dari Surat Jalan UNBILLED
+            <CardTitle className="type-h3 flex items-center gap-2">
+              <Layers className="size-4 text-primary" aria-hidden="true" />
+              1. Kontrak Material Vendor
             </CardTitle>
-            <CardDescription className="text-xs">
-              Klik &ldquo;Buat Tagihan&rdquo; pada vendor untuk menarik semua Surat
-              Jalan lapangan berstatus UNBILLED.
+            <CardDescription className="type-p3">
+              Klik &ldquo;Buat Tagihan&rdquo; untuk menarik Surat Jalan (DO) berstatus UNBILLED.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <label className="type-p3 flex cursor-pointer items-center gap-2 text-muted-foreground">
               <Checkbox
                 checked={showInactiveContracts}
                 onCheckedChange={(checked) =>
@@ -325,12 +372,12 @@ export default function VendorContractBillingPanel({
               Tampilkan nonaktif
             </label>
             <div className="relative w-56">
-              <Search className="pointer-events-none absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={contractSearch}
                 onChange={(event) => setContractSearch(event.target.value)}
                 placeholder="Cari kontrak / vendor..."
-                className="h-8 pl-8 text-xs"
+                className="pl-9"
               />
             </div>
           </div>
@@ -338,10 +385,11 @@ export default function VendorContractBillingPanel({
 
         <CardContent>
           {visibleContracts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
-              Belum ada kontrak material aktif. Kontrak dibuat oleh tim Logistik
-              pada menu Logistik &rarr; Kontrak Curah.
-            </div>
+            <EmptyState
+              icon={Layers}
+              title="Belum ada kontrak material"
+              description="Kontrak material dibuat oleh tim Logistik pada menu Kontrak Curah."
+            />
           ) : (
             <>
               {/* Mobile Card View (< 768px) */}
@@ -353,46 +401,60 @@ export default function VendorContractBillingPanel({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-foreground">
+                        <p className="type-p1 font-bold text-foreground">
                           {contract.vendorName}
                         </p>
-                        <p className="font-mono text-xs text-muted-foreground">
+                        <p className="type-p3 font-mono text-muted-foreground">
                           {contract.contractNumber} · {contract.materialType}
                         </p>
                       </div>
                       <Badge
                         variant={contract.isActive ? "success" : "outline"}
-                        className="shrink-0 text-[10px]"
+                        className="shrink-0"
                       >
                         {contract.isActive ? "Aktif" : "Nonaktif"}
                       </Badge>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2.5">
                       <div>
-                        <span className="text-[10px] text-muted-foreground">DO Belum Ditagih</span>
-                        <p className="font-semibold text-foreground">
-                          {contract.unbilledDeliveriesCount} DO ({formatMaterialVolume(contract.unbilledVolume, contract.unit)})
+                        <span className="type-p3 text-muted-foreground">
+                          DO Belum Ditagih
+                        </span>
+                        <p className="type-p2 font-semibold text-foreground">
+                          {contract.unbilledDeliveriesCount} DO (
+                          {formatMaterialVolume(
+                            contract.unbilledVolume,
+                            contract.unit,
+                          )}
+                          )
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className="text-[10px] text-muted-foreground">Estimasi Tagihan</span>
-                        <p className="font-mono font-bold text-primary">
+                        <span className="type-p3 text-muted-foreground">
+                          Estimasi
+                        </span>
+                        <p className="type-p2 font-mono font-bold text-primary">
                           {currency(contract.unbilledEstimatedAmount)}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{currency(contract.unitPrice)} / {contract.unit}</span>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="type-p3">
+                        {currency(contract.unitPrice)} / {contract.unit}
+                      </span>
                       {canManage && (
                         <Button
                           type="button"
                           size="sm"
-                          variant={contract.unbilledDeliveriesCount > 0 ? "default" : "outline"}
+                          variant={
+                            contract.unbilledDeliveriesCount > 0
+                              ? "default"
+                              : "outline"
+                          }
                           disabled={contract.unbilledDeliveriesCount === 0}
                           onClick={() => openCreateInvoiceModal(contract)}
-                          className="h-8 gap-1.5 text-xs"
                         >
-                          <ListChecks className="size-3.5" />
+                          <ListChecks className="size-3.5" aria-hidden="true" />
                           Buat Tagihan
                         </Button>
                       )}
@@ -402,106 +464,358 @@ export default function VendorContractBillingPanel({
               </div>
 
               {/* Desktop Table View (>= 768px) */}
-              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Vendor &amp; No. Kontrak</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead className="text-right">Harga Satuan</TableHead>
-                    <TableHead className="text-right">DO Belum Ditagih</TableHead>
-                    <TableHead className="text-right">Volume UNBILLED</TableHead>
-                    <TableHead className="text-right">Estimasi Tagihan</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi Keuangan</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleContracts.map((contract) => (
-                    <TableRow key={contract.id}>
-                      <TableCell>
-                        <div className="text-xs font-bold">
-                          {contract.vendorName}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {contract.contractNumber}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[10px]">
-                          {contract.materialType}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                        {currency(contract.unitPrice)} / {contract.unit}
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-bold">
-                        {contract.unbilledDeliveriesCount > 0 ? (
-                          <Badge variant="warning">
-                            {contract.unbilledDeliveriesCount} DO
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">0 DO</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                        {formatMaterialVolume(
-                          contract.unbilledVolume,
-                          contract.unit,
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs font-bold text-primary">
-                        {currency(contract.unbilledEstimatedAmount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={contract.isActive ? "success" : "outline"}
-                          className="text-[10px]"
-                        >
-                          {contract.isActive ? "Aktif" : "Nonaktif"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canManage && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={
-                              contract.unbilledDeliveriesCount > 0
-                                ? "default"
-                                : "outline"
-                            }
-                            disabled={contract.unbilledDeliveriesCount === 0}
-                            onClick={() => openCreateInvoiceModal(contract)}
-                            className="h-8 gap-1.5 text-xs"
-                          >
-                            <ListChecks className="size-3.5" />
-                            Buat Tagihan
-                          </Button>
-                        )}
-                      </TableCell>
+              <div className="hidden md:block">
+                <Table pageSize={10} itemLabel="kontrak">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vendor &amp; No. Kontrak</TableHead>
+                      <TableHead>Material</TableHead>
+                      <TableHead className="text-right">Harga Satuan</TableHead>
+                      <TableHead className="text-right">DO UNBILLED</TableHead>
+                      <TableHead className="text-right">Volume UNBILLED</TableHead>
+                      <TableHead className="text-right">Estimasi</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleContracts.map((contract) => (
+                      <TableRow key={contract.id}>
+                        <TableCell>
+                          <div className="type-p2 font-bold">
+                            {contract.vendorName}
+                          </div>
+                          <div className="type-p3 text-muted-foreground">
+                            {contract.contractNumber}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {contract.materialType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
+                          {currency(contract.unitPrice)} / {contract.unit}
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {contract.unbilledDeliveriesCount > 0 ? (
+                            <Badge variant="warning">
+                              {contract.unbilledDeliveriesCount} DO
+                            </Badge>
+                          ) : (
+                            <span className="type-p3 text-muted-foreground">
+                              0 DO
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
+                          {formatMaterialVolume(
+                            contract.unbilledVolume,
+                            contract.unit,
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-bold text-primary tabular-nums">
+                          {currency(contract.unbilledEstimatedAmount)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={contract.isActive ? "success" : "outline"}
+                          >
+                            {contract.isActive ? "Aktif" : "Nonaktif"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canManage && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={
+                                contract.unbilledDeliveriesCount > 0
+                                  ? "default"
+                                  : "outline"
+                              }
+                              disabled={contract.unbilledDeliveriesCount === 0}
+                              onClick={() => openCreateInvoiceModal(contract)}
+                            >
+                              <ListChecks className="size-3.5" aria-hidden="true" />
+                              Buat Tagihan
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* Section 2: VendorInvoices & Payments */}
+      {/* Section 2: Surat Jalan (DO) Material Alam per Tiket & Proyek */}
       <Card className="border-border/80 shadow-2xs">
         <CardHeader className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2 text-sm font-bold">
-                <Receipt className="size-4 text-primary" />
-                2. Daftar Tagihan Kontrak Vendor &amp; Pembayaran
+              <CardTitle className="type-h3 flex items-center gap-2">
+                <TicketIcon className="size-4 text-primary" aria-hidden="true" />
+                2. Surat Jalan Material Alam (DO &amp; Referensi Tiket)
               </CardTitle>
-              <CardDescription className="text-xs">
-                Kelola tagihan kumulatif dan proses pembayaran DP, Termin, atau
-                Pelunasan melalui buku kas/bank.
+              <CardDescription className="type-p3">
+                Pantau seluruh kiriman DO lapangan per Tiket, Proyek, Supplier, Volume, Nominal, dan Foto Surat Jalan.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  { id: "UNBILLED", label: `UNBILLED (${unbilledDeliveryRowsCount})` },
+                  { id: "BILLED", label: `BILLED (${billedDeliveryRowsCount})` },
+                  { id: "ALL", label: `Semua (${deliveries.length})` },
+                ] as const
+              ).map((tab) => (
+                <Button
+                  key={tab.id}
+                  type="button"
+                  size="sm"
+                  variant={deliveryFilter === tab.id ? "default" : "outline"}
+                  onClick={() => setDeliveryFilter(tab.id)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative max-w-sm">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={deliverySearch}
+              onChange={(event) => setDeliverySearch(event.target.value)}
+              placeholder="Cari Tiket, No. DO, supplier, proyek..."
+              className="pl-9"
+            />
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {filteredDeliveries.length === 0 ? (
+            <EmptyState
+              icon={FileSpreadsheet}
+              title="Belum ada Surat Jalan pada filter ini"
+              description="Surat Jalan yang dicatat oleh lapangan atau logistik akan muncul di sini."
+            />
+          ) : (
+            <>
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
+                {filteredDeliveries.map((delivery) => (
+                  <div
+                    key={delivery.id}
+                    className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="type-p2 font-mono font-bold text-primary">
+                            {delivery.doNumber}
+                          </span>
+                          {delivery.ticketNumber && (
+                            <Badge variant="outline" className="font-mono">
+                              Tiket {delivery.ticketNumber}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="type-p2 mt-0.5 font-semibold text-foreground">
+                          {delivery.vendorName} · {delivery.materialType}
+                        </p>
+                        <p className="type-p3 text-muted-foreground">
+                          {delivery.projectName}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          delivery.billingStatus === "UNBILLED"
+                            ? "warning"
+                            : "success"
+                        }
+                        className="shrink-0"
+                      >
+                        {delivery.billingStatus}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2.5">
+                      <div>
+                        <span className="type-p3 text-muted-foreground">
+                          Volume ({delivery.deliveryDate})
+                        </span>
+                        <p className="type-p2 font-semibold text-foreground tabular-nums">
+                          {formatMaterialVolume(
+                            delivery.quantityReceived,
+                            delivery.unit,
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="type-p3 text-muted-foreground">
+                          Nominal Estimasi
+                        </span>
+                        <p className="type-p2 font-bold text-primary tabular-nums">
+                          {currency(delivery.estimatedAmount)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="type-p3 text-muted-foreground">
+                        {delivery.vendorInvoiceNumber
+                          ? `Invoice: ${delivery.vendorInvoiceNumber}`
+                          : `Kontrak ${delivery.contractNumber}`}
+                      </span>
+                      {delivery.proofUrl ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            openProof(
+                              delivery.proofUrl!,
+                              `Foto DO ${delivery.doNumber}`,
+                            )
+                          }
+                        >
+                          <Eye className="size-3.5" aria-hidden="true" />
+                          Foto SJ
+                        </Button>
+                      ) : (
+                        <span className="type-p3 text-muted-foreground">
+                          Tanpa foto
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden md:block">
+                <Table pageSize={10} itemLabel="Surat Jalan">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal &amp; No. DO</TableHead>
+                      <TableHead>Tiket</TableHead>
+                      <TableHead>Proyek</TableHead>
+                      <TableHead>Supplier &amp; Kontrak</TableHead>
+                      <TableHead className="text-right">Volume</TableHead>
+                      <TableHead className="text-right">Nominal</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Foto SJ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDeliveries.map((delivery) => (
+                      <TableRow key={delivery.id}>
+                        <TableCell>
+                          <div className="type-p2 font-bold text-foreground">
+                            {delivery.doNumber}
+                          </div>
+                          <div className="type-p3 text-muted-foreground">
+                            {delivery.deliveryDate}
+                            {delivery.vehiclePlate
+                              ? ` · ${delivery.vehiclePlate}`
+                              : ""}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {delivery.ticketNumber ? (
+                            <Badge variant="outline" className="font-mono">
+                              {delivery.ticketNumber}
+                            </Badge>
+                          ) : (
+                            <span className="type-p3 text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p2 max-w-[200px] truncate">
+                          {delivery.projectName}
+                        </TableCell>
+                        <TableCell>
+                          <div className="type-p2 font-semibold text-foreground">
+                            {delivery.vendorName}
+                          </div>
+                          <div className="type-p3 text-muted-foreground">
+                            {delivery.contractNumber} ({delivery.materialType})
+                          </div>
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
+                          {formatMaterialVolume(
+                            delivery.quantityReceived,
+                            delivery.unit,
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-bold tabular-nums">
+                          {currency(delivery.estimatedAmount)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              delivery.billingStatus === "UNBILLED"
+                                ? "warning"
+                                : "success"
+                            }
+                          >
+                            {delivery.billingStatus}
+                          </Badge>
+                          {delivery.vendorInvoiceNumber && (
+                            <span className="type-p3 mt-0.5 block text-muted-foreground">
+                              {delivery.vendorInvoiceNumber}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {delivery.proofUrl ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                openProof(
+                                  delivery.proofUrl!,
+                                  `Foto DO ${delivery.doNumber}`,
+                                )
+                              }
+                            >
+                              <Eye className="size-3.5" aria-hidden="true" />
+                              Lihat
+                            </Button>
+                          ) : (
+                            <span className="type-p3 text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 3: VendorInvoices & Payments */}
+      <Card className="border-border/80 shadow-2xs">
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="type-h3 flex items-center gap-2">
+                <Receipt className="size-4 text-primary" aria-hidden="true" />
+                3. Daftar Tagihan Kontrak Vendor &amp; Pembayaran
+              </CardTitle>
+              <CardDescription className="type-p3">
+                Kelola tagihan kumulatif dan proses DP, Termin, atau Pelunasan melalui buku kas/bank.
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -512,7 +826,6 @@ export default function VendorContractBillingPanel({
                   size="sm"
                   variant={invoiceFilter === status ? "default" : "outline"}
                   onClick={() => setInvoiceFilter(status)}
-                  className="h-8 text-xs"
                 >
                   {status === "OPEN"
                     ? `Belum Lunas (${openInvoices.length})`
@@ -525,27 +838,36 @@ export default function VendorContractBillingPanel({
           </div>
 
           <div className="relative max-w-sm">
-            <Search className="pointer-events-none absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={invoiceSearch}
               onChange={(event) => setInvoiceSearch(event.target.value)}
-              placeholder="Cari No. Tagihan, vendor, kontrak, atau proyek..."
-              className="h-8 pl-8 text-xs"
+              placeholder="Cari No. Tagihan, tiket, vendor, proyek..."
+              className="pl-9"
             />
           </div>
         </CardHeader>
 
         <CardContent>
           {filteredInvoices.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-              Tidak ada tagihan kontrak vendor pada filter ini.
-            </div>
+            <EmptyState
+              icon={Receipt}
+              title="Tidak ada tagihan kontrak vendor"
+              description="Tagihan yang diterbitkan dari Surat Jalan (DO) akan tampil di daftar ini."
+            />
           ) : (
             <>
               {/* Mobile Card View (< 768px) */}
               <div className="space-y-2.5 md:hidden">
                 {filteredInvoices.map((invoice) => {
                   const badge = invoiceStatusBadge[invoice.status];
+                  const ticketNumbers = Array.from(
+                    new Set(
+                      invoice.deliveries
+                        .map((d) => d.ticketNumber)
+                        .filter((t): t is string => Boolean(t)),
+                    ),
+                  );
                   return (
                     <div
                       key={invoice.id}
@@ -553,42 +875,56 @@ export default function VendorContractBillingPanel({
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-mono text-xs font-bold text-primary">
+                          <p className="type-p2 font-mono font-bold text-primary">
                             {invoice.invoiceNumber}
                           </p>
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="type-p1 font-semibold text-foreground">
                             {invoice.vendorName}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {invoice.contractNumber} ({invoice.materialType}) · {invoice.deliveryCount} SJ
+                          <p className="type-p3 text-muted-foreground">
+                            {invoice.contractNumber} ({invoice.materialType}) ·{" "}
+                            {invoice.deliveryCount} DO
                           </p>
+                          {ticketNumbers.length > 0 && (
+                            <p className="type-p3 mt-0.5 font-mono text-primary">
+                              Tiket: {ticketNumbers.join(", ")}
+                            </p>
+                          )}
                         </div>
-                        <Badge variant={badge.variant} className="shrink-0 text-[10px]">
+                        <Badge variant={badge.variant} className="shrink-0">
                           {badge.label}
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-xs">
+                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2.5">
                         <div>
-                          <span className="text-[10px] text-muted-foreground">Total</span>
-                          <p className="font-bold tabular-nums">{currency(invoice.grandTotal)}</p>
+                          <span className="type-p3 text-muted-foreground">
+                            Total
+                          </span>
+                          <p className="type-p2 font-bold tabular-nums">
+                            {currency(invoice.grandTotal)}
+                          </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground">Terbayar</span>
-                          <p className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                          <span className="type-p3 text-muted-foreground">
+                            Terbayar
+                          </span>
+                          <p className="type-p2 font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                             {currency(invoice.paidAmount)}
                           </p>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground">Sisa</span>
-                          <p className="font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                          <span className="type-p3 text-muted-foreground">
+                            Sisa
+                          </span>
+                          <p className="type-p2 font-semibold tabular-nums text-rose-600 dark:text-rose-400">
                             {currency(invoice.remainingAmount)}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="type-p3 text-muted-foreground">
                           {invoice.createdAt.slice(0, 10)}
                           {invoice.dueDate ? ` · JT ${invoice.dueDate}` : ""}
                         </span>
@@ -598,9 +934,8 @@ export default function VendorContractBillingPanel({
                             size="sm"
                             variant="outline"
                             onClick={() => setDetailInvoice(invoice)}
-                            className="h-8 gap-1 text-xs"
                           >
-                            <Eye className="size-3.5" />
+                            <Eye className="size-3.5" aria-hidden="true" />
                             Rincian
                           </Button>
                           {canManage && invoice.status !== "PAID" && (
@@ -608,9 +943,8 @@ export default function VendorContractBillingPanel({
                               type="button"
                               size="sm"
                               onClick={() => setPayingInvoice(invoice)}
-                              className="h-8 gap-1 text-xs"
                             >
-                              <CreditCard className="size-3.5" />
+                              <CreditCard className="size-3.5" aria-hidden="true" />
                               Bayar
                             </Button>
                           )}
@@ -622,109 +956,117 @@ export default function VendorContractBillingPanel({
               </div>
 
               {/* Desktop Table View (>= 768px) */}
-              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>No. Tagihan &amp; Jatuh Tempo</TableHead>
-                    <TableHead>Vendor &amp; Kontrak</TableHead>
-                    <TableHead>Cakupan DO &amp; Proyek</TableHead>
-                    <TableHead className="text-right">Total Volume</TableHead>
-                    <TableHead className="text-right">Total Tagihan</TableHead>
-                    <TableHead className="text-right">Terbayar / Sisa</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInvoices.map((invoice) => {
-                    const badge = invoiceStatusBadge[invoice.status];
-                    return (
-                      <TableRow key={invoice.id}>
-                        <TableCell>
-                          <div className="text-xs font-bold">
-                            {invoice.invoiceNumber}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Dibuat: {invoice.createdAt.slice(0, 10)}
-                            {invoice.dueDate
-                              ? ` · JT ${invoice.dueDate}`
-                              : ""}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-xs font-semibold">
-                            {invoice.vendorName}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {invoice.contractNumber} ({invoice.materialType})
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            type="button"
-                            onClick={() => setDetailInvoice(invoice)}
-                            className="text-left text-xs font-medium text-primary underline-offset-2 hover:underline"
-                          >
-                            {invoice.deliveryCount} Surat Jalan
-                          </button>
-                          <div className="max-w-[210px] truncate text-[11px] text-muted-foreground">
-                            {invoice.projectNames.join(", ") || "-"}
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                          {formatMaterialVolume(
-                            invoice.totalQuantity,
-                            invoice.unit,
-                          )}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-xs font-bold">
-                          {currency(invoice.grandTotal)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-xs">
-                          <div className="font-medium text-emerald-700 dark:text-emerald-300">
-                            {currency(invoice.paidAmount)}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Sisa: {currency(invoice.remainingAmount)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={badge.variant} className="text-[10px]">
-                            {badge.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
+              <div className="hidden md:block">
+                <Table pageSize={10} itemLabel="tagihan vendor">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No. Tagihan &amp; Jatuh Tempo</TableHead>
+                      <TableHead>Vendor &amp; Kontrak</TableHead>
+                      <TableHead>Cakupan DO, Tiket &amp; Proyek</TableHead>
+                      <TableHead className="text-right">Total Volume</TableHead>
+                      <TableHead className="text-right">Total Tagihan</TableHead>
+                      <TableHead className="text-right">Terbayar / Sisa</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredInvoices.map((invoice) => {
+                      const badge = invoiceStatusBadge[invoice.status];
+                      const ticketNumbers = Array.from(
+                        new Set(
+                          invoice.deliveries
+                            .map((d) => d.ticketNumber)
+                            .filter((t): t is string => Boolean(t)),
+                        ),
+                      );
+                      return (
+                        <TableRow key={invoice.id}>
+                          <TableCell>
+                            <div className="type-p2 font-bold">
+                              {invoice.invoiceNumber}
+                            </div>
+                            <div className="type-p3 text-muted-foreground">
+                              {invoice.createdAt.slice(0, 10)}
+                              {invoice.dueDate
+                                ? ` · JT ${invoice.dueDate}`
+                                : ""}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="type-p2 font-semibold">
+                              {invoice.vendorName}
+                            </div>
+                            <div className="type-p3 text-muted-foreground">
+                              {invoice.contractNumber} ({invoice.materialType})
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <button
                               type="button"
-                              size="sm"
-                              variant="outline"
                               onClick={() => setDetailInvoice(invoice)}
-                              className="h-8 gap-1 text-xs"
+                              className="type-p2 text-left font-medium text-primary underline-offset-2 hover:underline"
                             >
-                              <Eye className="size-3.5" />
-                              Rincian
-                            </Button>
-                            {canManage && invoice.status !== "PAID" && (
+                              {invoice.deliveryCount} Surat Jalan
+                            </button>
+                            {ticketNumbers.length > 0 && (
+                              <div className="type-p3 font-mono text-foreground">
+                                Tiket: {ticketNumbers.join(", ")}
+                              </div>
+                            )}
+                            <div className="type-p3 max-w-[210px] truncate text-muted-foreground">
+                              {invoice.projectNames.join(", ") || "-"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
+                            {formatMaterialVolume(
+                              invoice.totalQuantity,
+                              invoice.unit,
+                            )}
+                          </TableCell>
+                          <TableCell className="type-p2 whitespace-nowrap text-right font-bold tabular-nums">
+                            {currency(invoice.grandTotal)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-right">
+                            <div className="type-p2 font-medium text-emerald-700 dark:text-emerald-300 tabular-nums">
+                              {currency(invoice.paidAmount)}
+                            </div>
+                            <div className="type-p3 text-muted-foreground tabular-nums">
+                              Sisa: {currency(invoice.remainingAmount)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 type="button"
                                 size="sm"
-                                onClick={() => setPayingInvoice(invoice)}
-                                className="h-8 gap-1 text-xs"
+                                variant="outline"
+                                onClick={() => setDetailInvoice(invoice)}
                               >
-                                <CreditCard className="size-3.5" />
-                                Bayar
+                                <Eye className="size-3.5" aria-hidden="true" />
+                                Rincian
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                              {canManage && invoice.status !== "PAID" && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => setPayingInvoice(invoice)}
+                                >
+                                  <CreditCard className="size-3.5" aria-hidden="true" />
+                                  Bayar
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </>
           )}
         </CardContent>
@@ -735,7 +1077,7 @@ export default function VendorContractBillingPanel({
         isOpen={builderOpen}
         onClose={() => setBuilderOpen(false)}
         onOpenChange={setBuilderOpen}
-        title="Buat Tagihan Kontrak Vendor (Akumulasi Surat Jalan)"
+        title="Buat Tagihan Kontrak Vendor"
         description={
           builderContract
             ? `${builderContract.vendorName} · ${builderContract.contractNumber} · ${currency(builderContract.unitPrice)} / ${builderContract.unit}`
@@ -751,9 +1093,10 @@ export default function VendorContractBillingPanel({
             loading={builderLoading}
             loadError={builderError}
             onClose={() => setBuilderOpen(false)}
-            onPreviewProof={(url, title) => setLocalPreview({ url, title })}
+            onPreviewProof={(url, title) => openProof(url, title)}
             onCreated={(message) => {
               setFeedback({ text: message, isError: false });
+              toast.success(message);
               setBuilderOpen(false);
               router.refresh();
             }}
@@ -763,66 +1106,70 @@ export default function VendorContractBillingPanel({
 
       {/* Invoice Detail Modal (included DOs + Payment Receipts) */}
       <GlobalModal
-        isOpen={Boolean(detailInvoice)}
-        onClose={() => setDetailInvoice(null)}
+        isOpen={Boolean(resolvedDetailInvoice)}
+        onClose={() => {
+          setDetailInvoice(null);
+          onInitialInvoiceHandled?.();
+        }}
         title={
-          detailInvoice
-            ? `Rincian Tagihan ${detailInvoice.invoiceNumber}`
+          resolvedDetailInvoice
+            ? `Rincian Tagihan ${resolvedDetailInvoice.invoiceNumber}`
             : "Rincian Tagihan"
         }
         description={
-          detailInvoice
-            ? `${detailInvoice.vendorName} · Kontrak ${detailInvoice.contractNumber} (${currency(detailInvoice.unitPrice)}/${detailInvoice.unit})`
+          resolvedDetailInvoice
+            ? `${resolvedDetailInvoice.vendorName} · Kontrak ${resolvedDetailInvoice.contractNumber} (${currency(resolvedDetailInvoice.unitPrice)}/${resolvedDetailInvoice.unit})`
             : ""
         }
         className="sm:max-w-3xl"
       >
-        {detailInvoice && (
+        {resolvedDetailInvoice && (
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-                <p className="text-[11px] text-muted-foreground">Total Kuantitas</p>
-                <p className="text-sm font-bold">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="type-p3 text-muted-foreground">Total Kuantitas</p>
+                <p className="type-p1 font-bold">
                   {formatMaterialVolume(
-                    detailInvoice.totalQuantity,
-                    detailInvoice.unit,
+                    resolvedDetailInvoice.totalQuantity,
+                    resolvedDetailInvoice.unit,
                   )}
                 </p>
               </div>
-              <div className="rounded-lg border border-border bg-muted/20 p-2.5">
-                <p className="text-[11px] text-muted-foreground">Grand Total</p>
-                <p className="text-sm font-bold">
-                  {currency(detailInvoice.grandTotal)}
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="type-p3 text-muted-foreground">Grand Total</p>
+                <p className="type-p1 font-bold tabular-nums">
+                  {currency(resolvedDetailInvoice.grandTotal)}
                 </p>
               </div>
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                <p className="type-p3 text-emerald-700 dark:text-emerald-300">
                   Sudah Dibayar
                 </p>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                  {currency(detailInvoice.paidAmount)}
+                <p className="type-p1 font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                  {currency(resolvedDetailInvoice.paidAmount)}
                 </p>
               </div>
-              <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-2.5">
-                <p className="text-[11px] text-rose-700 dark:text-rose-300">
+              <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-3">
+                <p className="type-p3 text-rose-700 dark:text-rose-300">
                   Sisa Tagihan
                 </p>
-                <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
-                  {currency(detailInvoice.remainingAmount)}
+                <p className="type-p1 font-bold text-rose-700 dark:text-rose-300 tabular-nums">
+                  {currency(resolvedDetailInvoice.remainingAmount)}
                 </p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Surat Jalan Tercakup ({detailInvoice.deliveries.length} DO)
+              <h4 className="type-p3 font-bold uppercase tracking-wide text-muted-foreground">
+                Surat Jalan Tercakup ({resolvedDetailInvoice.deliveries.length} DO)
               </h4>
-              <div className="max-h-64 overflow-auto rounded-lg border border-border">
-                <Table>
+              <div className="max-h-64 overflow-auto">
+                <Table pagination={false}>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Tanggal</TableHead>
-                      <TableHead>No. DO</TableHead>
+                      <TableHead>No. DO &amp; Truk</TableHead>
+                      <TableHead>Tiket</TableHead>
                       <TableHead>Lokasi Proyek</TableHead>
                       <TableHead className="text-right">Volume</TableHead>
                       <TableHead className="text-right">Subtotal</TableHead>
@@ -830,29 +1177,42 @@ export default function VendorContractBillingPanel({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {detailInvoice.deliveries.map((delivery) => (
+                    {resolvedDetailInvoice.deliveries.map((delivery) => (
                       <TableRow key={delivery.id}>
-                        <TableCell className="whitespace-nowrap text-xs">
+                        <TableCell className="type-p3 whitespace-nowrap">
                           {delivery.deliveryDate}
                         </TableCell>
-                        <TableCell className="text-xs font-semibold">
-                          {delivery.doNumber}
+                        <TableCell>
+                          <span className="type-p2 font-semibold block">
+                            {delivery.doNumber}
+                          </span>
                           {delivery.vehiclePlate ? (
-                            <span className="block text-[10px] font-normal text-muted-foreground">
+                            <span className="type-p3 block text-muted-foreground">
                               {delivery.vehiclePlate}
                             </span>
                           ) : null}
                         </TableCell>
-                        <TableCell className="text-xs">
-                          {delivery.projectName}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                          {formatMaterialVolume(
-                            delivery.quantityReceived,
-                            detailInvoice.unit,
+                        <TableCell>
+                          {delivery.ticketNumber ? (
+                            <Badge variant="outline" className="font-mono">
+                              {delivery.ticketNumber}
+                            </Badge>
+                          ) : (
+                            <span className="type-p3 text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
+                        <TableCell className="type-p3">
+                          {delivery.projectName}
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
+                          {formatMaterialVolume(
+                            delivery.quantityReceived,
+                            resolvedDetailInvoice.unit,
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-nowrap text-right font-semibold tabular-nums">
                           {currency(delivery.subtotal)}
                         </TableCell>
                         <TableCell className="text-right">
@@ -862,19 +1222,18 @@ export default function VendorContractBillingPanel({
                               size="sm"
                               variant="outline"
                               onClick={() =>
-                                setLocalPreview({
-                                  url: delivery.proofUrl!,
-                                  title: `Foto DO ${delivery.doNumber}`,
-                                })
+                                openProof(
+                                  delivery.proofUrl!,
+                                  `Foto DO ${delivery.doNumber}`,
+                                )
                               }
-                              className="h-7 gap-1 text-[11px]"
                             >
-                              <Eye className="size-3" />
+                              <Eye className="size-3.5" aria-hidden="true" />
                               Lihat
                             </Button>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">
-                              -
+                            <span className="type-p3 text-muted-foreground">
+                              —
                             </span>
                           )}
                         </TableCell>
@@ -886,32 +1245,34 @@ export default function VendorContractBillingPanel({
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                Riwayat Pembayaran ({detailInvoice.payments.length})
+              <h4 className="type-p3 font-bold uppercase tracking-wide text-muted-foreground">
+                Riwayat Pembayaran ({resolvedDetailInvoice.payments.length})
               </h4>
-              {detailInvoice.payments.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
+              {resolvedDetailInvoice.payments.length === 0 ? (
+                <p className="type-p3 rounded-lg border border-dashed border-border p-3 text-muted-foreground">
                   Belum ada pembayaran tercatat untuk tagihan ini.
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {detailInvoice.payments.map((payment) => (
+                  {resolvedDetailInvoice.payments.map((payment) => (
                     <div
                       key={payment.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/20 p-3 text-xs"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-muted/20 p-3"
                     >
                       <div>
-                        <div className="flex items-center gap-1.5 font-semibold">
-                          <Badge variant="outline" className="text-[10px]">
+                        <div className="type-p2 flex items-center gap-1.5 font-semibold">
+                          <Badge variant="outline">
                             {paymentTypeLabel[payment.paymentType] ??
                               payment.paymentType}
                           </Badge>
-                          <span>{currency(payment.amount)}</span>
+                          <span className="tabular-nums">
+                            {currency(payment.amount)}
+                          </span>
                           <span className="text-muted-foreground">
                             · {payment.paymentMethod}
                           </span>
                         </div>
-                        <p className="mt-1 text-[11px] text-muted-foreground">
+                        <p className="type-p3 mt-1 text-muted-foreground">
                           {payment.paidAt.slice(0, 10)} · Sumber:{" "}
                           {payment.financeAccountName ?? "-"} · Tujuan:{" "}
                           {payment.transferDestination} · Oleh:{" "}
@@ -925,12 +1286,11 @@ export default function VendorContractBillingPanel({
                         onClick={() =>
                           openProof(
                             payment.proofOfTransferUrl,
-                            `Bukti Pembayaran ${detailInvoice.invoiceNumber}`,
+                            `Bukti Pembayaran ${resolvedDetailInvoice.invoiceNumber}`,
                           )
                         }
-                        className="h-7 gap-1 text-[11px]"
                       >
-                        <Eye className="size-3" />
+                        <Eye className="size-3.5" aria-hidden="true" />
                         Bukti Transfer
                       </Button>
                     </div>
@@ -940,22 +1300,26 @@ export default function VendorContractBillingPanel({
             </div>
 
             <div className="flex justify-end gap-2">
-              {canManage && detailInvoice.status !== "PAID" && (
+              {canManage && resolvedDetailInvoice.status !== "PAID" && (
                 <Button
                   type="button"
                   onClick={() => {
-                    const target = detailInvoice;
+                    const target = resolvedDetailInvoice;
                     setDetailInvoice(null);
+                    onInitialInvoiceHandled?.();
                     setPayingInvoice(target);
                   }}
                 >
-                  Proses Pembayaran
+                  Proses Bayar
                 </Button>
               )}
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDetailInvoice(null)}
+                onClick={() => {
+                  setDetailInvoice(null);
+                  onInitialInvoiceHandled?.();
+                }}
               >
                 Tutup
               </Button>
@@ -1095,10 +1459,13 @@ function CreateVendorInvoiceBuilderBody({
           onCreated(result.message);
         } else {
           setSubmitMessage(result.message);
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Create vendor invoice failed:", error);
-        setSubmitMessage("Gagal menerbitkan tagihan vendor. Silakan coba lagi.");
+        const errMsg = "Gagal menerbitkan tagihan vendor. Silakan coba lagi.";
+        setSubmitMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
@@ -1151,8 +1518,8 @@ function CreateVendorInvoiceBuilderBody({
         dan berubah status menjadi <strong>BILLED</strong>.
       </div>
 
-      <div className="max-h-72 overflow-auto rounded-lg border border-border">
-        <Table>
+      <div className="max-h-72 overflow-auto">
+        <Table pagination={false}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">
@@ -1164,6 +1531,7 @@ function CreateVendorInvoiceBuilderBody({
               </TableHead>
               <TableHead>Tanggal</TableHead>
               <TableHead>No. DO &amp; Truk</TableHead>
+              <TableHead>Tiket</TableHead>
               <TableHead>Proyek Lokasi</TableHead>
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="text-right">Subtotal</TableHead>
@@ -1187,24 +1555,33 @@ function CreateVendorInvoiceBuilderBody({
                       aria-label={`Pilih DO ${delivery.doNumber}`}
                     />
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs">
+                  <TableCell className="type-p3 whitespace-nowrap">
                     {delivery.deliveryDate}
                   </TableCell>
                   <TableCell>
-                    <div className="text-xs font-bold">{delivery.doNumber}</div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="type-p2 font-bold">{delivery.doNumber}</div>
+                    <div className="type-p3 text-muted-foreground">
                       {delivery.vehiclePlate || "-"}
                       {delivery.driverName ? ` · ${delivery.driverName}` : ""}
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs">{delivery.projectName}</TableCell>
-                  <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
+                  <TableCell>
+                    {delivery.ticketNumber ? (
+                      <Badge variant="outline" className="font-mono">
+                        {delivery.ticketNumber}
+                      </Badge>
+                    ) : (
+                      <span className="type-p3 text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="type-p3">{delivery.projectName}</TableCell>
+                  <TableCell className="type-p2 whitespace-nowrap text-right font-semibold tabular-nums">
                     {formatMaterialVolume(
                       delivery.quantityReceived,
                       contract.unit,
                     )}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-right text-xs font-medium">
+                  <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
                     {currency(delivery.estimatedAmount)}
                   </TableCell>
                   <TableCell className="text-right">
@@ -1219,13 +1596,12 @@ function CreateVendorInvoiceBuilderBody({
                             `Foto DO ${delivery.doNumber}`,
                           )
                         }
-                        className="h-7 gap-1 text-[11px]"
                       >
-                        <Eye className="size-3" />
+                        <Eye className="size-3.5" aria-hidden="true" />
                         Foto
                       </Button>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground">-</span>
+                      <span className="type-p3 text-muted-foreground">-</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -1237,8 +1613,8 @@ function CreateVendorInvoiceBuilderBody({
 
       {/* Live Totals Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3">
-        <div className="flex items-center gap-2 text-xs">
-          <CheckCircle2 className="size-4 text-primary" />
+        <div className="type-p2 flex items-center gap-2">
+          <CheckCircle2 className="size-4 text-primary" aria-hidden="true" />
           <span>
             <strong>{selectedDeliveries.length}</strong> DO dipilih · Total:{" "}
             <strong>
@@ -1248,19 +1624,15 @@ function CreateVendorInvoiceBuilderBody({
           </span>
         </div>
         <div className="text-right">
-          <p className="text-[11px] text-muted-foreground">
-            Grand Total Tagihan
-          </p>
-          <p className="text-lg font-extrabold text-primary">
-            {currency(grandTotal)}
-          </p>
+          <p className="type-p3 text-muted-foreground">Grand Total Tagihan</p>
+          <p className="type-kpi text-primary">{currency(grandTotal)}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="vi-number">
-            No. Invoice / Tagihan Vendor (Kosongkan untuk Auto)
+            No. Invoice (Kosongkan untuk Auto)
           </Label>
           <Input
             id="vi-number"
@@ -1270,12 +1642,13 @@ function CreateVendorInvoiceBuilderBody({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="vi-due-date">Tanggal Jatuh Tempo (Opsional)</Label>
-          <Input
+          <Label htmlFor="vi-due-date">Jatuh Tempo (Opsional)</Label>
+          <DatePicker
             id="vi-due-date"
-            type="date"
             value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
+            onValueChange={setDueDate}
+            clearable
+            disabled={isPending}
           />
         </div>
       </div>

@@ -1,17 +1,39 @@
 "use client";
-import { FormLabel } from "@/components/ui/label"
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { addVehicle, type VehicleInput, type VehicleSummary } from "@/app/actions/vehicles";
+import { Plus, Truck } from "lucide-react";
+import { toast } from "sonner";
+import {
+  addVehicle,
+  type VehicleInput,
+  type VehicleSummary,
+} from "@/app/actions/vehicles";
 import { createVehicleTripLog } from "@/app/actions/vehicle-trips";
 import type { VehicleTripLogRow } from "@/lib/vehicle-trip-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { NativeDataTable } from "@/components/ui/native-data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import VehicleTripLogTable from "@/app/components/apps/logistics/VehicleTripLogTable";
 
 type ProjectOption = { id: string; title: string; kelompokTani: string };
@@ -26,9 +48,44 @@ type DeliveryOrderOption = {
 const vehicleStatusLabel: Record<VehicleSummary["status"], string> = {
   AVAILABLE: "Tersedia",
   RESERVED: "Ditugaskan ke DO",
-  IN_USE: "Sedang digunakan",
-  MAINTENANCE: "Dalam perawatan",
+  IN_USE: "Sedang Digunakan",
+  MAINTENANCE: "Perawatan",
 };
+
+const vehicleStatusBadge: Record<
+  VehicleSummary["status"],
+  "lightSuccess" | "lightInfo" | "lightPrimary" | "lightWarning"
+> = {
+  AVAILABLE: "lightSuccess",
+  RESERVED: "lightInfo",
+  IN_USE: "lightPrimary",
+  MAINTENANCE: "lightWarning",
+};
+
+function VehicleOperationMobileCard({ vehicle }: { vehicle: VehicleSummary }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-border/80 bg-card p-3.5">
+      <div className="min-w-0">
+        <p className="type-p1 font-mono font-bold text-foreground">
+          {vehicle.plateNumber}
+        </p>
+        <p className="type-p3 text-muted-foreground">
+          {vehicle.vehicleType}
+          {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
+          {vehicle.brand ? ` (${vehicle.brand})` : ""}
+        </p>
+        <p className="type-p3 tabular-nums text-muted-foreground">
+          {vehicle.odometerInitialized
+            ? `${vehicle.currentKilometer} km`
+            : "KM belum diinisialisasi"}
+        </p>
+      </div>
+      <Badge variant={vehicleStatusBadge[vehicle.status]} className="shrink-0">
+        {vehicleStatusLabel[vehicle.status]}
+      </Badge>
+    </div>
+  );
+}
 
 export default function VehicleOperationsPanel({
   vehicles,
@@ -47,9 +104,10 @@ export default function VehicleOperationsPanel({
   const [masterOpen, setMasterOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedDoId, setSelectedDoId] = useState("__NONE__");
   const [isPending, startTransition] = useTransition();
+
   const availableVehicles = vehicles.filter(
     (vehicle) => vehicle.status === "AVAILABLE",
   );
@@ -66,6 +124,16 @@ export default function VehicleOperationsPanel({
       !logs.some((log) => log.doNumber === order.doNumber),
   );
 
+  const projectOptions = useMemo<ComboboxOption[]>(
+    () =>
+      projects.map((project) => ({
+        value: project.id,
+        label: `${project.kelompokTani} · ${project.title}`,
+        keywords: [project.kelompokTani, project.title],
+      })),
+    [projects],
+  );
+
   const submitVehicle = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -76,65 +144,73 @@ export default function VehicleOperationsPanel({
       modelName: String(data.get("modelName") ?? ""),
       initialKilometer: Number(data.get("initialKilometer")),
     };
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await addVehicle(input);
-        setMessage(result.message);
-        setIsError(!result.success);
         if (result.success) {
+          toast.success(result.message);
           setMasterOpen(false);
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Vehicle master registration failed:", error);
-        setMessage("Kendaraan gagal didaftarkan. Silakan coba kembali.");
-        setIsError(true);
+        toast.error("Kendaraan gagal didaftarkan. Silakan coba kembali.");
       }
     });
   };
 
   const submitTripLog = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!selectedVehicleId || !selectedProjectId) {
+      toast.error("Pilih kendaraan dan proyek tujuan terlebih dahulu.");
+      return;
+    }
     const data = new FormData(event.currentTarget);
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await createVehicleTripLog({
-          vehicleId: String(data.get("vehicleId") ?? ""),
-          projectId: String(data.get("projectId") ?? ""),
-          deliveryOrderId: String(data.get("deliveryOrderId") ?? "") || undefined,
+          vehicleId: selectedVehicleId,
+          projectId: selectedProjectId,
+          deliveryOrderId:
+            selectedDoId && selectedDoId !== "__NONE__"
+              ? selectedDoId
+              : undefined,
           kilometerStart: Number(data.get("kilometerStart")),
           kilometerEnd: Number(data.get("kilometerEnd")),
         });
-        setMessage(result.message);
-        setIsError(!result.success);
         if (result.success) {
+          toast.success(result.message);
           setLogOpen(false);
           setSelectedVehicleId("");
+          setSelectedProjectId("");
+          setSelectedDoId("__NONE__");
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Vehicle trip log submission failed:", error);
-        setMessage("Log KM dan BBM gagal disimpan. Silakan coba kembali.");
-        setIsError(true);
+        toast.error("Log KM dan BBM gagal disimpan. Silakan coba kembali.");
       }
     });
   };
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Logistik, Kendaraan & BBM</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Estimasi BBM dihitung otomatis berdasarkan rasio 12 km per liter.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <CardTitle className="type-h2">Operasional Kendaraan &amp; BBM</CardTitle>
+          <p className="type-p2 mt-1 text-muted-foreground">
+            Estimasi BBM dihitung otomatis berdasarkan rasio 12 km per liter.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           {canManageVehicles && (
             <Button type="button" onClick={() => setMasterOpen(true)}>
-              + Daftarkan Kendaraan
+              <Plus className="size-4" aria-hidden="true" />
+              + Kendaraan
             </Button>
           )}
           <Button
@@ -143,106 +219,82 @@ export default function VehicleOperationsPanel({
             disabled={availableVehicles.length === 0 || projects.length === 0}
             onClick={() => {
               setSelectedVehicleId("");
+              setSelectedProjectId("");
+              setSelectedDoId("__NONE__");
               setLogOpen(true);
             }}
           >
-            + Catat Log KM & BBM
+            <Plus className="size-4" aria-hidden="true" />
+            + Log KM
           </Button>
         </div>
-        {message && (
-          <p
-            className={`rounded-md border p-3 text-sm ${
-              isError
-                ? "border-destructive text-destructive"
-                : "border-green-200 text-green-800"
-            }`}
-            role={isError ? "alert" : "status"}
-          >
-            {message}
-          </p>
-        )}
-        <section className="space-y-3">
-          <h3 className="font-semibold text-primary">Daftar Kendaraan Aktif</h3>
-          {/* Mobile Card View (< 768px) */}
-          <div className="space-y-2 md:hidden">
-            {vehicles.map((vehicle) => (
-              <div
-                key={vehicle.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-border/80 bg-card p-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-mono text-sm font-bold text-foreground">
-                    {vehicle.plateNumber}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {vehicle.vehicleType}
-                    {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
-                    {vehicle.brand ? ` (${vehicle.brand})` : ""}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {vehicle.odometerInitialized
-                      ? `${vehicle.currentKilometer} km`
-                      : "KM belum diinisialisasi"}
-                  </p>
-                </div>
-                <Badge variant="outline" className="shrink-0">
-                  {vehicleStatusLabel[vehicle.status]}
-                </Badge>
-              </div>
-            ))}
-            {vehicles.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
-                Belum ada kendaraan terdaftar.
-              </div>
-            )}
-          </div>
+      </CardHeader>
 
-          {/* Desktop Table View (>= 768px) */}
-          <div className="hidden md:block">
-          <NativeDataTable itemLabel="kendaraan">
-            <table className="app-data-table w-full min-w-[720px] text-sm">
-              <thead className="bg-[#102A4D] text-left text-white">
-                <tr>
-                  <th className="p-3">No. Plat</th>
-                  <th className="p-3">Jenis / Model</th>
-                  <th className="p-3">Merk</th>
-                  <th className="p-3">Kilometer Saat Ini</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vehicles.map((vehicle) => (
-                  <tr className="border-b" key={vehicle.id}>
-                    <td className="p-3 font-medium">{vehicle.plateNumber}</td>
-                    <td className="p-3">
-                      {vehicle.vehicleType}
-                      {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
-                    </td>
-                    <td className="p-3">{vehicle.brand ?? "—"}</td>
-                    <td className="p-3">
-                      {vehicle.odometerInitialized
-                        ? `${vehicle.currentKilometer} km`
-                        : "KM belum diinisialisasi"}
-                    </td>
-                    <td className="p-3">
-                      <Badge variant="outline">{vehicleStatusLabel[vehicle.status]}</Badge>
-                    </td>
-                  </tr>
-                ))}
-                {vehicles.length === 0 && (
-                  <tr>
-                    <td className="p-5 text-center text-muted-foreground" colSpan={5}>
-                      Belum ada kendaraan terdaftar.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </NativeDataTable>
-          </div>
-        </section>
+      <CardContent className="space-y-6">
         <section className="space-y-3">
-          <h3 className="font-semibold text-primary">Riwayat Log Perjalanan & BBM</h3>
+          <h3 className="type-h3 text-foreground">Daftar Kendaraan Aktif</h3>
+          {vehicles.length === 0 ? (
+            <EmptyState
+              icon={Truck}
+              title="Belum Ada Kendaraan"
+              description="Daftarkan kendaraan armada terlebih dahulu sebelum mencatat log perjalanan."
+            />
+          ) : (
+            <>
+              <div className="space-y-2 md:hidden">
+                {vehicles.map((vehicle) => (
+                  <VehicleOperationMobileCard
+                    key={vehicle.id}
+                    vehicle={vehicle}
+                  />
+                ))}
+              </div>
+
+              <div className="hidden md:block">
+                <Table itemLabel="kendaraan">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No. Plat</TableHead>
+                      <TableHead>Jenis / Model</TableHead>
+                      <TableHead>Merk</TableHead>
+                      <TableHead>Kilometer</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vehicles.map((vehicle) => (
+                      <TableRow key={vehicle.id}>
+                        <TableCell className="type-p2 font-mono font-semibold">
+                          {vehicle.plateNumber}
+                        </TableCell>
+                        <TableCell className="type-p2 whitespace-normal">
+                          {vehicle.vehicleType}
+                          {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
+                        </TableCell>
+                        <TableCell className="type-p2">
+                          {vehicle.brand ?? "—"}
+                        </TableCell>
+                        <TableCell className="type-p2 tabular-nums">
+                          {vehicle.odometerInitialized
+                            ? `${vehicle.currentKilometer} km`
+                            : "Belum diatur"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={vehicleStatusBadge[vehicle.status]}>
+                            {vehicleStatusLabel[vehicle.status]}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="type-h3 text-foreground">Riwayat Perjalanan &amp; BBM</h3>
           <VehicleTripLogTable logs={logs} />
         </section>
       </CardContent>
@@ -252,45 +304,83 @@ export default function VehicleOperationsPanel({
         onClose={() => {
           if (!isPending) setMasterOpen(false);
         }}
-        title="Daftarkan Master Kendaraan"
+        title="Daftarkan Kendaraan"
         description="KM awal akan menjadi acuan odometer untuk log perjalanan berikutnya."
         className="sm:max-w-xl"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setMasterOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button type="submit" form="vehicle-master-form" disabled={isPending}>
+              {isPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </>
+        }
       >
-          <form id="vehicle-master-form" className="mt-6 space-y-3" onSubmit={submitVehicle}>
-            <FormLabel className="grid gap-1 text-sm">
-              Nomor plat
-              <Input name="plateNumber" required maxLength={20} placeholder="BL 1234 AB" />
-            </FormLabel>
-            <FormLabel className="grid gap-1 text-sm">
-              Jenis kendaraan
-              <Input name="vehicleType" required maxLength={80} placeholder="Pick-up, Truk Engkel" />
-            </FormLabel>
-            <FormLabel className="grid gap-1 text-sm">
-              Merk
-              <Input name="brand" maxLength={80} />
-            </FormLabel>
-            <FormLabel className="grid gap-1 text-sm">
-              Model
-              <Input name="modelName" maxLength={80} />
-            </FormLabel>
-            <FormLabel className="grid gap-1 text-sm">
-              KM awal
-              <Input name="initialKilometer" type="number" min="0" step="0.001" required defaultValue="0" />
-            </FormLabel>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => setMasterOpen(false)}
-              >
-                Batal
-              </Button>
-              <Button type="submit" form="vehicle-master-form" disabled={isPending}>
-                {isPending ? "Menyimpan..." : "Daftarkan"}
-              </Button>
+        <form
+          id="vehicle-master-form"
+          className="space-y-3.5"
+          onSubmit={submitVehicle}
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="vo-plate" className="type-p2 font-medium">
+              Nomor Plat <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="vo-plate"
+              name="plateNumber"
+              required
+              maxLength={20}
+              placeholder="BL 1234 AB"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vo-type" className="type-p2 font-medium">
+              Jenis Kendaraan <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="vo-type"
+              name="vehicleType"
+              required
+              maxLength={80}
+              placeholder="Pick-up, Truk Engkel"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="vo-brand" className="type-p2 font-medium">
+                Merk
+              </Label>
+              <Input id="vo-brand" name="brand" maxLength={80} />
             </div>
-          </form>
+            <div className="space-y-1.5">
+              <Label htmlFor="vo-model" className="type-p2 font-medium">
+                Model
+              </Label>
+              <Input id="vo-model" name="modelName" maxLength={80} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vo-km" className="type-p2 font-medium">
+              KM Awal <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="vo-km"
+              name="initialKilometer"
+              type="number"
+              min="0"
+              step="0.001"
+              required
+              defaultValue="0"
+            />
+          </div>
+        </form>
       </GlobalModal>
 
       <GlobalModal
@@ -299,83 +389,121 @@ export default function VehicleOperationsPanel({
           if (!isPending) setLogOpen(false);
         }}
         title="Catat Log Perjalanan & BBM"
-        description="Jarak dihitung dari odometer dan liter estimasi = jarak ÷ 15."
+        description="Jarak dihitung dari odometer dan estimasi BBM otomatis."
         className="sm:max-w-xl"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setLogOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="vehicle-trip-form"
+              disabled={isPending || !selectedVehicleId || !selectedProjectId}
+            >
+              {isPending ? "Menyimpan..." : "Simpan Log"}
+            </Button>
+          </>
+        }
       >
-          <form id="vehicle-trip-form" className="mt-6 space-y-3" onSubmit={submitTripLog}>
-            <FormLabel className="grid gap-1 text-sm">
-              Kendaraan
-              <select
-                name="vehicleId"
-                required
-                value={selectedVehicleId}
-                onChange={(event) => setSelectedVehicleId(event.target.value)}
-                className="h-10 rounded-md border bg-background px-3"
-              >
-                <option value="">Pilih kendaraan</option>
+        <form
+          id="vehicle-trip-form"
+          className="space-y-3.5"
+          onSubmit={submitTripLog}
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="vtf-vehicle" className="type-p2 font-medium">
+              Kendaraan <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={selectedVehicleId}
+              onValueChange={(value) => {
+                setSelectedVehicleId(value);
+                setSelectedDoId("__NONE__");
+              }}
+            >
+              <SelectTrigger id="vtf-vehicle" className="w-full">
+                <SelectValue placeholder="Pilih kendaraan..." />
+              </SelectTrigger>
+              <SelectContent>
                 {availableVehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
+                  <SelectItem key={vehicle.id} value={vehicle.id}>
                     {vehicle.plateNumber} · {vehicle.vehicleType}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-            </FormLabel>
-            <FormLabel className="grid gap-1 text-sm">
-              Tujuan proyek
-              <select name="projectId" required className="h-10 rounded-md border bg-background px-3">
-                <option value="">Pilih proyek</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.kelompokTani} · {project.title}
-                  </option>
-                ))}
-              </select>
-            </FormLabel>
-            <FormLabel className="grid gap-1 text-sm">
-              No. DO (opsional; hanya DO selesai tanpa log)
-              <select name="deliveryOrderId" className="h-10 rounded-md border bg-background px-3">
-                <option value="">Tidak terkait DO</option>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="vtf-project" className="type-p2 font-medium">
+              Tujuan Proyek <span className="text-destructive">*</span>
+            </Label>
+            <Combobox
+              id="vtf-project"
+              options={projectOptions}
+              value={selectedProjectId}
+              onValueChange={setSelectedProjectId}
+              placeholder="Pilih proyek..."
+              searchPlaceholder="Cari nama proyek atau kelompok tani..."
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="vtf-do" className="type-p2 font-medium">
+              No. DO (Opsional)
+            </Label>
+            <Select value={selectedDoId} onValueChange={setSelectedDoId}>
+              <SelectTrigger id="vtf-do" className="w-full">
+                <SelectValue placeholder="Tidak terkait DO" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__NONE__">Tidak terkait DO</SelectItem>
                 {linkedOrders.map((order) => (
-                  <option key={order.id} value={order.id}>{order.doNumber}</option>
+                  <SelectItem key={order.id} value={order.id}>
+                    {order.doNumber}
+                  </SelectItem>
                 ))}
-              </select>
-            </FormLabel>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormLabel className="grid gap-1 text-sm">
-                KM awal
-                <Input
-                  name="kilometerStart"
-                  type="number"
-                  min="0"
-                  step="0.001"
-                  required
-                  defaultValue={selectedVehicle?.currentKilometer ?? ""}
-                  key={selectedVehicle?.id ?? "no-vehicle"}
-                />
-              </FormLabel>
-              <FormLabel className="grid gap-1 text-sm">
-                KM akhir
-                <Input name="kilometerEnd" type="number" min="0" step="0.001" required />
-              </FormLabel>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="vtf-km-start" className="type-p2 font-medium">
+                KM Awal <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="vtf-km-start"
+                name="kilometerStart"
+                type="number"
+                min="0"
+                step="0.001"
+                required
+                defaultValue={selectedVehicle?.currentKilometer ?? ""}
+                key={selectedVehicle?.id ?? "no-vehicle"}
+              />
             </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => setLogOpen(false)}
-              >
-                Batal
-              </Button>
-              <Button
-                type="submit"
-                form="vehicle-trip-form"
-                disabled={isPending || !selectedVehicleId}
-              >
-                {isPending ? "Menyimpan..." : "Simpan Log"}
-              </Button>
+            <div className="space-y-1.5">
+              <Label htmlFor="vtf-km-end" className="type-p2 font-medium">
+                KM Akhir <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="vtf-km-end"
+                name="kilometerEnd"
+                type="number"
+                min="0"
+                step="0.001"
+                required
+              />
             </div>
-          </form>
+          </div>
+        </form>
       </GlobalModal>
     </Card>
   );

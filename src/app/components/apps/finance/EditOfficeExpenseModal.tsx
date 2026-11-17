@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { updateOfficeExpense } from "@/app/actions/finance";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRupiahInput, parseRupiahInput } from "@/lib/indonesian-currency";
@@ -153,15 +155,18 @@ export default function EditOfficeExpenseModal({
       setIsError(!result.success);
 
       if (result.success) {
-        setTimeout(() => {
-          onClose();
-          router.refresh();
-        }, 800);
+        toast.success(result.message || "Pengeluaran berhasil diperbarui.");
+        onClose();
+        router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (err) {
       console.error("Update office expense error:", err);
-      setMessage("Gagal memperbarui pengeluaran. Silakan coba kembali.");
+      const errMsg = "Gagal memperbarui pengeluaran. Silakan coba kembali.";
+      setMessage(errMsg);
       setIsError(true);
+      toast.error(errMsg);
     } finally {
       setIsPending(false);
     }
@@ -200,27 +205,25 @@ export default function EditOfficeExpenseModal({
           {/* 1. Edit Tanggal */}
           <div className="space-y-2">
             <Label htmlFor="edit-expense-date" className="flex items-center gap-1.5 font-medium">
-              <Calendar className="size-4 text-orange-600" />
-              Edit Tanggal Transaksi
+              <Calendar className="size-4 text-primary" />
+              Tanggal Transaksi
             </Label>
-            <Input
-              type="date"
+            <DatePicker
               id="edit-expense-date"
               value={transactionDate}
-              onChange={(e) => setTransactionDate(e.target.value)}
-              className="h-10 bg-background text-foreground"
+              onValueChange={setTransactionDate}
               disabled={isPending}
             />
-            <p className="text-xs text-muted-foreground">
-              Ubah tanggal transaksi sesuai catatan bukti pengeluaran.
+            <p className="type-p3 text-muted-foreground">
+              Ubah tanggal transaksi sesuai catatan bukti.
             </p>
           </div>
 
           {/* 2. Edit Nominal */}
           <div className="space-y-2">
             <Label htmlFor="edit-expense-amount" className="flex items-center gap-1.5 font-medium">
-              <Wallet className="size-4 text-orange-600" />
-              Edit Nominal (Rp)
+              <Wallet className="size-4 text-primary" />
+              Nominal (Rp)
             </Label>
             <RupiahAmountInput
               id="edit-expense-amount"
@@ -228,8 +231,8 @@ export default function EditOfficeExpenseModal({
               onChange={(formatted) => setAmountInput(formatted)}
               required
             />
-            <p className="text-xs text-muted-foreground">
-              Saldo akun buku kas akan otomatis disesuaikan dengan selisih nominal.
+            <p className="type-p3 text-muted-foreground">
+              Saldo buku kas disesuaikan otomatis.
             </p>
           </div>
         </div>
@@ -357,29 +360,49 @@ export default function EditOfficeExpenseModal({
 
           {/* File input to add new/replacement photos */}
           <div className="space-y-1.5 pt-2">
-            <Label htmlFor="edit-expense-file-input" className="text-xs font-medium">
-              Tambah / Ganti Foto Bukti (PDF, JPG, PNG, WEBP, HEIC - Maks 5 MB)
+            <Label htmlFor="edit-expense-file-input" className="type-p3 font-medium">
+              Tambah / Ganti Foto Bukti
             </Label>
-            <Input
+            <FileDropzone
               id="edit-expense-file-input"
-              type="file"
               accept={FINANCE_PROOF_ACCEPT_ALL}
               multiple
+              capture="environment"
+              maxFiles={Math.max(1, 5 - keepUrls.length)}
+              maxSizeMb={5}
+              files={newProofFiles.map((item) => item.file)}
+              label={
+                isPreparingProof ? "Memproses file bukti..." : "Tambah Bukti"
+              }
+              hint="PDF, JPG, PNG, WEBP, atau HEIC; maks 5 MB/file (total maks 5 file)."
               disabled={
                 isPending ||
                 isPreparingProof ||
                 keepUrls.length + newProofFiles.length >= 5
               }
-              onChange={async (e) => {
-                const input = e.currentTarget;
-                const files = Array.from(input.files ?? []);
-                if (files.length === 0) return;
+              onError={(err) => setProofError(err)}
+              onFilesChange={async (nextFiles) => {
+                if (nextFiles.length < newProofFiles.length) {
+                  const kept = newProofFiles.filter((item) =>
+                    nextFiles.includes(item.file),
+                  );
+                  const removed = newProofFiles.filter(
+                    (item) => !nextFiles.includes(item.file),
+                  );
+                  revokeProofItems(removed);
+                  setNewProofFiles(kept);
+                  return;
+                }
+                const newlyAdded = nextFiles.filter(
+                  (file) => !newProofFiles.some((item) => item.file === file),
+                );
+                if (newlyAdded.length === 0) return;
 
                 setIsPreparingProof(true);
                 setProofError("");
                 try {
                   const { prepared, error: prepError } =
-                    await prepareFinanceProofFiles(files);
+                    await prepareFinanceProofFiles(newlyAdded);
                   const maxAdditional = Math.max(
                     0,
                     5 - keepUrls.length - newProofFiles.length,
@@ -399,26 +422,27 @@ export default function EditOfficeExpenseModal({
                   setProofError(prepError);
                 } finally {
                   setIsPreparingProof(false);
-                  input.value = "";
                 }
               }}
             />
-            {isPreparingProof && (
-              <p className="text-xs text-muted-foreground" role="status">
-                Memproses file bukti agar siap diunggah...
-              </p>
-            )}
           </div>
 
           {proofError && (
-            <p className="text-xs text-destructive font-medium" role="alert">
+            <p className="type-p3 text-destructive font-medium" role="alert">
               {proofError}
             </p>
           )}
         </div>
 
         {message && (
-          <p className={isError ? "text-sm text-destructive font-medium" : "text-sm text-emerald-600 font-medium"} role="status">
+          <p
+            className={
+              isError
+                ? "type-p2 text-destructive font-medium"
+                : "type-p2 text-emerald-600 dark:text-emerald-400 font-medium"
+            }
+            role="status"
+          >
             {message}
           </p>
         )}

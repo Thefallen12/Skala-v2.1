@@ -1,12 +1,11 @@
 "use client";
-import { FormLabel } from "@/components/ui/label"
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Icon } from "@iconify/react";
+import { toast } from "sonner";
 import {
   Check,
   CircleDollarSign,
@@ -16,20 +15,33 @@ import {
   Eye,
   FileText,
   Lock,
+  MoreHorizontal,
   PackageOpen,
   Paperclip,
   Pencil,
   Plus,
   Printer,
   RefreshCw,
-  Save,
-  ShoppingCart,
+  Search,
   Send,
+  ShoppingCart,
   Trash2,
   Truck,
   UploadCloud,
-  X,
 } from "lucide-react";
+import {
+  DOStatus,
+  FulfillmentStatus,
+  PaymentType,
+  POPaymentMethod,
+  POStatus,
+  TicketCategoryHint,
+  TicketPriority,
+  TicketRequestCategory,
+  TicketStatus,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts";
 import {
   canRecordMaterialDeliveries,
@@ -39,8 +51,8 @@ import {
 } from "@/lib/material-contracts";
 import {
   addTicketItemByExecutive,
-  checkTicketItemsStock,
   approveByDirector,
+  checkTicketItemsStock,
   deleteTicketItemByExecutive,
   fulfillTicketItemsFromStock,
   mapTicketItemToStock,
@@ -48,50 +60,48 @@ import {
   updateTicketItemByExecutive,
   type TicketActionResult,
 } from "@/app/actions/tickets";
-import { isTicketProcessedByFinance } from "@/lib/ticket-finance-lock";
 import {
   approveEquipmentRequest,
   processEquipmentRequestAtLogistics,
   submitEquipmentRequest,
 } from "@/app/actions/equipment-requests";
-import CreatePOForm from "@/app/components/forms/CreatePOForm";
-import DirectStockPurchaseForm from "@/app/components/forms/DirectStockPurchaseForm";
-import ExpeditionArrivalModal from "@/app/components/apps/tickets/ExpeditionArrivalModal";
+import { isTicketProcessedByFinance } from "@/lib/ticket-finance-lock";
+import { EQUIPMENT_REQUEST_TYPE } from "@/lib/equipment-request";
+import type { VehicleSummary } from "@/app/actions/vehicles";
 import type {
   TicketPageRole,
   TicketProjectOption,
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
-import type { VehicleSummary } from "@/app/actions/vehicles";
-import { EQUIPMENT_REQUEST_TYPE } from "@/lib/equipment-request";
-import {
-  FulfillmentStatus,
-  DOStatus,
-  PaymentType,
-  POPaymentMethod,
-  POStatus,
-  TicketCategoryHint,
-  TicketRequestCategory,
-  TicketStatus,
-  TicketType,
-  UserRole,
-} from "@prisma/client";
-import { Badge } from "@/components/ui/badge";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Button } from "@/components/ui/button";
-import { NativeDataTable } from "@/components/ui/native-data-table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import {
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { GlobalModal } from "@/components/ui/global-modal";
-import FinanceActionModal from "./FinanceActionModal";
-import LogisticsActionModal from "./LogisticsActionModal";
-import MoverActionModal from "./MoverActionModal";
-import TicketManagementActions from "./TicketManagementActions";
+import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
+import CreatePOForm from "@/app/components/forms/CreatePOForm";
+import DirectStockPurchaseForm from "@/app/components/forms/DirectStockPurchaseForm";
 import MaterialDeliveryModal from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
+import ExpeditionArrivalModal from "@/app/components/apps/tickets/ExpeditionArrivalModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EmptyState } from "@/components/ui/empty-state";
+import { GlobalModal } from "@/components/ui/global-modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -108,18 +118,26 @@ import {
   withLocalPhotoPreview,
 } from "@/lib/photo-urls";
 import { printUrlInFrame } from "@/lib/print-url";
-import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
+import { cn } from "@/lib/utils";
+import FinanceActionModal from "./FinanceActionModal";
+import LogisticsActionModal from "./LogisticsActionModal";
+import MoverActionModal from "./MoverActionModal";
+import {
+  getTicketManagementPermissions,
+  TicketManagementModal,
+  type TicketManageMode,
+} from "./TicketManagementActions";
 
 const statusLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Draft",
-  PENDING_DIRECTOR: "Menunggu persetujuan Direktur",
-  PENDING_LOGISTIK: "Menunggu diproses Logistik",
+  PENDING_DIRECTOR: "Menunggu Direktur",
+  PENDING_LOGISTIK: "Menunggu Logistik",
   APPROVED_DIR: "Disetujui Direktur",
   PROCESSED_FINANCE: "Diproses Finance",
   PROCESSED_LOGISTIC: "Diproses Logistik",
   ASSIGNED_TO_MOVER: "Ditugaskan ke Mover",
-  IN_TRANSIT: "Dalam perjalanan (ekspedisi)",
-  WAITING_FINANCE_PAYMENT: "Menunggu pembayaran Finance",
+  IN_TRANSIT: "Dalam Perjalanan",
+  WAITING_FINANCE_PAYMENT: "Menunggu Finance",
   COMPLETED: "Selesai",
   REJECTED: "Ditolak",
 };
@@ -127,15 +145,15 @@ const statusLabels: Record<TicketRow["status"], string> = {
 const nextStepLabels: Record<TicketRow["status"], string> = {
   DRAFT: "Pemohon perlu mengajukan tiket.",
   PENDING_DIRECTOR: "Menunggu Direktur menyetujui tiket.",
-  PENDING_LOGISTIK: "Logistik perlu menentukan alat internal atau vendor.",
+  PENDING_LOGISTIK: "Logistik menentukan pemenuhan atau vendor.",
   APPROVED_DIR: "Menunggu Finance memproses kebutuhan.",
-  PROCESSED_FINANCE: "Menunggu Logistik menyiapkan barang atau pengiriman.",
-  PROCESSED_LOGISTIC: "Menunggu proses pengiriman atau konfirmasi kebutuhan.",
-  ASSIGNED_TO_MOVER: "Menunggu Mover mengambil dan mengantar barang.",
+  PROCESSED_FINANCE: "Menunggu Logistik menyiapkan pengiriman.",
+  PROCESSED_LOGISTIC: "Menunggu proses logistik atau konfirmasi.",
+  ASSIGNED_TO_MOVER: "Menunggu Mover mengantar barang.",
   IN_TRANSIT: "Menunggu barang tiba dan diterima.",
   WAITING_FINANCE_PAYMENT: "Menunggu Finance melakukan pembayaran.",
-  COMPLETED: "Seluruh proses tiket telah selesai.",
-  REJECTED: "Tiket ditolak dan tidak dilanjutkan.",
+  COMPLETED: "Seluruh proses tiket selesai.",
+  REJECTED: "Tiket ditolak dan dihentikan.",
 };
 
 const statusVariants: Record<
@@ -174,11 +192,51 @@ const requestCategoryLabels: Record<TicketRequestCategory, string> = {
   SHIPPING_COST: "Biaya Pengiriman",
 };
 
+const priorityLabels: Record<TicketPriority, string> = {
+  LOW: "Rendah",
+  MEDIUM: "Sedang",
+  HIGH: "Tinggi",
+  URGENT: "Mendesak",
+};
+
+const auditActionLabels: Record<string, string> = {
+  CREATED: "Draft dibuat",
+  UPDATED: "Detail tiket diperbarui",
+  SUBMITTED: "Diajukan ke Direktur",
+  APPROVED_BY_DIR: "Disetujui Direktur",
+  REJECTED_BY_DIR: "Ditolak Direktur",
+  REVISION_REQUESTED_BY_DIR: "Diminta revisi",
+  LOGISTICS_EQUIPMENT_INTERNAL: "Alat internal disiapkan",
+  LOGISTICS_EQUIPMENT_RENTAL: "Diteruskan ke vendor sewa",
+  FINANCE_PAYMENT_PARTIAL: "Pembayaran sebagian dicatat",
+  LOGISTICS_READY_WAREHOUSE: "Stok gudang siap; ke Mover",
+  LOGISTICS_TICKET_ITEM_SKU_MAPPED: "Item ditautkan ke SKU",
+  MATERIAL_CONTRACT_DELIVERY_RECORDED: "Surat Jalan kontrak dicatat",
+  LOGISTICS_SWITCHED_TO_PURCHASE: "Dialihkan ke pengadaan",
+  LOGISTICS_BUY_STORE: "Pembelian dikirim ke Finance",
+  LOGISTICS_PO_CREATED: "PO dibuat; menunggu persetujuan",
+  LOGISTICS_DIRECT_PURCHASE_CREATED: "Pembelian langsung ditautkan",
+  DIRECT_PURCHASE_APPROVED: "Pembelian langsung disetujui",
+  DIRECT_PURCHASE_PAYMENT: "Pembayaran pembelian dicatat",
+  DIRECT_PURCHASE_RECEIVED: "Pembelian diterima Logistik",
+  DOCUMENT_ISSUED: "Dokumen PO/DO terbit",
+  FINANCE_PAYMENT_COMPLETED: "Pembayaran lunas",
+  MOVER_DELIVERY_COMPLETED: "Barang diterima di lokasi",
+  COMPLETED: "Tiket selesai",
+};
+
 function parseTicketDescription(description: string | null) {
   if (!description) {
-    return { categoryFromDesc: null, notes: "", extraFields: [] as { label: string; value: string }[] };
+    return {
+      categoryFromDesc: null,
+      notes: "",
+      extraFields: [] as { label: string; value: string }[],
+    };
   }
-  const lines = description.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = description
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
   let categoryFromDesc: string | null = null;
   const noteLines: string[] = [];
   const extraFields: { label: string; value: string }[] = [];
@@ -193,7 +251,6 @@ function parseTicketDescription(description: string | null) {
         line,
       )
     ) {
-      // Already displayed in dedicated KPI / Payment cards
       continue;
     }
     if (/^Keterangan\s*:/i.test(line)) {
@@ -216,39 +273,6 @@ function parseTicketDescription(description: string | null) {
   };
 }
 
-const priorityLabels = {
-  LOW: "Rendah",
-  MEDIUM: "Sedang",
-  HIGH: "Tinggi",
-  URGENT: "Mendesak",
-} as const;
-
-const auditActionLabels: Record<string, string> = {
-  CREATED: "Draft dibuat",
-  UPDATED: "Detail tiket diperbarui",
-  SUBMITTED: "Diajukan ke Direktur",
-  APPROVED_BY_DIR: "Disetujui Direktur",
-  REJECTED_BY_DIR: "Ditolak Direktur",
-  REVISION_REQUESTED_BY_DIR: "Diminta revisi oleh Direktur",
-  LOGISTICS_EQUIPMENT_INTERNAL: "Dipenuhi dengan alat internal",
-  LOGISTICS_EQUIPMENT_RENTAL: "Diteruskan ke penyewaan vendor",
-  FINANCE_PAYMENT_PARTIAL: "Pembayaran dicatat sebagian oleh Keuangan",
-  LOGISTICS_READY_WAREHOUSE: "Stok gudang siap; ditugaskan ke Mover",
-  LOGISTICS_TICKET_ITEM_SKU_MAPPED: "Item tiket ditautkan ke SKU stok",
-  MATERIAL_CONTRACT_DELIVERY_RECORDED: "Surat Jalan kontrak dicatat",
-  LOGISTICS_SWITCHED_TO_PURCHASE: "Dialihkan ke pengadaan baru",
-  LOGISTICS_BUY_STORE: "Dibeli di toko; diteruskan ke Keuangan",
-  LOGISTICS_PO_CREATED: "PO dibuat; menunggu persetujuan",
-  LOGISTICS_DIRECT_PURCHASE_CREATED: "Pembelian langsung ditautkan",
-  DIRECT_PURCHASE_APPROVED: "Pembelian langsung disetujui Direktur",
-  DIRECT_PURCHASE_PAYMENT: "Pembayaran pembelian langsung dicatat",
-  DIRECT_PURCHASE_RECEIVED: "Pembelian langsung diterima Logistik",
-  DOCUMENT_ISSUED: "Dokumen PO/DO diterbitkan",
-  FINANCE_PAYMENT_COMPLETED: "Pembayaran diselesaikan",
-  MOVER_DELIVERY_COMPLETED: "Barang diterima di lapangan",
-  COMPLETED: "Pemrosesan selesai",
-};
-
 const formatCurrency = (amount: string | null) =>
   amount === null
     ? "—"
@@ -258,8 +282,49 @@ const formatCurrency = (amount: string | null) =>
         maximumFractionDigits: 0,
       }).format(Number(amount));
 
-const warehouseInsufficientMessage =
-  "Stok gudang tidak mencukupi untuk memenuhi permintaan ini.";
+const getTicketStageNumber = (status: TicketRow["status"]): 1 | 2 | 3 | 4 => {
+  if (status === TicketStatus.DRAFT) return 1;
+  if (status === TicketStatus.PENDING_DIRECTOR) return 2;
+  if (status === TicketStatus.COMPLETED) return 4;
+  return 3;
+};
+
+const getPriorityBadgeClass = (priority: TicketPriority) =>
+  priority === "URGENT"
+    ? "border-rose-500/35 bg-rose-500/15 text-rose-500"
+    : priority === "HIGH"
+      ? "border-amber-500/35 bg-amber-500/15 text-amber-500"
+      : priority === "MEDIUM"
+        ? "border-sky-500/35 bg-sky-500/15 text-sky-500"
+        : "border-border bg-muted text-muted-foreground";
+
+const getContractItemDeliveredVolume = (
+  ticket: TicketRow,
+  materialContractId?: string | null,
+) =>
+  materialContractId
+    ? (ticket.materialDeliveries ?? [])
+        .filter((delivery) => delivery.contractId === materialContractId)
+        .reduce((sum, delivery) => sum + delivery.quantityReceived, 0)
+    : 0;
+
+const hasOpenContractDelivery = (role: TicketPageRole, ticket: TicketRow) =>
+  !(
+    (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
+    isTicketProcessedByFinance(ticket)
+  ) &&
+  ticket.type === TicketType.MATERIAL &&
+  (ticket.status === TicketStatus.APPROVED_DIR ||
+    ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+    ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+    ticket.status === TicketStatus.PROCESSED_FINANCE ||
+    ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+    ticket.status === TicketStatus.IN_TRANSIT) &&
+  ticket.items.some(
+    (item) =>
+      item.categoryHint === TicketCategoryHint.CONTRACT &&
+      item.status === FulfillmentStatus.PENDING,
+  );
 
 type DirectAction = {
   label: string;
@@ -308,12 +373,20 @@ function workflowFor(
     return null;
   }
   if (
+    role === UserRole.MOVER &&
+    (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+      ticket.status === TicketStatus.IN_TRANSIT)
+  ) {
+    return "MOVER";
+  }
+  if (
     (role === UserRole.LOGISTICS ||
       role === UserRole.ADMINISTRATIONS ||
       role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.requestCategory === TicketRequestCategory.SHIPPING_COST &&
-    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+    (ticket.status === TicketStatus.APPROVED_DIR ||
+      ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
       ticket.status === TicketStatus.PROCESSED_FINANCE)
   ) {
     return "LOGISTICS_DO";
@@ -324,10 +397,15 @@ function workflowFor(
       role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.type === TicketType.MATERIAL &&
-    ticket.status === TicketStatus.IN_TRANSIT &&
+    ticket.status !== TicketStatus.DRAFT &&
+    ticket.status !== TicketStatus.PENDING_DIRECTOR &&
+    ticket.status !== TicketStatus.REJECTED &&
+    ticket.status !== TicketStatus.COMPLETED &&
     ticket.deliveryOrders?.some(
       (deliveryOrder) => deliveryOrder.status === DOStatus.IN_TRANSIT,
-    )
+    ) &&
+    (ticket.status === TicketStatus.IN_TRANSIT ||
+      Boolean(ticket.purchaseOrders?.some((po) => Boolean(po.paidAt))))
   ) {
     return "EXPEDITION_RECEIPT";
   }
@@ -337,24 +415,43 @@ function workflowFor(
       role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR) &&
     ticket.type === TicketType.MATERIAL &&
-    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-      ticket.status === TicketStatus.PROCESSED_FINANCE) &&
-    ticket.purchaseOrders?.some((purchaseOrder) => purchaseOrder.paidAt) &&
-    ticket.items.some((item) => item.status !== FulfillmentStatus.PROCESSED_TO_DO)
+    (ticket.status === TicketStatus.APPROVED_DIR ||
+      ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE ||
+      ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+      ticket.status === TicketStatus.IN_TRANSIT) &&
+    ((ticket.purchaseOrders?.some((purchaseOrder) => Boolean(purchaseOrder.paidAt)) &&
+      ticket.items.some(
+        (item) =>
+          item.categoryHint !== TicketCategoryHint.CONTRACT &&
+          item.status !== FulfillmentStatus.PROCESSED_TO_DO &&
+          !item.doItemId,
+      )) ||
+      ticket.purchaseOrders?.some(
+        (purchaseOrder) =>
+          purchaseOrder.status === POStatus.APPROVED &&
+          !purchaseOrder.paidAt &&
+          !purchaseOrder.vendorInvoiceUrl,
+      ))
   ) {
     return "LOGISTICS";
   }
   if (
     role === UserRole.FINANCE &&
-    ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT
+    (ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+      (ticket.status === TicketStatus.APPROVED_DIR &&
+        ticket.type !== TicketType.MATERIAL) ||
+      Boolean(
+        ticket.purchaseOrders?.some(
+          (purchaseOrder) =>
+            purchaseOrder.status === POStatus.APPROVED &&
+            !purchaseOrder.paidAt &&
+            Boolean(purchaseOrder.vendorInvoiceUrl),
+        ),
+      ))
   ) {
     return "FINANCE";
-  }
-  if (
-    role === UserRole.MOVER &&
-    ticket.status === TicketStatus.ASSIGNED_TO_MOVER
-  ) {
-    return "MOVER";
   }
   return null;
 }
@@ -372,7 +469,7 @@ function getFinanceActionTarget(
   if (payablePurchase) {
     return {
       href: `/apps/finance?tab=payment&openSheet=${encodeURIComponent(payablePurchase.id)}`,
-      label: `Bayar ${payablePurchase.purchaseNumber} di Finance`,
+      label: "Bayar",
     };
   }
   const payablePo = ticket.purchaseOrders?.find(
@@ -384,7 +481,7 @@ function getFinanceActionTarget(
   if (payablePo) {
     return {
       href: `/apps/finance?tab=payment&openSheet=${encodeURIComponent(payablePo.publicCode)}`,
-      label: `Bayar ${payablePo.poNumber} di Finance`,
+      label: "Bayar",
     };
   }
   const reviewPo = ticket.purchaseOrders?.find(
@@ -393,7 +490,7 @@ function getFinanceActionTarget(
   if (reviewPo) {
     return {
       href: `/apps/finance?tab=check&openSheet=${encodeURIComponent(reviewPo.publicCode)}`,
-      label: `Periksa ${reviewPo.poNumber} di Finance`,
+      label: "Periksa PO",
     };
   }
   return null;
@@ -415,6 +512,1306 @@ type TicketStockItemOption = {
   unit: string;
   unitPrice: string;
 };
+
+type ItemEditorModalState =
+  | { mode: "add" }
+  | { mode: "edit"; item: TicketRow["items"][number] }
+  | { mode: "delete"; item: TicketRow["items"][number] }
+  | null;
+
+type AvailabilityItem = NonNullable<
+  TicketActionResult["stockAvailability"]
+>[number];
+
+function TicketRowActionControls({
+  ticket,
+  role,
+  variant,
+  canRecordContractDo,
+  isPending,
+  busyId,
+  onOpenDetail,
+  onRunAction,
+  onOpenWorkflow,
+  onOpenLogisticsDo,
+  onOpenContractDo,
+  onOpenManage,
+}: {
+  ticket: TicketRow;
+  role: TicketPageRole;
+  variant: "table" | "mobile";
+  canRecordContractDo: boolean;
+  isPending: boolean;
+  busyId: string | null;
+  onOpenDetail: (ticket: TicketRow) => void;
+  onRunAction: (ticket: TicketRow, action: DirectAction) => void;
+  onOpenWorkflow: (ticket: TicketRow) => void;
+  onOpenLogisticsDo: (ticketId: string) => void;
+  onOpenContractDo: (ticket: TicketRow) => void;
+  onOpenManage: (ticket: TicketRow, mode: TicketManageMode) => void;
+}) {
+  const isMobile = variant === "mobile";
+  const action = actionFor(role, ticket);
+  const workflow = workflowFor(role, ticket);
+  const canSubmit = ticket.status === TicketStatus.DRAFT && ticket.canSubmit;
+  const visibleAction =
+    action ??
+    (canSubmit
+      ? {
+          label: "Ajukan",
+          run: submitTicketRequest,
+        }
+      : null);
+
+  const primaryDo = ticket.deliveryOrders?.[0];
+  const showDoPrint =
+    (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+      ticket.status === TicketStatus.IN_TRANSIT) &&
+    Boolean(primaryDo);
+
+  const hasNonContractItems = ticket.items.some(
+    (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
+  );
+  const hasPendingNonContractItems = ticket.items.some(
+    (item) =>
+      item.categoryHint !== TicketCategoryHint.CONTRACT &&
+      item.status === FulfillmentStatus.PENDING,
+  );
+  const hasOpenContract =
+    canRecordContractDo && hasOpenContractDelivery(role, ticket);
+  const canManageLogisticsItems =
+    (role === UserRole.LOGISTICS ||
+      role === UserRole.ADMINISTRATIONS ||
+      ((role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
+        !isTicketProcessedByFinance(ticket))) &&
+    ticket.type === TicketType.MATERIAL &&
+    (ticket.status === TicketStatus.APPROVED_DIR ||
+      ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+      ticket.status === TicketStatus.PROCESSED_FINANCE ||
+      ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+      ticket.status === TicketStatus.IN_TRANSIT) &&
+    ticket.items.length > 0 &&
+    hasNonContractItems &&
+    (workflow !== "LOGISTICS" || hasPendingNonContractItems);
+
+  const financeTarget =
+    role === UserRole.FINANCE ? getFinanceActionTarget(ticket) : null;
+  const { canEdit, canDelete } = getTicketManagementPermissions(ticket, role);
+
+  const workflowShortLabels = {
+    LOGISTICS: ticket.deliveryOrders?.length ? "Lanjut DO" : "Proses",
+    LOGISTICS_DO: "Buat DO",
+    EXPEDITION_RECEIPT: "Terima Barang",
+    FINANCE: "Bayar",
+    MOVER: "Konfirmasi Tiba",
+  } as const;
+
+  const workflowIcons = {
+    LOGISTICS: PackageOpen,
+    LOGISTICS_DO: Truck,
+    EXPEDITION_RECEIPT: UploadCloud,
+    FINANCE: CircleDollarSign,
+    MOVER: Truck,
+  } as const;
+
+  const WorkflowIcon = workflow ? workflowIcons[workflow] : null;
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5",
+        isMobile ? "flex-wrap justify-end" : "flex-nowrap justify-end",
+      )}
+    >
+      {hasOpenContract && (
+        <Button
+          type="button"
+          size={isMobile ? "sm" : "icon"}
+          variant="success"
+          aria-label="DO Kontrak"
+          title="DO Kontrak"
+          onClick={() => onOpenContractDo(ticket)}
+        >
+          <Truck className="size-3.5" aria-hidden="true" />
+          {isMobile && <span>DO Kontrak</span>}
+        </Button>
+      )}
+
+      {canManageLogisticsItems && (
+        <Button
+          type="button"
+          size={isMobile ? "sm" : "icon"}
+          variant="warning"
+          aria-label={hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
+          title={hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
+          onClick={() => onOpenDetail(ticket)}
+        >
+          <ClipboardList className="size-3.5" aria-hidden="true" />
+          {isMobile && (
+            <span>{hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}</span>
+          )}
+        </Button>
+      )}
+
+      {workflow && WorkflowIcon ? (
+        <Button
+          type="button"
+          size={isMobile ? "sm" : "icon"}
+          variant={workflow === "EXPEDITION_RECEIPT" ? "outlinesuccess" : "default"}
+          aria-label={workflowShortLabels[workflow]}
+          title={workflowShortLabels[workflow]}
+          onClick={() => {
+            if (workflow === "LOGISTICS_DO") {
+              onOpenLogisticsDo(ticket.id);
+              return;
+            }
+            onOpenWorkflow(ticket);
+          }}
+        >
+          <WorkflowIcon className="size-3.5" aria-hidden="true" />
+          {isMobile && <span>{workflowShortLabels[workflow]}</span>}
+        </Button>
+      ) : financeTarget ? (
+        <Button
+          asChild
+          size={isMobile ? "sm" : "icon"}
+          aria-label={financeTarget.label}
+        >
+          <Link href={financeTarget.href}>
+            <CircleDollarSign className="size-3.5" aria-hidden="true" />
+            {isMobile && <span>{financeTarget.label}</span>}
+          </Link>
+        </Button>
+      ) : visibleAction ? (
+        <Button
+          type="button"
+          size={isMobile ? "sm" : "icon"}
+          aria-label={visibleAction.label}
+          title={visibleAction.label}
+          disabled={isPending && busyId === ticket.id}
+          onClick={() => onRunAction(ticket, visibleAction)}
+        >
+          {visibleAction.label === "Setujui" ? (
+            <Check className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Send className="size-3.5" aria-hidden="true" />
+          )}
+          {isMobile && <span>{visibleAction.label}</span>}
+        </Button>
+      ) : null}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label={`Menu aksi ${ticket.ticketNumber}`}
+          >
+            <MoreHorizontal className="size-4" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => onOpenDetail(ticket)}>
+            <Eye className="size-4" aria-hidden="true" />
+            Detail
+          </DropdownMenuItem>
+          {showDoPrint && primaryDo && (
+            <DropdownMenuItem asChild>
+              <Link href={`/d/${primaryDo.publicCode}`}>
+                <Printer className="size-4" aria-hidden="true" />
+                Cetak DO
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+          {canEdit && (
+            <DropdownMenuItem onSelect={() => onOpenManage(ticket, "edit")}>
+              <Pencil className="size-4" aria-hidden="true" />
+              Edit
+            </DropdownMenuItem>
+          )}
+          {canDelete && (
+            <DropdownMenuItem
+              onSelect={() => onOpenManage(ticket, "delete")}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Hapus
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function TicketMobileCard({
+  ticket,
+  role,
+  canRecordContractDo,
+  isPending,
+  busyId,
+  onOpenDetail,
+  onRunAction,
+  onOpenWorkflow,
+  onOpenLogisticsDo,
+  onOpenContractDo,
+  onOpenManage,
+}: {
+  ticket: TicketRow;
+  role: TicketPageRole;
+  canRecordContractDo: boolean;
+  isPending: boolean;
+  busyId: string | null;
+  onOpenDetail: (ticket: TicketRow) => void;
+  onRunAction: (ticket: TicketRow, action: DirectAction) => void;
+  onOpenWorkflow: (ticket: TicketRow) => void;
+  onOpenLogisticsDo: (ticketId: string) => void;
+  onOpenContractDo: (ticket: TicketRow) => void;
+  onOpenManage: (ticket: TicketRow, mode: TicketManageMode) => void;
+}) {
+  const stageNum = getTicketStageNumber(ticket.status);
+  const priorityBadgeClass = getPriorityBadgeClass(ticket.priority);
+  const hasAttachment =
+    (ticket.receiptUrls?.length ?? 0) > 0 ||
+    Boolean(
+      ticket.attachmentUrl ||
+        ticket.purchaseReceiptUrl ||
+        ticket.transferReceiptUrl ||
+        ticket.deliveryReceiptUrl,
+    );
+
+  return (
+    <article
+      onClick={() => onOpenDetail(ticket)}
+      className="cursor-pointer rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-colors hover:border-primary/40 active:bg-muted/30"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="type-p3 inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono font-semibold text-amber-500">
+            {ticket.ticketNumber}
+          </span>
+          <span
+            className={`type-p3 inline-flex items-center rounded-md border px-2 py-0.5 font-medium ${priorityBadgeClass}`}
+          >
+            {priorityLabels[ticket.priority]}
+          </span>
+        </div>
+        <span className="type-p3 text-muted-foreground">
+          {format(new Date(ticket.createdAt), "d MMM yyyy, HH:mm", {
+            locale: id,
+          })}
+        </span>
+      </div>
+
+      <h3 className="type-h3 mt-2 line-clamp-2 text-foreground">
+        {ticket.title}
+      </h3>
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline">
+          {ticket.ticketType === EQUIPMENT_REQUEST_TYPE
+            ? "Alat & Kendaraan"
+            : typeLabels[ticket.type]}
+        </Badge>
+        <span className="type-p3 inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 font-medium text-sky-600 dark:text-sky-400">
+          {ticket.project
+            ? `${ticket.project.kelompokTani} — ${ticket.project.title}`
+            : "Kantor Pusat / Overhead"}
+        </span>
+        {ticket.items.length > 0 && (
+          <Badge variant="secondary">{ticket.items.length} Item</Badge>
+        )}
+        {hasAttachment && (
+          <Badge variant="lightSuccess" className="gap-1">
+            <Paperclip className="size-3" aria-hidden="true" />
+            Nota/Bukti
+          </Badge>
+        )}
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={statusVariants[ticket.status]}>
+              {statusLabels[ticket.status]}
+            </Badge>
+            {ticket.status !== TicketStatus.REJECTED && (
+              <span className="type-p3 shrink-0 font-semibold text-muted-foreground">
+                · Tahap {stageNum}/4
+              </span>
+            )}
+          </div>
+          <p className="type-p3 text-muted-foreground">
+            Pemohon: <strong className="text-foreground">{ticket.requester.name}</strong>
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <span className="type-p3 block uppercase tracking-wider text-muted-foreground">
+            Estimasi
+          </span>
+          <span className="type-p1 font-extrabold tabular-nums text-foreground">
+            {formatCurrency(ticket.totalAmount)}
+          </span>
+        </div>
+      </div>
+
+      <div
+        className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="type-p3 text-muted-foreground">
+          Ketuk kartu untuk detail
+        </span>
+        <TicketRowActionControls
+          ticket={ticket}
+          role={role}
+          variant="mobile"
+          canRecordContractDo={canRecordContractDo}
+          isPending={isPending}
+          busyId={busyId}
+          onOpenDetail={onOpenDetail}
+          onRunAction={onRunAction}
+          onOpenWorkflow={onOpenWorkflow}
+          onOpenLogisticsDo={onOpenLogisticsDo}
+          onOpenContractDo={onOpenContractDo}
+          onOpenManage={onOpenManage}
+        />
+      </div>
+    </article>
+  );
+}
+
+function TicketDesktopRow({
+  ticket,
+  role,
+  canRecordContractDo,
+  isPending,
+  busyId,
+  onOpenDetail,
+  onRunAction,
+  onOpenWorkflow,
+  onOpenLogisticsDo,
+  onOpenContractDo,
+  onOpenManage,
+}: {
+  ticket: TicketRow;
+  role: TicketPageRole;
+  canRecordContractDo: boolean;
+  isPending: boolean;
+  busyId: string | null;
+  onOpenDetail: (ticket: TicketRow) => void;
+  onRunAction: (ticket: TicketRow, action: DirectAction) => void;
+  onOpenWorkflow: (ticket: TicketRow) => void;
+  onOpenLogisticsDo: (ticketId: string) => void;
+  onOpenContractDo: (ticket: TicketRow) => void;
+  onOpenManage: (ticket: TicketRow, mode: TicketManageMode) => void;
+}) {
+  const stageNum = getTicketStageNumber(ticket.status);
+  const priorityBadgeClass = getPriorityBadgeClass(ticket.priority);
+  const hasAttachment =
+    (ticket.receiptUrls?.length ?? 0) > 0 ||
+    Boolean(
+      ticket.attachmentUrl ||
+        ticket.purchaseReceiptUrl ||
+        ticket.transferReceiptUrl ||
+        ticket.deliveryReceiptUrl,
+    );
+
+  return (
+    <TableRow
+      tabIndex={0}
+      className="cursor-pointer transition-colors hover:bg-muted/30"
+      onClick={() => onOpenDetail(ticket)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpenDetail(ticket);
+        }
+      }}
+    >
+      <TableCell className="min-w-36 whitespace-nowrap align-top">
+        <span className="type-p3 inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono font-medium text-amber-500">
+          {ticket.ticketNumber}
+        </span>
+        <span className="type-p3 mt-1 block text-muted-foreground">
+          {format(new Date(ticket.createdAt), "d MMM yyyy, HH:mm", {
+            locale: id,
+          })}
+        </span>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 lg:hidden">
+          <span className="type-p3 font-medium text-muted-foreground">
+            {ticket.requester.name}
+          </span>
+          <span
+            className={`type-p3 inline-flex items-center rounded-md border px-2 py-0.5 font-medium ${priorityBadgeClass}`}
+          >
+            {priorityLabels[ticket.priority]}
+          </span>
+        </div>
+      </TableCell>
+
+      <TableCell className="max-w-[260px] whitespace-normal break-words align-top lg:max-w-[360px]">
+        <p className="type-p1 line-clamp-2 break-words font-semibold text-foreground">
+          {ticket.title}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Badge variant="outline">
+            {ticket.ticketType === EQUIPMENT_REQUEST_TYPE
+              ? "Alat & Kendaraan"
+              : typeLabels[ticket.type]}
+          </Badge>
+          <span className="type-p3 inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 font-medium text-sky-600 dark:text-sky-400">
+            {ticket.project
+              ? `${ticket.project.kelompokTani} — ${ticket.project.title}`
+              : "Kantor Pusat / Overhead"}
+          </span>
+          {hasAttachment && (
+            <Badge variant="lightSuccess" className="gap-1">
+              <Paperclip className="size-3" aria-hidden="true" />
+              Bukti
+            </Badge>
+          )}
+          {ticket.items.some(
+            (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+          ) && <Badge variant="lightInfo">Kontrak Alam</Badge>}
+          {ticket.items.length > 0 && (
+            <Badge variant="secondary">{ticket.items.length} Item</Badge>
+          )}
+        </div>
+      </TableCell>
+
+      <TableCell className="type-p2 hidden align-top font-medium lg:table-cell">
+        {ticket.requester.name}
+      </TableCell>
+
+      <TableCell className="hidden align-top text-center lg:table-cell">
+        <span
+          className={`type-p3 inline-flex items-center rounded-md border px-2 py-0.5 font-medium ${priorityBadgeClass}`}
+        >
+          {priorityLabels[ticket.priority]}
+        </span>
+      </TableCell>
+
+      <TableCell className="align-top">
+        <div className="space-y-1.5">
+          <Badge variant={statusVariants[ticket.status]}>
+            {statusLabels[ticket.status]}
+          </Badge>
+          {ticket.status !== TicketStatus.REJECTED && (
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4].map((step) => (
+                  <span
+                    key={step}
+                    className={`h-1.5 w-4 rounded-full ${
+                      step <= stageNum
+                        ? ticket.status === TicketStatus.COMPLETED
+                          ? "bg-emerald-500"
+                          : "bg-primary"
+                        : "bg-muted-foreground/25"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="type-p3 font-semibold text-muted-foreground">
+                {stageNum}/4
+              </span>
+            </div>
+          )}
+        </div>
+      </TableCell>
+
+      <TableCell className="type-p1 whitespace-nowrap align-top text-right font-bold tabular-nums">
+        {formatCurrency(ticket.totalAmount)}
+      </TableCell>
+
+      <TableCell
+        className="sticky right-0 z-10 w-[124px] border-l border-border/50 bg-card/95 align-top backdrop-blur-sm"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <TicketRowActionControls
+          ticket={ticket}
+          role={role}
+          variant="table"
+          canRecordContractDo={canRecordContractDo}
+          isPending={isPending}
+          busyId={busyId}
+          onOpenDetail={onOpenDetail}
+          onRunAction={onRunAction}
+          onOpenWorkflow={onOpenWorkflow}
+          onOpenLogisticsDo={onOpenLogisticsDo}
+          onOpenContractDo={onOpenContractDo}
+          onOpenManage={onOpenManage}
+        />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function TicketDetailItemCard({
+  ticket,
+  item,
+  canSplitFulfillment,
+  canExecutiveManageTicket,
+  selected,
+  onToggleSelect,
+  onEditItem,
+  onDeleteItem,
+}: {
+  ticket: TicketRow;
+  item: TicketRow["items"][number];
+  canSplitFulfillment: boolean;
+  canExecutiveManageTicket: boolean;
+  selected: boolean;
+  onToggleSelect: (checked: boolean) => void;
+  onEditItem: (item: TicketRow["items"][number]) => void;
+  onDeleteItem: (item: TicketRow["items"][number]) => void;
+}) {
+  const activeDirectPurchase =
+    item.status === FulfillmentStatus.PENDING
+      ? ticket.directStockPurchases?.find(
+          (purchase) =>
+            purchase.status === "PENDING_RECEIPT" &&
+            (purchase.items ?? []).some((purchaseItem) => {
+              if (item.stockItemId && purchaseItem.stockItemId) {
+                return purchaseItem.stockItemId === item.stockItemId;
+              }
+              return (
+                purchaseItem.itemName.trim().toLowerCase() ===
+                  item.itemName.trim().toLowerCase() &&
+                purchaseItem.unit.trim().toLowerCase() ===
+                  item.unit.trim().toLowerCase()
+              );
+            }),
+        )
+      : undefined;
+
+  const deliveredContractVolume =
+    item.categoryHint === TicketCategoryHint.CONTRACT
+      ? getContractItemDeliveredVolume(ticket, item.materialContractId)
+      : 0;
+
+  return (
+    <div className="space-y-2 rounded-xl border border-border bg-card p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          {canSplitFulfillment && (
+            <Checkbox
+              className="mt-0.5"
+              checked={selected}
+              disabled={
+                item.status !== FulfillmentStatus.PENDING ||
+                item.categoryHint === TicketCategoryHint.CONTRACT
+              }
+              aria-label={`Pilih ${item.itemName}`}
+              onCheckedChange={(checked) => onToggleSelect(checked === true)}
+            />
+          )}
+          <div className="min-w-0">
+            <p className="type-p2 font-semibold text-foreground">
+              {item.itemName}
+            </p>
+            {item.categoryHint === TicketCategoryHint.CONTRACT &&
+              item.materialContract && (
+                <p className="type-p3 text-muted-foreground">
+                  {item.materialContract.contractNumber} ·{" "}
+                  {item.materialContract.vendorName}
+                </p>
+              )}
+          </div>
+        </div>
+        <Badge
+          variant={
+            item.status === FulfillmentStatus.PENDING
+              ? "lightWarning"
+              : "lightSuccess"
+          }
+          className="shrink-0"
+        >
+          {item.categoryHint === TicketCategoryHint.CONTRACT
+            ? item.status === FulfillmentStatus.PROCESSED_TO_DO
+              ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
+              : deliveredContractVolume > 0
+                ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
+                : "Menunggu DO Kontrak"
+            : item.status === FulfillmentStatus.PENDING
+              ? activeDirectPurchase
+                ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
+                : "Menunggu"
+              : item.status === FulfillmentStatus.PROCESSED_TO_DO
+                ? "Dipenuhi DO"
+                : "Diproses PO"}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-lg bg-muted/30 p-2.5">
+        <div>
+          <span className="type-p3 block uppercase tracking-wide text-muted-foreground">
+            Jumlah
+          </span>
+          <p className="type-p2 font-semibold text-foreground">
+            {item.quantity} {item.unit}
+          </p>
+        </div>
+        <div>
+          <span className="type-p3 block uppercase tracking-wide text-muted-foreground">
+            Harga Satuan
+          </span>
+          <p className="type-p2 font-semibold tabular-nums text-foreground">
+            {formatCurrency(item.estimatedCost)}
+          </p>
+        </div>
+        <div>
+          <span className="type-p3 block uppercase tracking-wide text-muted-foreground">
+            Sumber
+          </span>
+          <p className="type-p2 font-medium text-foreground">
+            {item.categoryHint === TicketCategoryHint.WAREHOUSE
+              ? "Stok Gudang"
+              : item.categoryHint === TicketCategoryHint.CONTRACT
+                ? "Kontrak Alam"
+                : "Pembelian"}
+          </p>
+        </div>
+        <div>
+          <span className="type-p3 block uppercase tracking-wide text-muted-foreground">
+            Target Tiba
+          </span>
+          <p className="type-p2 text-foreground">
+            {item.expectedDeliveryDate ?? "—"}
+          </p>
+        </div>
+      </div>
+
+      {canExecutiveManageTicket && (
+        <div className="flex items-center justify-end gap-1.5 border-t border-border/60 pt-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onEditItem(item)}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Edit
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            disabled={ticket.items.length <= 1}
+            onClick={() => onDeleteItem(item)}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Hapus
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TicketDetailItemRow({
+  ticket,
+  item,
+  canSplitFulfillment,
+  canExecutiveManageTicket,
+  selected,
+  onToggleSelect,
+  onEditItem,
+  onDeleteItem,
+}: {
+  ticket: TicketRow;
+  item: TicketRow["items"][number];
+  canSplitFulfillment: boolean;
+  canExecutiveManageTicket: boolean;
+  selected: boolean;
+  onToggleSelect: (checked: boolean) => void;
+  onEditItem: (item: TicketRow["items"][number]) => void;
+  onDeleteItem: (item: TicketRow["items"][number]) => void;
+}) {
+  const activeDirectPurchase =
+    item.status === FulfillmentStatus.PENDING
+      ? ticket.directStockPurchases?.find(
+          (purchase) =>
+            purchase.status === "PENDING_RECEIPT" &&
+            (purchase.items ?? []).some((purchaseItem) => {
+              if (item.stockItemId && purchaseItem.stockItemId) {
+                return purchaseItem.stockItemId === item.stockItemId;
+              }
+              return (
+                purchaseItem.itemName.trim().toLowerCase() ===
+                  item.itemName.trim().toLowerCase() &&
+                purchaseItem.unit.trim().toLowerCase() ===
+                  item.unit.trim().toLowerCase()
+              );
+            }),
+        )
+      : undefined;
+
+  const deliveredContractVolume =
+    item.categoryHint === TicketCategoryHint.CONTRACT
+      ? getContractItemDeliveredVolume(ticket, item.materialContractId)
+      : 0;
+
+  return (
+    <TableRow>
+      {canSplitFulfillment && (
+        <TableCell>
+          <Checkbox
+            checked={selected}
+            disabled={
+              item.status !== FulfillmentStatus.PENDING ||
+              item.categoryHint === TicketCategoryHint.CONTRACT
+            }
+            aria-label={`Pilih ${item.itemName}`}
+            onCheckedChange={(checked) => onToggleSelect(checked === true)}
+          />
+        </TableCell>
+      )}
+      <TableCell className="font-medium">
+        <div className="type-p2 font-medium text-foreground">
+          {item.itemName}
+        </div>
+        {item.categoryHint === TicketCategoryHint.CONTRACT &&
+          item.materialContract && (
+            <div className="type-p3 text-muted-foreground">
+              {item.materialContract.contractNumber} ·{" "}
+              {item.materialContract.vendorName}
+            </div>
+          )}
+      </TableCell>
+      <TableCell className="type-p2 whitespace-nowrap">
+        {item.quantity} {item.unit}
+      </TableCell>
+      <TableCell className="type-p2 whitespace-nowrap tabular-nums">
+        {formatCurrency(item.estimatedCost)}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline">
+          {item.categoryHint === TicketCategoryHint.WAREHOUSE
+            ? "Stok Gudang"
+            : item.categoryHint === TicketCategoryHint.CONTRACT
+              ? "Kontrak Alam"
+              : "Pembelian"}
+        </Badge>
+      </TableCell>
+      <TableCell className="type-p3 whitespace-nowrap">
+        {item.expectedDeliveryDate ?? "—"}
+      </TableCell>
+      <TableCell>
+        <Badge
+          variant={
+            item.status === FulfillmentStatus.PENDING
+              ? "lightWarning"
+              : "lightSuccess"
+          }
+        >
+          {item.categoryHint === TicketCategoryHint.CONTRACT
+            ? item.status === FulfillmentStatus.PROCESSED_TO_DO
+              ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
+              : deliveredContractVolume > 0
+                ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
+                : "Menunggu DO Kontrak"
+            : item.status === FulfillmentStatus.PENDING
+              ? activeDirectPurchase
+                ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
+                : "Menunggu"
+              : item.status === FulfillmentStatus.PROCESSED_TO_DO
+                ? "Dipenuhi DO"
+                : "Diproses PO"}
+        </Badge>
+      </TableCell>
+      {canExecutiveManageTicket && (
+        <TableCell className="whitespace-nowrap text-right">
+          <div className="inline-flex items-center justify-end gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onEditItem(item)}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Edit
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              disabled={ticket.items.length <= 1}
+              onClick={() => onDeleteItem(item)}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              Hapus
+            </Button>
+          </div>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+}
+
+function StockAvailabilityRow({
+  item,
+  availability,
+  disabled,
+  onOpenSkuMapper,
+}: {
+  item: TicketRow["items"][number];
+  availability?: AvailabilityItem;
+  disabled: boolean;
+  onOpenSkuMapper: (
+    item: TicketRow["items"][number],
+    currentStockId?: string | null,
+  ) => void;
+}) {
+  return (
+    <TableRow>
+      <TableCell className="type-p2 align-top font-medium whitespace-normal break-words">
+        {item.itemName}
+      </TableCell>
+      <TableCell className="type-p2 align-top whitespace-nowrap tabular-nums">
+        {item.quantity} {item.unit}
+      </TableCell>
+      <TableCell className="type-p2 align-top whitespace-nowrap tabular-nums">
+        {availability
+          ? `${availability.availableQuantity} ${item.unit}`
+          : "Belum diperiksa"}
+      </TableCell>
+      <TableCell className="align-top whitespace-normal">
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant={
+                availability?.ready ? "lightSuccess" : "lightWarning"
+              }
+            >
+              {availability
+                ? availability.pendingPurchaseNumber
+                  ? "Sedang Dipesan"
+                  : availability.ready
+                    ? "Stok Ready"
+                    : "Perlu Pesan"
+                : "Menunggu"}
+            </Badge>
+            {availability?.stockItemSku && (
+              <span className="type-p3 text-muted-foreground">
+                SKU: {availability.stockItemSku}
+              </span>
+            )}
+          </div>
+          {availability?.message && (
+            <p className="type-p3 text-muted-foreground">
+              {availability.message}
+            </p>
+          )}
+          {availability && !availability.pendingPurchaseNumber && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={disabled}
+              onClick={() => onOpenSkuMapper(item, availability.stockItemId)}
+            >
+              Tautkan SKU
+            </Button>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function TicketItemEditorModal({
+  ticket,
+  modalState,
+  stockItems,
+  onClose,
+  onSaved,
+}: {
+  ticket: TicketRow;
+  modalState: NonNullable<ItemEditorModalState>;
+  stockItems: TicketStockItemOption[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = modalState.mode === "edit";
+  const isDelete = modalState.mode === "delete";
+  const targetItem =
+    modalState.mode === "edit" || modalState.mode === "delete"
+      ? modalState.item
+      : null;
+  const isContractItem =
+    targetItem?.categoryHint === TicketCategoryHint.CONTRACT;
+
+  const defaultDeliveryDate =
+    ticket.items.find((i) => i.expectedDeliveryDate)?.expectedDeliveryDate ||
+    new Date().toISOString().slice(0, 10);
+
+  const [stockId, setStockId] = useState(targetItem?.stockItemId ?? "");
+  const [name, setName] = useState(targetItem?.itemName ?? "");
+  const [quantity, setQuantity] = useState(
+    targetItem ? String(targetItem.quantity) : "1",
+  );
+  const [unit, setUnit] = useState(targetItem?.unit ?? "pcs");
+  const [cost, setCost] = useState(targetItem?.estimatedCost ?? "");
+  const [categoryHint, setCategoryHint] = useState<TicketCategoryHint>(
+    targetItem?.categoryHint ?? TicketCategoryHint.WAREHOUSE,
+  );
+  const [deliveryDate, setDeliveryDate] = useState(
+    targetItem?.expectedDeliveryDate ?? (isEdit ? "" : defaultDeliveryDate),
+  );
+  const [pending, setPending] = useState(false);
+
+  const stockOptions = useMemo<ComboboxOption[]>(
+    () => [
+      { value: "__MANUAL__", label: "Ketik manual (tanpa SKU)" },
+      ...stockItems.map((s) => ({
+        value: s.id,
+        label: `${s.sku} — ${s.name} (${s.unit})`,
+        keywords: [s.sku, s.name, s.unit],
+      })),
+    ],
+    [stockItems],
+  );
+
+  if (isDelete && targetItem) {
+    const confirmDelete = async () => {
+      if (pending) return;
+      setPending(true);
+      try {
+        const result = await deleteTicketItemByExecutive(
+          ticket.id,
+          targetItem.id,
+        );
+        if (result.success) {
+          toast.success(result.message);
+          onClose();
+          onSaved();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (err) {
+        console.error("Delete ticket item failed:", err);
+        toast.error("Gagal menghapus barang.");
+      } finally {
+        setPending(false);
+      }
+    };
+
+    return (
+      <GlobalModal
+        isOpen
+        onClose={() => {
+          if (!pending) onClose();
+        }}
+        title="Hapus Barang?"
+        description="Item akan dihapus dari rincian tiket ini."
+        className="sm:max-w-md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={onClose}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={pending}
+              onClick={() => void confirmDelete()}
+            >
+              {pending ? "Menghapus..." : "Hapus"}
+            </Button>
+          </>
+        }
+      >
+        <p className="type-p2 text-foreground">
+          Yakin ingin menghapus <strong>{targetItem.itemName}</strong> (
+          {targetItem.quantity} {targetItem.unit}) dari tiket{" "}
+          <strong>{ticket.ticketNumber}</strong>?
+        </p>
+      </GlobalModal>
+    );
+  }
+
+  const handleSave = async () => {
+    const qty = Number(quantity);
+    if (!name.trim() || !unit.trim() || !Number.isFinite(qty) || qty <= 0) {
+      toast.error("Nama barang, satuan, dan jumlah (> 0) wajib diisi.");
+      return;
+    }
+    setPending(true);
+    try {
+      const result = isEdit && targetItem
+        ? await updateTicketItemByExecutive(ticket.id, targetItem.id, {
+            stockItemId: stockId || null,
+            itemName: name.trim(),
+            quantity: qty,
+            unit: unit.trim(),
+            estimatedCost: cost.trim() !== "" ? Number(cost) : null,
+            categoryHint,
+            expectedDeliveryDate: deliveryDate.trim() || null,
+          })
+        : await addTicketItemByExecutive(ticket.id, {
+            stockItemId: stockId || null,
+            itemName: name.trim(),
+            quantity: qty,
+            unit: unit.trim(),
+            estimatedCost: cost.trim() !== "" ? Number(cost) : null,
+            categoryHint,
+            expectedDeliveryDate: deliveryDate.trim() || null,
+          });
+      if (result.success) {
+        toast.success(result.message);
+        onClose();
+        onSaved();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (err) {
+      console.error("Save ticket item failed:", err);
+      toast.error("Gagal menyimpan barang.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <GlobalModal
+      isOpen
+      onClose={() => {
+        if (!pending) onClose();
+      }}
+      title={isEdit ? "Edit Barang Tiket" : "Tambah Barang Tiket"}
+      description="Lengkapi rincian item barang untuk tiket ini."
+      className="sm:max-w-xl"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={onClose}
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            disabled={
+              pending ||
+              !name.trim() ||
+              !unit.trim() ||
+              !(Number(quantity) > 0)
+            }
+            onClick={() => void handleSave()}
+          >
+            {pending ? "Menyimpan..." : "Simpan"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {!isEdit && stockItems.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="type-p2 font-medium">
+              Pilih dari Katalog Stok (Opsional)
+            </Label>
+            <Combobox
+              options={stockOptions}
+              value={stockId || "__MANUAL__"}
+              placeholder="Pilih SKU atau ketik manual..."
+              searchPlaceholder="Cari SKU atau nama barang..."
+              emptyText="SKU tidak ditemukan."
+              onValueChange={(val) => {
+                if (val === "__MANUAL__" || !val) {
+                  setStockId("");
+                  return;
+                }
+                setStockId(val);
+                const found = stockItems.find((s) => s.id === val);
+                if (found) {
+                  setName(found.name);
+                  setUnit(found.unit);
+                  if (found.unitPrice && Number(found.unitPrice) > 0) {
+                    setCost(String(Number(found.unitPrice)));
+                  }
+                }
+              }}
+            />
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="type-p2 font-medium">
+              Nama Barang <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              value={name}
+              maxLength={160}
+              placeholder="Contoh: Semen 40 Kg"
+              disabled={isContractItem || pending}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="type-p2 font-medium">
+              Jumlah <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              type="number"
+              min="0.01"
+              step="any"
+              value={quantity}
+              disabled={pending}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="type-p2 font-medium">
+              Satuan <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              value={unit}
+              maxLength={32}
+              placeholder="zak / pcs / m3"
+              disabled={isContractItem || pending}
+              onChange={(e) => setUnit(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="type-p2 font-medium">Harga Satuan (Rp)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Opsional"
+              value={cost}
+              disabled={pending}
+              onChange={(e) => setCost(e.target.value)}
+            />
+          </div>
+          {!isContractItem && (
+            <div className="space-y-1.5">
+              <Label className="type-p2 font-medium">Sumber</Label>
+              <Select
+                value={categoryHint}
+                disabled={pending}
+                onValueChange={(value) =>
+                  setCategoryHint(value as TicketCategoryHint)
+                }
+              >
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TicketCategoryHint.WAREHOUSE}>
+                    Stok Gudang
+                  </SelectItem>
+                  <SelectItem value={TicketCategoryHint.PURCHASE}>
+                    Pembelian
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label className="type-p2 font-medium">Target Tiba</Label>
+            <DatePicker
+              value={deliveryDate}
+              clearable
+              disabled={pending}
+              onValueChange={setDeliveryDate}
+              placeholder="Pilih tanggal target tiba"
+            />
+          </div>
+        </div>
+      </div>
+    </GlobalModal>
+  );
+}
+
+function SkuMappingModal({
+  target,
+  stockItems,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  target: {
+    item: TicketRow["items"][number];
+    currentStockId?: string | null;
+  };
+  stockItems: TicketStockItemOption[];
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: (ticketItemId: string, stockItemId: string) => void;
+}) {
+  const [selectedSkuId, setSelectedSkuId] = useState(
+    target.currentStockId ?? "",
+  );
+  const options = useMemo<ComboboxOption[]>(
+    () =>
+      stockItems.map((s) => ({
+        value: s.id,
+        label: `${s.sku} — ${s.name} (${s.unit})`,
+        keywords: [s.sku, s.name, s.unit],
+      })),
+    [stockItems],
+  );
+
+  return (
+    <GlobalModal
+      isOpen
+      onClose={() => {
+        if (!pending) onClose();
+      }}
+      title="Tautkan ke SKU Gudang"
+      description={`Pilih SKU katalog stok untuk item "${target.item.itemName}".`}
+      className="sm:max-w-md"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={onClose}
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            disabled={pending || !selectedSkuId}
+            onClick={() => onConfirm(target.item.id, selectedSkuId)}
+          >
+            {pending ? "Menautkan..." : "Tautkan SKU"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-2">
+        <Label className="type-p2 font-medium">Katalog SKU Gudang</Label>
+        <Combobox
+          options={options}
+          value={selectedSkuId}
+          onValueChange={setSelectedSkuId}
+          placeholder="Pilih SKU gudang..."
+          searchPlaceholder="Ketik kode SKU atau nama barang..."
+          emptyText="SKU tidak ditemukan."
+        />
+      </div>
+    </GlobalModal>
+  );
+}
 
 export default function TicketListing({
   tickets,
@@ -450,6 +1847,18 @@ export default function TicketListing({
     ? (tickets.find((ticket) => ticket.id === selectedTicketState.id) ??
       selectedTicketState)
     : null;
+
+  const [activeManageModal, setActiveManageModal] = useState<{
+    ticket: TicketRow;
+    mode: TicketManageMode;
+  } | null>(null);
+  const [itemEditorModal, setItemEditorModal] =
+    useState<ItemEditorModalState>(null);
+  const [skuMapTarget, setSkuMapTarget] = useState<{
+    item: TicketRow["items"][number];
+    currentStockId?: string | null;
+  } | null>(null);
+
   const [itemSelection, setItemSelection] = useState<{
     ticketId: string;
     itemIds: string[];
@@ -492,6 +1901,21 @@ export default function TicketListing({
     url: string;
   } | null>(null);
   const [receiptPreviewError, setReceiptPreviewError] = useState(false);
+  const [workflowTicket, setWorkflowTicket] = useState<TicketRow | null>(null);
+  const [contractDoModalTicket, setContractDoModalTicket] =
+    useState<TicketRow | null>(null);
+  const [deletingDeliveryId, setDeletingDeliveryId] = useState<string | null>(
+    null,
+  );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [mobilePage, setMobilePage] = useState(1);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const canRecordContractDo = canRecordMaterialDeliveries(role);
+
   const openReceiptPreview = (receipt: { label: string; url: string }) => {
     setReceiptPreviewError(false);
     setSelectedReceipt(receipt);
@@ -500,52 +1924,11 @@ export default function TicketListing({
     setReceiptPreviewError(false);
     setSelectedReceipt(null);
   };
-  const [workflowTicket, setWorkflowTicket] = useState<TicketRow | null>(null);
-  const [contractDoModalTicket, setContractDoModalTicket] =
-    useState<TicketRow | null>(null);
-  const [contractDoFeedback, setContractDoFeedback] = useState<{
-    text: string;
-    isError: boolean;
-  } | null>(null);
-  const [deletingDeliveryId, setDeletingDeliveryId] = useState<string | null>(
-    null,
-  );
-  const [message, setMessage] = useState("");
-  const [printMessage, setPrintMessage] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const canRecordContractDo = canRecordMaterialDeliveries(role);
+
   const selectedItemIds =
     selectedTicket && itemSelection?.ticketId === selectedTicket.id
       ? itemSelection.itemIds
       : [];
-
-  const getContractItemDeliveredVolume = (
-    ticket: TicketRow,
-    materialContractId?: string | null,
-  ) =>
-    materialContractId
-      ? (ticket.materialDeliveries ?? [])
-          .filter((delivery) => delivery.contractId === materialContractId)
-          .reduce((sum, delivery) => sum + delivery.quantityReceived, 0)
-      : 0;
-
-  const hasOpenContractDelivery = (ticket: TicketRow) =>
-    !(
-      (role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
-      isTicketProcessedByFinance(ticket)
-    ) &&
-    ticket.type === TicketType.MATERIAL &&
-    (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-      ticket.status === TicketStatus.PROCESSED_FINANCE) &&
-    ticket.items.some(
-      (item) =>
-        item.categoryHint === TicketCategoryHint.CONTRACT &&
-        item.status === FulfillmentStatus.PENDING,
-    );
 
   const selectedTicketItems = selectedTicket
     ? selectedTicket.items.filter(
@@ -580,6 +1963,7 @@ export default function TicketListing({
     pendingTicketItemIds.every((id) => selectedItemIds.includes(id));
   const somePendingItemsSelected =
     pendingTicketItemIds.some((id) => selectedItemIds.includes(id));
+
   const isExecutive =
     role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR;
   const selectedTicketFinanceLocked = selectedTicket
@@ -593,204 +1977,24 @@ export default function TicketListing({
       ((role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) &&
         !selectedTicketFinanceLocked)) &&
     selectedTicket?.type === TicketType.MATERIAL &&
-    (selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC ||
-      selectedTicket.status === TicketStatus.PROCESSED_FINANCE) &&
+    (selectedTicket.status === TicketStatus.APPROVED_DIR ||
+      selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC ||
+      selectedTicket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+      selectedTicket.status === TicketStatus.PROCESSED_FINANCE ||
+      selectedTicket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+      selectedTicket.status === TicketStatus.IN_TRANSIT) &&
     Boolean(
       selectedTicket.items.some(
         (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
       ),
     );
 
-  // State khusus Direktur & Wakil Direktur untuk tambah/edit/hapus barang langsung di modal
-  const [addingItemOpen, setAddingItemOpen] = useState(false);
-  const [newItemStockId, setNewItemStockId] = useState("");
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemQuantity, setNewItemQuantity] = useState("1");
-  const [newItemUnit, setNewItemUnit] = useState("pcs");
-  const [newItemCost, setNewItemCost] = useState("");
-  const [newItemCategoryHint, setNewItemCategoryHint] =
-    useState<TicketCategoryHint>(TicketCategoryHint.WAREHOUSE);
-  const [newItemDeliveryDate, setNewItemDeliveryDate] = useState("");
-
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editItemStockId, setEditItemStockId] = useState("");
-  const [editItemName, setEditItemName] = useState("");
-  const [editItemQuantity, setEditItemQuantity] = useState("");
-  const [editItemUnit, setEditItemUnit] = useState("");
-  const [editItemCost, setEditItemCost] = useState("");
-  const [editItemCategoryHint, setEditItemCategoryHint] =
-    useState<TicketCategoryHint>(TicketCategoryHint.WAREHOUSE);
-  const [editItemDeliveryDate, setEditItemDeliveryDate] = useState("");
-
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
-  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(
-    null,
-  );
-  const [executiveItemPending, setExecutiveItemPending] = useState(false);
-  const [executiveItemFeedback, setExecutiveItemFeedback] = useState<{
-    text: string;
-    isError: boolean;
-  } | null>(null);
-
-  const resetExecutiveItemState = () => {
-    setAddingItemOpen(false);
-    setEditingItemId(null);
-    setConfirmDeleteItemId(null);
-    setExecutiveItemFeedback(null);
-  };
-
-  const openAddItemForm = () => {
-    const defaultDate =
-      selectedTicket?.items.find((i) => i.expectedDeliveryDate)
-        ?.expectedDeliveryDate || new Date().toISOString().slice(0, 10);
-    setNewItemStockId("");
-    setNewItemName("");
-    setNewItemQuantity("1");
-    setNewItemUnit("pcs");
-    setNewItemCost("");
-    setNewItemCategoryHint(TicketCategoryHint.WAREHOUSE);
-    setNewItemDeliveryDate(defaultDate);
-    setEditingItemId(null);
-    setConfirmDeleteItemId(null);
-    setExecutiveItemFeedback(null);
-    setAddingItemOpen(true);
-  };
-
-  const openEditItemRow = (item: TicketRow["items"][number]) => {
-    setAddingItemOpen(false);
-    setConfirmDeleteItemId(null);
-    setExecutiveItemFeedback(null);
-    setEditingItemId(item.id);
-    setEditItemStockId(item.stockItemId ?? "");
-    setEditItemName(item.itemName);
-    setEditItemQuantity(String(item.quantity));
-    setEditItemUnit(item.unit);
-    setEditItemCost(item.estimatedCost ?? "");
-    setEditItemCategoryHint(item.categoryHint ?? TicketCategoryHint.WAREHOUSE);
-    setEditItemDeliveryDate(item.expectedDeliveryDate ?? "");
-  };
-
-  const handleExecutiveAddItem = async () => {
-    if (!selectedTicket || executiveItemPending) return;
-    const qty = Number(newItemQuantity);
-    if (!newItemName.trim() || !newItemUnit.trim() || !Number.isFinite(qty) || qty <= 0) {
-      setExecutiveItemFeedback({
-        text: "Nama barang, satuan, dan jumlah (> 0) wajib diisi.",
-        isError: true,
-      });
-      return;
-    }
-    setExecutiveItemPending(true);
-    setExecutiveItemFeedback(null);
-    try {
-      const result = await addTicketItemByExecutive(selectedTicket.id, {
-        stockItemId: newItemStockId || null,
-        itemName: newItemName.trim(),
-        quantity: qty,
-        unit: newItemUnit.trim(),
-        estimatedCost: newItemCost.trim() !== "" ? Number(newItemCost) : null,
-        categoryHint: newItemCategoryHint,
-        expectedDeliveryDate: newItemDeliveryDate.trim() || null,
-      });
-      setExecutiveItemFeedback({
-        text: result.message,
-        isError: !result.success,
-      });
-      if (result.success) {
-        setAddingItemOpen(false);
-        router.refresh();
-      }
-    } catch (error) {
-      console.error("Executive add item failed:", error);
-      setExecutiveItemFeedback({
-        text: "Gagal menambahkan barang ke tiket.",
-        isError: true,
-      });
-    } finally {
-      setExecutiveItemPending(false);
-    }
-  };
-
-  const handleExecutiveUpdateItem = async (itemId: string) => {
-    if (!selectedTicket || executiveItemPending) return;
-    const qty = Number(editItemQuantity);
-    if (!editItemName.trim() || !editItemUnit.trim() || !Number.isFinite(qty) || qty <= 0) {
-      setExecutiveItemFeedback({
-        text: "Nama barang, satuan, dan jumlah (> 0) wajib diisi.",
-        isError: true,
-      });
-      return;
-    }
-    setExecutiveItemPending(true);
-    setExecutiveItemFeedback(null);
-    try {
-      const result = await updateTicketItemByExecutive(
-        selectedTicket.id,
-        itemId,
-        {
-          stockItemId: editItemStockId || null,
-          itemName: editItemName.trim(),
-          quantity: qty,
-          unit: editItemUnit.trim(),
-          estimatedCost:
-            editItemCost.trim() !== "" ? Number(editItemCost) : null,
-          categoryHint: editItemCategoryHint,
-          expectedDeliveryDate: editItemDeliveryDate.trim() || null,
-        },
-      );
-      setExecutiveItemFeedback({
-        text: result.message,
-        isError: !result.success,
-      });
-      if (result.success) {
-        setEditingItemId(null);
-        router.refresh();
-      }
-    } catch (error) {
-      console.error("Executive update item failed:", error);
-      setExecutiveItemFeedback({
-        text: "Gagal memperbarui rincian barang.",
-        isError: true,
-      });
-    } finally {
-      setExecutiveItemPending(false);
-    }
-  };
-
-  const handleExecutiveDeleteItem = async (itemId: string) => {
-    if (!selectedTicket || executiveItemPending || deletingItemId) return;
-    setDeletingItemId(itemId);
-    setExecutiveItemFeedback(null);
-    try {
-      const result = await deleteTicketItemByExecutive(
-        selectedTicket.id,
-        itemId,
-      );
-      setExecutiveItemFeedback({
-        text: result.message,
-        isError: !result.success,
-      });
-      if (result.success) {
-        setConfirmDeleteItemId(null);
-        router.refresh();
-      }
-    } catch (error) {
-      console.error("Executive delete item failed:", error);
-      setExecutiveItemFeedback({
-        text: "Gagal menghapus barang dari tiket.",
-        isError: true,
-      });
-    } finally {
-      setDeletingItemId(null);
-    }
-  };
-
   const openTicketSheet = (ticket: TicketRow) => {
     setSelectedReceipt(null);
     setDoDialogOpen(false);
     setPoDialogOpen(false);
-    setContractDoFeedback(null);
-    resetExecutiveItemState();
+    setItemEditorModal(null);
+    setSkuMapTarget(null);
     setItemSelection(null);
     setFulfillmentMessage("");
     setStockAvailability([]);
@@ -802,8 +2006,8 @@ export default function TicketListing({
     setSelectedReceipt(null);
     setDoDialogOpen(false);
     setPoDialogOpen(false);
-    setContractDoFeedback(null);
-    resetExecutiveItemState();
+    setItemEditorModal(null);
+    setSkuMapTarget(null);
     setSelectedTicket(null);
     setItemSelection(null);
     setFulfillmentMessage("");
@@ -833,19 +2037,20 @@ export default function TicketListing({
         selectedMoverId,
         selectedVehicleId,
       );
-      setFulfillmentMessage(result.message);
       if (result.success) {
+        toast.success(result.message);
         setDoDialogOpen(false);
         setStockAvailability([]);
         setSelectedTicket(null);
         setItemSelection(null);
         router.refresh();
+      } else {
+        setFulfillmentMessage(result.message);
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Ticket stock fulfillment failed:", error);
-      setFulfillmentMessage(
-        "Pemenuhan stok gagal. Muat ulang tiket lalu coba kembali.",
-      );
+      setFulfillmentMessage("Pemenuhan stok gagal. Coba kembali.");
     } finally {
       setFulfillmentPending(false);
     }
@@ -879,14 +2084,14 @@ export default function TicketListing({
         setSelectedVehicleId(result.vehicles?.[0]?.id ?? "");
         setSelectedMoverId(
           result.movers?.some((mover) => mover.id === result.moverAssigneeId)
-            ? result.moverAssigneeId ?? ""
+            ? (result.moverAssigneeId ?? "")
             : "",
         );
         setDoDialogOpen(true);
       }
     } catch (error) {
       console.error("Ticket stock availability check failed:", error);
-      setFulfillmentMessage("Saldo gudang gagal diperiksa. Silakan coba kembali.");
+      setFulfillmentMessage("Saldo gudang gagal diperiksa.");
       setDoDialogOpen(true);
     } finally {
       setFulfillmentPending(false);
@@ -914,6 +2119,7 @@ export default function TicketListing({
       );
       if (!mappingResult.success) {
         setFulfillmentMessage(mappingResult.message);
+        toast.error(mappingResult.message);
         return;
       }
 
@@ -931,65 +2137,57 @@ export default function TicketListing({
             ? current.itemIds.filter((id) =>
                 stockCheck.readyItemIds?.includes(id),
               )
-            : stockCheck.readyItemIds ?? [];
+            : (stockCheck.readyItemIds ?? []);
         const nextIds = mappedReady
           ? [...new Set([...previousIds, ticketItemId])]
           : previousIds;
-        return {
-          ticketId,
-          itemIds: nextIds,
-        };
+        return { ticketId, itemIds: nextIds };
       });
+      setSkuMapTarget(null);
+      toast.success(mappingResult.message);
       router.refresh();
       setMoverOptions(stockCheck.movers ?? []);
       setVehicleOptions(stockCheck.vehicles ?? []);
       setSelectedVehicleId(
-        stockCheck.vehicles?.some(
-          (vehicle) => vehicle.id === selectedVehicleId,
-        )
+        stockCheck.vehicles?.some((v) => v.id === selectedVehicleId)
           ? selectedVehicleId
-          : stockCheck.vehicles?.[0]?.id ?? "",
+          : (stockCheck.vehicles?.[0]?.id ?? ""),
       );
       setSelectedMoverId(
-        stockCheck.movers?.some((mover) => mover.id === selectedMoverId)
+        stockCheck.movers?.some((m) => m.id === selectedMoverId)
           ? selectedMoverId
-          : stockCheck.movers?.some(
-                (mover) => mover.id === stockCheck.moverAssigneeId,
-              )
-            ? stockCheck.moverAssigneeId ?? ""
+          : stockCheck.movers?.some((m) => m.id === stockCheck.moverAssigneeId)
+            ? (stockCheck.moverAssigneeId ?? "")
             : "",
       );
-      setFulfillmentMessage(mappingResult.message);
     } catch (error) {
       console.error("Ticket item SKU mapping failed:", error);
-      setFulfillmentMessage(
-        "Item tiket gagal ditautkan ke SKU. Muat ulang tiket lalu coba kembali.",
-      );
+      setFulfillmentMessage("Item tiket gagal ditautkan ke SKU.");
     } finally {
       setFulfillmentPending(false);
     }
   };
 
-  const handleDeleteContractDelivery = (deliveryId: string, doNumber: string) => {
+  const handleDeleteContractDelivery = (
+    deliveryId: string,
+    doNumber: string,
+  ) => {
     if (deletingDeliveryId) return;
     setDeletingDeliveryId(deliveryId);
-    setContractDoFeedback(null);
     startTransition(async () => {
       try {
         const result = await deleteUnbilledMaterialDelivery(deliveryId);
-        setContractDoFeedback({
-          text: result.message || `Surat Jalan ${doNumber} berhasil dihapus.`,
-          isError: !result.success,
-        });
         if (result.success) {
+          toast.success(
+            result.message || `Surat Jalan ${doNumber} berhasil dihapus.`,
+          );
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Delete material delivery failed:", error);
-        setContractDoFeedback({
-          text: "Gagal menghapus Surat Jalan material alam.",
-          isError: true,
-        });
+        toast.error("Gagal menghapus Surat Jalan material alam.");
       } finally {
         setDeletingDeliveryId(null);
       }
@@ -1008,25 +2206,22 @@ export default function TicketListing({
     setPoDialogOpen(true);
   };
 
-  const runAction = (
-    ticket: TicketRow,
-    action: ReturnType<typeof actionFor>,
-  ) => {
-    if (!action) return;
+  const runAction = (ticket: TicketRow, action: DirectAction) => {
     setBusyId(ticket.id);
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await action.run(ticket);
-        setMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           setSelectedTicket(null);
           setItemSelection(null);
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Ticket workflow action failed:", error);
-        setMessage("Aksi tiket gagal. Silakan muat ulang dan coba kembali.");
+        toast.error("Aksi tiket gagal. Silakan coba kembali.");
       } finally {
         setBusyId(null);
       }
@@ -1052,21 +2247,20 @@ export default function TicketListing({
         setEquipmentDecisionError(result.message);
         return;
       }
+      toast.success(result.message || "Keputusan alat disimpan.");
       setEquipmentDecisionOpen(false);
       setSelectedTicket(null);
       router.refresh();
     } catch (error) {
       console.error("Logistics equipment decision failed:", error);
-      setEquipmentDecisionError(
-        "Pemrosesan gagal. Silakan muat ulang dan coba kembali.",
-      );
+      setEquipmentDecisionError("Pemrosesan gagal. Coba kembali.");
     } finally {
       setEquipmentDecisionPending(false);
     }
   };
 
   const printPurchaseOrder = async (ticketId: string, publicCode?: string) => {
-    setPrintMessage("Menyiapkan PDF Purchase Order...");
+    const toastId = toast.loading("Menyiapkan PDF Purchase Order...");
     let pdfUrl: string | null = null;
     try {
       const response = publicCode
@@ -1087,15 +2281,15 @@ export default function TicketListing({
           typeof body.message === "string"
             ? body.message
             : "PDF PO gagal dibuat.";
-        setPrintMessage(errorMessage);
+        toast.error(errorMessage, { id: toastId });
         return;
       }
       pdfUrl = URL.createObjectURL(await response.blob());
+      toast.dismiss(toastId);
       await printUrlInFrame(pdfUrl);
-      setPrintMessage("");
     } catch (error) {
       console.error("Purchase order PDF download failed:", error);
-      setPrintMessage("PDF PO gagal disiapkan untuk dicetak. Silakan coba kembali.");
+      toast.error("PDF PO gagal disiapkan.", { id: toastId });
     } finally {
       if (pdfUrl) {
         const urlToRevoke = pdfUrl;
@@ -1104,16 +2298,6 @@ export default function TicketListing({
     }
   };
 
-  const getTicketStageNumber = (
-    status: TicketRow["status"],
-  ): 1 | 2 | 3 | 4 => {
-    if (status === TicketStatus.DRAFT) return 1;
-    if (status === TicketStatus.PENDING_DIRECTOR) return 2;
-    if (status === TicketStatus.COMPLETED) return 4;
-    return 3;
-  };
-
-  const [mobilePage, setMobilePage] = useState(1);
   const MOBILE_PAGE_SIZE = 10;
   const safeMobilePage = Math.min(
     mobilePage,
@@ -1124,268 +2308,25 @@ export default function TicketListing({
     safeMobilePage * MOBILE_PAGE_SIZE,
   );
 
-  const renderTicketRowActions = (ticket: TicketRow) => (
-    <div className="flex flex-nowrap items-center justify-end gap-1.5 sm:justify-center">
-      {(() => {
-        const action = actionFor(role, ticket);
-        const workflow = workflowFor(role, ticket);
-        const canSubmit =
-          ticket.status === TicketStatus.DRAFT && ticket.canSubmit;
-        const visibleAction =
-          action ??
-          (canSubmit
-            ? {
-                label: "Ajukan",
-                run: submitTicketRequest,
-              }
-            : null);
-        const primaryDo = ticket.deliveryOrders?.[0];
-        const showDoPrint =
-          (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
-            ticket.status === TicketStatus.IN_TRANSIT) &&
-          Boolean(primaryDo);
-
-        if (workflow) {
-          const labels = {
-            LOGISTICS: ticket.deliveryOrders?.length
-              ? "Lanjutkan DO"
-              : "Proses Logistik",
-            LOGISTICS_DO: "Terbitkan DO",
-            EXPEDITION_RECEIPT: "Upload Bukti Tiba & Selesaikan (Tahap 4/4)",
-            FINANCE: "Bayar / Selesaikan",
-            MOVER: "Konfirmasi Tiba (Ruang Kerja Mover)",
-          };
-          const icons = {
-            LOGISTICS: PackageOpen,
-            LOGISTICS_DO: Truck,
-            EXPEDITION_RECEIPT: UploadCloud,
-            FINANCE: CircleDollarSign,
-            MOVER: Truck,
-          };
-          const WorkflowIcon = icons[workflow];
-          return (
-            <>
-              {showDoPrint && primaryDo && (
-                <Button
-                  asChild
-                  type="button"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-                >
-                  <Link
-                    href={`/d/${primaryDo.publicCode}`}
-                    title="Cetak Surat Jalan (DO)"
-                    aria-label="Cetak DO"
-                  >
-                    <Printer className="size-4" />
-                  </Link>
-                </Button>
-              )}
-              <Button
-                type="button"
-                size="icon"
-                variant={
-                  workflow === "EXPEDITION_RECEIPT"
-                    ? "outline"
-                    : "default"
-                }
-                title={labels[workflow]}
-                aria-label={labels[workflow]}
-                className={
-                  workflow === "EXPEDITION_RECEIPT"
-                    ? "h-8 w-8 shrink-0 border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                    : "h-8 w-8 shrink-0"
-                }
-                onClick={() => {
-                  if (workflow === "LOGISTICS_DO") {
-                    router.push(
-                      `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticket.id)}`,
-                    );
-                    return;
-                  }
-                  setWorkflowTicket(ticket);
-                }}
-              >
-                <WorkflowIcon className="size-4" />
-              </Button>
-            </>
-          );
-        }
-        const hasNonContractItems = ticket.items.some(
-          (item) =>
-            item.categoryHint !== TicketCategoryHint.CONTRACT,
-        );
-        const hasOpenContract =
-          canRecordContractDo && hasOpenContractDelivery(ticket);
-        if (hasOpenContract && !hasNonContractItems) {
-          return (
-            <Button
-              type="button"
-              size="icon"
-              title="Catat Surat Jalan Kontrak (DO)"
-              aria-label="Catat Surat Jalan Kontrak (DO)"
-              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
-              onClick={() => setContractDoModalTicket(ticket)}
-            >
-              <Truck className="size-4" />
-            </Button>
-          );
-        }
-        if (
-          (role === UserRole.LOGISTICS ||
-            role === UserRole.ADMINISTRATIONS ||
-            ((role === UserRole.DIRECTOR ||
-              role === UserRole.DEPUTY_DIRECTOR) &&
-              !isTicketProcessedByFinance(ticket))) &&
-          ticket.type === TicketType.MATERIAL &&
-          (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-            ticket.status === TicketStatus.PROCESSED_FINANCE) &&
-          ticket.items.length > 0 &&
-          hasNonContractItems
-        ) {
-          const hasPendingItems = ticket.items.some(
-            (item) =>
-              item.categoryHint !==
-                TicketCategoryHint.CONTRACT &&
-              item.status === FulfillmentStatus.PENDING,
-          );
-          const itemLabel = hasPendingItems
-            ? "Proses & Alokasi Item Gudang"
-            : "Kelola Item & Pengadaan";
-          return (
-            <Button
-              type="button"
-              size="icon"
-              title={itemLabel}
-              aria-label={itemLabel}
-              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-              onClick={() => openTicketSheet(ticket)}
-            >
-              <ClipboardList className="size-4" />
-            </Button>
-          );
-        }
-        if (hasOpenContract) {
-          return (
-            <Button
-              type="button"
-              size="icon"
-              title="Catat Surat Jalan Kontrak (DO)"
-              aria-label="Catat Surat Jalan Kontrak (DO)"
-              className="h-8 w-8 shrink-0 bg-emerald-600 text-white shadow-sm hover:bg-emerald-500"
-              onClick={() => setContractDoModalTicket(ticket)}
-            >
-              <Truck className="size-4" />
-            </Button>
-          );
-        }
-        if (role === UserRole.FINANCE) {
-          const financeTarget = getFinanceActionTarget(ticket);
-          if (financeTarget || (showDoPrint && primaryDo)) {
-            return (
-              <>
-                {showDoPrint && primaryDo && (
-                  <Button
-                    asChild
-                    type="button"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-                  >
-                    <Link
-                      href={`/d/${primaryDo.publicCode}`}
-                      title="Cetak Surat Jalan (DO)"
-                      aria-label="Cetak DO"
-                    >
-                      <Printer className="size-4" />
-                    </Link>
-                  </Button>
-                )}
-                {financeTarget && (
-                  <Button
-                    asChild
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                  >
-                    <Link
-                      href={financeTarget.href}
-                      title={financeTarget.label}
-                      aria-label={financeTarget.label}
-                    >
-                      <CircleDollarSign className="size-4" />
-                    </Link>
-                  </Button>
-                )}
-              </>
-            );
-          }
-        }
-        if (showDoPrint && primaryDo) {
-          return (
-            <Button
-              asChild
-              type="button"
-              size="icon"
-              className="h-8 w-8 shrink-0 bg-amber-500 text-slate-950 shadow-sm hover:bg-amber-400"
-            >
-              <Link
-                href={`/d/${primaryDo.publicCode}`}
-                title="Cetak Surat Jalan (DO)"
-                aria-label="Cetak DO"
-              >
-                <Printer className="size-4" />
-              </Link>
-            </Button>
-          );
-        }
-        return visibleAction ? (
-          <Button
-            type="button"
-            size="icon"
-            title={visibleAction.label}
-            aria-label={visibleAction.label}
-            className="h-8 w-8 shrink-0"
-            disabled={isPending && busyId === ticket.id}
-            onClick={() => runAction(ticket, visibleAction)}
-          >
-            {visibleAction.label === "Setujui" ? (
-              <Check className="size-4" />
-            ) : (
-              <Send className="size-4" />
-            )}
-          </Button>
-        ) : null;
-      })()}
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        title="Lihat Rincian & Lampiran Foto"
-        aria-label="Detail Tiket"
-        className="h-8 w-8 shrink-0 border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
-        onClick={() => openTicketSheet(ticket)}
-      >
-        <Eye className="size-4" />
-      </Button>
-      <TicketManagementActions ticket={ticket} role={role} />
-    </div>
-  );
+  const selectedTicketPermissions = selectedTicket
+    ? getTicketManagementPermissions(selectedTicket, role)
+    : null;
 
   return (
     <div className="my-2">
       {!hideSearch && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="relative w-full sm:max-w-96">
-            <Icon
-              icon="tabler:search"
-              height={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
             />
             <Input
               type="search"
-              className="h-9 pl-9 text-sm"
+              className="h-9 pl-9"
               value={ticketSearch}
               onChange={(event) => searchTickets(event.target.value)}
-              placeholder="Cari nomor tiket, judul permintaan, proyek, atau pemohon..."
+              placeholder="Cari nomor tiket, judul, proyek, pemohon..."
               aria-label="Cari tiket"
             />
           </div>
@@ -1395,147 +2336,42 @@ export default function TicketListing({
               variant="ghost"
               size="sm"
               onClick={() => searchTickets("")}
-              className="h-8 text-xs text-muted-foreground hover:text-foreground"
             >
-              Bersihkan pencarian
+              Reset Cari
             </Button>
           )}
         </div>
       )}
 
-      {message && (
-        <div
-          className="mb-4 rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2.5 text-sm font-medium text-foreground"
-          role="status"
-        >
-          {message}
-        </div>
-      )}
-
       {/* TAMPILAN KARTU MOBILE (< 768px) */}
       <div className="space-y-3 md:hidden">
-        {visibleMobileTickets.map((ticket) => {
-          const stageNum = getTicketStageNumber(ticket.status);
-          const priorityBadgeClass =
-            ticket.priority === "URGENT"
-              ? "border-rose-500/35 bg-rose-500/15 text-rose-400"
-              : ticket.priority === "HIGH"
-                ? "border-amber-500/35 bg-amber-500/15 text-amber-400"
-                : ticket.priority === "MEDIUM"
-                  ? "border-sky-500/35 bg-sky-500/15 text-sky-400"
-                  : "border-border bg-muted text-muted-foreground";
-          const hasAttachment =
-            (ticket.receiptUrls?.length ?? 0) > 0 ||
-            Boolean(
-              ticket.attachmentUrl ||
-                ticket.purchaseReceiptUrl ||
-                ticket.transferReceiptUrl ||
-                ticket.deliveryReceiptUrl,
-            );
-          return (
-            <article
-              key={`mobile-${ticket.id}`}
-              onClick={() => openTicketSheet(ticket)}
-              className="cursor-pointer rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-colors hover:border-primary/40 active:bg-muted/30"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-semibold text-amber-500">
-                    {ticket.ticketNumber}
-                  </span>
-                  <span
-                    className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
-                  >
-                    {priorityLabels[ticket.priority]}
-                  </span>
-                </div>
-                <span className="text-[11px] text-muted-foreground">
-                  {format(new Date(ticket.createdAt), "d MMM yyyy, HH:mm", {
-                    locale: id,
-                  })}
-                </span>
-              </div>
-
-              <h4 className="mt-2 line-clamp-2 text-sm font-bold leading-snug text-foreground">
-                {ticket.title}
-              </h4>
-
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge
-                  variant="outline"
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
-                    ticket.type === TicketType.MATERIAL
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-                      : ""
-                  }`}
-                >
-                  {ticket.ticketType === EQUIPMENT_REQUEST_TYPE
-                    ? "Alat & Kendaraan"
-                    : typeLabels[ticket.type]}
-                </Badge>
-                <span className="inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
-                  {ticket.project
-                    ? `${ticket.project.kelompokTani} — ${ticket.project.title}`
-                    : "Kantor Pusat / Overhead"}
-                </span>
-                {ticket.items.length > 0 && (
-                  <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                    {ticket.items.length} Item
-                  </span>
-                )}
-                {hasAttachment && (
-                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-500">
-                    <Paperclip className="size-3" />
-                    Nota/Bukti
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-2.5 py-2 text-xs">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge
-                      variant={statusVariants[ticket.status]}
-                      className="rounded-md px-2 py-0.5 text-[10px] font-medium"
-                    >
-                      {statusLabels[ticket.status]}
-                    </Badge>
-                    {ticket.status !== TicketStatus.REJECTED && (
-                      <span className="text-[10px] font-semibold text-muted-foreground">
-                        · Tahap {stageNum}/4
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Pemohon: <strong className="text-foreground">{ticket.requester.name}</strong>
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
-                    Estimasi
-                  </span>
-                  <span className="text-sm font-extrabold tabular-nums text-foreground">
-                    {formatCurrency(ticket.totalAmount)}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  Ketuk kartu untuk rincian
-                </span>
-                {renderTicketRowActions(ticket)}
-              </div>
-            </article>
-          );
-        })}
+        {visibleMobileTickets.map((ticket) => (
+          <TicketMobileCard
+            key={`mobile-${ticket.id}`}
+            ticket={ticket}
+            role={role}
+            canRecordContractDo={canRecordContractDo}
+            isPending={isPending}
+            busyId={busyId}
+            onOpenDetail={openTicketSheet}
+            onRunAction={runAction}
+            onOpenWorkflow={setWorkflowTicket}
+            onOpenLogisticsDo={(ticketId) =>
+              router.push(
+                `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticketId)}`,
+              )
+            }
+            onOpenContractDo={setContractDoModalTicket}
+            onOpenManage={(target, mode) =>
+              setActiveManageModal({ ticket: target, mode })
+            }
+          />
+        ))}
         {tickets.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-            Tidak ada tiket permintaan yang cocok dengan filter saat ini.
-          </div>
+          <EmptyState
+            title="Belum ada tiket"
+            description="Tidak ada tiket permintaan yang cocok dengan filter saat ini."
+          />
         )}
         <TablePaginationControls
           count={tickets.length}
@@ -1548,195 +2384,64 @@ export default function TicketListing({
 
       {/* TAMPILAN TABEL DESKTOP (>= 768px) */}
       <div className="hidden md:block">
-        <Table itemLabel="tiket">
-          <TableHeader>
-            <TableRow className="bg-muted/40">
-              <TableHead className="w-40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                No. Tiket &amp; Tanggal
-              </TableHead>
-              <TableHead className="min-w-60 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Rincian Permintaan &amp; Proyek
-              </TableHead>
-              <TableHead className="hidden text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
-                Pemohon
-              </TableHead>
-              <TableHead className="hidden text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
-                Prioritas
-              </TableHead>
-              <TableHead className="min-w-44 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Status &amp; Tahap Alur
-              </TableHead>
-              <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Nilai Estimasi
-              </TableHead>
-              <TableHead className="sticky right-0 z-10 w-[132px] border-l border-border/50 bg-card/95 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
-                Aksi
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tickets.map((ticket) => {
-              const stageNum = getTicketStageNumber(ticket.status);
-              const priorityBadgeClass =
-                ticket.priority === "URGENT"
-                  ? "border-rose-500/35 bg-rose-500/15 text-rose-400"
-                  : ticket.priority === "HIGH"
-                    ? "border-amber-500/35 bg-amber-500/15 text-amber-400"
-                    : ticket.priority === "MEDIUM"
-                      ? "border-sky-500/35 bg-sky-500/15 text-sky-400"
-                      : "border-border bg-muted text-muted-foreground";
-              const hasAttachment =
-                (ticket.receiptUrls?.length ?? 0) > 0 ||
-                Boolean(
-                  ticket.attachmentUrl ||
-                    ticket.purchaseReceiptUrl ||
-                    ticket.transferReceiptUrl ||
-                    ticket.deliveryReceiptUrl,
-                );
-              return (
-                <TableRow
-                  key={ticket.id}
-                  tabIndex={0}
-                  className="cursor-pointer transition-colors hover:bg-muted/30"
-                  onClick={() => openTicketSheet(ticket)}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openTicketSheet(ticket);
-                    }
-                  }}
-                >
-                  <TableCell className="min-w-36 whitespace-nowrap align-top">
-                    <span className="inline-flex rounded-md border border-border bg-muted/60 px-2 py-0.5 font-mono text-xs font-medium text-amber-500">
-                      {ticket.ticketNumber}
-                    </span>
-                    <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                      {format(new Date(ticket.createdAt), "d MMM yyyy, HH:mm", {
-                        locale: id,
-                      })}
-                    </span>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 lg:hidden">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {ticket.requester.name}
-                      </span>
-                      <span
-                        className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
-                      >
-                        {priorityLabels[ticket.priority]}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[260px] whitespace-normal break-words align-top lg:max-w-[360px]">
-                    <p
-                      className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground"
-                      title={ticket.title}
-                    >
-                      {ticket.title}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <Badge
-                        variant="outline"
-                        className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
-                          ticket.type === TicketType.MATERIAL
-                            ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-                            : ""
-                        }`}
-                      >
-                        {ticket.ticketType === EQUIPMENT_REQUEST_TYPE
-                          ? "Alat & Kendaraan"
-                          : typeLabels[ticket.type]}
-                      </Badge>
-                      <span className="inline-flex max-w-full items-center truncate rounded-md border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
-                        {ticket.project
-                          ? `${ticket.project.kelompokTani} — ${ticket.project.title}`
-                          : "Kantor Pusat / Overhead"}
-                      </span>
-                      {hasAttachment && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-500">
-                          <Paperclip className="size-3" />
-                          Ada Nota / Bukti
-                        </span>
-                      )}
-                      {ticket.items.some(
-                        (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
-                      ) && (
-                        <span className="inline-flex items-center rounded-md border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[11px] font-medium text-teal-600 dark:text-teal-300">
-                          Kontrak Alam
-                        </span>
-                      )}
-                      {ticket.items.length > 0 && (
-                        <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {ticket.items.length} Item
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden align-top text-xs font-medium lg:table-cell">
-                    {ticket.requester.name}
-                  </TableCell>
-                  <TableCell className="hidden align-top text-center lg:table-cell">
-                    <span
-                      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${priorityBadgeClass}`}
-                    >
-                      {priorityLabels[ticket.priority]}
-                    </span>
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <div className="space-y-1.5">
-                      <Badge
-                        variant={statusVariants[ticket.status]}
-                        className="rounded-md px-2 py-0.5 text-[11px] font-medium"
-                      >
-                        {statusLabels[ticket.status]}
-                      </Badge>
-                      {ticket.status !== TicketStatus.REJECTED && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4].map((step) => (
-                              <span
-                                key={step}
-                                className={`h-1.5 w-4 rounded-full ${
-                                  step <= stageNum
-                                    ? ticket.status === TicketStatus.COMPLETED
-                                      ? "bg-emerald-500"
-                                      : "bg-primary"
-                                    : "bg-muted-foreground/25"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-[10px] font-semibold text-muted-foreground">
-                            Tahap {stageNum}/4
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap align-top text-right text-sm font-bold tabular-nums">
-                    {formatCurrency(ticket.totalAmount)}
-                  </TableCell>
-                  <TableCell
-                    className="sticky right-0 z-10 w-[132px] border-l border-border/50 bg-card/95 align-top backdrop-blur-sm"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {renderTicketRowActions(ticket)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-            {tickets.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="py-12 text-center text-muted-foreground"
-                >
-                  Tidak ada tiket permintaan yang cocok dengan filter saat ini.
-                </TableCell>
+        {tickets.length === 0 ? (
+          <EmptyState
+            title="Belum ada tiket"
+            description="Tidak ada tiket permintaan yang cocok dengan filter saat ini."
+          />
+        ) : (
+          <Table itemLabel="tiket">
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="type-p3 w-40 uppercase tracking-wider">
+                  No. Tiket &amp; Tanggal
+                </TableHead>
+                <TableHead className="type-p3 min-w-60 uppercase tracking-wider">
+                  Permintaan &amp; Proyek
+                </TableHead>
+                <TableHead className="type-p3 hidden uppercase tracking-wider lg:table-cell">
+                  Pemohon
+                </TableHead>
+                <TableHead className="type-p3 hidden text-center uppercase tracking-wider lg:table-cell">
+                  Prioritas
+                </TableHead>
+                <TableHead className="type-p3 min-w-44 uppercase tracking-wider">
+                  Status
+                </TableHead>
+                <TableHead className="type-p3 text-right uppercase tracking-wider">
+                  Estimasi
+                </TableHead>
+                <TableHead className="type-p3 sticky right-0 z-10 w-[124px] border-l border-border/50 bg-card/95 text-center uppercase tracking-wider backdrop-blur-sm">
+                  Aksi
+                </TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {tickets.map((ticket) => (
+                <TicketDesktopRow
+                  key={ticket.id}
+                  ticket={ticket}
+                  role={role}
+                  canRecordContractDo={canRecordContractDo}
+                  isPending={isPending}
+                  busyId={busyId}
+                  onOpenDetail={openTicketSheet}
+                  onRunAction={runAction}
+                  onOpenWorkflow={setWorkflowTicket}
+                  onOpenLogisticsDo={(ticketId) =>
+                    router.push(
+                      `/apps/orders/new?type=do&ticketId=${encodeURIComponent(ticketId)}`,
+                    )
+                  }
+                  onOpenContractDo={setContractDoModalTicket}
+                  onOpenManage={(target, mode) =>
+                    setActiveManageModal({ ticket: target, mode })
+                  }
+                />
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Modal Detail Tiket */}
@@ -1746,10 +2451,10 @@ export default function TicketListing({
         title={
           selectedTicket ? (
             <span className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md border border-primary/30 bg-primary/15 px-2 py-0.5 font-mono text-xs font-extrabold text-primary">
+              <span className="type-p3 rounded-md border border-primary/30 bg-primary/15 px-2 py-0.5 font-mono font-extrabold text-primary">
                 {selectedTicket.ticketNumber}
               </span>
-              <span className="line-clamp-1 text-base font-bold text-foreground">
+              <span className="type-h2 line-clamp-1 text-foreground">
                 {selectedTicket.title}
               </span>
             </span>
@@ -1761,11 +2466,11 @@ export default function TicketListing({
           selectedTicket
             ? `${
                 selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
-                  ? "Permintaan Alat & Kendaraan"
+                  ? "Alat & Kendaraan"
                   : selectedTicket.requestCategory
-                  ? requestCategoryLabels[selectedTicket.requestCategory]
-                  : typeLabels[selectedTicket.type]
-              } · Prioritas ${priorityLabels[selectedTicket.priority]} · Status: ${statusLabels[selectedTicket.status]}`
+                    ? requestCategoryLabels[selectedTicket.requestCategory]
+                    : typeLabels[selectedTicket.type]
+              } · Prioritas ${priorityLabels[selectedTicket.priority]} · ${statusLabels[selectedTicket.status]}`
             : ""
         }
         className="sm:max-w-4xl lg:max-w-5xl"
@@ -1781,7 +2486,6 @@ export default function TicketListing({
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
                       onClick={() =>
                         printPurchaseOrder(
                           selectedTicket.id,
@@ -1789,17 +2493,53 @@ export default function TicketListing({
                         )
                       }
                     >
-                      <Printer className="mr-1.5 size-4" />
+                      <Printer className="size-4" aria-hidden="true" />
                       Cetak PO
                     </Button>
                   )}
-                <TicketManagementActions
-                  ticket={selectedTicket}
-                  role={role}
-                  mode="full"
-                  onTicketDeleted={closeTicketSheet}
-                />
+
+                {selectedTicketPermissions?.processedByFinance && isExecutive ? (
+                  <Badge variant="outline" className="gap-1.5">
+                    <Lock className="size-3.5 text-amber-500" aria-hidden="true" />
+                    Terkunci Finance
+                  </Badge>
+                ) : (
+                  <>
+                    {selectedTicketPermissions?.canEdit && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          setActiveManageModal({
+                            ticket: selectedTicket,
+                            mode: "edit",
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" aria-hidden="true" />
+                        Edit
+                      </Button>
+                    )}
+                    {selectedTicketPermissions?.canDelete && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() =>
+                          setActiveManageModal({
+                            ticket: selectedTicket,
+                            mode: "delete",
+                          })
+                        }
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                        Hapus
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
+
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
@@ -1814,7 +2554,7 @@ export default function TicketListing({
                     (selectedTicket.status === TicketStatus.DRAFT &&
                     selectedTicket.canSubmit
                       ? {
-                          label: "Ajukan ke Direktur",
+                          label: "Ajukan",
                           run: submitTicketRequest,
                         }
                       : null);
@@ -1823,8 +2563,8 @@ export default function TicketListing({
                     role === UserRole.LOGISTICS &&
                     selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE &&
                     (selectedTicket.status === "PENDING_LOGISTIK" ||
-                      selectedTicket.status ===
-                        TicketStatus.PROCESSED_LOGISTIC)
+                      selectedTicket.status === TicketStatus.APPROVED_DIR ||
+                      selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC)
                   ) {
                     return (
                       <Button
@@ -1837,17 +2577,17 @@ export default function TicketListing({
                           setEquipmentDecisionOpen(true);
                         }}
                       >
-                        Proses Permintaan Alat
+                        Proses Alat
                       </Button>
                     );
                   }
                   if (workflow) {
                     const labels = {
-                      LOGISTICS: "Lanjutkan Proses Logistik (DO)",
-                      LOGISTICS_DO: "Terbitkan Surat Jalan (DO)",
-                      EXPEDITION_RECEIPT: "Terima Barang & Selesaikan",
-                      FINANCE: "Proses Pembayaran Finance",
-                      MOVER: "Konfirmasi Barang Tiba",
+                      LOGISTICS: "Proses Logistik",
+                      LOGISTICS_DO: "Buat DO",
+                      EXPEDITION_RECEIPT: "Terima Barang",
+                      FINANCE: "Bayar",
+                      MOVER: "Konfirmasi Tiba",
                     };
                     return (
                       <Button
@@ -1856,10 +2596,9 @@ export default function TicketListing({
                           setSelectedTicket(null);
                           setItemSelection(null);
                           if (workflow === "LOGISTICS_DO") {
-                            const tid = selectedTicket.id;
-                            setSelectedTicket(null);
-                            setItemSelection(null);
-                            router.push(`/apps/orders/new?type=do&ticketId=${encodeURIComponent(tid)}`);
+                            router.push(
+                              `/apps/orders/new?type=do&ticketId=${encodeURIComponent(selectedTicket.id)}`,
+                            );
                             return;
                           }
                           setWorkflowTicket(selectedTicket);
@@ -1896,1943 +2635,1230 @@ export default function TicketListing({
           ) : undefined
         }
       >
-        {selectedTicket && (() => {
-          const parsedDesc = parseTicketDescription(selectedTicket.description);
-          const categoryDisplay =
-            selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
-              ? "Permintaan Alat & Kendaraan"
-              : (selectedTicket.requestCategory &&
-                  requestCategoryLabels[selectedTicket.requestCategory]) ||
-                parsedDesc.categoryFromDesc ||
-                typeLabels[selectedTicket.type];
+        {selectedTicket &&
+          (() => {
+            const parsedDesc = parseTicketDescription(
+              selectedTicket.description,
+            );
+            const categoryDisplay =
+              selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE
+                ? "Alat & Kendaraan"
+                : (selectedTicket.requestCategory &&
+                    requestCategoryLabels[selectedTicket.requestCategory]) ||
+                  parsedDesc.categoryFromDesc ||
+                  typeLabels[selectedTicket.type];
 
-          return (
-            <div className="space-y-4">
-              {selectedTicket.equipmentDetails && (
-                <div className="rounded-xl border border-border bg-muted/20 p-3.5">
-                  <h3 className="text-sm font-semibold">Detail alat/kendaraan</h3>
-                  <dl className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <dt className="text-muted-foreground">Alat/kendaraan</dt>
-                      <dd>{selectedTicket.equipmentDetails.equipmentName || "-"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Tanggal pakai</dt>
-                      <dd>{selectedTicket.equipmentDetails.startDate || "-"}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Lama pakai</dt>
-                      <dd>
-                        {selectedTicket.equipmentDetails.duration ?? "-"}{" "}
-                        {selectedTicket.equipmentDetails.timeUnit}
-                      </dd>
-                    </div>
-                    {selectedTicket.equipmentDetails.fulfillmentSource && (
-                      <div>
-                        <dt className="text-muted-foreground">Pemenuhan</dt>
-                        <dd>
-                          {selectedTicket.equipmentDetails.fulfillmentSource ===
-                          "INTERNAL"
-                            ? "Alat internal"
-                            : "Sewa vendor eksternal"}
-                        </dd>
-                      </div>
-                    )}
-                    {selectedTicket.equipmentDetails.vendorName && (
-                      <div>
-                        <dt className="text-muted-foreground">Vendor</dt>
-                        <dd>{selectedTicket.equipmentDetails.vendorName}</dd>
-                      </div>
-                    )}
-                    {selectedTicket.equipmentDetails.quotedCost != null && (
-                      <div>
-                        <dt className="text-muted-foreground">
-                          Estimasi biaya sewa
-                        </dt>
-                        <dd>
-                          {formatCurrency(
-                            String(
-                              selectedTicket.equipmentDetails.quotedCost,
-                            ),
-                          )}
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                </div>
-              )}
-              {/* 1. Alur Tahapan Visual 4 Langkah */}
-              <div className="rounded-xl border border-border bg-muted/20 p-3.5">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {[
-                    { step: 1, title: "01. Pengajuan", sub: "Draft & Submit" },
-                    { step: 2, title: "02. Otorisasi", sub: "Direktur" },
-                    {
-                      step: 3,
-                      title: "03. Eksekusi",
-                      sub:
-                        selectedTicket.type === TicketType.MATERIAL
-                          ? "Logistik / PO / DO"
-                          : "Pencairan Finance",
-                    },
-                    { step: 4, title: "04. Selesai", sub: "Tuntas" },
-                  ].map((s) => {
-                    const currentStage = getTicketStageNumber(
-                      selectedTicket.status,
-                    );
-                    const isDone =
-                      selectedTicket.status === TicketStatus.COMPLETED ||
-                      s.step < currentStage;
-                    const isActive =
-                      selectedTicket.status !== TicketStatus.COMPLETED &&
-                      s.step === currentStage;
-                    return (
-                      <div
-                        key={s.step}
-                        className={`rounded-lg border px-3 py-2 ${
-                          isDone
-                            ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-400"
-                            : isActive
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border bg-card/50 text-muted-foreground"
-                        }`}
-                      >
-                        <p className="text-xs font-bold">{s.title}</p>
-                        <p className="text-[11px] opacity-80">{s.sub}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
-                  <div>
-                    <span className="font-bold text-amber-400">
-                      Tahap Saat Ini:{" "}
-                    </span>
-                    <span className="font-semibold text-foreground">
-                      {statusLabels[selectedTicket.status]}
-                    </span>
-                  </div>
-                  <span className="text-muted-foreground">
-                    {nextStepLabels[selectedTicket.status]}
-                  </span>
-                </div>
-                {printMessage && (
-                  <p className="mt-2 text-xs text-amber-400" role="status">
-                    {printMessage}
-                  </p>
-                )}
-              </div>
-
-              {/* 2. Grid Informasi Utama Tiket (Tanpa Duplikasi) */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Pemohon
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-foreground">
-                    {selectedTicket.requester.name}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Tanggal Pengajuan
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-foreground">
-                    {format(
-                      new Date(selectedTicket.createdAt),
-                      "d MMM yyyy, HH:mm",
-                      { locale: id },
-                    )}
-                  </p>
-                </div>
-                <div className="col-span-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:col-span-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {selectedTicket.type === TicketType.MATERIAL
-                      ? "Total Nilai Estimasi"
-                      : "Nominal Pengajuan"}
-                  </p>
-                  <p className="mt-1 text-base font-extrabold text-primary tabular-nums">
-                    {formatCurrency(selectedTicket.totalAmount)}
-                  </p>
-                </div>
-                <div className="col-span-2 rounded-xl border border-border bg-card p-3 sm:col-span-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Proyek &amp; Lokasi Kerja
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-foreground">
-                    {selectedTicket.project
-                      ? `${selectedTicket.project.kelompokTani} — ${selectedTicket.project.title}`
-                      : "Non-Proyek / Operasional Internal"}
-                  </p>
-                </div>
-                <div className="col-span-2 rounded-xl border border-border bg-card p-3 sm:col-span-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {selectedTicket.items.length > 0
-                      ? "Status Pemenuhan Barang"
-                      : "Kategori Permintaan"}
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-foreground">
-                    {selectedTicket.items.length > 0
-                      ? selectedTicket.fulfillmentStatus === "COMPLETED"
-                        ? "Selesai (100%)"
-                        : selectedTicket.fulfillmentStatus ===
-                            "PARTIALLY_FULFILLED"
-                          ? "Sebagian Terpenuhi"
-                          : "Menunggu Pemenuhan"
-                      : categoryDisplay}
-                  </p>
-                </div>
-              </div>
-
-              {/* 3. Kartu Keterangan / Catatan Kebutuhan (Bersih Tanpa Pengulangan) */}
-              {(parsedDesc.notes ||
-                parsedDesc.extraFields.length > 0 ||
-                selectedTicket.requestCategory === TicketRequestCategory.APH) && (
-                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Keterangan &amp; Rincian Kebutuhan
-                    </h4>
-                    <Badge variant="outline" className="text-[11px]">
-                      {categoryDisplay}
-                    </Badge>
-                  </div>
-
-                  {parsedDesc.notes && (
-                    <div className="rounded-lg border border-border/70 bg-muted/25 px-3.5 py-2.5 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
-                      {parsedDesc.notes}
-                    </div>
-                  )}
-
-                  {parsedDesc.extraFields.length > 0 && (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {parsedDesc.extraFields.map((field, idx) => (
-                        <div
-                          key={`${field.label}-${idx}`}
-                          className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs"
-                        >
-                          <span className="block text-[11px] text-muted-foreground">
-                            {field.label}
-                          </span>
-                          <span className="mt-0.5 block font-semibold text-foreground">
-                            {field.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {selectedTicket.requestCategory ===
-                    TicketRequestCategory.APH && (
-                    <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-1">
-                      <h4 className="font-semibold text-foreground">
-                        Detail Pembayaran APH
-                      </h4>
-                      <p className="text-xs text-muted-foreground">
-                        Metode Pembayaran:{" "}
-                        <span className="font-semibold text-foreground">
-                          {selectedTicket.requestPaymentMethod ===
-                          POPaymentMethod.CASH
-                            ? "Tunai (Cash)"
-                            : "Transfer Bank"}
-                        </span>
-                      </p>
-                      {selectedTicket.requestPaymentMethod ===
-                        POPaymentMethod.TRANSFER && (
-                        <p className="text-xs text-muted-foreground">
-                          Tujuan Transfer:{" "}
-                          <span className="font-semibold text-foreground">
-                            {selectedTicket.transferDestination || "—"}
-                          </span>
-                        </p>
-                      )}
-                      {selectedTicket.requestPaymentDescription && (
-                        <p className="whitespace-pre-wrap text-xs text-muted-foreground">
-                          Keterangan: {selectedTicket.requestPaymentDescription}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 4. Kartu Khusus Rekening Tujuan Pembayaran */}
-              {(selectedTicket.recipientName ||
-                selectedTicket.bankName ||
-                selectedTicket.accountNumber ||
-                selectedTicket.transferReceiptUrl) && (
-                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Tujuan Pembayaran / Rekening Penerima
-                    </h4>
-                    {selectedTicket.transferReceiptUrl && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        onClick={() =>
-                          setSelectedReceipt({
-                            label: "Bukti Transfer",
-                            url: selectedTicket.transferReceiptUrl!,
-                          })
-                        }
-                      >
-                        <Eye className="size-3.5" />
-                        Lihat Bukti Transfer
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                    <div className="rounded-lg border border-border bg-muted/25 p-3">
-                      <span className="block text-[11px] text-muted-foreground">
-                        Nama Penerima
-                      </span>
-                      <span className="mt-0.5 block text-sm font-bold text-foreground">
-                        {selectedTicket.recipientName || "—"}
-                      </span>
-                    </div>
-                    <div className="rounded-lg border border-border bg-muted/25 p-3">
-                      <span className="block text-[11px] text-muted-foreground">
-                        Bank Tujuan
-                      </span>
-                      <span className="mt-0.5 block text-sm font-bold uppercase text-foreground">
-                        {selectedTicket.bankName || "—"}
-                      </span>
-                    </div>
-                    <div className="rounded-lg border border-border bg-muted/25 p-3">
-                      <span className="block text-[11px] text-muted-foreground">
-                        Nomor Rekening
-                      </span>
-                      <span className="mt-0.5 block font-mono text-sm font-bold tracking-wide text-primary">
-                        {selectedTicket.accountNumber || "—"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 5. Lampiran & Bukti Dokumen dengan Label Jelas */}
-              {(selectedTicket.attachmentUrl ||
-                selectedTicket.receiptUrls.length > 0 ||
-                selectedTicket.paymentProofUrl ||
-                selectedTicket.purchaseReceiptUrl ||
-                selectedTicket.deliveryReceiptUrl) && (
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <h4 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Lampiran &amp; Bukti Dokumen
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedTicket.attachmentUrl && (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                      >
-                        <a
-                          href={selectedTicket.attachmentUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink className="size-3.5" />
-                          Lampiran / Quotation
-                        </a>
-                      </Button>
-                    )}
-                    {selectedTicket.receiptUrls.map((url, index) => (
-                      <Button
-                        key={`${selectedTicket.id}-receipt-${index}-${url}`}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        onClick={() =>
-                          setSelectedReceipt({
-                            label: `Bukti Pengajuan ${index + 1}`,
-                            url,
-                          })
-                        }
-                      >
-                        <Eye className="size-3.5" />
-                        Bukti Pengajuan {index + 1}
-                      </Button>
-                    ))}
-                    {[
-                      ["Bukti Pembayaran", selectedTicket.paymentProofUrl],
-                      ["Bukti Pembelian", selectedTicket.purchaseReceiptUrl],
-                      ["Bukti Pengiriman", selectedTicket.deliveryReceiptUrl],
-                    ]
-                      .filter((receipt): receipt is [string, string] =>
-                        Boolean(receipt[1]),
-                      )
-                      .map(([label, url]) => (
-                        <Button
-                          key={`${selectedTicket.id}-${label}-${url}`}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 text-xs"
-                          onClick={() => openReceiptPreview({ label, url })}
-                        >
-                          <Eye className="size-3.5" />
-                          {label}
-                        </Button>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-            {/* Dokumen Surat Jalan (DO) & Pembelian Langsung */}
-            {((selectedTicket.deliveryOrders?.length ?? 0) > 0 ||
-              (selectedTicket.directStockPurchases?.length ?? 0) > 0) && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {selectedTicket.deliveryOrders?.map((deliveryOrder) => {
-                  const hasOrderPhotos =
-                    Boolean(deliveryOrder.arrivalPhotoUrl) ||
-                    Boolean(deliveryOrder.deliveryReceiptUrl) ||
-                    (deliveryOrder.receiptPhotos?.length ?? 0) > 0;
-                  return (
-                    <div
-                      key={deliveryOrder.publicCode}
-                      className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                            Surat Jalan Gudang (DO)
-                          </p>
-                          <p className="mt-0.5 text-sm font-bold text-foreground">
-                            {deliveryOrder.doNumber}
-                          </p>
-                        </div>
-                        <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
-                          <Link href={`/d/${deliveryOrder.publicCode}`}>
-                            <FileText className="size-3.5" />
-                            Buka / Cetak DO
-                          </Link>
-                        </Button>
-                      </div>
-                      {hasOrderPhotos && (
-                        <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
-                          {deliveryOrder.arrivalPhotoUrl && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1 px-2 text-xs"
-                              onClick={() =>
-                                openReceiptPreview({
-                                  label: `Foto Material Tiba · ${deliveryOrder.doNumber}`,
-                                  url: deliveryOrder.arrivalPhotoUrl!,
-                                })
-                              }
-                            >
-                              <Eye className="size-3" />
-                              Foto Tiba
-                            </Button>
-                          )}
-                          {deliveryOrder.deliveryReceiptUrl && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1 px-2 text-xs"
-                              onClick={() =>
-                                openReceiptPreview({
-                                  label: `Bukti Penerimaan · ${deliveryOrder.doNumber}`,
-                                  url: deliveryOrder.deliveryReceiptUrl!,
-                                })
-                              }
-                            >
-                              <Eye className="size-3" />
-                              Bukti DO
-                            </Button>
-                          )}
-                          {deliveryOrder.receiptPhotos?.map((photo, photoIdx) => (
-                            <Button
-                              key={photo.id}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1 px-2 text-xs"
-                              onClick={() =>
-                                openReceiptPreview({
-                                  label: `Foto Serah Terima #${photoIdx + 1} · ${deliveryOrder.doNumber}`,
-                                  url: photo.url,
-                                })
-                              }
-                            >
-                              <Eye className="size-3" />
-                              Serah Terima #{photoIdx + 1}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {selectedTicket.directStockPurchases?.map((purchase) => {
-                  const stageLabel =
-                    purchase.status === "RECEIVED"
-                      ? "Diterima · Siap Di-DO"
-                      : purchase.hasFinanceProof
-                        ? "Siap Diterima Logistik"
-                        : purchase.vendorInvoiceUrl
-                          ? "Menunggu Pembayaran Finance"
-                          : purchase.isApprovedByDirector
-                            ? "Menunggu Invoice/Bon Logistik"
-                            : "Menunggu Persetujuan Direktur";
-                  const purchasePhotoUrls =
-                    purchase.receivedPhotos && purchase.receivedPhotos.length > 0
-                      ? purchase.receivedPhotos
-                      : purchase.arrivalPhotoUrl
-                        ? [purchase.arrivalPhotoUrl]
-                        : [];
-                  return (
-                    <div
-                      key={purchase.id}
-                      className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                            Pembelian Langsung Toko
-                          </p>
-                          <p className="mt-0.5 text-sm font-bold text-foreground">
-                            {purchase.purchaseNumber} · {purchase.vendorName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(purchase.totalAmount)} · {stageLabel}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant={
-                              purchase.status === "RECEIVED"
-                                ? "lightSuccess"
-                                : "lightWarning"
-                            }
-                          >
-                            {stageLabel}
-                          </Badge>
-                          {purchase.status === "PENDING_RECEIPT" &&
-                            role === UserRole.FINANCE &&
-                            purchase.isApprovedByDirector &&
-                            Boolean(purchase.vendorInvoiceUrl) &&
-                            !purchase.hasFinanceProof && (
-                              <Button
-                                asChild
-                                size="sm"
-                                className="h-8 text-xs"
-                              >
-                                <Link
-                                  href={`/apps/finance?tab=payment&openSheet=${encodeURIComponent(purchase.id)}`}
-                                >
-                                  Bayar di Finance
-                                </Link>
-                              </Button>
-                            )}
-                          {purchase.status === "PENDING_RECEIPT" &&
-                            role !== UserRole.FINANCE && (
-                              <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs"
-                              >
-                                <Link href="/apps/logistics?tab=stock">
-                                  Kelola di Stok
-                                </Link>
-                              </Button>
-                            )}
-                        </div>
-                      </div>
-                      {(purchase.vendorInvoiceUrl || purchasePhotoUrls.length > 0) && (
-                        <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
-                          {purchase.vendorInvoiceUrl && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1 px-2 text-xs"
-                              onClick={() =>
-                                openReceiptPreview({
-                                  label: `Invoice/Bon · ${purchase.purchaseNumber}`,
-                                  url: purchase.vendorInvoiceUrl!,
-                                })
-                              }
-                            >
-                              <Eye className="size-3" />
-                              Invoice/Bon
-                            </Button>
-                          )}
-                          {purchasePhotoUrls.map((photoUrl, photoIdx) => (
-                            <Button
-                              key={`${purchase.id}-photo-${photoIdx}`}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1 px-2 text-xs"
-                              onClick={() =>
-                                openReceiptPreview({
-                                  label: `Foto Tiba #${photoIdx + 1} · ${purchase.purchaseNumber}`,
-                                  url: photoUrl,
-                                })
-                              }
-                            >
-                              <Eye className="size-3" />
-                              Foto Tiba #{photoIdx + 1}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* 3B. Kontrak Material Alam & Surat Jalan (DO) */}
-            {(selectedTicket.items.some(
-              (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
-            ) ||
-              (selectedTicket.materialDeliveries?.length ?? 0) > 0) && (
-              <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">
-                      Kontrak Material Alam &amp; Surat Jalan (DO)
+            return (
+              <div className="space-y-4">
+                {selectedTicket.equipmentDetails && (
+                  <div className="rounded-xl border border-border bg-muted/20 p-3.5">
+                    <h3 className="type-h3 text-foreground">
+                      Detail Alat &amp; Kendaraan
                     </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Pengadaan material alam menggunakan Kontrak Payung vendor tanpa PO baru. Catat setiap kedatangan truk agar progres item dan penyelesaian tiket tersinkron otomatis.
-                    </p>
-                  </div>
-                  {canRecordContractDo &&
-                    hasOpenContractDelivery(selectedTicket) && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-9 gap-1.5 text-xs"
-                        onClick={() => setContractDoModalTicket(selectedTicket)}
-                      >
-                        <Truck className="size-3.5" />
-                        Catat Surat Jalan (DO)
-                      </Button>
-                    )}
-                </div>
-
-                {contractDoFeedback && (
-                  <div
-                    className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                      contractDoFeedback.isError
-                        ? "border-destructive/40 bg-destructive/10 text-destructive"
-                        : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                    }`}
-                  >
-                    {contractDoFeedback.text}
+                    <dl className="mt-2 grid grid-cols-2 gap-3">
+                      <div>
+                        <dt className="type-p3 text-muted-foreground">
+                          Alat / Kendaraan
+                        </dt>
+                        <dd className="type-p2 font-medium">
+                          {selectedTicket.equipmentDetails.equipmentName || "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="type-p3 text-muted-foreground">
+                          Tanggal Pakai
+                        </dt>
+                        <dd className="type-p2 font-medium">
+                          {selectedTicket.equipmentDetails.startDate || "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="type-p3 text-muted-foreground">
+                          Lama Pakai
+                        </dt>
+                        <dd className="type-p2 font-medium">
+                          {selectedTicket.equipmentDetails.duration ?? "—"}{" "}
+                          {selectedTicket.equipmentDetails.timeUnit}
+                        </dd>
+                      </div>
+                      {selectedTicket.equipmentDetails.fulfillmentSource && (
+                        <div>
+                          <dt className="type-p3 text-muted-foreground">
+                            Pemenuhan
+                          </dt>
+                          <dd className="type-p2 font-medium">
+                            {selectedTicket.equipmentDetails
+                              .fulfillmentSource === "INTERNAL"
+                              ? "Alat internal"
+                              : "Sewa vendor"}
+                          </dd>
+                        </div>
+                      )}
+                      {selectedTicket.equipmentDetails.vendorName && (
+                        <div>
+                          <dt className="type-p3 text-muted-foreground">
+                            Vendor
+                          </dt>
+                          <dd className="type-p2 font-medium">
+                            {selectedTicket.equipmentDetails.vendorName}
+                          </dd>
+                        </div>
+                      )}
+                      {selectedTicket.equipmentDetails.quotedCost != null && (
+                        <div>
+                          <dt className="type-p3 text-muted-foreground">
+                            Estimasi Sewa
+                          </dt>
+                          <dd className="type-p2 font-semibold text-primary">
+                            {formatCurrency(
+                              String(
+                                selectedTicket.equipmentDetails.quotedCost,
+                              ),
+                            )}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
                   </div>
                 )}
 
-                <div className="grid gap-2.5 sm:grid-cols-2">
-                  {selectedTicket.items
-                    .filter(
-                      (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
-                    )
-                    .map((item) => {
-                      const delivered = getContractItemDeliveredVolume(
-                        selectedTicket,
-                        item.materialContractId,
+                <div className="rounded-xl border border-border bg-muted/20 p-3.5">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { step: 1, title: "01. Pengajuan", sub: "Draft & Submit" },
+                      { step: 2, title: "02. Otorisasi", sub: "Direktur" },
+                      {
+                        step: 3,
+                        title: "03. Eksekusi",
+                        sub:
+                          selectedTicket.type === TicketType.MATERIAL
+                            ? "Logistik / PO / DO"
+                            : "Pencairan Finance",
+                      },
+                      { step: 4, title: "04. Selesai", sub: "Tuntas" },
+                    ].map((s) => {
+                      const currentStage = getTicketStageNumber(
+                        selectedTicket.status,
                       );
-                      const remaining = Math.max(0, item.quantity - delivered);
                       const isDone =
-                        item.status === FulfillmentStatus.PROCESSED_TO_DO ||
-                        remaining <= 0;
+                        selectedTicket.status === TicketStatus.COMPLETED ||
+                        s.step < currentStage;
+                      const isActive =
+                        selectedTicket.status !== TicketStatus.COMPLETED &&
+                        s.step === currentStage;
                       return (
                         <div
-                          key={`contract-progress-${item.id}`}
-                          className="rounded-lg border border-border/80 bg-muted/20 p-3 text-xs space-y-1.5"
+                          key={s.step}
+                          className={`rounded-lg border px-3 py-2 ${
+                            isDone
+                              ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-500"
+                              : isActive
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-card/50 text-muted-foreground"
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="font-bold text-foreground">
-                                {item.itemName}
-                              </p>
-                              {item.materialContract && (
-                                <p className="text-[11px] text-muted-foreground">
-                                  {item.materialContract.contractNumber} ·{" "}
-                                  {item.materialContract.vendorName} ·{" "}
-                                  {formatCurrency(
-                                    String(item.materialContract.unitPrice),
-                                  )}
-                                  /{item.unit}
-                                </p>
-                              )}
-                            </div>
-                            <Badge variant={isDone ? "lightSuccess" : "lightWarning"}>
-                              {isDone ? "Terpenuhi" : "Aktif"}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-muted-foreground">
-                            <span>
-                              Diminta:{" "}
-                              <strong className="text-foreground">
-                                {formatMaterialVolume(item.quantity, item.unit)}
-                              </strong>
-                            </span>
-                            <span>
-                              Terkirim:{" "}
-                              <strong className="text-emerald-600 dark:text-emerald-400">
-                                {formatMaterialVolume(delivered, item.unit)}
-                              </strong>
-                            </span>
-                            <span>
-                              Sisa:{" "}
-                              <strong className="text-foreground">
-                                {formatMaterialVolume(remaining, item.unit)}
-                              </strong>
-                            </span>
-                          </div>
+                          <p className="type-p2 font-bold">{s.title}</p>
+                          <p className="type-p3 opacity-80">{s.sub}</p>
                         </div>
                       );
                     })}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                    <span className="type-p3 font-semibold text-foreground">
+                      Status: {statusLabels[selectedTicket.status]}
+                    </span>
+                    <span className="type-p3 text-muted-foreground">
+                      {nextStepLabels[selectedTicket.status]}
+                    </span>
+                  </div>
                 </div>
 
-                {(selectedTicket.materialDeliveries?.length ?? 0) > 0 ? (
-                  <div className="overflow-x-auto rounded-lg border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/40">
-                          <TableHead>Tanggal</TableHead>
-                          <TableHead>No. DO &amp; Truk</TableHead>
-                          <TableHead>Kontrak</TableHead>
-                          <TableHead className="text-right">Volume</TableHead>
-                          <TableHead className="text-right">Nilai Kontrak</TableHead>
-                          <TableHead>Status Tagihan</TableHead>
-                          <TableHead className="text-right">Aksi</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedTicket.materialDeliveries!.map((delivery) => (
-                          <TableRow key={delivery.id}>
-                            <TableCell className="whitespace-nowrap text-xs">
-                              {delivery.deliveryDate}
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-xs font-bold">
-                                {delivery.doNumber}
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                {delivery.vehiclePlate || "-"}
-                                {delivery.driverName ? ` · ${delivery.driverName}` : ""}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-xs font-medium">
-                                {delivery.materialType} · {delivery.vendorName}
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                {delivery.contractNumber}
-                              </div>
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
-                              {formatMaterialVolume(
-                                delivery.quantityReceived,
-                                delivery.unit,
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
+                      Pemohon
+                    </p>
+                    <p className="type-p2 mt-1 font-bold text-foreground">
+                      {selectedTicket.requester.name}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-3">
+                    <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
+                      Tanggal Pengajuan
+                    </p>
+                    <p className="type-p2 mt-1 font-bold text-foreground">
+                      {format(
+                        new Date(selectedTicket.createdAt),
+                        "d MMM yyyy, HH:mm",
+                        { locale: id },
+                      )}
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:col-span-1">
+                    <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
+                      {selectedTicket.type === TicketType.MATERIAL
+                        ? "Total Estimasi"
+                        : "Nominal Pengajuan"}
+                    </p>
+                    <p className="type-kpi mt-1 text-primary">
+                      {formatCurrency(selectedTicket.totalAmount)}
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-xl border border-border bg-card p-3">
+                    <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
+                      Proyek &amp; Lokasi Kerja
+                    </p>
+                    <p className="type-p2 mt-1 font-bold text-foreground">
+                      {selectedTicket.project
+                        ? `${selectedTicket.project.kelompokTani} — ${selectedTicket.project.title}`
+                        : "Non-Proyek / Operasional"}
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-xl border border-border bg-card p-3 sm:col-span-1">
+                    <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
+                      {selectedTicket.items.length > 0
+                        ? "Pemenuhan Barang"
+                        : "Kategori"}
+                    </p>
+                    <p className="type-p2 mt-1 font-bold text-foreground">
+                      {selectedTicket.items.length > 0
+                        ? selectedTicket.fulfillmentStatus === "COMPLETED"
+                          ? "Selesai (100%)"
+                          : selectedTicket.fulfillmentStatus ===
+                              "PARTIALLY_FULFILLED"
+                            ? "Sebagian Terpenuhi"
+                            : "Menunggu Pemenuhan"
+                        : categoryDisplay}
+                    </p>
+                  </div>
+                </div>
+
+                {(parsedDesc.notes ||
+                  parsedDesc.extraFields.length > 0 ||
+                  selectedTicket.requestCategory ===
+                    TicketRequestCategory.APH) && (
+                  <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                        Keterangan &amp; Rincian
+                      </h3>
+                      <Badge variant="outline">{categoryDisplay}</Badge>
+                    </div>
+
+                    {parsedDesc.notes && (
+                      <div className="type-p2 whitespace-pre-wrap rounded-lg border border-border/70 bg-muted/25 px-3.5 py-2.5 text-foreground">
+                        {parsedDesc.notes}
+                      </div>
+                    )}
+
+                    {parsedDesc.extraFields.length > 0 && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {parsedDesc.extraFields.map((field, idx) => (
+                          <div
+                            key={`${field.label}-${idx}`}
+                            className="rounded-lg border border-border bg-muted/20 px-3 py-2"
+                          >
+                            <span className="type-p3 block text-muted-foreground">
+                              {field.label}
+                            </span>
+                            <span className="type-p2 mt-0.5 block font-semibold text-foreground">
+                              {field.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedTicket.requestCategory ===
+                      TicketRequestCategory.APH && (
+                      <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
+                        <h4 className="type-p2 font-semibold text-foreground">
+                          Detail Pembayaran APH
+                        </h4>
+                        <p className="type-p3 text-muted-foreground">
+                          Metode:{" "}
+                          <span className="font-semibold text-foreground">
+                            {selectedTicket.requestPaymentMethod ===
+                            POPaymentMethod.CASH
+                              ? "Tunai (Cash)"
+                              : "Transfer Bank"}
+                          </span>
+                        </p>
+                        {selectedTicket.requestPaymentMethod ===
+                          POPaymentMethod.TRANSFER && (
+                          <p className="type-p3 text-muted-foreground">
+                            Tujuan Transfer:{" "}
+                            <span className="font-semibold text-foreground">
+                              {selectedTicket.transferDestination || "—"}
+                            </span>
+                          </p>
+                        )}
+                        {selectedTicket.requestPaymentDescription && (
+                          <p className="type-p3 whitespace-pre-wrap text-muted-foreground">
+                            {selectedTicket.requestPaymentDescription}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(selectedTicket.recipientName ||
+                  selectedTicket.bankName ||
+                  selectedTicket.accountNumber ||
+                  selectedTicket.transferReceiptUrl) && (
+                  <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                        Rekening Tujuan
+                      </h3>
+                      {selectedTicket.transferReceiptUrl && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            openReceiptPreview({
+                              label: "Bukti Transfer",
+                              url: selectedTicket.transferReceiptUrl!,
+                            })
+                          }
+                        >
+                          <Eye className="size-3.5" aria-hidden="true" />
+                          Bukti Transfer
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                      <div className="rounded-lg border border-border bg-muted/25 p-3">
+                        <span className="type-p3 block text-muted-foreground">
+                          Nama Penerima
+                        </span>
+                        <span className="type-p2 mt-0.5 block font-bold text-foreground">
+                          {selectedTicket.recipientName || "—"}
+                        </span>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/25 p-3">
+                        <span className="type-p3 block text-muted-foreground">
+                          Bank Tujuan
+                        </span>
+                        <span className="type-p2 mt-0.5 block font-bold uppercase text-foreground">
+                          {selectedTicket.bankName || "—"}
+                        </span>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/25 p-3">
+                        <span className="type-p3 block text-muted-foreground">
+                          Nomor Rekening
+                        </span>
+                        <span className="type-p2 mt-0.5 block font-mono font-bold text-primary">
+                          {selectedTicket.accountNumber || "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(selectedTicket.attachmentUrl ||
+                  selectedTicket.receiptUrls.length > 0 ||
+                  selectedTicket.paymentProofUrl ||
+                  selectedTicket.purchaseReceiptUrl ||
+                  selectedTicket.deliveryReceiptUrl) && (
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <h3 className="type-p3 mb-2.5 font-bold uppercase tracking-wider text-muted-foreground">
+                      Lampiran &amp; Bukti Dokumen
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTicket.attachmentUrl && (
+                        <Button asChild variant="outline" size="sm">
+                          <a
+                            href={selectedTicket.attachmentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <ExternalLink className="size-3.5" aria-hidden="true" />
+                            Lampiran
+                          </a>
+                        </Button>
+                      )}
+                      {selectedTicket.receiptUrls.map((url, index) => (
+                        <Button
+                          key={`${selectedTicket.id}-receipt-${index}-${url}`}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            openReceiptPreview({
+                              label: `Bukti Pengajuan ${index + 1}`,
+                              url,
+                            })
+                          }
+                        >
+                          <Eye className="size-3.5" aria-hidden="true" />
+                          Bukti #{index + 1}
+                        </Button>
+                      ))}
+                      {[
+                        ["Bukti Pembayaran", selectedTicket.paymentProofUrl],
+                        ["Bukti Pembelian", selectedTicket.purchaseReceiptUrl],
+                        ["Bukti Pengiriman", selectedTicket.deliveryReceiptUrl],
+                      ]
+                        .filter((receipt): receipt is [string, string] =>
+                          Boolean(receipt[1]),
+                        )
+                        .map(([label, url]) => (
+                          <Button
+                            key={`${selectedTicket.id}-${label}-${url}`}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openReceiptPreview({ label, url })}
+                          >
+                            <Eye className="size-3.5" aria-hidden="true" />
+                            {label}
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {(selectedTicket.purchaseOrders?.length ?? 0) > 0 && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {selectedTicket.purchaseOrders!.map((po) => (
+                      <div
+                        key={po.publicCode}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card p-3.5"
+                      >
+                        <div>
+                          <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                            Purchase Order
+                          </p>
+                          <p className="type-p2 mt-0.5 font-bold text-foreground">
+                            {po.poNumber} · {po.vendorName}
+                          </p>
+                          <Badge
+                            variant={po.paidAt ? "lightSuccess" : "lightWarning"}
+                            className="mt-1"
+                          >
+                            {po.paidAt ? "Lunas" : po.status}
+                          </Badge>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            printPurchaseOrder(selectedTicket.id, po.publicCode)
+                          }
+                        >
+                          <Printer className="size-3.5" aria-hidden="true" />
+                          Cetak PO
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {((selectedTicket.deliveryOrders?.length ?? 0) > 0 ||
+                  (selectedTicket.directStockPurchases?.length ?? 0) > 0) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {selectedTicket.deliveryOrders?.map((deliveryOrder) => {
+                      const hasOrderPhotos =
+                        Boolean(deliveryOrder.arrivalPhotoUrl) ||
+                        Boolean(deliveryOrder.deliveryReceiptUrl) ||
+                        (deliveryOrder.receiptPhotos?.length ?? 0) > 0;
+                      return (
+                        <div
+                          key={deliveryOrder.publicCode}
+                          className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                                Surat Jalan (DO)
+                              </p>
+                              <p className="type-p2 mt-0.5 font-bold text-foreground">
+                                {deliveryOrder.doNumber}
+                              </p>
+                            </div>
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/d/${deliveryOrder.publicCode}`}>
+                                <FileText className="size-3.5" aria-hidden="true" />
+                                Cetak DO
+                              </Link>
+                            </Button>
+                          </div>
+                          {hasOrderPhotos && (
+                            <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+                              {deliveryOrder.arrivalPhotoUrl && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openReceiptPreview({
+                                      label: `Foto Material Tiba · ${deliveryOrder.doNumber}`,
+                                      url: deliveryOrder.arrivalPhotoUrl!,
+                                    })
+                                  }
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Foto Tiba
+                                </Button>
                               )}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                              {formatCurrency(String(delivery.estimatedAmount))}
-                            </TableCell>
-                            <TableCell>
+                              {deliveryOrder.deliveryReceiptUrl && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openReceiptPreview({
+                                      label: `Bukti DO · ${deliveryOrder.doNumber}`,
+                                      url: deliveryOrder.deliveryReceiptUrl!,
+                                    })
+                                  }
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Bukti DO
+                                </Button>
+                              )}
+                              {deliveryOrder.receiptPhotos?.map(
+                                (photo, photoIdx) => (
+                                  <Button
+                                    key={photo.id}
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      openReceiptPreview({
+                                        label: `Serah Terima #${photoIdx + 1} · ${deliveryOrder.doNumber}`,
+                                        url: photo.url,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Foto #{photoIdx + 1}
+                                  </Button>
+                                ),
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {selectedTicket.directStockPurchases?.map((purchase) => {
+                      const stageLabel =
+                        purchase.status === "RECEIVED"
+                          ? "Diterima"
+                          : purchase.hasFinanceProof
+                            ? "Siap Diterima"
+                            : purchase.vendorInvoiceUrl
+                              ? "Menunggu Finance"
+                              : purchase.isApprovedByDirector
+                                ? "Menunggu Invoice"
+                                : "Menunggu Direktur";
+                      const purchasePhotoUrls =
+                        purchase.receivedPhotos &&
+                        purchase.receivedPhotos.length > 0
+                          ? purchase.receivedPhotos
+                          : purchase.arrivalPhotoUrl
+                            ? [purchase.arrivalPhotoUrl]
+                            : [];
+                      return (
+                        <div
+                          key={purchase.id}
+                          className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
+                                Pembelian Langsung
+                              </p>
+                              <p className="type-p2 mt-0.5 font-bold text-foreground">
+                                {purchase.purchaseNumber} · {purchase.vendorName}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {formatCurrency(purchase.totalAmount)} ·{" "}
+                                {stageLabel}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
                               <Badge
                                 variant={
-                                  delivery.billingStatus === "BILLED"
+                                  purchase.status === "RECEIVED"
                                     ? "lightSuccess"
                                     : "lightWarning"
                                 }
                               >
-                                {delivery.billingStatus}
+                                {stageLabel}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {delivery.proofUrl && (
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    className="h-7 w-7"
-                                    title="Lihat Foto Surat Jalan"
-                                    onClick={() =>
-                                      openReceiptPreview({
-                                        label: `Surat Jalan ${delivery.doNumber}`,
-                                        url: delivery.proofUrl!,
-                                      })
-                                    }
-                                  >
-                                    <Eye className="size-3.5" />
+                              {purchase.status === "PENDING_RECEIPT" &&
+                                role === UserRole.FINANCE &&
+                                purchase.isApprovedByDirector &&
+                                Boolean(purchase.vendorInvoiceUrl) &&
+                                !purchase.hasFinanceProof && (
+                                  <Button asChild size="sm">
+                                    <Link
+                                      href={`/apps/finance?tab=payment&openSheet=${encodeURIComponent(purchase.id)}`}
+                                    >
+                                      Bayar
+                                    </Link>
                                   </Button>
                                 )}
-                                {canRecordContractDo &&
-                                  delivery.billingStatus === "UNBILLED" && (
+                              {purchase.status === "PENDING_RECEIPT" &&
+                                role !== UserRole.FINANCE && (
+                                  <Button asChild size="sm" variant="outline">
+                                    <Link href="/apps/logistics?tab=stock">
+                                      Kelola Stok
+                                    </Link>
+                                  </Button>
+                                )}
+                            </div>
+                          </div>
+                          {(purchase.vendorInvoiceUrl ||
+                            purchasePhotoUrls.length > 0) && (
+                            <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+                              {purchase.vendorInvoiceUrl && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openReceiptPreview({
+                                      label: `Invoice · ${purchase.purchaseNumber}`,
+                                      url: purchase.vendorInvoiceUrl!,
+                                    })
+                                  }
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Invoice
+                                </Button>
+                              )}
+                              {purchasePhotoUrls.map((photoUrl, photoIdx) => (
+                                <Button
+                                  key={`${purchase.id}-photo-${photoIdx}`}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openReceiptPreview({
+                                      label: `Foto Tiba #${photoIdx + 1} · ${purchase.purchaseNumber}`,
+                                      url: photoUrl,
+                                    })
+                                  }
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Foto #{photoIdx + 1}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {(selectedTicket.items.some(
+                  (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+                ) ||
+                  (selectedTicket.materialDeliveries?.length ?? 0) > 0) && (
+                  <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="type-h3 text-foreground">
+                          Kontrak Material Alam &amp; DO
+                        </h3>
+                        <p className="type-p3 text-muted-foreground">
+                          Pengiriman langsung dari vendor Kontrak Payung tanpa
+                          PO baru.
+                        </p>
+                      </div>
+                      {canRecordContractDo &&
+                        hasOpenContractDelivery(role, selectedTicket) && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() =>
+                              setContractDoModalTicket(selectedTicket)
+                            }
+                          >
+                            <Truck className="size-3.5" aria-hidden="true" />
+                            DO Kontrak
+                          </Button>
+                        )}
+                    </div>
+
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      {selectedTicket.items
+                        .filter(
+                          (item) =>
+                            item.categoryHint === TicketCategoryHint.CONTRACT,
+                        )
+                        .map((item) => {
+                          const delivered = getContractItemDeliveredVolume(
+                            selectedTicket,
+                            item.materialContractId,
+                          );
+                          const remaining = Math.max(
+                            0,
+                            item.quantity - delivered,
+                          );
+                          const isDone =
+                            item.status === FulfillmentStatus.PROCESSED_TO_DO ||
+                            remaining <= 0;
+                          return (
+                            <div
+                              key={`contract-progress-${item.id}`}
+                              className="space-y-1.5 rounded-lg border border-border/80 bg-muted/20 p-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <p className="type-p2 font-bold text-foreground">
+                                    {item.itemName}
+                                  </p>
+                                  {item.materialContract && (
+                                    <p className="type-p3 text-muted-foreground">
+                                      {item.materialContract.contractNumber} ·{" "}
+                                      {item.materialContract.vendorName} ·{" "}
+                                      {formatCurrency(
+                                        String(item.materialContract.unitPrice),
+                                      )}
+                                      /{item.unit}
+                                    </p>
+                                  )}
+                                </div>
+                                <Badge
+                                  variant={isDone ? "lightSuccess" : "lightWarning"}
+                                >
+                                  {isDone ? "Terpenuhi" : "Aktif"}
+                                </Badge>
+                              </div>
+                              <div className="type-p3 flex flex-wrap items-center justify-between gap-2 pt-1 text-muted-foreground">
+                                <span>
+                                  Diminta:{" "}
+                                  <strong className="text-foreground">
+                                    {formatMaterialVolume(
+                                      item.quantity,
+                                      item.unit,
+                                    )}
+                                  </strong>
+                                </span>
+                                <span>
+                                  Terkirim:{" "}
+                                  <strong className="text-emerald-500">
+                                    {formatMaterialVolume(delivered, item.unit)}
+                                  </strong>
+                                </span>
+                                <span>
+                                  Sisa:{" "}
+                                  <strong className="text-foreground">
+                                    {formatMaterialVolume(remaining, item.unit)}
+                                  </strong>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {(selectedTicket.materialDeliveries?.length ?? 0) > 0 ? (
+                      <Table pagination={false}>
+                        <TableHeader>
+                          <TableRow className="bg-muted/40">
+                            <TableHead className="type-p3">Tanggal</TableHead>
+                            <TableHead className="type-p3">No. DO &amp; Truk</TableHead>
+                            <TableHead className="type-p3">Kontrak</TableHead>
+                            <TableHead className="type-p3 text-right">
+                              Volume
+                            </TableHead>
+                            <TableHead className="type-p3 text-right">
+                              Nilai
+                            </TableHead>
+                            <TableHead className="type-p3">Tagihan</TableHead>
+                            <TableHead className="type-p3 text-right">
+                              Aksi
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedTicket.materialDeliveries!.map((delivery) => (
+                            <TableRow key={delivery.id}>
+                              <TableCell className="type-p3 whitespace-nowrap">
+                                {delivery.deliveryDate}
+                              </TableCell>
+                              <TableCell>
+                                <div className="type-p2 font-semibold">
+                                  {delivery.doNumber}
+                                </div>
+                                <div className="type-p3 text-muted-foreground">
+                                  {delivery.vehiclePlate || "-"}
+                                  {delivery.driverName
+                                    ? ` · ${delivery.driverName}`
+                                    : ""}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="type-p2 font-medium">
+                                  {delivery.materialType} · {delivery.vendorName}
+                                </div>
+                                <div className="type-p3 text-muted-foreground">
+                                  {delivery.contractNumber}
+                                </div>
+                              </TableCell>
+                              <TableCell className="type-p2 whitespace-nowrap text-right font-semibold">
+                                {formatMaterialVolume(
+                                  delivery.quantityReceived,
+                                  delivery.unit,
+                                )}
+                              </TableCell>
+                              <TableCell className="type-p2 whitespace-nowrap text-right font-medium">
+                                {formatCurrency(String(delivery.estimatedAmount))}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    delivery.billingStatus === "BILLED"
+                                      ? "lightSuccess"
+                                      : "lightWarning"
+                                  }
+                                >
+                                  {delivery.billingStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {delivery.proofUrl && (
                                     <Button
                                       type="button"
                                       size="icon"
                                       variant="outline"
-                                      className="h-7 w-7"
-                                      disabled={
-                                        isPending ||
-                                        deletingDeliveryId === delivery.id
-                                      }
-                                      title="Hapus DO belum ditagih"
+                                      aria-label={`Lihat bukti ${delivery.doNumber}`}
                                       onClick={() =>
-                                        handleDeleteContractDelivery(
-                                          delivery.id,
-                                          delivery.doNumber,
-                                        )
+                                        openReceiptPreview({
+                                          label: `Surat Jalan ${delivery.doNumber}`,
+                                          url: delivery.proofUrl!,
+                                        })
                                       }
                                     >
-                                      <Trash2 className="size-3.5 text-destructive" />
+                                      <Eye className="size-3.5" aria-hidden="true" />
                                     </Button>
                                   )}
-                              </div>
+                                  {canRecordContractDo &&
+                                    delivery.billingStatus === "UNBILLED" && (
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        disabled={
+                                          isPending ||
+                                          deletingDeliveryId === delivery.id
+                                        }
+                                        aria-label={`Hapus DO ${delivery.doNumber}`}
+                                        onClick={() =>
+                                          handleDeleteContractDelivery(
+                                            delivery.id,
+                                            delivery.doNumber,
+                                          )
+                                        }
+                                      >
+                                        <Trash2
+                                          className="size-3.5 text-destructive"
+                                          aria-hidden="true"
+                                        />
+                                      </Button>
+                                    )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <EmptyState
+                        variant="inline"
+                        title="Belum ada Surat Jalan"
+                        description="Belum ada DO material alam tercatat untuk tiket ini."
+                      />
+                    )}
+                  </section>
+                )}
+
+                {(selectedTicket.items.length > 0 ||
+                  (canExecutiveManageTicket &&
+                    selectedTicket.type === TicketType.MATERIAL)) && (
+                  <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="type-h3 text-foreground">
+                            Rincian Item ({selectedTicket.items.length})
+                          </h3>
+                          {isExecutive && selectedTicketFinanceLocked && (
+                            <Badge variant="lightWarning" className="gap-1">
+                              <Lock className="size-3" aria-hidden="true" />
+                              Terkunci Finance
+                            </Badge>
+                          )}
+                        </div>
+                        {canSplitFulfillment && (
+                          <p className="type-p3 text-muted-foreground">
+                            Centang item untuk memeriksa stok (DO) atau membuat
+                            PO / pembelian langsung.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canExecutiveManageTicket && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={fulfillmentPending}
+                            onClick={() => setItemEditorModal({ mode: "add" })}
+                          >
+                            <Plus className="size-3.5" aria-hidden="true" />
+                            Tambah Item
+                          </Button>
+                        )}
+                        {canSplitFulfillment && (
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={
+                                selectedStockItems.length === 0 ||
+                                fulfillmentPending
+                              }
+                              onClick={prepareWarehouseFulfillment}
+                            >
+                              <PackageOpen
+                                className="size-3.5"
+                                aria-hidden="true"
+                              />
+                              Cek Stok ({selectedStockItems.length})
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={
+                                selectedStockItems.length === 0 ||
+                                fulfillmentPending
+                              }
+                              onClick={() => {
+                                if (
+                                  !selectedTicket ||
+                                  selectedStockItems.length === 0
+                                )
+                                  return;
+                                setFulfillmentMessage("");
+                                setStockAvailability([]);
+                                setItemSelection({
+                                  ticketId: selectedTicket.id,
+                                  itemIds: selectedStockItems.map((i) => i.id),
+                                });
+                                setPurchaseMode("DIRECT_PURCHASE");
+                                setPoDialogOpen(true);
+                              }}
+                            >
+                              <ShoppingCart
+                                className="size-3.5"
+                                aria-hidden="true"
+                              />
+                              Buat PO / Belanja ({selectedStockItems.length})
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5 md:hidden">
+                      {canSplitFulfillment &&
+                        pendingTicketItemIds.length > 0 && (
+                          <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/30 px-3 py-2">
+                            <Label className="type-p3 flex cursor-pointer items-center gap-2 font-medium text-foreground">
+                              <Checkbox
+                                checked={
+                                  allPendingItemsSelected
+                                    ? true
+                                    : somePendingItemsSelected
+                                      ? "indeterminate"
+                                      : false
+                                }
+                                onCheckedChange={(checked) =>
+                                  setItemSelection({
+                                    ticketId: selectedTicket.id,
+                                    itemIds:
+                                      checked === true
+                                        ? pendingTicketItemIds
+                                        : [],
+                                  })
+                                }
+                              />
+                              <span>
+                                Pilih Semua ({pendingTicketItemIds.length})
+                              </span>
+                            </Label>
+                          </div>
+                        )}
+                      {selectedTicket.items.map((item) => (
+                        <TicketDetailItemCard
+                          key={item.id}
+                          ticket={selectedTicket}
+                          item={item}
+                          canSplitFulfillment={canSplitFulfillment}
+                          canExecutiveManageTicket={canExecutiveManageTicket}
+                          selected={selectedItemIds.includes(item.id)}
+                          onToggleSelect={(checked) =>
+                            setItemSelection({
+                              ticketId: selectedTicket.id,
+                              itemIds: checked
+                                ? [...selectedItemIds, item.id]
+                                : selectedItemIds.filter((id) => id !== item.id),
+                            })
+                          }
+                          onEditItem={(target) =>
+                            setItemEditorModal({ mode: "edit", item: target })
+                          }
+                          onDeleteItem={(target) =>
+                            setItemEditorModal({ mode: "delete", item: target })
+                          }
+                        />
+                      ))}
+                    </div>
+
+                    <div className="hidden md:block">
+                      <Table pagination={false}>
+                        <TableHeader>
+                          <TableRow className="bg-muted/40">
+                            {canSplitFulfillment && (
+                              <TableHead className="w-10">
+                                <Checkbox
+                                  checked={
+                                    allPendingItemsSelected
+                                      ? true
+                                      : somePendingItemsSelected
+                                        ? "indeterminate"
+                                        : false
+                                  }
+                                  aria-label="Pilih semua item"
+                                  onCheckedChange={(checked) =>
+                                    setItemSelection({
+                                      ticketId: selectedTicket.id,
+                                      itemIds:
+                                        checked === true
+                                          ? pendingTicketItemIds
+                                          : [],
+                                    })
+                                  }
+                                />
+                              </TableHead>
+                            )}
+                            <TableHead className="type-p3">Nama Item</TableHead>
+                            <TableHead className="type-p3">Jumlah</TableHead>
+                            <TableHead className="type-p3">Harga</TableHead>
+                            <TableHead className="type-p3">Sumber</TableHead>
+                            <TableHead className="type-p3">Target Tiba</TableHead>
+                            <TableHead className="type-p3">Status</TableHead>
+                            {canExecutiveManageTicket && (
+                              <TableHead className="type-p3 text-right">
+                                Aksi
+                              </TableHead>
+                            )}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedTicket.items.map((item) => (
+                            <TicketDetailItemRow
+                              key={item.id}
+                              ticket={selectedTicket}
+                              item={item}
+                              canSplitFulfillment={canSplitFulfillment}
+                              canExecutiveManageTicket={canExecutiveManageTicket}
+                              selected={selectedItemIds.includes(item.id)}
+                              onToggleSelect={(checked) =>
+                                setItemSelection({
+                                  ticketId: selectedTicket.id,
+                                  itemIds: checked
+                                    ? [...selectedItemIds, item.id]
+                                    : selectedItemIds.filter(
+                                        (id) => id !== item.id,
+                                      ),
+                                })
+                              }
+                              onEditItem={(target) =>
+                                setItemEditorModal({
+                                  mode: "edit",
+                                  item: target,
+                                })
+                              }
+                              onDeleteItem={(target) =>
+                                setItemEditorModal({
+                                  mode: "delete",
+                                  item: target,
+                                })
+                              }
+                            />
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </section>
+                )}
+
+                {(selectedTicket.paymentTransactions?.length ?? 0) > 0 && (
+                  <div className="space-y-2.5 rounded-xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="type-h3 text-foreground">
+                        Riwayat Pembayaran
+                      </h3>
+                      {(() => {
+                        const paid = selectedTicket.paymentTransactions!.reduce(
+                          (sum, payment) => sum + payment.amount,
+                          0,
+                        );
+                        return (
+                          <Badge variant="secondary">
+                            {selectedTicket.paymentTransactions!.length} transaksi
+                            · {formatCurrency(String(paid))}
+                          </Badge>
+                        );
+                      })()}
+                    </div>
+                    <Table pagination={false}>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="type-p3">Tanggal</TableHead>
+                          <TableHead className="type-p3">Referensi</TableHead>
+                          <TableHead className="type-p3">Tipe</TableHead>
+                          <TableHead className="type-p3 text-right">
+                            Jumlah
+                          </TableHead>
+                          <TableHead className="type-p3">
+                            Tujuan Transfer
+                          </TableHead>
+                          <TableHead className="type-p3 text-right">
+                            Bukti
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedTicket.paymentTransactions!.map((payment) => (
+                          <TableRow key={payment.id}>
+                            <TableCell className="type-p3 whitespace-nowrap">
+                              {payment.paidAt
+                                ? new Date(payment.paidAt).toLocaleDateString(
+                                    "id-ID",
+                                  )
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="type-p2 font-medium">
+                              {payment.reference}
+                            </TableCell>
+                            <TableCell className="type-p3">
+                              {payment.paymentType === PaymentType.DOWN_PAYMENT
+                                ? "DP"
+                                : payment.paymentType ===
+                                    PaymentType.PROGRESS_PAYMENT
+                                  ? "Termin"
+                                  : "Pelunasan"}
+                            </TableCell>
+                            <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                              {formatCurrency(String(payment.amount))}
+                            </TableCell>
+                            <TableCell className="type-p3">
+                              {payment.transferDestination}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {payment.proofOfTransferUrl ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    openReceiptPreview({
+                                      label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
+                                      url: payment.proofOfTransferUrl!,
+                                    })
+                                  }
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Bukti
+                                </Button>
+                              ) : (
+                                "—"
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                    Belum ada Surat Jalan (DO) material alam yang tercatat untuk tiket ini.
-                  </p>
-                )}
-              </section>
-            )}
-
-            {/* 4. Tabel Rincian Item & Pemenuhan Stok */}
-            {(selectedTicket.items.length > 0 ||
-              (canExecutiveManageTicket &&
-                selectedTicket.type === TicketType.MATERIAL)) && (
-              <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-bold text-foreground">
-                        Rincian Item Permintaan ({selectedTicket.items.length} Item)
-                      </h3>
-                      {isExecutive && selectedTicketFinanceLocked && (
-                        <Badge
-                          variant="outline"
-                          className="gap-1 border-amber-500/40 bg-amber-500/10 text-[11px] font-medium text-amber-500"
-                        >
-                          <Lock className="size-3" />
-                          Terkunci · Sudah Diproses Keuangan
-                        </Badge>
-                      )}
-                    </div>
-                    {canSplitFulfillment && (
-                      <p className="text-xs text-muted-foreground">
-                        Centang item gudang/pembelian di bawah untuk memeriksa stok (DO) atau menerbitkan PO pengadaan. Item Kontrak Material Alam dipenuhi lewat Surat Jalan (DO) Kontrak di atas.
-                      </p>
-                    )}
-                    {canExecutiveManageTicket && (
-                      <p className="text-xs text-muted-foreground">
-                        Direktur &amp; Wakil Direktur dapat menambah barang, mengubah rincian, atau menghapus barang selama tiket belum diproses Keuangan.
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {canExecutiveManageTicket && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={addingItemOpen ? "secondary" : "outline"}
-                        disabled={executiveItemPending || fulfillmentPending}
-                        onClick={() => {
-                          if (addingItemOpen) {
-                            setAddingItemOpen(false);
-                          } else {
-                            openAddItemForm();
-                          }
-                        }}
-                        className="h-9 gap-1.5 border-primary/40 text-xs font-semibold text-primary hover:bg-primary/10"
-                      >
-                        <Plus className="size-3.5" />
-                        Tambah Barang
-                      </Button>
-                    )}
-                    {canSplitFulfillment && (
-                      <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={
-                            selectedStockItems.length === 0 || fulfillmentPending
-                          }
-                          onClick={prepareWarehouseFulfillment}
-                          className="h-9 gap-1.5 text-xs"
-                        >
-                          <PackageOpen className="size-3.5" />
-                          Periksa &amp; Penuhi dari Stok ({selectedStockItems.length})
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          disabled={
-                            selectedStockItems.length === 0 || fulfillmentPending
-                          }
-                          onClick={() => {
-                            if (!selectedTicket || selectedStockItems.length === 0)
-                              return;
-                            const ticketId = selectedTicket.id;
-                            const itemIds = selectedStockItems.map(
-                              (item) => item.id,
-                            );
-                            setFulfillmentMessage("");
-                            setStockAvailability([]);
-                            setItemSelection({ ticketId, itemIds });
-                            setPurchaseMode("DIRECT_PURCHASE");
-                            setPoDialogOpen(true);
-                          }}
-                          className="h-9 gap-1.5 text-xs"
-                        >
-                          <ShoppingCart className="size-3.5" />
-                          Pembelian Langsung / PO ({selectedStockItems.length})
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {executiveItemFeedback && (
-                  <div
-                    className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                      executiveItemFeedback.isError
-                        ? "border-destructive/40 bg-destructive/10 text-destructive"
-                        : "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
-                    }`}
-                    role={executiveItemFeedback.isError ? "alert" : "status"}
-                  >
-                    {executiveItemFeedback.text}
-                  </div>
                 )}
 
-                {canExecutiveManageTicket && addingItemOpen && (
-                  <div className="space-y-3 rounded-xl border border-primary/35 bg-primary/5 p-3.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
-                        Tambah Barang Baru ke Tiket
-                      </h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        disabled={executiveItemPending}
-                        onClick={() => setAddingItemOpen(false)}
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </div>
-                    {stockItems.length > 0 && (
-                      <div className="space-y-1">
-                        <FormLabel className="text-xs text-muted-foreground">
-                          Pilih dari Katalog Stok Gudang (Opsional)
-                        </FormLabel>
-                        <select
-                          value={newItemStockId}
-                          disabled={executiveItemPending}
-                          onChange={(event) => {
-                            const val = event.target.value;
-                            setNewItemStockId(val);
-                            const found = stockItems.find((s) => s.id === val);
-                            if (found) {
-                              setNewItemName(found.name);
-                              setNewItemUnit(found.unit);
-                              if (
-                                found.unitPrice &&
-                                Number(found.unitPrice) > 0
-                              ) {
-                                setNewItemCost(String(Number(found.unitPrice)));
-                              }
-                            }
-                          }}
-                          className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs"
-                        >
-                          <option value="">
-                            — Ketik manual atau pilih SKU dari katalog stok —
-                          </option>
-                          {stockItems.map((stock) => (
-                            <option key={stock.id} value={stock.id}>
-                              {stock.sku} — {stock.name} ({stock.unit})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-6">
-                      <div className="space-y-1 sm:col-span-2">
-                        <FormLabel className="text-xs">Nama Barang *</FormLabel>
-                        <Input
-                          value={newItemName}
-                          maxLength={160}
-                          placeholder="Contoh: Semen 40 Kg"
-                          disabled={executiveItemPending}
-                          onChange={(e) => setNewItemName(e.target.value)}
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <FormLabel className="text-xs">Jumlah *</FormLabel>
-                        <Input
-                          type="number"
-                          min="0.01"
-                          step="any"
-                          value={newItemQuantity}
-                          disabled={executiveItemPending}
-                          onChange={(e) => setNewItemQuantity(e.target.value)}
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <FormLabel className="text-xs">Satuan *</FormLabel>
-                        <Input
-                          value={newItemUnit}
-                          maxLength={32}
-                          placeholder="Zak / pcs / m2"
-                          disabled={executiveItemPending}
-                          onChange={(e) => setNewItemUnit(e.target.value)}
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <FormLabel className="text-xs">
-                          Harga Satuan (Rp)
-                        </FormLabel>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="any"
-                          placeholder="Opsional"
-                          value={newItemCost}
-                          disabled={executiveItemPending}
-                          onChange={(e) => setNewItemCost(e.target.value)}
-                          className="h-9 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <FormLabel className="text-xs">Sumber</FormLabel>
-                        <select
-                          value={newItemCategoryHint}
-                          disabled={executiveItemPending}
-                          onChange={(e) =>
-                            setNewItemCategoryHint(
-                              e.target.value as TicketCategoryHint,
-                            )
-                          }
-                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
-                        >
-                          <option value={TicketCategoryHint.WAREHOUSE}>
-                            Stok Gudang
-                          </option>
-                          <option value={TicketCategoryHint.PURCHASE}>
-                            Pembelian
-                          </option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-end justify-between gap-2 pt-1">
-                      <div className="w-full space-y-1 sm:w-48">
-                        <FormLabel className="text-xs">Target Tiba</FormLabel>
-                        <Input
-                          type="date"
-                          value={newItemDeliveryDate}
-                          disabled={executiveItemPending}
-                          onChange={(e) =>
-                            setNewItemDeliveryDate(e.target.value)
-                          }
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs"
-                          disabled={executiveItemPending}
-                          onClick={() => setAddingItemOpen(false)}
-                        >
-                          Batal
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 gap-1.5 text-xs"
-                          disabled={
-                            executiveItemPending ||
-                            !newItemName.trim() ||
-                            !newItemUnit.trim() ||
-                            !(Number(newItemQuantity) > 0)
-                          }
-                          onClick={() => void handleExecutiveAddItem()}
-                        >
-                          <Plus className="size-3.5" />
-                          {executiveItemPending
-                            ? "Menyimpan..."
-                            : "Simpan Barang"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Mobile Card View untuk Rincian Item Permintaan (< 768px) */}
-                <div className="space-y-2.5 md:hidden">
-                  {canSplitFulfillment && pendingTicketItemIds.length > 0 && (
-                    <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/30 px-3 py-2">
-                      <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-foreground">
-                        <Checkbox
-                          checked={
-                            allPendingItemsSelected
-                              ? true
-                              : somePendingItemsSelected
-                                ? "indeterminate"
-                                : false
-                          }
-                          aria-label="Pilih semua item yang belum dipenuhi"
-                          onCheckedChange={(checked) =>
-                            setItemSelection({
-                              ticketId: selectedTicket.id,
-                              itemIds:
-                                checked === true
-                                  ? pendingTicketItemIds
-                                  : [],
-                            })
-                          }
-                        />
-                        <span>Pilih Semua Item Pending ({pendingTicketItemIds.length})</span>
-                      </label>
-                    </div>
-                  )}
-
-                  {selectedTicket.items.map((item) => {
-                    const isEditingThisRow = editingItemId === item.id;
-                    const isConfirmingDeleteThisRow =
-                      confirmDeleteItemId === item.id;
-                    const isContractItem =
-                      item.categoryHint === TicketCategoryHint.CONTRACT;
-                    const activeDirectPurchase =
-                      item.status === FulfillmentStatus.PENDING
-                        ? selectedTicket.directStockPurchases?.find(
-                            (purchase) =>
-                              purchase.status === "PENDING_RECEIPT" &&
-                              (purchase.items ?? []).some((purchaseItem) => {
-                                if (
-                                  item.stockItemId &&
-                                  purchaseItem.stockItemId
-                                ) {
-                                  return (
-                                    purchaseItem.stockItemId ===
-                                    item.stockItemId
-                                  );
-                                }
-                                return (
-                                  purchaseItem.itemName.trim().toLowerCase() ===
-                                    item.itemName.trim().toLowerCase() &&
-                                  purchaseItem.unit.trim().toLowerCase() ===
-                                    item.unit.trim().toLowerCase()
-                                );
-                              }),
-                          )
-                        : undefined;
-
-                    if (isEditingThisRow && canExecutiveManageTicket) {
-                      return (
-                        <div
-                          key={item.id}
-                          className="space-y-2.5 rounded-lg border border-primary/40 bg-primary/5 p-3"
-                        >
-                          <div className="grid grid-cols-1 gap-2">
-                            <Input
-                              value={editItemName}
-                              maxLength={160}
-                              disabled={isContractItem || executiveItemPending}
-                              onChange={(e) => setEditItemName(e.target.value)}
-                              className="h-8 text-xs"
-                              placeholder="Nama barang"
-                            />
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                type="number"
-                                min="0.01"
-                                step="any"
-                                value={editItemQuantity}
-                                disabled={executiveItemPending}
-                                onChange={(e) =>
-                                  setEditItemQuantity(e.target.value)
-                                }
-                                className="h-8 text-xs"
-                                placeholder="Jumlah"
-                              />
-                              <Input
-                                value={editItemUnit}
-                                maxLength={32}
-                                disabled={isContractItem || executiveItemPending}
-                                onChange={(e) => setEditItemUnit(e.target.value)}
-                                className="h-8 text-xs"
-                                placeholder="Satuan"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="any"
-                                value={editItemCost}
-                                disabled={executiveItemPending}
-                                onChange={(e) => setEditItemCost(e.target.value)}
-                                className="h-8 text-xs"
-                                placeholder="Harga Satuan (Rp)"
-                              />
-                              {isContractItem ? (
-                                <div className="flex items-center">
-                                  <Badge variant="outline">Kontrak Alam</Badge>
-                                </div>
-                              ) : (
-                                <select
-                                  value={editItemCategoryHint}
-                                  disabled={executiveItemPending}
-                                  onChange={(e) =>
-                                    setEditItemCategoryHint(
-                                      e.target.value as TicketCategoryHint,
-                                    )
-                                  }
-                                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                                >
-                                  <option value={TicketCategoryHint.WAREHOUSE}>
-                                    Stok Gudang
-                                  </option>
-                                  <option value={TicketCategoryHint.PURCHASE}>
-                                    Pembelian
-                                  </option>
-                                </select>
-                              )}
-                            </div>
-                            <Input
-                              type="date"
-                              value={editItemDeliveryDate}
-                              disabled={executiveItemPending}
-                              onChange={(e) =>
-                                setEditItemDeliveryDate(e.target.value)
-                              }
-                              className="h-8 text-xs"
-                            />
-                          </div>
-                          <div className="flex items-center justify-end gap-1.5 pt-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2.5 text-xs"
-                              disabled={executiveItemPending}
-                              onClick={() => setEditingItemId(null)}
-                            >
-                              Batal
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-7 gap-1 px-2.5 text-xs"
-                              disabled={executiveItemPending}
-                              onClick={() =>
-                                void handleExecutiveUpdateItem(item.id)
-                              }
-                            >
-                              <Save className="size-3" />
-                              Simpan
-                            </Button>
-                          </div>
+                <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+                  <h3 className="type-h3 text-foreground">
+                    Riwayat Aktivitas ({selectedTicket.auditLogs.length})
+                  </h3>
+                  <ol className="space-y-3 border-l-2 border-primary/30 pl-4">
+                    {selectedTicket.auditLogs.map((log) => (
+                      <li key={log.id} className="relative">
+                        <span className="absolute -left-[1.35rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="type-p2 font-semibold text-foreground">
+                            {auditActionLabels[log.action] ?? log.action}
+                          </p>
+                          <span className="type-p3 text-muted-foreground">
+                            {log.user.name} ·{" "}
+                            {format(
+                              new Date(log.createdAt),
+                              "d MMM yyyy, HH:mm",
+                              { locale: id },
+                            )}
+                          </span>
                         </div>
-                      );
-                    }
-
-                    const deliveredContractVolume =
-                      item.categoryHint === TicketCategoryHint.CONTRACT
-                        ? getContractItemDeliveredVolume(
-                            selectedTicket,
-                            item.materialContractId,
-                          )
-                        : 0;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="space-y-2 rounded-lg border border-border/80 bg-card p-3"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 items-start gap-2">
-                            {canSplitFulfillment && (
-                              <Checkbox
-                                className="mt-0.5"
-                                checked={selectedItemIds.includes(item.id)}
-                                disabled={
-                                  item.status !== FulfillmentStatus.PENDING ||
-                                  item.categoryHint ===
-                                    TicketCategoryHint.CONTRACT
-                                }
-                                aria-label={`Pilih ${item.itemName}`}
-                                onCheckedChange={(checked) =>
-                                  setItemSelection({
-                                    ticketId: selectedTicket.id,
-                                    itemIds:
-                                      checked === true
-                                        ? [...selectedItemIds, item.id]
-                                        : selectedItemIds.filter(
-                                            (id) => id !== item.id,
-                                          ),
-                                  })
-                                }
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold leading-snug text-foreground">
-                                {item.itemName}
-                              </p>
-                              {item.categoryHint ===
-                                TicketCategoryHint.CONTRACT &&
-                                item.materialContract && (
-                                  <p className="text-[11px] text-muted-foreground">
-                                    {item.materialContract.contractNumber} ·{" "}
-                                    {item.materialContract.vendorName}
-                                  </p>
-                                )}
-                            </div>
-                          </div>
-                          <Badge
-                            variant={
-                              item.status === FulfillmentStatus.PENDING
-                                ? "lightWarning"
-                                : "lightSuccess"
-                            }
-                            className="shrink-0"
-                          >
-                            {item.categoryHint === TicketCategoryHint.CONTRACT
-                              ? item.status === FulfillmentStatus.PROCESSED_TO_DO
-                                ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
-                                : deliveredContractVolume > 0
-                                  ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
-                                  : "Menunggu DO Kontrak"
-                              : item.status === FulfillmentStatus.PENDING
-                                ? activeDirectPurchase
-                                  ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
-                                  : "Menunggu"
-                                : item.status ===
-                                    FulfillmentStatus.PROCESSED_TO_DO
-                                  ? "Dipenuhi via DO"
-                                  : "Diproses via PO"}
-                          </Badge>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-md bg-muted/30 p-2 text-xs">
-                          <div>
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Jumlah
-                            </span>
-                            <p className="font-semibold text-foreground">
-                              {item.quantity} {item.unit}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Harga Satuan
-                            </span>
-                            <p className="font-semibold tabular-nums text-foreground">
-                              {formatCurrency(item.estimatedCost)}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Sumber
-                            </span>
-                            <p className="font-medium text-foreground">
-                              {item.categoryHint ===
-                              TicketCategoryHint.WAREHOUSE
-                                ? "Stok Gudang"
-                                : item.categoryHint ===
-                                    TicketCategoryHint.CONTRACT
-                                  ? "Kontrak Alam"
-                                  : "Pembelian"}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                              Target Tiba
-                            </span>
-                            <p className="font-medium text-foreground">
-                              {item.expectedDeliveryDate ?? "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {canExecutiveManageTicket && (
-                          <div className="flex items-center justify-end gap-1.5 border-t border-border/60 pt-2">
-                            {isConfirmingDeleteThisRow ? (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-7 px-2.5 text-xs"
-                                  disabled={deletingItemId === item.id}
-                                  onClick={() =>
-                                    void handleExecutiveDeleteItem(item.id)
-                                  }
-                                >
-                                  {deletingItemId === item.id
-                                    ? "Menghapus..."
-                                    : "Ya, Hapus"}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 px-2.5 text-xs"
-                                  disabled={deletingItemId === item.id}
-                                  onClick={() => setConfirmDeleteItemId(null)}
-                                >
-                                  Batal
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 gap-1 px-2.5 text-xs"
-                                  onClick={() => openEditItemRow(item)}
-                                >
-                                  <Pencil className="size-3" />
-                                  Edit
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 gap-1 border-destructive/40 px-2.5 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                  disabled={selectedTicket.items.length <= 1}
-                                  onClick={() => setConfirmDeleteItemId(item.id)}
-                                >
-                                  <Trash2 className="size-3" />
-                                  Hapus
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                        {log.notes && (
+                          <p className="type-p3 mt-0.5 text-muted-foreground">
+                            {log.notes}
+                          </p>
                         )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Desktop Table View (>= 768px) */}
-                <div className="hidden overflow-x-auto rounded-lg border border-border md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/40">
-                        {canSplitFulfillment && (
-                          <TableHead className="w-9 px-2.5 py-2">
-                            <Checkbox
-                              checked={
-                                allPendingItemsSelected
-                                  ? true
-                                  : somePendingItemsSelected
-                                    ? "indeterminate"
-                                    : false
-                              }
-                              disabled={pendingTicketItemIds.length === 0}
-                              aria-label="Pilih semua item yang belum dipenuhi"
-                              onCheckedChange={(checked) =>
-                                setItemSelection({
-                                  ticketId: selectedTicket.id,
-                                  itemIds:
-                                    checked === true
-                                      ? pendingTicketItemIds
-                                      : [],
-                                })
-                              }
-                            />
-                          </TableHead>
-                        )}
-                        <TableHead className="px-2.5 py-2 text-xs">Nama Item</TableHead>
-                        <TableHead className="px-2.5 py-2 text-xs">Jumlah</TableHead>
-                        <TableHead className="px-2.5 py-2 text-xs">Harga Satuan</TableHead>
-                        <TableHead className="px-2.5 py-2 text-xs">Sumber</TableHead>
-                        <TableHead className="px-2.5 py-2 text-xs">Target Tiba</TableHead>
-                        <TableHead className="px-2.5 py-2 text-xs">Status Pemenuhan</TableHead>
-                        {canExecutiveManageTicket && (
-                          <TableHead className="px-2.5 py-2 text-right text-xs">Aksi</TableHead>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedTicket.items.map((item) => {
-                        const isEditingThisRow = editingItemId === item.id;
-                        const isConfirmingDeleteThisRow =
-                          confirmDeleteItemId === item.id;
-                        const isContractItem =
-                          item.categoryHint === TicketCategoryHint.CONTRACT;
-                        const activeDirectPurchase =
-                          item.status === FulfillmentStatus.PENDING
-                            ? selectedTicket.directStockPurchases?.find(
-                                (purchase) =>
-                                  purchase.status === "PENDING_RECEIPT" &&
-                                  (purchase.items ?? []).some((purchaseItem) => {
-                                    if (
-                                      item.stockItemId &&
-                                      purchaseItem.stockItemId
-                                    ) {
-                                      return (
-                                        purchaseItem.stockItemId ===
-                                        item.stockItemId
-                                      );
-                                    }
-                                    return (
-                                      purchaseItem.itemName
-                                        .trim()
-                                        .toLowerCase() ===
-                                        item.itemName.trim().toLowerCase() &&
-                                      purchaseItem.unit.trim().toLowerCase() ===
-                                        item.unit.trim().toLowerCase()
-                                    );
-                                  }),
-                              )
-                            : undefined;
-                        if (isEditingThisRow && canExecutiveManageTicket) {
-                          return (
-                            <TableRow
-                              key={item.id}
-                              className="bg-primary/5 align-top"
-                            >
-                              {canSplitFulfillment && <TableCell />}
-                              <TableCell className="min-w-[160px]">
-                                <Input
-                                  value={editItemName}
-                                  maxLength={160}
-                                  disabled={
-                                    isContractItem || executiveItemPending
-                                  }
-                                  onChange={(e) =>
-                                    setEditItemName(e.target.value)
-                                  }
-                                  className="h-8 text-xs"
-                                  placeholder="Nama barang"
-                                />
-                              </TableCell>
-                              <TableCell className="min-w-[130px]">
-                                <div className="flex items-center gap-1">
-                                  <Input
-                                    type="number"
-                                    min="0.01"
-                                    step="any"
-                                    value={editItemQuantity}
-                                    disabled={executiveItemPending}
-                                    onChange={(e) =>
-                                      setEditItemQuantity(e.target.value)
-                                    }
-                                    className="h-8 w-16 px-2 text-xs"
-                                  />
-                                  <Input
-                                    value={editItemUnit}
-                                    maxLength={32}
-                                    disabled={
-                                      isContractItem || executiveItemPending
-                                    }
-                                    onChange={(e) =>
-                                      setEditItemUnit(e.target.value)
-                                    }
-                                    className="h-8 w-16 px-2 text-xs"
-                                    placeholder="Satuan"
-                                  />
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[120px]">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  value={editItemCost}
-                                  disabled={executiveItemPending}
-                                  onChange={(e) =>
-                                    setEditItemCost(e.target.value)
-                                  }
-                                  className="h-8 text-xs"
-                                  placeholder="Rp"
-                                />
-                              </TableCell>
-                              <TableCell className="min-w-[120px]">
-                                {isContractItem ? (
-                                  <Badge variant="outline">Kontrak Alam</Badge>
-                                ) : (
-                                  <select
-                                    value={editItemCategoryHint}
-                                    disabled={executiveItemPending}
-                                    onChange={(e) =>
-                                      setEditItemCategoryHint(
-                                        e.target.value as TicketCategoryHint,
-                                      )
-                                    }
-                                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                                  >
-                                    <option value={TicketCategoryHint.WAREHOUSE}>
-                                      Stok Gudang
-                                    </option>
-                                    <option value={TicketCategoryHint.PURCHASE}>
-                                      Pembelian
-                                    </option>
-                                  </select>
-                                )}
-                              </TableCell>
-                              <TableCell className="min-w-[125px]">
-                                <Input
-                                  type="date"
-                                  value={editItemDeliveryDate}
-                                  disabled={executiveItemPending}
-                                  onChange={(e) =>
-                                    setEditItemDeliveryDate(e.target.value)
-                                  }
-                                  className="h-8 text-xs"
-                                />
-                              </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
-                                Mengedit...
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="h-7 gap-1 px-2 text-xs"
-                                    disabled={executiveItemPending}
-                                    onClick={() =>
-                                      void handleExecutiveUpdateItem(item.id)
-                                    }
-                                  >
-                                    <Save className="size-3" />
-                                    Simpan
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 px-2 text-xs"
-                                    disabled={executiveItemPending}
-                                    onClick={() => setEditingItemId(null)}
-                                  >
-                                    Batal
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        }
-                        return (
-                          <TableRow key={item.id}>
-                            {canSplitFulfillment && (
-                              <TableCell>
-                                <Checkbox
-                                  checked={selectedItemIds.includes(item.id)}
-                                  disabled={
-                                    item.status !== FulfillmentStatus.PENDING ||
-                                    item.categoryHint ===
-                                      TicketCategoryHint.CONTRACT
-                                  }
-                                  aria-label={`Pilih ${item.itemName}`}
-                                  onCheckedChange={(checked) =>
-                                    setItemSelection({
-                                      ticketId: selectedTicket.id,
-                                      itemIds:
-                                        checked === true
-                                          ? [...selectedItemIds, item.id]
-                                          : selectedItemIds.filter(
-                                              (id) => id !== item.id,
-                                            ),
-                                    })
-                                  }
-                                />
-                              </TableCell>
-                            )}
-                            <TableCell className="font-medium">
-                              <div>{item.itemName}</div>
-                              {item.categoryHint ===
-                                TicketCategoryHint.CONTRACT &&
-                                item.materialContract && (
-                                  <div className="text-[11px] font-normal text-muted-foreground">
-                                    {item.materialContract.contractNumber} ·{" "}
-                                    {item.materialContract.vendorName}
-                                  </div>
-                                )}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              {item.quantity} {item.unit}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap tabular-nums">
-                              {formatCurrency(item.estimatedCost)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {item.categoryHint ===
-                                TicketCategoryHint.WAREHOUSE
-                                  ? "Stok Gudang"
-                                  : item.categoryHint ===
-                                      TicketCategoryHint.CONTRACT
-                                    ? "Kontrak Alam"
-                                    : "Pembelian"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap text-xs">
-                              {item.expectedDeliveryDate ?? "—"}
-                            </TableCell>
-                            <TableCell>
-                              {(() => {
-                                const deliveredContractVolume =
-                                  item.categoryHint ===
-                                  TicketCategoryHint.CONTRACT
-                                    ? getContractItemDeliveredVolume(
-                                        selectedTicket,
-                                        item.materialContractId,
-                                      )
-                                    : 0;
-                                return (
-                                  <Badge
-                                    variant={
-                                      item.status === FulfillmentStatus.PENDING
-                                        ? "lightWarning"
-                                        : "lightSuccess"
-                                    }
-                                  >
-                                    {item.categoryHint ===
-                                    TicketCategoryHint.CONTRACT
-                                      ? item.status ===
-                                        FulfillmentStatus.PROCESSED_TO_DO
-                                        ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
-                                        : deliveredContractVolume > 0
-                                          ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
-                                          : "Menunggu DO Kontrak"
-                                      : item.status ===
-                                          FulfillmentStatus.PENDING
-                                        ? activeDirectPurchase
-                                          ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
-                                          : "Menunggu"
-                                        : item.status ===
-                                            FulfillmentStatus.PROCESSED_TO_DO
-                                          ? "Dipenuhi via DO"
-                                          : "Diproses via PO"}
-                                  </Badge>
-                                );
-                              })()}
-                            </TableCell>
-                            {canExecutiveManageTicket && (
-                              <TableCell className="whitespace-nowrap text-right">
-                                {isConfirmingDeleteThisRow ? (
-                                  <div className="inline-flex items-center justify-end gap-1">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="destructive"
-                                      className="h-7 px-2 text-xs"
-                                      disabled={deletingItemId === item.id}
-                                      onClick={() =>
-                                        void handleExecutiveDeleteItem(item.id)
-                                      }
-                                    >
-                                      {deletingItemId === item.id
-                                        ? "Menghapus..."
-                                        : "Ya, Hapus"}
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 px-2 text-xs"
-                                      disabled={deletingItemId === item.id}
-                                      onClick={() =>
-                                        setConfirmDeleteItemId(null)
-                                      }
-                                    >
-                                      Batal
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="inline-flex items-center justify-end gap-1">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 gap-1 px-2 text-xs"
-                                      title={`Edit ${item.itemName}`}
-                                      onClick={() => openEditItemRow(item)}
-                                    >
-                                      <Pencil className="size-3" />
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 gap-1 border-destructive/40 px-2 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                      title={
-                                        selectedTicket.items.length <= 1
-                                          ? "Minimal 1 barang pada tiket (gunakan Hapus Tiket di bawah untuk menghapus seluruh tiket)"
-                                          : `Hapus ${item.itemName}`
-                                      }
-                                      disabled={selectedTicket.items.length <= 1}
-                                      onClick={() =>
-                                        setConfirmDeleteItemId(item.id)
-                                      }
-                                    >
-                                      <Trash2 className="size-3" />
-                                      Hapus
-                                    </Button>
-                                  </div>
-                                )}
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </section>
-            )}
-
-            {/* 5. Riwayat Pembayaran (Jika Ada) */}
-            {(selectedTicket.paymentTransactions?.length ?? 0) > 0 && (
-              <div className="space-y-2.5 rounded-xl border border-border bg-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-sm font-bold text-foreground">
-                    Riwayat Transaksi Pembayaran
-                  </h4>
-                  {(() => {
-                    const paid = selectedTicket.paymentTransactions!.reduce(
-                      (sum, payment) => sum + payment.amount,
-                      0,
-                    );
-                    return (
-                      <Badge variant="secondary">
-                        {selectedTicket.paymentTransactions!.length} transaksi ·{" "}
-                        {formatCurrency(String(paid))}
-                      </Badge>
-                    );
-                  })()}
-                </div>
-                <NativeDataTable itemLabel="pembayaran">
-                  <table className="app-data-table w-full min-w-[600px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="py-2 pr-3">Tanggal</th>
-                        <th className="py-2 pr-3">Referensi</th>
-                        <th className="py-2 pr-3">Tipe</th>
-                        <th className="py-2 pr-3">Jumlah</th>
-                        <th className="py-2 pr-3">Tujuan Transfer</th>
-                        <th className="py-2">Bukti</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedTicket.paymentTransactions!.map((payment) => (
-                        <tr key={payment.id} className="border-b last:border-0">
-                          <td className="py-2 pr-3">
-                            {payment.paidAt
-                              ? new Date(payment.paidAt).toLocaleDateString(
-                                  "id-ID",
-                                )
-                              : "—"}
-                          </td>
-                          <td className="py-2 pr-3">{payment.reference}</td>
-                          <td className="py-2 pr-3">
-                            {payment.paymentType === PaymentType.DOWN_PAYMENT
-                              ? "DP"
-                              : payment.paymentType ===
-                                  PaymentType.PROGRESS_PAYMENT
-                                ? "Termin"
-                                : "Pelunasan"}
-                          </td>
-                          <td className="py-2 pr-3 font-semibold tabular-nums">
-                            {formatCurrency(String(payment.amount))}
-                          </td>
-                          <td className="py-2 pr-3">
-                            {payment.transferDestination}
-                          </td>
-                          <td className="py-2">
-                            {payment.proofOfTransferUrl ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 gap-1 px-2 text-xs"
-                                onClick={() =>
-                                  openReceiptPreview({
-                                    label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
-                                    url: payment.proofOfTransferUrl!,
-                                  })
-                                }
-                              >
-                                <Eye className="size-3" />
-                                Bukti
-                              </Button>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </NativeDataTable>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
               </div>
-            )}
-
-            {/* 6. Jejak Audit / Riwayat Aktivitas */}
-            <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-              <h3 className="text-sm font-bold text-foreground">
-                Riwayat Aktivitas &amp; Otorisasi ({selectedTicket.auditLogs.length})
-              </h3>
-              <ol className="space-y-3 border-l-2 border-primary/30 pl-4">
-                {selectedTicket.auditLogs.map((log) => (
-                  <li key={log.id} className="relative">
-                    <span className="absolute -left-[1.35rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">
-                        {auditActionLabels[log.action] ?? log.action}
-                      </p>
-                      <span className="text-xs text-muted-foreground">
-                        {log.user.name} ·{" "}
-                        {format(new Date(log.createdAt), "d MMM yyyy, HH:mm", {
-                          locale: id,
-                        })}
-                      </span>
-                    </div>
-                    {log.notes && (
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {log.notes}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          </div>
-          );
-        })()}
+            );
+          })()}
       </GlobalModal>
 
+      {/* Hoisted Item Editor Modal */}
+      {selectedTicket && itemEditorModal && (
+        <TicketItemEditorModal
+          key={`${selectedTicket.id}:${itemEditorModal.mode}:${itemEditorModal.mode !== "add" ? itemEditorModal.item.id : "new"}`}
+          ticket={selectedTicket}
+          modalState={itemEditorModal}
+          stockItems={stockItems}
+          onClose={() => setItemEditorModal(null)}
+          onSaved={() => router.refresh()}
+        />
+      )}
+
+      {/* Hoisted Ticket Edit / Delete Modal */}
+      <TicketManagementModal
+        ticket={activeManageModal?.ticket ?? null}
+        mode={activeManageModal?.mode ?? null}
+        role={role}
+        onClose={() => setActiveManageModal(null)}
+        onTicketDeleted={() => {
+          if (selectedTicket?.id === activeManageModal?.ticket.id) {
+            closeTicketSheet();
+          }
+        }}
+      />
+
+      {/* Hoisted Equipment Decision Modal */}
       <GlobalModal
         isOpen={equipmentDecisionOpen}
         onClose={() => {
@@ -3841,8 +3867,33 @@ export default function TicketListing({
           setEquipmentDecisionError("");
         }}
         title="Proses Permintaan Alat"
-        description="Tentukan apakah kebutuhan dipenuhi dari aset internal atau melalui penyewaan vendor."
+        description="Tentukan pemenuhan alat internal atau sewa vendor."
         className="sm:max-w-xl"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEquipmentDecisionOpen(false)}
+              disabled={equipmentDecisionPending}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void processEquipmentLogisticsDecision()}
+              disabled={
+                equipmentDecisionPending ||
+                (equipmentSource === "EXTERNAL_VENDOR" &&
+                  (!equipmentVendorName.trim() ||
+                    !equipmentQuotedCost ||
+                    Number(equipmentQuotedCost) <= 0))
+              }
+            >
+              {equipmentDecisionPending ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           <RadioGroup
@@ -3854,7 +3905,7 @@ export default function TicketListing({
             }
             className="grid gap-3 sm:grid-cols-2"
           >
-            <FormLabel
+            <Label
               htmlFor="equipment-source-internal"
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${
                 equipmentSource === "INTERNAL"
@@ -3862,18 +3913,17 @@ export default function TicketListing({
                   : "border-border bg-card"
               }`}
             >
-              <RadioGroupItem
-                value="INTERNAL"
-                id="equipment-source-internal"
-              />
+              <RadioGroupItem value="INTERNAL" id="equipment-source-internal" />
               <span>
-                <span className="block font-semibold">Alat Internal</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Tandai permintaan selesai dengan aset perusahaan.
+                <span className="type-p2 block font-semibold">
+                  Alat Internal
+                </span>
+                <span className="type-p3 mt-1 block text-muted-foreground">
+                  Gunakan aset perusahaan.
                 </span>
               </span>
-            </FormLabel>
-            <FormLabel
+            </Label>
+            <Label
               htmlFor="equipment-source-vendor"
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${
                 equipmentSource === "EXTERNAL_VENDOR"
@@ -3886,17 +3936,20 @@ export default function TicketListing({
                 id="equipment-source-vendor"
               />
               <span>
-                <span className="block font-semibold">Sewa Vendor Eksternal</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Kirim estimasi biaya sewa ke Finance untuk pembayaran.
+                <span className="type-p2 block font-semibold">
+                  Sewa Vendor
+                </span>
+                <span className="type-p3 mt-1 block text-muted-foreground">
+                  Kirim estimasi ke Finance.
                 </span>
               </span>
-            </FormLabel>
+            </Label>
           </RadioGroup>
+
           {equipmentSource === "EXTERNAL_VENDOR" && (
             <div className="grid gap-3 sm:grid-cols-2">
-              <FormLabel className="space-y-1.5 text-sm">
-                <span className="font-semibold">Nama Vendor</span>
+              <div className="space-y-1.5">
+                <Label className="type-p2 font-medium">Nama Vendor</Label>
                 <Input
                   value={equipmentVendorName}
                   onChange={(event) =>
@@ -3907,9 +3960,11 @@ export default function TicketListing({
                   disabled={equipmentDecisionPending}
                   required
                 />
-              </FormLabel>
-              <FormLabel className="space-y-1.5 text-sm">
-                <span className="font-semibold">Estimasi Biaya Sewa (IDR)</span>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="type-p2 font-medium">
+                  Estimasi Biaya (Rp)
+                </Label>
                 <Input
                   type="number"
                   min="1"
@@ -3922,37 +3977,15 @@ export default function TicketListing({
                   disabled={equipmentDecisionPending}
                   required
                 />
-              </FormLabel>
+              </div>
             </div>
           )}
+
           {equipmentDecisionError && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="type-p2 text-destructive" role="alert">
               {equipmentDecisionError}
             </p>
           )}
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setEquipmentDecisionOpen(false)}
-              disabled={equipmentDecisionPending}
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              onClick={processEquipmentLogisticsDecision}
-              disabled={
-                equipmentDecisionPending ||
-                (equipmentSource === "EXTERNAL_VENDOR" &&
-                  (!equipmentVendorName.trim() ||
-                    !equipmentQuotedCost ||
-                    Number(equipmentQuotedCost) <= 0))
-              }
-            >
-              {equipmentDecisionPending ? "Menyimpan..." : "Simpan Keputusan"}
-            </Button>
-          </div>
         </div>
       </GlobalModal>
 
@@ -3964,8 +3997,8 @@ export default function TicketListing({
           setFulfillmentMessage("");
           setStockAvailability([]);
         }}
-        title="Konfirmasi Pemenuhan dari Stok Gudang"
-        description="Status stok dihitung otomatis untuk barang yang dipilih. Buat Surat Jalan (DO) untuk barang ready dan teruskan barang yang kurang ke pengadaan PO atau Pembelian Langsung."
+        title="Pemenuhan Stok Gudang"
+        description="Periksa stok barang, tautkan SKU bila perlu, lalu terbitkan DO atau alihkan ke PO."
         className="sm:max-w-4xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
@@ -3984,38 +4017,41 @@ export default function TicketListing({
                   variant="outline"
                   onClick={prepareWarehouseFulfillment}
                   disabled={fulfillmentPending}
-                  className="gap-1.5"
                 >
-                  <RefreshCw className={`size-3.5 ${fulfillmentPending ? "animate-spin" : ""}`} />
-                  Coba Periksa Ulang
+                  <RefreshCw
+                    className={`size-4 ${fulfillmentPending ? "animate-spin" : ""}`}
+                    aria-hidden="true"
+                  />
+                  Periksa Ulang
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => {
-                    if (!selectedTicket || selectedStockItems.length === 0) return;
-                    const ticketId = selectedTicket.id;
-                    const itemIds = selectedStockItems.map((item) => item.id);
+                    if (!selectedTicket || selectedStockItems.length === 0)
+                      return;
                     setFulfillmentMessage("");
                     setDoDialogOpen(false);
                     setStockAvailability([]);
-                    setItemSelection({ ticketId, itemIds });
+                    setItemSelection({
+                      ticketId: selectedTicket.id,
+                      itemIds: selectedStockItems.map((i) => i.id),
+                    });
                     setPurchaseMode("DIRECT_PURCHASE");
                     setPoDialogOpen(true);
                   }}
-                  disabled={fulfillmentPending || selectedStockItems.length === 0}
-                  className="gap-1.5"
+                  disabled={
+                    fulfillmentPending || selectedStockItems.length === 0
+                  }
                 >
-                  <ShoppingCart className="size-3.5" />
-                  Alihkan ke Pengadaan / Pembelian Langsung ({selectedStockItems.length})
+                  <ShoppingCart className="size-4" aria-hidden="true" />
+                  Beli Langsung ({selectedStockItems.length})
                 </Button>
               </>
             )}
             {stockAvailability.some((a) => Boolean(a.pendingPurchaseNumber)) && (
               <Button asChild type="button" variant="outline">
-                <Link href="/apps/logistics?tab=stock">
-                  Kelola di Stok Gudang
-                </Link>
+                <Link href="/apps/logistics?tab=stock">Kelola Stok</Link>
               </Button>
             )}
             {needsOrderTicketItemIds.length > 0 && (
@@ -4025,9 +4061,7 @@ export default function TicketListing({
                 onClick={openPurchaseOrderForUnavailableItems}
                 disabled={fulfillmentPending}
               >
-                {fulfillmentPending
-                  ? "Memproses..."
-                  : `Buat Pengadaan untuk ${needsOrderTicketItemIds.length} Barang`}
+                Buat PO ({needsOrderTicketItemIds.length})
               </Button>
             )}
             {readyStockItems.length > 0 && (
@@ -4043,168 +4077,126 @@ export default function TicketListing({
               >
                 {fulfillmentPending
                   ? "Memproses..."
-                  : `Terbitkan DO (${readyStockItems.length} Barang Ready)`}
+                  : `Terbitkan DO (${readyStockItems.length})`}
               </Button>
             )}
           </div>
         }
       >
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <Table className="w-full table-auto">
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead className="min-w-[140px]">Barang yang Dibutuhkan</TableHead>
-                  <TableHead className="whitespace-nowrap">Jumlah</TableHead>
-                  <TableHead className="whitespace-nowrap">Stok Tersedia</TableHead>
-                  <TableHead className="min-w-[260px]">Status Ketersediaan</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(stockAvailability.length > 0
-                  ? selectedTicket?.items.filter((item) =>
-                      stockAvailability.some(
-                        (availability) =>
-                          availability.ticketItemId === item.id,
-                      ),
-                    ) ?? []
-                  : selectedStockItems
-                ).map((item) => {
-                  const availability = stockAvailability.find(
+          <Table pagination={false}>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="type-p3">Barang</TableHead>
+                <TableHead className="type-p3">Jumlah</TableHead>
+                <TableHead className="type-p3">Tersedia</TableHead>
+                <TableHead className="type-p3">Status &amp; SKU</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(stockAvailability.length > 0
+                ? (selectedTicket?.items.filter((item) =>
+                    stockAvailability.some(
+                      (availability) => availability.ticketItemId === item.id,
+                    ),
+                  ) ?? [])
+                : selectedStockItems
+              ).map((item) => (
+                <StockAvailabilityRow
+                  key={item.id}
+                  item={item}
+                  availability={stockAvailability.find(
                     (entry) => entry.ticketItemId === item.id,
-                  );
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell className="align-top font-medium whitespace-normal break-words">
-                        {item.itemName}
-                      </TableCell>
-                      <TableCell className="align-top whitespace-nowrap tabular-nums">
-                        {item.quantity} {item.unit}
-                      </TableCell>
-                      <TableCell className="align-top whitespace-nowrap tabular-nums">
-                        {availability
-                          ? `${availability.availableQuantity} ${item.unit}`
-                          : "Belum diperiksa"}
-                      </TableCell>
-                      <TableCell className="align-top whitespace-normal">
-                        <Badge
-                          variant={
-                            availability?.ready
-                              ? "lightSuccess"
-                              : "lightWarning"
-                          }
-                        >
-                          {availability
-                            ? availability.pendingPurchaseNumber
-                              ? "Sedang Dipesan"
-                              : availability.ready
-                                ? "Stok Ready"
-                                : "Perlu Pemesanan"
-                            : "Menunggu pemeriksaan"}
-                        </Badge>
-                        {availability?.message && (
-                          <span className="mt-1.5 block whitespace-normal break-words text-xs leading-relaxed text-muted-foreground">
-                            {availability.message}
-                          </span>
-                        )}
-                        {availability?.stockItemSku && (
-                          <span className="mt-1 block text-xs text-muted-foreground">
-                            SKU gudang: {availability.stockItemSku}
-                          </span>
-                        )}
-                        {availability && !availability.pendingPurchaseNumber && (
-                          <label className="mt-2 block w-full max-w-md space-y-1 text-xs text-muted-foreground">
-                            <span>Tautkan ke SKU katalog stok</span>
-                            <select
-                              value={availability.stockItemId ?? ""}
-                              onChange={(event) =>
-                                void mapTicketItemToSku(
-                                  item.id,
-                                  event.target.value,
-                                )
-                              }
-                              disabled={
-                                fulfillmentPending || stockItems.length === 0
-                              }
-                              className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-sm text-foreground"
-                            >
-                              <option value="">Pilih SKU</option>
-                              {stockItems.map((stockItem) => (
-                                <option
-                                  key={stockItem.id}
-                                  value={stockItem.id}
-                                >
-                                  {stockItem.sku} — {stockItem.name} ·{" "}
-                                  {stockItem.unit}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                  )}
+                  disabled={fulfillmentPending || stockItems.length === 0}
+                  onOpenSkuMapper={(targetItem, currentStockId) =>
+                    setSkuMapTarget({ item: targetItem, currentStockId })
+                  }
+                />
+              ))}
+            </TableBody>
+          </Table>
+
           {readyStockItems.length > 0 && (
             <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3.5 sm:grid-cols-2">
-              <FormLabel className="min-w-0 space-y-1.5 text-sm">
-                <span className="font-semibold">Mover Pengiriman</span>
-                <select
+              <div className="space-y-1.5">
+                <Label className="type-p2 font-semibold">
+                  Mover Pengiriman
+                </Label>
+                <Select
                   value={selectedMoverId}
-                  onChange={(event) => setSelectedMoverId(event.target.value)}
+                  onValueChange={setSelectedMoverId}
                   disabled={fulfillmentPending || moverOptions.length === 0}
-                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
-                  required
                 >
-                  <option value="">Pilih Petugas Mover</option>
-                  {moverOptions.map((mover) => (
-                    <option key={mover.id} value={mover.id}>
-                      {mover.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full">
+                    <SelectValue placeholder="Pilih petugas Mover" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {moverOptions.map((mover) => (
+                      <SelectItem key={mover.id} value={mover.id}>
+                        {mover.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {moverOptions.length === 0 && (
-                  <span className="block text-xs text-destructive" role="alert">
-                    Belum ada Mover aktif yang dapat ditugaskan.
-                  </span>
+                  <p className="type-p3 text-destructive" role="alert">
+                    Belum ada Mover aktif.
+                  </p>
                 )}
-              </FormLabel>
-              <FormLabel className="min-w-0 space-y-1.5 text-sm">
-                <span className="font-semibold">Kendaraan Operasional</span>
-                <select
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="type-p2 font-semibold">
+                  Kendaraan Operasional
+                </Label>
+                <Select
                   value={selectedVehicleId}
-                  onChange={(event) => setSelectedVehicleId(event.target.value)}
+                  onValueChange={setSelectedVehicleId}
                   disabled={fulfillmentPending || vehicleOptions.length === 0}
-                  className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
-                  required
                 >
-                  <option value="">Pilih Kendaraan</option>
-                  {vehicleOptions.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.plateNumber} · {vehicle.vehicleType}
-                      {vehicle.brand ? ` · ${vehicle.brand}` : ""}
-                      {vehicle.modelName ? ` · ${vehicle.modelName}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-10 w-full">
+                    <SelectValue placeholder="Pilih kendaraan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicleOptions.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.plateNumber} · {vehicle.vehicleType}
+                        {vehicle.brand ? ` · ${vehicle.brand}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {vehicleOptions.length === 0 && (
-                  <span className="block text-xs text-destructive" role="alert">
-                    Tidak ada kendaraan tersedia dengan KM awal yang sudah disiapkan.
-                  </span>
+                  <p className="type-p3 text-destructive" role="alert">
+                    Tidak ada kendaraan siap.
+                  </p>
                 )}
-              </FormLabel>
+              </div>
             </div>
           )}
+
           {fulfillmentMessage && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="type-p2 text-destructive" role="alert">
               {fulfillmentMessage}
             </p>
           )}
         </div>
       </GlobalModal>
+
+      {/* Hoisted SKU Mapping Modal */}
+      {skuMapTarget && (
+        <SkuMappingModal
+          key={skuMapTarget.item.id}
+          target={skuMapTarget}
+          stockItems={stockItems}
+          pending={fulfillmentPending}
+          onClose={() => setSkuMapTarget(null)}
+          onConfirm={(ticketItemId, stockItemId) =>
+            void mapTicketItemToSku(ticketItemId, stockItemId)
+          }
+        />
+      )}
 
       {/* Modal Pilih Mode Pengadaan (PO / Pembelian Langsung) */}
       <GlobalModal
@@ -4213,8 +4205,8 @@ export default function TicketListing({
           setPoDialogOpen(false);
           setFulfillmentMessage("");
         }}
-        title="Pilih Mode Pengadaan Barang"
-        description="Pilih jalur pengadaan untuk barang yang stoknya belum mencukupi di gudang."
+        title="Pengadaan Barang"
+        description="Pilih jalur pengadaan untuk barang yang belum tersedia di gudang."
         className="sm:max-w-5xl"
       >
         <div className="space-y-4">
@@ -4229,7 +4221,7 @@ export default function TicketListing({
             }
             className="grid gap-3 sm:grid-cols-2"
           >
-            <FormLabel
+            <Label
               htmlFor="ticket-procurement-po"
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
                 purchaseMode === "PURCHASE_ORDER"
@@ -4242,13 +4234,15 @@ export default function TicketListing({
                 id="ticket-procurement-po"
               />
               <span>
-                <span className="block font-semibold">Purchase Order (PO Vendor)</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Pengadaan resmi melalui PO vendor dan alur otorisasi pembayaran.
+                <span className="type-p2 block font-semibold">
+                  Purchase Order (PO)
+                </span>
+                <span className="type-p3 mt-1 block text-muted-foreground">
+                  Pengadaan resmi melalui PO vendor.
                 </span>
               </span>
-            </FormLabel>
-            <FormLabel
+            </Label>
+            <Label
               htmlFor="ticket-procurement-direct"
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
                 purchaseMode === "DIRECT_PURCHASE"
@@ -4261,22 +4255,21 @@ export default function TicketListing({
                 id="ticket-procurement-direct"
               />
               <span>
-                <span className="block font-semibold">
-                  Pembelian Langsung ke Toko
+                <span className="type-p2 block font-semibold">
+                  Pembelian Langsung
                 </span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Catat pembelian langsung barang kebutuhan tanpa menerbitkan PO.
+                <span className="type-p3 mt-1 block text-muted-foreground">
+                  Pembelian langsung ke toko tanpa PO.
                 </span>
               </span>
-            </FormLabel>
+            </Label>
           </RadioGroup>
+
           {selectedTicket &&
           selectedTicketItems.length > 0 &&
           purchaseMode === "PURCHASE_ORDER" ? (
             <CreatePOForm
-              key={`${selectedTicket.id}:${selectedTicketItems
-                .map((item) => item.id)
-                .join(",")}`}
+              key={`${selectedTicket.id}:${selectedTicketItems.map((item) => item.id).join(",")}`}
               vendors={vendors}
               stockItems={stockItems}
               ticketId={selectedTicket.id}
@@ -4302,9 +4295,7 @@ export default function TicketListing({
             />
           ) : selectedTicket && selectedTicketItems.length > 0 ? (
             <DirectStockPurchaseForm
-              key={`direct:${selectedTicket.id}:${selectedTicketItems
-                .map((item) => item.id)
-                .join(",")}`}
+              key={`direct:${selectedTicket.id}:${selectedTicketItems.map((item) => item.id).join(",")}`}
               vendors={vendors}
               stockItems={stockItems}
               tickets={[
@@ -4332,8 +4323,8 @@ export default function TicketListing({
               }}
             />
           ) : (
-            <p className="text-sm text-destructive" role="alert">
-              Tidak ada barang yang perlu dipesan. Tutup dan periksa kembali stok.
+            <p className="type-p2 text-destructive" role="alert">
+              Tidak ada barang yang perlu dipesan.
             </p>
           )}
         </div>
@@ -4343,12 +4334,12 @@ export default function TicketListing({
       <GlobalModal
         isOpen={selectedReceipt !== null}
         onClose={closeReceiptPreview}
-        title={selectedReceipt?.label ?? "Pratinjau Bukti Dokumen"}
-        description="Pratinjau dokumen/foto bukti terunggah. Klik tombol Unduh di bawah untuk menyimpan salinan file."
+        title={selectedReceipt?.label ?? "Pratinjau Dokumen"}
+        description="Pratinjau dokumen atau foto bukti."
         className="max-w-4xl"
         footer={
           selectedReceipt ? (
-            <div className="flex w-full items-center justify-end gap-2">
+            <>
               <Button
                 type="button"
                 variant="outline"
@@ -4361,14 +4352,14 @@ export default function TicketListing({
                   href={photoDownloadHref(selectedReceipt.url)}
                   {...photoDownloadLinkProps(selectedReceipt.url)}
                 >
-                  <Download className="mr-1.5 size-4" aria-hidden="true" />
+                  <Download className="size-4" aria-hidden="true" />
                   {photoDownloadLabel(selectedReceipt.url).replace(
                     "foto",
                     "bukti",
                   )}
                 </a>
               </Button>
-            </div>
+            </>
           ) : undefined
         }
       >
@@ -4377,13 +4368,13 @@ export default function TicketListing({
             {/\.(jpe?g|png|webp)$/i.test(
               selectedReceipt.url.split(/[?#]/, 1)[0],
             ) && receiptPreviewError ? (
-              <p className="p-8 text-sm text-muted-foreground" role="status">
-                Foto tidak dapat dimuat. File mungkin sudah tidak tersedia di
-                penyimpanan.
+              <p className="type-p2 p-8 text-muted-foreground" role="status">
+                Foto tidak dapat dimuat.
               </p>
             ) : /\.(jpe?g|png|webp)$/i.test(
-              selectedReceipt.url.split(/[?#]/, 1)[0],
-            ) ? (
+                selectedReceipt.url.split(/[?#]/, 1)[0],
+              ) ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={selectedReceipt.url}
                 src={withLocalPhotoPreview(selectedReceipt.url)}
@@ -4403,15 +4394,17 @@ export default function TicketListing({
               />
             ) : (
               <div className="flex flex-col items-center gap-3 p-8 text-center">
-                <FileText className="size-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Pratinjau tidak tersedia untuk jenis file ini. Silakan unduh file melalui tombol di bawah.
+                <FileText className="size-12 text-muted-foreground" aria-hidden="true" />
+                <p className="type-p2 text-muted-foreground">
+                  Pratinjau tidak tersedia. Unduh melalui tombol di bawah.
                 </p>
               </div>
             )}
           </div>
         )}
       </GlobalModal>
+
+      {/* Hoisted Workflow Action Modals */}
       {workflowTicket && (
         <>
           {workflowFor(role, workflowTicket) === "EXPEDITION_RECEIPT" &&
@@ -4436,6 +4429,7 @@ export default function TicketListing({
               ) : null;
             })()}
           <LogisticsActionModal
+            key={`logistics-${workflowTicket.id}`}
             open={workflowFor(role, workflowTicket) === "LOGISTICS"}
             ticket={workflowTicket}
             vendors={vendors}
@@ -4444,12 +4438,18 @@ export default function TicketListing({
             onOpenChange={(open) => {
               if (!open) setWorkflowTicket(null);
             }}
+            onOpenContractDo={() => {
+              const target = workflowTicket;
+              setWorkflowTicket(null);
+              if (target) setContractDoModalTicket(target);
+            }}
             onSuccess={() => {
               setWorkflowTicket(null);
               router.refresh();
             }}
           />
           <FinanceActionModal
+            key={`finance-${workflowTicket.id}`}
             open={workflowFor(role, workflowTicket) === "FINANCE"}
             ticket={workflowTicket}
             onOpenChange={(open) => {
@@ -4461,8 +4461,10 @@ export default function TicketListing({
             }}
           />
           <MoverActionModal
+            key={`mover-${workflowTicket.id}`}
             open={workflowFor(role, workflowTicket) === "MOVER"}
             ticketId={workflowTicket.id}
+            deliveryOrders={workflowTicket.deliveryOrders}
             onOpenChange={(open) => {
               if (!open) setWorkflowTicket(null);
             }}
@@ -4473,6 +4475,8 @@ export default function TicketListing({
           />
         </>
       )}
+
+      {/* Hoisted Material Contract DO Modal */}
       {contractDoModalTicket &&
         (() => {
           const modalContracts: MaterialContractRow[] = (() => {
@@ -4594,10 +4598,9 @@ export default function TicketListing({
               lockedProjectId={contractDoModalTicket.projectId ?? undefined}
               lockedTicketId={contractDoModalTicket.id}
               onSaved={() => {
-                setContractDoFeedback({
-                  text: `Surat Jalan (DO) untuk tiket ${contractDoModalTicket.ticketNumber} berhasil dicatat.`,
-                  isError: false,
-                });
+                toast.success(
+                  `Surat Jalan untuk tiket ${contractDoModalTicket.ticketNumber} dicatat.`,
+                );
                 setContractDoModalTicket(null);
                 router.refresh();
               }}

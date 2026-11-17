@@ -395,7 +395,7 @@ export async function processEquipmentRequestAtLogistics(
   if (!userId) {
     return failure("Silakan masuk sebelum memproses tiket.");
   }
-  if (role !== "LOGISTICS") {
+  if (role !== "LOGISTICS" && String(role ?? "") !== "KOORDINATOR_LOGISTIK") {
     return failure("Hanya Logistik yang dapat memproses permintaan alat.");
   }
   if (
@@ -436,7 +436,7 @@ export async function processEquipmentRequestAtLogistics(
       const ticket = await Ticket.findOne({
         _id: ticketId,
         ticketType: EQUIPMENT_REQUEST_TYPE,
-        status: { $in: ["PENDING_LOGISTIK", "PROCESSED_LOGISTIC"] },
+        status: { $in: ["PENDING_LOGISTIK", "APPROVED_DIR", "PROCESSED_LOGISTIC"] },
       })
         .session(transactionSession)
         .select({ ticketNumber: 1, title: 1, requesterId: 1, equipmentDetails: 1 });
@@ -449,7 +449,7 @@ export async function processEquipmentRequestAtLogistics(
       const updated = await Ticket.updateOne(
         {
           _id: ticketId,
-          status: { $in: ["PENDING_LOGISTIK", "PROCESSED_LOGISTIC"] },
+          status: { $in: ["PENDING_LOGISTIK", "APPROVED_DIR", "PROCESSED_LOGISTIC"] },
         },
         {
           $set: {

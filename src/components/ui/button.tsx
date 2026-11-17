@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:cursor-pointer select-none active:scale-[0.98] transition-transform duration-75 touch-manipulation',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium ring-offset-background transition-[color,background-color,border-color,transform] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:cursor-pointer select-none active:scale-[0.98] touch-manipulation',
   {
     variants: {
       variant: {
@@ -24,11 +24,11 @@ const buttonVariants = cva(
           'border border-info bg-transparent hover:bg-info text-info hover:text-white',
         outlineerror:
           'border border-error bg-transparent hover:bg-error text-error hover:text-white',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondaryemphasis',
-        success: 'bg-success text-white hover:bg-successemphasis',
-        warning: 'bg-warning text-white hover:bg-warningemphasis',
-        info: 'bg-info text-white hover:bg-infoemphasis',
-        error: 'bg-error text-white hover:bg-erroremphasis',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondaryemphasis font-semibold',
+        success: 'bg-success text-white hover:bg-successemphasis dark:text-slate-950 font-semibold',
+        warning: 'bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300 font-semibold',
+        info: 'bg-info text-white hover:bg-infoemphasis dark:text-slate-950 font-semibold',
+        error: 'bg-error text-white hover:bg-erroremphasis dark:text-slate-950 font-semibold',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         ghostprimary: 'hover:bg-lightprimary hover:text-primary text-primary',
         ghostsecondary:
@@ -50,11 +50,10 @@ const buttonVariants = cva(
         lighterror: 'bg-lighterror text-error hover:bg-error hover:text-white',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 rounded-md px-2.5 text-xs',
-        xs: 'h-7 rounded-md px-2 text-[11px]',
+        default: 'h-10 px-4 py-2 text-[13px]',
+        sm: 'h-8 rounded-md px-3 text-xs',
         lg: 'h-11 rounded-md px-6 text-sm',
-        icon: 'size-8 p-0',
+        icon: 'size-9 p-0',
       },
       shape: {
         pill: 'rounded-full',
@@ -78,6 +77,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : 'button'
     return (
       <Comp
+        data-slot="button"
         className={cn(buttonVariants({ variant, size, shape, className }))}
         ref={ref}
         // Ekstensi browser (autofill/password manager) menyisipkan atribut

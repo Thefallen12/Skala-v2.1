@@ -3,12 +3,13 @@
 import dynamic from "next/dynamic";
 import type { ApexOptions } from "apexcharts";
 import { useTheme } from "next-themes";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const Chart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
   loading: () => (
     <div
-      className="flex h-[280px] items-center justify-center text-sm text-muted-foreground"
+      className="type-p2 flex h-[280px] items-center justify-center text-muted-foreground"
       aria-live="polite"
     >
       Memuat grafik progres...
@@ -60,9 +61,11 @@ export function ProjectProgressChart({
 
   if (projects.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        Belum ada data proyek untuk ditampilkan.
-      </p>
+      <EmptyState
+        variant="inline"
+        title="Belum ada data proyek"
+        description="Grafik rata-rata progres PIC akan muncul setelah proyek aktif tersedia."
+      />
     );
   }
 
@@ -95,7 +98,7 @@ export function ProjectProgressChart({
       formatter: (value) => `${Math.round(Number(value))}%`,
       style: {
         colors: [isDark ? "#e2e8f0" : "#334155"],
-        fontSize: "11px",
+        fontSize: "12px",
         fontWeight: 600,
       },
       background: { enabled: false },
@@ -116,13 +119,13 @@ export function ProjectProgressChart({
       axisTicks: { show: false },
       labels: {
         formatter: (value) => `${Math.round(Number(value))}%`,
-        style: { fontSize: "10px" },
+        style: { fontSize: "12px" },
       },
     },
     yaxis: {
       labels: {
         maxWidth: 140,
-        style: { fontSize: "11px" },
+        style: { fontSize: "12px" },
       },
     },
     tooltip: {

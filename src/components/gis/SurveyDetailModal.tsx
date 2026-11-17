@@ -89,6 +89,99 @@ function getPhotoEntries(survey: FieldSurveySummary | null) {
   }));
 }
 
+interface PhotoSlotCardProps {
+  index: number;
+  photo: { url: string; label: string };
+  registerInputRef: (slotIndex: number, element: HTMLInputElement | null) => void;
+  onFileSelect: (slotIndex: number, file: File | null) => void;
+  onSelectPhoto: (slotIndex: number) => void;
+  onRemove: (slotIndex: number) => void;
+  onLabelChange: (slotIndex: number, value: string) => void;
+}
+
+function PhotoSlotCard({
+  index,
+  photo,
+  registerInputRef,
+  onFileSelect,
+  onSelectPhoto,
+  onRemove,
+  onLabelChange,
+}: PhotoSlotCardProps) {
+  const hasImage = Boolean(photo.url);
+
+  return (
+    <div className="min-w-0">
+      {hasImage ? (
+        <div className="relative overflow-hidden rounded-[12px] border border-slate-700 bg-[#0f1b2d] shadow-sm">
+          <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[12px]">
+            <Image
+              src={photo.url}
+              alt={photo.label}
+              fill
+              unoptimized
+              className="h-full w-full object-cover object-center"
+              style={{ objectPosition: "center" }}
+              sizes="(max-width: 768px) 50vw, 20vw"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              data-compact="true"
+              aria-label={`Hapus ${photo.label}`}
+              onClick={() => onRemove(index)}
+              className="absolute right-2 top-2 size-7 rounded-full border border-slate-600 bg-slate-950/80 text-slate-200 shadow-sm hover:bg-slate-700 hover:text-white"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <input
+            ref={(element) => registerInputRef(index, element)}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              event.preventDefault();
+              onFileSelect(index, event.target.files?.[0] ?? null);
+              event.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onSelectPhoto(index);
+            }}
+            className="group flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center rounded-[12px] border border-dashed border-slate-600 bg-slate-900/20 transition-colors hover:border-orange-500 hover:bg-slate-800/40"
+          >
+            <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-slate-700/70 text-slate-200 transition-colors group-hover:bg-orange-500/20 group-hover:text-orange-500 sm:size-12">
+              <Plus className="size-5 sm:size-6" aria-hidden="true" />
+            </div>
+            <span className="type-p3 font-medium text-slate-400 transition-colors group-hover:text-orange-500">
+              Tambah Foto
+            </span>
+          </button>
+        </>
+      )}
+
+      <div className="mt-2 text-center">
+        <input
+          value={photo.label}
+          onChange={(event) => onLabelChange(index, event.target.value)}
+          placeholder="Nama foto"
+          aria-label={`Nama foto ${index + 1}`}
+          className="type-p3 w-full border-none bg-transparent text-center font-semibold uppercase tracking-wider text-slate-200 outline-none placeholder:text-slate-400"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function SurveyDetailModal({
   open,
   survey,
@@ -121,8 +214,7 @@ export default function SurveyDetailModal({
   );
 
   const statusText = project ? formatStatus(project.status) : "Aktif";
-  const badgeText =
-    statusText === "Aktif" ? "Aktif / Active" : "Tidak Aktif / Inactive";
+  const badgeText = statusText === "Aktif" ? "Aktif" : "Tidak Aktif";
   const subtitle = project?.title ?? survey?.projectName ?? "Nama Proyek";
 
   const buildPhotoSlots = (items: { url: string; label: string }[]) =>
@@ -159,90 +251,8 @@ export default function SurveyDetailModal({
     };
   }, []);
 
-  const PhotoSlotCard = ({
-    index,
-    photo,
-    onSelectPhoto,
-    onRemove,
-    onLabelChange,
-  }: {
-    index: number;
-    photo: { url: string; label: string };
-    onSelectPhoto: (slotIndex: number) => void;
-    onRemove: (slotIndex: number) => void;
-    onLabelChange: (slotIndex: number, value: string) => void;
-  }) => {
-    const hasImage = Boolean(photo.url);
-
-    return (
-      <div className="min-w-0">
-        {hasImage ? (
-          <div className="relative overflow-hidden rounded-[12px] border border-slate-700 bg-[#0f1b2d] shadow-sm">
-            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[12px]">
-              <Image
-                src={photo.url}
-                alt={photo.label}
-                fill
-                unoptimized
-                className="h-full w-full object-cover object-center"
-                style={{ objectPosition: "center" }}
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
-              <button
-                type="button"
-                aria-label={`Hapus ${photo.label}`}
-                onClick={() => onRemove(index)}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-slate-600 bg-slate-950/80 text-slate-200 shadow-sm transition hover:bg-slate-700 hover:text-white"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <input
-              ref={(element) => {
-                fileInputRefs.current[index] = element;
-              }}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                event.preventDefault();
-                handleLocalPhotoUpload(index, event.target.files?.[0] ?? null);
-                event.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onSelectPhoto(index);
-              }}
-              className="group flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center rounded-[12px] border border-dashed border-slate-600 bg-slate-900/20 transition-colors hover:border-orange-500 hover:bg-slate-800/40"
-            >
-              <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-slate-700/70 text-slate-200 transition-colors group-hover:bg-orange-500/20 group-hover:text-orange-500">
-                <Plus className="h-6 w-6" />
-              </div>
-              <span className="text-[11px] font-medium text-slate-400 transition-colors group-hover:text-orange-500">
-                Tambah Foto
-              </span>
-            </button>
-          </>
-        )}
-
-        <div className="mt-2 text-center">
-          <input
-            value={photo.label}
-            onChange={(event) => onLabelChange(index, event.target.value)}
-            placeholder="Nama foto"
-            aria-label={`Nama foto ${index + 1}`}
-            className="w-full border-none bg-transparent text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-200 outline-none placeholder:text-slate-400"
-          />
-        </div>
-      </div>
-    );
+  const registerInputRef = (slotIndex: number, element: HTMLInputElement | null) => {
+    fileInputRefs.current[slotIndex] = element;
   };
 
   const resetPhotosFromSurvey = () => {
@@ -432,40 +442,40 @@ export default function SurveyDetailModal({
           <>
             <Button
               type="button"
-              className="h-10 bg-orange-500 text-[11px] font-semibold text-white hover:bg-orange-600"
+              className="bg-orange-500 text-white hover:bg-orange-600"
               onClick={openReport}
             >
-              <FileText className="mr-1.5 size-3.5" />
+              <FileText className="size-4" aria-hidden="true" />
               Tampilkan PDF
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-10 border-slate-700 bg-slate-900/80 text-[11px] font-semibold text-slate-100 hover:bg-slate-800"
+              className="border-slate-700 bg-slate-900/80 text-slate-100 hover:bg-slate-800"
               onClick={openReport}
             >
-              <Download className="mr-1.5 size-3.5" />
+              <Download className="size-4" aria-hidden="true" />
               Unduh PDF
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-10 border-slate-700 bg-slate-900/80 text-[11px] font-semibold text-slate-100 hover:bg-slate-800"
+              className="border-slate-700 bg-slate-900/80 text-slate-100 hover:bg-slate-800"
               onClick={printReport}
             >
-              <Printer className="mr-1.5 size-3.5" />
-              Cetak / Print
+              <Printer className="size-4" aria-hidden="true" />
+              Cetak
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="h-10 border-slate-700 bg-slate-900/80 text-[11px] font-semibold text-slate-100 hover:bg-slate-800"
+              className="border-slate-700 bg-slate-900/80 text-slate-100 hover:bg-slate-800"
               onClick={handleCloseAttempt}
             >
               Tutup
             </Button>
             {printMessage && (
-              <p className="w-full text-xs text-red-400" role="alert">
+              <p className="type-p3 w-full text-red-400" role="alert">
                 {printMessage}
               </p>
             )}
@@ -473,23 +483,23 @@ export default function SurveyDetailModal({
         }
       >
         <div className="bg-[#0f172a]">
-          <div className="border-b border-slate-700 bg-[#101d2f] px-5 py-4">
-            <div className="flex items-start justify-between gap-4">
+          <div className="border-b border-slate-700 bg-[#101d2f] px-4 py-4 sm:px-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-orange-400/30 bg-orange-500/10 text-orange-300">
-                  <FileText className="size-5" />
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-orange-400/30 bg-orange-500/10 text-orange-300 sm:size-12">
+                  <FileText className="size-5" aria-hidden="true" />
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-[14px] font-black uppercase tracking-[0.14em] text-white md:text-[18px]">
-                      DETAIL & REKAP SURVEI PROYEK: {projectCode}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="type-h2 uppercase tracking-wider text-white">
+                      Rekap Survei: {projectCode}
                     </h2>
-                    <Badge className="border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">
+                    <Badge className="type-p3 border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 font-semibold uppercase tracking-wider text-emerald-300">
                       {badgeText}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
+                  <p className="type-p2 mt-1 text-slate-400">{subtitle}</p>
                 </div>
               </div>
 
@@ -500,23 +510,26 @@ export default function SurveyDetailModal({
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-9 border-slate-700 bg-slate-900/60 text-slate-100 hover:bg-slate-800"
+                        size="icon"
+                        aria-label="Edit Data Survei"
+                        className="border-slate-700 bg-slate-900/60 text-slate-100 hover:bg-slate-800"
                         onClick={onEditData}
                       >
-                        <Pencil className="size-3.5" />
+                        <Pencil className="size-4" aria-hidden="true" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="bottom">Edit Data & Keterangan</TooltipContent>
+                    <TooltipContent side="bottom">Edit Data</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
 
                 <Button
                   type="button"
-                  className="h-9 bg-orange-500 px-4 text-[11px] font-semibold text-white hover:bg-orange-600"
+                  size="sm"
+                  className="bg-orange-500 px-3.5 text-white hover:bg-orange-600"
                   onClick={onAddInformation}
                 >
-                  <Plus className="mr-1.5 size-3.5" />
-                  Tambah Informasi / Add Data
+                  <Plus className="size-4" aria-hidden="true" />
+                  Tambah Data
                 </Button>
               </div>
             </div>
@@ -525,18 +538,21 @@ export default function SurveyDetailModal({
           <div className="space-y-4 p-4">
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-[14px] border border-slate-700 bg-[#101d2f] p-3">
-                <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-700 pb-3">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-300">
-                    <Layers3 className="size-3.5 text-orange-300" />
-                    Data Spasial & Peta Polygon
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 pb-3">
+                  <div className="type-p3 flex items-center gap-2 font-semibold uppercase tracking-wider text-slate-300">
+                    <Layers3 className="size-4 text-orange-300" aria-hidden="true" />
+                    Data Spasial &amp; Peta
                   </div>
-                  <button
+                  <Button
                     type="button"
-                    className="rounded-lg border border-slate-700 bg-slate-900/80 px-2 py-1 text-[10px] font-semibold text-slate-100 hover:bg-slate-800"
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-700 bg-slate-900/80 text-slate-100 hover:bg-slate-800"
                     onClick={onAddInformation}
                   >
-                    + Tambah Titik/Koordinat
-                  </button>
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    Tambah Titik
+                  </Button>
                 </div>
 
                 <ReadOnlyMap
@@ -548,8 +564,8 @@ export default function SurveyDetailModal({
 
               <div className="rounded-[14px] border border-slate-700 bg-[#101d2f] p-0">
                 <div className="border-b border-slate-700 px-4 py-3">
-                  <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-300">
-                    Informasi Proyek & Hasil Survei
+                  <h3 className="type-h3 uppercase tracking-wider text-slate-200">
+                    Informasi Proyek &amp; Survei
                   </h3>
                 </div>
 
@@ -567,37 +583,40 @@ export default function SurveyDetailModal({
                   ].map(([label, value], index, items) => (
                     <div
                       key={`${label}-${index}`}
-                      className={`grid grid-cols-[180px_1fr] gap-4 px-4 py-3 text-left ${index < items.length - 1 ? "border-b border-slate-700" : ""}`}
+                      className={`grid grid-cols-1 gap-1 px-4 py-3 text-left sm:grid-cols-[180px_1fr] sm:gap-4 ${index < items.length - 1 ? "border-b border-slate-700" : ""}`}
                     >
-                      <div className="text-[12px] font-medium text-slate-300">{label}</div>
-                      <div className="text-[12px] font-semibold text-white">{value}</div>
+                      <div className="type-p2 font-medium text-slate-300">{label}</div>
+                      <div className="type-p2 font-semibold text-white">{value}</div>
                     </div>
                   ))}
                 </div>
 
                 <div className="border-t border-slate-700 px-4 py-3">
-                  <button
+                  <Button
                     type="button"
-                    className="h-9 rounded-xl border border-dashed border-slate-600 bg-transparent px-3 text-[11px] font-semibold text-slate-200 hover:bg-slate-800/60"
+                    variant="outline"
+                    size="sm"
+                    className="border-dashed border-slate-600 bg-transparent text-slate-200 hover:bg-slate-800/60"
                     onClick={onAddInformation}
                   >
-                    + Tambah Informasi Baru / Add Custom Field
-                  </button>
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    Tambah Informasi
+                  </Button>
                 </div>
               </div>
             </div>
 
             <div className="rounded-[14px] border border-slate-700 bg-[#101d2f] p-0">
               <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3">
-                <ImageIcon className="size-4 text-orange-300" />
-                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-200">
-                  FOTO DOKUMENTASI LAPANGAN (MAKS. 5 FOTO)
+                <ImageIcon className="size-4 text-orange-300" aria-hidden="true" />
+                <h3 className="type-h3 uppercase tracking-wider text-slate-200">
+                  Foto Dokumentasi (Maks. 5 Foto)
                 </h3>
               </div>
 
               <div className="p-4">
                 <div className="rounded-[10px] border border-dashed border-slate-700 bg-[#0d1a2d] p-3">
-                  <div className="grid grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
                     {Array.from({ length: 5 }, (_, index) => {
                       const photo = photos[index] ?? { url: "", label: `Foto ${index + 1}` };
 
@@ -606,6 +625,8 @@ export default function SurveyDetailModal({
                           key={`photo-slot-${index}`}
                           index={index}
                           photo={photo}
+                          registerInputRef={registerInputRef}
+                          onFileSelect={handleLocalPhotoUpload}
                           onSelectPhoto={triggerPhotoInput}
                           onRemove={removePhoto}
                           onLabelChange={updateLabel}

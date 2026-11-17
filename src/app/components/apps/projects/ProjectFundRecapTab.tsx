@@ -1,30 +1,50 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  HardHat,
-  Boxes,
-  Wrench,
-  Fuel,
-  Download,
-  Printer,
-  Search,
-  CheckCircle2,
-  Clock,
   ArrowUpRight,
-  Filter,
+  Boxes,
+  CheckCircle2,
   DollarSign,
-  Receipt,
+  Download,
+  Fuel,
+  HardHat,
+  Home,
   Layers,
+  Printer,
+  Receipt,
+  Search,
+  Wrench,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import ProjectActionButton from "./ProjectActionButton";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import ProjectActionButton from "./ProjectActionButton";
 
-export type FundCategoryKey = "TUKANG" | "BAHAN" | "INVENTARIS" | "OPERASIONAL";
+export type FundCategoryKey =
+  | "TUKANG"
+  | "BAHAN"
+  | "SEWA"
+  | "INVENTARIS"
+  | "OPERASIONAL";
 
 export interface FundTicketItem {
   id: string;
@@ -36,6 +56,7 @@ export interface FundTicketItem {
   paidAt?: string | null;
   requesterName: string;
   type?: string | null;
+  ticketType?: string | null;
   requestCategory?: string | null;
   fieldCategory?: string | null;
   fundCategory?: FundCategoryKey | null;
@@ -61,16 +82,16 @@ interface ProjectFundRecapTabProps {
 }
 
 function currency(val: number | string | null | undefined): string {
-  const num = typeof val === "string" ? parseFloat(val) : Number(val || 0);
-  if (isNaN(num)) return "Rp 0";
-  return "Rp " + Math.round(num).toLocaleString("id-ID");
+  const num = typeof val === "string" ? Number.parseFloat(val) : Number(val || 0);
+  if (Number.isNaN(num)) return "Rp 0";
+  return `Rp ${Math.round(num).toLocaleString("id-ID")}`;
 }
 
 function formatDateIndo(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
+    if (Number.isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("id-ID", {
       day: "numeric",
       month: "short",
@@ -81,7 +102,9 @@ function formatDateIndo(dateStr: string | null | undefined): string {
   }
 }
 
-// Function to classify a ticket into one of the 4 fund categories
+const SEWA_RENTAL_TEXT_PATTERN =
+  /rumah\s*sewa|mess\s*(tukang|pekerja|proyek)?|kontrakan|basecamp|kendaraan\s*sewa|sewa\s*(rumah|mess|kos|kendaraan|armada|alat|truk|truck|mobil|pickup|excavator|molen|genset|stamper)|\bsewa\b/i;
+
 export function classifyTicketFundCategory(ticket: FundTicketItem): {
   key: FundCategoryKey;
   label: string;
@@ -89,53 +112,83 @@ export function classifyTicketFundCategory(ticket: FundTicketItem): {
   badgeClass: string;
 } {
   const title = (ticket.title || "").toLowerCase();
-  const desc = (ticket.items || []).map((i) => i.itemName.toLowerCase()).join(" ");
+  const desc = (ticket.items || [])
+    .map((item) => item.itemName.toLowerCase())
+    .join(" ");
   const text = `${title} ${desc}`;
   const reqCat = (ticket.requestCategory || "").toUpperCase();
   const fieldCat = (ticket.fieldCategory || "").toUpperCase();
   const type = (ticket.type || "").toUpperCase();
+  const ticketType = (ticket.ticketType || "").toUpperCase();
 
-  // 0. Upah Langsir / Hauling masuk ke Operasional & Transportasi Lapangan
+  const isSewa =
+    ticket.fundCategory === "SEWA" ||
+    reqCat === "HOUSE_RENTAL" ||
+    reqCat === "VEHICLE_RENTAL" ||
+    reqCat === "EQUIPMENT_REQUEST" ||
+    fieldCat === "HOUSE_RENTAL" ||
+    fieldCat === "VEHICLE_RENTAL" ||
+    fieldCat === "RENTAL" ||
+    ticketType === "EQUIPMENT_REQUEST" ||
+    ticketType === "HOUSE_RENTAL" ||
+    ticketType === "VEHICLE_RENTAL" ||
+    ticketType === "EQUIPMENT_RENTAL" ||
+    SEWA_RENTAL_TEXT_PATTERN.test(text);
+
+  if (isSewa) {
+    return {
+      key: "SEWA",
+      label: "Rumah & Kendaraan Sewa",
+      icon: Home,
+      badgeClass:
+        "bg-teal-500/10 text-teal-700 border-teal-500/30 dark:bg-teal-950/40 dark:text-teal-300",
+    };
+  }
+
   if (fieldCat === "HAULING" || /langsir/.test(text)) {
     return {
       key: "OPERASIONAL",
       label: "Operasional & Lainnya",
       icon: Fuel,
-      badgeClass: "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-800 dark:text-slate-300",
+      badgeClass:
+        "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-800 dark:text-slate-300",
     };
   }
 
-  // 1. Ambilan Tukang (Labor/Wage/Kasbon)
   const isLabor =
     ticket.fundCategory === "TUKANG" ||
     fieldCat === "LABOR" ||
     reqCat === "KASBON" ||
-    /tukang|mandor|upah|kasbon|gaji|ambilan|tenaga|pekerja|borongan|ongkos/.test(text);
+    /tukang|mandor|upah|kasbon|gaji|ambilan|tenaga|pekerja|borongan|ongkos/.test(
+      text,
+    );
 
   if (isLabor) {
     return {
       key: "TUKANG",
       label: "Ambilan Tukang",
       icon: HardHat,
-      badgeClass: "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300",
+      badgeClass:
+        "bg-amber-500/10 text-amber-600 border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300",
     };
   }
 
-  // 2. Barang Inventaris (Equipment, Tools, Machinery, Rental)
   const isInventaris =
     ticket.fundCategory === "INVENTARIS" ||
-    /inventaris|alat|sewa|mesin|genset|molen|peralatan|perkakas|gerobak|scaffolding|helm|rompi|cangkul|meteran|equipment|aset/.test(text);
+    /inventaris|alat|mesin|genset|molen|peralatan|perkakas|gerobak|scaffolding|helm|rompi|cangkul|meteran|equipment|aset/.test(
+      text,
+    );
 
   if (isInventaris) {
     return {
       key: "INVENTARIS",
       label: "Barang Inventaris",
       icon: Wrench,
-      badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/30 dark:bg-blue-950/40 dark:text-blue-300",
+      badgeClass:
+        "bg-blue-500/10 text-blue-600 border-blue-500/30 dark:bg-blue-950/40 dark:text-blue-300",
     };
   }
 
-  // 3. Pembelanjaan Bahan (Materials)
   const isBahan =
     ticket.fundCategory === "BAHAN" ||
     type === "MATERIAL" ||
@@ -146,23 +199,26 @@ export function classifyTicketFundCategory(ticket: FundTicketItem): {
     reqCat === "MATERIAL_CONTRACT" ||
     fieldCat === "MATERIAL" ||
     fieldCat === "DIRECT_STORE" ||
-    /bahan|material|semen|pasir|batu|besi|cat|keramik|kayu|paku|pipa|bata|toko|triplek|baut|seng/.test(text);
+    /bahan|material|semen|pasir|batu|besi|cat|keramik|kayu|paku|pipa|bata|toko|triplek|baut|seng/.test(
+      text,
+    );
 
   if (isBahan) {
     return {
       key: "BAHAN",
       label: "Pembelanjaan Bahan",
       icon: Boxes,
-      badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300",
+      badgeClass:
+        "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300",
     };
   }
 
-  // 4. Operasional Lapangan & Lainnya (BBM, Transport, Konsumsi, dsb)
   return {
     key: "OPERASIONAL",
     label: "Operasional & Lainnya",
     icon: Fuel,
-    badgeClass: "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-800 dark:text-slate-300",
+    badgeClass:
+      "bg-slate-500/10 text-slate-600 border-slate-500/30 dark:bg-slate-800 dark:text-slate-300",
   };
 }
 
@@ -173,11 +229,14 @@ export default function ProjectFundRecapTab({
   tickets = [],
   stockItems = [],
 }: ProjectFundRecapTabProps) {
-  const [selectedCategory, setSelectedCategory] = useState<"ALL" | FundCategoryKey>("ALL");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"ALL" | "PAID" | "PENDING">("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<
+    "ALL" | FundCategoryKey
+  >("ALL");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<
+    "ALL" | "PAID" | "PENDING"
+  >("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Rejected tickets are omitted before any project-fund calculation.
   const classifiedTickets = useMemo(() => {
     const cleanStr = (s: string) =>
       s
@@ -202,13 +261,21 @@ export default function ProjectFundRecapTab({
             const targetClean = cleanStr(it.itemName);
 
             const matchedStock = stockItems.find((s) => {
-              if (s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()) return true;
+              if (
+                s.name.trim().toLowerCase() === it.itemName.trim().toLowerCase()
+              ) {
+                return true;
+              }
               if (cleanStr(s.name) === targetClean) return true;
               const sClean = cleanStr(s.name);
-              return sClean.includes(targetClean) || targetClean.includes(sClean);
+              return (
+                sClean.includes(targetClean) || targetClean.includes(sClean)
+              );
             });
 
-            const stockPrice = matchedStock?.unitPrice ? Number(matchedStock.unitPrice) : 0;
+            const stockPrice = matchedStock?.unitPrice
+              ? Number(matchedStock.unitPrice)
+              : 0;
             const unitPrice = stockPrice > 0 ? stockPrice : estCost;
             itemsSum += qty * unitPrice;
           }
@@ -225,18 +292,14 @@ export default function ProjectFundRecapTab({
       });
   }, [tickets, stockItems]);
 
-  // Aggregated Summary by Category
   const summary = useMemo(() => {
     const res: Record<
       FundCategoryKey,
-      {
-        requested: number;
-        paid: number;
-        count: number;
-      }
+      { requested: number; paid: number; count: number }
     > = {
       TUKANG: { requested: 0, paid: 0, count: 0 },
       BAHAN: { requested: 0, paid: 0, count: 0 },
+      SEWA: { requested: 0, paid: 0, count: 0 },
       INVENTARIS: { requested: 0, paid: 0, count: 0 },
       OPERASIONAL: { requested: 0, paid: 0, count: 0 },
     };
@@ -246,15 +309,11 @@ export default function ProjectFundRecapTab({
 
     for (const t of classifiedTickets) {
       res[t.category.key].requested += t.amountNum;
-      if (t.paid) {
-        res[t.category.key].paid += t.amountNum;
-      }
+      if (t.paid) res[t.category.key].paid += t.amountNum;
       res[t.category.key].count += 1;
 
       grandRequested += t.amountNum;
-      if (t.paid) {
-        grandPaid += t.amountNum;
-      }
+      if (t.paid) grandPaid += t.amountNum;
     }
 
     return {
@@ -266,17 +325,13 @@ export default function ProjectFundRecapTab({
     };
   }, [classifiedTickets, contractValue]);
 
-  // Filtered tickets list
   const filteredTickets = useMemo(() => {
     return classifiedTickets.filter((t) => {
-      // Category filter
       if (selectedCategory !== "ALL" && t.category.key !== selectedCategory) {
         return false;
       }
-      // Payment status filter
       if (paymentStatusFilter === "PAID" && !t.paid) return false;
       if (paymentStatusFilter === "PENDING" && t.paid) return false;
-      // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = t.title.toLowerCase().includes(q);
@@ -288,7 +343,6 @@ export default function ProjectFundRecapTab({
     });
   }, [classifiedTickets, selectedCategory, paymentStatusFilter, searchQuery]);
 
-  // Export CSV
   const handleExportCSV = () => {
     const rows = [
       [`Rekap Penggunaan Dana Proyek · ${projectTitle}`],
@@ -298,14 +352,53 @@ export default function ProjectFundRecapTab({
       [],
       ["RINGKASAN PER KATEGORI"],
       ["Kategori", "Total Di-request", "Total Cair (Lunas)", "Jumlah Tiket"],
-      ["Ambilan Tukang", summary.categories.TUKANG.requested.toString(), summary.categories.TUKANG.paid.toString(), summary.categories.TUKANG.count.toString()],
-      ["Pembelanjaan Bahan", summary.categories.BAHAN.requested.toString(), summary.categories.BAHAN.paid.toString(), summary.categories.BAHAN.count.toString()],
-      ["Barang Inventaris", summary.categories.INVENTARIS.requested.toString(), summary.categories.INVENTARIS.paid.toString(), summary.categories.INVENTARIS.count.toString()],
-      ["Operasional & Lainnya", summary.categories.OPERASIONAL.requested.toString(), summary.categories.OPERASIONAL.paid.toString(), summary.categories.OPERASIONAL.count.toString()],
-      ["TOTAL KESELURUHAN", summary.grandRequested.toString(), summary.grandPaid.toString(), summary.totalTicketsCount.toString()],
+      [
+        "Ambilan Tukang",
+        summary.categories.TUKANG.requested.toString(),
+        summary.categories.TUKANG.paid.toString(),
+        summary.categories.TUKANG.count.toString(),
+      ],
+      [
+        "Pembelanjaan Bahan",
+        summary.categories.BAHAN.requested.toString(),
+        summary.categories.BAHAN.paid.toString(),
+        summary.categories.BAHAN.count.toString(),
+      ],
+      [
+        "Rumah & Kendaraan Sewa",
+        summary.categories.SEWA.requested.toString(),
+        summary.categories.SEWA.paid.toString(),
+        summary.categories.SEWA.count.toString(),
+      ],
+      [
+        "Barang Inventaris",
+        summary.categories.INVENTARIS.requested.toString(),
+        summary.categories.INVENTARIS.paid.toString(),
+        summary.categories.INVENTARIS.count.toString(),
+      ],
+      [
+        "Operasional & Lainnya",
+        summary.categories.OPERASIONAL.requested.toString(),
+        summary.categories.OPERASIONAL.paid.toString(),
+        summary.categories.OPERASIONAL.count.toString(),
+      ],
+      [
+        "TOTAL KESELURUHAN",
+        summary.grandRequested.toString(),
+        summary.grandPaid.toString(),
+        summary.totalTicketsCount.toString(),
+      ],
       [],
       ["RINCIAN TIKET DANA"],
-      ["No Tiket", "Kategori", "Uraian / Judul", "Pemohon", "Tanggal", "Nominal (Rp)", "Status Pencairan"],
+      [
+        "No Tiket",
+        "Kategori",
+        "Uraian / Judul",
+        "Pemohon",
+        "Tanggal",
+        "Nominal (Rp)",
+        "Status Pencairan",
+      ],
     ];
 
     for (const t of classifiedTickets) {
@@ -320,26 +413,81 @@ export default function ProjectFundRecapTab({
       ]);
     }
 
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map((e) => e.join(",")).join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," + rows.map((e) => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `rekap_dana_${projectCode || "proyek"}.csv`);
+    link.setAttribute(
+      "download",
+      `rekap_dana_${projectCode || "proyek"}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const categoryCards: Array<{
+    key: FundCategoryKey;
+    label: string;
+    unitLabel: string;
+    icon: React.ComponentType<{ className?: string }>;
+    accentClass: string;
+    activeClass: string;
+  }> = [
+    {
+      key: "TUKANG",
+      label: "Ambilan Tukang",
+      unitLabel: "Tiket",
+      icon: HardHat,
+      accentClass: "text-amber-600 dark:text-amber-400",
+      activeClass: "border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/20",
+    },
+    {
+      key: "BAHAN",
+      label: "Pembelanjaan Bahan",
+      unitLabel: "Tiket",
+      icon: Boxes,
+      accentClass: "text-emerald-600 dark:text-emerald-400",
+      activeClass:
+        "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20",
+    },
+    {
+      key: "SEWA",
+      label: "Rumah & Sewa",
+      unitLabel: "Item",
+      icon: Home,
+      accentClass: "text-teal-700 dark:text-teal-300",
+      activeClass: "border-teal-500 bg-teal-500/5 ring-2 ring-teal-500/20",
+    },
+    {
+      key: "INVENTARIS",
+      label: "Barang Inventaris",
+      unitLabel: "Tiket",
+      icon: Wrench,
+      accentClass: "text-blue-600 dark:text-blue-400",
+      activeClass: "border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20",
+    },
+    {
+      key: "OPERASIONAL",
+      label: "Operasional",
+      unitLabel: "Tiket",
+      icon: Fuel,
+      accentClass: "text-muted-foreground",
+      activeClass: "border-primary bg-primary/5 ring-2 ring-primary/20",
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* 1. Header Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-foreground">
-            Rekap Penggunaan Dana · {projectTitle}
+          <h2 className="type-h2 text-foreground">
+            Rekap Dana · {projectTitle}
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Rekapitulasi realisasi pengajuan dana berdasarkan tiket proyek untuk ambilan tukang, bahan, dan inventaris.
+          <p className="type-p3 mt-0.5 text-muted-foreground">
+            Realisasi pengajuan dana proyek untuk tukang, bahan, sewa, dan
+            inventaris.
           </p>
         </div>
 
@@ -347,77 +495,76 @@ export default function ProjectFundRecapTab({
           <ProjectActionButton
             type="button"
             label="Ekspor CSV"
-            icon={<Download className="size-3.5" />}
+            icon={<Download className="size-3.5" aria-hidden="true" />}
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
-            className="h-8 gap-1.5 text-xs rounded-lg"
           />
-
           <ProjectActionButton
             type="button"
-            label="Cetak rekap"
-            icon={<Printer className="size-3.5" />}
+            label="Cetak Rekap"
+            icon={<Printer className="size-3.5" aria-hidden="true" />}
             variant="outline"
             size="sm"
             onClick={() => window.print()}
-            className="h-8 gap-1.5 text-xs rounded-lg"
           />
         </div>
       </div>
 
-      {/* 2. Top Metric Cards (Overall Project Financial Health) */}
+      {/* Top Metric Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
-          <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
-            <Receipt className="size-3.5 text-primary" />
+        <div className="rounded-xl border border-border bg-card p-4 shadow-2xs">
+          <span className="type-p3 flex items-center gap-1.5 font-semibold text-muted-foreground">
+            <Receipt className="size-3.5 text-primary" aria-hidden="true" />
             Nilai Kontrak Proyek
           </span>
-          <p className="mt-1 text-base sm:text-lg font-bold text-foreground">
+          <p className="type-kpi mt-1 text-foreground">
             {currency(contractValue)}
           </p>
-          <span className="text-[10px] text-muted-foreground">Pagu anggaran dasar</span>
+          <span className="type-p3 text-muted-foreground">
+            Pagu anggaran dasar
+          </span>
         </div>
 
-        <div className="rounded-xl border border-amber-500/30 bg-card p-4 shadow-2xs">
-          <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-            <DollarSign className="size-3.5" />
-            Total Dana Di-request
+        <div className="rounded-xl border border-warning/30 bg-card p-4 shadow-2xs">
+          <span className="type-p3 flex items-center gap-1.5 font-semibold text-warning">
+            <DollarSign className="size-3.5" aria-hidden="true" />
+            Total Dana Diajukan
           </span>
-          <p className="mt-1 text-base sm:text-lg font-bold text-amber-600 dark:text-amber-400">
+          <p className="type-kpi mt-1 text-warning">
             {currency(summary.grandRequested)}
           </p>
-          <span className="text-[10px] text-muted-foreground">
+          <span className="type-p3 text-muted-foreground tabular-nums">
             {contractValue > 0
-              ? `${Math.round((summary.grandRequested / contractValue) * 100)}% dari nilai kontrak`
+              ? `${Math.round((summary.grandRequested / contractValue) * 100)}% dari kontrak`
               : `${summary.totalTicketsCount} pengajuan`}
           </span>
         </div>
 
-        <div className="rounded-xl border border-emerald-500/30 bg-card p-4 shadow-2xs">
-          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-            <CheckCircle2 className="size-3.5" />
+        <div className="rounded-xl border border-success/30 bg-card p-4 shadow-2xs">
+          <span className="type-p3 flex items-center gap-1.5 font-semibold text-success">
+            <CheckCircle2 className="size-3.5" aria-hidden="true" />
             Total Realisasi Cair
           </span>
-          <p className="mt-1 text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
+          <p className="type-kpi mt-1 text-success">
             {currency(summary.grandPaid)}
           </p>
-          <span className="text-[10px] text-muted-foreground">
+          <span className="type-p3 text-muted-foreground tabular-nums">
             {summary.grandRequested > 0
-              ? `${Math.round((summary.grandPaid / summary.grandRequested) * 100)}% pencairan tiket`
+              ? `${Math.round((summary.grandPaid / summary.grandRequested) * 100)}% pencairan`
               : "Belum ada pencairan"}
           </span>
         </div>
 
-        <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
-          <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
-            <Layers className="size-3.5 text-muted-foreground" />
+        <div className="rounded-xl border border-border bg-card p-4 shadow-2xs">
+          <span className="type-p3 flex items-center gap-1.5 font-semibold text-muted-foreground">
+            <Layers className="size-3.5" aria-hidden="true" />
             Sisa Pagu Anggaran
           </span>
-          <p className="mt-1 text-base sm:text-lg font-bold text-foreground">
+          <p className="type-kpi mt-1 text-foreground">
             {currency(summary.remainingContract)}
           </p>
-          <span className="text-[10px] text-muted-foreground">
+          <span className="type-p3 text-muted-foreground tabular-nums">
             {contractValue > 0
               ? `${Math.max(0, Math.round((summary.remainingContract / contractValue) * 100))}% sisa kontrak`
               : "—"}
@@ -425,369 +572,292 @@ export default function ProjectFundRecapTab({
         </div>
       </div>
 
-      {/* 3. The 4 Category Cards (Requested by User) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Ambilan Tukang */}
-        <div
-          onClick={() => setSelectedCategory(selectedCategory === "TUKANG" ? "ALL" : "TUKANG")}
-          className={`cursor-pointer rounded-xl border p-4 shadow-2xs transition-all hover:border-amber-500/60 ${
-            selectedCategory === "TUKANG"
-              ? "border-amber-500 bg-amber-500/5 ring-2 ring-amber-500/20"
-              : "border-border/80 bg-card"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
-              <HardHat className="size-4 shrink-0" />
-              Ambilan Tukang
-            </span>
-            <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30">
-              {summary.categories.TUKANG.count} Tiket
-            </Badge>
-          </div>
-          <p className="mt-2 text-xl font-extrabold text-foreground">
-            {currency(summary.categories.TUKANG.requested)}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2">
-            <span>Cair (Lunas):</span>
-            <strong className="text-emerald-600 dark:text-emerald-400">
-              {currency(summary.categories.TUKANG.paid)}
-            </strong>
-          </div>
-        </div>
-
-        {/* Card 2: Pembelanjaan Bahan */}
-        <div
-          onClick={() => setSelectedCategory(selectedCategory === "BAHAN" ? "ALL" : "BAHAN")}
-          className={`cursor-pointer rounded-xl border p-4 shadow-2xs transition-all hover:border-emerald-500/60 ${
-            selectedCategory === "BAHAN"
-              ? "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20"
-              : "border-border/80 bg-card"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-              <Boxes className="size-4 shrink-0" />
-              Pembelanjaan Bahan
-            </span>
-            <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-              {summary.categories.BAHAN.count} Tiket
-            </Badge>
-          </div>
-          <p className="mt-2 text-xl font-extrabold text-foreground">
-            {currency(summary.categories.BAHAN.requested)}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2">
-            <span>Cair (Lunas):</span>
-            <strong className="text-emerald-600 dark:text-emerald-400">
-              {currency(summary.categories.BAHAN.paid)}
-            </strong>
-          </div>
-        </div>
-
-        {/* Card 3: Barang Inventaris */}
-        <div
-          onClick={() => setSelectedCategory(selectedCategory === "INVENTARIS" ? "ALL" : "INVENTARIS")}
-          className={`cursor-pointer rounded-xl border p-4 shadow-2xs transition-all hover:border-blue-500/60 ${
-            selectedCategory === "INVENTARIS"
-              ? "border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/20"
-              : "border-border/80 bg-card"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-blue-400">
-              <Wrench className="size-4 shrink-0" />
-              Barang Inventaris
-            </span>
-            <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
-              {summary.categories.INVENTARIS.count} Tiket
-            </Badge>
-          </div>
-          <p className="mt-2 text-xl font-extrabold text-foreground">
-            {currency(summary.categories.INVENTARIS.requested)}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2">
-            <span>Cair (Lunas):</span>
-            <strong className="text-emerald-600 dark:text-emerald-400">
-              {currency(summary.categories.INVENTARIS.paid)}
-            </strong>
-          </div>
-        </div>
-
-        {/* Card 4: Operasional & Lainnya */}
-        <div
-          onClick={() => setSelectedCategory(selectedCategory === "OPERASIONAL" ? "ALL" : "OPERASIONAL")}
-          className={`cursor-pointer rounded-xl border p-4 shadow-2xs transition-all hover:border-slate-500/60 ${
-            selectedCategory === "OPERASIONAL"
-              ? "border-slate-500 bg-slate-500/5 ring-2 ring-slate-500/20"
-              : "border-border/80 bg-card"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-              <Fuel className="size-4 shrink-0" />
-              Operasional / Lainnya
-            </span>
-            <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-600 border-slate-500/30">
-              {summary.categories.OPERASIONAL.count} Tiket
-            </Badge>
-          </div>
-          <p className="mt-2 text-xl font-extrabold text-foreground">
-            {currency(summary.categories.OPERASIONAL.requested)}
-          </p>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-border/50 pt-2">
-            <span>Cair (Lunas):</span>
-            <strong className="text-emerald-600 dark:text-emerald-400">
-              {currency(summary.categories.OPERASIONAL.paid)}
-            </strong>
-          </div>
-        </div>
+      {/* 5 Category Filter Cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {categoryCards.map((cat) => {
+          const Icon = cat.icon;
+          const stats = summary.categories[cat.key];
+          const isSelected = selectedCategory === cat.key;
+          return (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() =>
+                setSelectedCategory(isSelected ? "ALL" : cat.key)
+              }
+              aria-pressed={isSelected}
+              className={cn(
+                "rounded-xl border bg-card p-4 text-left shadow-2xs transition-all hover:border-primary/50",
+                isSelected ? cat.activeClass : "border-border",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={cn(
+                    "type-p3 flex items-center gap-1.5 font-bold",
+                    cat.accentClass,
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{cat.label}</span>
+                </span>
+                <Badge variant="outline" className="shrink-0 tabular-nums">
+                  {stats.count} {cat.unitLabel}
+                </Badge>
+              </div>
+              <p className="type-kpi mt-2 text-foreground">
+                {currency(stats.requested)}
+              </p>
+              <div className="type-p3 mt-2 flex items-center justify-between border-t border-border/60 pt-2 text-muted-foreground tabular-nums">
+                <span>Lunas:</span>
+                <strong className="text-success">{currency(stats.paid)}</strong>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* 4. Rincian Tiket Data Table Card */}
+      {/* Tickets Table Card */}
       <Card className="border-border/80 shadow-2xs">
         <CardHeader className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-base font-bold">Rincian Pengajuan Dana Berdasarkan Tiket</CardTitle>
-            <CardDescription className="text-xs">
-              Daftar tiket yang diperhitungkan. Tiket ditolak tidak masuk rekap ini.
+            <CardTitle className="type-h3 text-foreground">
+              Rincian Pengajuan Dana per Tiket
+            </CardTitle>
+            <CardDescription className="type-p3">
+              Daftar tiket yang diperhitungkan. Tiket ditolak tidak masuk rekap.
             </CardDescription>
           </div>
 
-          {/* Filters Toolbar */}
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {/* Payment filter pills */}
-            <div
-              tabIndex={0}
-              aria-label="Filter status pembayaran"
-              className="flex items-center overflow-x-auto rounded-lg border border-border/80 bg-muted/30 p-0.5 text-xs"
-            >
-              <button
+            <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+              <Button
                 type="button"
-                aria-pressed={paymentStatusFilter === "ALL"}
+                size="sm"
+                variant={paymentStatusFilter === "ALL" ? "secondary" : "ghost"}
                 onClick={() => setPaymentStatusFilter("ALL")}
-                className={`min-h-11 shrink-0 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-8 sm:px-2.5 ${
-                  paymentStatusFilter === "ALL" ? "bg-background text-foreground shadow-2xs" : "text-muted-foreground"
-                }`}
               >
-                Semua Status
-              </button>
-              <button
+                Semua
+              </Button>
+              <Button
                 type="button"
-                aria-pressed={paymentStatusFilter === "PAID"}
+                size="sm"
+                variant={paymentStatusFilter === "PAID" ? "secondary" : "ghost"}
                 onClick={() => setPaymentStatusFilter("PAID")}
-                className={`min-h-11 shrink-0 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-8 sm:px-2.5 ${
-                  paymentStatusFilter === "PAID" ? "bg-background text-foreground shadow-2xs" : "text-muted-foreground"
-                }`}
               >
                 Lunas
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                aria-pressed={paymentStatusFilter === "PENDING"}
+                size="sm"
+                variant={
+                  paymentStatusFilter === "PENDING" ? "secondary" : "ghost"
+                }
                 onClick={() => setPaymentStatusFilter("PENDING")}
-                className={`min-h-11 shrink-0 rounded-md px-3 py-1 text-xs font-medium transition sm:min-h-8 sm:px-2.5 ${
-                  paymentStatusFilter === "PENDING" ? "bg-background text-foreground shadow-2xs" : "text-muted-foreground"
-                }`}
               >
                 Pending
-              </button>
+              </Button>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-44 sm:w-56">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <div className="relative w-full sm:w-56">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
               <Input
                 placeholder="Cari tiket / judul..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8 text-xs"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="pl-8"
               />
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
-          {/* Mobile Card View (< 768px) */}
-          <div className="space-y-2.5 md:hidden">
-            {filteredTickets.map((ticket) => {
-              const Icon = ticket.category.icon;
-              return (
-                <div
-                  key={ticket.id}
-                  className="space-y-2 rounded-lg border border-border/80 bg-card p-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`}
-                        className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-primary hover:underline"
-                      >
-                        {ticket.ticketNumber}
-                        <ArrowUpRight className="size-3 opacity-60" />
-                      </Link>
-                      <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
-                        {ticket.title}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={
-                        ticket.paid
-                          ? "shrink-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]"
-                          : "shrink-0 bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]"
-                      }
-                    >
-                      {ticket.paid ? "Cair (Lunas)" : "Menunggu Cair"}
-                    </Badge>
-                  </div>
-
-                  {ticket.items && ticket.items.length > 0 && (
-                    <p className="line-clamp-2 text-[11px] text-muted-foreground">
-                      {ticket.items
-                        .map((it) => `${it.itemName} (${it.quantity} ${it.unit})`)
-                        .join(", ")}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/30 p-2 text-xs">
-                    <Badge variant="outline" className={`gap-1 text-[10px] ${ticket.category.badgeClass}`}>
-                      <Icon className="size-3" />
-                      <span>{ticket.category.label}</span>
-                    </Badge>
-                    <span className="font-mono text-sm font-bold text-foreground tabular-nums">
-                      {currency(ticket.amountNum)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>Pemohon: {ticket.requesterName}</span>
-                    <span>{formatDateIndo(ticket.createdAt)}</span>
-                  </div>
-                </div>
-              );
-            })}
-
-            {filteredTickets.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-                Belum ada pengajuan tiket pada kategori ini.
-              </div>
-            )}
-          </div>
-
-          {/* Desktop Table View (>= 768px) */}
-          <div className="hidden overflow-x-auto rounded-lg border border-border/70 md:block">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-border/80 bg-muted/40 font-semibold text-muted-foreground">
-                <tr>
-                  <th className="px-3.5 py-2.5">No. Tiket</th>
-                  <th className="px-3.5 py-2.5">Kategori Rekap</th>
-                  <th className="px-3.5 py-2.5">Uraian / Judul</th>
-                  <th className="px-3.5 py-2.5">Pemohon</th>
-                  <th className="px-3.5 py-2.5">Tanggal</th>
-                  <th className="px-3.5 py-2.5 text-right">Nominal Request</th>
-                  <th className="px-3.5 py-2.5 text-center">Status Pencairan</th>
-                  <th className="px-3.5 py-2.5 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
+          {filteredTickets.length === 0 ? (
+            <EmptyState
+              title="Belum ada pengajuan tiket"
+              description="Tidak ada pengajuan dana yang cocok dengan filter saat ini."
+            />
+          ) : (
+            <>
+              {/* Mobile Card View (< 768px) */}
+              <div className="space-y-2.5 md:hidden">
                 {filteredTickets.map((ticket) => {
                   const Icon = ticket.category.icon;
+                  const href = ticket.id.startsWith("rental-")
+                    ? "/apps/logistics?tab=equipment"
+                    : `/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`;
                   return (
-                    <tr key={ticket.id} className="hover:bg-muted/20 transition-colors">
-                      {/* Ticket Number */}
-                      <td className="px-3.5 py-2.5 font-mono font-medium text-primary">
-                        <Link
-                          href={`/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`}
-                          className="hover:underline flex items-center gap-1"
-                        >
-                          {ticket.ticketNumber}
-                          <ArrowUpRight className="size-3 opacity-60" />
-                        </Link>
-                      </td>
-
-                      {/* Category Badge */}
-                      <td className="px-3.5 py-2.5">
-                        <Badge variant="outline" className={`gap-1 text-[11px] ${ticket.category.badgeClass}`}>
-                          <Icon className="size-3" />
-                          <span>{ticket.category.label}</span>
-                        </Badge>
-                      </td>
-
-                      {/* Title & Items preview */}
-                      <td className="px-3.5 py-2.5 max-w-xs">
-                        <p className="font-semibold text-foreground truncate" title={ticket.title}>
-                          {ticket.title}
-                        </p>
-                        {ticket.items && ticket.items.length > 0 && (
-                          <p className="text-[10px] text-muted-foreground truncate">
-                            {ticket.items.map((it) => `${it.itemName} (${it.quantity} ${it.unit})`).join(", ")}
+                    <div
+                      key={ticket.id}
+                      className="space-y-2.5 rounded-xl border border-border bg-card p-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link
+                            href={href}
+                            className="type-p3 inline-flex items-center gap-1 font-mono font-semibold text-primary hover:underline"
+                          >
+                            {ticket.ticketNumber}
+                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                          </Link>
+                          <p className="type-p2 mt-0.5 font-semibold text-foreground">
+                            {ticket.title}
                           </p>
-                        )}
-                      </td>
+                        </div>
+                        <Badge
+                          variant={ticket.paid ? "success" : "warning"}
+                          className="shrink-0"
+                        >
+                          {ticket.paid ? "Lunas" : "Menunggu"}
+                        </Badge>
+                      </div>
 
-                      {/* Requester */}
-                      <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">
-                        {ticket.requesterName}
-                      </td>
+                      {ticket.items && ticket.items.length > 0 && (
+                        <p className="type-p3 line-clamp-2 text-muted-foreground">
+                          {ticket.items
+                            .map(
+                              (it) =>
+                                `${it.itemName} (${it.quantity} ${it.unit})`,
+                            )
+                            .join(", ")}
+                        </p>
+                      )}
 
-                      {/* Date */}
-                      <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">
-                        {formatDateIndo(ticket.createdAt)}
-                      </td>
-
-                      {/* Amount */}
-                      <td className="px-3.5 py-2.5 text-right font-bold text-foreground tabular-nums">
-                        {currency(ticket.amountNum)}
-                      </td>
-
-                      {/* Payment Status */}
-                      <td className="px-3.5 py-2.5 text-center">
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-2.5">
                         <Badge
                           variant="outline"
-                          className={
-                            ticket.paid
-                              ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]"
-                              : "bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]"
-                          }
+                          className={cn("gap-1", ticket.category.badgeClass)}
                         >
-                          {ticket.paid ? "Cair (Lunas)" : "Menunggu Cair"}
+                          <Icon className="size-3.5" aria-hidden="true" />
+                          <span>{ticket.category.label}</span>
                         </Badge>
-                      </td>
+                        <span className="type-p2 font-mono font-bold text-foreground tabular-nums">
+                          {currency(ticket.amountNum)}
+                        </span>
+                      </div>
 
-                      {/* Action */}
-                      <td className="px-3.5 py-2.5 text-right">
-                        <Button
-                          asChild
-                          variant="ghost"
-                          size="sm"
-                          className="min-h-11 min-w-11 px-0 text-xs text-primary hover:text-primary sm:min-h-8 sm:min-w-0 sm:px-2.5"
-                        >
-                          <Link
-                            href={`/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`}
-                            aria-label={`Buka tiket ${ticket.ticketNumber}`}
-                            title="Buka tiket"
-                            className="inline-flex items-center gap-1.5"
-                          >
-                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
-                            <span className="sr-only sm:not-sr-only">Buka Tiket</span>
-                          </Link>
-                        </Button>
-                      </td>
-                    </tr>
+                      <div className="type-p3 flex items-center justify-between text-muted-foreground">
+                        <span>Pemohon: {ticket.requesterName}</span>
+                        <span>{formatDateIndo(ticket.createdAt)}</span>
+                      </div>
+                    </div>
                   );
                 })}
+              </div>
 
-                {filteredTickets.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-xs text-muted-foreground">
-                      Tidak ada pengajuan dana yang cocok dengan filter.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              {/* Desktop Shadcn Table (>= 768px) */}
+              <div className="hidden md:block">
+                <Table pagination={false}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No. Tiket</TableHead>
+                      <TableHead>Kategori Rekap</TableHead>
+                      <TableHead>Uraian / Judul</TableHead>
+                      <TableHead>Pemohon</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead className="text-right">
+                        Nominal Request
+                      </TableHead>
+                      <TableHead className="text-center">
+                        Status Pencairan
+                      </TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTickets.map((ticket) => {
+                      const Icon = ticket.category.icon;
+                      const href = ticket.id.startsWith("rental-")
+                        ? "/apps/logistics?tab=equipment"
+                        : `/apps/tickets?tab=all&openSheet=${encodeURIComponent(ticket.id)}`;
+
+                      return (
+                        <TableRow key={ticket.id}>
+                          <TableCell className="font-mono font-medium text-primary">
+                            <Link
+                              href={href}
+                              className="type-p3 inline-flex items-center gap-1 hover:underline"
+                            >
+                              {ticket.ticketNumber}
+                              <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={cn("gap-1", ticket.category.badgeClass)}
+                            >
+                              <Icon className="size-3.5" aria-hidden="true" />
+                              <span>{ticket.category.label}</span>
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs whitespace-normal">
+                            <p
+                              className="type-p2 truncate font-semibold text-foreground"
+                              title={ticket.title}
+                            >
+                              {ticket.title}
+                            </p>
+                            {ticket.items && ticket.items.length > 0 && (
+                              <p className="type-p3 truncate text-muted-foreground">
+                                {ticket.items
+                                  .map(
+                                    (it) =>
+                                      `${it.itemName} (${it.quantity} ${it.unit})`,
+                                  )
+                                  .join(", ")}
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell className="type-p3 text-muted-foreground">
+                            {ticket.requesterName}
+                          </TableCell>
+                          <TableCell className="type-p3 text-muted-foreground">
+                            {formatDateIndo(ticket.createdAt)}
+                          </TableCell>
+                          <TableCell className="type-p2 text-right font-bold text-foreground tabular-nums">
+                            {currency(ticket.amountNum)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant={ticket.paid ? "success" : "warning"}
+                            >
+                              {ticket.paid ? "Lunas" : "Menunggu"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button asChild variant="ghost" size="sm">
+                              <Link
+                                href={href}
+                                aria-label={
+                                  ticket.id.startsWith("rental-")
+                                    ? `Lihat sewa ${ticket.ticketNumber}`
+                                    : `Buka tiket ${ticket.ticketNumber}`
+                                }
+                              >
+                                <ArrowUpRight
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                                <span>
+                                  {ticket.id.startsWith("rental-")
+                                    ? "Lihat Sewa"
+                                    : "Buka Tiket"}
+                                </span>
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

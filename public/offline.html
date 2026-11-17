@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#102A4D" />
+  <title>Koneksi Terputus - Skala Prioritas</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #475569;
+      --primary: #102a4d;
+      --primary-hover: #173a69;
+      --accent-bg: #fef3c7;
+      --accent-fg: #b45309;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1324;
+        --card: #111c33;
+        --border: #233252;
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --primary: #1e88e5;
+        --primary-hover: #1976d2;
+        --accent-bg: rgba(245, 158, 11, 0.16);
+        --accent-fg: #fbbf24;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .card {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 28px 24px;
+      text-align: center;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    .icon-wrap {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 18px;
+      border-radius: 16px;
+      background: var(--accent-bg);
+      color: var(--accent-fg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      margin: 0 0 22px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+
+    .status {
+      margin: 0 0 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent-fg);
+      min-height: 1.2em;
+    }
+
+    .retry-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #ffffff;
+      padding: 13px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s ease, opacity 0.15s ease;
+    }
+
+    .retry-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .retry-btn:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <div class="icon-wrap" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="2" x2="22" y1="2" y2="22"></line>
+        <path d="M8.5 16.5a5 5 0 0 1 7 0"></path>
+        <path d="M2 8.82a15 15 0 0 1 4.17-2.65"></path>
+        <path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76"></path>
+        <path d="M16.85 11.25a10 10 0 0 1 2.22 1.68"></path>
+        <path d="M5 12.86a10 10 0 0 1 5.17-2.89"></path>
+        <circle cx="12" cy="20" r="1"></circle>
+      </svg>
+    </div>
+    <h1>Koneksi Internet Terputus</h1>
+    <p>
+      Halaman Skala Prioritas tidak dapat dimuat saat ini. Periksa jaringan Wi-Fi atau data seluler Anda, lalu coba kembali.
+    </p>
+    <p id="status-text" class="status" role="status" aria-live="polite"></p>
+    <button id="retry-btn" type="button" class="retry-btn">
+      Coba Muat Ulang
+    </button>
+  </main>
+
+  <script>
+    (function () {
+      var DEFAULT_APP_URL = 'https://www.skala-prioritas.com/';
+      var retryBtn = document.getElementById('retry-btn');
+      var statusText = document.getElementById('status-text');
+
+      function resolveTargetUrl() {
+        try {
+          if (document.referrer) {
+            var ref = new URL(document.referrer);
+            if (
+              ref.protocol === 'https:' &&
+              (ref.hostname === 'www.skala-prioritas.com' || ref.hostname === 'skala-prioritas.com')
+            ) {
+              return ref.toString();
+            }
+          }
+        } catch (e) {
+          // Abaikan URL referrer tidak valid
+        }
+        return DEFAULT_APP_URL;
+      }
+
+      function retryConnection() {
+        if (!retryBtn) return;
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Menghubungkan ulang...';
+        if (statusText) {
+          statusText.textContent = navigator.onLine
+            ? 'Memuat ulang aplikasi...'
+            : 'Perangkat masih offline. Mencoba menghubungkan ke server...';
+        }
+        window.location.replace(resolveTargetUrl());
+      }
+
+      if (retryBtn) {
+        retryBtn.addEventListener('click', retryConnection);
+      }
+
+      window.addEventListener('online', function () {
+        if (statusText) {
+          statusText.textContent = 'Koneksi internet kembali tersedia.';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

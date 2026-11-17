@@ -1,6 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import {
+  useMemo,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -9,25 +14,37 @@ import {
   Layers,
   Loader2,
   Plus,
+  Receipt,
   Search,
+  Send,
   Trash2,
   Truck,
 } from "lucide-react";
-import type { TicketPageRole, TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
+import { toast } from "sonner";
+import type {
+  TicketPageRole,
+  TicketProjectOption,
+} from "@/app/(DashboardLayout)/types/ticket";
 import {
   createMaterialContract,
+  createVendorInvoiceFromDeliveries,
   deleteUnbilledMaterialDelivery,
+  getUnbilledDeliveriesForContract,
   toggleMaterialContractActive,
 } from "@/app/actions/material-contracts";
+import { getJakartaDateKey } from "@/lib/habit-date";
 import {
   BULK_MATERIAL_TYPE_OPTIONS,
   BULK_MATERIAL_UNIT_OPTIONS,
   canManageMaterialContracts,
+  canPrepareVendorInvoices,
   canRecordMaterialDeliveries,
   formatMaterialVolume,
+  roundMaterialNumber,
   type ContractTicketDeliveryOption,
   type MaterialContractRow,
   type MaterialDeliveryRow,
+  type VendorInvoiceRow,
 } from "@/lib/material-contracts";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
@@ -40,6 +57,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +80,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import MaterialDeliveryModal from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
@@ -78,10 +100,263 @@ function currency(amount: number): string {
   }).format(amount);
 }
 
-function getLocalTodayIsoDate(): string {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+function ContractMobileCard({
+  contract,
+  canCreateContract,
+  canRecordDelivery,
+  canPrepareInvoices,
+  isPending,
+  onToggleActive,
+  onRecordDo,
+  onSendBilling,
+}: {
+  contract: MaterialContractRow;
+  canCreateContract: boolean;
+  canRecordDelivery: boolean;
+  canPrepareInvoices: boolean;
+  isPending: boolean;
+  onToggleActive: (contract: MaterialContractRow, checked: boolean) => void;
+  onRecordDo: (contractId: string) => void;
+  onSendBilling: (contractId: string) => void;
+}) {
+  return (
+    <div className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="type-p3 font-mono font-bold text-primary">
+            {contract.contractNumber}
+          </p>
+          <p className="type-p1 font-semibold text-foreground">
+            {contract.vendorName}
+          </p>
+          <p className="type-p3 text-muted-foreground">
+            {contract.materialType} · {currency(contract.unitPrice)} /{" "}
+            {contract.unit}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {canCreateContract && (
+            <Switch
+              checked={contract.isActive}
+              disabled={isPending}
+              onCheckedChange={(checked) => onToggleActive(contract, checked)}
+              aria-label={`Aktifkan kontrak ${contract.contractNumber}`}
+            />
+          )}
+          <Badge variant={contract.isActive ? "lightSuccess" : "outline"}>
+            {contract.isActive ? "Aktif" : "Nonaktif"}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 p-2.5">
+        <div>
+          <span className="type-p3 text-muted-foreground">Total Kirim</span>
+          <p className="type-p2 font-semibold text-foreground">
+            {formatMaterialVolume(contract.totalDeliveredVolume, contract.unit)}{" "}
+            ({contract.totalDeliveriesCount} DO)
+          </p>
+        </div>
+        <div className="text-right">
+          <span className="type-p3 text-muted-foreground">Belum Ditagih</span>
+          <p className="type-p2 font-bold text-amber-700 dark:text-amber-300">
+            {formatMaterialVolume(contract.unbilledVolume, contract.unit)}
+          </p>
+          <p className="type-p3 text-muted-foreground tabular-nums">
+            {currency(contract.unbilledEstimatedAmount)}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="type-p3 text-muted-foreground">
+          {contract.startDate}
+          {contract.endDate ? ` s.d. ${contract.endDate}` : " · Tanpa batas"}
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {canPrepareInvoices && contract.unbilledDeliveriesCount > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outlinesuccess"
+              onClick={() => onSendBilling(contract.id)}
+            >
+              <Send className="size-3.5" aria-hidden="true" />
+              Kirim Tagihan
+            </Button>
+          )}
+          {canRecordDelivery && contract.isActive && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onRecordDo(contract.id)}
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+              Catat DO
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeliveryMobileCard({
+  delivery,
+  canRecordDelivery,
+  isPending,
+  onPreviewProof,
+  onDelete,
+}: {
+  delivery: MaterialDeliveryRow;
+  canRecordDelivery: boolean;
+  isPending: boolean;
+  onPreviewProof: (delivery: MaterialDeliveryRow) => void;
+  onDelete: (delivery: MaterialDeliveryRow) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="type-p3 font-mono font-bold text-primary">
+              {delivery.doNumber}
+            </span>
+            {delivery.ticketNumber && (
+              <Badge variant="outline">{delivery.ticketNumber}</Badge>
+            )}
+          </div>
+          <p className="type-p1 mt-0.5 font-semibold text-foreground">
+            {delivery.projectName}
+          </p>
+          <p className="type-p3 text-muted-foreground">
+            {delivery.vendorName} · {delivery.contractNumber} (
+            {delivery.materialType})
+          </p>
+        </div>
+        {delivery.billingStatus === "BILLED" ? (
+          <Badge variant="lightSuccess" className="shrink-0 gap-1">
+            <CheckCircle2 className="size-3.5" aria-hidden="true" />
+            BILLED
+          </Badge>
+        ) : (
+          <Badge variant="lightWarning" className="shrink-0">
+            UNBILLED
+          </Badge>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+        <span className="type-p2 font-semibold text-foreground">
+          {formatMaterialVolume(delivery.quantityReceived, delivery.unit)}
+        </span>
+        <span className="type-p2 font-mono font-bold tabular-nums text-foreground">
+          {currency(delivery.estimatedAmount)}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="type-p3 text-muted-foreground">
+          {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
+          {delivery.driverName ? ` (${delivery.driverName})` : ""}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {delivery.proofUrl && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onPreviewProof(delivery)}
+            >
+              <Eye className="size-3.5" aria-hidden="true" />
+              Foto
+            </Button>
+          )}
+          {canRecordDelivery && delivery.billingStatus === "UNBILLED" && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isPending}
+              className="text-destructive"
+              onClick={() => onDelete(delivery)}
+            >
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              Hapus
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingDeliveryMobileCard({
+  delivery,
+  checked,
+  onToggle,
+  onPreviewProof,
+}: {
+  delivery: MaterialDeliveryRow;
+  checked: boolean;
+  onToggle: (checked: boolean) => void;
+  onPreviewProof: (delivery: MaterialDeliveryRow) => void;
+}) {
+  return (
+    <div
+      className={`space-y-2 rounded-xl border p-3.5 transition-colors ${
+        checked
+          ? "border-primary/50 bg-primary/5"
+          : "border-border/80 bg-card"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <label className="flex min-w-0 cursor-pointer items-start gap-2.5">
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(val) => onToggle(val === true)}
+            aria-label={`Pilih DO ${delivery.doNumber}`}
+            className="mt-0.5"
+          />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="type-p2 font-mono font-bold text-primary">
+                {delivery.doNumber}
+              </span>
+              {delivery.ticketNumber && (
+                <Badge variant="outline">{delivery.ticketNumber}</Badge>
+              )}
+            </div>
+            <p className="type-p3 text-muted-foreground">
+              {delivery.deliveryDate} · {delivery.projectName}
+            </p>
+          </div>
+        </label>
+        {delivery.proofUrl && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onPreviewProof(delivery)}
+          >
+            <Eye className="size-3.5" aria-hidden="true" />
+            Foto
+          </Button>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
+        <span className="type-p3 text-muted-foreground">
+          {formatMaterialVolume(delivery.quantityReceived, delivery.unit)} ·{" "}
+          {delivery.vehiclePlate || "-"}
+        </span>
+        <span className="type-p2 font-mono font-bold tabular-nums text-foreground">
+          {currency(delivery.estimatedAmount)}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export default function MaterialContractsPanel({
@@ -91,6 +366,7 @@ export default function MaterialContractsPanel({
   vendors,
   projects,
   contractTickets = [],
+  vendorInvoices = [],
 }: {
   role: TicketPageRole;
   contracts: MaterialContractRow[];
@@ -98,31 +374,80 @@ export default function MaterialContractsPanel({
   vendors: ContractVendorCatalogOption[];
   projects: TicketProjectOption[];
   contractTickets?: ContractTicketDeliveryOption[];
+  vendorInvoices?: VendorInvoiceRow[];
 }) {
   const router = useRouter();
   const canCreateContract = canManageMaterialContracts(role);
   const canRecordDelivery = canRecordMaterialDeliveries(role);
+  const canPrepareInvoices = canPrepareVendorInvoices(role);
 
+  const [activeSubTab, setActiveSubTab] = useState<
+    "contracts" | "deliveries" | "billing"
+  >("contracts");
   const [contractModalOpen, setContractModalOpen] = useState(false);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [selectedContractForDo, setSelectedContractForDo] = useState<
     string | undefined
   >(undefined);
+  const [deleteDeliveryTarget, setDeleteDeliveryTarget] =
+    useState<MaterialDeliveryRow | null>(null);
   const [proofPreview, setProofPreview] = useState<{
     title: string;
     url: string;
   } | null>(null);
 
-  const [billingFilter, setBillingFilter] = useState<"ALL" | "UNBILLED" | "BILLED">(
-    "ALL",
-  );
+  const [billingFilter, setBillingFilter] = useState<
+    "ALL" | "UNBILLED" | "BILLED"
+  >("ALL");
   const [contractFilter, setContractFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [feedback, setFeedback] = useState<{
-    text: string;
-    isError: boolean;
-  } | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Billing Builder state ("Kirim Tagihan ke Keuangan")
+  const [billingContractId, setBillingContractId] = useState(() => {
+    const firstWithUnbilled = contracts.find(
+      (c) => c.unbilledDeliveriesCount > 0,
+    );
+    return firstWithUnbilled?.id ?? contracts[0]?.id ?? "";
+  });
+  const [unbilledDeliveries, setUnbilledDeliveries] = useState<
+    MaterialDeliveryRow[]
+  >([]);
+  const [loadingUnbilled, setLoadingUnbilled] = useState(false);
+  const [unbilledError, setUnbilledError] = useState("");
+  const [selectedDeliveryIds, setSelectedDeliveryIds] = useState<string[]>([]);
+  const [invoiceNumberInput, setInvoiceNumberInput] = useState("");
+  const [dueDateInput, setDueDateInput] = useState("");
+  const [invoiceNotesInput, setInvoiceNotesInput] = useState("");
+  const [billingConfirmOpen, setBillingConfirmOpen] = useState(false);
+
+  const loadContractUnbilled = async (targetContractId: string) => {
+    if (!targetContractId || !canPrepareInvoices) {
+      setUnbilledDeliveries([]);
+      setSelectedDeliveryIds([]);
+      return;
+    }
+    setLoadingUnbilled(true);
+    setUnbilledError("");
+    try {
+      const res = await getUnbilledDeliveriesForContract(targetContractId);
+      if (res.success) {
+        setUnbilledDeliveries(res.deliveries);
+        setSelectedDeliveryIds(res.deliveries.map((d) => d.id));
+      } else {
+        setUnbilledDeliveries([]);
+        setSelectedDeliveryIds([]);
+        setUnbilledError(res.message ?? "Gagal memuat daftar Surat Jalan.");
+      }
+    } catch (error) {
+      console.error("Failed to fetch unbilled deliveries:", error);
+      setUnbilledDeliveries([]);
+      setSelectedDeliveryIds([]);
+      setUnbilledError("Gagal memuat daftar Surat Jalan belum ditagih.");
+    } finally {
+      setLoadingUnbilled(false);
+    }
+  };
 
   const activeContractsCount = contracts.filter((c) => c.isActive).length;
   const unbilledDeliveriesCount = deliveries.filter(
@@ -148,39 +473,151 @@ export default function MaterialContractsPanel({
         delivery.contractNumber.toLowerCase().includes(query) ||
         delivery.vendorName.toLowerCase().includes(query) ||
         delivery.projectName.toLowerCase().includes(query) ||
+        (delivery.ticketNumber ?? "").toLowerCase().includes(query) ||
         (delivery.vehiclePlate ?? "").toLowerCase().includes(query) ||
         (delivery.driverName ?? "").toLowerCase().includes(query)
       );
     });
   }, [deliveries, billingFilter, contractFilter, searchQuery]);
 
-  const handleToggleActive = (contract: MaterialContractRow, checked: boolean) => {
-    setFeedback(null);
+  const billingContractOptions = useMemo<ComboboxOption[]>(() => {
+    const sorted = [...contracts].sort(
+      (a, b) => b.unbilledDeliveriesCount - a.unbilledDeliveriesCount,
+    );
+    return sorted.map((c) => ({
+      value: c.id,
+      label: `${c.contractNumber} · ${c.vendorName}`,
+      description: `${c.materialType} · ${c.unbilledDeliveriesCount} DO belum ditagih (${currency(c.unbilledEstimatedAmount)})`,
+      keywords: [c.contractNumber, c.vendorName, c.materialType],
+    }));
+  }, [contracts]);
+
+  const selectedBillingContract =
+    contracts.find((c) => c.id === billingContractId) ?? null;
+
+  const selectedBillingDeliveries = useMemo(() => {
+    const idSet = new Set(selectedDeliveryIds);
+    return unbilledDeliveries.filter((d) => idSet.has(d.id));
+  }, [selectedDeliveryIds, unbilledDeliveries]);
+
+  const selectedTotalQty = roundMaterialNumber(
+    selectedBillingDeliveries.reduce((sum, d) => sum + d.quantityReceived, 0),
+    2,
+  );
+  const selectedGrandTotal = selectedBillingContract
+    ? roundMaterialNumber(selectedTotalQty * selectedBillingContract.unitPrice, 2)
+    : 0;
+
+  const allUnbilledChecked =
+    unbilledDeliveries.length > 0 &&
+    selectedDeliveryIds.length === unbilledDeliveries.length;
+
+  const handleToggleActive = (
+    contract: MaterialContractRow,
+    checked: boolean,
+  ) => {
     startTransition(async () => {
-      const result = await toggleMaterialContractActive(contract.id, checked);
-      setFeedback({ text: result.message, isError: !result.success });
-      if (result.success) {
-        router.refresh();
+      try {
+        const result = await toggleMaterialContractActive(contract.id, checked);
+        if (result.success) {
+          toast.success(result.message);
+          router.refresh();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Toggle material contract error:", error);
+        toast.error("Gagal memperbarui status kontrak.");
       }
     });
   };
 
-  const handleDeleteDelivery = (delivery: MaterialDeliveryRow) => {
-    if (
-      !window.confirm(
-        `Hapus Surat Jalan ${delivery.doNumber} (${formatMaterialVolume(delivery.quantityReceived, delivery.unit)})?`,
-      )
-    ) {
-      return;
-    }
-
-    setFeedback(null);
+  const confirmDeleteDelivery = () => {
+    if (!deleteDeliveryTarget) return;
     startTransition(async () => {
-      const result = await deleteUnbilledMaterialDelivery(delivery.id);
-      setFeedback({ text: result.message, isError: !result.success });
-      if (result.success) {
-        requestNotificationFeedRefresh();
-        router.refresh();
+      try {
+        const result = await deleteUnbilledMaterialDelivery(
+          deleteDeliveryTarget.id,
+        );
+        if (result.success) {
+          toast.success(result.message);
+          setDeleteDeliveryTarget(null);
+          requestNotificationFeedRefresh();
+          router.refresh();
+          if (activeSubTab === "billing" && billingContractId) {
+            void loadContractUnbilled(billingContractId);
+          }
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Delete delivery error:", error);
+        toast.error("Gagal menghapus Surat Jalan.");
+      }
+    });
+  };
+
+  const handleOpenBillingForContract = (targetContractId?: string) => {
+    let resolvedId = billingContractId;
+    if (targetContractId) {
+      resolvedId = targetContractId;
+      setBillingContractId(targetContractId);
+    } else if (!billingContractId) {
+      const firstUnbilled = contracts.find(
+        (c) => c.unbilledDeliveriesCount > 0,
+      );
+      if (firstUnbilled) {
+        resolvedId = firstUnbilled.id;
+        setBillingContractId(firstUnbilled.id);
+      }
+    }
+    setActiveSubTab("billing");
+    if (resolvedId) {
+      void loadContractUnbilled(resolvedId);
+    }
+  };
+
+  const handleTabChange = (value: string) => {
+    const nextTab = value as "contracts" | "deliveries" | "billing";
+    setActiveSubTab(nextTab);
+    if (nextTab === "billing" && billingContractId) {
+      void loadContractUnbilled(billingContractId);
+    }
+  };
+
+  const handleBillingContractChange = (nextContractId: string) => {
+    setBillingContractId(nextContractId);
+    void loadContractUnbilled(nextContractId);
+  };
+
+  const handleConfirmCreateInvoice = () => {
+    if (!selectedBillingContract || selectedDeliveryIds.length === 0) return;
+    startTransition(async () => {
+      try {
+        const result = await createVendorInvoiceFromDeliveries({
+          contractId: selectedBillingContract.id,
+          deliveryIds: selectedDeliveryIds,
+          invoiceNumber: invoiceNumberInput.trim() || null,
+          dueDate: dueDateInput.trim() || null,
+          notes: invoiceNotesInput.trim() || null,
+        });
+        if (result.success) {
+          toast.success("Tagihan dikirim ke Keuangan", {
+            description: result.message,
+          });
+          setBillingConfirmOpen(false);
+          setInvoiceNumberInput("");
+          setDueDateInput("");
+          setInvoiceNotesInput("");
+          requestNotificationFeedRefresh();
+          router.refresh();
+          await loadContractUnbilled(selectedBillingContract.id);
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Create vendor invoice failed:", error);
+        toast.error("Gagal mengirim tagihan ke Keuangan.");
       }
     });
   };
@@ -189,14 +626,12 @@ export default function MaterialContractsPanel({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
-            <Layers className="size-4 text-primary" />
-            Kontrak Payung Material Curah (Blanket PO Pasir &amp; Batu)
+          <h2 className="type-h2 flex items-center gap-2 text-foreground">
+            <Layers className="size-5 text-primary" aria-hidden="true" />
+            Kontrak Material Alam
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Ikat harga &amp; kuantitas kontrak vendor, catat Surat Jalan (DO) per
-            kedatangan truk di berbagai proyek, dan kirim rekap siap-tagih ke
-            Keuangan.
+          <p className="type-p2 mt-1 text-muted-foreground">
+            Ikat harga kontrak vendor, catat Surat Jalan per tiket proyek, dan kirim tagihan ke Keuangan.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -208,20 +643,25 @@ export default function MaterialContractsPanel({
                 setSelectedContractForDo(undefined);
                 setDeliveryModalOpen(true);
               }}
-              className="gap-1.5"
             >
-              <Truck className="size-4" />
-              Catat Surat Jalan (DO)
+              <Truck className="size-4" aria-hidden="true" />
+              Catat Surat Jalan
+            </Button>
+          )}
+          {canPrepareInvoices && (
+            <Button
+              type="button"
+              variant="outlinesuccess"
+              onClick={() => handleOpenBillingForContract()}
+            >
+              <Send className="size-4" aria-hidden="true" />
+              Kirim Tagihan
             </Button>
           )}
           {canCreateContract && (
-            <Button
-              type="button"
-              onClick={() => setContractModalOpen(true)}
-              className="gap-1.5"
-            >
-              <FilePlus2 className="size-4" />
-              Buat Kontrak Payung
+            <Button type="button" onClick={() => setContractModalOpen(true)}>
+              <FilePlus2 className="size-4" aria-hidden="true" />
+              Buat Kontrak
             </Button>
           )}
         </div>
@@ -230,532 +670,825 @@ export default function MaterialContractsPanel({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card className="border-border/80 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs">
-              Kontrak Payung Aktif
+            <CardDescription className="type-p3">
+              Kontrak Aktif
             </CardDescription>
-            <CardTitle className="text-2xl font-bold">
+            <CardTitle className="type-kpi">
               {activeContractsCount}{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                / {contracts.length} total kontrak
+              <span className="type-p3 font-normal text-muted-foreground">
+                / {contracts.length} kontrak
               </span>
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-amber-500/30 bg-amber-500/5 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs text-amber-700 dark:text-amber-300">
-              Surat Jalan Belum Ditagih (UNBILLED)
+            <CardDescription className="type-p3 text-amber-700 dark:text-amber-300">
+              Surat Jalan UNBILLED
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+            <CardTitle className="type-kpi text-amber-700 dark:text-amber-300">
               {unbilledDeliveriesCount} DO
             </CardTitle>
           </CardHeader>
         </Card>
         <Card className="border-emerald-500/30 bg-emerald-500/5 shadow-2xs">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs text-emerald-700 dark:text-emerald-300">
-              Estimasi Nilai Material UNBILLED
+            <CardDescription className="type-p3 text-emerald-700 dark:text-emerald-300">
+              Estimasi Nilai UNBILLED
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+            <CardTitle className="type-kpi text-emerald-700 dark:text-emerald-300">
               {currency(totalUnbilledEstimate)}
             </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
-      {feedback && (
-        <div
-          className={`rounded-lg border px-4 py-2.5 text-xs font-medium ${
-            feedback.isError
-              ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          }`}
-        >
-          {feedback.text}
-        </div>
-      )}
+      <Tabs
+        value={activeSubTab}
+        onValueChange={handleTabChange}
+        className="space-y-4"
+      >
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 sm:w-auto sm:inline-grid">
+          <TabsTrigger value="contracts" className="gap-1.5">
+            <Layers className="size-4" aria-hidden="true" />
+            <span>Kontrak Material</span>
+          </TabsTrigger>
+          <TabsTrigger value="deliveries" className="gap-1.5">
+            <Truck className="size-4" aria-hidden="true" />
+            <span>Surat Jalan</span>
+          </TabsTrigger>
+          {canPrepareInvoices && (
+            <TabsTrigger value="billing" className="gap-1.5">
+              <Send className="size-4" aria-hidden="true" />
+              <span>Kirim Tagihan</span>
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* Contracts List */}
-      <Card className="border-border/80 shadow-2xs">
-        <CardHeader>
-          <CardTitle className="text-sm font-bold">
-            Daftar Perjanjian Induk / Kontrak Payung Vendor
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Harga satuan kontrak mengikat otomatis setiap Surat Jalan dan tagihan
-            Keuangan.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {contracts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border py-10 text-center">
-              <p className="text-sm font-semibold">Belum ada kontrak material curah</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Klik tombol &ldquo;Buat Kontrak Payung&rdquo; untuk mendaftarkan
-                harga kesepakatan pasir/batu dengan vendor.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Mobile Card View (< 768px) */}
-              <div className="space-y-2.5 md:hidden">
-                {contracts.map((contract) => (
-                  <div
-                    key={contract.id}
-                    className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-mono text-xs font-bold text-primary">
-                          {contract.contractNumber}
-                        </p>
-                        <p className="text-sm font-semibold text-foreground">
-                          {contract.vendorName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {contract.materialType} · {currency(contract.unitPrice)} / {contract.unit}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {canCreateContract && (
-                          <Switch
-                            checked={contract.isActive}
-                            disabled={isPending}
-                            onCheckedChange={(checked) =>
-                              handleToggleActive(contract, checked)
-                            }
-                            aria-label={`Aktifkan kontrak ${contract.contractNumber}`}
-                          />
-                        )}
-                        <Badge
-                          variant={contract.isActive ? "success" : "outline"}
-                          className="text-[10px]"
-                        >
-                          {contract.isActive ? "Aktif" : "Nonaktif"}
-                        </Badge>
-                      </div>
+        <TabsContent value="contracts">
+          <Card className="border-border/80 shadow-2xs">
+            <CardHeader>
+              <CardTitle className="type-h3">
+                Daftar Kontrak Payung Vendor
+              </CardTitle>
+              <CardDescription className="type-p2">
+                Harga satuan kontrak mengikat otomatis setiap Surat Jalan dan tagihan Keuangan.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {contracts.length === 0 ? (
+                <EmptyState
+                  icon={Layers}
+                  title="Belum Ada Kontrak Material"
+                  description="Klik tombol Buat Kontrak untuk mendaftarkan harga kesepakatan pasir/batu dengan vendor."
+                  action={
+                    canCreateContract ? (
+                      <Button
+                        type="button"
+                        onClick={() => setContractModalOpen(true)}
+                      >
+                        <FilePlus2 className="size-4" aria-hidden="true" />
+                        Buat Kontrak
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <>
+                  <div className="space-y-2.5 md:hidden">
+                    {contracts.map((contract) => (
+                      <ContractMobileCard
+                        key={contract.id}
+                        contract={contract}
+                        canCreateContract={canCreateContract}
+                        canRecordDelivery={canRecordDelivery}
+                        canPrepareInvoices={canPrepareInvoices}
+                        isPending={isPending}
+                        onToggleActive={handleToggleActive}
+                        onRecordDo={(contractId) => {
+                          setSelectedContractForDo(contractId);
+                          setDeliveryModalOpen(true);
+                        }}
+                        onSendBilling={(contractId) =>
+                          handleOpenBillingForContract(contractId)
+                        }
+                      />
+                    ))}
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table itemLabel="kontrak material">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>No. Kontrak &amp; Vendor</TableHead>
+                          <TableHead>Material</TableHead>
+                          <TableHead className="text-right">
+                            Harga Kontrak
+                          </TableHead>
+                          <TableHead>Masa Berlaku</TableHead>
+                          <TableHead className="text-right">Total Kirim</TableHead>
+                          <TableHead className="text-right">
+                            Belum Ditagih
+                          </TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {contracts.map((contract) => (
+                          <TableRow key={contract.id}>
+                            <TableCell className="whitespace-normal">
+                              <p className="type-p2 font-bold text-foreground">
+                                {contract.contractNumber}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {contract.vendorName}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {contract.materialType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                              {currency(contract.unitPrice)} / {contract.unit}
+                            </TableCell>
+                            <TableCell className="type-p3 text-muted-foreground">
+                              {contract.startDate}
+                              {contract.endDate
+                                ? ` s.d. ${contract.endDate}`
+                                : " · Tanpa batas"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <p className="type-p2 font-semibold tabular-nums">
+                                {formatMaterialVolume(
+                                  contract.totalDeliveredVolume,
+                                  contract.unit,
+                                )}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {contract.totalDeliveriesCount} DO
+                              </p>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <p className="type-p2 font-bold tabular-nums text-amber-700 dark:text-amber-300">
+                                {formatMaterialVolume(
+                                  contract.unbilledVolume,
+                                  contract.unit,
+                                )}
+                              </p>
+                              <p className="type-p3 text-muted-foreground tabular-nums">
+                                {contract.unbilledDeliveriesCount} DO ·{" "}
+                                {currency(contract.unbilledEstimatedAmount)}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {canCreateContract && (
+                                  <Switch
+                                    checked={contract.isActive}
+                                    disabled={isPending}
+                                    onCheckedChange={(checked) =>
+                                      handleToggleActive(contract, checked)
+                                    }
+                                    aria-label={`Aktifkan kontrak ${contract.contractNumber}`}
+                                  />
+                                )}
+                                <Badge
+                                  variant={
+                                    contract.isActive ? "lightSuccess" : "outline"
+                                  }
+                                >
+                                  {contract.isActive ? "Aktif" : "Nonaktif"}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {canPrepareInvoices &&
+                                  contract.unbilledDeliveriesCount > 0 && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outlinesuccess"
+                                      onClick={() =>
+                                        handleOpenBillingForContract(contract.id)
+                                      }
+                                    >
+                                      <Send className="size-3.5" aria-hidden="true" />
+                                      Kirim Tagihan
+                                    </Button>
+                                  )}
+                                {canRecordDelivery && contract.isActive && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedContractForDo(contract.id);
+                                      setDeliveryModalOpen(true);
+                                    }}
+                                  >
+                                    <Plus className="size-3.5" aria-hidden="true" />
+                                    Catat DO
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deliveries">
+          <Card className="border-border/80 shadow-2xs">
+            <CardHeader className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="type-h3">
+                    Log Surat Jalan Material Alam
+                  </CardTitle>
+                  <CardDescription className="type-p2">
+                    Setiap kiriman UNBILLED siap disusun menjadi tagihan ke Keuangan.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(["ALL", "UNBILLED", "BILLED"] as const).map((status) => (
+                    <Button
+                      key={status}
+                      type="button"
+                      size="sm"
+                      variant={billingFilter === status ? "default" : "outline"}
+                      onClick={() => setBillingFilter(status)}
+                    >
+                      {status === "ALL"
+                        ? "Semua"
+                        : status === "UNBILLED"
+                          ? "UNBILLED"
+                          : "BILLED"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Cari No. DO, tiket, proyek, vendor..."
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={contractFilter} onValueChange={setContractFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filter kontrak" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Semua Kontrak</SelectItem>
+                    {contracts.map((contract) => (
+                      <SelectItem key={contract.id} value={contract.id}>
+                        {contract.contractNumber} · {contract.vendorName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {filteredDeliveries.length === 0 ? (
+                <EmptyState
+                  icon={Truck}
+                  title="Belum Ada Surat Jalan"
+                  description="Tidak ada data Surat Jalan sesuai filter saat ini."
+                />
+              ) : (
+                <>
+                  <div className="space-y-2.5 md:hidden">
+                    {filteredDeliveries.map((delivery) => (
+                      <DeliveryMobileCard
+                        key={delivery.id}
+                        delivery={delivery}
+                        canRecordDelivery={canRecordDelivery}
+                        isPending={isPending}
+                        onPreviewProof={(d) =>
+                          setProofPreview({
+                            title: `Surat Jalan ${d.doNumber}`,
+                            url: d.proofUrl!,
+                          })
+                        }
+                        onDelete={setDeleteDeliveryTarget}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table itemLabel="surat jalan">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tanggal</TableHead>
+                          <TableHead>No. DO &amp; Tiket</TableHead>
+                          <TableHead>Kontrak &amp; Vendor</TableHead>
+                          <TableHead>Proyek Tujuan</TableHead>
+                          <TableHead>Truk / Supir</TableHead>
+                          <TableHead className="text-right">Volume</TableHead>
+                          <TableHead className="text-right">Nilai</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredDeliveries.map((delivery) => (
+                          <TableRow key={delivery.id}>
+                            <TableCell className="type-p2 tabular-nums">
+                              {delivery.deliveryDate}
+                            </TableCell>
+                            <TableCell className="whitespace-normal">
+                              <p className="type-p2 font-bold text-foreground">
+                                {delivery.doNumber}
+                              </p>
+                              {delivery.ticketNumber && (
+                                <Badge variant="outline" className="mt-1">
+                                  {delivery.ticketNumber}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="whitespace-normal">
+                              <p className="type-p2 font-medium text-foreground">
+                                {delivery.vendorName}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {delivery.contractNumber} ({delivery.materialType})
+                              </p>
+                            </TableCell>
+                            <TableCell className="type-p2 max-w-[200px] truncate">
+                              {delivery.projectName}
+                            </TableCell>
+                            <TableCell className="type-p3 text-muted-foreground">
+                              {delivery.vehiclePlate || "-"}
+                              {delivery.driverName
+                                ? ` · ${delivery.driverName}`
+                                : ""}
+                            </TableCell>
+                            <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                              {formatMaterialVolume(
+                                delivery.quantityReceived,
+                                delivery.unit,
+                              )}
+                            </TableCell>
+                            <TableCell className="type-p2 text-right font-medium tabular-nums">
+                              {currency(delivery.estimatedAmount)}
+                            </TableCell>
+                            <TableCell>
+                              {delivery.billingStatus === "BILLED" ? (
+                                <div className="space-y-0.5">
+                                  <Badge variant="lightSuccess" className="gap-1">
+                                    <CheckCircle2
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    BILLED
+                                  </Badge>
+                                  {delivery.vendorInvoiceNumber && (
+                                    <p className="type-p3 text-muted-foreground">
+                                      {delivery.vendorInvoiceNumber}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <Badge variant="lightWarning">UNBILLED</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {delivery.proofUrl && (
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    title="Lihat Foto Surat Jalan"
+                                    onClick={() =>
+                                      setProofPreview({
+                                        title: `Surat Jalan ${delivery.doNumber}`,
+                                        url: delivery.proofUrl!,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-4" aria-hidden="true" />
+                                  </Button>
+                                )}
+                                {canRecordDelivery &&
+                                  delivery.billingStatus === "UNBILLED" && (
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="outline"
+                                      disabled={isPending}
+                                      title="Hapus DO belum ditagih"
+                                      onClick={() =>
+                                        setDeleteDeliveryTarget(delivery)
+                                      }
+                                    >
+                                      <Trash2
+                                        className="size-4 text-destructive"
+                                        aria-hidden="true"
+                                      />
+                                    </Button>
+                                  )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {canPrepareInvoices && (
+          <TabsContent value="billing" className="space-y-5">
+            <Card className="border-border/80 shadow-2xs">
+              <CardHeader>
+                <CardTitle className="type-h3">
+                  Kirim Tagihan ke Keuangan
+                </CardTitle>
+                <CardDescription className="type-p2">
+                  Pilih kontrak dan centang Surat Jalan UNBILLED yang siap ditagihkan ke Bagian Keuangan.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="billing-contract-select"
+                      className="type-p2 font-semibold"
+                    >
+                      Pilih Kontrak Vendor
+                    </Label>
+                    <Combobox
+                      id="billing-contract-select"
+                      options={billingContractOptions}
+                      value={billingContractId}
+                      onValueChange={handleBillingContractChange}
+                      placeholder="Pilih kontrak..."
+                      searchPlaceholder="Cari kontrak atau vendor..."
+                    />
+                  </div>
+                  {selectedBillingContract && (
+                    <div className="flex flex-col justify-center rounded-xl border border-border bg-muted/30 px-3.5 py-2.5">
+                      <p className="type-p3 text-muted-foreground">
+                        {selectedBillingContract.vendorName} ·{" "}
+                        {selectedBillingContract.materialType}
+                      </p>
+                      <p className="type-p2 font-semibold text-foreground tabular-nums">
+                        Harga: {currency(selectedBillingContract.unitPrice)} /{" "}
+                        {selectedBillingContract.unit}
+                      </p>
                     </div>
+                  )}
+                </div>
 
-                    <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/30 p-2 text-xs">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground">Total Kirim</span>
-                        <p className="font-semibold text-foreground">
-                          {formatMaterialVolume(contract.totalDeliveredVolume, contract.unit)} ({contract.totalDeliveriesCount} DO)
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-muted-foreground">Belum Ditagih</span>
-                        <p className="font-bold text-amber-700 dark:text-amber-300">
-                          {formatMaterialVolume(contract.unbilledVolume, contract.unit)}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {currency(contract.unbilledEstimatedAmount)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        {contract.startDate}
-                        {contract.endDate ? ` s.d. ${contract.endDate}` : " · Tanpa batas"}
+                {loadingUnbilled ? (
+                  <div className="type-p2 flex items-center justify-center gap-2 py-10 text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    Memuat Surat Jalan belum ditagih...
+                  </div>
+                ) : unbilledError ? (
+                  <EmptyState
+                    icon={Receipt}
+                    title="Gagal Memuat Surat Jalan"
+                    description={unbilledError}
+                  />
+                ) : unbilledDeliveries.length === 0 ? (
+                  <EmptyState
+                    icon={CheckCircle2}
+                    title="Tidak Ada DO UNBILLED"
+                    description="Semua Surat Jalan pada kontrak ini sudah dikirim ke Keuangan atau belum ada pengiriman tercatat."
+                  />
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                      <label className="type-p2 flex cursor-pointer items-center gap-2 font-medium">
+                        <Checkbox
+                          checked={allUnbilledChecked}
+                          onCheckedChange={(checked) =>
+                            setSelectedDeliveryIds(
+                              checked === true
+                                ? unbilledDeliveries.map((d) => d.id)
+                                : [],
+                            )
+                          }
+                          aria-label="Pilih semua Surat Jalan"
+                        />
+                        <span>
+                          Pilih Semua ({selectedDeliveryIds.length}/
+                          {unbilledDeliveries.length} DO)
+                        </span>
+                      </label>
+                      <span className="type-p2 font-bold tabular-nums text-primary">
+                        Total:{" "}
+                        {formatMaterialVolume(
+                          selectedTotalQty,
+                          selectedBillingContract?.unit ?? "RIT",
+                        )}{" "}
+                        · {currency(selectedGrandTotal)}
                       </span>
-                      {canRecordDelivery && contract.isActive && (
+                    </div>
+
+                    <div className="space-y-2.5 md:hidden">
+                      {unbilledDeliveries.map((delivery) => (
+                        <BillingDeliveryMobileCard
+                          key={delivery.id}
+                          delivery={delivery}
+                          checked={selectedDeliveryIds.includes(delivery.id)}
+                          onToggle={(checked) => {
+                            setSelectedDeliveryIds((prev) =>
+                              checked
+                                ? [...new Set([...prev, delivery.id])]
+                                : prev.filter((id) => id !== delivery.id),
+                            );
+                          }}
+                          onPreviewProof={(d) =>
+                            setProofPreview({
+                              title: `Surat Jalan ${d.doNumber}`,
+                              url: d.proofUrl!,
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
+
+                    <div className="hidden md:block">
+                      <Table itemLabel="surat jalan unbilled">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">
+                              <Checkbox
+                                checked={allUnbilledChecked}
+                                onCheckedChange={(checked) =>
+                                  setSelectedDeliveryIds(
+                                    checked === true
+                                      ? unbilledDeliveries.map((d) => d.id)
+                                      : [],
+                                  )
+                                }
+                                aria-label="Pilih semua Surat Jalan"
+                              />
+                            </TableHead>
+                            <TableHead>Tanggal</TableHead>
+                            <TableHead>No. DO &amp; Truk</TableHead>
+                            <TableHead>No. Tiket</TableHead>
+                            <TableHead>Proyek Lokasi</TableHead>
+                            <TableHead className="text-right">Volume</TableHead>
+                            <TableHead className="text-right">Subtotal</TableHead>
+                            <TableHead className="text-right">Bukti</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {unbilledDeliveries.map((delivery) => {
+                            const checked = selectedDeliveryIds.includes(
+                              delivery.id,
+                            );
+                            return (
+                              <TableRow
+                                key={delivery.id}
+                                data-state={checked ? "selected" : undefined}
+                              >
+                                <TableCell>
+                                  <Checkbox
+                                    checked={checked}
+                                    onCheckedChange={(val) => {
+                                      setSelectedDeliveryIds((prev) =>
+                                        val === true
+                                          ? [...new Set([...prev, delivery.id])]
+                                          : prev.filter(
+                                              (id) => id !== delivery.id,
+                                            ),
+                                      );
+                                    }}
+                                    aria-label={`Pilih DO ${delivery.doNumber}`}
+                                  />
+                                </TableCell>
+                                <TableCell className="type-p2 tabular-nums">
+                                  {delivery.deliveryDate}
+                                </TableCell>
+                                <TableCell className="whitespace-normal">
+                                  <p className="type-p2 font-bold text-foreground">
+                                    {delivery.doNumber}
+                                  </p>
+                                  <p className="type-p3 text-muted-foreground">
+                                    {delivery.vehiclePlate || "-"}
+                                    {delivery.driverName
+                                      ? ` · ${delivery.driverName}`
+                                      : ""}
+                                  </p>
+                                </TableCell>
+                                <TableCell>
+                                  {delivery.ticketNumber ? (
+                                    <Badge variant="outline">
+                                      {delivery.ticketNumber}
+                                    </Badge>
+                                  ) : (
+                                    <span className="type-p3 text-muted-foreground">
+                                      —
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="type-p2 max-w-[220px] truncate">
+                                  {delivery.projectName}
+                                </TableCell>
+                                <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                                  {formatMaterialVolume(
+                                    delivery.quantityReceived,
+                                    delivery.unit,
+                                  )}
+                                </TableCell>
+                                <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                                  {currency(delivery.estimatedAmount)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {delivery.proofUrl ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        setProofPreview({
+                                          title: `Surat Jalan ${delivery.doNumber}`,
+                                          url: delivery.proofUrl!,
+                                        })
+                                      }
+                                    >
+                                      <Eye
+                                        className="size-3.5"
+                                        aria-hidden="true"
+                                      />
+                                      Foto
+                                    </Button>
+                                  ) : (
+                                    <span className="type-p3 text-muted-foreground">
+                                      —
+                                    </span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="bi-invoice-number"
+                          className="type-p2 font-medium"
+                        >
+                          No. Tagihan (Opsional)
+                        </Label>
+                        <Input
+                          id="bi-invoice-number"
+                          placeholder="Kosongkan untuk auto-generate"
+                          value={invoiceNumberInput}
+                          onChange={(e) => setInvoiceNumberInput(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="bi-due-date" className="type-p2 font-medium">
+                          Jatuh Tempo (Opsional)
+                        </Label>
+                        <DatePicker
+                          id="bi-due-date"
+                          value={dueDateInput}
+                          clearable
+                          onValueChange={setDueDateInput}
+                          placeholder="Pilih jatuh tempo"
+                        />
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor="bi-notes" className="type-p2 font-medium">
+                          Catatan Tagihan (Opsional)
+                        </Label>
+                        <Textarea
+                          id="bi-notes"
+                          rows={2}
+                          placeholder="Keterangan verifikasi lapangan / rekening vendor..."
+                          value={invoiceNotesInput}
+                          onChange={(e) => setInvoiceNotesInput(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between pt-2 border-t">
+                        <div>
+                          <p className="type-p3 text-muted-foreground">
+                            {selectedDeliveryIds.length} Surat Jalan dipilih ·{" "}
+                            {formatMaterialVolume(
+                              selectedTotalQty,
+                              selectedBillingContract?.unit ?? "RIT",
+                            )}
+                          </p>
+                          <p className="type-kpi text-primary">
+                            {currency(selectedGrandTotal)}
+                          </p>
+                        </div>
                         <Button
                           type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedContractForDo(contract.id);
-                            setDeliveryModalOpen(true);
-                          }}
-                          className="h-8 gap-1 text-xs"
+                          variant="success"
+                          disabled={
+                            isPending || selectedDeliveryIds.length === 0
+                          }
+                          onClick={() => setBillingConfirmOpen(true)}
                         >
-                          <Plus className="size-3.5" />
-                          Catat DO
+                          <Send className="size-4" aria-hidden="true" />
+                          Kirim Tagihan
                         </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop Table View (>= 768px) */}
-              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>No. Kontrak &amp; Vendor</TableHead>
-                    <TableHead>Material</TableHead>
-                    <TableHead className="text-right">Harga Kontrak</TableHead>
-                    <TableHead>Masa Berlaku</TableHead>
-                    <TableHead className="text-right">Total Kirim</TableHead>
-                    <TableHead className="text-right">Belum Ditagih</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contracts.map((contract) => (
-                    <TableRow key={contract.id}>
-                      <TableCell>
-                        <div className="text-xs font-bold text-foreground">
-                          {contract.contractNumber}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {contract.vendorName}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{contract.materialType}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
-                        {currency(contract.unitPrice)} / {contract.unit}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {contract.startDate}
-                        {contract.endDate ? ` s.d. ${contract.endDate}` : " · Tanpa batas"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs">
-                        <div className="font-semibold">
-                          {formatMaterialVolume(
-                            contract.totalDeliveredVolume,
-                            contract.unit,
-                          )}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {contract.totalDeliveriesCount} DO
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs">
-                        <div className="font-bold text-amber-700 dark:text-amber-300">
-                          {formatMaterialVolume(
-                            contract.unbilledVolume,
-                            contract.unit,
-                          )}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {contract.unbilledDeliveriesCount} DO ·{" "}
-                          {currency(contract.unbilledEstimatedAmount)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {canCreateContract && (
-                            <Switch
-                              checked={contract.isActive}
-                              disabled={isPending}
-                              onCheckedChange={(checked) =>
-                                handleToggleActive(contract, checked)
-                              }
-                              aria-label={`Aktifkan kontrak ${contract.contractNumber}`}
-                            />
-                          )}
-                          <Badge
-                            variant={contract.isActive ? "success" : "outline"}
-                            className="text-[10px]"
-                          >
-                            {contract.isActive ? "Aktif" : "Nonaktif"}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canRecordDelivery && contract.isActive && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedContractForDo(contract.id);
-                              setDeliveryModalOpen(true);
-                            }}
-                            className="h-8 gap-1 text-xs"
-                          >
-                            <Plus className="size-3.5" />
-                            Catat DO
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Deliveries History */}
-      <Card className="border-border/80 shadow-2xs">
-        <CardHeader className="space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-sm font-bold">
-                Log Surat Jalan (DO) Material Curah Lintas Proyek
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Setiap kiriman berstatus UNBILLED siap dipilih Keuangan pada menu
-                Tagihan Kontrak Vendor.
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {(["ALL", "UNBILLED", "BILLED"] as const).map((status) => (
-                <Button
-                  key={status}
-                  type="button"
-                  size="sm"
-                  variant={billingFilter === status ? "default" : "outline"}
-                  onClick={() => setBillingFilter(status)}
-                  className="h-8 text-xs"
-                >
-                  {status === "ALL"
-                    ? "Semua"
-                    : status === "UNBILLED"
-                      ? "Belum Ditagih"
-                      : "Sudah Ditagih"}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Cari No. DO, proyek, vendor, plat truk..."
-                className="pl-9 text-xs"
-              />
-            </div>
-            <Select value={contractFilter} onValueChange={setContractFilter}>
-              <SelectTrigger className="text-xs">
-                <SelectValue placeholder="Filter berdasarkan kontrak" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Semua Kontrak Vendor</SelectItem>
-                {contracts.map((contract) => (
-                  <SelectItem key={contract.id} value={contract.id}>
-                    {contract.contractNumber} · {contract.vendorName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          {filteredDeliveries.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-              Tidak ada data Surat Jalan sesuai filter saat ini.
-            </div>
-          ) : (
-            <>
-              {/* Mobile Card View (< 768px) */}
-              <div className="space-y-2.5 md:hidden">
-                {filteredDeliveries.map((delivery) => (
-                  <div
-                    key={delivery.id}
-                    className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono text-xs font-bold text-primary">
-                            {delivery.doNumber}
-                          </span>
-                          {delivery.ticketNumber && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {delivery.ticketNumber}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-sm font-semibold text-foreground">
-                          {delivery.projectName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {delivery.vendorName} · {delivery.contractNumber} ({delivery.materialType})
-                        </p>
-                      </div>
-                      {delivery.billingStatus === "BILLED" ? (
-                        <Badge variant="success" className="shrink-0 gap-1 text-[10px]">
-                          <CheckCircle2 className="size-3" />
-                          BILLED
-                        </Badge>
-                      ) : (
-                        <Badge variant="warning" className="shrink-0 text-[10px]">
-                          UNBILLED
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-md bg-muted/30 p-2 text-xs">
-                      <span className="font-semibold text-foreground">
-                        {formatMaterialVolume(delivery.quantityReceived, delivery.unit)}
-                      </span>
-                      <span className="font-mono font-bold text-foreground">
-                        {currency(delivery.estimatedAmount)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>
-                        {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
-                        {delivery.driverName ? ` (${delivery.driverName})` : ""}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {delivery.proofUrl && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 px-2 text-xs"
-                            onClick={() =>
-                              setProofPreview({
-                                title: `Surat Jalan ${delivery.doNumber}`,
-                                url: delivery.proofUrl!,
-                              })
-                            }
-                          >
-                            <Eye className="size-3" />
-                            Foto
-                          </Button>
-                        )}
-                        {canRecordDelivery && delivery.billingStatus === "UNBILLED" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={isPending}
-                            className="h-7 gap-1 px-2 text-xs text-destructive"
-                            onClick={() => handleDeleteDelivery(delivery)}
-                          >
-                            <Trash2 className="size-3" />
-                            Hapus
-                          </Button>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* Desktop Table View (>= 768px) */}
-              <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>No. Surat Jalan</TableHead>
-                    <TableHead>Kontrak &amp; Vendor</TableHead>
-                    <TableHead>Proyek Tujuan</TableHead>
-                    <TableHead>Truk / Supir</TableHead>
-                    <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Nilai Kontrak</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDeliveries.map((delivery) => (
-                    <TableRow key={delivery.id}>
-                      <TableCell className="whitespace-nowrap text-xs">
-                        {delivery.deliveryDate}
-                      </TableCell>
-                      <TableCell className="text-xs font-bold">
-                        <div>{delivery.doNumber}</div>
-                        {delivery.ticketNumber && (
-                          <Badge variant="outline" className="mt-0.5 text-[10px] font-medium">
-                            {delivery.ticketNumber}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs font-medium">
-                          {delivery.vendorName}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {delivery.contractNumber} ({delivery.materialType})
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-xs">
-                        {delivery.projectName}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {delivery.vehiclePlate || "-"}
-                        {delivery.driverName ? ` · ${delivery.driverName}` : ""}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
-                        {formatMaterialVolume(
-                          delivery.quantityReceived,
-                          delivery.unit,
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                        {currency(delivery.estimatedAmount)}
-                      </TableCell>
-                      <TableCell>
-                        {delivery.billingStatus === "BILLED" ? (
-                          <div className="space-y-0.5">
-                            <Badge variant="success" className="gap-1 text-[10px]">
-                              <CheckCircle2 className="size-3" />
-                              BILLED
-                            </Badge>
-                            {delivery.vendorInvoiceNumber && (
-                              <div className="text-[10px] text-muted-foreground">
-                                {delivery.vendorInvoiceNumber}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Badge variant="warning" className="text-[10px]">
-                            UNBILLED
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {delivery.proofUrl && (
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="outline"
-                              title="Lihat Foto Surat Jalan"
-                              onClick={() =>
-                                setProofPreview({
-                                  title: `Surat Jalan ${delivery.doNumber}`,
-                                  url: delivery.proofUrl!,
-                                })
+            {vendorInvoices.length > 0 && (
+              <Card className="border-border/80 shadow-2xs">
+                <CardHeader>
+                  <CardTitle className="type-h3">
+                    Riwayat Tagihan Terkirim
+                  </CardTitle>
+                  <CardDescription className="type-p2">
+                    Daftar tagihan kontrak material yang sudah diteruskan ke Bagian Keuangan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table itemLabel="tagihan vendor">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>No. Tagihan</TableHead>
+                        <TableHead>Kontrak &amp; Vendor</TableHead>
+                        <TableHead>Jumlah DO</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {vendorInvoices.map((inv) => (
+                        <TableRow key={inv.id}>
+                          <TableCell className="type-p2 font-mono font-semibold">
+                            {inv.invoiceNumber}
+                          </TableCell>
+                          <TableCell className="whitespace-normal">
+                            <p className="type-p2 font-medium">
+                              {inv.vendorName}
+                            </p>
+                            <p className="type-p3 text-muted-foreground">
+                              {inv.contractNumber} · {inv.materialType}
+                            </p>
+                          </TableCell>
+                          <TableCell className="type-p2">
+                            {inv.deliveryCount} DO (
+                            {formatMaterialVolume(inv.totalQuantity, inv.unit)})
+                          </TableCell>
+                          <TableCell className="type-p2 text-right font-bold tabular-nums">
+                            {currency(inv.grandTotal)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                inv.status === "PAID"
+                                  ? "lightSuccess"
+                                  : inv.status === "PARTIAL"
+                                    ? "lightInfo"
+                                    : "lightWarning"
                               }
                             >
-                              <Eye className="size-3.5" />
-                            </Button>
-                          )}
-                          {canRecordDelivery &&
-                            delivery.billingStatus === "UNBILLED" && (
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="outline"
-                                disabled={isPending}
-                                title="Hapus DO belum ditagih"
-                                onClick={() => handleDeleteDelivery(delivery)}
-                              >
-                                <Trash2 className="size-3.5 text-destructive" />
-                              </Button>
-                            )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                              {inv.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
+      </Tabs>
 
+      {/* Modals */}
       <CreateMaterialContractModal
         open={contractModalOpen}
         onOpenChange={setContractModalOpen}
@@ -772,12 +1505,115 @@ export default function MaterialContractsPanel({
         projects={projects}
         contractTickets={contractTickets}
         defaultContractId={selectedContractForDo}
+        onSaved={() => {
+          if (activeSubTab === "billing" && billingContractId) {
+            void loadContractUnbilled(billingContractId);
+          }
+        }}
       />
 
       <MaterialDeliveryProofModal
         preview={proofPreview}
         onClose={() => setProofPreview(null)}
       />
+
+      {/* Delete DO Confirmation */}
+      <GlobalModal
+        isOpen={deleteDeliveryTarget !== null}
+        onClose={() => {
+          if (!isPending) setDeleteDeliveryTarget(null);
+        }}
+        title="Hapus Surat Jalan?"
+        description={
+          deleteDeliveryTarget
+            ? `Surat Jalan ${deleteDeliveryTarget.doNumber} (${formatMaterialVolume(deleteDeliveryTarget.quantityReceived, deleteDeliveryTarget.unit)}) akan dihapus.`
+            : undefined
+        }
+        className="sm:max-w-md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setDeleteDeliveryTarget(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              onClick={confirmDeleteDelivery}
+            >
+              {isPending ? "Menghapus..." : "Hapus"}
+            </Button>
+          </>
+        }
+      >
+        <p className="type-p2 text-muted-foreground">
+          Hanya Surat Jalan berstatus UNBILLED yang dapat dihapus.
+        </p>
+      </GlobalModal>
+
+      {/* Billing Confirmation */}
+      <GlobalModal
+        isOpen={billingConfirmOpen}
+        onClose={() => {
+          if (!isPending) setBillingConfirmOpen(false);
+        }}
+        title="Konfirmasi Kirim Tagihan"
+        description="Tagihan akan dibuat dari Surat Jalan terpilih dan diteruskan ke Keuangan."
+        className="sm:max-w-md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setBillingConfirmOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="success"
+              disabled={isPending}
+              onClick={handleConfirmCreateInvoice}
+            >
+              {isPending ? "Mengirim..." : "Kirim Tagihan"}
+            </Button>
+          </>
+        }
+      >
+        {selectedBillingContract && (
+          <dl className="type-p2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3.5">
+            <dt className="text-muted-foreground">Kontrak</dt>
+            <dd className="text-right font-semibold">
+              {selectedBillingContract.contractNumber}
+            </dd>
+            <dt className="text-muted-foreground">Vendor</dt>
+            <dd className="text-right font-medium">
+              {selectedBillingContract.vendorName}
+            </dd>
+            <dt className="text-muted-foreground">Jumlah DO</dt>
+            <dd className="text-right font-medium">
+              {selectedDeliveryIds.length} Surat Jalan
+            </dd>
+            <dt className="text-muted-foreground">Total Volume</dt>
+            <dd className="text-right font-medium">
+              {formatMaterialVolume(
+                selectedTotalQty,
+                selectedBillingContract.unit,
+              )}
+            </dd>
+            <dt className="text-muted-foreground">Total Tagihan</dt>
+            <dd className="text-right font-bold tabular-nums text-primary">
+              {currency(selectedGrandTotal)}
+            </dd>
+          </dl>
+        )}
+      </GlobalModal>
     </div>
   );
 }
@@ -798,8 +1634,8 @@ function CreateMaterialContractModal({
       isOpen={open}
       onClose={() => onOpenChange(false)}
       onOpenChange={onOpenChange}
-      title="Buat Kontrak Payung Material Curah"
-      description="Ikat harga per rit atau m3 dengan vendor untuk pengiriman bertahap ke berbagai lokasi proyek."
+      title="Buat Kontrak Material"
+      description="Ikat harga per rit atau m3 dengan vendor untuk pengiriman bertahap."
       className="sm:max-w-xl"
     >
       <CreateMaterialContractFormBody
@@ -830,11 +1666,22 @@ function CreateMaterialContractFormBody({
   const [unitPriceFormatted, setUnitPriceFormatted] = useState("");
   const [unit, setUnit] = useState("RIT");
   const [estimatedVolume, setEstimatedVolume] = useState("");
-  const [startDate, setStartDate] = useState(() => getLocalTodayIsoDate());
+  const [startDate, setStartDate] = useState(() => getJakartaDateKey());
   const [endDate, setEndDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+
+  const vendorOptions = useMemo<ComboboxOption[]>(
+    () => [
+      { value: "CUSTOM", label: "Input Vendor Manual" },
+      ...vendors.map((vendor) => ({
+        value: vendor.id,
+        label: vendor.name,
+        description: vendor.category,
+        keywords: [vendor.name, vendor.category],
+      })),
+    ],
+    [vendors],
+  );
 
   const handleVendorChange = (value: string) => {
     setVendorSelection(value);
@@ -857,15 +1704,11 @@ function CreateMaterialContractFormBody({
     const numericUnitPrice = parseRupiahInput(unitPriceFormatted);
 
     if (!vendorName.trim() || !resolvedMaterial || numericUnitPrice <= 0) {
-      setMessage(
+      toast.error(
         "Nama vendor, jenis material, dan harga kontrak wajib diisi dengan benar.",
       );
-      setIsError(true);
       return;
     }
-
-    setMessage("");
-    setIsError(false);
 
     startTransition(async () => {
       try {
@@ -883,16 +1726,16 @@ function CreateMaterialContractFormBody({
           endDate: endDate.trim() || null,
           notes: notes.trim() || null,
         });
-        setMessage(result.message);
-        setIsError(!result.success);
         if (result.success) {
+          toast.success(result.message);
           onCreated();
           onClose();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Create contract failed:", error);
-        setMessage("Gagal menyimpan kontrak material. Silakan coba lagi.");
-        setIsError(true);
+        toast.error("Gagal menyimpan kontrak material. Silakan coba lagi.");
       }
     });
   };
@@ -901,25 +1744,22 @@ function CreateMaterialContractFormBody({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="mc-catalog-vendor">Pilih dari Katalog Vendor</Label>
-          <Select value={vendorSelection} onValueChange={handleVendorChange}>
-            <SelectTrigger id="mc-catalog-vendor">
-              <SelectValue placeholder="Pilih vendor atau ketik manual" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CUSTOM">-- Input Vendor Manual --</SelectItem>
-              {vendors.map((vendor) => (
-                <SelectItem key={vendor.id} value={vendor.id}>
-                  {vendor.name} ({vendor.category})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label htmlFor="mc-catalog-vendor" className="type-p2 font-medium">
+            Katalog Vendor
+          </Label>
+          <Combobox
+            id="mc-catalog-vendor"
+            options={vendorOptions}
+            value={vendorSelection}
+            onValueChange={handleVendorChange}
+            placeholder="Pilih vendor..."
+            searchPlaceholder="Cari nama vendor..."
+          />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="mc-vendor-name">
-            Nama Vendor / Supplier <span className="text-destructive">*</span>
+          <Label htmlFor="mc-vendor-name" className="type-p2 font-medium">
+            Nama Vendor <span className="text-destructive">*</span>
           </Label>
           <Input
             id="mc-vendor-name"
@@ -941,23 +1781,23 @@ function CreateMaterialContractFormBody({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="mc-number">
-            Nomor Kontrak (Kosongkan untuk Auto)
+          <Label htmlFor="mc-number" className="type-p2 font-medium">
+            Nomor Kontrak (Opsional)
           </Label>
           <Input
             id="mc-number"
-            placeholder="KONTRAK/PASIR/2026/001"
+            placeholder="Auto jika dikosongkan"
             value={contractNumber}
             onChange={(event) => setContractNumber(event.target.value)}
           />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="mc-material">
-            Jenis Material Curah <span className="text-destructive">*</span>
+          <Label htmlFor="mc-material" className="type-p2 font-medium">
+            Jenis Material <span className="text-destructive">*</span>
           </Label>
           <Select value={materialType} onValueChange={setMaterialType}>
-            <SelectTrigger id="mc-material">
+            <SelectTrigger id="mc-material" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -974,7 +1814,7 @@ function CreateMaterialContractFormBody({
 
       {materialType === "CUSTOM" && (
         <div className="space-y-1.5">
-          <Label htmlFor="mc-custom-material">
+          <Label htmlFor="mc-custom-material" className="type-p2 font-medium">
             Nama Jenis Material <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -989,11 +1829,11 @@ function CreateMaterialContractFormBody({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="mc-unit">
-            Satuan Hitung Kontrak <span className="text-destructive">*</span>
+          <Label htmlFor="mc-unit" className="type-p2 font-medium">
+            Satuan Hitung <span className="text-destructive">*</span>
           </Label>
           <Select value={unit} onValueChange={setUnit}>
-            <SelectTrigger id="mc-unit">
+            <SelectTrigger id="mc-unit" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1007,7 +1847,9 @@ function CreateMaterialContractFormBody({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="mc-est-volume">Target Volume Kontrak (Opsional)</Label>
+          <Label htmlFor="mc-est-volume" className="type-p2 font-medium">
+            Target Volume (Opsional)
+          </Label>
           <Input
             id="mc-est-volume"
             type="number"
@@ -1021,8 +1863,9 @@ function CreateMaterialContractFormBody({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="mc-unit-price">
-          Harga Kesepakatan per {unit} <span className="text-destructive">*</span>
+        <Label htmlFor="mc-unit-price" className="type-p2 font-medium">
+          Harga Kesepakatan per {unit}{" "}
+          <span className="text-destructive">*</span>
         </Label>
         <RupiahAmountInput
           id="mc-unit-price"
@@ -1034,50 +1877,42 @@ function CreateMaterialContractFormBody({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="mc-start-date">
-            Tanggal Mulai Berlaku <span className="text-destructive">*</span>
+          <Label htmlFor="mc-start-date" className="type-p2 font-medium">
+            Tanggal Mulai <span className="text-destructive">*</span>
           </Label>
-          <Input
+          <DatePicker
             id="mc-start-date"
-            type="date"
-            required
             value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
+            onValueChange={setStartDate}
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="mc-end-date">Tanggal Berakhir (Opsional)</Label>
-          <Input
+          <Label htmlFor="mc-end-date" className="type-p2 font-medium">
+            Tanggal Berakhir (Opsional)
+          </Label>
+          <DatePicker
             id="mc-end-date"
-            type="date"
             value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
+            minDate={startDate}
+            clearable
+            onValueChange={setEndDate}
+            placeholder="Tanpa batas"
           />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="mc-notes">Catatan Syarat / Ketentuan</Label>
+        <Label htmlFor="mc-notes" className="type-p2 font-medium">
+          Catatan Syarat
+        </Label>
         <Textarea
           id="mc-notes"
           rows={2}
-          placeholder="Mis. Harga sudah termasuk ongkos kirim ke lokasi proyek area Subang"
+          placeholder="Mis. Harga sudah termasuk ongkos kirim..."
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
         />
       </div>
-
-      {message && (
-        <div
-          className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-            isError
-              ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <div className="flex justify-end gap-2 pt-2">
         <Button
@@ -1091,11 +1926,11 @@ function CreateMaterialContractFormBody({
         <Button type="submit" disabled={isPending}>
           {isPending ? (
             <>
-              <Loader2 className="mr-1.5 size-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               Menyimpan...
             </>
           ) : (
-            "Simpan Kontrak Payung"
+            "Simpan Kontrak"
           )}
         </Button>
       </div>

@@ -1,6 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { NotificationType, type UserRole } from '@prisma/client'
 import Header from './layout/header/Header'
@@ -65,6 +73,25 @@ function resolveNotificationCategoryLabel(item: NotificationFeedItem): string {
   if (item.type === NotificationType.WARNING) return 'Perhatian Operasional'
   if (item.type === NotificationType.SUCCESS) return 'Konfirmasi Selesai'
   return 'Skala Prioritas'
+}
+
+export interface DashboardMenuAccessContextValue {
+  userRole: UserRole
+  allowedMenuKeys: string[]
+  canManageUsers: boolean
+  canAccessLogistics: boolean
+  canAccessExecutive: boolean
+  canAccessFinance: boolean
+  canAccessProjects: boolean
+  canAccessDrafter: boolean
+  isMover: boolean
+}
+
+const DashboardMenuAccessContext =
+  createContext<DashboardMenuAccessContextValue | null>(null)
+
+export function useDashboardMenuAccess() {
+  return useContext(DashboardMenuAccessContext)
 }
 
 export default function DashboardLayoutClient({
@@ -430,70 +457,116 @@ export default function DashboardLayoutClient({
     window.dispatchEvent(new CustomEvent('skala:sound-pref-changed', { detail: next }))
   }
 
+  const menuAccessValue = useMemo<DashboardMenuAccessContextValue>(
+    () => ({
+      userRole,
+      allowedMenuKeys,
+      canManageUsers,
+      canAccessLogistics,
+      canAccessExecutive,
+      canAccessFinance,
+      canAccessProjects,
+      canAccessDrafter,
+      isMover,
+    }),
+    [
+      allowedMenuKeys,
+      canAccessDrafter,
+      canAccessExecutive,
+      canAccessFinance,
+      canAccessLogistics,
+      canAccessProjects,
+      canManageUsers,
+      isMover,
+      userRole,
+    ],
+  )
+
   return (
     <MaintenanceProvider enabledKeys={maintenancePageKeys}>
-      <div className='flex min-h-screen w-full min-w-0'>
-        <WhatsAppNotificationPopup
-          notification={activeIncoming}
-          queuedCount={Math.max(0, incomingQueue.length - 1)}
-          soundEnabled={soundEnabled}
-          busy={popupBusy}
-          onToggleSound={handleToggleSound}
-          onDismiss={handleDismissPopup}
-          onMarkAsRead={(item) => void handleMarkAsReadPopup(item)}
-          onOpen={(item) => void openNotificationTarget(item.id, item.actionUrl)}
-          onPauseTimer={setPopupPaused}
-        />
-        <DevicePermissionsDialog onTestPopup={triggerTestWhatsAppPopup} />
-        <div className='page-wrapper flex min-w-0 flex-1 bg-background'>
-          <div className='hidden xl:block xl:w-[272px] xl:shrink-0'>
-            <Sidebar
-              canManageUsers={canManageUsers}
-              canAccessLogistics={canAccessLogistics}
-              canAccessExecutive={canAccessExecutive}
-              canAccessFinance={canAccessFinance}
-              canAccessProjects={canAccessProjects}
-              canAccessDrafter={canAccessDrafter}
-              isMover={isMover}
-              allowedMenuKeys={allowedMenuKeys}
-              sidebarCounts={sidebarCounts}
-              androidDownloadUrl={androidDownloadUrl}
-            />
-          </div>
-          <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-[68px] md:pt-0'>
-            <Header
-              canManageUsers={canManageUsers}
-              canAccessLogistics={canAccessLogistics}
-              canAccessExecutive={canAccessExecutive}
-              canAccessFinance={canAccessFinance}
-              canAccessProjects={canAccessProjects}
-              canAccessDrafter={canAccessDrafter}
-              isMover={isMover}
-              allowedMenuKeys={allowedMenuKeys}
-              profilePhotoUrl={profilePhotoUrl}
-              userName={userName}
-              userRole={userRole}
-              notifications={notifications}
-              androidDownloadUrl={androidDownloadUrl}
-              sidebarCounts={sidebarCounts}
-              notificationFeed={data ?? null}
-              notificationLoadFailed={Boolean(error)}
-              refreshNotifications={mutate}
-            />
-            <div className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3.5 pb-24 pt-4 sm:px-6 sm:pt-6 md:pb-8'>
-              {pageUnderMaintenance ? (
-                <UnderProductionState
-                  className='mx-auto w-full max-w-[1200px]'
-                  footerText={`MAINTENANCE · ${pageUnderMaintenance.name}`}
-                />
-              ) : (
-                children
-              )}
+      <DashboardMenuAccessContext.Provider value={menuAccessValue}>
+        <div className='flex min-h-screen w-full min-w-0'>
+          <a
+            href='#main-content'
+            className='sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-xs focus:font-semibold focus:text-primary-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring'
+          >
+            Lewati ke konten utama
+          </a>
+          <WhatsAppNotificationPopup
+            notification={activeIncoming}
+            queuedCount={Math.max(0, incomingQueue.length - 1)}
+            soundEnabled={soundEnabled}
+            busy={popupBusy}
+            onToggleSound={handleToggleSound}
+            onDismiss={handleDismissPopup}
+            onMarkAsRead={(item) => void handleMarkAsReadPopup(item)}
+            onOpen={(item) => void openNotificationTarget(item.id, item.actionUrl)}
+            onPauseTimer={setPopupPaused}
+          />
+          <DevicePermissionsDialog onTestPopup={triggerTestWhatsAppPopup} />
+          <div className='page-wrapper flex min-w-0 flex-1 bg-background'>
+            <div className='hidden xl:block xl:w-[272px] xl:shrink-0'>
+              <Sidebar
+                canManageUsers={canManageUsers}
+                canAccessLogistics={canAccessLogistics}
+                canAccessExecutive={canAccessExecutive}
+                canAccessFinance={canAccessFinance}
+                canAccessProjects={canAccessProjects}
+                canAccessDrafter={canAccessDrafter}
+                isMover={isMover}
+                allowedMenuKeys={allowedMenuKeys}
+                sidebarCounts={sidebarCounts}
+                androidDownloadUrl={androidDownloadUrl}
+              />
             </div>
-            <MobileBottomNav userRole={userRole} />
+            <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-[calc(4.25rem+env(safe-area-inset-top,0px))] md:pt-0'>
+              <Header
+                canManageUsers={canManageUsers}
+                canAccessLogistics={canAccessLogistics}
+                canAccessExecutive={canAccessExecutive}
+                canAccessFinance={canAccessFinance}
+                canAccessProjects={canAccessProjects}
+                canAccessDrafter={canAccessDrafter}
+                isMover={isMover}
+                allowedMenuKeys={allowedMenuKeys}
+                profilePhotoUrl={profilePhotoUrl}
+                userName={userName}
+                userRole={userRole}
+                notifications={notifications}
+                androidDownloadUrl={androidDownloadUrl}
+                sidebarCounts={sidebarCounts}
+                notificationFeed={data ?? null}
+                notificationLoadFailed={Boolean(error)}
+                refreshNotifications={mutate}
+              />
+              <main
+                id='main-content'
+                tabIndex={-1}
+                className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3.5 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] pt-4 outline-none sm:px-6 sm:pt-6 md:pb-8'
+              >
+                {pageUnderMaintenance ? (
+                  <UnderProductionState
+                    className='mx-auto w-full max-w-[1200px]'
+                    footerText={`MAINTENANCE · ${pageUnderMaintenance.name}`}
+                  />
+                ) : (
+                  children
+                )}
+              </main>
+              <MobileBottomNav
+                userRole={userRole}
+                allowedMenuKeys={allowedMenuKeys}
+                canAccessLogistics={canAccessLogistics}
+                canAccessExecutive={canAccessExecutive}
+                canAccessFinance={canAccessFinance}
+                canAccessProjects={canAccessProjects}
+                canAccessDrafter={canAccessDrafter}
+                sidebarCounts={sidebarCounts}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardMenuAccessContext.Provider>
     </MaintenanceProvider>
   )
 }

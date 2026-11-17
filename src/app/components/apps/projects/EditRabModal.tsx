@@ -1,22 +1,37 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
+  Calendar,
+  ClipboardPaste,
   FileSpreadsheet,
-  FileUp,
   HelpCircle,
+  Loader2,
   Plus,
   Trash2,
-  X,
-  Sparkles,
-  ClipboardPaste,
-  Calendar,
-  Loader2,
-  CheckCircle2,
 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  parseDrtRabFileAction,
+  saveProjectRab,
+  type RabItemInput,
+} from "@/app/actions/project";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { saveProjectRab, parseDrtRabFileAction, type RabItemInput } from "@/app/actions/project";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { getJakartaDateKey, shiftDateKey } from "@/lib/habit-date";
 
 export type EditableRabItem = {
   id?: string;
@@ -31,59 +46,26 @@ export type EditableRabItem = {
   endDate: string;
 };
 
-const SAMPLE_RENOVATION_ITEMS: EditableRabItem[] = [
-  {
-    section: "A. Persiapan",
-    code: "A.1",
-    title: "Pembersihan dan bongkaran",
-    volume: 1,
-    unit: "paket",
-    unitPrice: 4500000,
-    rapPrice: 3400000,
-    startDate: "2026-10-27",
-    endDate: "2026-11-02",
-  },
-  {
-    section: "B. Lantai",
-    code: "B.1",
-    title: "Pasang keramik 60×60",
-    volume: 85,
-    unit: "m2",
-    unitPrice: 285000,
-    rapPrice: 220000,
-    startDate: "2026-11-03",
-    endDate: "2026-11-20",
-  },
-  {
-    section: "C. Dinding",
-    code: "C.1",
-    title: "Cat dinding 2 lapis",
-    volume: 240,
-    unit: "m2",
-    unitPrice: 42000,
-    rapPrice: 31000,
-    startDate: "2026-11-18",
-    endDate: "2026-12-05",
-  },
-  {
-    section: "D. Listrik",
-    code: "D.1",
-    title: "Titik lampu dan stopkontak",
-    volume: 24,
-    unit: "titik",
-    unitPrice: 350000,
-    rapPrice: 260000,
-    startDate: "2026-11-30",
-    endDate: "2026-12-20",
-  },
-];
-
 interface EditRabModalProps {
   open: boolean;
   onClose: () => void;
   projectId: string;
   initialItems: EditableRabItem[];
   onSuccess?: () => void;
+}
+
+function createEmptyRabItem(section = ""): EditableRabItem {
+  return {
+    section,
+    code: "",
+    title: "",
+    volume: 0,
+    unit: "",
+    unitPrice: 0,
+    rapPrice: 0,
+    startDate: "",
+    endDate: "",
+  };
 }
 
 export default function EditRabModal({
@@ -94,79 +76,53 @@ export default function EditRabModal({
   onSuccess,
 }: EditRabModalProps) {
   const [items, setItems] = useState<EditableRabItem[]>(() =>
-    initialItems.length > 0
-      ? initialItems
-      : [
-          {
-            section: "",
-            code: "",
-            title: "",
-            volume: "" as unknown as number,
-            unit: "",
-            unitPrice: "" as unknown as number,
-            rapPrice: "" as unknown as number,
-            startDate: "",
-            endDate: "",
-          },
-        ],
+    initialItems.length > 0 ? initialItems : [createEmptyRabItem()],
   );
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [showGuide, setShowGuide] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [importSuccessMsg, setImportSuccessMsg] = useState("");
   const [isParsingExcel, setIsParsingExcel] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
-  if (!open) return null;
-
   const isNewRab = initialItems.length === 0;
 
   const totalRab = items.reduce(
-    (sum, item) => sum + (Number(item.volume) || 0) * (Number(item.unitPrice) || 0),
+    (sum, item) =>
+      sum + (Number(item.volume) || 0) * (Number(item.unitPrice) || 0),
     0,
   );
   const totalRap = items.reduce(
-    (sum, item) => sum + (Number(item.volume) || 0) * (Number(item.rapPrice) || 0),
+    (sum, item) =>
+      sum + (Number(item.volume) || 0) * (Number(item.rapPrice) || 0),
     0,
   );
   const profit = totalRab - totalRap;
-  const profitPercent = totalRab > 0 ? ((profit / totalRab) * 100).toFixed(1) : "0.0";
+  const profitPercent =
+    totalRab > 0 ? ((profit / totalRab) * 100).toFixed(1) : "0.0";
 
   const handleAddItem = () => {
     setItems((prev) => [
       ...prev,
-      {
-        section: prev[prev.length - 1]?.section || "",
-        code: "",
-        title: "",
-        volume: "" as unknown as number,
-        unit: "",
-        unitPrice: "" as unknown as number,
-        rapPrice: "" as unknown as number,
-        startDate: "",
-        endDate: "",
-      },
+      createEmptyRabItem(prev[prev.length - 1]?.section || ""),
     ]);
   };
 
   const handleAutoSchedule = () => {
-    const today = new Date();
+    const todayKey = getJakartaDateKey();
     setItems((prev) =>
-      prev.map((it, idx) => {
-        const dStart = new Date(today);
-        dStart.setDate(dStart.getDate() + idx * 7);
-        const dEnd = new Date(dStart);
-        dEnd.setDate(dEnd.getDate() + 7);
+      prev.map((item, idx) => {
+        const start = shiftDateKey(todayKey, idx * 7);
+        const end = shiftDateKey(start, 7);
         return {
-          ...it,
-          startDate: dStart.toISOString().split("T")[0],
-          endDate: dEnd.toISOString().split("T")[0],
+          ...item,
+          startDate: start,
+          endDate: end,
         };
-      })
+      }),
     );
+    toast.success("Jadwal rencana otomatis diisi per minggu.");
   };
 
   const handleRemoveItem = (index: number) => {
@@ -183,14 +139,13 @@ export default function EditRabModal({
     );
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setIsParsingExcel(true);
-    setErrorMsg("");
-    setImportSuccessMsg("");
-
     try {
       const reader = new FileReader();
       reader.onload = async () => {
@@ -203,44 +158,50 @@ export default function EditRabModal({
           });
 
           if (!parsed.success || parsed.workItems.length === 0) {
-            setErrorMsg(parsed.message || "Gagal membaca item RAB dari file Excel.");
+            toast.error(
+              parsed.message || "Gagal membaca item RAB dari file Excel.",
+            );
             return;
           }
 
-          const today = new Date();
-          const mappedItems: EditableRabItem[] = parsed.workItems.map((w, idx) => {
-            const dStart = new Date(today);
-            dStart.setDate(dStart.getDate() + Math.floor(idx / 2) * 7);
-            const dEnd = new Date(dStart);
-            dEnd.setDate(dEnd.getDate() + 7);
+          const todayKey = getJakartaDateKey();
+          const mappedItems: EditableRabItem[] = parsed.workItems.map(
+            (work, idx) => {
+              const start = shiftDateKey(todayKey, Math.floor(idx / 2) * 7);
+              const end = shiftDateKey(start, 7);
 
-            return {
-              section: w.section || "Pekerjaan",
-              code: w.code || `ITM-${idx + 1}`,
-              title: w.title,
-              volume: w.volume,
-              unit: w.unit || "unit",
-              unitPrice: w.unitPrice,
-              rapPrice: 0, // "kecuali harga RAP"
-              startDate: dStart.toISOString().split("T")[0],
-              endDate: dEnd.toISOString().split("T")[0],
-            };
-          });
+              return {
+                section: work.section || "Pekerjaan",
+                code: work.code || `ITM-${idx + 1}`,
+                title: work.title,
+                volume: work.volume,
+                unit: work.unit || "unit",
+                unitPrice: work.unitPrice,
+                rapPrice: 0,
+                startDate: start,
+                endDate: end,
+              };
+            },
+          );
 
           setItems(mappedItems);
-          setImportSuccessMsg(
-            `Berhasil memuat ${mappedItems.length} item pekerjaan dari file Excel (${file.name}). Harga RAP dikosongkan (dapat diisi kemudian).`,
+          toast.success(
+            `Berhasil memuat ${mappedItems.length} item pekerjaan dari ${file.name}.`,
           );
-        } catch (err: any) {
-          setErrorMsg(`Error memproses file Excel: ${err?.message || "Format tidak sesuai"}`);
+        } catch (err) {
+          toast.error(
+            `Error memproses file Excel: ${err instanceof Error ? err.message : "Format tidak sesuai"}`,
+          );
         } finally {
           setIsParsingExcel(false);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
       };
       reader.readAsDataURL(file);
-    } catch (err: any) {
-      setErrorMsg(`Error membaca file: ${err?.message}`);
+    } catch (err) {
+      toast.error(
+        `Error membaca file: ${err instanceof Error ? err.message : "Gagal"}`,
+      );
       setIsParsingExcel(false);
     }
   };
@@ -257,10 +218,13 @@ export default function EditRabModal({
           section: parts[0]?.trim() || `Bagian ${index + 1}`,
           code: parts[1]?.trim() || `ITM-${index + 1}`,
           title: parts[2]?.trim() || "Item Pekerjaan",
-          volume: parseFloat(parts[3]?.replace(/[^0-9.]/g, "") || "1") || 1,
+          volume:
+            Number.parseFloat(parts[3]?.replace(/[^0-9.]/g, "") || "1") || 1,
           unit: parts[4]?.trim() || "paket",
-          unitPrice: parseFloat(parts[5]?.replace(/[^0-9.]/g, "") || "0") || 0,
-          rapPrice: parseFloat(parts[6]?.replace(/[^0-9.]/g, "") || "0") || 0,
+          unitPrice:
+            Number.parseFloat(parts[5]?.replace(/[^0-9.]/g, "") || "0") || 0,
+          rapPrice:
+            Number.parseFloat(parts[6]?.replace(/[^0-9.]/g, "") || "0") || 0,
           startDate: parts[7]?.trim() || "",
           endDate: parts[8]?.trim() || "",
         });
@@ -271,28 +235,30 @@ export default function EditRabModal({
       setItems(parsed);
       setShowPasteModal(false);
       setPasteText("");
+      toast.success(`${parsed.length} baris RAB berhasil ditempel.`);
+    } else {
+      toast.error("Format tempel tidak valid. Gunakan pemisah Tab dari Excel.");
     }
   };
 
   const handleSave = () => {
-    setErrorMsg("");
     if (items.length === 0) {
-      setErrorMsg("Tambahkan minimal 1 item pekerjaan.");
+      toast.error("Tambahkan minimal 1 item pekerjaan.");
       return;
     }
 
     startTransition(async () => {
-      const payload: RabItemInput[] = items.map((it) => ({
-        id: it.id,
-        section: it.section,
-        code: it.code,
-        title: it.title,
-        volume: Number(it.volume) || 0,
-        unit: it.unit,
-        unitPrice: Number(it.unitPrice) || 0,
-        rapPrice: Number(it.rapPrice) || 0,
-        startDate: it.startDate || undefined,
-        endDate: it.endDate || undefined,
+      const payload: RabItemInput[] = items.map((item) => ({
+        id: item.id,
+        section: item.section,
+        code: item.code,
+        title: item.title,
+        volume: Number(item.volume) || 0,
+        unit: item.unit,
+        unitPrice: Number(item.unitPrice) || 0,
+        rapPrice: Number(item.rapPrice) || 0,
+        startDate: item.startDate || undefined,
+        endDate: item.endDate || undefined,
       }));
 
       const res = await saveProjectRab(projectId, {
@@ -301,334 +267,526 @@ export default function EditRabModal({
       });
 
       if (res.success) {
+        toast.success(res.message || "RAB berhasil disimpan.");
         onSuccess?.();
         onClose();
       } else {
-        setErrorMsg(res.message);
+        toast.error(res.message || "Gagal menyimpan RAB.");
       }
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="relative flex max-h-[92vh] w-full max-w-6xl flex-col rounded-2xl border border-border bg-card shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border p-5">
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold text-foreground">
-              {isNewRab ? "Isi RAB" : "Ubah RAB"}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Satu baris per item pekerjaan. Bagian mengelompokkan item (mis. &quot;II. Pekerjaan Dinding&quot;). Tanggal rencana dipakai untuk Kurva S.
-            </p>
+    <>
+      <GlobalModal
+        isOpen={open}
+        onClose={onClose}
+        mobileBehavior="sheet"
+        icon={<FileSpreadsheet className="size-4" aria-hidden="true" />}
+        title={isNewRab ? "Isi RAB" : "Ubah RAB"}
+        description="Satu baris per item pekerjaan. Tanggal rencana dipakai untuk Kurva S."
+        className="max-w-6xl"
+        footer={
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5 text-left">
+              <p className="type-p2 font-bold text-foreground tabular-nums">
+                Total RAB Rp {totalRab.toLocaleString("id-ID")} · {items.length}{" "}
+                item
+              </p>
+              <p className="type-p3 text-muted-foreground tabular-nums">
+                Rencana laba:{" "}
+                <strong className="text-success">
+                  Rp {profit.toLocaleString("id-ID")} ({profitPercent}%)
+                </strong>
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                disabled={isPending}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSave}
+                disabled={isPending}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan RAB"
+                )}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowGuide(!showGuide)}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-            >
-              <HelpCircle className="size-4" />
-              <span>Panduan</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <X className="size-5" />
-            </button>
-          </div>
-        </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPasteModal(true)}
+                className="gap-1.5"
+              >
+                <ClipboardPaste className="size-3.5" aria-hidden="true" />
+                Tempel Excel
+              </Button>
 
-        {/* Guide Callout */}
-        {showGuide && (
-          <div className="border-b border-border/60 bg-muted/30 p-4 text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground">Tips Pengisian RAB:</p>
-            <ul className="mt-1 list-disc space-y-1 pl-4">
-              <li>Kelompokkan item dengan nama <strong>Bagian</strong> yang sama (mis. &quot;A. Persiapan&quot;) agar otomatis terkelompok di tabel.</li>
-              <li>Isi <strong>Harga satuan</strong> (harga jual/RAB klien) dan <strong>Harga RAP</strong> (estimasi biaya modal riil) untuk melihat margin laba otomatis.</li>
-              <li>Kolom <strong>Mulai</strong> dan <strong>Selesai</strong> digunakan sebagai acuan distribusi target pada grafik <strong>Kurva S</strong>.</li>
-            </ul>
-          </div>
-        )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileChange}
+                className="sr-only"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isParsingExcel}
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-1.5"
+              >
+                {isParsingExcel ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <FileSpreadsheet className="size-3.5 text-success" aria-hidden="true" />
+                )}
+                {isParsingExcel ? "Membaca..." : "Impor Excel"}
+              </Button>
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-muted/10 px-5 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPasteModal(true)}
-              className="h-8 gap-1.5 text-xs"
-            >
-              <ClipboardPaste className="size-3.5 text-muted-foreground" />
-              <span>Tempel dari Excel</span>
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isParsingExcel}
-              onClick={() => fileInputRef.current?.click()}
-              className="h-8 gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
-              title="Unggah file Excel RAB / DRT pemerintah untuk otomatis membaca seluruh item pekerjaan"
-            >
-              {isParsingExcel ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  <span>Membaca Excel...</span>
-                </>
-              ) : (
-                <>
-                  <FileSpreadsheet className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>Impor Excel / DRT</span>
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAddItem}
-              className="h-8 gap-1.5 text-xs font-semibold"
-            >
-              <Plus className="size-3.5 text-primary" />
-              <span>Tambah baris</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAutoSchedule}
-              className="h-8 gap-1.5 text-xs"
-              title="Isi jadwal otomatis per minggu"
-            >
-              <Calendar className="size-3.5 text-muted-foreground" />
-              <span>Isi jadwal otomatis</span>
-            </Button>
-          </div>
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={replaceExisting}
-              onChange={(e) => setReplaceExisting(e.target.checked)}
-              className="rounded border-border text-primary focus:ring-primary"
-            />
-            <span>Impor mengganti item yang belum punya progres</span>
-          </label>
-        </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddItem}
+                className="gap-1.5"
+              >
+                <Plus className="size-3.5 text-primary" aria-hidden="true" />
+                Tambah Baris
+              </Button>
 
-        {/* Table of items */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {errorMsg && (
-            <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-xs font-medium text-destructive">
-              {errorMsg}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAutoSchedule}
+                className="gap-1.5"
+              >
+                <Calendar className="size-3.5" aria-hidden="true" />
+                Jadwal Otomatis
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowGuide((prev) => !prev)}
+                className="gap-1.5"
+              >
+                <HelpCircle className="size-3.5" aria-hidden="true" />
+                Panduan
+              </Button>
+            </div>
+
+            <Label
+              htmlFor="rab-replace-existing"
+              className="flex cursor-pointer items-center gap-2"
+            >
+              <Checkbox
+                id="rab-replace-existing"
+                checked={replaceExisting}
+                onCheckedChange={(checked) =>
+                  setReplaceExisting(checked === true)
+                }
+              />
+              <span className="type-p3 font-normal text-muted-foreground">
+                Ganti item tanpa progres
+              </span>
+            </Label>
+          </div>
+
+          {showGuide && (
+            <div className="type-p3 rounded-xl border border-border bg-muted/30 p-3.5 text-muted-foreground">
+              <p className="font-semibold text-foreground">
+                Tips Pengisian RAB:
+              </p>
+              <ul className="mt-1 list-disc space-y-1 pl-4">
+                <li>
+                  Kelompokkan item dengan nama <strong>Bagian</strong> yang
+                  sama (mis. &quot;A. Persiapan&quot;).
+                </li>
+                <li>
+                  Isi <strong>Harga Satuan</strong> (RAB klien) dan{" "}
+                  <strong>Harga RAP</strong> (estimasi biaya) untuk melihat
+                  margin laba.
+                </li>
+                <li>
+                  Kolom <strong>Mulai</strong> dan <strong>Selesai</strong>{" "}
+                  dipakai untuk Kurva S.
+                </li>
+              </ul>
             </div>
           )}
 
-          {importSuccessMsg && (
-            <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-500/10 p-3 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="size-4 shrink-0" />
-              <span>{importSuccessMsg}</span>
-            </div>
-          )}
+          {/* Mobile Cards */}
+          <div className="space-y-3 md:hidden">
+            {items.map((item, index) => (
+              <div
+                key={item.id ?? `mob-${index}`}
+                className="space-y-3 rounded-xl border border-border bg-card p-3.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="type-p3 font-semibold text-muted-foreground">
+                    Item #{index + 1}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Hapus baris ${index + 1}`}
+                    onClick={() => handleRemoveItem(index)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  </Button>
+                </div>
 
-          <div className="overflow-x-auto rounded-xl border border-border/80">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-muted/40 font-semibold text-muted-foreground">
-                <tr className="border-b border-border">
-                  <th className="px-2.5 py-2.5">Bagian</th>
-                  <th className="w-16 px-2.5 py-2.5">Kode</th>
-                  <th className="min-w-44 px-2.5 py-2.5">Uraian pekerjaan</th>
-                  <th className="w-20 px-2.5 py-2.5">Volume</th>
-                  <th className="w-20 px-2.5 py-2.5">Satuan</th>
-                  <th className="w-28 px-2.5 py-2.5">Harga satuan</th>
-                  <th className="w-28 px-2.5 py-2.5">Harga RAP</th>
-                  <th className="w-32 px-2.5 py-2.5">Mulai</th>
-                  <th className="w-32 px-2.5 py-2.5">Selesai</th>
-                  <th className="w-10 px-2.5 py-2.5 text-center"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2 space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Bagian
+                    </Label>
+                    <Input
+                      value={item.section}
+                      onChange={(e) =>
+                        handleChangeItem(index, "section", e.target.value)
+                      }
+                      placeholder="A. Persiapan"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Kode
+                    </Label>
+                    <Input
+                      value={item.code}
+                      onChange={(e) =>
+                        handleChangeItem(index, "code", e.target.value)
+                      }
+                      placeholder="A.1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="type-p3 text-muted-foreground">
+                    Uraian Pekerjaan
+                  </Label>
+                  <Input
+                    value={item.title}
+                    onChange={(e) =>
+                      handleChangeItem(index, "title", e.target.value)
+                    }
+                    placeholder="Uraian item pekerjaan"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Volume
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.volume ? item.volume : ""}
+                      onChange={(e) =>
+                        handleChangeItem(
+                          index,
+                          "volume",
+                          Number.parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      placeholder="0"
+                      className="text-right tabular-nums"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Satuan
+                    </Label>
+                    <Input
+                      value={item.unit}
+                      onChange={(e) =>
+                        handleChangeItem(index, "unit", e.target.value)
+                      }
+                      placeholder="m2 / unit"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Harga Satuan
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={item.unitPrice ? item.unitPrice : ""}
+                      onChange={(e) =>
+                        handleChangeItem(
+                          index,
+                          "unitPrice",
+                          Number.parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      placeholder="0"
+                      className="text-right tabular-nums"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Harga RAP
+                    </Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={item.rapPrice ? item.rapPrice : ""}
+                      onChange={(e) =>
+                        handleChangeItem(
+                          index,
+                          "rapPrice",
+                          Number.parseFloat(e.target.value) || 0,
+                        )
+                      }
+                      placeholder="0"
+                      className="text-right tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Mulai
+                    </Label>
+                    <DatePicker
+                      clearable
+                      value={item.startDate}
+                      onValueChange={(val) =>
+                        handleChangeItem(index, "startDate", val)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="type-p3 text-muted-foreground">
+                      Selesai
+                    </Label>
+                    <DatePicker
+                      clearable
+                      value={item.endDate}
+                      onValueChange={(val) =>
+                        handleChangeItem(index, "endDate", val)
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Shadcn Table */}
+          <div className="hidden md:block">
+            <Table pagination={false}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Bagian</TableHead>
+                  <TableHead className="w-20">Kode</TableHead>
+                  <TableHead className="min-w-44">Uraian</TableHead>
+                  <TableHead className="w-24">Volume</TableHead>
+                  <TableHead className="w-24">Satuan</TableHead>
+                  <TableHead className="w-32">Harga Satuan</TableHead>
+                  <TableHead className="w-32">Harga RAP</TableHead>
+                  <TableHead className="w-40">Mulai</TableHead>
+                  <TableHead className="w-40">Selesai</TableHead>
+                  <TableHead className="w-12 text-center">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {items.map((item, index) => (
-                  <tr key={index} className="hover:bg-muted/10">
-                    <td className="p-1.5">
+                  <TableRow key={item.id ?? `row-${index}`}>
+                    <TableCell>
                       <Input
                         value={item.section}
-                        onChange={(e) => handleChangeItem(index, "section", e.target.value)}
+                        onChange={(e) =>
+                          handleChangeItem(index, "section", e.target.value)
+                        }
                         placeholder="A. Persiapan"
-                        className="h-8 text-xs"
                       />
-                    </td>
-                    <td className="p-1.5">
+                    </TableCell>
+                    <TableCell>
                       <Input
                         value={item.code}
-                        onChange={(e) => handleChangeItem(index, "code", e.target.value)}
+                        onChange={(e) =>
+                          handleChangeItem(index, "code", e.target.value)
+                        }
                         placeholder="A.1"
-                        className="h-8 font-mono text-xs"
+                        className="font-mono"
                       />
-                    </td>
-                    <td className="p-1.5">
+                    </TableCell>
+                    <TableCell>
                       <Input
                         value={item.title}
-                        onChange={(e) => handleChangeItem(index, "title", e.target.value)}
-                        placeholder="Uraian item pekerjaan"
-                        className="h-8 text-xs"
+                        onChange={(e) =>
+                          handleChangeItem(index, "title", e.target.value)
+                        }
+                        placeholder="Uraian pekerjaan"
                       />
-                    </td>
-                    <td className="p-1.5">
+                    </TableCell>
+                    <TableCell>
                       <Input
                         type="number"
                         min="0"
                         step="any"
                         value={item.volume ? item.volume : ""}
                         onChange={(e) =>
-                          handleChangeItem(index, "volume", parseFloat(e.target.value) || 0)
+                          handleChangeItem(
+                            index,
+                            "volume",
+                            Number.parseFloat(e.target.value) || 0,
+                          )
                         }
-                        placeholder="Volume"
-                        className="h-8 text-right text-xs"
+                        placeholder="0"
+                        className="text-right tabular-nums"
                       />
-                    </td>
-                    <td className="p-1.5">
+                    </TableCell>
+                    <TableCell>
                       <Input
                         value={item.unit}
-                        onChange={(e) => handleChangeItem(index, "unit", e.target.value)}
+                        onChange={(e) =>
+                          handleChangeItem(index, "unit", e.target.value)
+                        }
                         placeholder="Satuan"
-                        className="h-8 text-xs"
                       />
-                    </td>
-                    <td className="p-1.5">
+                    </TableCell>
+                    <TableCell>
                       <Input
                         type="number"
                         min="0"
                         value={item.unitPrice ? item.unitPrice : ""}
                         onChange={(e) =>
-                          handleChangeItem(index, "unitPrice", parseFloat(e.target.value) || 0)
+                          handleChangeItem(
+                            index,
+                            "unitPrice",
+                            Number.parseFloat(e.target.value) || 0,
+                          )
                         }
-                        placeholder="Harga satuan"
-                        className="h-8 text-right text-xs"
+                        placeholder="0"
+                        className="text-right tabular-nums"
                       />
-                    </td>
-                    <td className="p-1.5">
+                    </TableCell>
+                    <TableCell>
                       <Input
                         type="number"
                         min="0"
                         value={item.rapPrice ? item.rapPrice : ""}
                         onChange={(e) =>
-                          handleChangeItem(index, "rapPrice", parseFloat(e.target.value) || 0)
+                          handleChangeItem(
+                            index,
+                            "rapPrice",
+                            Number.parseFloat(e.target.value) || 0,
+                          )
                         }
-                        placeholder="Harga RAP"
-                        className="h-8 text-right text-xs"
+                        placeholder="0"
+                        className="text-right tabular-nums"
                       />
-                    </td>
-                    <td className="p-1.5">
-                      <Input
-                        type="date"
+                    </TableCell>
+                    <TableCell>
+                      <DatePicker
+                        clearable
                         value={item.startDate}
-                        onChange={(e) => handleChangeItem(index, "startDate", e.target.value)}
-                        className="h-8 text-xs"
+                        onValueChange={(val) =>
+                          handleChangeItem(index, "startDate", val)
+                        }
                       />
-                    </td>
-                    <td className="p-1.5">
-                      <Input
-                        type="date"
+                    </TableCell>
+                    <TableCell>
+                      <DatePicker
+                        clearable
                         value={item.endDate}
-                        onChange={(e) => handleChangeItem(index, "endDate", e.target.value)}
-                        className="h-8 text-xs"
+                        onValueChange={(val) =>
+                          handleChangeItem(index, "endDate", val)
+                        }
                       />
-                    </td>
-                    <td className="p-1.5 text-center">
-                      <button
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Hapus baris ${index + 1}`}
                         onClick={() => handleRemoveItem(index)}
-                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        title="Hapus baris"
+                        className="text-muted-foreground hover:text-destructive"
                       >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </td>
-                  </tr>
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
+      </GlobalModal>
 
-        {/* Footer Summary & Actions */}
-        <div className="flex flex-col gap-3 border-t border-border bg-muted/10 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold text-foreground">
-              Total RAB Rp {totalRab.toLocaleString("id-ID")} · {items.length} item
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Rencana laba: <strong className="text-emerald-600 dark:text-emerald-400">Rp {profit.toLocaleString("id-ID")} ({profitPercent}%)</strong>
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-2">
+      {/* Nested Excel Paste Modal */}
+      <GlobalModal
+        isOpen={showPasteModal}
+        onClose={() => setShowPasteModal(false)}
+        mobileBehavior="sheet"
+        icon={<ClipboardPaste className="size-4" aria-hidden="true" />}
+        title="Tempel Data Excel"
+        description="Salin kolom dari Excel: Bagian, Kode, Uraian, Volume, Satuan, Harga satuan, Harga RAP, Mulai (YYYY-MM-DD), Selesai."
+        className="max-w-lg"
+        footer={
+          <>
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
-              disabled={isPending}
+              size="sm"
+              onClick={() => setShowPasteModal(false)}
             >
               Batal
             </Button>
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={isPending}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isPending ? "Menyimpan..." : "Simpan RAB"}
+            <Button type="button" size="sm" onClick={handleParsePaste}>
+              Terapkan Baris
             </Button>
-          </div>
-        </div>
-
-        {/* Excel Paste Sub-Modal */}
-        {showPasteModal && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 p-4">
-            <div className="w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-2xl">
-              <h3 className="text-base font-bold text-foreground">Tempel Data dari Excel</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Salin kolom dari Excel dengan urutan: <code>Bagian</code>, <code>Kode</code>, <code>Uraian</code>, <code>Volume</code>, <code>Satuan</code>, <code>Harga satuan</code>, <code>Harga RAP</code>, <code>Mulai (YYYY-MM-DD)</code>, <code>Selesai</code>.
-              </p>
-              <textarea
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                placeholder="Tempel baris tabel Excel di sini..."
-                rows={6}
-                className="mt-3 w-full rounded-lg border border-border bg-background p-2.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-              <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPasteModal(false)}
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleParsePaste}
-                >
-                  Terapkan Baris
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+          </>
+        }
+      >
+        <Textarea
+          value={pasteText}
+          onChange={(event) => setPasteText(event.target.value)}
+          placeholder="Tempel baris tabel Excel di sini..."
+          rows={6}
+          className="font-mono"
+        />
+      </GlobalModal>
+    </>
   );
 }

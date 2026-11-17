@@ -10,6 +10,7 @@ import {
 } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   FileSignature,
   FileText,
@@ -35,6 +36,8 @@ import type { Template } from "@pdfme/common";
 import { Badge } from "@/components/ui/badge";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
@@ -196,6 +199,9 @@ export default function DocumentWorkspace({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [activeTab, setActiveTab] = useState<
+    "create" | "pending" | "issued" | "templates"
+  >(readOnly ? "issued" : "create");
   const [kind, setKind] = useState<OperationalDocumentKind>(
     OperationalDocumentKind.PURCHASE_ORDER,
   );
@@ -204,8 +210,6 @@ export default function DocumentWorkspace({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [signatureDrawn, setSignatureDrawn] = useState(false);
-  const [createMessage, setCreateMessage] = useState("");
-  const [createError, setCreateError] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateDraft, setTemplateDraft] = useState<{
     id?: string;
@@ -219,8 +223,6 @@ export default function DocumentWorkspace({
     title: "",
     content: "",
   });
-  const [templateMessage, setTemplateMessage] = useState("");
-  const [templateError, setTemplateError] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<DocumentRow | null>(null);
   const [detailMessage, setDetailMessage] = useState("");
   const [richTemplateName, setRichTemplateName] = useState(initialRichTemplate?.name ?? "");
@@ -238,8 +240,6 @@ export default function DocumentWorkspace({
   const [pdfmeTemplate, setPdfmeTemplate] = useState<Template>(
     initialRichTemplate?.contentJson ?? createBlankPdfmeTemplate(),
   );
-  const [richTemplateMessage, setRichTemplateMessage] = useState("");
-  const [richTemplateError, setRichTemplateError] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const signingRef = useRef(false);
 
@@ -328,16 +328,13 @@ export default function DocumentWorkspace({
     event.preventDefault();
     const signatureImage = canvasRef.current?.toDataURL("image/png") ?? "";
     if (!signatureDrawn || !signatureImage) {
-      setCreateError(true);
-      setCreateMessage("Tanda tangan wajib dibubuhkan sebelum dokumen disimpan.");
+      toast.error("Tanda tangan wajib dibubuhkan sebelum dokumen disimpan.");
       return;
     }
     if (!ticketId) {
-      setCreateError(true);
-      setCreateMessage("Pilih tiket material yang akan dilampirkan.");
+      toast.error("Pilih tiket material yang akan dilampirkan.");
       return;
     }
-    setCreateMessage("");
     startTransition(async () => {
       try {
         const result = await createSignedOperationalDocument({
@@ -348,28 +345,27 @@ export default function DocumentWorkspace({
           content,
           signatureImage,
         });
-        setCreateError(!result.success);
-        setCreateMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           setSignatureDrawn(false);
           setTicketId("");
           setTemplateId("");
           setTitle("");
           setContent("");
           clearSignature();
+          setActiveTab("pending");
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Signed operational document save failed:", error);
-        setCreateError(true);
-        setCreateMessage("Dokumen gagal disimpan. Silakan coba kembali.");
+        toast.error("Dokumen gagal disimpan. Silakan coba kembali.");
       }
     });
   };
 
   const openTemplateDialog = (template?: TemplateRow) => {
-    setTemplateMessage("");
-    setTemplateError(false);
     setTemplateDraft(
       template
         ? {
@@ -391,20 +387,19 @@ export default function DocumentWorkspace({
 
   const submitTemplate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setTemplateMessage("");
     startTransition(async () => {
       try {
         const result = await saveDocumentTemplate(templateDraft);
-        setTemplateError(!result.success);
-        setTemplateMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           setTemplateDialogOpen(false);
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Operational document template save failed:", error);
-        setTemplateError(true);
-        setTemplateMessage("Template gagal disimpan. Silakan coba kembali.");
+        toast.error("Template gagal disimpan. Silakan coba kembali.");
       }
     });
   };
@@ -412,11 +407,9 @@ export default function DocumentWorkspace({
   const submitRichTemplate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!richContentHtml.trim() || richContentHtml === "<p></p>") {
-      setRichTemplateError(true);
-      setRichTemplateMessage("Isi template dokumen wajib diisi.");
+      toast.error("Isi template dokumen wajib diisi.");
       return;
     }
-    setRichTemplateMessage("");
     startTransition(async () => {
       try {
         const result = await saveRichDocumentTemplate({
@@ -426,9 +419,8 @@ export default function DocumentWorkspace({
           contentHtml: richContentHtml,
           contentJson: richEditorMode === "pdfme" ? pdfmeTemplate : null,
         });
-        setRichTemplateError(!result.success);
-        setRichTemplateMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           if (!initialRichTemplate) {
             setRichTemplateName("");
             setRichTemplateType(DocType.PURCHASE_ORDER);
@@ -436,11 +428,12 @@ export default function DocumentWorkspace({
             setPdfmeTemplate(createBlankPdfmeTemplate());
           }
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Rich document template save failed:", error);
-        setRichTemplateError(true);
-        setRichTemplateMessage("Template gagal disimpan. Silakan coba kembali.");
+        toast.error("Template gagal disimpan. Silakan coba kembali.");
       }
     });
   };
@@ -473,10 +466,10 @@ export default function DocumentWorkspace({
       <CardBox>
         <form onSubmit={submitRichTemplate} className="space-y-5">
           <div>
-            <h2 className="text-xl font-semibold">
+            <h2 className="type-h2 text-foreground">
               {initialRichTemplate ? "Edit Template Dokumen" : "Buat Template Dokumen"}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="type-p2 mt-1 text-muted-foreground">
               PDFme sudah terpasang. Template PDFme disimpan sebagai JSON, sedangkan
               template Word lama tetap disimpan sebagai HTML.
             </p>
@@ -535,7 +528,7 @@ export default function DocumentWorkspace({
                   initialTemplate={pdfmeTemplate}
                   onChange={setPdfmeTemplate}
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="type-p3 text-muted-foreground">
                   PDFme menggunakan bidang yang diseret ke lembar A4 dan menyimpan
                   posisi, ukuran, tipe bidang, serta variabel ke JSON.
                 </p>
@@ -546,24 +539,16 @@ export default function DocumentWorkspace({
                   documentType={richTemplateType}
                   onChange={setRichContentHtml}
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="type-p3 text-muted-foreground">
                   Editor HTML lama tetap tersedia untuk membuka dan mengubah
                   template yang sudah ada.
                 </p>
               </TabsContent>
             </Tabs>
           </div>
-          {richTemplateMessage && (
-            <p className={`text-sm ${richTemplateError ? "text-destructive" : "text-emerald-700"}`} role="status">
-              {richTemplateMessage}
-            </p>
-          )}
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => router.push("/apps/documents")}>
-              Kembali ke Dokumen
-            </Button>
             <Button type="submit" disabled={isPending}>
-              <Save className="mr-2 h-4 w-4" />
+              <Save className="mr-2 size-4" aria-hidden="true" />
               {isPending
                 ? "Menyimpan..."
                 : initialRichTemplate
@@ -576,33 +561,31 @@ export default function DocumentWorkspace({
     );
   }
 
+  const ticketComboboxOptions = compatibleTickets.map((ticket) => ({
+    value: ticket.id,
+    label: `${ticket.ticketNumber} · ${ticket.title}`,
+    description: ticket.project?.title ?? ticket.requester.name,
+  }));
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {!readOnly && (
         <CardBox>
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold">Dokumen Operasional</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Siapkan PO, DO, atau dokumen custom, bubuhkan tanda tangan,
-                lalu pantau penerbitannya oleh Logistik.
+              <h2 className="type-h2 text-foreground">Alur Dokumen Operasional</h2>
+              <p className="type-p2 mt-1 text-muted-foreground">
+                Buat dan tanda tangani dokumen, lalu pantau antrean terbit Logistik pada tab berikut.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
+                type="button"
+                size="sm"
                 variant="outline"
-                onClick={() => router.push("/apps/documents/issued")}
+                onClick={() => openTemplateDialog()}
               >
-                Dokumen Terbit
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/apps/templates")}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Editor Template
-              </Button>
-              <Button variant="outline" onClick={() => openTemplateDialog()}>
+                <Plus className="mr-1.5 size-4" aria-hidden="true" />
                 Template Custom
               </Button>
             </div>
@@ -610,14 +593,29 @@ export default function DocumentWorkspace({
         </CardBox>
       )}
 
-      <Tabs defaultValue={readOnly ? "issued" : "create"} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          if (
+            value === "create" ||
+            value === "pending" ||
+            value === "issued" ||
+            value === "templates"
+          ) {
+            setActiveTab(value);
+          }
+        }}
+        className="space-y-4"
+      >
         {!readOnly && (
-          <TabsList>
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit">
             <TabsTrigger value="create">Buat &amp; Tanda Tangani</TabsTrigger>
             <TabsTrigger value="pending">
               Menunggu Logistik ({signedDocuments.length})
             </TabsTrigger>
-            <TabsTrigger value="issued">Dokumen Terbit ({issuedDocuments.length})</TabsTrigger>
+            <TabsTrigger value="issued">
+              Dokumen Terbit ({issuedDocuments.length})
+            </TabsTrigger>
             <TabsTrigger value="templates">
               Template ({templates.length})
             </TabsTrigger>
@@ -627,8 +625,8 @@ export default function DocumentWorkspace({
         {readOnly && (
           <CardBox>
             <div>
-              <h2 className="text-xl font-semibold">Dokumen Terbit</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h2 className="type-h2 text-foreground">Dokumen Terbit</h2>
+              <p className="type-p2 mt-1 text-muted-foreground">
                 Daftar dokumen yang sudah diterbitkan Logistik dan dapat diakses
                 oleh seluruh pengguna.
               </p>
@@ -654,7 +652,7 @@ export default function DocumentWorkspace({
                       setContent("");
                     }}
                   >
-                    <SelectTrigger id="document-kind">
+                    <SelectTrigger id="document-kind" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -668,8 +666,14 @@ export default function DocumentWorkspace({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="document-ticket">Tiket material</Label>
-                  <Select
+                  <Combobox
+                    id="document-ticket"
+                    options={ticketComboboxOptions}
                     value={ticketId}
+                    placeholder="Pilih tiket material"
+                    searchPlaceholder="Cari nomor atau judul tiket..."
+                    emptyText="Tidak ada tiket yang memenuhi syarat."
+                    disabled={compatibleTickets.length === 0}
                     onValueChange={(value) => {
                       setTicketId(value);
                       const nextTicket = tickets.find((ticket) => ticket.id === value);
@@ -678,20 +682,9 @@ export default function DocumentWorkspace({
                         setContent(fillTemplate(template.content, nextTicket, kind));
                       }
                     }}
-                  >
-                    <SelectTrigger id="document-ticket">
-                      <SelectValue placeholder="Pilih tiket material" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {compatibleTickets.map((ticket) => (
-                        <SelectItem key={ticket.id} value={ticket.id}>
-                          {ticket.ticketNumber} · {ticket.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                   {compatibleTickets.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="type-p3 text-muted-foreground">
                       Tidak ada tiket yang memenuhi syarat untuk jenis dokumen ini.
                     </p>
                   )}
@@ -702,7 +695,7 @@ export default function DocumentWorkspace({
                 <div className="space-y-2">
                   <Label htmlFor="document-template">Gunakan template</Label>
                   <Select value={templateId || "NONE"} onValueChange={chooseTemplate}>
-                    <SelectTrigger id="document-template">
+                    <SelectTrigger id="document-template" className="w-full">
                       <SelectValue placeholder="Dokumen custom tanpa template" />
                     </SelectTrigger>
                     <SelectContent>
@@ -728,11 +721,11 @@ export default function DocumentWorkspace({
               </div>
 
               {selectedTicket && (
-                <div className="rounded-md border bg-muted/30 p-4 text-sm">
-                  <p className="font-medium">
+                <div className="type-p2 rounded-md border border-border bg-muted/30 p-4">
+                  <p className="font-medium text-foreground">
                     {selectedTicket.ticketNumber} · {selectedTicket.title}
                   </p>
-                  <p className="mt-1 text-muted-foreground">
+                  <p className="type-p3 mt-1 text-muted-foreground">
                     Pemohon: {selectedTicket.requester.name}
                     {selectedTicket.project ? ` · Proyek: ${selectedTicket.project.title}` : ""}
                     {selectedTicket.totalAmount
@@ -740,7 +733,7 @@ export default function DocumentWorkspace({
                       : ""}
                   </p>
                   {selectedTicket.items.length > 0 && (
-                    <ul className="mt-2 list-inside list-disc text-muted-foreground">
+                    <ul className="type-p3 mt-2 list-inside list-disc text-muted-foreground">
                       {selectedTicket.items.map((item, index) => (
                         <li key={`${item.itemName}-${index}`}>
                           {item.itemName} — {item.quantity} {item.unit}
@@ -760,9 +753,10 @@ export default function DocumentWorkspace({
                   rows={9}
                   maxLength={20000}
                   required
+                  className="mt-0"
                   placeholder="Tulis isi PO/DO atau dokumen custom. Token template: {{ticketNumber}}, {{ticketTitle}}, {{requester}}, {{project}}, {{amount}}, {{items}}"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="type-p3 text-muted-foreground">
                   Isi dokumen disimpan sebagai snapshot dan tidak berubah jika template diedit kemudian.
                 </p>
               </div>
@@ -783,27 +777,19 @@ export default function DocumentWorkspace({
                   onPointerMove={continueSigning}
                   onPointerUp={finishSigning}
                   onPointerCancel={finishSigning}
-                  className="h-36 w-full touch-none rounded-md border bg-white"
+                  className="h-36 w-full touch-none rounded-md border border-border bg-white"
                   aria-label="Area tanda tangan digital"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="type-p3 text-muted-foreground">
                   Tanda tangan gambar ini terikat pada akun yang sedang masuk, bukan sertifikat digital kriptografis.
                 </p>
               </div>
 
-              {createMessage && (
-                <p
-                  className={`text-sm ${createError ? "text-destructive" : "text-emerald-700"}`}
-                  role="status"
-                >
-                  {createMessage}
-                </p>
-              )}
               <Button
                 type="submit"
                 disabled={isPending || compatibleTickets.length === 0}
               >
-                <FileSignature className="mr-2 h-4 w-4" />
+                <FileSignature className="mr-2 size-4" aria-hidden="true" />
                 {isPending ? "Menyimpan..." : "Simpan & Tanda Tangani"}
               </Button>
             </form>
@@ -813,20 +799,22 @@ export default function DocumentWorkspace({
 
         {!readOnly && (
           <TabsContent value="pending">
-            {renderDocumentTable(
-              signedDocuments,
-              "Belum ada dokumen yang menunggu diterbitkan.",
-              openDocument,
-            )}
+            <DocumentArchiveSection
+              documents={signedDocuments}
+              emptyTitle="Belum ada dokumen menunggu"
+              emptyDescription="Dokumen yang baru ditandatangani akan tampil di sini sebelum diterbitkan Logistik."
+              onSelect={openDocument}
+            />
           </TabsContent>
         )}
 
         <TabsContent value="issued">
-          {renderDocumentTable(
-            issuedDocuments,
-            "Belum ada dokumen yang diterbitkan Logistik.",
-            openDocument,
-          )}
+          <DocumentArchiveSection
+            documents={issuedDocuments}
+            emptyTitle="Belum ada dokumen terbit"
+            emptyDescription="Dokumen yang sudah diterbitkan Logistik akan tampil di sini."
+            onSelect={openDocument}
+          />
         </TabsContent>
 
         {!readOnly && (
@@ -834,94 +822,96 @@ export default function DocumentWorkspace({
           <CardBox>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-semibold">Template Dokumen</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="type-h3 text-foreground">Template Dokumen</h3>
+                <p className="type-p3 text-muted-foreground">
                   Gunakan token tiket untuk mengisi informasi otomatis saat membuat dokumen.
                 </p>
               </div>
-              <Button onClick={() => openTemplateDialog()}>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="sm" onClick={() => openTemplateDialog()}>
+                <Plus className="mr-1.5 size-4" aria-hidden="true" />
                 Tambah Template
               </Button>
             </div>
-            {/* Mobile Card View (< 768px) */}
-            <div className="space-y-2.5 md:hidden">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card p-3.5"
-                >
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-sm font-semibold text-foreground">
-                        {template.name}
-                      </span>
-                      <Badge variant={template.isActive ? "lightSuccess" : "gray"}>
-                        {template.isActive ? "Aktif" : "Nonaktif"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {kindLabels[template.kind]} · {template.title}
-                    </p>
-                  </div>
-                  <ActionIconButton
-                    label={`Edit template ${template.name}`}
-                    tooltip={`Edit template ${template.name}`}
-                    icon={Pencil}
-                    onClick={() => openTemplateDialog(template)}
-                  />
-                </div>
-              ))}
-              {templates.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
-                  Belum ada template. Buat template pertama untuk mempercepat dokumen berikutnya.
-                </div>
-              )}
-            </div>
-
-            {/* Desktop Table View (>= 768px) */}
-            <div className="hidden overflow-x-auto md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Jenis</TableHead>
-                    <TableHead>Judul</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            {templates.length ? (
+              <>
+                <div className="space-y-2.5 md:hidden">
                   {templates.map((template) => (
-                    <TableRow key={template.id}>
-                      <TableCell className="font-medium">{template.name}</TableCell>
-                      <TableCell>{kindLabels[template.kind]}</TableCell>
-                      <TableCell>{template.title}</TableCell>
-                      <TableCell>
-                        <Badge variant={template.isActive ? "lightSuccess" : "gray"}>
-                          {template.isActive ? "Aktif" : "Nonaktif"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <ActionIconButton
-                          label={`Edit template ${template.name}`}
-                          tooltip={`Edit template ${template.name}`}
-                          icon={Pencil}
-                          onClick={() => openTemplateDialog(template)}
-                        />
-                      </TableCell>
-                    </TableRow>
+                    <div
+                      key={template.id}
+                      className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="type-p2 font-semibold text-foreground">
+                            {template.name}
+                          </span>
+                          <Badge variant={template.isActive ? "lightSuccess" : "gray"}>
+                            {template.isActive ? "Aktif" : "Nonaktif"}
+                          </Badge>
+                        </div>
+                        <p className="type-p3 text-muted-foreground">
+                          {kindLabels[template.kind]} · {template.title}
+                        </p>
+                      </div>
+                      <ActionIconButton
+                        label={`Edit template ${template.name}`}
+                        tooltip={`Edit template ${template.name}`}
+                        icon={Pencil}
+                        onClick={() => openTemplateDialog(template)}
+                      />
+                    </div>
                   ))}
-                  {templates.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                        Belum ada template. Buat template pertama untuk mempercepat dokumen berikutnya.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nama</TableHead>
+                        <TableHead>Jenis</TableHead>
+                        <TableHead>Judul</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {templates.map((template) => (
+                        <TableRow key={template.id}>
+                          <TableCell className="type-p2 font-medium">{template.name}</TableCell>
+                          <TableCell className="type-p2">{kindLabels[template.kind]}</TableCell>
+                          <TableCell className="type-p2">{template.title}</TableCell>
+                          <TableCell>
+                            <Badge variant={template.isActive ? "lightSuccess" : "gray"}>
+                              {template.isActive ? "Aktif" : "Nonaktif"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <ActionIconButton
+                              label={`Edit template ${template.name}`}
+                              tooltip={`Edit template ${template.name}`}
+                              icon={Pencil}
+                              onClick={() => openTemplateDialog(template)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            ) : (
+              <EmptyState
+                variant="inline"
+                title="Belum ada template"
+                description="Buat template pertama untuk mempercepat penyusunan dokumen berikutnya."
+                action={
+                  <Button size="sm" variant="outline" onClick={() => openTemplateDialog()}>
+                    <Plus className="mr-1.5 size-4" aria-hidden="true" />
+                    Tambah Template
+                  </Button>
+                }
+              />
+            )}
           </CardBox>
           </TabsContent>
         )}
@@ -955,7 +945,7 @@ export default function DocumentWorkspace({
                   }
                 }}
               >
-                <SelectTrigger id="template-kind"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="template-kind" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.values(OperationalDocumentKind).map((value) => (
                     <SelectItem key={value} value={value}>{kindLabels[value]}</SelectItem>
@@ -981,17 +971,13 @@ export default function DocumentWorkspace({
                 onChange={(event) => setTemplateDraft({ ...templateDraft, content: event.target.value })}
                 rows={8}
                 maxLength={20000}
+                className="mt-0"
                 required
               />
             </div>
-            {templateMessage && (
-              <p className={`text-sm ${templateError ? "text-destructive" : "text-emerald-700"}`} role="status">
-                {templateMessage}
-              </p>
-            )}
             <DialogFooter>
               <Button type="submit" disabled={isPending}>
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="mr-2 size-4" aria-hidden="true" />
                 {isPending ? "Menyimpan..." : "Simpan Template"}
               </Button>
             </DialogFooter>
@@ -1003,8 +989,7 @@ export default function DocumentWorkspace({
         onClose={() => {
           setSelectedDocument(null);
           setDetailMessage("");
-        }
-        }
+        }}
         title={selectedDocument?.title ?? "Detail dokumen"}
         description={
           selectedDocument
@@ -1015,10 +1000,10 @@ export default function DocumentWorkspace({
       >
           {selectedDocument && (
             <>
-              <div className="space-y-4 rounded-md border p-5">
-                <p className="whitespace-pre-wrap text-sm">{selectedDocument.content}</p>
-                <div className="border-t pt-4">
-                  <p className="text-xs text-muted-foreground">
+              <div className="space-y-4 rounded-md border border-border p-5">
+                <p className="type-p2 whitespace-pre-wrap">{selectedDocument.content}</p>
+                <div className="border-t border-border pt-4">
+                  <p className="type-p3 text-muted-foreground">
                     Ditandatangani {selectedDocument.signedBy.name} pada {dateFormatter.format(new Date(selectedDocument.signedAt))}
                   </p>
                   {selectedDocument.signatureImage ? (
@@ -1031,12 +1016,12 @@ export default function DocumentWorkspace({
                       className="mt-2 h-20 max-w-64 object-contain object-left"
                     />
                   ) : (
-                    <p className="mt-2 text-sm text-muted-foreground" role="status">
+                    <p className="type-p2 mt-2 text-muted-foreground" role="status">
                       {detailMessage}
                     </p>
                   )}
                   {selectedDocument.issuedAt && (
-                    <p className="mt-2 text-xs text-muted-foreground">
+                    <p className="type-p3 mt-2 text-muted-foreground">
                       Diterbitkan {selectedDocument.issuedBy?.name ?? "Logistik"} pada {dateFormatter.format(new Date(selectedDocument.issuedAt))}
                     </p>
                   )}
@@ -1047,7 +1032,7 @@ export default function DocumentWorkspace({
                   <Button variant="outline">Tutup</Button>
                 </DialogClose>
                 <Button variant="outline" onClick={() => window.print()}>
-                  <Printer className="mr-2 h-4 w-4" />
+                  <Printer className="mr-2 size-4" aria-hidden="true" />
                   Cetak
                 </Button>
               </DialogFooter>
@@ -1058,128 +1043,174 @@ export default function DocumentWorkspace({
   );
 }
 
-function renderDocumentTable(
-  documents: DocumentRow[],
-  emptyMessage: string,
-  onSelect: (document: DocumentRow) => void,
-) {
+function DocumentArchiveSection({
+  documents,
+  emptyTitle,
+  emptyDescription,
+  onSelect,
+}: {
+  documents: DocumentRow[];
+  emptyTitle: string;
+  emptyDescription: string;
+  onSelect: (document: DocumentRow) => void;
+}) {
+  const [kindFilter, setKindFilter] = useState<
+    "ALL" | OperationalDocumentKind
+  >("ALL");
+
+  const filteredDocuments = useMemo(
+    () =>
+      kindFilter === "ALL"
+        ? documents
+        : documents.filter((doc) => doc.kind === kindFilter),
+    [documents, kindFilter],
+  );
+
+  const filterChips: { value: "ALL" | OperationalDocumentKind; label: string }[] = [
+    { value: "ALL", label: `Semua (${documents.length})` },
+    { value: OperationalDocumentKind.PURCHASE_ORDER, label: "Purchase Order" },
+    { value: OperationalDocumentKind.DELIVERY_ORDER, label: "Delivery Order" },
+    { value: OperationalDocumentKind.CUSTOM, label: "Custom" },
+  ];
+
   return (
-    <CardBox>
-      {/* Mobile Card View (< 768px) */}
-      <div className="space-y-2.5 md:hidden">
-        {documents.map((document) => (
-          <div
-            key={document.id}
-            className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
+    <CardBox className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {filterChips.map((chip) => (
+          <Button
+            key={chip.value}
+            type="button"
+            size="sm"
+            variant={kindFilter === chip.value ? "default" : "outline"}
+            onClick={() => setKindFilter(chip.value)}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="font-mono text-xs font-semibold text-primary">
-                  {document.documentNumber}
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-foreground">
-                  {document.title}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {kindLabels[document.kind]} · {document.ticket.ticketNumber}
-                </p>
-              </div>
-              <Badge
-                variant={
-                  document.status === OperationalDocumentStatus.ISSUED
-                    ? "lightSuccess"
-                    : "lightWarning"
-                }
-                className="shrink-0"
-              >
-                {document.status === OperationalDocumentStatus.ISSUED
-                  ? "Terbit"
-                  : "Siap diterbitkan"}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
-              <div className="min-w-0">
-                <span className="font-medium text-foreground">
-                  {document.signedBy.name}
-                </span>
-                <span className="block text-[11px]">
-                  {dateFormatter.format(new Date(document.signedAt))}
-                </span>
-              </div>
-              <ActionIconButton
-                label={`Lihat detail dokumen ${document.documentNumber}`}
-                tooltip={`Lihat detail dokumen ${document.documentNumber}`}
-                icon={FileText}
-                onClick={() => onSelect(document)}
-              />
-            </div>
-          </div>
+            {chip.label}
+          </Button>
         ))}
-        {documents.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-            {emptyMessage}
-          </div>
-        )}
       </div>
 
-      {/* Desktop Table View (>= 768px) */}
-      <div className="hidden overflow-x-auto md:block">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nomor dokumen</TableHead>
-              <TableHead>Jenis / Tiket</TableHead>
-              <TableHead>Judul</TableHead>
-              <TableHead>Tanda tangan</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Aksi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {documents.map((document) => (
-              <TableRow key={document.id}>
-                <TableCell className="font-medium">{document.documentNumber}</TableCell>
-                <TableCell>
-                  {kindLabels[document.kind]}
-                  <span className="block text-xs text-muted-foreground">{document.ticket.ticketNumber}</span>
-                </TableCell>
-                <TableCell>{document.title}</TableCell>
-                <TableCell>
-                  {document.signedBy.name}
-                  <span className="block text-xs text-muted-foreground">
-                    {dateFormatter.format(new Date(document.signedAt))}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={document.status === OperationalDocumentStatus.ISSUED ? "lightSuccess" : "lightWarning"}>
-                    {document.status === OperationalDocumentStatus.ISSUED ? "Terbit" : "Siap diterbitkan"}
+      {filteredDocuments.length ? (
+        <>
+          <div className="space-y-2.5 md:hidden">
+            {filteredDocuments.map((document) => (
+              <div
+                key={document.id}
+                className="space-y-2 rounded-xl border border-border bg-card p-3.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="type-p3 font-mono font-semibold text-primary">
+                      {document.documentNumber}
+                    </p>
+                    <p className="type-p2 mt-0.5 font-semibold text-foreground">
+                      {document.title}
+                    </p>
+                    <p className="type-p3 text-muted-foreground">
+                      {kindLabels[document.kind]} · {document.ticket.ticketNumber}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      document.status === OperationalDocumentStatus.ISSUED
+                        ? "lightSuccess"
+                        : "lightWarning"
+                    }
+                    className="shrink-0"
+                  >
+                    {document.status === OperationalDocumentStatus.ISSUED
+                      ? "Terbit"
+                      : "Siap diterbitkan"}
                   </Badge>
-                  {document.issuedAt && (
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {dateFormatter.format(new Date(document.issuedAt))}
+                </div>
+                <div className="type-p3 flex items-center justify-between border-t border-border pt-2 text-muted-foreground">
+                  <div className="min-w-0">
+                    <span className="font-medium text-foreground">
+                      {document.signedBy.name}
                     </span>
-                  )}
-                </TableCell>
-                <TableCell>
+                    <span className="type-p3 block">
+                      {dateFormatter.format(new Date(document.signedAt))}
+                    </span>
+                  </div>
                   <ActionIconButton
                     label={`Lihat detail dokumen ${document.documentNumber}`}
                     tooltip={`Lihat detail dokumen ${document.documentNumber}`}
                     icon={FileText}
                     onClick={() => onSelect(document)}
                   />
-                </TableCell>
-              </TableRow>
+                </div>
+              </div>
             ))}
-            {documents.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  {emptyMessage}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nomor dokumen</TableHead>
+                  <TableHead>Jenis / Tiket</TableHead>
+                  <TableHead>Judul</TableHead>
+                  <TableHead>Tanda tangan</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDocuments.map((document) => (
+                  <TableRow key={document.id}>
+                    <TableCell className="type-p2 font-medium">{document.documentNumber}</TableCell>
+                    <TableCell className="type-p2">
+                      {kindLabels[document.kind]}
+                      <span className="type-p3 block text-muted-foreground">
+                        {document.ticket.ticketNumber}
+                      </span>
+                    </TableCell>
+                    <TableCell className="type-p2">{document.title}</TableCell>
+                    <TableCell className="type-p2">
+                      {document.signedBy.name}
+                      <span className="type-p3 block text-muted-foreground">
+                        {dateFormatter.format(new Date(document.signedAt))}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          document.status === OperationalDocumentStatus.ISSUED
+                            ? "lightSuccess"
+                            : "lightWarning"
+                        }
+                      >
+                        {document.status === OperationalDocumentStatus.ISSUED
+                          ? "Terbit"
+                          : "Siap diterbitkan"}
+                      </Badge>
+                      {document.issuedAt && (
+                        <span className="type-p3 mt-1 block text-muted-foreground">
+                          {dateFormatter.format(new Date(document.issuedAt))}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <ActionIconButton
+                        label={`Lihat detail dokumen ${document.documentNumber}`}
+                        tooltip={`Lihat detail dokumen ${document.documentNumber}`}
+                        icon={FileText}
+                        onClick={() => onSelect(document)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          variant="inline"
+          icon={FileText}
+          title={emptyTitle}
+          description={emptyDescription}
+        />
+      )}
     </CardBox>
   );
 }

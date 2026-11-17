@@ -1,21 +1,35 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { X, HelpCircle, Paperclip } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
+import { CalendarDays, Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FileDropzone } from "@/components/ui/file-dropzone";
+import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { compressFieldImageFiles } from "@/lib/image-compression-client";
 
 export interface TaskModalData {
   id?: string;
   title: string;
-  location: string; // Fase
+  location: string;
   status: string;
   assigneeName?: string;
-  hasConstraint: boolean; // Kendala
-  needsCheck: boolean; // Perlu dicek
-  startWeek: number; // Mulai (minggu)
-  durationWeeks: number; // Durasi (mgg)
-  progress: number; // Progress (%)
+  hasConstraint: boolean;
+  needsCheck: boolean;
+  startWeek: number;
+  durationWeeks: number;
+  progress: number;
   startDate?: string;
   endDate?: string;
 }
@@ -66,6 +80,8 @@ const STATUS_OPTIONS = [
   { value: "DELAYED", label: "Terlambat" },
 ];
 
+const NO_ASSIGNEE_VALUE = "__NONE__";
+
 function getPhotoSelectionKey(photo: File): string {
   return `${photo.name}\u0000${photo.size}\u0000${photo.lastModified}\u0000${photo.type}`;
 }
@@ -80,6 +96,7 @@ export default function TaskModal({
   onDelete,
 }: TaskModalProps) {
   const [formData, setFormData] = useState<TaskModalData>(() => ({
+    id: initialData?.id,
     title: initialData?.title ?? "",
     location: initialData?.location ?? "A. Persiapan",
     status: initialData?.status ?? "auto",
@@ -103,23 +120,61 @@ export default function TaskModal({
   const [pendingProgressReportId, setPendingProgressReportId] = useState<
     string | null
   >(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const uploadedPhotoKeysRef = useRef(new Set<string>());
 
-  if (!isOpen) return null;
+  const handleFilesChange = (incomingFiles: File[]) => {
+    // Mendeteksi penghapusan file maupun penambahan baru dari FileDropzone
+    if (incomingFiles.length < selectedPhotos.length) {
+      setSelectedPhotos(incomingFiles);
+      setPhotoSelectionNotice("");
+      return;
+    }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title.trim()) return;
+    const uploadedKeys = uploadedPhotoKeysRef.current;
+    const seenKeys = new Set<string>();
+    const deduped: File[] = [];
+    let skippedCount = 0;
+
+    for (const file of incomingFiles) {
+      const key = getPhotoSelectionKey(file);
+      if (uploadedKeys.has(key) || seenKeys.has(key)) {
+        skippedCount += 1;
+        continue;
+      }
+      seenKeys.add(key);
+      deduped.push(file);
+    }
+
+    setSelectedPhotos(deduped);
+    setPhotoSelectionNotice(
+      skippedCount > 0
+        ? "Foto duplikat diabaikan dan tidak akan diunggah ulang."
+        : "",
+    );
+    setSubmitError("");
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!formData.title.trim()) {
+      toast.error("Nama task wajib diisi.");
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError("");
     try {
+      const compressedPhotos =
+        selectedPhotos.length > 0
+          ? await compressFieldImageFiles(selectedPhotos)
+          : [];
+
       const result = await onSave({
         ...formData,
         id: formData.id || savedTaskId || undefined,
         progressReportId: pendingProgressReportId ?? undefined,
-        photos: selectedPhotos,
+        photos: compressedPhotos,
       });
+
       if (result?.savedTaskId) setSavedTaskId(result.savedTaskId);
       if (result?.progressReportId) {
         setPendingProgressReportId(result.progressReportId);
@@ -137,406 +192,370 @@ export default function TaskModal({
       }
       if (result?.error) {
         setSubmitError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Task jadwal berhasil disimpan.");
       onClose();
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Task gagal disimpan.",
-      );
+      const msg =
+        error instanceof Error ? error.message : "Task gagal disimpan.";
+      setSubmitError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card text-card-foreground shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/60 p-5 pb-4">
-          <h3 className="text-base font-semibold text-foreground">
-            {formData.id ? "Ubah task" : "Task baru"}
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-              <HelpCircle className="size-3.5" />
-              <span>Panduan</span>
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit}>
-          <div className="max-h-[72vh] overflow-y-auto p-5 space-y-4">
-            {/* Nama task */}
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Nama task <span className="text-destructive">*</span>
-              </label>
-              <Input
-                type="text"
-                placeholder="mis. Struktur Lantai 1-5"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                required
-                className="h-9 text-xs"
-              />
-            </div>
-
-            {/* Fase & Status row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">Fase</label>
-                <select
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
-                >
-                  {PHASES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1.5">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
-                >
-                  {STATUS_OPTIONS.map((st) => (
-                    <option key={st.value} value={st.value}>
-                      {st.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Penanggung jawab */}
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">
-                Penanggung jawab
-              </label>
-              <select
-                value={formData.assigneeName || ""}
-                onChange={(e) => setFormData({ ...formData, assigneeName: e.target.value })}
-                className="h-9 w-full rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
-              >
-                <option value="">Tanpa penanggung jawab</option>
-                {defaultAssigneeName && (
-                  <option value={defaultAssigneeName}>
-                    {defaultAssigneeName} (PIC Proyek)
-                  </option>
-                )}
-                {teamMembers && teamMembers.length > 0 ? (
-                  teamMembers
-                    .filter((m) => m.name !== defaultAssigneeName)
-                    .map((m) => (
-                      <option key={m.id} value={m.name}>
-                        {m.name} ({m.role || "Tim Lapangan"})
-                      </option>
-                    ))
-                ) : (
-                  <>
-                    <option value="Angga Okta Pratama">Angga Okta Pratama (PM)</option>
-                    <option value="Bambang Gunawan">Bambang Gunawan (Koordinator)</option>
-                    <option value="Athariq Virziansyah">Athariq Virziansyah (Field Team)</option>
-                  </>
-                )}
-              </select>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Dapat tugas dengan batas tanggal Selesai.
-              </p>
-            </div>
-
-            {/* Kendala & Perlu Dicek checkboxes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="flex items-start gap-2.5 rounded-xl border border-border/80 p-3 bg-muted/10 cursor-pointer hover:bg-muted/20 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.hasConstraint}
-                  onChange={(e) =>
-                    setFormData({ ...formData, hasConstraint: e.target.checked })
-                  }
-                  className="size-4 mt-0.5 rounded border-border text-foreground accent-foreground cursor-pointer"
-                />
-                <div>
-                  <div className="text-xs font-medium text-foreground">Kendala</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    Pekerjaan terhenti, mis. hujan atau material belum datang.
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2.5 rounded-xl border border-border/80 p-3 bg-muted/10 cursor-pointer hover:bg-muted/20 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.needsCheck}
-                  onChange={(e) =>
-                    setFormData({ ...formData, needsCheck: e.target.checked })
-                  }
-                  className="size-4 mt-0.5 rounded border-border text-foreground accent-foreground cursor-pointer"
-                />
-                <div>
-                  <div className="text-xs font-medium text-foreground">Perlu dicek</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    Sudah dikerjakan, belum diperiksa.
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            {/* Numbers row (Start week, Duration, Progress) */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Mulai (minggu)
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={formData.startWeek}
-                  onChange={(e) =>
-                    setFormData({ ...formData, startWeek: parseInt(e.target.value) || 0 })
-                  }
-                  className="h-9 text-xs"
-                />
-                <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                  0 = minggu 1
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Durasi (mgg)
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={formData.durationWeeks}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      durationWeeks: Math.max(1, parseInt(e.target.value) || 1),
-                    })
-                  }
-                  className="h-9 text-xs"
-                />
-                <span className="text-[10px] text-muted-foreground mt-0.5 block">min. 1</span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Progress (%)
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={formData.progress}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      progress: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)),
-                    })
-                  }
-                  className="h-9 text-xs"
-                />
-                <span className="text-[10px] text-muted-foreground mt-0.5 block">0–100</span>
-              </div>
-            </div>
-
-            {/* Dates row (Tanggal mulai & selesai) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Tanggal mulai
-                </label>
-                <Input
-                  type="date"
-                  value={formData.startDate || ""}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="h-9 text-xs"
-                />
-                <span className="text-[10px] text-muted-foreground mt-0.5 block">opsional</span>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-foreground mb-1">
-                  Tanggal selesai
-                </label>
-                <Input
-                  type="date"
-                  value={formData.endDate || ""}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="h-9 text-xs"
-                />
-                <span className="text-[10px] text-muted-foreground mt-0.5 block">opsional</span>
-              </div>
-            </div>
-
-            {/* Laporan harian */}
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">
-                Laporan harian
-              </label>
-              <p className="rounded-lg border border-border/70 bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
-                Progres task dan foto lampiran otomatis masuk ke laporan harian proyek hari ini.
-              </p>
-            </div>
-
-            {/* Lampiran (foto / bukti) */}
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1.5">
-                Lampiran (foto / bukti)
-              </label>
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                multiple
-                className="sr-only"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files ?? []);
-                  if (files.length > 0) {
-                    const selectedKeys = new Set(
-                      [
-                        ...selectedPhotos.map(getPhotoSelectionKey),
-                        ...uploadedPhotoKeysRef.current,
-                      ],
-                    );
-                    const addedKeys = new Set<string>();
-                    const uniqueFiles = files.filter((file) => {
-                      const key = getPhotoSelectionKey(file);
-                      if (selectedKeys.has(key) || addedKeys.has(key)) return false;
-                      addedKeys.add(key);
-                      return true;
-                    });
-                    setSelectedPhotos((current) => {
-                      const currentKeys = new Set(current.map(getPhotoSelectionKey));
-                      return [
-                        ...current,
-                        ...uniqueFiles.filter((file) => {
-                          const key = getPhotoSelectionKey(file);
-                          if (currentKeys.has(key)) return false;
-                          currentKeys.add(key);
-                          return true;
-                        }),
-                      ];
-                    });
-                    setPhotoSelectionNotice(
-                      uniqueFiles.length < files.length
-                        ? "Foto duplikat diabaikan dan tidak akan diunggah ulang."
-                        : "",
-                    );
-                    setSubmitError("");
-                  }
-                  event.currentTarget.value = "";
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs rounded-lg"
-                disabled={isSubmitting}
-                onClick={() => photoInputRef.current?.click()}
-              >
-                <Paperclip className="size-3.5" />
-                <span>Unggah lampiran</span>
-              </Button>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                Jumlah foto tidak dibatasi. JPG, PNG, atau WEBP; maksimal 100 MB per foto.
-              </p>
-              {photoSelectionNotice && (
-                <p className="mt-1 text-xs text-muted-foreground" role="status">
-                  {photoSelectionNotice}
-                </p>
-              )}
-              {selectedPhotos.length > 0 && (
-                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-border/60 p-2">
-                  {selectedPhotos.map((photo, index) => (
-                    <li
-                      key={`${photo.name}-${photo.lastModified}-${index}`}
-                      className="flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className="min-w-0 truncate text-muted-foreground">
-                        {photo.name}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={`Hapus ${photo.name}`}
-                        disabled={isSubmitting}
-                        onClick={() =>
-                          setSelectedPhotos((current) =>
-                            current.filter((_, photoIndex) => photoIndex !== index),
-                          )
-                        }
-                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {submitError && (
-                <p className="mt-2 text-xs text-destructive" role="alert">
-                  {submitError}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Footer actions */}
-          <div className="flex items-center justify-between border-t border-border/60 bg-muted/10 p-4">
+    <GlobalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileBehavior="sheet"
+      icon={<CalendarDays className="size-4" aria-hidden="true" />}
+      title={formData.id ? "Ubah Task" : "Task Baru"}
+      description="Progres task dan foto lampiran otomatis tercatat ke laporan harian proyek."
+      className="max-w-lg"
+      footer={
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+          <div>
             {formData.id && onDelete ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => onDelete(formData.id!)}
-                className="h-9 text-xs text-destructive hover:bg-destructive/10"
-              >
-                Hapus task
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onClose}
-                className="h-9 px-4 text-xs rounded-lg"
-              >
-                Batal
-              </Button>
-              <Button
-                type="submit"
-                variant="default"
-                size="sm"
                 disabled={isSubmitting}
-                className="h-9 px-4 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium"
+                onClick={() => void onDelete(formData.id!)}
+                className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
-                {isSubmitting ? "Menyimpan..." : "Simpan"}
+                <Trash2 className="size-4" aria-hidden="true" />
+                Hapus Task
               </Button>
-            </div>
+            ) : null}
           </div>
-        </form>
-      </div>
-    </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="project-task-modal-form"
+              size="sm"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Simpan"
+              )}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <form
+        id="project-task-modal-form"
+        onSubmit={handleSubmit}
+        className="space-y-4"
+      >
+        <div className="space-y-1.5">
+          <Label htmlFor="task-title" className="type-p2 font-medium">
+            Nama Task <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="task-title"
+            type="text"
+            placeholder="mis. Struktur Lantai 1-5"
+            value={formData.title}
+            onChange={(event) =>
+              setFormData({ ...formData, title: event.target.value })
+            }
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="task-phase" className="type-p2 font-medium">
+              Fase
+            </Label>
+            <Select
+              value={formData.location}
+              onValueChange={(value) =>
+                setFormData({ ...formData, location: value })
+              }
+            >
+              <SelectTrigger id="task-phase" className="w-full">
+                <SelectValue placeholder="Pilih fase" />
+              </SelectTrigger>
+              <SelectContent>
+                {!PHASES.includes(formData.location) && formData.location ? (
+                  <SelectItem value={formData.location}>
+                    {formData.location}
+                  </SelectItem>
+                ) : null}
+                {PHASES.map((phase) => (
+                  <SelectItem key={phase} value={phase}>
+                    {phase}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="task-status" className="type-p2 font-medium">
+              Status
+            </Label>
+            <Select
+              value={formData.status}
+              onValueChange={(value) =>
+                setFormData({ ...formData, status: value })
+              }
+            >
+              <SelectTrigger id="task-status" className="w-full">
+                <SelectValue placeholder="Pilih status" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((st) => (
+                  <SelectItem key={st.value} value={st.value}>
+                    {st.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="task-assignee" className="type-p2 font-medium">
+            Penanggung Jawab
+          </Label>
+          <Select
+            value={formData.assigneeName || NO_ASSIGNEE_VALUE}
+            onValueChange={(value) =>
+              setFormData({
+                ...formData,
+                assigneeName: value === NO_ASSIGNEE_VALUE ? "" : value,
+              })
+            }
+          >
+            <SelectTrigger id="task-assignee" className="w-full">
+              <SelectValue placeholder="Pilih penanggung jawab" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_ASSIGNEE_VALUE}>
+                Tanpa penanggung jawab
+              </SelectItem>
+              {defaultAssigneeName && (
+                <SelectItem value={defaultAssigneeName}>
+                  {defaultAssigneeName} (PIC Proyek)
+                </SelectItem>
+              )}
+              {teamMembers && teamMembers.length > 0 ? (
+                teamMembers
+                  .filter((member) => member.name !== defaultAssigneeName)
+                  .map((member) => (
+                    <SelectItem key={member.id} value={member.name}>
+                      {member.name} ({member.role || "Tim Lapangan"})
+                    </SelectItem>
+                  ))
+              ) : (
+                <>
+                  <SelectItem value="Angga Okta Pratama">
+                    Angga Okta Pratama (PM)
+                  </SelectItem>
+                  <SelectItem value="Bambang Gunawan">
+                    Bambang Gunawan (Koordinator)
+                  </SelectItem>
+                  <SelectItem value="Athariq Virziansyah">
+                    Athariq Virziansyah (Field Team)
+                  </SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Label
+            htmlFor="task-constraint"
+            className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-muted/20 p-3"
+          >
+            <Checkbox
+              id="task-constraint"
+              checked={formData.hasConstraint}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, hasConstraint: checked === true })
+              }
+              className="mt-0.5"
+            />
+            <div className="space-y-0.5">
+              <span className="type-p2 block font-semibold text-foreground">
+                Kendala
+              </span>
+              <span className="type-p3 block font-normal text-muted-foreground">
+                Terhenti karena cuaca atau material.
+              </span>
+            </div>
+          </Label>
+
+          <Label
+            htmlFor="task-needs-check"
+            className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-muted/20 p-3"
+          >
+            <Checkbox
+              id="task-needs-check"
+              checked={formData.needsCheck}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, needsCheck: checked === true })
+              }
+              className="mt-0.5"
+            />
+            <div className="space-y-0.5">
+              <span className="type-p2 block font-semibold text-foreground">
+                Perlu Dicek
+              </span>
+              <span className="type-p3 block font-normal text-muted-foreground">
+                Sudah dikerjakan, menunggu verifikasi.
+              </span>
+            </div>
+          </Label>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="task-start-week" className="type-p2 font-medium">
+              Mulai (mgg)
+            </Label>
+            <Input
+              id="task-start-week"
+              type="number"
+              min={0}
+              value={formData.startWeek}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  startWeek: Number.parseInt(event.target.value, 10) || 0,
+                })
+              }
+              className="tabular-nums"
+            />
+            <span className="type-p3 block text-muted-foreground">
+              0 = minggu 1
+            </span>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="task-duration" className="type-p2 font-medium">
+              Durasi (mgg)
+            </Label>
+            <Input
+              id="task-duration"
+              type="number"
+              min={1}
+              value={formData.durationWeeks}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  durationWeeks: Math.max(
+                    1,
+                    Number.parseInt(event.target.value, 10) || 1,
+                  ),
+                })
+              }
+              className="tabular-nums"
+            />
+            <span className="type-p3 block text-muted-foreground">min. 1</span>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="task-progress" className="type-p2 font-medium">
+              Progress (%)
+            </Label>
+            <Input
+              id="task-progress"
+              type="number"
+              min={0}
+              max={100}
+              value={formData.progress}
+              onChange={(event) =>
+                setFormData({
+                  ...formData,
+                  progress: Math.max(
+                    0,
+                    Math.min(100, Number.parseInt(event.target.value, 10) || 0),
+                  ),
+                })
+              }
+              className="tabular-nums"
+            />
+            <span className="type-p3 block text-muted-foreground">0–100%</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="type-p2 font-medium">Tanggal Mulai</Label>
+            <DatePicker
+              clearable
+              value={formData.startDate || ""}
+              onValueChange={(dateKey) =>
+                setFormData({ ...formData, startDate: dateKey })
+              }
+              placeholder="Opsional"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="type-p2 font-medium">Tanggal Selesai</Label>
+            <DatePicker
+              clearable
+              value={formData.endDate || ""}
+              onValueChange={(dateKey) =>
+                setFormData({ ...formData, endDate: dateKey })
+              }
+              placeholder="Opsional"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="type-p2 font-medium">
+            Lampiran Foto Progres
+          </Label>
+          <FileDropzone
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            multiple
+            files={selectedPhotos}
+            disabled={isSubmitting}
+            onFilesChange={handleFilesChange}
+            onError={(msg) => toast.error(msg)}
+            label="Unggah Foto Lampiran"
+            hint="JPG, PNG, atau WEBP (otomatis dikompresi saat disimpan)."
+          />
+          {photoSelectionNotice && (
+            <p className="type-p3 text-muted-foreground" role="status">
+              {photoSelectionNotice}
+            </p>
+          )}
+          {submitError && (
+            <p className="type-p3 text-destructive" role="alert">
+              {submitError}
+            </p>
+          )}
+        </div>
+      </form>
+    </GlobalModal>
   );
 }

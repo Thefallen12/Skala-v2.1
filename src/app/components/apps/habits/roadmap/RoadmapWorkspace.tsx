@@ -1,17 +1,29 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { AlarmClock, ArrowUpRight, CalendarDays, CheckCircle2, Plus, TriangleAlert } from "lucide-react";
+import { AlarmClock, ArrowUpRight, CalendarDays, Plus, TriangleAlert } from "lucide-react";
 import { WorkTaskStatus } from "@prisma/client";
-import { toggleWorkspaceEventReminder, type WorkspaceActionResult } from "@/app/actions/habit-workspace";
+import { toggleWorkspaceEventReminder } from "@/app/actions/habit-workspace";
 import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { NativeDataTable } from "@/components/ui/native-data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Member = { id: string; name: string };
 type TaskRecord = {
@@ -39,9 +51,9 @@ type MeetingRecord = {
 };
 
 const statusText: Record<WorkTaskStatus, string> = {
-  TODO: "Planned",
-  IN_PROGRESS: "On track",
-  DONE: "Done",
+  TODO: "Direncanakan",
+  IN_PROGRESS: "Berjalan",
+  DONE: "Selesai",
 };
 
 function initials(name: string) {
@@ -61,19 +73,19 @@ function Avatars({ members }: { members: Member[] }) {
         <span
           key={member.id}
           title={member.name}
-          className={`grid size-6 place-items-center rounded-full border-2 border-card text-[8px] font-semibold text-white ${
-            ["bg-info", "bg-primary", "bg-warning", "bg-success"][index]
+          className={`type-p3 grid size-7 place-items-center rounded-full border-2 border-card font-semibold text-white ${
+            ["bg-info", "bg-primary", "bg-warning", "bg-success"][index % 4]
           }`}
         >
           {initials(member.name)}
         </span>
       ))}
       {distinct.length > 4 && (
-        <span className="grid size-6 place-items-center rounded-full border-2 border-card bg-muted text-[8px]">
+        <span className="type-p3 grid size-7 place-items-center rounded-full border-2 border-card bg-muted font-medium">
           +{distinct.length - 4}
         </span>
       )}
-      {!distinct.length && <span className="text-[10px] text-muted-foreground">—</span>}
+      {!distinct.length && <span className="type-p3 text-muted-foreground">—</span>}
     </div>
   );
 }
@@ -93,7 +105,6 @@ export default function RoadmapWorkspace({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [message, setMessage] = useState<WorkspaceActionResult | null>(null);
   const tasksByProject = projects
     .map((project) => ({
       ...project,
@@ -106,8 +117,12 @@ export default function RoadmapWorkspace({
         meeting.id,
         !meeting.isReminderSet,
       );
-      setMessage(result);
-      if (result.success) router.refresh();
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
     });
   };
   const meetingDay = (date: string) =>
@@ -118,51 +133,42 @@ export default function RoadmapWorkspace({
     );
 
   return (
-    <div className="my-4 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Product roadmap</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Milestone proyek, pemilik tugas, progres, dan rapat terjadwal.
-          </p>
-        </div>
-        <Button asChild size="sm">
-          <Link href="/apps/habits/tasks">
-            <Plus className="mr-1.5 size-3.5" aria-hidden="true" />
-            Tambah tugas
-          </Link>
-        </Button>
-      </div>
-      {message && (
-        <p
-          role={message.success ? "status" : "alert"}
-          className={`rounded-md border px-3 py-2 text-xs ${
-            message.success
-              ? "border-success/30 bg-success/10 text-success"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.message}
-        </p>
-      )}
+    <div className="my-4 space-y-5">
+      <PageHeader
+        title="Peta Jalan Proyek"
+        description="Milestone proyek, penanggung jawab tugas, progres, dan rapat terjadwal."
+        breadcrumbs={[
+          { label: "Beranda", href: "/" },
+          { label: "Jadwal & Tugas", href: "/apps/habits" },
+          { label: "Peta Jalan" },
+        ]}
+        actions={
+          <Button asChild size="sm">
+            <Link href="/apps/habits?tab=tasks">
+              <Plus className="mr-1.5 size-4" aria-hidden="true" />
+              Tambah Tugas
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(240px,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
         <CardBox className="overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold">Product roadmap</h2>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
+              <h2 className="type-h2 text-foreground">Daftar Milestone</h2>
+              <p className="type-p3 mt-0.5 text-muted-foreground">
                 {tasks.length} milestone · dikelompokkan per proyek
               </p>
             </div>
             <Link
-              href="/apps/habits/tasks"
-              className="text-[10px] font-medium text-primary hover:underline"
+              href="/apps/habits?tab=tasks"
+              className="type-p3 font-medium text-primary hover:underline"
             >
-              Kelola tugas <ArrowUpRight className="ml-1 inline size-3" />
+              Kelola tugas <ArrowUpRight className="ml-1 inline size-3.5" aria-hidden="true" />
             </Link>
           </div>
-          <div className="max-h-[680px] space-y-3 overflow-auto p-3">
+          <div className="max-h-[680px] space-y-3 overflow-auto p-3 sm:p-4">
             {tasksByProject.map((project, projectIndex) => {
               const doneCount = project.tasks.filter(
                 (task) => task.status === WorkTaskStatus.DONE,
@@ -171,36 +177,36 @@ export default function RoadmapWorkspace({
                 <details
                   key={project.id}
                   open
-                  className={`overflow-hidden rounded-md border border-border border-l-2 ${
+                  className={`overflow-hidden rounded-lg border border-border border-l-2 ${
                     projectIndex % 2 ? "border-l-warning" : "border-l-primary"
                   }`}
                 >
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/40 px-3 py-2.5">
-                    <span className="text-xs font-semibold">{project.name}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {project.tasks.length} milestone · {Math.round(project.progress)}% project progress
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-muted/40 px-3.5 py-2.5">
+                    <span className="type-h3 text-foreground">{project.name}</span>
+                    <span className="type-p3 text-muted-foreground">
+                      {project.tasks.length} milestone · {Math.round(project.progress)}% progres proyek
                     </span>
                   </summary>
-                  <NativeDataTable itemLabel="tugas">
-                    <table className="app-data-table min-w-[700px] text-[10px]">
-                      <thead className="border-b border-border text-left text-muted-foreground">
-                        <tr>
-                          <th className="w-7 px-2 py-2" aria-label="Nomor" />
-                          <th className="px-2 py-2 font-medium">Name</th>
-                          <th className="w-24 px-2 py-2 font-medium">ETA</th>
-                          <th className="w-24 px-2 py-2 font-medium">Lead</th>
-                          <th className="w-24 px-2 py-2 font-medium">Members</th>
-                          <th className="w-24 px-2 py-2 font-medium">Progress</th>
-                          <th className="w-20 px-2 py-2 font-medium">State</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <div className="p-2">
+                    <Table pagination={false}>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10">#</TableHead>
+                          <TableHead>Tugas</TableHead>
+                          <TableHead className="w-32">Target</TableHead>
+                          <TableHead className="w-28">Penanggung Jawab</TableHead>
+                          <TableHead className="w-28">Tim</TableHead>
+                          <TableHead className="w-28">Progres</TableHead>
+                          <TableHead className="w-28">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {project.tasks.map((task, index) => {
                           const late =
                             task.status !== WorkTaskStatus.DONE &&
                             task.endsAt.slice(0, 10) < today;
-                          const members = task.members.map(({ user }) => user);
-                          if (task.assignee) members.push(task.assignee);
+                          const taskMembers = task.members.map(({ user }) => user);
+                          if (task.assignee) taskMembers.push(task.assignee);
                           const progress =
                             task.status === WorkTaskStatus.DONE
                               ? 100
@@ -208,39 +214,30 @@ export default function RoadmapWorkspace({
                                 ? 50
                                 : 0;
                           return (
-                            <tr key={task.id} className="border-b border-border/70 last:border-0">
-                              <td className="px-2 py-2.5 text-muted-foreground">{index + 1}</td>
-                              <td className="max-w-52 truncate px-2 py-2.5" title={task.title}>
+                            <TableRow key={task.id}>
+                              <TableCell className="type-p3 text-muted-foreground">{index + 1}</TableCell>
+                              <TableCell className="type-p2 max-w-52 truncate font-medium" title={task.title}>
                                 {task.title}
-                              </td>
-                              <td className="whitespace-nowrap px-2 py-2.5 text-muted-foreground">
-                                <CalendarDays className="mr-1 inline size-3" />
-                                {format(new Date(task.endsAt), "d MMM, yyyy", { locale: id })}
-                              </td>
-                              <td className="px-2 py-2.5">
+                              </TableCell>
+                              <TableCell className="type-p3 whitespace-nowrap text-muted-foreground">
+                                <CalendarDays className="mr-1 inline size-3.5" aria-hidden="true" />
+                                {format(new Date(task.endsAt), "d MMM yyyy", { locale: id })}
+                              </TableCell>
+                              <TableCell>
                                 <Avatars members={task.assignee ? [task.assignee] : []} />
-                              </td>
-                              <td className="px-2 py-2.5">
-                                <Avatars members={members} />
-                              </td>
-                              <td className="px-2 py-2.5">
-                                <div
-                                  role="progressbar"
+                              </TableCell>
+                              <TableCell>
+                                <Avatars members={taskMembers} />
+                              </TableCell>
+                              <TableCell>
+                                <Progress
+                                  value={progress}
+                                  variant={late ? "warning" : "success"}
                                   aria-label={`Progres ${task.title}`}
-                                  aria-valuemin={0}
-                                  aria-valuemax={100}
-                                  aria-valuenow={progress}
-                                  className="h-1.5 w-20 overflow-hidden rounded-full bg-muted"
-                                >
-                                  <div
-                                    className={`h-full rounded-full ${
-                                      late ? "bg-warning" : "bg-success"
-                                    }`}
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-2 py-2.5">
+                                  className="h-1.5 w-20"
+                                />
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">
                                 <Badge
                                   variant={
                                     late
@@ -252,71 +249,72 @@ export default function RoadmapWorkspace({
                                           : "gray"
                                   }
                                 >
-                                  {late ? "Overdue" : statusText[task.status]}
+                                  {late ? "Terlambat" : statusText[task.status]}
                                 </Badge>
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t border-border bg-muted/20">
-                          <td colSpan={7} className="px-2 py-2 text-right text-muted-foreground">
-                            {doneCount} of {project.tasks.length} milestones complete
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </NativeDataTable>
+                      </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={7} className="type-p3 text-right text-muted-foreground">
+                            {doneCount} dari {project.tasks.length} milestone selesai
+                          </TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </div>
                 </details>
               );
             })}
             {!tasksByProject.length && (
-              <div className="rounded-md border border-dashed border-border px-4 py-10 text-center">
-                <p className="text-xs font-medium">Belum ada milestone di roadmap.</p>
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Buat tugas dan kaitkan dengan proyek untuk menambah milestone.
-                </p>
-                <Button asChild variant="outline" size="sm" className="mt-3">
-                  <Link href="/apps/habits/tasks">Buat tugas</Link>
-                </Button>
-              </div>
+              <EmptyState
+                variant="inline"
+                title="Belum ada milestone"
+                description="Buat tugas dan kaitkan dengan proyek untuk menambah milestone."
+                action={
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/apps/habits?tab=tasks">Buat Tugas</Link>
+                  </Button>
+                }
+              />
             )}
           </div>
         </CardBox>
 
         <CardBox className="overflow-hidden p-0">
           <div className="border-b border-border px-4 py-3">
-            <h2 className="text-sm font-semibold">Scheduled meetings</h2>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
+            <h2 className="type-h2 text-foreground">Jadwal Rapat</h2>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
               Rapat mendatang dalam 90 hari
             </p>
           </div>
-          <div className="max-h-[680px] space-y-2 overflow-auto p-3">
+          <div className="max-h-[680px] space-y-2.5 overflow-auto p-3 sm:p-4">
             {meetings.map((meeting) => {
               const days = meetingDay(meeting.startsAt);
               const participants = meeting.participants.map(({ user }) => user);
               const canSetReminder =
                 meeting.createdById === currentUserId ||
-                participants.some(({ id }) => id === currentUserId);
+                participants.some(({ id: participantId }) => participantId === currentUserId);
               const isSoon = days <= 1;
               return (
                 <article
                   key={meeting.id}
-                  className={`rounded-md border border-border p-3 ${
+                  className={`rounded-lg border border-border p-3 ${
                     isSoon ? "bg-warning/10" : "bg-muted/20"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-xs font-semibold">{meeting.title}</h3>
+                    <h3 className="type-h3 text-foreground">{meeting.title}</h3>
                     <Badge variant={isSoon ? "warning" : "gray"}>
-                      {days === 0 ? "Today" : days === 1 ? "Tomorrow" : `${days} days`}
+                      {days === 0 ? "Hari ini" : days === 1 ? "Besok" : `${days} hari`}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {meeting.project?.name ?? "Meeting"} · {meeting.User.name}
+                  <p className="type-p3 mt-1 text-muted-foreground">
+                    {meeting.project?.name ?? "Rapat"} · {meeting.User.name}
                   </p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">
+                  <p className="type-p3 mt-1.5 text-muted-foreground">
                     {format(new Date(meeting.startsAt), "d MMMM yyyy · HH:mm", { locale: id })}
                   </p>
                   <div className="mt-3 flex items-center justify-between gap-2">
@@ -326,32 +324,29 @@ export default function RoadmapWorkspace({
                         <Button
                           size="sm"
                           variant={meeting.isReminderSet ? "secondary" : "outline"}
-                          className="h-7 px-2 text-[10px]"
                           onClick={() => toggleReminder(meeting)}
                           disabled={isPending}
                           aria-pressed={meeting.isReminderSet}
                         >
-                          <AlarmClock className="mr-1 size-3" />
-                          {meeting.isReminderSet ? "Reminder on" : "Notify me"}
+                          <AlarmClock className="mr-1 size-3.5" aria-hidden="true" />
+                          {meeting.isReminderSet ? "Pengingat aktif" : "Ingatkan"}
                         </Button>
                       )}
                       {meeting.meetingUrl ? (
-                        <Button asChild size="sm" className="h-7 px-2 text-[10px]">
+                        <Button asChild size="sm">
                           <a href={meeting.meetingUrl} target="_blank" rel="noreferrer">
-                            Join <ArrowUpRight className="ml-1 size-3" />
+                            Gabung <ArrowUpRight className="ml-1 size-3.5" aria-hidden="true" />
                           </a>
                         </Button>
                       ) : (
-                        <span title="Belum ada tautan rapat">
-                          <Button size="sm" className="h-7 px-2 text-[10px]" disabled>
-                            Join
-                          </Button>
-                        </span>
+                        <Button size="sm" disabled title="Belum ada tautan rapat">
+                          Gabung
+                        </Button>
                       )}
                     </div>
                   </div>
                   {meeting.isReminderSet && (
-                    <p className="mt-2 text-[9px] text-success">
+                    <p className="type-p3 mt-2 text-success">
                       Pengingat tersimpan untuk akun Anda.
                     </p>
                   )}
@@ -359,16 +354,17 @@ export default function RoadmapWorkspace({
               );
             })}
             {!meetings.length && (
-              <div className="rounded-md border border-dashed border-border p-6 text-center">
-                <TriangleAlert className="mx-auto size-5 text-muted-foreground" />
-                <p className="mt-2 text-xs font-medium">Belum ada rapat mendatang.</p>
-                <Link
-                  href="/apps/habits/schedule"
-                  className="mt-2 inline-block text-[10px] text-primary hover:underline"
-                >
-                  Buka kalender dan jadwalkan rapat
-                </Link>
-              </div>
+              <EmptyState
+                variant="inline"
+                icon={TriangleAlert}
+                title="Belum ada rapat mendatang"
+                description="Jadwalkan rapat baru melalui tab Kalender."
+                action={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/apps/habits?tab=calendar">Buka Kalender</Link>
+                  </Button>
+                }
+              />
             )}
           </div>
         </CardBox>

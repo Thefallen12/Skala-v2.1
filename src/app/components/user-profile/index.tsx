@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -34,6 +35,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -118,14 +121,14 @@ const roleLabels: Record<string, string> = {
 };
 
 const projectStatusLabels: Record<ProjectStatus, string> = {
-  PENDING_SETUP: "PENDING SETUP",
+  PENDING_SETUP: "Menunggu Setup",
   RUNNING: "Berjalan",
-  PENDING: "PENDING SETUP",
-  ON_PROGRESS: "RUNNING",
+  PENDING: "Menunggu Setup",
+  ON_PROGRESS: "Berjalan",
   TERHAMBAT: "Terhambat",
   DONE: "Selesai",
-  PLANNED: "PENDING SETUP",
-  ACTIVE: "RUNNING",
+  PLANNED: "Menunggu Setup",
+  ACTIVE: "Berjalan",
   ON_HOLD: "Ditunda",
   COMPLETED: "Selesai",
 };
@@ -201,6 +204,7 @@ export default function UserProfile({
     : "account";
   const [projectQuery, setProjectQuery] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [profileMessage, setProfileMessage] =
     useState<ProfileActionResult | null>(null);
   const [passwordMessage, setPasswordMessage] =
@@ -225,12 +229,19 @@ export default function UserProfile({
     event.preventDefault();
     setProfileMessage(null);
     const formData = new FormData(event.currentTarget);
+    if (photoFiles[0]) {
+      formData.set("profilePhoto", photoFiles[0]);
+    }
     startProfileTransition(async () => {
       const result = await updateMyProfile(formData);
       setProfileMessage(result);
       if (result.success) {
+        toast.success(result.message);
+        setPhotoFiles([]);
         setEditOpen(false);
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     });
   };
@@ -243,7 +254,12 @@ export default function UserProfile({
     startPasswordTransition(async () => {
       const result = await changeMyPassword(formData);
       setPasswordMessage(result);
-      if (result.success) form.reset();
+      if (result.success) {
+        toast.success(result.message);
+        form.reset();
+      } else {
+        toast.error(result.message);
+      }
     });
   };
 
@@ -261,7 +277,7 @@ export default function UserProfile({
               {getInitials(profile.name)}
             </AvatarFallback>
           </Avatar>
-          <h1 className="mt-3 text-base font-semibold">{profile.name}</h1>
+          <h2 className="type-h2 mt-3 text-foreground">{profile.name}</h2>
           <Badge variant="secondary" className="mt-1">
             {roleLabels[profile.role] ?? profile.role}
           </Badge>
@@ -269,24 +285,24 @@ export default function UserProfile({
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <div className="rounded-md border border-border p-3 text-center">
-            <CheckCircle2 className="mx-auto size-4 text-success" />
-            <p className="mt-1 text-lg font-semibold">
+            <CheckCircle2 className="mx-auto size-4 text-success" aria-hidden="true" />
+            <p className="type-kpi mt-1 text-foreground">
               {profile.completedTaskCount}
             </p>
-            <p className="text-[10px] text-muted-foreground">Tugas selesai</p>
+            <p className="type-p3 text-muted-foreground">Tugas selesai</p>
           </div>
           <div className="rounded-md border border-border p-3 text-center">
-            <BriefcaseBusiness className="mx-auto size-4 text-primary" />
-            <p className="mt-1 text-lg font-semibold">
+            <BriefcaseBusiness className="mx-auto size-4 text-primary" aria-hidden="true" />
+            <p className="type-kpi mt-1 text-foreground">
               {profile.completedProjectCount}
             </p>
-            <p className="text-[10px] text-muted-foreground">Proyek selesai</p>
+            <p className="type-p3 text-muted-foreground">Proyek selesai</p>
           </div>
         </div>
 
         <div className="mt-5 border-t border-border pt-4">
-          <h2 className="text-xs font-semibold">Detail akun</h2>
-          <dl className="mt-3 space-y-3 text-xs">
+          <h3 className="type-h3 text-foreground">Detail akun</h3>
+          <dl className="type-p3 mt-3 space-y-3">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">Nama pengguna</dt>
               <dd className="max-w-[58%] truncate text-right" title={profile.name}>
@@ -333,14 +349,15 @@ export default function UserProfile({
             className="mt-5 w-full"
             onClick={() => {
               setProfileMessage(null);
+              setPhotoFiles([]);
               setEditOpen(true);
             }}
           >
-            <Pencil className="mr-2 size-3.5" />
+            <Pencil className="mr-2 size-3.5" aria-hidden="true" />
             Edit profil
           </Button>
           {profileMessage?.success && (
-            <p role="status" className="mt-2 text-center text-[10px] text-success">
+            <p role="status" className="type-p3 mt-2 text-center text-success">
               {profileMessage.message}
             </p>
           )}
@@ -349,19 +366,19 @@ export default function UserProfile({
 
       <Tabs defaultValue={defaultTab} className="min-w-0 space-y-4">
         <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-muted p-1 sm:grid-cols-5">
-          <TabsTrigger value="account" className="text-xs">Akun</TabsTrigger>
-          <TabsTrigger value="security" className="text-xs">Keamanan</TabsTrigger>
-          <TabsTrigger value="billing" className="text-xs">Billing &amp; Plans</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs">Notifikasi</TabsTrigger>
-          <TabsTrigger value="connections" className="text-xs">Koneksi</TabsTrigger>
+          <TabsTrigger value="account">Akun</TabsTrigger>
+          <TabsTrigger value="security">Keamanan</TabsTrigger>
+          <TabsTrigger value="billing">Rekening &amp; Tiket</TabsTrigger>
+          <TabsTrigger value="notifications">Notifikasi</TabsTrigger>
+          <TabsTrigger value="connections">Koneksi</TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="mt-0 space-y-4">
           <CardBox className="overflow-hidden p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div>
-                <h2 className="text-sm font-semibold">Daftar proyek</h2>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <h2 className="type-h3 text-foreground">Daftar proyek</h2>
+                <p className="type-p3 mt-0.5 text-muted-foreground">
                   Proyek yang ditugaskan kepada Anda
                 </p>
               </div>
@@ -371,66 +388,75 @@ export default function UserProfile({
                   placeholder="Cari proyek"
                   value={projectQuery}
                   onChange={(event) => setProjectQuery(event.target.value)}
-                  className="h-8 text-xs"
                 />
               </div>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proyek</TableHead>
-                  <TableHead className="hidden md:table-cell">PIC</TableHead>
-                  <TableHead className="min-w-32">Status & progres</TableHead>
-                  <TableHead className="w-12 text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProjects.slice(0, 8).map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="max-w-56">
-                      <p className="truncate text-xs font-medium" title={project.name}>
-                        {project.name}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {project.code}
-                      </p>
-                    </TableCell>
-                    <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                      {project.leader || "Belum ditentukan"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={project.progress} className="h-1.5" />
-                        <span className="w-9 text-right text-[10px] text-muted-foreground">
-                          {Math.round(project.progress)}%
-                        </span>
-                      </div>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        {projectStatusLabels[project.status]}
-                      </p>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <ActionIconButton
-                        label={`Buka proyek ${project.name}`}
-                        tooltip={`Buka proyek ${project.name}`}
-                        icon={FolderKanban}
-                        href="/apps/habits?tab=calendar"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredProjects.length === 0 && (
+            {filteredProjects.length ? (
+              <Table pagination={false}>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center text-xs text-muted-foreground">
-                      {projectQuery
-                        ? "Tidak ada proyek yang cocok dengan pencarian."
-                        : "Belum ada proyek yang ditugaskan kepada Anda."}
-                    </TableCell>
+                    <TableHead>Proyek</TableHead>
+                    <TableHead className="hidden md:table-cell">PIC</TableHead>
+                    <TableHead className="min-w-32">Status &amp; progres</TableHead>
+                    <TableHead className="w-12 text-right">Aksi</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
+                </TableHeader>
+                <TableBody>
+                  {filteredProjects.slice(0, 8).map((project) => (
+                    <TableRow key={project.id}>
+                      <TableCell className="max-w-56">
+                        <p className="type-p2 truncate font-medium" title={project.name}>
+                          {project.name}
+                        </p>
+                        <p className="type-p3 mt-0.5 text-muted-foreground">
+                          {project.code}
+                        </p>
+                      </TableCell>
+                      <TableCell className="type-p3 hidden text-muted-foreground md:table-cell">
+                        {project.leader || "Belum ditentukan"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress value={project.progress} className="h-1.5" />
+                          <span className="type-p3 w-9 text-right text-muted-foreground">
+                            {Math.round(project.progress)}%
+                          </span>
+                        </div>
+                        <p className="type-p3 mt-1 text-muted-foreground">
+                          {projectStatusLabels[project.status]}
+                        </p>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <ActionIconButton
+                          label={`Buka proyek ${project.name}`}
+                          tooltip={`Buka proyek ${project.name}`}
+                          icon={FolderKanban}
+                          href="/apps/habits?tab=calendar"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="p-4">
+                <EmptyState
+                  variant="inline"
+                  icon={FolderKanban}
+                  title={
+                    projectQuery
+                      ? "Proyek tidak ditemukan"
+                      : "Belum ada proyek"
+                  }
+                  description={
+                    projectQuery
+                      ? "Ubah kata kunci pencarian Anda."
+                      : "Belum ada proyek yang ditugaskan kepada Anda."
+                  }
+                />
+              </div>
+            )}
+            <div className="type-p3 flex items-center justify-between border-t border-border px-4 py-2.5 text-muted-foreground">
               <span>
                 Menampilkan {Math.min(filteredProjects.length, 8)} dari{" "}
                 {filteredProjects.length} proyek
@@ -439,7 +465,7 @@ export default function UserProfile({
                 href="/apps/habits?tab=calendar"
                 className="font-medium text-primary hover:underline"
               >
-                Buka timeline <ArrowRight className="ml-1 inline size-3" />
+                Buka jadwal <ArrowRight className="ml-1 inline size-3" aria-hidden="true" />
               </Link>
             </div>
           </CardBox>
@@ -447,16 +473,16 @@ export default function UserProfile({
           <CardBox className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold">Aktivitas tugas</h2>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <h2 className="type-h3 text-foreground">Aktivitas tugas</h2>
+                <p className="type-p3 mt-0.5 text-muted-foreground">
                   Aktivitas tugas terbaru yang terkait dengan akun Anda
                 </p>
               </div>
               <Link
                 href="/apps/habits?tab=tasks"
-                className="shrink-0 text-[10px] font-medium text-primary hover:underline"
+                className="type-p3 shrink-0 font-medium text-primary hover:underline"
               >
-                Semua tugas <ArrowRight className="ml-1 inline size-3" />
+                Semua tugas <ArrowRight className="ml-1 inline size-3" aria-hidden="true" />
               </Link>
             </div>
             {profile.tasks.length ? (
@@ -481,15 +507,15 @@ export default function UserProfile({
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                        <p className="text-xs font-medium">{task.title}</p>
+                        <p className="type-p2 font-medium">{task.title}</p>
                         <time
                           dateTime={task.updatedAt}
-                          className="text-[10px] text-muted-foreground"
+                          className="type-p3 text-muted-foreground"
                         >
                           {formatActivityTime(task.updatedAt)}
                         </time>
                       </div>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
+                      <p className="type-p3 mt-1 text-muted-foreground">
                         {task.projectName} · {taskStatusLabels[task.status]}
                       </p>
                     </div>
@@ -497,12 +523,13 @@ export default function UserProfile({
                 ))}
               </ol>
             ) : (
-              <div className="mt-4 rounded-md border border-dashed border-border px-4 py-8 text-center">
-                <FolderKanban className="mx-auto size-5 text-muted-foreground" />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Belum ada aktivitas tugas untuk ditampilkan.
-                </p>
-              </div>
+              <EmptyState
+                variant="inline"
+                icon={FolderKanban}
+                title="Belum ada aktivitas tugas"
+                description="Tugas yang terkait dengan akun Anda akan muncul di sini."
+                className="mt-4"
+              />
             )}
           </CardBox>
         </TabsContent>
@@ -511,11 +538,11 @@ export default function UserProfile({
           <CardBox className="p-5">
             <div className="mb-4 flex items-start gap-3">
               <span className="rounded-md bg-success/10 p-2 text-success">
-                <ShieldCheck className="size-4" />
+                <ShieldCheck className="size-4" aria-hidden="true" />
               </span>
               <div>
-                <h2 className="text-sm font-semibold">Ubah kata sandi</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <h2 className="type-h3 text-foreground">Ubah kata sandi</h2>
+                <p className="type-p3 mt-1 text-muted-foreground">
                   Minimal 6 karakter, dengan huruf besar, huruf kecil, angka, dan simbol.
                 </p>
               </div>
@@ -634,8 +661,8 @@ export default function UserProfile({
             </form>
           </CardBox>
           <CardBox className="p-5">
-            <h2 className="text-sm font-semibold">Aktivitas keamanan</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <h2 className="type-h3 text-foreground">Aktivitas keamanan</h2>
+            <p className="type-p3 mt-1 text-muted-foreground">
               Login terakhir:{" "}
               {profile.lastLoginAt
                 ? formatActivityTime(profile.lastLoginAt)
@@ -648,8 +675,8 @@ export default function UserProfile({
           <CardBox className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold">Informasi rekening</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <h2 className="type-h3 text-foreground">Informasi rekening</h2>
+                <p className="type-p3 mt-1 text-muted-foreground">
                   Rekening tujuan pembayaran untuk akun Anda.
                 </p>
               </div>
@@ -659,107 +686,108 @@ export default function UserProfile({
                 size="sm"
                 onClick={() => {
                   setProfileMessage(null);
+                  setPhotoFiles([]);
                   setEditOpen(true);
                 }}
               >
-                <Pencil className="mr-2 size-3.5" />
+                <Pencil className="mr-2 size-3.5" aria-hidden="true" />
                 Edit rekening
               </Button>
             </div>
             {profile.bankName && profile.bankAccountName && profile.bankAccountNumber ? (
               <dl className="mt-4 grid gap-4 rounded-md border border-border p-4 sm:grid-cols-3">
                 <div>
-                  <dt className="text-[10px] text-muted-foreground">Nama bank</dt>
-                  <dd className="mt-1 text-xs font-medium">{profile.bankName}</dd>
+                  <dt className="type-p3 text-muted-foreground">Nama bank</dt>
+                  <dd className="type-p2 mt-1 font-medium">{profile.bankName}</dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] text-muted-foreground">Nama pemilik rekening</dt>
-                  <dd className="mt-1 text-xs font-medium">{profile.bankAccountName}</dd>
+                  <dt className="type-p3 text-muted-foreground">Nama pemilik rekening</dt>
+                  <dd className="type-p2 mt-1 font-medium">{profile.bankAccountName}</dd>
                 </div>
                 <div>
-                  <dt className="text-[10px] text-muted-foreground">Nomor rekening</dt>
-                  <dd className="mt-1 break-all text-xs font-medium">
+                  <dt className="type-p3 text-muted-foreground">Nomor rekening</dt>
+                  <dd className="type-p2 mt-1 break-all font-medium">
                     {profile.bankAccountNumber}
                   </dd>
                 </div>
               </dl>
             ) : (
-              <div className="mt-4 rounded-md border border-dashed border-border px-4 py-6 text-center">
-                <p className="text-xs font-medium">Rekening belum dilengkapi</p>
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Tambahkan nama bank, nama pemilik, dan nomor rekening melalui Edit profil.
-                </p>
-              </div>
+              <EmptyState
+                variant="inline"
+                title="Rekening belum dilengkapi"
+                description="Tambahkan nama bank, nama pemilik, dan nomor rekening melalui Edit profil."
+                className="mt-4"
+              />
             )}
           </CardBox>
 
           <CardBox className="overflow-hidden p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
               <div>
-                <h2 className="text-sm font-semibold">Riwayat request tiket</h2>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <h2 className="type-h3 text-foreground">Riwayat request tiket</h2>
+                <p className="type-p3 mt-0.5 text-muted-foreground">
                   Tiket yang Anda ajukan
                 </p>
               </div>
               <Link
                 href="/apps/tickets"
-                className="text-[10px] font-medium text-primary hover:underline"
+                className="type-p3 font-medium text-primary hover:underline"
               >
-                Buka tiket <ArrowRight className="ml-1 inline size-3" />
+                Buka tiket <ArrowRight className="ml-1 inline size-3" aria-hidden="true" />
               </Link>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tiket</TableHead>
-                  <TableHead className="hidden sm:table-cell">Jenis</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Jumlah</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {profile.tickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell className="max-w-52">
-                      <p className="truncate text-xs font-medium" title={ticket.title}>
-                        {ticket.title}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {ticket.ticketNumber} ·{" "}
-                        {new Intl.DateTimeFormat("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          timeZone: "Asia/Jakarta",
-                        }).format(new Date(ticket.createdAt))}
-                      </p>
-                    </TableCell>
-                    <TableCell className="hidden text-xs sm:table-cell">
-                      {ticketTypeLabels[ticket.type]}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-[9px]">
-                        {ticketStatusLabels[ticket.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-xs">
-                      {formatCurrency(ticket.totalAmount)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {profile.tickets.length === 0 && (
+            {profile.tickets.length ? (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="h-24 text-center text-xs text-muted-foreground"
-                    >
-                      Belum ada request tiket yang diajukan.
-                    </TableCell>
+                    <TableHead>Tiket</TableHead>
+                    <TableHead className="hidden sm:table-cell">Jenis</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Jumlah</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <div className="border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
+                </TableHeader>
+                <TableBody>
+                  {profile.tickets.map((ticket) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell className="max-w-52">
+                        <p className="type-p2 truncate font-medium" title={ticket.title}>
+                          {ticket.title}
+                        </p>
+                        <p className="type-p3 mt-0.5 text-muted-foreground">
+                          {ticket.ticketNumber} ·{" "}
+                          {new Intl.DateTimeFormat("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            timeZone: "Asia/Jakarta",
+                          }).format(new Date(ticket.createdAt))}
+                        </p>
+                      </TableCell>
+                      <TableCell className="type-p3 hidden sm:table-cell">
+                        {ticketTypeLabels[ticket.type]}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {ticketStatusLabels[ticket.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="type-p2 text-right font-medium tabular-nums">
+                        {formatCurrency(ticket.totalAmount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="p-4">
+                <EmptyState
+                  variant="inline"
+                  title="Belum ada request tiket"
+                  description="Tiket yang Anda ajukan akan tercatat di sini."
+                />
+              </div>
+            )}
+            <div className="type-p3 border-t border-border px-4 py-2.5 text-muted-foreground">
               Menampilkan {profile.tickets.length} tiket terbaru
             </div>
           </CardBox>
@@ -767,17 +795,17 @@ export default function UserProfile({
 
         <TabsContent value="notifications" className="mt-0">
           <CardBox className="p-5">
-            <h2 className="text-sm font-semibold">Notifikasi dan pengingat</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <h2 className="type-h3 text-foreground">Notifikasi dan pengingat</h2>
+            <p className="type-p3 mt-1 text-muted-foreground">
               Aktifkan notifikasi browser untuk menerima tiket yang ditugaskan
               kepada Anda, termasuk saat aplikasi tidak sedang terbuka.
             </p>
             <PushNotificationSettings />
             <Link
               href="/apps/habits?tab=calendar"
-              className="mt-4 inline-flex items-center text-xs font-medium text-primary hover:underline"
+              className="type-p3 mt-4 inline-flex items-center font-medium text-primary hover:underline"
             >
-              Buka Jadwal &amp; Rapat <ArrowRight className="ml-1 size-3" />
+              Buka Jadwal &amp; Rapat <ArrowRight className="ml-1 size-3" aria-hidden="true" />
             </Link>
           </CardBox>
         </TabsContent>
@@ -786,11 +814,11 @@ export default function UserProfile({
           <CardBox className="p-5">
             <div className="flex items-start gap-3">
               <span className="rounded-md bg-primary/10 p-2 text-primary">
-                <UserRound className="size-4" />
+                <UserRound className="size-4" aria-hidden="true" />
               </span>
               <div>
-                <h2 className="text-sm font-semibold">Koneksi pekerjaan</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <h2 className="type-h3 text-foreground">Koneksi pekerjaan</h2>
+                <p className="type-p3 mt-1 text-muted-foreground">
                   Akun ini terhubung ke {profile.projects.length} proyek dan{" "}
                   {profile.taskCount} tugas.
                 </p>
@@ -798,9 +826,9 @@ export default function UserProfile({
             </div>
             <Link
               href="/apps/habits?tab=calendar"
-              className="mt-4 inline-flex items-center text-xs font-medium text-primary hover:underline"
+              className="type-p3 mt-4 inline-flex items-center font-medium text-primary hover:underline"
             >
-              Lihat proyek terkait <ArrowRight className="ml-1 size-3" />
+              Lihat proyek terkait <ArrowRight className="ml-1 size-3" aria-hidden="true" />
             </Link>
           </CardBox>
         </TabsContent>
@@ -814,28 +842,33 @@ export default function UserProfile({
       className="sm:max-w-xl"
     >
         <form className="space-y-4" onSubmit={submitProfile}>
-          <div className="flex items-center gap-4">
-            <Avatar className="size-16 border border-border">
-              <AvatarImage
-                src={profile.profilePhotoUrl ?? "/images/profile/user-1.jpg"}
-                alt=""
-              />
-              <AvatarFallback>{getInitials(profile.name)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="profilePhoto">Foto profil</Label>
-              <Input
-                id="profilePhoto"
-                name="profilePhoto"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={isSavingProfile}
-                className="text-xs"
-              />
-              <p className="text-[10px] text-muted-foreground">
-                JPG, PNG, atau WEBP; maksimal 5 MB.
-              </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-4">
+              <Avatar className="size-16 border border-border">
+                <AvatarImage
+                  src={profile.profilePhotoUrl ?? "/images/profile/user-1.jpg"}
+                  alt=""
+                />
+                <AvatarFallback>{getInitials(profile.name)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="profilePhoto">Foto profil</Label>
+                <p className="type-p3 mt-0.5 text-muted-foreground">
+                  JPG, PNG, atau WEBP; maksimal 5 MB.
+                </p>
+              </div>
             </div>
+            <FileDropzone
+              id="profilePhoto"
+              accept="image/jpeg,image/png,image/webp"
+              maxSizeMb={5}
+              files={photoFiles}
+              onFilesChange={setPhotoFiles}
+              onError={(errorMessage) => toast.error(errorMessage)}
+              label="Unggah Foto Profil"
+              hint="Format JPG, PNG, atau WEBP (maks. 5 MB)"
+              disabled={isSavingProfile}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">

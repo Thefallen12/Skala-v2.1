@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import CardBox from "../shared/CardBox";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { ApexOptions } from "apexcharts";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -75,14 +76,14 @@ const YearlyBreakup = ({
   ];
 
   return (
-    <CardBox className="h-full min-w-0 border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-      <h2 className="mb-4 font-bold text-slate-900 dark:text-white">
+    <CardBox className="h-full min-w-0 border border-border bg-card p-4 text-card-foreground shadow-2xs sm:p-5">
+      <h2 className="type-h2 mb-4 text-foreground">
         Status Proyek
       </h2>
       <div className="grid min-w-0 grid-cols-1 items-center gap-2 2xl:grid-cols-[minmax(0,1fr)_180px]">
         <div className="min-w-0">
-          <p className="mb-1 text-xs text-muted-foreground">Total proyek</p>
-          <h3 className="mb-4 text-xl font-bold text-slate-900 dark:text-white">
+          <p className="type-p3 mb-1 text-muted-foreground">Total proyek</p>
+          <h3 className="type-kpi mb-4 text-foreground">
             {total}
           </h3>
           <div className="flex flex-col gap-2">
@@ -92,7 +93,7 @@ const YearlyBreakup = ({
                   icon="tabler:point-filled"
                   className={`text-xl ${item.color}`}
                 />
-                <span className="text-xs text-muted-foreground">
+                <span className="type-p3 text-muted-foreground">
                   {item.label}: {item.value}
                 </span>
               </div>
@@ -111,9 +112,11 @@ const YearlyBreakup = ({
               />
             </div>
           ) : (
-            <p className="py-12 text-center text-xs text-muted-foreground">
-              Belum ada data proyek.
-            </p>
+            <EmptyState
+              variant="inline"
+              title="Belum ada data"
+              description="Data status proyek akan tampil di sini."
+            />
           )}
         </div>
       </div>

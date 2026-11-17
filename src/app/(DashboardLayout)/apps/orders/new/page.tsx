@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import BreadcrumbComp from "../../../layout/shared/breadcrumb/BreadcrumbComp";
+import { PageHeader } from "@/components/ui/page-header";
 import DOEditForm from "@/components/orders/DOEditForm";
 import POEditForm from "@/components/orders/POEditForm";
 import {
@@ -176,13 +176,18 @@ export default async function NewOrderPage({
   const poMap = new Map(relatedPurchaseOrders.map((po) => [po.id, po]));
 
   return (
-    <div className="space-y-4">
-      <BreadcrumbComp
+    <div className="space-y-5">
+      <PageHeader
         title={isDeliveryOrder ? "Buat Delivery Order" : "Buat Purchase Order"}
-        items={[
-          { to: "/", title: "Beranda" },
-          { to: "/apps/orders", title: "PO & Surat Jalan" },
-          { title: isDeliveryOrder ? "DO Baru" : "PO Baru" },
+        description={
+          isDeliveryOrder
+            ? "Lengkapi referensi tiket, kendaraan atau ekspedisi, serta daftar barang pengiriman."
+            : "Lengkapi data vendor, metode pembayaran, dan rincian material pengadaan."
+        }
+        breadcrumbs={[
+          { label: "Beranda", href: "/" },
+          { label: "PO & Surat Jalan", href: "/apps/orders" },
+          { label: isDeliveryOrder ? "DO Baru" : "PO Baru" },
         ]}
       />
       <main className="w-full">

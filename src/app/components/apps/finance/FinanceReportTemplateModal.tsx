@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   Calendar,
   CheckCircle2,
@@ -15,9 +16,25 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { FinanceAccountCard } from "@/app/components/apps/finance/FinanceLedger";
 
 export type ReportTransactionRow = {
@@ -572,11 +589,15 @@ export default function FinanceReportTemplateModal({
     link.download = `SPE-Template-Kosong-Arus-Kas.csv`;
     link.click();
     URL.revokeObjectURL(url);
+    toast.success("Template CSV kosong berhasil diunduh.");
   };
 
   const handlePrintOfficialReport = () => {
     const printWindow = window.open("", "_blank", "width=1024,height=800");
-    if (!printWindow) return;
+    if (!printWindow) {
+      toast.error("Pop-up diblokir browser. Izinkan pop-up untuk mencetak laporan.");
+      return;
+    }
 
     const printedAt = new Intl.DateTimeFormat("id-ID", {
       dateStyle: "long",
@@ -1234,81 +1255,88 @@ export default function FinanceReportTemplateModal({
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
-            <Label htmlFor="report-period-filter" className="text-xs">
+            <Label htmlFor="report-period-filter" className="type-p3">
               Periode Transaksi
             </Label>
-            <select
-              id="report-period-filter"
+            <Select
               value={periodFilter}
-              onChange={(e) =>
-                setPeriodFilter(e.target.value as PeriodFilterType)
-              }
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs text-foreground"
+              onValueChange={(value) => setPeriodFilter(value as PeriodFilterType)}
             >
-              <option value="ALL">Semua Waktu ({transactions.length} mutasi)</option>
-              <option value="THIS_MONTH">Bulan Ini</option>
-              <option value="LAST_30_DAYS">30 Hari Terakhir</option>
-              <option value="CUSTOM">Rentang Tanggal Kustom</option>
-            </select>
+              <SelectTrigger id="report-period-filter" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">
+                  Semua Waktu ({transactions.length} mutasi)
+                </SelectItem>
+                <SelectItem value="THIS_MONTH">Bulan Ini</SelectItem>
+                <SelectItem value="LAST_30_DAYS">30 Hari Terakhir</SelectItem>
+                <SelectItem value="CUSTOM">Rentang Kustom</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="report-account-filter" className="text-xs">
-              Filter Buku Kas / Rekening
+            <Label htmlFor="report-account-filter" className="type-p3">
+              Buku Kas / Rekening
             </Label>
-            <select
-              id="report-account-filter"
+            <Select
               value={selectedAccountName}
-              onChange={(e) => setSelectedAccountName(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs text-foreground"
+              onValueChange={setSelectedAccountName}
             >
-              <option value="ALL">Semua Rekening ({accounts.length} akun)</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.accountName}>
-                  {acc.accountName} ({currency(acc.balance)})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="report-account-filter" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">
+                  Semua Rekening ({accounts.length} akun)
+                </SelectItem>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.accountName}>
+                    {acc.accountName} ({currency(acc.balance)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {periodFilter === "CUSTOM" ? (
             <>
               <div className="space-y-1.5">
-                <Label htmlFor="report-date-start" className="text-xs">
+                <Label htmlFor="report-date-start" className="type-p3">
                   Dari Tanggal
                 </Label>
-                <Input
+                <DatePicker
                   id="report-date-start"
-                  type="date"
                   value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="h-9 text-xs"
+                  onValueChange={setCustomStartDate}
+                  clearable
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="report-date-end" className="text-xs">
+                <Label htmlFor="report-date-end" className="type-p3">
                   Sampai Tanggal
                 </Label>
-                <Input
+                <DatePicker
                   id="report-date-end"
-                  type="date"
                   value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="h-9 text-xs"
+                  onValueChange={setCustomEndDate}
+                  minDate={customStartDate || undefined}
+                  clearable
                 />
               </div>
             </>
           ) : (
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="report-note-input" className="text-xs">
-                Catatan / Keterangan Laporan
+              <Label htmlFor="report-note-input" className="type-p3">
+                Catatan Laporan
               </Label>
               <Input
                 id="report-note-input"
                 value={reportNote}
                 onChange={(e) => setReportNote(e.target.value)}
                 placeholder="Contoh: Rekonsiliasi arus kas bulanan"
-                className="h-9 text-xs"
+                className="h-10"
               />
             </div>
           )}
@@ -1470,234 +1498,224 @@ export default function FinanceReportTemplateModal({
           {/* Konten Tabel Berdasarkan Template */}
           {templateType === "ACCOUNT_BALANCE" && (
             <div className="space-y-2">
-              <h4 className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+              <h4 className="type-p3 font-bold tracking-wider uppercase text-muted-foreground">
                 Tabel Posisi Saldo Buku Kas &amp; Rekening Bank
               </h4>
-              <div className="overflow-x-auto rounded-lg border border-border/70">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b bg-muted/40 text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2.5">Rekening / Kas</th>
-                      <th className="px-3 py-2.5">No. Rekening &amp; Atas Nama</th>
-                      <th className="px-3 py-2.5 text-right">Dana Masuk</th>
-                      <th className="px-3 py-2.5 text-right">Dana Keluar</th>
-                      <th className="px-3 py-2.5 text-right">Saldo Saat Ini</th>
-                      <th className="px-3 py-2.5 text-right">Porsi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {accountSummaryRows.map((acc) => (
-                      <tr key={acc.id} className="hover:bg-muted/20">
-                        <td className="px-3 py-2.5 font-semibold text-foreground">
-                          {acc.accountName}
-                        </td>
-                        <td className="px-3 py-2.5 text-muted-foreground">
-                          {acc.accountNumber ?? "Kas Tunai"} · {acc.holderName}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                          +{currency(acc.accIn)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-medium tabular-nums text-rose-600 dark:text-rose-400">
-                          -{currency(acc.accOut)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-bold tabular-nums text-foreground">
-                          {currency(acc.balance)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                          {acc.sharePct}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Table pagination={false}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rekening / Kas</TableHead>
+                    <TableHead>No. Rekening &amp; Atas Nama</TableHead>
+                    <TableHead className="text-right">Dana Masuk</TableHead>
+                    <TableHead className="text-right">Dana Keluar</TableHead>
+                    <TableHead className="text-right">Saldo Saat Ini</TableHead>
+                    <TableHead className="text-right">Porsi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accountSummaryRows.map((acc) => (
+                    <TableRow key={acc.id}>
+                      <TableCell className="type-p2 font-semibold text-foreground">
+                        {acc.accountName}
+                      </TableCell>
+                      <TableCell className="type-p3 text-muted-foreground">
+                        {acc.accountNumber ?? "Kas Tunai"} · {acc.holderName}
+                      </TableCell>
+                      <TableCell className="type-p3 text-right font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                        +{currency(acc.accIn)}
+                      </TableCell>
+                      <TableCell className="type-p3 text-right font-medium tabular-nums text-rose-600 dark:text-rose-400">
+                        -{currency(acc.accOut)}
+                      </TableCell>
+                      <TableCell className="type-p2 text-right font-bold tabular-nums text-foreground">
+                        {currency(acc.balance)}
+                      </TableCell>
+                      <TableCell className="type-p3 text-right tabular-nums text-muted-foreground">
+                        {acc.sharePct}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
 
           {templateType === "EXPENSE_BREAKDOWN" && (
             <div className="space-y-3">
-              <h4 className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
+              <h4 className="type-p3 font-bold tracking-wider uppercase text-muted-foreground">
                 Rekapitulasi Pengeluaran per Kategori Operasional
               </h4>
-              <div className="overflow-x-auto rounded-lg border border-border/70">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b bg-muted/40 text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2.5">Kategori Pengeluaran</th>
-                      <th className="px-3 py-2.5 text-center">Jumlah Mutasi</th>
-                      <th className="px-3 py-2.5 text-right">Total Pengeluaran</th>
-                      <th className="px-3 py-2.5 text-right">Porsi Biaya</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {expenseCategoryRows.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={4}
-                          className="px-3 py-6 text-center text-muted-foreground"
-                        >
-                          Belum ada transaksi pengeluaran pada periode ini.
-                        </td>
-                      </tr>
-                    ) : (
-                      expenseCategoryRows.map((row) => (
-                        <tr key={row.category} className="hover:bg-muted/20">
-                          <td className="px-3 py-2.5 font-semibold text-foreground">
-                            {row.category}
-                          </td>
-                          <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">
-                            {row.count} transaksi
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
-                            {currency(row.total)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">
-                            {row.percentage}%
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <Table pagination={false}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kategori Pengeluaran</TableHead>
+                    <TableHead className="text-center">Jumlah Mutasi</TableHead>
+                    <TableHead className="text-right">Total Pengeluaran</TableHead>
+                    <TableHead className="text-right">Porsi Biaya</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expenseCategoryRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="type-p2 py-6 text-center text-muted-foreground"
+                      >
+                        Belum ada transaksi pengeluaran pada periode ini.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    expenseCategoryRows.map((row) => (
+                      <TableRow key={row.category}>
+                        <TableCell className="type-p2 font-semibold text-foreground">
+                          {row.category}
+                        </TableCell>
+                        <TableCell className="type-p3 text-center tabular-nums text-muted-foreground">
+                          {row.count} transaksi
+                        </TableCell>
+                        <TableCell className="type-p2 text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                          {currency(row.total)}
+                        </TableCell>
+                        <TableCell className="type-p3 text-right tabular-nums text-muted-foreground">
+                          {row.percentage}%
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
 
           {templateType === "OUTSTANDING_PAYABLE" && (
             <div className="space-y-2">
-              <h4 className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
-                Daftar Tagihan PO &amp; Pengajuan Belum Lunas ({payables.length} item)
+              <h4 className="type-p3 font-bold tracking-wider uppercase text-muted-foreground">
+                Daftar Tagihan Belum Lunas ({payables.length} item)
               </h4>
-              <div className="overflow-x-auto rounded-lg border border-border/70">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b bg-muted/40 text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2.5">Referensi</th>
-                      <th className="px-3 py-2.5">Keperluan / Judul</th>
-                      <th className="px-3 py-2.5">Vendor / Pemohon</th>
-                      <th className="px-3 py-2.5 text-right">Total Tagihan</th>
-                      <th className="px-3 py-2.5 text-right">Terbayar</th>
-                      <th className="px-3 py-2.5 text-right">Sisa Hutang</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {payables.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-3 py-6 text-center text-muted-foreground"
-                        >
-                          Seluruh tagihan PO dan pengajuan tiket sudah lunas.
-                        </td>
-                      </tr>
-                    ) : (
-                      payables.map((row) => (
-                        <tr key={row.id} className="hover:bg-muted/20">
-                          <td className="px-3 py-2.5">
-                            <span className="font-mono font-semibold text-foreground">
-                              {row.reference}
-                            </span>
-                            <span className="block text-[10px] text-muted-foreground">
-                              {row.sourceLabel}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5 font-medium text-foreground">
-                            {row.title}
-                          </td>
-                          <td className="px-3 py-2.5 text-muted-foreground">
-                            {row.vendorOrRequester}
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">
-                            {currency(row.grandTotal)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {currency(row.paidAmount)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
-                            {currency(row.remainingAmount)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <Table pagination={false}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Referensi</TableHead>
+                    <TableHead>Keperluan / Judul</TableHead>
+                    <TableHead>Vendor / Pemohon</TableHead>
+                    <TableHead className="text-right">Total Tagihan</TableHead>
+                    <TableHead className="text-right">Terbayar</TableHead>
+                    <TableHead className="text-right">Sisa Hutang</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payables.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="type-p2 py-6 text-center text-muted-foreground"
+                      >
+                        Seluruh tagihan sudah lunas.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    payables.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <span className="type-p3 font-mono font-semibold text-foreground">
+                            {row.reference}
+                          </span>
+                          <span className="type-p3 block text-muted-foreground">
+                            {row.sourceLabel}
+                          </span>
+                        </TableCell>
+                        <TableCell className="type-p2 font-medium text-foreground">
+                          {row.title}
+                        </TableCell>
+                        <TableCell className="type-p3 text-muted-foreground">
+                          {row.vendorOrRequester}
+                        </TableCell>
+                        <TableCell className="type-p3 text-right tabular-nums">
+                          {currency(row.grandTotal)}
+                        </TableCell>
+                        <TableCell className="type-p3 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {currency(row.paidAmount)}
+                        </TableCell>
+                        <TableCell className="type-p2 text-right font-bold tabular-nums text-rose-600 dark:text-rose-400">
+                          {currency(row.remainingAmount)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
 
           {(templateType === "CASHFLOW_FULL" ||
             templateType === "EXPENSE_BREAKDOWN") && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold tracking-wider uppercase text-muted-foreground">
-                  Rincian Mutasi Transaksi (Pratinjau 15 Baris Terbaru)
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="type-p3 font-bold tracking-wider uppercase text-muted-foreground">
+                  Rincian Mutasi Transaksi (15 Baris Terbaru)
                 </h4>
-                <span className="text-[11px] text-muted-foreground">
-                  Seluruh {filteredTransactions.length} baris akan disertakan saat Cetak / Unduh CSV
+                <span className="type-p3 text-muted-foreground">
+                  Seluruh {filteredTransactions.length} baris disertakan saat Cetak / Unduh CSV
                 </span>
               </div>
-              <div className="overflow-x-auto rounded-lg border border-border/70">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b bg-muted/40 text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2.5">Tanggal</th>
-                      <th className="px-3 py-2.5">Kategori</th>
-                      <th className="px-3 py-2.5">Deskripsi &amp; Proyek</th>
-                      <th className="px-3 py-2.5">Buku Kas/Bank</th>
-                      <th className="px-3 py-2.5 text-right">Dana Masuk (+)</th>
-                      <th className="px-3 py-2.5 text-right">Dana Keluar (-)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {filteredTransactions.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-3 py-6 text-center text-muted-foreground"
-                        >
-                          Tidak ada transaksi yang sesuai dengan filter periode/rekening.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredTransactions.slice(0, 15).map((tx) => (
-                        <tr key={tx.id} className="hover:bg-muted/20">
-                          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                            {tx.date}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant="outline" className="text-[10px]">
-                              {tx.category}
-                            </Badge>
-                          </td>
-                          <td className="px-3 py-2">
-                            <p className="font-medium text-foreground">
-                              {tx.description}
-                            </p>
-                            {tx.projectName && (
-                              <span className="text-[11px] text-muted-foreground">
-                                Proyek: {tx.projectName}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {tx.accountName}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                            {tx.direction === "IN"
-                              ? `+${currency(tx.amount)}`
-                              : "—"}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold tabular-nums text-rose-600 dark:text-rose-400">
-                            {tx.direction === "OUT"
-                              ? `-${currency(tx.amount)}`
-                              : "—"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <Table pagination={false}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Kategori</TableHead>
+                    <TableHead>Deskripsi &amp; Proyek</TableHead>
+                    <TableHead>Buku Kas/Bank</TableHead>
+                    <TableHead className="text-right">Dana Masuk (+)</TableHead>
+                    <TableHead className="text-right">Dana Keluar (-)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTransactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="type-p2 py-6 text-center text-muted-foreground"
+                      >
+                        Tidak ada transaksi yang sesuai dengan filter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTransactions.slice(0, 15).map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="type-p3 whitespace-nowrap text-muted-foreground">
+                          {tx.date}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{tx.category}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <p className="type-p2 font-medium text-foreground">
+                            {tx.description}
+                          </p>
+                          {tx.projectName && (
+                            <span className="type-p3 text-muted-foreground">
+                              Proyek: {tx.projectName}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="type-p3 text-muted-foreground">
+                          {tx.accountName}
+                        </TableCell>
+                        <TableCell className="type-p3 text-right font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                          {tx.direction === "IN"
+                            ? `+${currency(tx.amount)}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="type-p3 text-right font-semibold tabular-nums text-rose-600 dark:text-rose-400">
+                          {tx.direction === "OUT"
+                            ? `-${currency(tx.amount)}`
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
 

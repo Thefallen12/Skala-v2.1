@@ -754,6 +754,7 @@ main {
 }
 
 @theme inline {
+  --font-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -900,7 +901,7 @@ main {
   --destructive: var(--error);
   --border: #2d3d54;
   --input: var(--border);
-  --ring: var(--lightprimary);
+  --ring: #fb923c;
   --chart-1: var(--primary);
   --chart-2: var(--secondary);
   --chart-3: var(--success);
@@ -916,7 +917,7 @@ main {
   --sidebar-ring: var(--ring);
 
   /* CUSTOM COLORS */
-  --info: #a78bfa;
+  --info: #c4b5fd;
   --success: #34d399;
   --warning: #fbbf24;
   --error: #f87171;
@@ -961,6 +962,55 @@ main {
   .dark select {
     color-scheme: dark;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--foreground);
+  }
+
+  h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 1.5rem;
+    }
+
+    h2 {
+      font-size: 1.125rem;
+    }
+
+    h3 {
+      font-size: 0.9375rem;
+    }
+  }
 }
 
 @layer base {
@@ -973,25 +1023,75 @@ main {
   }
 }
 
+@utility type-h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  @media (min-width: 768px) {
+    font-size: 1.5rem;
+  }
+}
+
+@utility type-h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  @media (min-width: 768px) {
+    font-size: 1.125rem;
+  }
+}
+
+@utility type-h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  @media (min-width: 768px) {
+    font-size: 0.9375rem;
+  }
+}
+
+@utility type-p1 {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@utility type-p2 {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+@utility type-p3 {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+@utility type-kpi {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  @media (min-width: 768px) {
+    font-size: 1.375rem;
+  }
+}
+
 @utility form-control {
   & input {
-    @apply border rounded-md border-border bg-transparent ring-transparent dark:ring-transparent dark:bg-transparent w-full text-sm;
+    @apply border rounded-md border-border bg-transparent dark:bg-transparent w-full text-base md:text-sm;
   }
 
-  & input:focus {
-    @apply shadow-none dark:shadow-none ring-transparent dark:ring-transparent;
-  }
-
-  & input:focus {
-    @apply border-primary dark:border-primary outline-hidden shadow-none ring-offset-0 ring-transparent;
+  & input:focus-visible {
+    @apply border-primary dark:border-primary outline-none ring-2 ring-primary/30;
   }
 }
 
 @utility form-control-textarea {
-  @apply rounded-md border border-border bg-transparent dark:bg-transparent w-full text-sm p-4;
+  @apply rounded-md border border-border bg-transparent dark:bg-transparent w-full text-base md:text-sm p-4;
 
-  &:focus {
-    @apply border-primary dark:border-primary outline-hidden shadow-none ring-offset-0 ring-transparent;
+  &:focus-visible {
+    @apply border-primary dark:border-primary outline-none ring-2 ring-primary/30;
   }
 }
 
@@ -1016,17 +1116,6 @@ main {
 @layer components {
   body {
     @apply text-sm overflow-x-hidden;
-  }
-
-
-  /*heading text color*/
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply text-foreground font-semibold;
   }
 
   input::placeholder {
@@ -1108,6 +1197,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+}
+
 @media (max-width: 639px) {
   html,
   body {
@@ -1153,18 +1250,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 0.8125rem;
   }
 
-  .body-wrapper h1 {
-    font-size: 1.25rem;
-  }
-
-  .body-wrapper h2 {
-    font-size: 1.125rem;
-  }
-
-  .body-wrapper h3 {
-    font-size: 1rem;
-  }
-
   .app-data-table {
     min-width: 100%;
   }
@@ -1185,9 +1270,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     max-width: calc(100vw - 1rem);
     max-height: calc(100dvh - 1rem);
   }
+}
 
-  [data-testid="flowbite-drawer"] {
-    max-width: 88vw;
+@media (pointer: coarse) {
+  [data-slot="button"]:not([data-compact="true"]) {
+    min-height: 2.75rem;
   }
 }
 
@@ -1239,11 +1326,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 /* Hide in Firefox */
 input[type="time"] {
   -moz-appearance: textfield;
-}
-
-[data-testid="flowbite-drawer"] {
-  will-change: transform;
-  -webkit-transform: translate3d(0, 0, 0);
 }
 
 @page {

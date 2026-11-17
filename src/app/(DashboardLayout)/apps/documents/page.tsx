@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { canManageUsers } from "@/lib/user-access";
 import { TicketStatus, TicketType, UserRole } from "@prisma/client";
-import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
+import { PageHeader } from "@/components/ui/page-header";
 import DocumentWorkspace from "@/app/components/apps/documents/DocumentWorkspace";
 
 export const metadata: Metadata = {
@@ -98,12 +98,13 @@ export default async function DocumentsPage() {
   ]);
 
   return (
-    <>
-      <BreadcrumbComp
+    <div className="space-y-5">
+      <PageHeader
         title="Dokumen PO & DO"
-        items={[
-          { to: "/", title: "Beranda" },
-          { title: "Dokumen PO & DO" },
+        description="Buat, bubuhkan tanda tangan, dan pantau penerbitan dokumen operasional secara searah."
+        breadcrumbs={[
+          { label: "Beranda", href: "/" },
+          { label: "Dokumen PO & DO" },
         ]}
       />
       <DocumentWorkspace
@@ -132,6 +133,6 @@ export default async function DocumentsPage() {
           createdAt: document.createdAt.toISOString(),
         }))}
       />
-    </>
+    </div>
   );
 }

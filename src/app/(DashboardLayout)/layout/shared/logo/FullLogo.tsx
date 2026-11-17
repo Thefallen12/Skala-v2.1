@@ -15,7 +15,7 @@ const FullLogo = () => {
         <span className="truncate text-sm font-bold text-primary dark:text-foreground">
           SKALA PRIORITAS
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary">
+        <span className="type-p3 font-semibold uppercase tracking-[0.14em] text-secondary">
           Engineering
         </span>
       </span>

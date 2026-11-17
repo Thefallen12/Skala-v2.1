@@ -44,16 +44,43 @@ export const MATERIAL_BILLING_FINANCE_ROLES: UserRole[] = [
   UserRole.DEPUTY_DIRECTOR,
 ];
 
-export function canManageMaterialContracts(role: UserRole): boolean {
-  return MATERIAL_CONTRACT_MANAGER_ROLES.includes(role);
+export const MATERIAL_INVOICE_PREPARER_ROLES: UserRole[] = [
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+];
+
+export function canManageMaterialContracts(role: UserRole | string): boolean {
+  return (
+    MATERIAL_CONTRACT_MANAGER_ROLES.includes(role as UserRole) ||
+    role === "KOORDINATOR_LOGISTIK"
+  );
 }
 
-export function canRecordMaterialDeliveries(role: UserRole): boolean {
-  return MATERIAL_DELIVERY_RECORDER_ROLES.includes(role);
+export function canRecordMaterialDeliveries(role: UserRole | string): boolean {
+  return (
+    MATERIAL_DELIVERY_RECORDER_ROLES.includes(role as UserRole) ||
+    role === "KOORDINATOR_LOGISTIK" ||
+    role === "TIM_LAPANGAN" ||
+    role === "KOORDINATOR_LAPANGAN"
+  );
 }
 
-export function canBillAndPayVendorContracts(role: UserRole): boolean {
-  return MATERIAL_BILLING_FINANCE_ROLES.includes(role);
+export function canPrepareVendorInvoices(role: UserRole | string): boolean {
+  return (
+    MATERIAL_INVOICE_PREPARER_ROLES.includes(role as UserRole) ||
+    role === "KOORDINATOR_LOGISTIK" ||
+    role === "KEUANGAN"
+  );
+}
+
+export function canBillAndPayVendorContracts(role: UserRole | string): boolean {
+  return (
+    MATERIAL_BILLING_FINANCE_ROLES.includes(role as UserRole) ||
+    role === "KEUANGAN"
+  );
 }
 
 export type MaterialDeliveryBillingStatusValue = "UNBILLED" | "BILLED";
@@ -156,6 +183,8 @@ export type VendorInvoiceDeliverySummary = {
   deliveryDate: string;
   projectId: string;
   projectName: string;
+  ticketId: string | null;
+  ticketNumber: string | null;
   vehiclePlate: string | null;
   driverName: string | null;
   quantityReceived: number;
@@ -319,7 +348,10 @@ export type CreateMaterialContractInput = z.input<
 export const recordMaterialDeliverySchema = z.object({
   contractId: z.string().trim().min(1, "Kontrak material wajib dipilih."),
   projectId: z.string().trim().min(1, "Proyek tujuan pengiriman wajib dipilih."),
-  ticketId: z.string().trim().optional().nullable(),
+  ticketId: z
+    .string()
+    .trim()
+    .min(1, "Surat Jalan Material Alam wajib ditautkan ke Tiket dari Tim Lapangan."),
   deliveryDate: z.string().trim().min(10, "Tanggal pengiriman wajib diisi."),
   doNumber: z
     .string()

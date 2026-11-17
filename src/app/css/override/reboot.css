@@ -59,37 +59,18 @@
   border: none !important
 }
 
-select {
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  background: transparent !important;
-  background-image: url("data:image/svg+xml,%3csvg aria-hidden='true' xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 10 6'%3e %3cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 1 4 4 4-4'/%3e %3c/svg%3e") !important;
-  background-repeat: no-repeat !important;
-  background-position: right .75rem center !important;
-  background-repeat: no-repeat !important;
-  background-size: .75em .75em !important;
-  cursor: pointer;
-}
-
-select:focus{
-  outline: none;
-}
-
-/* Mobile Touch Optimization for all Buttons & Interactive Elements */
+/* Mobile Touch Optimization without breaking compact icon/badge controls */
 @media (hover: none) and (pointer: coarse), (max-width: 768px) {
   button,
   [role="button"],
   input[type="button"],
   input[type="submit"],
-  input[type="reset"],
-  .btn {
-    min-height: 44px !important;
+  input[type="reset"] {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
 
-  button:active,
-  [role="button"]:active {
+  button:not(:disabled):active {
     transform: scale(0.97);
     transition: transform 0.08s ease-in-out;
   }

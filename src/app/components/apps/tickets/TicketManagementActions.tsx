@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import {
-  CircleAlert,
-  CircleCheck,
-  Lock,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
+  TicketCategoryHint,
+  TicketPriority,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import type { TicketRow } from "@/app/(DashboardLayout)/types/ticket";
 import {
   deleteTicket,
@@ -18,16 +17,19 @@ import {
   type TicketActionResult,
 } from "@/app/actions/tickets";
 import { isTicketProcessedByFinance } from "@/lib/ticket-finance-lock";
-import {
-  TicketCategoryHint,
-  TicketPriority,
-  TicketType,
-  UserRole,
-} from "@prisma/client";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 const priorities: { value: TicketPriority; label: string }[] = [
@@ -37,7 +39,7 @@ const priorities: { value: TicketPriority; label: string }[] = [
   { value: TicketPriority.URGENT, label: "Mendesak" },
 ];
 
-type EditableTicketItem = {
+export type EditableTicketItem = {
   id: string;
   stockItemId: string | null;
   itemName: string;
@@ -51,32 +53,12 @@ type EditableTicketItem = {
   deliveredQty: number;
 };
 
-type TicketToast = {
-  message: string;
-  success: boolean;
-};
+export type TicketManageMode = "edit" | "delete";
 
-export default function TicketManagementActions({
-  ticket,
-  role,
-  mode = "icon",
-  onTicketDeleted,
-}: {
-  ticket: TicketRow;
-  role: UserRole;
-  mode?: "icon" | "full";
-  onTicketDeleted?: () => void;
-}) {
-  const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [title, setTitle] = useState(ticket.title);
-  const [description, setDescription] = useState(ticket.description ?? "");
-  const [priority, setPriority] = useState(ticket.priority);
-  const [items, setItems] = useState<EditableTicketItem[]>([]);
-  const [toast, setToast] = useState<TicketToast | null>(null);
-  const [isPending, startTransition] = useTransition();
-
+export function getTicketManagementPermissions(
+  ticket: TicketRow,
+  role: UserRole,
+) {
   const isExecutive =
     role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR;
   const processedByFinance = isTicketProcessedByFinance(ticket);
@@ -84,61 +66,244 @@ export default function TicketManagementActions({
     !processedByFinance &&
     (isExecutive || (ticket.canSubmit && ticket.canRequesterEdit));
   const canDelete = !processedByFinance && isExecutive;
+  return { isExecutive, processedByFinance, canEdit, canDelete };
+}
 
-  useEffect(() => {
-    if (!toast) return;
-    const timeout = window.setTimeout(() => setToast(null), 4000);
-    return () => window.clearTimeout(timeout);
-  }, [toast]);
+function buildEditableItems(
+  ticket: TicketRow,
+  isExecutive: boolean,
+): EditableTicketItem[] {
+  return ticket.items.map((item) => {
+    const isContract = item.categoryHint === TicketCategoryHint.CONTRACT;
+    const deliveredQty =
+      isContract && item.materialContractId
+        ? (ticket.materialDeliveries ?? [])
+            .filter(
+              (delivery) => delivery.contractId === item.materialContractId,
+            )
+            .reduce((sum, delivery) => sum + delivery.quantityReceived, 0)
+        : 0;
+    return {
+      id: item.id,
+      stockItemId: item.stockItemId ?? null,
+      itemName: item.itemName,
+      quantity: item.quantity,
+      unit: item.unit,
+      estimatedCost: item.estimatedCost ?? "",
+      categoryHint: item.categoryHint ?? TicketCategoryHint.WAREHOUSE,
+      expectedDeliveryDate: item.expectedDeliveryDate ?? "",
+      isLinked: !isExecutive && Boolean(item.poItemId || item.doItemId),
+      isContract,
+      deliveredQty,
+    };
+  });
+}
 
-  if (processedByFinance) {
-    if (mode === "full" && isExecutive) {
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground">
-          <Lock className="size-3.5 text-amber-500" />
-          Terkunci · Sudah Diproses Keuangan
-        </span>
-      );
-    }
-    return null;
-  }
+function EditableTicketItemCard({
+  item,
+  index,
+  isExecutive,
+  isPending,
+  canRemove,
+  onUpdate,
+  onRemove,
+}: {
+  item: EditableTicketItem;
+  index: number;
+  isExecutive: boolean;
+  isPending: boolean;
+  canRemove: boolean;
+  onUpdate: (
+    itemId: string,
+    changes: Partial<
+      Pick<
+        EditableTicketItem,
+        | "itemName"
+        | "quantity"
+        | "unit"
+        | "estimatedCost"
+        | "categoryHint"
+        | "expectedDeliveryDate"
+      >
+    >,
+  ) => void;
+  onRemove: (itemId: string) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-muted/15 p-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[minmax(0,1.4fr)_6rem_6rem_auto] sm:items-end">
+        <div className="col-span-2 space-y-1 sm:col-span-1">
+          <Label htmlFor={`ticket-item-name-${item.id}`} className="type-p2">
+            Barang #{index + 1}
+          </Label>
+          <Input
+            id={`ticket-item-name-${item.id}`}
+            value={item.itemName}
+            maxLength={160}
+            placeholder="Contoh: Semen 40 Kg"
+            disabled={item.isLinked || item.isContract || isPending}
+            onChange={(event) =>
+              onUpdate(item.id, { itemName: event.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`ticket-item-quantity-${item.id}`} className="type-p2">
+            Jumlah
+          </Label>
+          <Input
+            id={`ticket-item-quantity-${item.id}`}
+            type="number"
+            min={item.isContract && item.deliveredQty > 0 ? item.deliveredQty : 0.01}
+            max="1000000000"
+            step="any"
+            value={Number.isFinite(item.quantity) ? item.quantity : ""}
+            disabled={item.isLinked || isPending}
+            onChange={(event) =>
+              onUpdate(item.id, { quantity: event.target.valueAsNumber })
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`ticket-item-unit-${item.id}`} className="type-p2">
+            Satuan
+          </Label>
+          <Input
+            id={`ticket-item-unit-${item.id}`}
+            value={item.unit}
+            maxLength={32}
+            placeholder="zak / pcs"
+            disabled={item.isLinked || item.isContract || isPending}
+            onChange={(event) =>
+              onUpdate(item.id, { unit: event.target.value })
+            }
+          />
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          aria-label={`Hapus barang ${item.itemName}`}
+          disabled={!canRemove || isPending}
+          onClick={() => onRemove(item.id)}
+          className="self-end text-destructive hover:bg-destructive/10 hover:text-destructive"
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
 
-  if (!canEdit && !canDelete) return null;
+      {isExecutive && !item.isContract && (
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          <div className="space-y-1">
+            <Label
+              htmlFor={`ticket-item-cost-${item.id}`}
+              className="type-p3 text-muted-foreground"
+            >
+              Harga Satuan (Rp)
+            </Label>
+            <Input
+              id={`ticket-item-cost-${item.id}`}
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Opsional"
+              value={item.estimatedCost}
+              disabled={isPending}
+              onChange={(event) =>
+                onUpdate(item.id, { estimatedCost: event.target.value })
+              }
+            />
+          </div>
+          <div className="space-y-1">
+            <Label
+              htmlFor={`ticket-item-source-${item.id}`}
+              className="type-p3 text-muted-foreground"
+            >
+              Sumber
+            </Label>
+            <Select
+              value={
+                item.categoryHint === TicketCategoryHint.PURCHASE
+                  ? TicketCategoryHint.PURCHASE
+                  : TicketCategoryHint.WAREHOUSE
+              }
+              disabled={isPending}
+              onValueChange={(value) =>
+                onUpdate(item.id, {
+                  categoryHint: value as TicketCategoryHint,
+                })
+              }
+            >
+              <SelectTrigger id={`ticket-item-source-${item.id}`} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TicketCategoryHint.WAREHOUSE}>
+                  Stok Gudang
+                </SelectItem>
+                <SelectItem value={TicketCategoryHint.PURCHASE}>
+                  Pembelian / PO
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label
+              htmlFor={`ticket-item-date-${item.id}`}
+              className="type-p3 text-muted-foreground"
+            >
+              Target Tiba
+            </Label>
+            <DatePicker
+              id={`ticket-item-date-${item.id}`}
+              value={item.expectedDeliveryDate}
+              clearable
+              disabled={isPending}
+              onValueChange={(val) =>
+                onUpdate(item.id, { expectedDeliveryDate: val })
+              }
+              placeholder="Pilih tanggal"
+            />
+          </div>
+        </div>
+      )}
 
-  const getEditableItems = (): EditableTicketItem[] =>
-    ticket.items.map((item) => {
-      const isContract = item.categoryHint === TicketCategoryHint.CONTRACT;
-      const deliveredQty =
-        isContract && item.materialContractId
-          ? (ticket.materialDeliveries ?? [])
-              .filter(
-                (delivery) => delivery.contractId === item.materialContractId,
-              )
-              .reduce((sum, delivery) => sum + delivery.quantityReceived, 0)
-          : 0;
-      return {
-        id: item.id,
-        stockItemId: item.stockItemId ?? null,
-        itemName: item.itemName,
-        quantity: item.quantity,
-        unit: item.unit,
-        estimatedCost: item.estimatedCost ?? "",
-        categoryHint: item.categoryHint ?? TicketCategoryHint.WAREHOUSE,
-        expectedDeliveryDate: item.expectedDeliveryDate ?? "",
-        isLinked: !isExecutive && Boolean(item.poItemId || item.doItemId),
-        isContract,
-        deliveredQty,
-      };
-    });
+      {item.isContract && (
+        <p className="type-p3 text-muted-foreground">
+          Item Kontrak Material Alam (nama &amp; satuan mengikuti kontrak
+          {item.deliveredQty > 0
+            ? `; terkirim ${item.deliveredQty} ${item.unit}`
+            : ""}
+          ).
+        </p>
+      )}
+      {item.isLinked && (
+        <p className="type-p3 text-muted-foreground">
+          Sudah terhubung ke PO atau Surat Jalan.
+        </p>
+      )}
+    </div>
+  );
+}
 
-  const openEditor = () => {
-    setTitle(ticket.title);
-    setDescription(ticket.description ?? "");
-    setPriority(ticket.priority);
-    setItems(getEditableItems());
-    setToast(null);
-    setIsOpen(true);
-  };
+function TicketManageFormBody({
+  ticket,
+  role,
+  onClose,
+}: {
+  ticket: TicketRow;
+  role: UserRole;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { isExecutive } = getTicketManagementPermissions(ticket, role);
+  const [title, setTitle] = useState(ticket.title);
+  const [description, setDescription] = useState(ticket.description ?? "");
+  const [priority, setPriority] = useState<TicketPriority>(ticket.priority);
+  const [items, setItems] = useState<EditableTicketItem[]>(() =>
+    buildEditableItems(ticket, isExecutive),
+  );
+  const [isPending, startTransition] = useTransition();
 
   const updateItem = (
     itemId: string,
@@ -198,7 +363,6 @@ export default function TicketManagementActions({
       ));
 
   const handleSave = () => {
-    setToast(null);
     startTransition(async () => {
       try {
         const result: TicketActionResult = await updateTicketDetails(
@@ -237,47 +401,280 @@ export default function TicketManagementActions({
                 : undefined,
           },
         );
-        setToast({ message: result.message, success: result.success });
         if (result.success) {
-          setIsOpen(false);
+          toast.success(result.message);
+          onClose();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Ticket edit action failed:", error);
-        setToast({
-          message: "Tiket gagal diperbarui. Silakan coba kembali.",
-          success: false,
-        });
+        toast.error("Tiket gagal diperbarui. Silakan coba kembali.");
       }
     });
   };
 
-  const handleDelete = () => {
-    if (isPending) return;
-    setToast(null);
-    setIsDeleteConfirmOpen(true);
-  };
+  return (
+    <GlobalModal
+      isOpen
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+      title={`Edit Tiket ${ticket.ticketNumber}`}
+      description="Perbarui rincian tiket sebelum diproses Keuangan."
+      className="sm:max-w-3xl"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={onClose}
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            disabled={
+              isPending ||
+              title.trim().length < 3 ||
+              title.trim().length > 160 ||
+              description.length > 5000 ||
+              !canSaveItems
+            }
+            onClick={handleSave}
+          >
+            {isPending ? "Menyimpan..." : "Simpan"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor={`ticket-title-${ticket.id}`} className="type-p2">
+              Judul Permintaan
+            </Label>
+            <Input
+              id={`ticket-title-${ticket.id}`}
+              value={title}
+              maxLength={160}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`ticket-priority-${ticket.id}`} className="type-p2">
+              Prioritas
+            </Label>
+            <Select
+              value={priority}
+              onValueChange={(value) => setPriority(value as TicketPriority)}
+            >
+              <SelectTrigger id={`ticket-priority-${ticket.id}`} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {priorities.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor={`ticket-description-${ticket.id}`} className="type-p2">
+            Deskripsi
+          </Label>
+          <Textarea
+            id={`ticket-description-${ticket.id}`}
+            value={description}
+            maxLength={5000}
+            rows={3}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+
+        {(items.length > 0 || ticket.type === TicketType.MATERIAL) && (
+          <section className="space-y-3 border-t border-border pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="type-h3 text-foreground">
+                  Rincian Barang ({items.length})
+                </h3>
+                <p className="type-p3 text-muted-foreground">
+                  Ubah nama, jumlah, satuan, atau sumber pemenuhan item.
+                </p>
+              </div>
+              {isExecutive && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={addNewBlankItem}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  Tambah Barang
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <EditableTicketItemCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  isExecutive={isExecutive}
+                  isPending={isPending}
+                  canRemove={
+                    !item.isLinked &&
+                    !(item.isContract && item.deliveredQty > 0) &&
+                    items.length > 1
+                  }
+                  onUpdate={updateItem}
+                  onRemove={(itemId) =>
+                    setItems((current) =>
+                      current.filter((currentItem) => currentItem.id !== itemId),
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </GlobalModal>
+  );
+}
+
+export function TicketManagementModal({
+  ticket,
+  mode,
+  role,
+  onClose,
+  onTicketDeleted,
+}: {
+  ticket: TicketRow | null;
+  mode: TicketManageMode | null;
+  role: UserRole;
+  onClose: () => void;
+  onTicketDeleted?: () => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  if (!ticket || !mode) return null;
+
+  if (mode === "edit") {
+    return (
+      <TicketManageFormBody
+        key={`${ticket.id}:edit`}
+        ticket={ticket}
+        role={role}
+        onClose={onClose}
+      />
+    );
+  }
 
   const confirmDelete = () => {
     if (isPending) return;
     startTransition(async () => {
       try {
         const result = await deleteTicket(ticket.id);
-        setToast({ message: result.message, success: result.success });
         if (result.success) {
-          setIsDeleteConfirmOpen(false);
+          toast.success(result.message);
+          onClose();
           onTicketDeleted?.();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Ticket delete action failed:", error);
-        setToast({
-          message: "Tiket gagal dihapus. Silakan coba kembali.",
-          success: false,
-        });
+        toast.error("Tiket gagal dihapus. Silakan coba kembali.");
       }
     });
   };
+
+  return (
+    <GlobalModal
+      isOpen
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+      title="Hapus Tiket?"
+      description="Tindakan ini tidak dapat dibatalkan."
+      icon={<Trash2 aria-hidden="true" className="size-5 text-destructive" />}
+      className="sm:max-w-lg"
+      footerNote="Pastikan Anda memahami dampak penghapusan."
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isPending}
+            onClick={onClose}
+          >
+            Batal
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isPending}
+            onClick={confirmDelete}
+          >
+            <Trash2 aria-hidden="true" className="size-4" />
+            {isPending ? "Menghapus..." : "Hapus"}
+          </Button>
+        </>
+      }
+    >
+      <p className="type-p2 leading-relaxed text-foreground">
+        Tiket <span className="font-semibold">{ticket.ticketNumber}</span> (
+        {ticket.title}) beserta rincian dan dokumen terkait akan dihapus
+        permanen.
+      </p>
+    </GlobalModal>
+  );
+}
+
+/**
+ * Legacy row-trigger wrapper kept solely for untouched compatibility files.
+ * New directory views use hoisted `TicketManagementModal` directly.
+ */
+export default function TicketManagementActions({
+  ticket,
+  role,
+  mode = "icon",
+  onTicketDeleted,
+}: {
+  ticket: TicketRow;
+  role: UserRole;
+  mode?: "icon" | "full";
+  onTicketDeleted?: () => void;
+}) {
+  const [activeMode, setActiveMode] = useState<TicketManageMode | null>(null);
+  const { isExecutive, processedByFinance, canEdit, canDelete } =
+    getTicketManagementPermissions(ticket, role);
+
+  if (processedByFinance) {
+    if (mode === "full" && isExecutive) {
+      return (
+        <span className="type-p3 inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-2.5 py-1 font-medium text-muted-foreground">
+          <Lock className="size-3.5 text-amber-500" aria-hidden="true" />
+          Terkunci
+        </span>
+      );
+    }
+    return null;
+  }
+
+  if (!canEdit && !canDelete) return null;
 
   return (
     <div className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
@@ -288,12 +685,10 @@ export default function TicketManagementActions({
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 text-xs"
-              disabled={isPending}
-              onClick={openEditor}
+              onClick={() => setActiveMode("edit")}
             >
-              <Pencil className="size-3.5" />
-              Edit Tiket
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Edit
             </Button>
           )}
           {canDelete && (
@@ -301,12 +696,11 @@ export default function TicketManagementActions({
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 border-destructive/50 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
-              disabled={isPending}
-              onClick={handleDelete}
+              className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => setActiveMode("delete")}
             >
-              <Trash2 className="size-3.5" />
-              Hapus Tiket
+              <Trash2 className="size-3.5" aria-hidden="true" />
+              Hapus
             </Button>
           )}
         </>
@@ -316,11 +710,10 @@ export default function TicketManagementActions({
             <ActionIconButton
               type="button"
               label="Edit tiket"
-              tooltip="Edit tiket & rincian barang"
+              tooltip="Edit tiket"
               icon={Pencil}
-              className="h-8 w-8"
-              disabled={isPending}
-              onClick={openEditor}
+              className="size-9"
+              onClick={() => setActiveMode("edit")}
             />
           )}
           {canDelete && (
@@ -329,379 +722,20 @@ export default function TicketManagementActions({
               label="Hapus tiket"
               tooltip="Hapus tiket"
               icon={Trash2}
-              className="h-8 w-8 border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-              disabled={isPending}
-              onClick={handleDelete}
+              className="size-9 border-destructive/70 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => setActiveMode("delete")}
             />
           )}
         </>
       )}
 
-      {toast && (
-        <div
-          className={`fixed bottom-5 right-5 z-[100] flex max-w-[min(24rem,calc(100vw-2.5rem))] items-center gap-3 rounded-xl border px-4 py-3 text-sm shadow-xl ${
-            toast.success
-              ? "border-emerald-500/30 bg-emerald-950 text-emerald-50"
-              : "border-red-500/30 bg-red-950 text-red-50"
-          }`}
-          role={toast.success ? "status" : "alert"}
-          aria-live={toast.success ? "polite" : "assertive"}
-        >
-          {toast.success ? (
-            <CircleCheck
-              className="size-5 shrink-0 text-emerald-300"
-              aria-hidden="true"
-            />
-          ) : (
-            <CircleAlert
-              className="size-5 shrink-0 text-red-300"
-              aria-hidden="true"
-            />
-          )}
-          <span>{toast.message}</span>
-        </div>
-      )}
-
-      <GlobalModal
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        title={`Edit Tiket ${ticket.ticketNumber}`}
-        description="Perbarui informasi tiket, tambah barang baru, atau ubah/hapus rincian barang sebelum diproses Keuangan."
-        className="sm:max-w-3xl"
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setIsOpen(false)}
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              disabled={
-                isPending ||
-                title.trim().length < 3 ||
-                title.trim().length > 160 ||
-                description.length > 5000 ||
-                !canSaveItems
-              }
-              onClick={handleSave}
-            >
-              {isPending ? "Menyimpan..." : "Simpan Perubahan"}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor={`ticket-title-${ticket.id}`}>
-                Judul Permintaan
-              </Label>
-              <Input
-                id={`ticket-title-${ticket.id}`}
-                value={title}
-                maxLength={160}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor={`ticket-priority-${ticket.id}`}>Prioritas</Label>
-              <select
-                id={`ticket-priority-${ticket.id}`}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={priority}
-                onChange={(event) =>
-                  setPriority(event.target.value as TicketPriority)
-                }
-              >
-                {priorities.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor={`ticket-description-${ticket.id}`}>Deskripsi</Label>
-            <Textarea
-              id={`ticket-description-${ticket.id}`}
-              value={description}
-              maxLength={5000}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-
-          {(items.length > 0 || ticket.type === TicketType.MATERIAL) && (
-            <section className="space-y-3 border-t border-border pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold">
-                    Rincian Barang ({items.length} Item)
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Ubah nama, jumlah, satuan, harga satuan, sumber, atau tambah
-                    barang baru.
-                  </p>
-                </div>
-                {isExecutive && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5 text-xs"
-                    disabled={isPending}
-                    onClick={addNewBlankItem}
-                  >
-                    <Plus className="size-3.5" />
-                    Tambah Barang
-                  </Button>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                {items.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="space-y-3 rounded-xl border border-border bg-muted/15 p-3"
-                  >
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[minmax(0,1.4fr)_6rem_6rem_auto] sm:items-end">
-                      <div className="col-span-2 space-y-1 sm:col-span-1">
-                        <Label htmlFor={`ticket-item-name-${item.id}`}>
-                          Nama Barang #{index + 1}
-                        </Label>
-                        <Input
-                          id={`ticket-item-name-${item.id}`}
-                          value={item.itemName}
-                          maxLength={160}
-                          placeholder="Contoh: Semen 40 Kg"
-                          disabled={
-                            item.isLinked || item.isContract || isPending
-                          }
-                          onChange={(event) =>
-                            updateItem(item.id, {
-                              itemName: event.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`ticket-item-quantity-${item.id}`}>
-                          Jumlah
-                        </Label>
-                        <Input
-                          id={`ticket-item-quantity-${item.id}`}
-                          type="number"
-                          min={
-                            item.isContract && item.deliveredQty > 0
-                              ? item.deliveredQty
-                              : 0.01
-                          }
-                          max="1000000000"
-                          step="any"
-                          value={
-                            Number.isFinite(item.quantity) ? item.quantity : ""
-                          }
-                          disabled={item.isLinked || isPending}
-                          onChange={(event) =>
-                            updateItem(item.id, {
-                              quantity: event.target.valueAsNumber,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`ticket-item-unit-${item.id}`}>
-                          Satuan
-                        </Label>
-                        <Input
-                          id={`ticket-item-unit-${item.id}`}
-                          value={item.unit}
-                          maxLength={32}
-                          placeholder="Zak / pcs / m2"
-                          disabled={
-                            item.isLinked || item.isContract || isPending
-                          }
-                          onChange={(event) =>
-                            updateItem(item.id, { unit: event.target.value })
-                          }
-                        />
-                      </div>
-                      <ActionIconButton
-                        label={`Hapus barang ${item.itemName}`}
-                        tooltip={
-                          item.isLinked ||
-                          (item.isContract && item.deliveredQty > 0)
-                            ? "Barang yang sudah diproses tidak dapat dihapus"
-                            : items.length === 1
-                              ? "Tiket harus memiliki setidaknya satu barang"
-                              : `Hapus barang ${item.itemName}`
-                        }
-                        icon={Trash2}
-                        disabled={
-                          item.isLinked ||
-                          (item.isContract && item.deliveredQty > 0) ||
-                          items.length === 1 ||
-                          isPending
-                        }
-                        onClick={() =>
-                          setItems((currentItems) =>
-                            currentItems.filter(
-                              (currentItem) => currentItem.id !== item.id,
-                            ),
-                          )
-                        }
-                        className="self-end text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                        variant="ghost"
-                      />
-                    </div>
-
-                    {isExecutive && !item.isContract && (
-                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                        <div className="space-y-1">
-                          <Label
-                            htmlFor={`ticket-item-cost-${item.id}`}
-                            className="text-xs text-muted-foreground"
-                          >
-                            Harga Satuan Estimasi (Rp)
-                          </Label>
-                          <Input
-                            id={`ticket-item-cost-${item.id}`}
-                            type="number"
-                            min="0"
-                            step="any"
-                            placeholder="Opsional"
-                            value={item.estimatedCost}
-                            disabled={isPending}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                estimatedCost: event.target.value,
-                              })
-                            }
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label
-                            htmlFor={`ticket-item-source-${item.id}`}
-                            className="text-xs text-muted-foreground"
-                          >
-                            Sumber Pemenuhan
-                          </Label>
-                          <select
-                            id={`ticket-item-source-${item.id}`}
-                            value={
-                              item.categoryHint === TicketCategoryHint.PURCHASE
-                                ? TicketCategoryHint.PURCHASE
-                                : TicketCategoryHint.WAREHOUSE
-                            }
-                            disabled={isPending}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                categoryHint: event.target
-                                  .value as TicketCategoryHint,
-                              })
-                            }
-                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
-                          >
-                            <option value={TicketCategoryHint.WAREHOUSE}>
-                              Stok Gudang
-                            </option>
-                            <option value={TicketCategoryHint.PURCHASE}>
-                              Pembelian / PO
-                            </option>
-                          </select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label
-                            htmlFor={`ticket-item-date-${item.id}`}
-                            className="text-xs text-muted-foreground"
-                          >
-                            Target Tiba
-                          </Label>
-                          <Input
-                            id={`ticket-item-date-${item.id}`}
-                            type="date"
-                            value={item.expectedDeliveryDate}
-                            disabled={isPending}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                expectedDeliveryDate: event.target.value,
-                              })
-                            }
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {item.isContract && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Item Kontrak Material Alam (nama &amp; satuan mengikuti
-                        kontrak
-                        {item.deliveredQty > 0
-                          ? `; sudah terkirim ${item.deliveredQty} ${item.unit}`
-                          : ""}
-                        ).
-                      </p>
-                    )}
-                    {item.isLinked && (
-                      <p className="text-xs text-muted-foreground">
-                        Sudah terhubung ke PO atau Surat Jalan dan tidak dapat
-                        diedit oleh pemohon.
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      </GlobalModal>
-
-      <GlobalModal
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => {
-          if (!isPending) setIsDeleteConfirmOpen(false);
-        }}
-        title="Hapus tiket ini?"
-        description="Tindakan ini tidak dapat dibatalkan."
-        icon={<Trash2 aria-hidden="true" className="size-5 text-destructive" />}
-        className="sm:max-w-lg"
-        bodyClassName="space-y-3"
-        footerNote="Pastikan Anda memahami dampak penghapusan."
-        footer={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setIsDeleteConfirmOpen(false)}
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isPending}
-              onClick={confirmDelete}
-            >
-              <Trash2 aria-hidden="true" className="size-4" />
-              {isPending ? "Menghapus..." : "Hapus Tiket"}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm leading-relaxed">
-          Tiket <span className="font-semibold">{ticket.ticketNumber}</span> (
-          {ticket.title}) beserta seluruh rincian barang dan dokumen operasional
-          terkait akan dihapus secara permanen.
-        </p>
-      </GlobalModal>
+      <TicketManagementModal
+        ticket={activeMode ? ticket : null}
+        mode={activeMode}
+        role={role}
+        onClose={() => setActiveMode(null)}
+        onTicketDeleted={onTicketDeleted}
+      />
     </div>
   );
 }

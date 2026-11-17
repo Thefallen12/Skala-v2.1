@@ -84,8 +84,8 @@ export const Login = ({ callbackUrl }: { callbackUrl?: string }) => {
         return
       }
 
-      // Hard navigation to ensure all server session cookies and fresh layout load cleanly
-      window.location.assign(destination)
+      // Replace login history entry so Android Back does not return to /login
+      window.location.replace(destination)
     } catch (err) {
       console.error('Sign-in exception:', err)
       setIsAuthenticating(false)

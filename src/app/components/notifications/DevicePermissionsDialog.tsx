@@ -19,7 +19,6 @@ import {
   clearPermissionsPromptSnooze,
   getDevicePermissionsSnapshot,
   getNotificationSoundEnabled,
-  isPermissionsPromptSnoozed,
   openDeviceAppSettings,
   openDeviceLocationSettings,
   openDeviceNotificationSettings,
@@ -99,24 +98,11 @@ export default function DevicePermissionsDialog({
       }
     });
 
-    const autoCheckTimer = window.setTimeout(() => {
-      void getDevicePermissionsSnapshot().then((next) => {
-        if (cancelled) return;
+    void getDevicePermissionsSnapshot().then((next) => {
+      if (!cancelled) {
         setSnapshot(next);
-
-        if (isPermissionsPromptSnoozed()) return;
-
-        const needsNotification =
-          next.notifications !== "granted" &&
-          next.notifications !== "unsupported";
-        const needsLocation =
-          next.location !== "granted" && next.location !== "unsupported";
-
-        if (needsNotification || needsLocation) {
-          setOpen(true);
-        }
-      });
-    }, 1600);
+      }
+    });
 
     const handleOpenDialog = () => {
       clearPermissionsPromptSnooze();
@@ -138,7 +124,6 @@ export default function DevicePermissionsDialog({
 
     return () => {
       cancelled = true;
-      window.clearTimeout(autoCheckTimer);
       window.removeEventListener(
         "skala:open-permissions-dialog",
         handleOpenDialog,

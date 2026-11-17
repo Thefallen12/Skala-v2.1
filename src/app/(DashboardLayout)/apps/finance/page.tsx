@@ -39,9 +39,11 @@ import type {
   RentalPeriodType,
   RentalStatus,
   RentalType,
+  RentalUsageScope,
 } from "@/app/actions/rentals";
+import type { PaymentPoSummaryOption } from "@/app/components/apps/finance/PaymentModal";
 import { loadMaterialContractsBundle } from "@/lib/material-contracts-server";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
 import FinanceAccount from "@/models/finance-account";
 import Cashflow from "@/models/cashflow";
 import OfficeExpense from "@/models/office-expense";
@@ -261,6 +263,7 @@ async function loadCashflowRows(
       paymentTransaction: payment
         ? {
             proofOfTransferUrl: payment.proofOfTransferUrl,
+            proofEditDisabledUrls: payment.proofEditDisabledUrls ?? [],
             ticket: payment.ticketId
               ? ticketById.get(payment.ticketId) ?? null
               : null,
@@ -475,6 +478,7 @@ async function loadPaidPaymentRows(
       paymentType: payment.paymentType as PaymentType,
       proofOfTransferUrl: payment.proofOfTransferUrl,
       additionalProofUrls: payment.additionalProofUrls,
+      proofEditDisabledUrls: payment.proofEditDisabledUrls ?? [],
       paidAt: payment.paidAt,
       cashflow: account ? { account: { accountName: account.accountName } } : null,
       ticket: ticket
@@ -525,9 +529,9 @@ async function loadPaidPaymentRows(
 export default async function FinancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; openSheet?: string }>;
+  searchParams: Promise<{ tab?: string; openSheet?: string; openInvoice?: string }>;
 }) {
-  const { tab, openSheet } = await searchParams;
+  const { tab, openSheet, openInvoice } = await searchParams;
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
   if (!financeRoles.includes(session.user.role)) redirect("/");
@@ -538,6 +542,7 @@ export default async function FinancePage({
   const canViewAPH =
     session.user.role === UserRole.FINANCE ||
     session.user.role === UserRole.DIRECTOR;
+  const mongo = await connectToMongoDBOptional();
   const financeData = await loadFinancePageMongooseData(
     session.user.role,
     canViewAPH,
@@ -572,76 +577,90 @@ export default async function FinancePage({
     dashboardOfficeExpenses,
     officeExpenseUsage,
   ] = await Promise.all([
-    FinanceAccount.find()
-      .sort({ accountName: 1 })
-      .select({
-        _id: 1,
-        accountName: 1,
-        accountNumber: 1,
-        holderName: 1,
-        balance: 1,
-      })
-      .lean()
-      .then((accounts) =>
-        accounts.map((account) => ({
-          id: String(account._id),
-          accountName: account.accountName,
-          accountNumber: account.accountNumber,
-          holderName: account.holderName,
-          balance: account.balance,
-        })),
-      ),
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.ADMINISTRATIONS
+    mongo
+      ? FinanceAccount.find()
+          .sort({ accountName: 1 })
+          .select({
+            _id: 1,
+            accountName: 1,
+            accountNumber: 1,
+            holderName: 1,
+            balance: 1,
+          })
+          .lean()
+          .then((accounts) =>
+            accounts.map((account) => ({
+              id: String(account._id),
+              accountName: account.accountName,
+              accountNumber: account.accountNumber,
+              holderName: account.holderName,
+              balance: account.balance,
+            })),
+          )
+      : Promise.resolve([]),
+    mongo &&
+    (session.user.role === UserRole.FINANCE ||
+      session.user.role === UserRole.ADMINISTRATIONS)
       ? loadOfficeExpenseRows({}, 200)
       : Promise.resolve([]),
-    User.find({ isActive: true })
-      .sort({ name: 1 })
-      .select({ _id: 1, name: 1, role: 1 })
-      .lean()
-      .then((users) =>
-        users.map((user) => ({
-          id: String(user._id),
-          name: user.name ?? "",
-          role: user.role as UserRole,
-        })),
-      ),
-    loadCashflowRows(canViewAPH),
-    loadPaidPaymentRows(canViewAPH, true),
-    loadCashflowRows(true, true),
-    loadPaidPaymentRows(canViewAPH, false),
-    Project.find()
-      .sort({ title: 1 })
-      .select({ _id: 1, title: 1, kelompokTani: 1 })
-      .lean()
-      .then((projects) =>
-        projects.map((project) => ({
-          id: String(project._id),
-          title: project.title,
-          kelompokTani: project.kelompokTani,
-        })),
-      ),
-    Cashflow.find({
-      type: "IN",
-      $or: [{ transferGroupId: null }, { transferGroupId: { $exists: false } }],
-      createdAt: { $gte: cashflowDashboardStart },
-    })
-      .select({ createdAt: 1, amount: 1 })
-      .lean(),
-    PaymentTransaction.find({
-      status: "PAID",
-      paidAt: { $gte: cashflowDashboardStart },
-      $or: [
-        { ticketId: { $ne: null } },
-        { poId: { $ne: null } },
-        { directStockPurchaseId: { $ne: null } },
-      ],
-    })
-      .select({ paidAt: 1, amount: 1, ticketId: 1, poId: 1 })
-      .lean(),
-    loadOfficeExpenseRows({ createdAt: { $gte: cashflowDashboardStart } }),
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.ADMINISTRATIONS
+    mongo
+      ? User.find({ isActive: true })
+          .sort({ name: 1 })
+          .select({ _id: 1, name: 1, role: 1 })
+          .lean()
+          .then((users) =>
+            users.map((user) => ({
+              id: String(user._id),
+              name: user.name ?? "",
+              role: user.role as UserRole,
+            })),
+          )
+      : Promise.resolve([]),
+    mongo ? loadCashflowRows(canViewAPH) : Promise.resolve([]),
+    mongo ? loadPaidPaymentRows(canViewAPH, true) : Promise.resolve([]),
+    mongo ? loadCashflowRows(true, true) : Promise.resolve([]),
+    mongo ? loadPaidPaymentRows(canViewAPH, false) : Promise.resolve([]),
+    mongo
+      ? Project.find()
+          .sort({ title: 1 })
+          .select({ _id: 1, title: 1, kelompokTani: 1 })
+          .lean()
+          .then((projects) =>
+            projects.map((project) => ({
+              id: String(project._id),
+              title: project.title,
+              kelompokTani: project.kelompokTani,
+            })),
+          )
+      : Promise.resolve([]),
+    mongo
+      ? Cashflow.find({
+          type: "IN",
+          $or: [{ transferGroupId: null }, { transferGroupId: { $exists: false } }],
+          createdAt: { $gte: cashflowDashboardStart },
+        })
+          .select({ createdAt: 1, amount: 1 })
+          .lean()
+      : Promise.resolve([]),
+    mongo
+      ? PaymentTransaction.find({
+          status: "PAID",
+          paidAt: { $gte: cashflowDashboardStart },
+          $or: [
+            { ticketId: { $ne: null } },
+            { poId: { $ne: null } },
+            { directStockPurchaseId: { $ne: null } },
+          ],
+        })
+          .select({ paidAt: 1, amount: 1, ticketId: 1, poId: 1 })
+          .lean()
+      : Promise.resolve([]),
+    mongo
+      ? loadOfficeExpenseRows({ createdAt: { $gte: cashflowDashboardStart } })
+      : Promise.resolve([]),
+    mongo &&
+    (session.user.role === UserRole.FINANCE ||
+      session.user.role === UserRole.ADMINISTRATIONS)
       ? loadOfficeExpenseRows({ expenseType: { $in: ["SALARY", "ADVANCE"] } })
       : Promise.resolve([]),
   ]);
@@ -765,6 +784,99 @@ export default async function FinancePage({
   for (const expense of dashboardOfficeExpenses) {
     addMonthlyFlow(expense.createdAt, "OUT", "office-expense", expense.amount);
   }
+  const paidTicketIdsForRentalDedup = new Set<string>([
+    ...dashboardPaidFlows
+      .map((flow) => flow.ticketId)
+      .filter((id): id is string => Boolean(id)),
+    ...tickets
+      .filter(
+        (ticket) =>
+          ticket.paymentTransactions.length > 0 ||
+          ticket.purchaseOrders.some(
+            (order) => order.paymentTransactions.length > 0,
+          ),
+      )
+      .map((ticket) => ticket.id),
+  ]);
+  const paidPaymentIdsForRentalDedup = new Set<string>([
+    ...dashboardPaidFlows.map((flow) => String(flow._id)),
+    ...dashboardPaidExpenses.map((payment) => payment.id),
+  ]);
+  const existingDashboardCashflowIds = new Set<string>(
+    dashboardIncomingFunds.map((fund) => fund.id),
+  );
+  const cashflowAccountById = new Map<string, string>(
+    cashflows.map((cf) => [cf.id, cf.account.accountName]),
+  );
+
+  const paidRentalDashboardTransactions: FinanceDashboardTransaction[] = [];
+  for (const rental of equipmentRentals) {
+    if (rental.paymentStatus !== "PAID") continue;
+    const sourceTicketId = rental.sourceTicketId
+      ? String(rental.sourceTicketId)
+      : null;
+    const paymentTxId = rental.paymentTransactionId
+      ? String(rental.paymentTransactionId)
+      : null;
+    const cashflowId = rental.cashflowId ? String(rental.cashflowId) : null;
+    const alreadyCounted =
+      (sourceTicketId !== null &&
+        paidTicketIdsForRentalDedup.has(sourceTicketId)) ||
+      (paymentTxId !== null && paidPaymentIdsForRentalDedup.has(paymentTxId)) ||
+      (cashflowId !== null &&
+        (existingDashboardCashflowIds.has(cashflowId) ||
+          paidPaymentIdsForRentalDedup.has(cashflowId)));
+    if (alreadyCounted) continue;
+
+    const rentalAmount = decimalNumberFromScaledInteger(rental.totalCost);
+    if (!Number.isFinite(rentalAmount) || rentalAmount <= 0) continue;
+    const paidDate =
+      rental.paidAt ?? rental.billingSubmittedAt ?? rental.createdAt;
+    if (paidDate && paidDate >= cashflowDashboardStart) {
+      addMonthlyFlow(paidDate, "OUT", "rental", rentalAmount);
+    }
+
+    const rentalTypeLabel =
+      rental.type === "HOUSE"
+        ? "Rumah Sewa"
+        : rental.type === "VEHICLE"
+          ? "Kendaraan Sewa"
+          : "Alat Sewa";
+    const ownerLabel = rental.landlordName || rental.vendorName || "";
+    const accountName =
+      (cashflowId ? cashflowAccountById.get(cashflowId) : undefined) ||
+      [
+        rental.paymentBankName,
+        rental.paymentAccountNumber,
+        rental.paymentAccountName,
+      ]
+        .filter(Boolean)
+        .join(" · ") ||
+      "Rekening Terdaftar";
+    const rentalProjectName = rental.project
+      ? rental.project.kelompokTani || rental.project.title
+      : rental.usageScope === "OPERATIONAL"
+        ? "Operasional Umum"
+        : null;
+
+    paidRentalDashboardTransactions.push({
+      id:
+        cashflowId ??
+        paymentTxId ??
+        `rental-${String(rental._id)}`,
+      createdAt: (paidDate ?? new Date()).toISOString(),
+      type: "OUT" as const,
+      category: "Rumah & Kendaraan Sewa",
+      sourceDesc: `${rentalTypeLabel} · ${rental.name}${ownerLabel ? ` (${ownerLabel})` : ""}`,
+      paymentMethod: rental.paymentBankName ? "Transfer" : "Pembayaran Sewa",
+      counterparty: ownerLabel || "Pemilik / Vendor Sewa",
+      accountOrDestination: accountName,
+      projectName: rentalProjectName,
+      amount: rentalAmount,
+      proofUrl: rental.proofOfPaymentUrl ?? null,
+    });
+  }
+
   const cashflowMonthlyAggregates = [...monthlyFlowMap.values()].sort((a, b) =>
     a.monthKey.localeCompare(b.monthKey),
   );
@@ -809,12 +921,14 @@ export default async function FinancePage({
     "purchase-order": "Purchase Order",
     "direct-material": "Belanja Material Langsung",
     "office-expense": "Pengeluaran Kantor & Operasional",
+    rental: "Rumah & Kendaraan Sewa",
   };
   const expenseCategoryKinds: FinanceExpenseCategory["kind"][] = [
     "ticket",
     "purchase-order",
     "direct-material",
     "office-expense",
+    "rental",
   ];
   const expenseCategories: FinanceExpenseCategory[] = expenseCategoryKinds.map((kind) => ({
     kind,
@@ -940,6 +1054,7 @@ export default async function FinancePage({
       amount: expense.amount,
       proofUrl: expense.proofUrls[0] ?? null,
     })),
+    ...paidRentalDashboardTransactions,
   ].sort(
     (first, second) =>
       new Date(second.createdAt).getTime() -
@@ -1277,7 +1392,72 @@ export default async function FinancePage({
             ticket.relatedPoIds?.length
               ? financePoMap.get(ticket.relatedPoIds[0])
               : undefined;
-          const activeTicketPo = ticket.purchaseOrders[0];
+          const prioritizedPoSummary =
+            ticket.poSummaries.find((po) => !po.isPaid && po.hasInvoice) ??
+            ticket.poSummaries.find((po) => !po.isPaid) ??
+            ticket.poSummaries.find((po) => po.hasInvoice) ??
+            ticket.poSummaries.at(0) ??
+            null;
+          const activeTicketPo = prioritizedPoSummary
+            ? ticket.purchaseOrders.find((po) => po.id === prioritizedPoSummary.id)
+            : ticket.purchaseOrders.find(
+                (po) => !po.paidAt && Boolean(po.vendorInvoiceUrl),
+              ) ??
+              ticket.purchaseOrders.find((po) => !po.paidAt) ??
+              ticket.purchaseOrders.find((po) => Boolean(po.vendorInvoiceUrl)) ??
+              ticket.purchaseOrders.at(0);
+          const serializedPoSummaries: PaymentPoSummaryOption[] =
+            ticket.poSummaries.map((summary) => {
+              const poDoc = ticket.purchaseOrders.find(
+                (po) => po.id === summary.id,
+              );
+              const poBankDetails = poDoc
+                ? resolveVendorBankDetails(
+                    poDoc,
+                    poDoc.vendor,
+                    poDoc.vendorName,
+                  )
+                : null;
+              const poBankDest =
+                poBankDetails?.paymentBankName &&
+                poBankDetails?.paymentAccountNumber
+                  ? `Ditransfer ke: ${poBankDetails.paymentBankName}, ${poBankDetails.paymentAccountNumber}, a.n. ${poBankDetails.paymentAccountName ?? poDoc?.vendorName ?? ""}`
+                  : null;
+              return {
+                id: summary.id,
+                publicCode: summary.publicCode,
+                poNumber: summary.poNumber,
+                vendorName: poDoc?.vendorName ?? "",
+                totalAmount: Number(summary.scaledTotal),
+                paidAmount: Number(summary.paidScaled),
+                remainingAmount: Number(summary.remainingScaled),
+                isPaid: summary.isPaid,
+                hasInvoice: summary.hasInvoice,
+                vendorInvoiceUrl: poDoc?.vendorInvoiceUrl ?? null,
+                transferDestination: poBankDest,
+                vendorBankAccounts: (poBankDetails?.vendorBankAccounts ?? []).flatMap(
+                  (account) => {
+                    const bankName = account.bankName?.trim();
+                    const bankAccount = account.bankAccount?.trim();
+                    if (!bankName || !bankAccount) return [];
+                    const holder =
+                      account.bankHolder?.trim() ||
+                      poDoc?.vendorName?.trim() ||
+                      "";
+                    return [
+                      {
+                        id: account.id,
+                        label: `${account.label ? `${account.label} · ` : ""}${bankName} · ${bankAccount}${account.bankHolder ? ` (a.n. ${account.bankHolder})` : ""}`,
+                        destination: holder
+                          ? `Ditransfer ke: ${bankName}, ${bankAccount}, a.n. ${holder}`
+                          : `Ditransfer ke: ${bankName}, ${bankAccount}`,
+                        isPrimary: account.isPrimary,
+                      },
+                    ];
+                  },
+                ),
+              };
+            });
           const ticketPoBankDetails = activeTicketPo
             ? resolveVendorBankDetails(
                 activeTicketPo,
@@ -1297,34 +1477,75 @@ export default async function FinancePage({
             ticketPoBankDetails?.paymentAccountNumber ?? null;
           const resolvedPoAccountName =
             ticketPoBankDetails?.paymentAccountName ?? null;
+          const rawRentalDetails = ticket.rentalDetails as {
+            rentalType?: string | null;
+            usageScope?: string | null;
+            assetName?: string | null;
+            propertyAddress?: string | null;
+            landlordName?: string | null;
+            landlordPhone?: string | null;
+            occupantCount?: number | null;
+            codeOrPlate?: string | null;
+            periodType?: string | null;
+            startDate?: Date | string | null;
+            endDate?: Date | string | null;
+            duration?: number | null;
+          } | null;
+          const serializeRentalDate = (value: Date | string | null | undefined) => {
+            if (!value) return null;
+            if (value instanceof Date && !Number.isNaN(value.getTime())) {
+              return value.toISOString();
+            }
+            return typeof value === "string" ? value : null;
+          };
+          const totalAmountStr =
+            ticket.aggregatedPoTotalAmount !== null
+              ? ticket.aggregatedPoTotalAmount.toString()
+              : (ticket.requestedAmount?.toString() ??
+                (ticket.totalAmount !== null
+                  ? decimalStringFromScaledInteger(ticket.totalAmount)
+                  : null) ??
+                null);
           return {
             id: ticket.id,
-            ticketType: equipmentTicketIds.has(ticket.id)
-              ? EQUIPMENT_REQUEST_TYPE
-              : null,
+            status: ticket.status,
+            ticketType:
+              ticket.ticketType ??
+              (equipmentTicketIds.has(ticket.id)
+                ? EQUIPMENT_REQUEST_TYPE
+                : null),
             ticketNumber: ticket.ticketNumber,
             title: ticket.title,
             type: ticket.type,
             hasApprovedPo: ticket.purchaseOrders.length > 0,
             poNumber: activeTicketPo?.poNumber ?? null,
-            totalAmount:
-              (activeTicketPo
-                ? Math.round(
-                    activeTicketPo.items.reduce(
-                      (sum, item) => sum + item.totalPrice,
-                      0,
-                    ) *
-                      (activeTicketPo.includeTax ? 1.11 : 1) *
-                      100,
-                  ) / 100
-                : null)?.toString() ??
-              ticket.requestedAmount?.toString() ??
-              (ticket.totalAmount !== null
-                ? decimalStringFromScaledInteger(ticket.totalAmount)
-                : null) ??
-              null,
+            totalAmount: totalAmountStr,
+            aggregatedPoTotalAmount:
+              ticket.aggregatedPoTotalAmount !== null
+                ? ticket.aggregatedPoTotalAmount.toString()
+                : null,
+            poSummaries: serializedPoSummaries,
+            itemsSummary: ticket.itemsSummary,
+            deliveryOrderCount: ticket.deliveryOrderCount,
+            rentalDetails: rawRentalDetails
+              ? {
+                  rentalType: rawRentalDetails.rentalType ?? null,
+                  usageScope: rawRentalDetails.usageScope ?? null,
+                  assetName: rawRentalDetails.assetName ?? null,
+                  propertyAddress: rawRentalDetails.propertyAddress ?? null,
+                  landlordName: rawRentalDetails.landlordName ?? null,
+                  landlordPhone: rawRentalDetails.landlordPhone ?? null,
+                  occupantCount: rawRentalDetails.occupantCount ?? null,
+                  codeOrPlate: rawRentalDetails.codeOrPlate ?? null,
+                  periodType: rawRentalDetails.periodType ?? null,
+                  startDate: serializeRentalDate(rawRentalDetails.startDate),
+                  endDate: serializeRentalDate(rawRentalDetails.endDate),
+                  duration: rawRentalDetails.duration ?? null,
+                }
+              : null,
             purchaseReceiptUrl: ticket.purchaseReceiptUrl,
             requestCategory: ticket.requestCategory,
+            fieldCategory: ticket.fieldCategory,
             receiptUrls: ticket.receiptUrls,
             requesterName: ticket.requester.name,
             requestPaymentMethod: ticket.requestPaymentMethod,
@@ -1474,14 +1695,26 @@ export default async function FinancePage({
         documentTemplates={documentTemplates}
         initialTab={tab}
         initialOpenSheet={openSheet}
+        initialOpenInvoice={openInvoice}
         rentals={equipmentRentals.map((r) => ({
           id: r.id,
           type: r.type as RentalType,
+          usageScope:
+            (r.usageScope as RentalUsageScope) ??
+            (r.type === "HOUSE"
+              ? "PROJECT"
+              : r.projectId
+                ? "PROJECT"
+                : "OPERATIONAL"),
           name: r.name,
           category: r.category,
           codeOrPlate: r.codeOrPlate,
           vendorName: r.vendorName,
           vendorPhone: r.vendorPhone,
+          propertyAddress: r.propertyAddress ?? null,
+          landlordName: r.landlordName ?? null,
+          landlordPhone: r.landlordPhone ?? null,
+          occupantCount: r.occupantCount ?? null,
           rentalPeriodType: r.rentalPeriodType as RentalPeriodType,
           startDate: r.startDate.toISOString().slice(0, 10),
           endDate: r.endDate.toISOString().slice(0, 10),
@@ -1495,6 +1728,9 @@ export default async function FinancePage({
           withFuel: r.withFuel,
           projectId: r.projectId,
           projectName: r.project ? `${r.project.kelompokTani} · ${r.project.title}` : null,
+          sourceTicketId: r.sourceTicketId ?? null,
+          cashflowId: r.cashflowId ?? null,
+          paymentTransactionId: r.paymentTransactionId ?? null,
           notes: r.notes,
           createdByName: r.createdByName,
           createdAt: r.createdAt.toISOString(),
@@ -1510,6 +1746,7 @@ export default async function FinancePage({
           financeNotes: r.financeNotes,
         }))}
         materialContracts={materialContractsBundle.contracts}
+        materialDeliveries={materialContractsBundle.deliveries}
         vendorInvoices={materialContractsBundle.vendorInvoices}
       />
     </>

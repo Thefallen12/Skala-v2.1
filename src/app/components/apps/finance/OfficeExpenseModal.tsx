@@ -1,10 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { recordOfficeExpense } from "@/app/actions/finance";
 import type { OfficeExpenseInput } from "@/app/actions/finance";
 import type {
@@ -14,9 +15,19 @@ import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
-import { Input } from "@/components/ui/input";
-import { FormLabel, Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
 import {
@@ -131,8 +142,23 @@ export default function OfficeExpenseModal({
     control: form.control,
     name: "paymentMethod",
   });
-  const amount = useWatch({ control: form.control, name: "amount" });
+  const recipientId = useWatch({ control: form.control, name: "recipientId" });
   const accountId = useWatch({ control: form.control, name: "accountId" });
+  const transactionDate = useWatch({
+    control: form.control,
+    name: "transactionDate",
+  });
+
+  const recipientOptions = useMemo(
+    () =>
+      recipients.map((recipient) => ({
+        value: recipient.id,
+        label: recipient.name,
+        description: recipient.role.replaceAll("_", " "),
+        keywords: [recipient.role],
+      })),
+    [recipients],
+  );
 
   const requiredProofCount = expenseType === "REIMBURSEMENT" ? 2 : 1;
   const proofLabel =
@@ -183,13 +209,18 @@ export default function OfficeExpenseModal({
       setMessage(result.message);
       setIsError(!result.success);
       if (result.success) {
+        toast.success(result.message || "Pengeluaran internal dicatat.");
         onClose();
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Office expense form submission failed:", error);
-      setMessage("Pengeluaran gagal dicatat. Silakan coba kembali.");
+      const errMsg = "Pengeluaran gagal dicatat. Silakan coba kembali.";
+      setMessage(errMsg);
       setIsError(true);
+      toast.error(errMsg);
     } finally {
       setIsPending(false);
     }
@@ -244,46 +275,64 @@ export default function OfficeExpenseModal({
       }
     >
       {accounts.length === 0 ? (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="type-p2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-300">
           Buat akun bank/kas terlebih dahulu sebelum mencatat pengeluaran.
         </p>
       ) : recipients.length === 0 ? (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="type-p2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-300">
           Tidak ada pengguna aktif yang dapat dipilih sebagai penerima dana.
         </p>
       ) : (
-        <form id={formId} className="space-y-5" onSubmit={submit}>
+        <form id={formId} className="space-y-4" onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor={`${formId}-type`}>Tipe Pengeluaran</Label>
-              <select
-                id={`${formId}-type`}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                {...form.register("expenseType")}
+              <Select
+                value={expenseType}
+                onValueChange={(value) => {
+                  if (
+                    value === "SALARY" ||
+                    value === "ADVANCE" ||
+                    value === "REIMBURSEMENT"
+                  ) {
+                    form.setValue("expenseType", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }
+                }}
+                disabled={isPending}
               >
-                {Object.entries(expenseTypeLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id={`${formId}-type`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(expenseTypeLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor={`${formId}-recipient`}>Penerima Dana</Label>
-              <select
+              <Combobox
                 id={`${formId}-recipient`}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                {...form.register("recipientId")}
-              >
-                <option value="">Pilih karyawan / tim</option>
-                {recipients.map((recipient) => (
-                  <option key={recipient.id} value={recipient.id}>
-                    {recipient.name} · {recipient.role}
-                  </option>
-                ))}
-              </select>
+                options={recipientOptions}
+                value={recipientId}
+                onValueChange={(value) =>
+                  form.setValue("recipientId", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                placeholder="Pilih karyawan / tim"
+                searchPlaceholder="Cari nama atau role..."
+                disabled={isPending}
+              />
               {form.formState.errors.recipientId && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="type-p2 text-destructive" role="alert">
                   {form.formState.errors.recipientId.message}
                 </p>
               )}
@@ -292,7 +341,7 @@ export default function OfficeExpenseModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor={`${formId}-amount`}>Nominal Pengeluaran (Rp)</Label>
+              <Label htmlFor={`${formId}-amount`}>Nominal (Rp)</Label>
               <input type="hidden" {...form.register("amount")} />
               <RupiahAmountInput
                 id={`${formId}-amount`}
@@ -308,28 +357,37 @@ export default function OfficeExpenseModal({
                 required
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="type-p2 text-destructive" role="alert">
                   {form.formState.errors.amount.message}
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor={`${formId}-account`}>Sumber Dana (Buku Kas / Bank)</Label>
-              <select
-                id={`${formId}-account`}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                {...form.register("accountId")}
+              <Label htmlFor={`${formId}-account`}>Sumber Kas / Bank</Label>
+              <Select
+                value={accountId}
+                onValueChange={(value) =>
+                  form.setValue("accountId", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                disabled={isPending}
               >
-                <option value="">Pilih akun kas / bank</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.accountName} · Saldo {currency(account.balance)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id={`${formId}-account`}>
+                  <SelectValue placeholder="Pilih akun kas / bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.accountName} · Saldo {currency(account.balance)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {form.formState.errors.accountId && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="type-p2 text-destructive" role="alert">
                   {form.formState.errors.accountId.message}
                 </p>
               )}
@@ -339,42 +397,58 @@ export default function OfficeExpenseModal({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor={`${formId}-date`}>Tanggal Pengeluaran</Label>
-              <Input
-                type="date"
+              <DatePicker
                 id={`${formId}-date`}
-                className="h-10 bg-background text-foreground"
-                {...form.register("transactionDate")}
+                value={transactionDate}
+                onValueChange={(dateKey) =>
+                  form.setValue("transactionDate", dateKey, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                disabled={isPending}
               />
-              <p className="text-xs text-muted-foreground">
-                Bebas disesuaikan jika pengeluaran terlambat di-input (input susulan).
+              <p className="type-p3 text-muted-foreground">
+                Sesuaikan tanggal jika input susulan.
               </p>
               {form.formState.errors.transactionDate && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="type-p2 text-destructive" role="alert">
                   {form.formState.errors.transactionDate.message}
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label>Metode Pembayaran</Label>
-              <div className="flex flex-wrap gap-4 pt-1.5">
+              <Label>Metode Bayar</Label>
+              <RadioGroup
+                value={paymentMethod}
+                onValueChange={(value) => {
+                  if (value === "TRANSFER" || value === "CASH") {
+                    form.setValue("paymentMethod", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }
+                }}
+                className="flex flex-wrap gap-3 pt-1"
+              >
                 {[
-                  ["TRANSFER", "Transfer Bank / E-Wallet"],
-                  ["CASH", "Kas Tunai (Cash)"],
+                  ["TRANSFER", "Transfer"],
+                  ["CASH", "Tunai (Cash)"],
                 ].map(([value, label]) => (
-                  <FormLabel
+                  <Label
                     key={value}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/80 bg-muted/20 px-3 py-2 text-sm hover:bg-muted/40"
+                    htmlFor={`${formId}-method-${value}`}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2 font-normal hover:bg-muted/40"
                   >
-                    <input
-                      type="radio"
+                    <RadioGroupItem
+                      id={`${formId}-method-${value}`}
                       value={value}
-                      {...form.register("paymentMethod")}
                     />
-                    {label}
-                  </FormLabel>
+                    <span className="type-p2">{label}</span>
+                  </Label>
                 ))}
-              </div>
+              </RadioGroup>
             </div>
           </div>
 
@@ -387,7 +461,7 @@ export default function OfficeExpenseModal({
               {...form.register("description")}
             />
             {form.formState.errors.description && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="type-p2 text-destructive" role="alert">
                 {form.formState.errors.description.message}
               </p>
             )}
@@ -395,22 +469,42 @@ export default function OfficeExpenseModal({
 
           <div className="space-y-2">
             <Label htmlFor={`${formId}-proofs`}>{proofLabel}</Label>
-            <Input
+            <FileDropzone
               id={`${formId}-proofs`}
-              type="file"
               accept={FINANCE_PROOF_ACCEPT_ALL}
               multiple
-              disabled={isPending || isPreparingProof || proofs.length >= 5}
-              onChange={async (event) => {
-                const input = event.currentTarget;
-                const selectedFiles = Array.from(input.files ?? []);
-                if (selectedFiles.length === 0) return;
+              capture="environment"
+              maxFiles={5}
+              maxSizeMb={5}
+              files={proofs.map((item) => item.file)}
+              label={
+                isPreparingProof ? "Memproses file bukti..." : "Unggah Bukti"
+              }
+              hint={
+                expenseType === "REIMBURSEMENT"
+                  ? "Minimal 2 file: nota pembelian dan bukti bayar (PDF/JPG/PNG/WEBP/HEIC, maks 5 MB/file)."
+                  : "Minimal 1 bukti transaksi (PDF/JPG/PNG/WEBP/HEIC, maks 5 MB/file)."
+              }
+              disabled={isPending || isPreparingProof}
+              onError={(err) => setProofError(err)}
+              onFilesChange={async (nextFiles) => {
+                // Jika user menghapus satu file lewat chip dropzone
+                if (nextFiles.length < proofs.length) {
+                  setProofs(
+                    nextFiles.map((file) => ({ file, name: file.name })),
+                  );
+                  return;
+                }
+                const newlyAdded = nextFiles.filter(
+                  (file) => !proofs.some((existing) => existing.file === file),
+                );
+                if (newlyAdded.length === 0) return;
 
                 setIsPreparingProof(true);
                 setProofError("");
                 try {
                   const { prepared, error: prepError } =
-                    await prepareFinanceProofFiles(selectedFiles);
+                    await prepareFinanceProofFiles(newlyAdded);
                   if (prepared.length > 0) {
                     setProofs((current) =>
                       [
@@ -425,25 +519,11 @@ export default function OfficeExpenseModal({
                   setProofError(prepError);
                 } finally {
                   setIsPreparingProof(false);
-                  input.value = "";
                 }
               }}
             />
-            {isPreparingProof && (
-              <p className="text-xs text-muted-foreground" role="status">
-                Memproses dan mengompres file bukti...
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              File tetap lokal sampai tombol Simpan Pengeluaran ditekan. PDF, JPG, PNG, WEBP, atau foto iPhone (HEIC) · Maks. 5 MB/file · Maks. 5 file.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {expenseType === "REIMBURSEMENT"
-                ? "Untuk reimbursement, unggah minimal dua file: nota pembelian dan bukti pembayaran."
-                : "Unggah minimal satu bukti transaksi."}
-            </p>
             {proofError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="type-p2 text-destructive" role="alert">
                 {proofError}
               </p>
             )}
@@ -454,16 +534,16 @@ export default function OfficeExpenseModal({
                     key={`${proof.file.name}-${proof.file.lastModified}-${proof.file.size}`}
                     className="overflow-hidden rounded-lg border bg-card"
                   >
-                    <div className="flex h-28 flex-col items-center justify-center gap-2 bg-muted/50 text-muted-foreground">
+                    <div className="flex h-24 flex-col items-center justify-center gap-1.5 bg-muted/50 text-muted-foreground">
                       {proof.file.type === "application/pdf" ? (
-                        <FileText className="size-8" aria-hidden="true" />
+                        <FileText className="size-7" aria-hidden="true" />
                       ) : (
-                        <ReceiptText className="size-8" aria-hidden="true" />
+                        <ReceiptText className="size-7" aria-hidden="true" />
                       )}
-                      <span className="text-xs">File lokal siap disimpan</span>
+                      <span className="type-p3">Siap disimpan</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 p-2">
-                      <span className="min-w-0 truncate text-xs" title={proof.name}>
+                      <span className="type-p3 min-w-0 truncate" title={proof.name}>
                         {proof.name}
                       </span>
                       <ActionIconButton
@@ -489,7 +569,11 @@ export default function OfficeExpenseModal({
           </div>
           {message && (
             <p
-              className={isError ? "text-sm text-destructive" : "text-sm text-emerald-600"}
+              className={
+                isError
+                  ? "type-p2 text-destructive"
+                  : "type-p2 text-emerald-600 dark:text-emerald-400"
+              }
               role="status"
             >
               {message}

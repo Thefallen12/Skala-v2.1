@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowDownLeft,
   ArrowLeft,
@@ -12,11 +13,15 @@ import {
   Eye,
   Landmark,
   Minus,
+  Pencil,
   Plus,
   Search,
   Wallet,
 } from "lucide-react";
 import { createFinanceAccount } from "@/app/actions/finance-cashflow";
+import FinancePaymentProofReplacement, {
+  type ReplacingProofTarget,
+} from "@/app/components/apps/finance/FinancePaymentProofReplacement";
 import IncomingFundModal, {
   type FinanceAccountOption,
   type FinanceProjectOption,
@@ -24,9 +29,19 @@ import IncomingFundModal, {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -53,6 +68,7 @@ export type FinanceCashflowRow = {
   paymentTransactionId: string | null;
   paymentTransaction: {
     proofOfTransferUrl: string | null;
+    proofEditDisabledUrls?: string[];
     ticket: { ticketNumber: string; title: string } | null;
     po: {
       poNumber: string;
@@ -76,6 +92,7 @@ export type FinanceHistoricalPayment = {
   paidAt: string;
   paymentType: PaymentType;
   proofUrl: string | null;
+  proofEditDisabledUrls?: string[];
   category: string;
   sourceDesc: string;
 };
@@ -149,6 +166,8 @@ type UnifiedLedgerRow = {
   methodAndCounterparty: string;
   amount: number;
   proofUrl: string | null;
+  rawProofUrl: string | null;
+  proofEditDisabledUrls: string[];
   paymentTransactionId: string | null;
 };
 
@@ -158,6 +177,7 @@ export default function FinanceLedger({
   historicalPayments,
   projects,
   canManage,
+  canEditProof = false,
   fundMode,
   onFundModeChange,
   typeFilter,
@@ -169,6 +189,7 @@ export default function FinanceLedger({
   historicalPayments: FinanceHistoricalPayment[];
   projects: FinanceProjectOption[];
   canManage: boolean;
+  canEditProof?: boolean;
   fundMode: "incoming" | "outgoing" | "transfer" | null;
   onFundModeChange: (mode: "incoming" | "outgoing" | "transfer" | null) => void;
   typeFilter: "IN" | "OUT" | null;
@@ -181,11 +202,14 @@ export default function FinanceLedger({
 }) {
   const router = useRouter();
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [accountMessage, setAccountMessage] = useState("");
+  const [replacingProofTarget, setReplacingProofTarget] =
+    useState<ReplacingProofTarget | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const selectedAccount =
@@ -218,7 +242,7 @@ export default function FinanceLedger({
           : payment?.directStockPurchase
             ? `Pembayaran ${payment.directStockPurchase.purchaseNumber} · ${payment.directStockPurchase.vendorName}`
             : cf.sourceDesc;
-      const proofUrl = payment?.proofOfTransferUrl ?? cf.proofUrl;
+      const rawProofUrl = payment?.proofOfTransferUrl ?? cf.proofUrl ?? null;
 
       return {
         id: `cf-${cf.id}`,
@@ -241,7 +265,9 @@ export default function FinanceLedger({
           .filter(Boolean)
           .join(" · "),
         amount: cf.amount,
-        proofUrl: proofUrl ? withLocalPhotoPreview(proofUrl) : null,
+        proofUrl: rawProofUrl ? withLocalPhotoPreview(rawProofUrl) : null,
+        rawProofUrl,
+        proofEditDisabledUrls: payment?.proofEditDisabledUrls ?? [],
         paymentTransactionId: cf.paymentTransactionId,
       };
     });
@@ -258,6 +284,8 @@ export default function FinanceLedger({
       methodAndCounterparty: paymentTypeLabel(hp.paymentType),
       amount: hp.amount,
       proofUrl: hp.proofUrl ? withLocalPhotoPreview(hp.proofUrl) : null,
+      rawProofUrl: hp.proofUrl ?? null,
+      proofEditDisabledUrls: hp.proofEditDisabledUrls ?? [],
       paymentTransactionId: hp.id,
     }));
 
@@ -303,9 +331,14 @@ export default function FinanceLedger({
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const accountName = String(formData.get("accountName") ?? "");
+    const accountName = newAccountName.trim();
     const accountNumber = String(formData.get("accountNumber") ?? "");
     const holderName = String(formData.get("holderName") ?? "");
+
+    if (!accountName) {
+      setAccountMessage("Pilih jenis rekening / kas terlebih dahulu.");
+      return;
+    }
 
     setAccountMessage("");
     startTransition(async () => {
@@ -317,52 +350,76 @@ export default function FinanceLedger({
         });
         if (!result.success) {
           setAccountMessage(result.message);
+          toast.error(result.message);
           return;
         }
+        toast.success(result.message || "Rekening / buku kas ditambahkan.");
         form.reset();
+        setNewAccountName("");
         setAccountModalOpen(false);
         router.refresh();
       } catch (error) {
         console.error("Create finance account failed:", error);
-        setAccountMessage("Gagal membuat buku bank/kas. Silakan coba kembali.");
+        const errMsg = "Gagal membuat buku bank/kas. Silakan coba kembali.";
+        setAccountMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
 
-  const renderProofAction = (
-    proofUrl: string | null,
-    label: string,
-    paymentTransactionId: string | null,
-  ) => {
+  const renderProofAction = (row: UnifiedLedgerRow) => {
+    const { proofUrl, rawProofUrl, description, paymentTransactionId, proofEditDisabledUrls } = row;
     if (!proofUrl) {
-      return <span className="text-xs text-muted-foreground">—</span>;
+      return <span className="type-p3 text-muted-foreground">—</span>;
     }
-    if (isImageUrl(proofUrl)) {
-      return (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => onPreviewProof(proofUrl, label, paymentTransactionId)}
-          className="h-7 gap-1.5 px-2.5 text-xs"
-        >
-          <Eye className="size-3.5" />
-          Lihat Bukti
-        </Button>
-      );
-    }
+    const isImage = isImageUrl(proofUrl);
+    const canReplace =
+      canEditProof &&
+      Boolean(paymentTransactionId) &&
+      Boolean(rawProofUrl) &&
+      !proofEditDisabledUrls.includes(rawProofUrl!) &&
+      (isImage || rawProofUrl!.startsWith("/api/tickets/receipts/"));
+
     return (
-      <Button
-        asChild
-        variant="outline"
-        size="sm"
-        className="h-7 gap-1.5 px-2.5 text-xs"
-      >
-        <a href={proofUrl} target="_blank" rel="noreferrer">
-          <ExternalLink className="size-3.5" />
-          Buka Dokumen
-        </a>
-      </Button>
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {isImage ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onPreviewProof(proofUrl, description, paymentTransactionId)}
+          >
+            <Eye className="size-3.5" aria-hidden="true" />
+            Lihat Bukti
+          </Button>
+        ) : (
+          <Button asChild variant="outline" size="sm">
+            <a href={proofUrl} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              Buka Dokumen
+            </a>
+          </Button>
+        )}
+        {canReplace && paymentTransactionId && rawProofUrl && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setReplacingProofTarget({
+                paymentTransactionId,
+                existingProofUrl: rawProofUrl,
+                proofIndex: 0,
+                label: description,
+                buttonLabel: isImage ? "Edit" : "Unggah Ulang",
+              })
+            }
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            {isImage ? "Edit" : "Ganti"}
+          </Button>
+        )}
+      </div>
     );
   };
 
@@ -372,20 +429,20 @@ export default function FinanceLedger({
       <Card className="p-5 space-y-5">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">BUKU KAS &amp; REKENING</Badge>
-              <span className="text-xs text-muted-foreground">
-                Total Saldo Gabungan:{" "}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">Buku Kas</Badge>
+              <span className="type-p3 text-muted-foreground">
+                Total Saldo:{" "}
                 <strong className="text-foreground">
                   {currency(totalBalance)}
                 </strong>
               </span>
             </div>
-            <h2 className="mt-1 text-lg font-bold text-foreground">
-              Daftar Rekening Bank, E-Wallet &amp; Kas Tunai
+            <h2 className="type-h2 mt-1 text-foreground">
+              Rekening Bank, E-Wallet &amp; Kas
             </h2>
-            <p className="text-xs text-muted-foreground">
-              Klik salah satu kartu rekening untuk menyaring buku mutasi khusus rekening tersebut.
+            <p className="type-p3 text-muted-foreground">
+              Klik kartu rekening untuk menyaring mutasi khusus rekening tersebut.
             </p>
           </div>
           {canManage && (
@@ -393,47 +450,61 @@ export default function FinanceLedger({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => setAccountModalOpen(true)}
-                className="gap-1.5"
               >
-                <Plus className="size-4" />
-                Tambah Rekening / Kas
+                <Plus className="size-4" aria-hidden="true" />
+                Tambah Akun
               </Button>
               <Button
                 type="button"
+                variant="success"
+                size="sm"
                 onClick={() => onFundModeChange("incoming")}
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                <Plus className="size-4" />
-                Catat Dana Masuk
+                <Plus className="size-4" aria-hidden="true" />
+                Dana Masuk
               </Button>
               <Button
                 type="button"
                 variant="destructive"
+                size="sm"
                 onClick={() => onFundModeChange("outgoing")}
-                className="gap-1.5 bg-rose-600 hover:bg-rose-700 text-white"
               >
-                <Minus className="size-4" />
-                Catat Dana Keluar
+                <Minus className="size-4" aria-hidden="true" />
+                Dana Keluar
               </Button>
               <Button
                 type="button"
                 variant="secondary"
+                size="sm"
                 onClick={() => onFundModeChange("transfer")}
-                className="gap-1.5"
               >
-                <ArrowRightLeft className="size-4" />
-                Transfer Antar Kas
+                <ArrowRightLeft className="size-4" aria-hidden="true" />
+                Transfer Kas
               </Button>
             </div>
           )}
         </div>
 
         {accounts.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-            Belum ada buku bank atau kas. Klik{" "}
-            <strong>Tambah Rekening / Kas</strong> untuk memulai pencatatan.
-          </div>
+          <EmptyState
+            icon={Wallet}
+            title="Belum ada buku bank atau kas"
+            description="Tambahkan rekening bank, e-wallet, atau kas tunai untuk memulai pencatatan."
+            action={
+              canManage ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setAccountModalOpen(true)}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  Tambah Akun
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {accounts.map((account) => {
@@ -455,16 +526,12 @@ export default function FinanceLedger({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="truncate font-semibold text-foreground">
+                        <p className="type-p1 truncate font-semibold text-foreground">
                           {account.accountName}
                         </p>
-                        {isSelected && (
-                          <Badge variant="default" className="text-[10px]">
-                            Aktif
-                          </Badge>
-                        )}
+                        {isSelected && <Badge variant="default">Aktif</Badge>}
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      <p className="type-p3 mt-0.5 truncate text-muted-foreground">
                         {account.accountNumber
                           ? `${account.accountNumber} · ${account.holderName}`
                           : `Kas Tunai · ${account.holderName}`}
@@ -474,7 +541,7 @@ export default function FinanceLedger({
                       <Icon className="size-4" aria-hidden="true" />
                     </span>
                   </div>
-                  <p className="mt-4 text-xl font-bold tracking-tight tabular-nums text-foreground">
+                  <p className="type-kpi mt-4 text-foreground">
                     {currency(account.balance)}
                   </p>
                 </button>
@@ -589,9 +656,11 @@ export default function FinanceLedger({
         {/* Daftar Mobile */}
         <div className="space-y-3 md:hidden">
           {visibleLedgerRows.length === 0 ? (
-            <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
-              Tidak ada transaksi yang sesuai dengan filter saat ini.
-            </div>
+            <EmptyState
+              icon={Search}
+              title="Tidak ada catatan mutasi"
+              description="Belum ada transaksi yang sesuai dengan filter saat ini."
+            />
           ) : (
             visibleLedgerRows.map((row) => {
               const isIn = row.direction === "IN";
@@ -602,10 +671,10 @@ export default function FinanceLedger({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-foreground">
+                      <p className="type-p1 font-semibold text-foreground">
                         {row.description}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="type-p3 text-muted-foreground">
                         {formatDateTime(row.createdAt)}
                       </p>
                     </div>
@@ -614,14 +683,14 @@ export default function FinanceLedger({
                     </Badge>
                   </div>
                   <p
-                    className={`text-base font-bold tabular-nums ${
+                    className={`type-h3 tabular-nums ${
                       isIn ? "text-foreground" : "text-primary"
                     }`}
                   >
                     {isIn ? "+" : "-"}
                     {currency(row.amount)}
                   </p>
-                  <div className="grid gap-1 text-xs text-muted-foreground">
+                  <div className="type-p3 grid gap-1 text-muted-foreground">
                     <p>
                       Buku Kas/Bank:{" "}
                       <strong className="text-foreground">
@@ -631,12 +700,8 @@ export default function FinanceLedger({
                     <p>Metode: {row.methodAndCounterparty}</p>
                     {row.subDescription && <p>{row.subDescription}</p>}
                   </div>
-                  <div className="pt-1">
-                    {renderProofAction(
-                      row.proofUrl,
-                      row.description,
-                      row.paymentTransactionId,
-                    )}
+                  <div className="flex justify-end pt-1">
+                    {renderProofAction(row)}
                   </div>
                 </div>
               );
@@ -646,7 +711,7 @@ export default function FinanceLedger({
 
         {/* Tabel Desktop */}
         <div className="hidden overflow-x-auto md:block">
-          <Table pageSize={10}>
+          <Table pageSize={10} itemLabel="mutasi">
             <TableHeader>
               <TableRow>
                 <TableHead>Tanggal</TableHead>
@@ -663,7 +728,7 @@ export default function FinanceLedger({
                 <TableRow>
                   <TableCell
                     colSpan={7}
-                    className="py-8 text-center text-muted-foreground"
+                    className="type-p2 py-8 text-center text-muted-foreground"
                   >
                     Tidak ada catatan mutasi yang sesuai dengan filter.
                   </TableCell>
@@ -673,7 +738,7 @@ export default function FinanceLedger({
                   const isIn = row.direction === "IN";
                   return (
                     <TableRow key={row.id}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      <TableCell className="type-p3 whitespace-nowrap text-muted-foreground">
                         {formatDateTime(row.createdAt)}
                       </TableCell>
                       <TableCell>
@@ -682,21 +747,21 @@ export default function FinanceLedger({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-foreground">
+                        <div className="type-p2 font-medium text-foreground">
                           {row.description}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="type-p3 text-muted-foreground">
                           {row.subDescription}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm font-medium">
+                      <TableCell className="type-p2 font-medium">
                         {row.accountName}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="type-p3 text-muted-foreground">
                         {row.methodAndCounterparty}
                       </TableCell>
                       <TableCell
-                        className={`text-right font-semibold tabular-nums whitespace-nowrap ${
+                        className={`type-p2 text-right font-semibold tabular-nums whitespace-nowrap ${
                           isIn ? "text-foreground" : "text-primary"
                         }`}
                       >
@@ -717,11 +782,7 @@ export default function FinanceLedger({
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {renderProofAction(
-                          row.proofUrl,
-                          row.description,
-                          row.paymentTransactionId,
-                        )}
+                        {renderProofAction(row)}
                       </TableCell>
                     </TableRow>
                   );
@@ -742,8 +803,12 @@ export default function FinanceLedger({
 
       <GlobalModal
         isOpen={accountModalOpen}
-        onClose={() => setAccountModalOpen(false)}
-        title="Tambah Rekening / Buku Kas"
+        onClose={() => {
+          setAccountModalOpen(false);
+          setNewAccountName("");
+          setAccountMessage("");
+        }}
+        title="Tambah Rekening / Kas"
         icon={<Wallet aria-hidden="true" className="size-5" />}
         description="Daftarkan rekening bank, e-wallet, atau kas tunai. Saldo awal akun baru adalah Rp 0."
         className="max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] sm:max-w-md"
@@ -753,7 +818,11 @@ export default function FinanceLedger({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setAccountModalOpen(false)}
+              onClick={() => {
+                setAccountModalOpen(false);
+                setNewAccountName("");
+                setAccountMessage("");
+              }}
             >
               Batal
             </Button>
@@ -774,42 +843,45 @@ export default function FinanceLedger({
         >
           <div className="space-y-2">
             <Label htmlFor="finance-account-name">Jenis Rekening / Kas</Label>
-            <select
-              id="finance-account-name"
-              name="accountName"
-              required
-              defaultValue=""
-              className="border-input focus-visible:ring-ring h-10 w-full rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2"
+            <Select
+              value={newAccountName}
+              onValueChange={setNewAccountName}
+              disabled={isPending}
             >
-              <option value="" disabled>
-                Pilih bank, e-wallet, atau kas tunai
-              </option>
-              <optgroup label="Bank">
-                {financeInstitutions.Bank.map((institution) => (
-                  <option key={institution} value={institution}>
-                    {institution}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="E-Wallet">
-                {financeInstitutions.Ewallet.map((institution) => (
-                  <option key={institution} value={institution}>
-                    {institution}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Kas Tunai">
-                {financeInstitutions.Cash.map((institution) => (
-                  <option key={institution} value={institution}>
-                    {institution}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+              <SelectTrigger id="finance-account-name" className="w-full">
+                <SelectValue placeholder="Pilih bank, e-wallet, atau kas tunai" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Bank</SelectLabel>
+                  {financeInstitutions.Bank.map((institution) => (
+                    <SelectItem key={institution} value={institution}>
+                      {institution}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>E-Wallet</SelectLabel>
+                  {financeInstitutions.Ewallet.map((institution) => (
+                    <SelectItem key={institution} value={institution}>
+                      {institution}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>Kas Tunai</SelectLabel>
+                  {financeInstitutions.Cash.map((institution) => (
+                    <SelectItem key={institution} value={institution}>
+                      {institution}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="finance-account-number">
-              Nomor Rekening (opsional untuk Kas Tunai)
+              Nomor Rekening (opsional untuk Kas)
             </Label>
             <Input
               id="finance-account-number"
@@ -831,12 +903,34 @@ export default function FinanceLedger({
             />
           </div>
           {accountMessage && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="type-p2 text-destructive" role="alert">
               {accountMessage}
             </p>
           )}
         </form>
       </GlobalModal>
+
+      <FinancePaymentProofReplacement
+        key={
+          replacingProofTarget
+            ? `${replacingProofTarget.paymentTransactionId}:${replacingProofTarget.proofIndex}`
+            : "ledger-proof-replace-closed"
+        }
+        open={replacingProofTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setReplacingProofTarget(null);
+        }}
+        showTrigger={false}
+        paymentTransactionId={replacingProofTarget?.paymentTransactionId ?? ""}
+        existingProofUrl={replacingProofTarget?.existingProofUrl}
+        proofIndex={replacingProofTarget?.proofIndex}
+        label={replacingProofTarget?.label ?? ""}
+        buttonLabel={replacingProofTarget?.buttonLabel ?? "Edit"}
+        onSaved={() => {
+          setReplacingProofTarget(null);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

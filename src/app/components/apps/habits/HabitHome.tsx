@@ -79,15 +79,15 @@ export default function HabitHome({
 
   return (
     <div className="my-4 space-y-5">
-      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/[0.07] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/[0.07] p-4 shadow-2xs sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+          <p className="type-p3 font-semibold uppercase tracking-wider text-primary">
             Ruang kerja personal
           </p>
-          <h2 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">
+          <h2 className="type-h2 mt-1 text-foreground">
             Atur agenda, bangun konsistensi
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="type-p2 mt-1 text-muted-foreground">
             Pantau kegiatan proyek dan kebiasaan harian dalam satu tempat.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function HabitHome({
         >
           <Button
             type="button"
-            size="default"
+            size="sm"
             variant={activeView === "calendar" ? "default" : "ghost"}
             aria-pressed={activeView === "calendar"}
             onClick={() => setActiveView("calendar")}
@@ -109,7 +109,7 @@ export default function HabitHome({
           </Button>
           <Button
             type="button"
-            size="default"
+            size="sm"
             variant={activeView === "habits" ? "default" : "ghost"}
             aria-pressed={activeView === "habits"}
             onClick={() => setActiveView("habits")}

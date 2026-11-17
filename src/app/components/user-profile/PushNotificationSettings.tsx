@@ -213,18 +213,18 @@ export default function PushNotificationSettings() {
             <BellRing className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <h3 className="text-sm font-semibold">
+            <h3 className="type-h3">
               {snapshot?.isAndroidApk
                 ? "Notifikasi Masuk Android (Popup WA)"
                 : "Notifikasi tiket di browser"}
             </h3>
-            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+            <p className="type-p3 mt-1 max-w-2xl text-muted-foreground">
               {snapshot?.isAndroidApk
                 ? "Terima popup notifikasi gaya WhatsApp dengan suara, getar, dan navigasi langsung ke dokumen terkait."
                 : "Dapatkan pemberitahuan ketika tiket baru ditugaskan kepada Anda. Langganan disimpan per perangkat."}
             </p>
             {message && (
-              <p className="mt-2 text-xs text-muted-foreground" role="status">
+              <p className="type-p3 mt-2 text-muted-foreground" role="status">
                 {message}
               </p>
             )}
@@ -332,8 +332,8 @@ export default function PushNotificationSettings() {
             <MapPin className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <h3 className="text-sm font-semibold">Izin Lokasi (GPS)</h3>
-            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+            <h3 className="type-h3">Izin Lokasi (GPS)</h3>
+            <p className="type-p3 mt-1 max-w-2xl text-muted-foreground">
               Digunakan untuk deteksi desa/kecamatan dashboard, bukti lokasi
               pengiriman Mover, dan geotag foto survei lapangan.
             </p>
@@ -355,7 +355,7 @@ export default function PushNotificationSettings() {
               </Button>
             )}
           {locationGranted ? (
-            <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            <span className="type-p3 inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-semibold text-emerald-700 dark:text-emerald-300">
               Lokasi Diizinkan
               {snapshot?.isAndroidApk
                 ? ` (${snapshot.locationPrecision === "fine" ? "Akurat" : "Perkiraan"})`
@@ -387,15 +387,15 @@ export default function PushNotificationSettings() {
           </span>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold">
+              <h3 className="type-h3">
                 Notifikasi Email Otomatis (SMTP)
               </h3>
               {smtpStatus && (
                 <span
                   className={
                     smtpStatus.configured
-                      ? "inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300"
-                      : "inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
+                      ? "type-p3 inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300"
+                      : "type-p3 inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 font-semibold text-amber-700 dark:text-amber-300"
                   }
                 >
                   {smtpStatus.configured
@@ -404,7 +404,7 @@ export default function PushNotificationSettings() {
                 </span>
               )}
             </div>
-            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+            <p className="type-p3 mt-1 max-w-2xl text-muted-foreground">
               Setiap tiket baru, persetujuan Direksi, PO, dan antrean pembayaran
               Keuangan otomatis dikirim dari{" "}
               <span className="font-medium text-foreground">
@@ -423,8 +423,8 @@ export default function PushNotificationSettings() {
               <p
                 className={
                   emailFeedback.ok
-                    ? "mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300"
-                    : "mt-2 text-xs font-medium text-rose-600 dark:text-rose-400"
+                    ? "type-p3 mt-2 font-medium text-emerald-700 dark:text-emerald-300"
+                    : "type-p3 mt-2 font-medium text-rose-600 dark:text-rose-400"
                 }
                 role="status"
               >

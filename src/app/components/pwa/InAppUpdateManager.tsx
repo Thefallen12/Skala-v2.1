@@ -334,8 +334,12 @@ export default function InAppUpdateManager() {
 
   if (upToDateMessage && !webUpdateAvailable && !apkUpdateAvailable) {
     return (
-      <div className="fixed bottom-4 right-4 z-[9999] flex max-w-sm items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-card/95 px-4 py-3 text-xs font-medium text-foreground shadow-xl backdrop-blur-md">
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] right-3 left-3 z-[9999] flex max-w-sm items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-card/95 px-4 py-3 text-xs font-medium text-foreground shadow-xl backdrop-blur-md sm:left-auto sm:right-4 md:bottom-4"
+      >
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
         <span>{upToDateMessage}</span>
       </div>
     );
@@ -351,7 +355,11 @@ export default function InAppUpdateManager() {
   const isNativeError = nativeProgress?.status === "error";
 
   return (
-    <div className="fixed inset-x-3 bottom-4 z-[9999] mx-auto max-w-md rounded-2xl border border-primary/30 bg-card/95 p-4 text-foreground shadow-2xl backdrop-blur-xl sm:left-auto sm:right-5 sm:inset-x-auto sm:w-[390px]">
+    <div
+      role="region"
+      aria-label="Pembaruan aplikasi"
+      className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] z-[9999] mx-auto max-w-md rounded-2xl border border-primary/30 bg-card/95 p-4 text-foreground shadow-2xl backdrop-blur-xl sm:left-auto sm:right-5 sm:inset-x-auto sm:w-[390px] md:bottom-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">

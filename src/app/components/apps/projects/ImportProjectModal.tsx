@@ -4,13 +4,35 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
-import { importProjects, importDrtRabProject } from "@/app/actions/project";
-import { parseDrtRabWorkbook, type ParsedDrtRabResult } from "@/lib/drt-rab-parser";
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  Coins,
+  FileSpreadsheet,
+  Layers,
+  Loader2,
+  MapPin,
+  Sparkles,
+  Upload,
+} from "lucide-react";
+import { toast } from "sonner";
+import { importDrtRabProject, importProjects } from "@/app/actions/project";
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { FileDown, Upload, CheckCircle2, AlertCircle, Sparkles, Building2, MapPin, Coins, FileText, Layers } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  parseDrtRabWorkbook,
+  type ParsedDrtRabResult,
+} from "@/lib/drt-rab-parser";
 
 type ImportProjectRow = {
   code: string;
@@ -37,7 +59,9 @@ const columns = [
 function cellValue(value: ExcelJS.CellValue): unknown {
   if (typeof value === "string" || typeof value === "number") return value;
   if (value && typeof value === "object" && "text" in value) return value.text;
-  if (value && typeof value === "object" && "result" in value) return value.result;
+  if (value && typeof value === "object" && "result" in value) {
+    return value.result;
+  }
   return "";
 }
 
@@ -48,6 +72,7 @@ export default function ImportProjectModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [rows, setRows] = useState<ImportProjectRow[]>([]);
   const [drtResult, setDrtResult] = useState<ParsedDrtRabResult | null>(null);
   const [rawFileBase64, setRawFileBase64] = useState<string>("");
@@ -63,12 +88,19 @@ export default function ImportProjectModal({
     setRawFileName("");
     setMessage("");
 
-    if (!file) return;
+    if (!file) {
+      setSelectedFiles([]);
+      return;
+    }
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      setMessage("Pilih file .xlsx, .xls, atau .csv.");
+      const err = "Pilih file berformat .xlsx, .xls, atau .csv.";
+      setMessage(err);
+      toast.error(err);
+      setSelectedFiles([]);
       return;
     }
 
+    setSelectedFiles([file]);
     setRawFileName(file.name);
 
     try {
@@ -76,7 +108,6 @@ export default function ImportProjectModal({
       const base64 = Buffer.from(buffer).toString("base64");
       setRawFileBase64(base64);
 
-      // Check if file is an official DRT / Poktan RAB Workbook
       if (/\.(xlsx|xls)$/i.test(file.name)) {
         try {
           const parsedDrt = await parseDrtRabWorkbook(buffer);
@@ -86,19 +117,21 @@ export default function ImportProjectModal({
             return;
           }
         } catch {
-          // If DRT parser fails, fallback to standard batch format
+          // Fallback ke format batch standar
         }
       }
 
-      // Fallback: Standard Batch Projects format
       let headers: string[];
       let records: Record<string, unknown>[];
       if (/\.csv$/i.test(file.name)) {
-        const parsedCsv = Papa.parse<Record<string, unknown>>(await file.text(), {
-          header: true,
-          skipEmptyLines: "greedy",
-          transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(),
-        });
+        const parsedCsv = Papa.parse<Record<string, unknown>>(
+          await file.text(),
+          {
+            header: true,
+            skipEmptyLines: "greedy",
+            transformHeader: (header) => header.replace(/^\uFEFF/, "").trim(),
+          },
+        );
         if (parsedCsv.errors.length) {
           setMessage(`Format CSV tidak valid: ${parsedCsv.errors[0].message}`);
           return;
@@ -141,7 +174,9 @@ export default function ImportProjectModal({
 
       const missingHeaders = columns.filter((col) => !headers.includes(col));
       if (missingHeaders.length) {
-        setMessage(`Format file tidak dikenali. Pastikan file adalah Dokumen Rencana Teknis (DRT/RAB) atau gunakan template resmi (${missingHeaders.join(", ")}).`);
+        setMessage(
+          `Format file tidak dikenali. Pastikan file adalah DRT/RAB atau gunakan template resmi (${missingHeaders.join(", ")}).`,
+        );
         return;
       }
 
@@ -159,7 +194,9 @@ export default function ImportProjectModal({
       setRows(importedRows);
     } catch (error) {
       console.error("Read file error:", error);
-      setMessage("Terjadi kesalahan saat membaca file. Pastikan file tidak rusak.");
+      setMessage(
+        "Terjadi kesalahan saat membaca file. Pastikan file tidak rusak.",
+      );
     }
   };
 
@@ -172,6 +209,7 @@ export default function ImportProjectModal({
       });
 
       if (res.success) {
+        toast.success(res.message || "Proyek DRT berhasil dibuat.");
         onOpenChange(false);
         if (res.projectId) {
           router.push(`/apps/projects/${res.projectId}`);
@@ -180,6 +218,7 @@ export default function ImportProjectModal({
         }
       } else {
         setMessage(res.message);
+        toast.error(res.message);
       }
     });
   };
@@ -188,10 +227,12 @@ export default function ImportProjectModal({
     startTransition(async () => {
       const res = await importProjects(rows);
       if (res.success) {
+        toast.success(res.message || `${rows.length} proyek berhasil diimpor.`);
         onOpenChange(false);
         router.refresh();
       } else {
         setMessage(res.message);
+        toast.error(res.message);
       }
     });
   };
@@ -200,10 +241,14 @@ export default function ImportProjectModal({
     <GlobalModal
       isOpen={open}
       onClose={() => onOpenChange(false)}
-      title="Impor Dokumen RAB / Proyek"
-      description="Unggah file Excel Dokumen Rencana Teknis (DRT/RAB) atau file batch proyek untuk diproses otomatis."
+      onOpenChange={onOpenChange}
+      mobileBehavior="sheet"
+      icon={<FileSpreadsheet className="size-4" aria-hidden="true" />}
+      title="Impor Proyek / RAB"
+      description="Unggah Excel Dokumen Rencana Teknis (DRT/RAB) atau daftar batch proyek (.xlsx, .xls, .csv)."
+      className="max-w-3xl"
       footer={
-        <div className="flex w-full items-center justify-end gap-2">
+        <>
           <Button
             type="button"
             variant="outline"
@@ -220,10 +265,14 @@ export default function ImportProjectModal({
               size="sm"
               onClick={handleApplyDrtProject}
               disabled={isPending}
-              className="gap-1.5 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="gap-1.5"
             >
-              <Sparkles className="size-3.5" />
-              <span>{isPending ? "Memproses Proyek & RAB..." : "Buat & Terapkan Proyek Ini"}</span>
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Sparkles className="size-4" aria-hidden="true" />
+              )}
+              <span>{isPending ? "Memproses..." : "Terapkan Proyek"}</span>
             </Button>
           ) : (
             <Button
@@ -231,101 +280,107 @@ export default function ImportProjectModal({
               size="sm"
               onClick={handleApplyBatchProjects}
               disabled={!rows.length || isPending}
-              className="gap-1.5 font-semibold"
+              className="gap-1.5"
             >
-              <Upload className="size-3.5" />
-              <span>{isPending ? "Mengimpor..." : `Impor ${rows.length} Proyek`}</span>
+              {isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Upload className="size-4" aria-hidden="true" />
+              )}
+              <span>{isPending ? "Mengimpor..." : "Impor Proyek"}</span>
             </Button>
           )}
-        </div>
+        </>
       }
     >
       <div className="space-y-4">
-        {/* Upload box */}
-        <div className="space-y-2 rounded-xl border border-dashed border-border/80 bg-muted/20 p-4 text-center">
-          <Label htmlFor="project-import-file" className="block text-xs font-bold text-foreground cursor-pointer">
-            Pilih atau Tarik File Excel RAB (.xlsx, .xls)
-          </Label>
-          <Input
-            id="project-import-file"
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            disabled={isPending}
-            className="cursor-pointer file:cursor-pointer text-xs"
-            onChange={(event) => void readFile(event.target.files?.[0])}
-          />
-          <p className="text-[11px] text-muted-foreground">
-            Sistem otomatis mengenali Dokumen Rencana Teknis (DRT) Poktan, Rekapitulasi, dan Rincian Biaya.
-          </p>
-        </div>
+        <FileDropzone
+          id="project-import-file"
+          accept=".xlsx,.xls,.csv"
+          multiple={false}
+          files={selectedFiles}
+          disabled={isPending}
+          onFilesChange={(files) => void readFile(files[0])}
+          onError={(err) => {
+            setMessage(err);
+            toast.error(err);
+          }}
+          label="Pilih File Excel RAB / Proyek"
+          hint="Mendukung file DRT Poktan dan template batch resmi (.xlsx, .xls, .csv)."
+        />
 
-        {/* DRT RAB DETECTED PREVIEW */}
         {drtResult && (
-          <div className="space-y-3 rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="size-4 shrink-0" />
+          <div className="space-y-3 rounded-xl border border-success/40 bg-success/5 p-4">
+            <div className="type-p2 flex items-center gap-2 font-semibold text-success">
+              <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
               <span>Dokumen Rencana Teknis (DRT) / RAB Terdeteksi</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-card p-3 rounded-lg border border-border">
+            <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Building2 className="size-3" />
+                <span className="type-p3 flex items-center gap-1 text-muted-foreground">
+                  <Building2 className="size-3.5" aria-hidden="true" />
                   <span>Nama Kelompok Tani / Proyek</span>
                 </span>
-                <p className="font-bold text-foreground">{drtResult.metadata.title}</p>
+                <p className="type-p2 font-bold text-foreground">
+                  {drtResult.metadata.title}
+                </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Coins className="size-3" />
+                <span className="type-p3 flex items-center gap-1 text-muted-foreground">
+                  <Coins className="size-3.5" aria-hidden="true" />
                   <span>Total Anggaran / Pagu Kontrak</span>
                 </span>
-                <p className="font-extrabold text-foreground text-sm font-mono">
+                <p className="type-kpi text-foreground">
                   Rp {drtResult.metadata.totalBudget.toLocaleString("id-ID")}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <MapPin className="size-3" />
+                <span className="type-p3 flex items-center gap-1 text-muted-foreground">
+                  <MapPin className="size-3.5" aria-hidden="true" />
                   <span>Lokasi Pekerjaan</span>
                 </span>
-                <p className="font-semibold text-foreground">
+                <p className="type-p2 font-semibold text-foreground">
                   {drtResult.metadata.address || "Aceh Tengah"}
-                  {drtResult.metadata.landAreaHa > 0 && ` (${drtResult.metadata.landAreaHa} Ha)`}
+                  {drtResult.metadata.landAreaHa > 0 &&
+                    ` (${drtResult.metadata.landAreaHa} Ha)`}
                 </p>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <Layers className="size-3" />
+                <span className="type-p3 flex items-center gap-1 text-muted-foreground">
+                  <Layers className="size-3.5" aria-hidden="true" />
                   <span>Rincian Titik Kerja &amp; Material</span>
                 </span>
-                <p className="font-semibold text-foreground">
-                  {drtResult.workItems.length} titik kerja · {drtResult.materials.length} material terdeteksi
+                <p className="type-p2 font-semibold text-foreground tabular-nums">
+                  {drtResult.workItems.length} titik kerja ·{" "}
+                  {drtResult.materials.length} material
                 </p>
               </div>
             </div>
 
-            {/* Work Items Preview List */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold text-muted-foreground">
-                Pratinjau Item Pekerjaan yang Akan Dibuat ({drtResult.workItems.length} item):
+              <span className="type-p3 font-semibold text-muted-foreground">
+                Pratinjau Item Pekerjaan ({drtResult.workItems.length} item):
               </span>
-              <div className="max-h-40 overflow-y-auto rounded-lg border border-border bg-background text-xs divide-y divide-border/60">
-                {drtResult.workItems.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 hover:bg-muted/30">
-                    <div className="min-w-0 pr-2">
-                      <p className="font-medium truncate text-foreground">
+              <div className="max-h-44 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-background">
+                {drtResult.workItems.map((item, idx) => (
+                  <div
+                    key={`${item.code}-${idx}`}
+                    className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted/30"
+                  >
+                    <div className="min-w-0">
+                      <p className="type-p2 truncate font-medium text-foreground">
                         {item.code ? `${item.code} ` : ""}
                         {item.title}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="type-p3 text-muted-foreground">
                         {item.section} · {item.volume} {item.unit}
                       </p>
                     </div>
-                    <span className="font-mono text-[11px] font-semibold text-foreground shrink-0">
+                    <span className="type-p3 shrink-0 font-semibold text-foreground tabular-nums">
                       Rp {item.totalPrice.toLocaleString("id-ID")}
                     </span>
                   </div>
@@ -333,44 +388,73 @@ export default function ImportProjectModal({
               </div>
             </div>
 
-            <p className="text-[11px] text-muted-foreground italic">
-              * Catatan: Harga RAP dikosongkan dan dapat dilengkapi internal tim nanti sesuai kebutuhan riil.
+            <p className="type-p3 text-muted-foreground">
+              * Harga RAP dikosongkan dan dapat dilengkapi internal tim sesuai
+              kebutuhan riil.
             </p>
           </div>
         )}
 
-        {/* BATCH ROWS PREVIEW */}
         {rows.length > 0 && !drtResult && (
-          <div className="space-y-2 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          <div className="space-y-2.5 rounded-xl border border-success/40 bg-success/5 p-3.5">
+            <div className="type-p2 flex items-center gap-2 font-semibold text-success">
               <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
               <span>{rows.length} baris proyek siap diimpor:</span>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-border bg-background">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-border bg-muted/50 text-[11px] text-muted-foreground">
-                  <tr>
-                    <th className="px-2.5 py-1.5">Kode</th>
-                    <th className="px-2.5 py-1.5">Nama Proyek</th>
-                    <th className="px-2.5 py-1.5">Lokasi</th>
-                    <th className="px-2.5 py-1.5 text-right">Pagu</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+
+            <div className="space-y-2 sm:hidden">
+              {rows.slice(0, 4).map((row, idx) => (
+                <div
+                  key={`${row.code}-${idx}`}
+                  className="rounded-lg border border-border bg-background p-3"
+                >
+                  <p className="type-p2 font-semibold text-foreground">
+                    {row.title}
+                  </p>
+                  <p className="type-p3 text-muted-foreground">
+                    {row.code} ·{" "}
+                    {[row.desa, row.kecamatan, row.kabupaten]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                  <p className="type-p3 mt-1 font-semibold text-foreground tabular-nums">
+                    Pagu: {row.pagu}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden bg-background sm:block">
+              <Table pagination={false}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kode</TableHead>
+                    <TableHead>Nama Proyek</TableHead>
+                    <TableHead>Lokasi</TableHead>
+                    <TableHead className="text-right">Pagu</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {rows.slice(0, 4).map((row, idx) => (
-                    <tr key={`${row.code}-${idx}`}>
-                      <td className="whitespace-nowrap px-2.5 py-1.5 font-mono text-[11px]">{row.code}</td>
-                      <td className="px-2.5 py-1.5 font-medium">{row.title}</td>
-                      <td className="px-2.5 py-1.5 text-muted-foreground">
-                        {[row.desa, row.kecamatan, row.kabupaten].filter(Boolean).join(", ")}
-                      </td>
-                      <td className="whitespace-nowrap px-2.5 py-1.5 text-right font-medium">
+                    <TableRow key={`${row.code}-${idx}`}>
+                      <TableCell className="type-p3 font-mono">
+                        {row.code}
+                      </TableCell>
+                      <TableCell className="type-p2 font-medium">
+                        {row.title}
+                      </TableCell>
+                      <TableCell className="type-p3 text-muted-foreground">
+                        {[row.desa, row.kecamatan, row.kabupaten]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </TableCell>
+                      <TableCell className="type-p2 text-right font-semibold tabular-nums">
                         {row.pagu}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </div>
         )}
@@ -378,9 +462,12 @@ export default function ImportProjectModal({
         {message && (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-3 text-xs font-medium text-foreground"
+            className="type-p3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-3 font-medium text-foreground"
           >
-            <AlertCircle className="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <AlertCircle
+              className="size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
             <span>{message}</span>
           </div>
         )}

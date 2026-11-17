@@ -384,6 +384,23 @@ function resolveDeliveryOrderRelation(doDoc: any) {
   };
 }
 
+const STRICT_PERSISTENCE_MODELS = new Set([
+  "dailyReport",
+  "projectWorkPoint",
+  "projectWorkPointProgress",
+  "projectWorkPointProgressPhoto",
+  "projectProgressPhoto",
+  "notification",
+]);
+
+function assertPersistenceAvailable(modelName: string, operation: string): void {
+  if (STRICT_PERSISTENCE_MODELS.has(modelName)) {
+    throw new Error(
+      `[Prisma] Koneksi database MongoDB tidak tersedia. Operasi ${modelName}.${operation} ditolak agar data tidak hilang di memori sementara.`,
+    );
+  }
+}
+
 function createModelHandler(modelName: string) {
   return {
     findMany: async (args: any = {}) => {
@@ -577,6 +594,7 @@ function createModelHandler(modelName: string) {
     }),
 
     create: async (args: any) => {
+      assertPersistenceAvailable(modelName, "create");
       const data = args?.data ?? {};
       const id = data.id || `rec_${Date.now()}`;
       const record = { id, createdAt: new Date(), updatedAt: new Date(), ...data };
@@ -592,7 +610,18 @@ function createModelHandler(modelName: string) {
       return record;
     },
 
+    createMany: async (args: any) => {
+      assertPersistenceAvailable(modelName, "createMany");
+      const handler = createModelHandler(modelName);
+      const rows = Array.isArray(args?.data) ? args.data : [];
+      for (const row of rows) {
+        await handler.create({ data: row });
+      }
+      return { count: rows.length };
+    },
+
     update: async (args: any) => {
+      assertPersistenceAvailable(modelName, "update");
       const { where, data } = args || {};
       let item: any = null;
       if (modelName === "user") {
@@ -609,7 +638,13 @@ function createModelHandler(modelName: string) {
       return data ?? {};
     },
 
+    updateMany: async () => {
+      assertPersistenceAvailable(modelName, "updateMany");
+      return { count: 0 };
+    },
+
     upsert: async (args: any) => {
+      assertPersistenceAvailable(modelName, "upsert");
       const handler = createModelHandler(modelName);
       const existing = await handler.findFirst({ where: args.where });
       if (existing) {
@@ -618,8 +653,14 @@ function createModelHandler(modelName: string) {
       return handler.create({ data: args.create });
     },
 
-    delete: async () => ({ id: "deleted" }),
-    deleteMany: async () => ({ count: 0 }),
+    delete: async () => {
+      assertPersistenceAvailable(modelName, "delete");
+      return { id: "deleted" };
+    },
+    deleteMany: async () => {
+      assertPersistenceAvailable(modelName, "deleteMany");
+      return { count: 0 };
+    },
   };
 }
 

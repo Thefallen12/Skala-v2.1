@@ -15,12 +15,17 @@ import {
 } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
 import EquipmentTicket from "@/models/ticket";
 import User from "@/models/user";
 import Project from "@/models/project";
 import {
   EQUIPMENT_REQUEST_TYPE,
+  HOUSE_RENTAL_REQUEST_TYPE,
+  VEHICLE_RENTAL_REQUEST_TYPE,
+  type RentalPeriodType,
+  type RentalTicketType,
+  type RentalUsageScope,
 } from "@/lib/equipment-request";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 
@@ -137,6 +142,7 @@ export default async function ApprovalsPage({
             type: true,
             priority: true,
             requestCategory: true,
+            fieldCategory: true,
             requestPaymentMethod: true,
             requestPaymentDescription: true,
             attachmentUrl: true,
@@ -449,6 +455,28 @@ export default async function ApprovalsPage({
     }),
   ]);
 
+  type ApprovalRentalDetailsPayload = {
+    rentalType: "HOUSE" | "VEHICLE";
+    usageScope?: RentalUsageScope;
+    assetName: string;
+    propertyAddress?: string | null;
+    landlordName?: string | null;
+    landlordPhone?: string | null;
+    occupantCount?: number | null;
+    codeOrPlate?: string | null;
+    periodType?: RentalPeriodType;
+    startDate?: string | null;
+    endDate?: string | null;
+    duration?: number | null;
+  };
+  const rentalMetadataByTicketId = new Map<
+    string,
+    {
+      ticketType: RentalTicketType;
+      rentalDetails: ApprovalRentalDetailsPayload | null;
+    }
+  >();
+
   let equipmentApprovalTickets: {
     id: string;
     ticketNumber: string;
@@ -456,6 +484,7 @@ export default async function ApprovalsPage({
     description: string | null;
     type: TicketType;
     ticketType: typeof EQUIPMENT_REQUEST_TYPE;
+    rentalDetails?: ApprovalRentalDetailsPayload | null;
     priority: TicketPriority;
     requestCategory: TicketRequestCategory;
     requestPaymentMethod: null;
@@ -473,16 +502,72 @@ export default async function ApprovalsPage({
     items: { itemName: string; quantity: number; unit: string }[];
   }[] = [];
   if (
-    session.user.role === UserRole.DIRECTOR ||
-    session.user.role === UserRole.DEPUTY_DIRECTOR
+    (session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR) &&
+    (await connectToMongoDBOptional())
   ) {
-    await connectToMongoDB();
-    const equipmentTickets = await EquipmentTicket.find({
-      ticketType: EQUIPMENT_REQUEST_TYPE,
-      status: TicketStatus.PENDING_DIRECTOR,
-    })
-      .sort({ priority: -1, createdAt: 1 })
-      .lean();
+    const pendingTicketIds = tickets.map((ticket) => ticket.id);
+    const [equipmentTickets, rentalTicketDocs] = await Promise.all([
+      EquipmentTicket.find({
+        ticketType: EQUIPMENT_REQUEST_TYPE,
+        status: TicketStatus.PENDING_DIRECTOR,
+      })
+        .sort({ priority: -1, createdAt: 1 })
+        .lean(),
+      pendingTicketIds.length > 0
+        ? EquipmentTicket.find({
+            _id: { $in: pendingTicketIds },
+            ticketType: {
+              $in: [HOUSE_RENTAL_REQUEST_TYPE, VEHICLE_RENTAL_REQUEST_TYPE],
+            },
+          })
+            .select({
+              _id: 1,
+              ticketType: 1,
+              rentalDetails: 1,
+            })
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    for (const doc of rentalTicketDocs) {
+      if (
+        doc.ticketType !== HOUSE_RENTAL_REQUEST_TYPE &&
+        doc.ticketType !== VEHICLE_RENTAL_REQUEST_TYPE
+      ) {
+        continue;
+      }
+      const raw = doc.rentalDetails;
+      const serializedDetails: ApprovalRentalDetailsPayload | null = raw
+        ? {
+            rentalType: raw.rentalType === "VEHICLE" ? "VEHICLE" : "HOUSE",
+            usageScope:
+              raw.usageScope === "OPERATIONAL" ? "OPERATIONAL" : "PROJECT",
+            assetName: raw.assetName ?? "",
+            propertyAddress: raw.propertyAddress ?? null,
+            landlordName: raw.landlordName ?? null,
+            landlordPhone: raw.landlordPhone ?? null,
+            occupantCount:
+              typeof raw.occupantCount === "number" ? raw.occupantCount : null,
+            codeOrPlate: raw.codeOrPlate ?? null,
+            periodType:
+              raw.periodType === "DAILY" ||
+              raw.periodType === "WEEKLY" ||
+              raw.periodType === "MONTHLY"
+                ? raw.periodType
+                : undefined,
+            startDate: raw.startDate
+              ? new Date(raw.startDate).toISOString()
+              : null,
+            endDate: raw.endDate ? new Date(raw.endDate).toISOString() : null,
+            duration: typeof raw.duration === "number" ? raw.duration : null,
+          }
+        : null;
+      rentalMetadataByTicketId.set(String(doc._id), {
+        ticketType: doc.ticketType,
+        rentalDetails: serializedDetails,
+      });
+    }
     const requesterIds = [
       ...new Set(equipmentTickets.map((ticket) => ticket.requesterId)),
     ];
@@ -738,47 +823,53 @@ export default async function ApprovalsPage({
           ...equipmentApprovalTickets,
           ...tickets
             .filter((ticket) => !equipmentApprovalTicketIds.has(ticket.id))
-            .map((ticket) => ({
-          id: ticket.id,
-          ticketNumber: ticket.ticketNumber,
-          title: ticket.title,
-          description: ticket.description,
-          type: ticket.type,
-          priority: ticket.priority,
-          requestCategory: ticket.requestCategory,
-          requestPaymentMethod: ticket.requestPaymentMethod,
-          requestPaymentDescription: ticket.requestPaymentDescription,
-          attachmentUrl: ticket.attachmentUrl,
-          receiptUrls: ticket.receiptUrls,
-          purchaseReceiptUrl: ticket.purchaseReceiptUrl,
-          totalAmount:
-            (ticket.totalAmount !== null
-              ? decimalStringFromScaledInteger(ticket.totalAmount)
-              : null) ??
-            ticket.requestedAmount?.toString() ??
-            null,
-          recipientName:
-            ticket.recipientName ?? ticket.requester.bankAccountName,
-          bankName: ticket.bankName ?? ticket.requester.bankName,
-          accountNumber:
-            ticket.accountNumber ?? ticket.requester.bankAccountNumber,
-          createdAt: ticket.createdAt.toISOString(),
-          requesterName: ticket.requester.name,
-          projectName: ticket.project
-            ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
-            : null,
-          items: ticket.items.map((item) => ({
-            itemName: item.itemName,
-            quantity: item.quantity,
-            unit: item.unit,
-            categoryHint: item.categoryHint,
-            estimatedCost:
-              item.estimatedCost !== null
-                ? decimalStringFromScaledInteger(item.estimatedCost)
-                : null,
-            materialContract: item.materialContract,
-          })),
-            })),
+            .map((ticket) => {
+              const rentalMeta = rentalMetadataByTicketId.get(ticket.id);
+              return {
+                id: ticket.id,
+                ticketNumber: ticket.ticketNumber,
+                title: ticket.title,
+                description: ticket.description,
+                type: ticket.type,
+                ticketType: rentalMeta?.ticketType ?? null,
+                rentalDetails: rentalMeta?.rentalDetails ?? null,
+                priority: ticket.priority,
+                requestCategory: ticket.requestCategory,
+                fieldCategory: ticket.fieldCategory,
+                requestPaymentMethod: ticket.requestPaymentMethod,
+                requestPaymentDescription: ticket.requestPaymentDescription,
+                attachmentUrl: ticket.attachmentUrl,
+                receiptUrls: ticket.receiptUrls,
+                purchaseReceiptUrl: ticket.purchaseReceiptUrl,
+                totalAmount:
+                  (ticket.totalAmount !== null
+                    ? decimalStringFromScaledInteger(ticket.totalAmount)
+                    : null) ??
+                  ticket.requestedAmount?.toString() ??
+                  null,
+                recipientName:
+                  ticket.recipientName ?? ticket.requester.bankAccountName,
+                bankName: ticket.bankName ?? ticket.requester.bankName,
+                accountNumber:
+                  ticket.accountNumber ?? ticket.requester.bankAccountNumber,
+                createdAt: ticket.createdAt.toISOString(),
+                requesterName: ticket.requester.name,
+                projectName: ticket.project
+                  ? `${ticket.project.kelompokTani} · ${ticket.project.title}`
+                  : null,
+                items: ticket.items.map((item) => ({
+                  itemName: item.itemName,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  categoryHint: item.categoryHint,
+                  estimatedCost:
+                    item.estimatedCost !== null
+                      ? decimalStringFromScaledInteger(item.estimatedCost)
+                      : null,
+                  materialContract: item.materialContract,
+                })),
+              };
+            }),
         ]}
         approvalHistory={approvalHistory}
         wages={workPoints.map((workPoint) => ({

@@ -1,8 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { X, HelpCircle, Calendar } from "lucide-react";
+import { useState } from "react";
+import { Calendar } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { GlobalModal } from "@/components/ui/global-modal";
+import { Label } from "@/components/ui/label";
 
 interface WorkCalendarModalProps {
   isOpen: boolean;
@@ -49,107 +53,88 @@ export default function WorkCalendarModal({
     "sab",
   ]);
 
-  if (!isOpen) return null;
-
   const toggleDay = (id: string) => {
     setActiveDays((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
     );
   };
 
   const handleSave = () => {
     onSave?.(activeDays);
+    toast.success("Kalender kerja proyek diperbarui.");
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-2xl border border-border bg-card text-card-foreground shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border/60 p-5 pb-4">
-          <div>
-            <h3 className="text-base font-semibold text-foreground">Kalender kerja proyek</h3>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Rencana RAB, perkiraan selesai dan geser otomatis di Gantt menghitung hari kerja ini.
-              Libur nasional, cuti bersama dan libur perusahaan mengikuti kalender HR di Pengaturan.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-              <HelpCircle className="size-3.5" />
-              <span>Panduan</span>
-            </span>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Days selection */}
-        <div className="p-5 pb-2">
-          <div className="flex items-center flex-wrap gap-4 text-xs">
+    <GlobalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileBehavior="sheet"
+      icon={<Calendar className="size-4" aria-hidden="true" />}
+      title="Kalender Kerja"
+      description="Rencana RAB, perkiraan selesai, dan geser otomatis di Gantt menghitung hari kerja ini."
+      className="max-w-md"
+      footerNote="Libur nasional mengikuti kalender HR di Pengaturan."
+      footer={
+        <>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Batal
+          </Button>
+          <Button type="button" size="sm" onClick={handleSave}>
+            Simpan
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <p className="type-p2 font-semibold text-foreground">
+            Hari Kerja Aktif
+          </p>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
             {DAYS.map((day) => {
               const checked = activeDays.includes(day.id);
               return (
-                <label
+                <Label
                   key={day.id}
-                  className="flex items-center gap-1.5 cursor-pointer text-foreground select-none"
+                  htmlFor={`work-day-${day.id}`}
+                  className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
+                    id={`work-day-${day.id}`}
                     checked={checked}
-                    onChange={() => toggleDay(day.id)}
-                    className="size-4 rounded border-border text-foreground accent-foreground cursor-pointer"
+                    onCheckedChange={() => toggleDay(day.id)}
                   />
-                  <span>{day.label}</span>
-                </label>
+                  <span className="type-p3 font-medium text-foreground">
+                    {day.label}
+                  </span>
+                </Label>
               );
             })}
           </div>
         </div>
 
-        {/* Holidays list */}
-        <div className="p-5 pt-3">
-          <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
-            <Calendar className="size-3.5 text-muted-foreground" />
-            <span>Libur 12 bulan ke depan</span>
-          </h4>
-          <div className="max-h-60 overflow-y-auto space-y-2 pr-1 text-xs text-muted-foreground">
-            {HOLIDAYS.map((h, idx) => (
-              <div key={idx} className="flex items-start gap-2 py-0.5">
-                <span className="font-medium text-foreground whitespace-nowrap">{h.date}</span>
-                <span>·</span>
-                <span className="truncate">{h.desc}</span>
+        <div className="space-y-2 border-t border-border pt-3">
+          <h3 className="type-h3 flex items-center gap-1.5 text-foreground">
+            <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
+            <span>Libur 12 Bulan ke Depan</span>
+          </h3>
+          <div className="max-h-60 space-y-2 overflow-y-auto pr-1">
+            {HOLIDAYS.map((holiday) => (
+              <div
+                key={`${holiday.date}-${holiday.desc}`}
+                className="type-p3 flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-muted-foreground"
+              >
+                <span className="shrink-0 font-semibold text-foreground tabular-nums">
+                  {holiday.date}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 flex-1">{holiday.desc}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-border/60 bg-muted/10 p-4">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="h-9 px-4 text-xs rounded-lg"
-          >
-            Batal
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={handleSave}
-            className="h-9 px-4 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium"
-          >
-            Simpan
-          </Button>
-        </div>
       </div>
-    </div>
+    </GlobalModal>
   );
 }

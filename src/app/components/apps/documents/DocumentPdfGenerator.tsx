@@ -1,10 +1,18 @@
 "use client";
-import { FormLabel } from "@/components/ui/label"
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Download } from "lucide-react";
 import type { DocType } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export type DocumentTemplateOption = {
   id: string;
@@ -34,12 +42,10 @@ export default function DocumentPdfGenerator({
     compatibleTemplates[0]?.id ?? "",
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [message, setMessage] = useState("");
 
   const downloadPdf = async () => {
     if (!selectedTemplateId) return;
     setIsGenerating(true);
-    setMessage("");
     try {
       const response = await fetch("/api/documents/generate", {
         method: "POST",
@@ -58,7 +64,7 @@ export default function DocumentPdfGenerator({
         } catch {
           errorMessage = `PDF gagal dibuat (HTTP ${response.status}).`;
         }
-        setMessage(errorMessage);
+        toast.error(errorMessage);
         return;
       }
 
@@ -68,10 +74,10 @@ export default function DocumentPdfGenerator({
       anchor.download = `${documentNumber.replace(/[^\w.-]+/g, "_")}.pdf`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
-      setMessage("PDF berhasil dibuat dan diunduh.");
+      toast.success("PDF berhasil dibuat dan diunduh.");
     } catch (error) {
       console.error("Document PDF download failed:", error);
-      setMessage("PDF gagal diunduh. Periksa koneksi lalu coba kembali.");
+      toast.error("PDF gagal diunduh. Periksa koneksi lalu coba kembali.");
     } finally {
       setIsGenerating(false);
     }
@@ -80,47 +86,38 @@ export default function DocumentPdfGenerator({
   if (compatibleTemplates.length === 0) return null;
 
   return (
-    <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+    <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
       <div className="flex flex-wrap items-end gap-3">
-        <FormLabel className="min-w-60 flex-1 space-y-1.5 text-sm">
-          <span className="font-medium">Template PDF</span>
-          <select
+        <div className="min-w-60 flex-1 space-y-1.5">
+          <Label htmlFor={`pdf-template-${recordId}`} className="type-p2 font-medium">
+            Template PDF
+          </Label>
+          <Select
             value={selectedTemplateId}
-            onChange={(event) => setSelectedTemplateId(event.target.value)}
-            disabled={isGenerating || compatibleTemplates.length === 0}
-            className="h-10 w-full rounded-md border border-input bg-background px-3"
+            onValueChange={setSelectedTemplateId}
+            disabled={isGenerating}
           >
-            {compatibleTemplates.length === 0 && (
-              <option value="">Belum ada template yang cocok</option>
-            )}
-            {compatibleTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </FormLabel>
+            <SelectTrigger id={`pdf-template-${recordId}`} className="w-full bg-background">
+              <SelectValue placeholder="Pilih template PDF" />
+            </SelectTrigger>
+            <SelectContent>
+              {compatibleTemplates.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  {template.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           type="button"
           onClick={downloadPdf}
-          disabled={
-            !selectedTemplateId ||
-            isGenerating ||
-            compatibleTemplates.length === 0
-          }
+          disabled={!selectedTemplateId || isGenerating}
         >
-          <Download className="mr-2 size-4" />
-          {isGenerating ? "Membuat PDF..." : "Generate & Cetak PDF"}
+          <Download className="mr-2 size-4" aria-hidden="true" />
+          {isGenerating ? "Membuat PDF..." : "Unduh PDF"}
         </Button>
       </div>
-      {message && (
-        <p
-          role={message.includes("berhasil") ? "status" : "alert"}
-          className="text-sm text-muted-foreground"
-        >
-          {message}
-        </p>
-      )}
     </div>
   );
 }

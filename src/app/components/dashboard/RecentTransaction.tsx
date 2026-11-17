@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Ticket, UserRound } from "lucide-react";
 import CardBox from "../shared/CardBox";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { TicketPriority } from "@prisma/client";
 
 type DashboardTicket = {
@@ -39,19 +40,19 @@ export const RecentTransaction = ({
 }: {
   tickets: DashboardTicket[];
 }) => (
-  <CardBox className="h-full w-full border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+  <CardBox className="h-full w-full border border-border bg-card p-5 text-card-foreground shadow-2xs sm:p-6">
     <div className="mb-5 flex items-center justify-between gap-3 border-b border-border pb-4">
       <div>
-        <h2 className="font-bold text-slate-900 dark:text-white">
-          Pengguna yang Mengajukan Request
+        <h2 className="type-h2 text-foreground">
+          Permintaan Tiket Terbaru
         </h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Pemohon dari request terbaru yang tercatat
+        <p className="type-p3 mt-1 text-muted-foreground">
+          Pemohon dari tiket yang tercatat terakhir
         </p>
       </div>
       <Link
         href="/apps/tickets"
-        className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-orange-600 hover:underline dark:text-orange-400"
+        className="type-p3 inline-flex shrink-0 items-center gap-1 font-semibold text-primary hover:underline"
       >
         Semua tiket
         <ArrowUpRight className="size-3.5" aria-hidden="true" />
@@ -63,29 +64,29 @@ export const RecentTransaction = ({
           <Link
             href={`/apps/tickets?openSheet=${encodeURIComponent(ticket.id)}`}
             key={ticket.id}
-            className="group flex items-start justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50 p-3.5 transition hover:border-orange-400/60 hover:bg-orange-50/50 dark:border-slate-700/80 dark:bg-[#0e1626] dark:hover:bg-slate-800/70"
+            className="group flex items-start justify-between gap-3 rounded-xl border border-border bg-muted/40 p-3.5 transition hover:border-primary/50 hover:bg-muted/70"
           >
             <div className="flex min-w-0 items-start gap-3">
-              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-orange-500/10 text-orange-500">
+              <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                 <UserRound className="size-4" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <span className="block truncate text-sm font-bold text-slate-900 group-hover:text-orange-600 dark:text-white dark:group-hover:text-orange-300">
+                <span className="type-p2 block truncate font-bold text-foreground group-hover:text-primary">
                   {ticket.requesterName}
                 </span>
-                <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                <p className="type-p3 mt-0.5 truncate text-muted-foreground">
                   {ticket.title} · {ticket.projectName}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <Badge variant="gray" className="px-2 py-0.5 text-[10px]">
+                  <Badge variant="gray">
                     {ticket.statusLabel}
                   </Badge>
                   {ticket.totalAmount !== "—" && (
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="type-p3 text-muted-foreground">
                       {ticket.totalAmount}
                     </span>
                   )}
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="type-p3 text-muted-foreground">
                     {ticket.createdAt}
                   </span>
                 </div>
@@ -93,19 +94,19 @@ export const RecentTransaction = ({
             </div>
             <Badge
               variant="outline"
-              className={`shrink-0 px-2 py-0.5 text-[10px] ${priorityClasses[ticket.priority]}`}
+              className={`shrink-0 ${priorityClasses[ticket.priority]}`}
             >
               {priorityLabels[ticket.priority]}
             </Badge>
           </Link>
         ))
       ) : (
-        <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-          <Ticket className="mx-auto mb-2 size-5 text-muted-foreground" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">
-          Belum ada tiket.
-          </p>
-        </div>
+        <EmptyState
+          variant="inline"
+          icon={Ticket}
+          title="Belum ada tiket"
+          description="Pengajuan tiket terbaru akan tampil di sini."
+        />
       )}
     </div>
   </CardBox>

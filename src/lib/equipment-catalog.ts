@@ -1,16 +1,21 @@
+export type RentalCatalogType = "EQUIPMENT" | "VEHICLE" | "HOUSE";
+export type RentalCatalogPeriodType = "DAILY" | "WEEKLY" | "MONTHLY";
+
 export type EquipmentCatalogItem = {
   id: string;
   name: string;
-  type: "EQUIPMENT" | "VEHICLE";
+  type: RentalCatalogType;
   category: string;
   brand?: string;
   description?: string;
+  defaultUnit?: string;
+  defaultPeriodType?: RentalCatalogPeriodType;
 };
 
 export type EquipmentCategoryGroup = {
   categoryNumber: number;
   categoryName: string;
-  type: "EQUIPMENT" | "VEHICLE";
+  type: RentalCatalogType;
   items: EquipmentCatalogItem[];
 };
 
@@ -257,6 +262,68 @@ export const STANDARD_EQUIPMENT_CATALOG: EquipmentCategoryGroup[] = [
         category: "Kendaraan Pengangkut",
         brand: "Isuzu",
         description: "Muatan logistik material bak terbuka",
+        defaultUnit: "Hari",
+        defaultPeriodType: "DAILY",
+      },
+      {
+        id: "pickup-granmax",
+        name: "Pick Up Daihatsu Gran Max",
+        type: "VEHICLE",
+        category: "Kendaraan Pengangkut",
+        brand: "Daihatsu",
+        description: "Pengangkutan material ringan & operasional harian",
+        defaultUnit: "Hari",
+        defaultPeriodType: "DAILY",
+      },
+      {
+        id: "truck-tangki-air",
+        name: "Truk Tangki Air 5000L",
+        type: "VEHICLE",
+        category: "Kendaraan Operasional Lapangan",
+        brand: "Mitsubishi",
+        description: "Suplai air kerja, pemadatan jalan & curing beton",
+        defaultUnit: "Hari",
+        defaultPeriodType: "DAILY",
+      },
+      {
+        id: "truck-engkel-box",
+        name: "Truk Engkel Box / Bak (4 Roda)",
+        type: "VEHICLE",
+        category: "Kendaraan Pengangkut",
+        brand: "Mitsubishi",
+        description: "Distribusi semen, perkakas, dan logistik antar gudang-proyek",
+        defaultUnit: "Hari",
+        defaultPeriodType: "DAILY",
+      },
+      {
+        id: "mpv-operasional",
+        name: "Mobil Operasional Proyek (MPV / Avanza / Innova)",
+        type: "VEHICLE",
+        category: "Kendaraan Operasional Lapangan",
+        brand: "Toyota",
+        description: "Mobilitas tim pengawas, survei lapangan, dan koordinasi kantor",
+        defaultUnit: "Bulan",
+        defaultPeriodType: "MONTHLY",
+      },
+      {
+        id: "double-cabin-4x4",
+        name: "Mobil Double Cabin 4x4 (Hilux / Triton)",
+        type: "VEHICLE",
+        category: "Kendaraan Operasional Lapangan",
+        brand: "Toyota / Mitsubishi",
+        description: "Akses medan berat proyek tanah, perkebunan & infrastruktur",
+        defaultUnit: "Bulan",
+        defaultPeriodType: "MONTHLY",
+      },
+      {
+        id: "motor-operasional",
+        name: "Motor Operasional Lapangan / Survei",
+        type: "VEHICLE",
+        category: "Kendaraan Operasional Lapangan",
+        brand: "Honda / Yamaha",
+        description: "Mobilitas kurir logistik, pembelian cepat & kontrol lapangan",
+        defaultUnit: "Bulan",
+        defaultPeriodType: "MONTHLY",
       },
     ],
   },
@@ -445,5 +512,119 @@ export const STANDARD_EQUIPMENT_CATALOG: EquipmentCategoryGroup[] = [
   },
 ];
 
+export const STANDARD_HOUSE_RENTAL_CATALOG: EquipmentCategoryGroup[] = [
+  {
+    categoryNumber: 7,
+    categoryName: "Rumah Sewa & Mess Tukang (Akomodasi Proyek)",
+    type: "HOUSE",
+    items: [
+      {
+        id: "house-mess-tukang",
+        name: "Rumah Sewa / Mess Tukang Proyek",
+        type: "HOUSE",
+        category: "Rumah Sewa Tukang",
+        description:
+          "Kontrakan rumah untuk tempat tinggal tim tukang & mandor di sekitar lokasi proyek",
+        defaultUnit: "Bulan",
+        defaultPeriodType: "MONTHLY",
+      },
+      {
+        id: "house-kontrakan-lapangan",
+        name: "Kontrakan Pekerja Lapangan",
+        type: "HOUSE",
+        category: "Rumah Sewa Tukang",
+        description:
+          "Rumah kontrakan atau bedeng sewa bulanan/periode untuk tim pekerja proyek",
+        defaultUnit: "Bulan",
+        defaultPeriodType: "MONTHLY",
+      },
+      {
+        id: "house-basecamp-gudang",
+        name: "Rumah / Ruko Basecamp & Gudang Material",
+        type: "HOUSE",
+        category: "Basecamp & Gudang Proyek",
+        description:
+          "Sewa rumah/ruko gabungan mess tukang dan tempat penyimpanan alat/material ringan",
+        defaultUnit: "Bulan",
+        defaultPeriodType: "MONTHLY",
+      },
+      {
+        id: "house-kos-periode",
+        name: "Kos / Penginapan Tukang (Mingguan / Periode)",
+        type: "HOUSE",
+        category: "Kos & Penginapan Tukang",
+        description:
+          "Sewa kamar kos atau penginapan tim tukang jangka pendek sesuai durasi pekerjaan",
+        defaultUnit: "Periode",
+        defaultPeriodType: "WEEKLY",
+      },
+    ],
+  },
+];
+
+export const STANDARD_RENTAL_CATALOG: EquipmentCategoryGroup[] = [
+  ...STANDARD_EQUIPMENT_CATALOG,
+  ...STANDARD_HOUSE_RENTAL_CATALOG,
+];
+
 export const ALL_CATALOG_ITEMS: EquipmentCatalogItem[] =
-  STANDARD_EQUIPMENT_CATALOG.flatMap((group) => group.items);
+  STANDARD_RENTAL_CATALOG.flatMap((group) => group.items);
+
+export const RENTAL_CATEGORY_OPTIONS: Record<RentalCatalogType, string[]> = {
+  EQUIPMENT: [
+    "Alat Gali & Pemuat",
+    "Alat Pemadat",
+    "Alat Beton",
+    "Alat Berat Angkat",
+    "Daya & Utilitas",
+  ],
+  VEHICLE: [
+    "Kendaraan Pengangkut",
+    "Kendaraan Operasional Lapangan",
+    "Kendaraan Proyek",
+  ],
+  HOUSE: [
+    "Rumah Sewa Tukang",
+    "Basecamp & Gudang Proyek",
+    "Kos & Penginapan Tukang",
+  ],
+};
+
+export function getRentalCatalogGroups(
+  type?: RentalCatalogType,
+): EquipmentCategoryGroup[] {
+  if (!type) return STANDARD_RENTAL_CATALOG;
+  return STANDARD_RENTAL_CATALOG.filter((group) => group.type === type);
+}
+
+export function getRentalCatalogItems(
+  type?: RentalCatalogType,
+): EquipmentCatalogItem[] {
+  if (!type) return ALL_CATALOG_ITEMS;
+  return ALL_CATALOG_ITEMS.filter((item) => item.type === type);
+}
+
+export function getRentalCategoryOptions(type: RentalCatalogType): string[] {
+  return RENTAL_CATEGORY_OPTIONS[type];
+}
+
+export function getDefaultRentalPeriodType(
+  type: RentalCatalogType,
+): RentalCatalogPeriodType {
+  return type === "HOUSE" ? "MONTHLY" : "DAILY";
+}
+
+export function getDefaultRentalUnit(
+  type: RentalCatalogType,
+  periodType?: RentalCatalogPeriodType,
+): string {
+  const effectivePeriod = periodType ?? getDefaultRentalPeriodType(type);
+  if (type === "HOUSE") {
+    if (effectivePeriod === "WEEKLY") return "Periode";
+    if (effectivePeriod === "DAILY") return "Hari";
+    return "Bulan";
+  }
+  if (effectivePeriod === "WEEKLY") return "Minggu";
+  if (effectivePeriod === "MONTHLY") return "Bulan";
+  return "Hari";
+}

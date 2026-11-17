@@ -1,16 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, Trash2, Plus, HelpCircle, Check } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Calculator, Check, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface MaterialAnalysisItem {
   id: string;
   materialName: string;
   unit: string;
   coefficient: number;
-  wastePercent: number; // susut %
+  wastePercent: number;
 }
 
 interface AnalisaMaterialModalProps {
@@ -39,7 +43,7 @@ const DEFAULT_MATERIALS = [
   { name: "Multipleks 12 mm", unit: "Lembar" },
   { name: "Paku Kayu", unit: "kg" },
   { name: "Minyak Bekisting", unit: "Liter" },
-  { name: "Pipa Besi 12\"", unit: "m" },
+  { name: 'Pipa Besi 12"', unit: "m" },
   { name: "Pipa PVC AW 3/4 inch", unit: "btg" },
   { name: "Bar Screen (Saringan Sedimen)", unit: "Unit" },
   { name: "Helm Safety", unit: "Unit" },
@@ -82,11 +86,14 @@ export default function AnalisaMaterialModal({
 
   const [prevOpen, setPrevOpen] = useState(isOpen);
   const [prevItemTitle, setPrevItemTitle] = useState(itemTitle);
-  const [prevInitialMaterials, setPrevInitialMaterials] = useState(initialMaterials);
+  const [prevInitialMaterials, setPrevInitialMaterials] =
+    useState(initialMaterials);
 
   if (
     isOpen &&
-    (!prevOpen || prevItemTitle !== itemTitle || prevInitialMaterials !== initialMaterials)
+    (!prevOpen ||
+      prevItemTitle !== itemTitle ||
+      prevInitialMaterials !== initialMaterials)
   ) {
     setPrevOpen(true);
     setPrevItemTitle(itemTitle);
@@ -111,10 +118,36 @@ export default function AnalisaMaterialModal({
   const [templateName, setTemplateName] = useState("");
   const [savedTemplate, setSavedTemplate] = useState(false);
 
-  if (!isOpen) return null;
+  const materialOptions = useMemo<ComboboxOption[]>(() => {
+    const seen = new Set<string>();
+    const options: ComboboxOption[] = [];
+    for (const item of availableMaterials) {
+      if (seen.has(item.name)) continue;
+      seen.add(item.name);
+      options.push({
+        value: item.name,
+        label: item.name,
+        description: `Satuan: ${item.unit}`,
+      });
+    }
+    for (const mat of materials) {
+      if (mat.materialName && !seen.has(mat.materialName)) {
+        seen.add(mat.materialName);
+        options.push({
+          value: mat.materialName,
+          label: mat.materialName,
+          description: `Satuan: ${mat.unit}`,
+        });
+      }
+    }
+    return options;
+  }, [availableMaterials, materials]);
 
   const handleAddMaterial = () => {
-    const defaultMat = availableMaterials[0] || { name: "Material baru", unit: "unit" };
+    const defaultMat = availableMaterials[0] || {
+      name: "Material baru",
+      unit: "unit",
+    };
     setMaterials((prev) => [
       ...prev,
       {
@@ -128,209 +161,199 @@ export default function AnalisaMaterialModal({
   };
 
   const handleRemoveMaterial = (id: string) => {
-    setMaterials((prev) => prev.filter((m) => m.id !== id));
+    setMaterials((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleUpdate = (
     id: string,
     field: keyof MaterialAnalysisItem,
-    value: string | number
+    value: string | number,
   ) => {
     setMaterials((prev) =>
-      prev.map((m) => {
-        if (m.id !== id) return m;
+      prev.map((item) => {
+        if (item.id !== id) return item;
         if (field === "materialName") {
           const found = availableMaterials.find((a) => a.name === value);
           return {
-            ...m,
+            ...item,
             materialName: String(value),
-            unit: found ? found.unit : m.unit,
+            unit: found ? found.unit : item.unit,
           };
         }
-        return { ...m, [field]: value };
-      })
+        return { ...item, [field]: value };
+      }),
     );
   };
 
   const handleSave = () => {
     onSave?.(materials);
+    toast.success("Analisa material item disimpan.");
     onClose();
   };
 
   const handleSaveTemplate = () => {
-    if (!templateName.trim()) return;
+    if (!templateName.trim()) {
+      toast.error("Masukkan nama template analisa terlebih dahulu.");
+      return;
+    }
     setSavedTemplate(true);
+    toast.success(`Template analisa "${templateName.trim()}" tersimpan.`);
     setTimeout(() => setSavedTemplate(false), 2000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-card text-card-foreground shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border/60 p-5 pb-4">
-          <div>
-            <h3 className="text-base font-semibold text-foreground">
-              Analisa material · {itemTitle || "Pekerjaan"}
-            </h3>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-lg">
-              Kebutuhan material per 1 {itemUnit || "M2"} pekerjaan. Rencana = volume{" "}
-              {itemVolume || 100} {itemUnit || "M2"} × koefisien × (1 + susut). Pakai angka analisa
-              perusahaan Anda sendiri.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer">
-              <HelpCircle className="size-3.5" />
-              <span>Panduan</span>
-            </span>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
+    <GlobalModal
+      isOpen={isOpen}
+      onClose={onClose}
+      mobileBehavior="sheet"
+      icon={<Calculator className="size-4" aria-hidden="true" />}
+      title={`Analisa Material · ${itemTitle || "Pekerjaan"}`}
+      description={`Kebutuhan per 1 ${itemUnit || "M2"} pekerjaan. Rencana = volume ${itemVolume || 100} ${itemUnit || "M2"} × koefisien × (1 + susut).`}
+      className="max-w-2xl"
+      footer={
+        <>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Batal
+          </Button>
+          <Button type="button" size="sm" onClick={handleSave}>
+            Simpan Analisa
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-3">
+          {materials.map((mat) => {
+            const vol = itemVolume > 0 ? itemVolume : 100;
+            const plannedTotal =
+              vol *
+              (mat.coefficient || 0) *
+              (1 + (mat.wastePercent || 0) / 100);
+            const formattedPlan = plannedTotal.toLocaleString("id-ID", {
+              maximumFractionDigits: 2,
+            });
 
-        {/* Body */}
-        <div className="max-h-[60vh] overflow-y-auto p-5 space-y-4">
-          <div className="space-y-3">
-            {materials.map((mat) => {
-              // Rencana = itemVolume * coefficient * (1 + waste/100)
-              const vol = itemVolume > 0 ? itemVolume : 100;
-              const plannedTotal = vol * (mat.coefficient || 0) * (1 + (mat.wastePercent || 0) / 100);
-              const formattedPlan = plannedTotal.toLocaleString("id-ID", {
-                maximumFractionDigits: 2,
-              });
-
-              return (
-                <div
-                  key={mat.id}
-                  className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 rounded-xl border border-border/60 bg-muted/20 p-2.5"
-                >
-                  {/* Select material */}
-                  <select
+            return (
+              <div
+                key={mat.id}
+                className="flex flex-col gap-2.5 rounded-xl border border-border bg-muted/20 p-3 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0 flex-1">
+                  <Combobox
+                    options={materialOptions}
                     value={mat.materialName}
-                    onChange={(e) => handleUpdate(mat.id, "materialName", e.target.value)}
-                    className="h-9 flex-1 min-w-[180px] rounded-lg border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
-                  >
-                    {availableMaterials.map((a, idx) => (
-                      <option key={idx} value={a.name}>
-                        {a.name} ({a.unit})
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(value) =>
+                      handleUpdate(mat.id, "materialName", value)
+                    }
+                    placeholder="Pilih material..."
+                    searchPlaceholder="Cari material..."
+                  />
+                </div>
 
-                  {/* Koefisien input */}
-                  <div className="w-20">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <div className="w-24 space-y-1">
+                    <Label className="type-p3 text-muted-foreground sm:sr-only">
+                      Koefisien
+                    </Label>
                     <Input
                       type="number"
                       step="0.01"
                       value={mat.coefficient}
-                      onChange={(e) =>
-                        handleUpdate(mat.id, "coefficient", parseFloat(e.target.value) || 0)
+                      onChange={(event) =>
+                        handleUpdate(
+                          mat.id,
+                          "coefficient",
+                          Number.parseFloat(event.target.value) || 0,
+                        )
                       }
+                      aria-label="Koefisien"
                       placeholder="Koef"
-                      className="h-9 text-xs text-center"
+                      className="text-right tabular-nums"
                     />
                   </div>
 
-                  {/* Susut % input */}
-                  <div className="w-16">
+                  <div className="w-20 space-y-1">
+                    <Label className="type-p3 text-muted-foreground sm:sr-only">
+                      Susut (%)
+                    </Label>
                     <Input
                       type="number"
                       step="0.5"
                       value={mat.wastePercent}
-                      onChange={(e) =>
-                        handleUpdate(mat.id, "wastePercent", parseFloat(e.target.value) || 0)
+                      onChange={(event) =>
+                        handleUpdate(
+                          mat.id,
+                          "wastePercent",
+                          Number.parseFloat(event.target.value) || 0,
+                        )
                       }
+                      aria-label="Susut persen"
                       placeholder="Susut %"
-                      className="h-9 text-xs text-center"
+                      className="text-right tabular-nums"
                     />
                   </div>
 
-                  {/* Result label */}
-                  <div className="w-36 text-xs text-muted-foreground whitespace-nowrap pl-1">
-                    Rencana <span className="font-semibold text-foreground">{formattedPlan}</span>{" "}
+                  <div className="type-p3 min-w-[112px] whitespace-nowrap text-muted-foreground tabular-nums">
+                    Rencana{" "}
+                    <strong className="font-semibold text-foreground">
+                      {formattedPlan}
+                    </strong>{" "}
                     {mat.unit}
                   </div>
 
-                  {/* Delete button */}
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
+                    aria-label={`Hapus ${mat.materialName}`}
                     onClick={() => handleRemoveMaterial(mat.id)}
-                    className="size-8 text-muted-foreground hover:text-destructive shrink-0"
+                    className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-4" aria-hidden="true" />
                   </Button>
                 </div>
-              );
-            })}
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddMaterial}
-            className="h-8 gap-1.5 text-xs rounded-lg"
-          >
-            <Plus className="size-3.5" />
-            <span>Tambah material</span>
-          </Button>
-
-          {/* Template saving section */}
-          <div className="pt-2 flex flex-wrap sm:flex-nowrap items-center gap-2 border-t border-border/50">
-            <Input
-              type="text"
-              placeholder="Simpan sebagai analisa, mis. B"
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              className="h-8 text-xs flex-1 max-w-xs rounded-lg"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSaveTemplate}
-              className="h-8 text-xs rounded-lg"
-            >
-              {savedTemplate ? (
-                <>
-                  <Check className="size-3.5 text-success mr-1" />
-                  <span>Tersimpan</span>
-                </>
-              ) : (
-                "Simpan ke analisa perusahaan"
-              )}
-            </Button>
-          </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-border/60 bg-muted/10 p-4">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddMaterial}
+          className="gap-1.5"
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Tambah Material
+        </Button>
+
+        <div className="flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center">
+          <Input
+            type="text"
+            placeholder="Nama template analisa, mis. Pasangan Batu"
+            value={templateName}
+            onChange={(event) => setTemplateName(event.target.value)}
+            className="flex-1 sm:max-w-xs"
+          />
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={onClose}
-            className="h-9 px-4 text-xs rounded-lg"
+            onClick={handleSaveTemplate}
+            className="gap-1.5"
           >
-            Batal
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={handleSave}
-            className="h-9 px-4 text-xs rounded-lg bg-foreground text-background hover:bg-foreground/90 font-medium"
-          >
-            Simpan analisa
+            {savedTemplate ? (
+              <>
+                <Check className="size-4 text-success" aria-hidden="true" />
+                Tersimpan
+              </>
+            ) : (
+              "Simpan Template"
+            )}
           </Button>
         </div>
       </div>
-    </div>
+    </GlobalModal>
   );
 }

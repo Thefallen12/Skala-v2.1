@@ -27,14 +27,14 @@ export const metadata: Metadata = {
 };
 
 const projectStatusLabels: Record<ProjectStatus, string> = {
-  [ProjectStatus.PENDING_SETUP]: "PENDING SETUP",
+  [ProjectStatus.PENDING_SETUP]: "Menunggu Setup",
   [ProjectStatus.RUNNING]: "Berjalan",
-  [ProjectStatus.PENDING]: "PENDING SETUP",
-  [ProjectStatus.ON_PROGRESS]: "RUNNING",
+  [ProjectStatus.PENDING]: "Menunggu Setup",
+  [ProjectStatus.ON_PROGRESS]: "Berjalan",
   [ProjectStatus.TERHAMBAT]: "Terhambat",
   [ProjectStatus.DONE]: "Selesai",
-  [ProjectStatus.PLANNED]: "PENDING SETUP",
-  [ProjectStatus.ACTIVE]: "RUNNING",
+  [ProjectStatus.PLANNED]: "Menunggu Setup",
+  [ProjectStatus.ACTIVE]: "Berjalan",
   [ProjectStatus.ON_HOLD]: "Ditunda",
   [ProjectStatus.COMPLETED]: "Selesai",
 };

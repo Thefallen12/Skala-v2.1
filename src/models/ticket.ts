@@ -1,9 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { model, models, Schema, type InferSchemaType } from "mongoose";
+import { TicketFieldCategory } from "@prisma/client";
 import {
   DEFAULT_EQUIPMENT_TIME_UNIT,
   EQUIPMENT_REQUEST_TYPE,
   EQUIPMENT_TIME_UNITS,
+  HOUSE_RENTAL_REQUEST_TYPE,
+  RENTAL_PERIOD_TYPES,
+  RENTAL_USAGE_SCOPES,
+  VEHICLE_RENTAL_REQUEST_TYPE,
 } from "@/lib/equipment-request";
 
 export const TICKET_TYPES = [
@@ -11,7 +16,41 @@ export const TICKET_TYPES = [
   "COST",
   "OPERATIONAL",
   EQUIPMENT_REQUEST_TYPE,
+  HOUSE_RENTAL_REQUEST_TYPE,
+  VEHICLE_RENTAL_REQUEST_TYPE,
 ] as const;
+
+const BASE_TICKET_TYPES = ["MATERIAL", "COST", "OPERATIONAL"] as const;
+
+const rentalDetailsSchema = new Schema(
+  {
+    rentalType: {
+      type: String,
+      enum: ["HOUSE", "VEHICLE"],
+      default: null,
+    },
+    usageScope: {
+      type: String,
+      enum: RENTAL_USAGE_SCOPES,
+      default: "PROJECT",
+    },
+    assetName: { type: String, default: null, trim: true },
+    propertyAddress: { type: String, default: null, trim: true },
+    landlordName: { type: String, default: null, trim: true },
+    landlordPhone: { type: String, default: null, trim: true },
+    occupantCount: { type: Number, default: null, min: 0 },
+    codeOrPlate: { type: String, default: null, trim: true },
+    periodType: {
+      type: String,
+      enum: RENTAL_PERIOD_TYPES,
+      default: "MONTHLY",
+    },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+    duration: { type: Number, default: null, min: 0 },
+  },
+  { _id: false },
+);
 
 const equipmentDetailsSchema = new Schema(
   {
@@ -45,10 +84,11 @@ const ticketSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: TICKET_TYPES.filter((type) => type !== EQUIPMENT_REQUEST_TYPE),
+      enum: BASE_TICKET_TYPES,
     },
     ticketType: { type: String, enum: TICKET_TYPES, default: null },
     equipmentDetails: { type: equipmentDetailsSchema, default: null },
+    rentalDetails: { type: rentalDetailsSchema, default: null },
     priority: {
       type: String,
       enum: ["LOW", "MEDIUM", "HIGH", "URGENT"],
@@ -63,7 +103,11 @@ const ticketSchema = new Schema(
     receiptUrls: { type: [String], default: [] },
     paymentProofUrl: { type: String, default: null },
     requestCategory: { type: String, default: null },
-    fieldCategory: { type: String, default: null },
+    fieldCategory: {
+      type: String,
+      enum: Object.values(TicketFieldCategory),
+      default: null,
+    },
     shippingDetails: { type: Schema.Types.Mixed, default: null },
     relatedPoIds: { type: [String], default: [] },
     relatedTicketIds: { type: [String], default: [] },
@@ -77,6 +121,8 @@ const ticketSchema = new Schema(
     transferDestination: { type: String, default: null },
     deliveryReceiptUrl: { type: String, default: null },
     deliveryOrderReceiptUrl: { type: String, default: null },
+    moverDeliveryNotes: { type: String, default: null },
+    paymentStatus: { type: String, default: null },
     moverAssigneeId: { type: String, default: null },
     requesterId: { type: String, required: true },
     projectId: { type: String, default: null },

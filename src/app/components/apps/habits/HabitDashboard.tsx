@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Activity,
   Check,
@@ -21,17 +22,24 @@ import CardBox from "@/app/components/shared/CardBox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DialogFooter } from "@/components/ui/dialog";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createHabit,
   deleteHabit,
   getHabitCompletions,
   toggleHabitCompletion,
-  type HabitActionResult,
 } from "@/app/actions/habits";
 import {
   dateFromKey,
@@ -100,7 +108,9 @@ export default function HabitDashboard({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<HabitItem | null>(null);
   const [isPending, setIsPending] = useState(false);
-  const [message, setMessage] = useState<HabitActionResult | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const [newFrequency, setNewFrequency] = useState<HabitFrequency>(HabitFrequency.WEEKDAYS);
+  const [newDescription, setNewDescription] = useState("");
   const weekDates = useMemo(
     () => getWeekDateKeys(selectedDate),
     [selectedDate],
@@ -137,35 +147,35 @@ export default function HabitDashboard({
   const changeWeek = async (direction: -1 | 1) => {
     const nextDate = shiftDateKey(selectedDate, direction * 7);
     setSelectedDate(nextDate);
-    setMessage(null);
     const result = await getHabitCompletions(nextDate);
     if (result.success) {
       setCompletions(result.completions);
     } else {
-      setMessage({
-        success: false,
-        message: result.message ?? "Data progres gagal dimuat.",
-      });
+      toast.error(result.message ?? "Data progres gagal dimuat.");
     }
   };
 
-  const handleCreateHabit = async (formData: FormData) => {
+  const handleCreateHabit = async () => {
     setIsPending(true);
-    setMessage(null);
     try {
       const result = await createHabit({
-        title: String(formData.get("title") ?? ""),
-        description: String(formData.get("description") ?? ""),
-        frequency: String(formData.get("frequency") ?? ""),
+        title: newTitle,
+        description: newDescription,
+        frequency: newFrequency,
       });
-      setMessage(result);
       if (result.success) {
+        toast.success(result.message);
         setIsDialogOpen(false);
+        setNewTitle("");
+        setNewFrequency(HabitFrequency.WEEKDAYS);
+        setNewDescription("");
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Habit creation request failed:", error);
-      setMessage({ success: false, message: "Kebiasaan gagal ditambahkan." });
+      toast.error("Kebiasaan gagal ditambahkan.");
     } finally {
       setIsPending(false);
     }
@@ -173,11 +183,10 @@ export default function HabitDashboard({
 
   const handleToggleCompletion = async (habit: HabitItem) => {
     setIsPending(true);
-    setMessage(null);
     try {
       const result = await toggleHabitCompletion(habit.id, selectedDate);
       if (!result.success || result.completed === undefined) {
-        setMessage({ success: false, message: result.message });
+        toast.error(result.message);
         return;
       }
       setCompletions((existing) =>
@@ -189,15 +198,12 @@ export default function HabitDashboard({
                 completion.date !== selectedDate,
             ),
       );
-      setMessage({ success: true, message: result.message });
+      toast.success(result.message);
       requestNotificationFeedRefresh();
       router.refresh();
     } catch (error) {
       console.error("Habit completion request failed:", error);
-      setMessage({
-        success: false,
-        message: "Status kebiasaan gagal diperbarui.",
-      });
+      toast.error("Status kebiasaan gagal diperbarui.");
     } finally {
       setIsPending(false);
     }
@@ -206,18 +212,19 @@ export default function HabitDashboard({
   const handleDeleteHabit = async () => {
     if (!deleteTarget) return;
     setIsPending(true);
-    setMessage(null);
     try {
       const result = await deleteHabit(deleteTarget.id);
-      setMessage(result);
       if (result.success) {
+        toast.success(result.message);
         setDeleteTarget(null);
         requestNotificationFeedRefresh();
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Habit deletion request failed:", error);
-      setMessage({ success: false, message: "Kebiasaan gagal dihapus." });
+      toast.error("Kebiasaan gagal dihapus.");
     } finally {
       setIsPending(false);
     }
@@ -259,8 +266,8 @@ export default function HabitDashboard({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Rutinitas &amp; Checklist SOP Harian</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="type-h2 text-foreground">Rutinitas &amp; Checklist SOP Harian</h2>
+          <p className="type-p3 text-muted-foreground">
             Jaga konsistensi standar operasional harian dan pantau capaian Anda setiap minggu.
           </p>
         </div>
@@ -269,19 +276,6 @@ export default function HabitDashboard({
           Tambah Rutinitas
         </Button>
       </div>
-
-      {message && (
-        <p
-          role={message.success ? "status" : "alert"}
-          className={`rounded-md border px-4 py-3 text-sm ${
-            message.success
-              ? "border-success/30 bg-lightsuccess text-success"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.message}
-        </p>
-      )}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {stats.map(({ label, value, hint, icon: Icon, iconClass }) => (
@@ -295,11 +289,11 @@ export default function HabitDashboard({
               <Icon className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="type-p3 font-medium uppercase tracking-wide text-muted-foreground">
                 {label}
               </p>
-              <p className="mt-1 text-xl font-semibold leading-tight">{value}</p>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground">
+              <p className="type-kpi mt-1 text-foreground">{value}</p>
+              <p className="type-p3 mt-0.5 truncate text-muted-foreground">
                 {hint}
               </p>
             </div>
@@ -323,6 +317,7 @@ export default function HabitDashboard({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => {
                 if (getWeekDateKeys(selectedDate).includes(today)) {
                   setSelectedDate(today);
@@ -333,11 +328,7 @@ export default function HabitDashboard({
                       setCompletions(result.completions);
                       setSelectedDate(today);
                     } else {
-                      setMessage({
-                        success: false,
-                        message:
-                          result.message ?? "Data progres gagal dimuat.",
-                      });
+                      toast.error(result.message ?? "Data progres gagal dimuat.");
                     }
                   })();
                 }
@@ -357,7 +348,7 @@ export default function HabitDashboard({
               <ChevronRight className="size-4" aria-hidden="true" />
             </Button>
           </div>
-          <p className="text-sm font-semibold">
+          <p className="type-p2 font-semibold">
             {format(dateFromKey(weekDates[0]), "d MMM", { locale: id })} –{" "}
             {format(dateFromKey(weekDates[6]), "d MMM yyyy", { locale: id })}
           </p>
@@ -386,10 +377,10 @@ export default function HabitDashboard({
                 aria-pressed={isSelected}
                 onClick={() => setSelectedDate(dateKey)}
               >
-                <span className="text-[10px] uppercase sm:text-xs">
+                <span className="type-p3 uppercase">
                   {format(date, "EEE", { locale: id })}
                 </span>
-                <span className="text-sm font-semibold sm:text-base">
+                <span className="type-h3 font-semibold">
                   {format(date, "d")}
                 </span>
                 <span
@@ -409,14 +400,14 @@ export default function HabitDashboard({
 
         <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border pt-4">
           <div>
-            <h3 className="text-lg font-semibold">
+            <h3 className="type-h2 text-foreground">
               {isSameDay(dateFromKey(selectedDate), dateFromKey(today))
                 ? "Agenda hari ini"
                 : format(dateFromKey(selectedDate), "EEEE, d MMMM yyyy", {
                     locale: id,
                   })}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="type-p2 mt-1 text-muted-foreground">
               {completedCount} dari {selectedDayHabits.length} kebiasaan selesai
             </p>
           </div>
@@ -450,21 +441,21 @@ export default function HabitDashboard({
                 />
                 <div className="min-w-0 flex-1">
                   <p
-                    className={`break-words font-medium ${
+                    className={`type-p1 break-words font-medium ${
                       isCompleted ? "text-muted-foreground line-through" : ""
                     }`}
                   >
                     {habit.title}
                   </p>
                   {habit.description && (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                    <p className="type-p2 mt-1 whitespace-pre-wrap break-words text-muted-foreground">
                       {habit.description}
                     </p>
                   )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant="gray">{frequencyLabels[habit.frequency]}</Badge>
                     {streak > 0 && (
-                      <span className="flex items-center gap-1 text-xs text-warning">
+                      <span className="type-p3 flex items-center gap-1 text-warning">
                         <Flame className="size-3.5" aria-hidden="true" />
                         {streak} hari
                       </span>
@@ -490,29 +481,31 @@ export default function HabitDashboard({
             );
           })}
           {selectedDayHabits.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center">
-              <Target
-                className="mx-auto size-8 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <p className="mt-3 font-medium">
-                {habits.length ? "Tidak ada kebiasaan terjadwal hari ini" : "Belum ada kebiasaan"}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {habits.length
+            <EmptyState
+              variant="inline"
+              icon={Target}
+              title={
+                habits.length
+                  ? "Tidak ada rutinitas terjadwal hari ini"
+                  : "Belum ada rutinitas"
+              }
+              description={
+                habits.length
                   ? "Belum ada rutinitas yang dijadwalkan untuk hari ini."
-                  : "Tambahkan kebiasaan pertama untuk mulai membangun rutinitas."}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-4"
-                onClick={() => setIsDialogOpen(true)}
-              >
-                <Plus className="mr-2 size-4" aria-hidden="true" />
-                Tambah kebiasaan
-              </Button>
-            </div>
+                  : "Tambahkan rutinitas pertama untuk mulai membangun konsistensi."
+              }
+              action={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(true)}
+                >
+                  <Plus className="mr-1.5 size-4" aria-hidden="true" />
+                  Tambah Rutinitas
+                </Button>
+              }
+            />
           )}
         </div>
       </CardBox>
@@ -544,12 +537,12 @@ export default function HabitDashboard({
           className="space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
-            void handleCreateHabit(new FormData(event.currentTarget));
+            void handleCreateHabit();
           }}
         >
           <div className="space-y-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">
-              Template Cepat Operasional (Klik untuk mengisi):
+            <span className="type-p3 font-semibold text-muted-foreground">
+              Template Cepat Operasional:
             </span>
             <div className="flex flex-wrap gap-1.5">
               {[
@@ -558,22 +551,15 @@ export default function HabitDashboard({
                 "Inspeksi Stok Material & Alat",
                 "Rekap Jam Kerja (Timesheet)",
               ].map((preset) => (
-                <button
+                <Button
                   key={preset}
                   type="button"
-                  onClick={() => {
-                    const input = document.getElementById(
-                      "habit-title",
-                    ) as HTMLInputElement | null;
-                    if (input) {
-                      input.value = preset;
-                      input.focus();
-                    }
-                  }}
-                  className="rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setNewTitle(preset)}
                 >
                   + {preset}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -581,7 +567,8 @@ export default function HabitDashboard({
             <Label htmlFor="habit-title">Nama Rutinitas / Checklist</Label>
             <Input
               id="habit-title"
-              name="title"
+              value={newTitle}
+              onChange={(event) => setNewTitle(event.target.value)}
               placeholder="Contoh: Briefing K3 & Cek APD Pagi"
               minLength={2}
               maxLength={120}
@@ -590,30 +577,36 @@ export default function HabitDashboard({
           </div>
           <div className="space-y-2">
             <Label htmlFor="habit-frequency">Frekuensi Pelaksanaan</Label>
-            <select
-              id="habit-frequency"
-              name="frequency"
-              defaultValue={HabitFrequency.WEEKDAYS}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            <Select
+              value={newFrequency}
+              onValueChange={(value) => setNewFrequency(value as HabitFrequency)}
             >
-              <option value={HabitFrequency.WEEKDAYS}>
-                Hari Kerja (Senin–Jumat)
-              </option>
-              <option value={HabitFrequency.DAILY}>Setiap Hari (Senin–Minggu)</option>
-              <option value={HabitFrequency.WEEKENDS}>
-                Akhir Pekan (Sabtu–Minggu)
-              </option>
-            </select>
+              <SelectTrigger id="habit-frequency" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={HabitFrequency.WEEKDAYS}>
+                  Hari Kerja (Senin–Jumat)
+                </SelectItem>
+                <SelectItem value={HabitFrequency.DAILY}>
+                  Setiap Hari (Senin–Minggu)
+                </SelectItem>
+                <SelectItem value={HabitFrequency.WEEKENDS}>
+                  Akhir Pekan (Sabtu–Minggu)
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="habit-description">Catatan / Kriteria Selesai (Opsional)</Label>
-            <textarea
+            <Textarea
               id="habit-description"
-              name="description"
+              value={newDescription}
+              onChange={(event) => setNewDescription(event.target.value)}
               rows={3}
               maxLength={500}
+              className="mt-0"
               placeholder="Tambahkan target atau rincian standar operasional..."
-              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
         </form>

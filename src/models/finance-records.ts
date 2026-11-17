@@ -360,12 +360,17 @@ export const KOItem =
 const equipmentRentalSchema = new Schema(
   {
     _id: String,
-    type: String,
+    type: String, // "EQUIPMENT" | "VEHICLE" | "HOUSE"
+    usageScope: { type: String, default: "PROJECT" }, // "PROJECT" | "OPERATIONAL"
     name: String,
     category: String,
     codeOrPlate: String,
     vendorName: String,
     vendorPhone: String,
+    propertyAddress: String,
+    landlordName: String,
+    landlordPhone: String,
+    occupantCount: Number,
     rentalPeriodType: String,
     startDate: Date,
     endDate: Date,
@@ -378,6 +383,9 @@ const equipmentRentalSchema = new Schema(
     operatorName: String,
     withFuel: Boolean,
     projectId: String,
+    sourceTicketId: String,
+    cashflowId: String,
+    paymentTransactionId: String,
     notes: String,
     createdById: String,
     createdByName: String,
@@ -398,6 +406,9 @@ const equipmentRentalSchema = new Schema(
   },
   { ...looseOptions, collection: "EquipmentRental" },
 );
+equipmentRentalSchema.index({ projectId: 1, status: 1, paymentStatus: 1 });
+equipmentRentalSchema.index({ type: 1, status: 1, createdAt: -1 });
+equipmentRentalSchema.index({ sourceTicketId: 1 }, { sparse: true });
 export const EquipmentRental =
   models.EquipmentRental ||
   model("EquipmentRental", equipmentRentalSchema, "EquipmentRental");

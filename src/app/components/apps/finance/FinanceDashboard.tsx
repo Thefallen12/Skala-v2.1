@@ -21,6 +21,7 @@ import FinanceReportTemplateModal, {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { withLocalPhotoPreview } from "@/lib/photo-urls";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
@@ -33,7 +34,12 @@ export type FinanceDashboardMonth = {
 };
 
 export type FinanceExpenseCategory = {
-  kind: "ticket" | "purchase-order" | "direct-material" | "office-expense";
+  kind:
+    | "ticket"
+    | "purchase-order"
+    | "direct-material"
+    | "office-expense"
+    | "rental";
   label: string;
   amount: number;
 };
@@ -196,7 +202,7 @@ export default function FinanceDashboard({
       });
     }
 
-    const palette = ["#f97316", "#fb923c", "#64748b", "#475569", "#94a3b8"];
+    const palette = ["#f97316", "#fb923c", "#64748b", "#475569", "#10b981"];
     expenseCategories.forEach((cat, idx) => {
       if (cat.amount > 0) {
         items.push({
@@ -299,142 +305,128 @@ export default function FinanceDashboard({
 
   return (
     <div className="space-y-4">
-      {/* Header Ringkas 1 Baris */}
-      <Card className="border border-border/80 bg-card p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[11px] font-semibold">
-                FINANCE HUB &amp; ARUS KAS
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                PT. Skala Prioritas Engineering
-              </span>
-            </div>
-            <h1 className="mt-1 text-lg font-bold tracking-tight text-foreground sm:text-xl">
-              Pusat Kendali Keuangan, Pembayaran &amp; Buku Kas
-            </h1>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
+      <PageHeader
+        title="Keuangan & Arus Kas"
+        description="PT. Skala Prioritas Engineering · Kontrol PO, pembayaran, material alam, sewa, dan buku kas."
+        badge={<Badge variant="outline">Finance Hub</Badge>}
+        actions={
+          <>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => setShowCharts((prev) => !prev)}
-              className="gap-1.5 text-xs"
             >
-              <BarChart3 className="size-3.5 text-primary" />
+              <BarChart3 className="size-4 text-primary" aria-hidden="true" />
               {showCharts ? "Tutup Grafik" : "Lihat Grafik"}
               {showCharts ? (
-                <ChevronUp className="size-3.5" />
+                <ChevronUp className="size-4" aria-hidden="true" />
               ) : (
-                <ChevronDown className="size-3.5" />
+                <ChevronDown className="size-4" aria-hidden="true" />
               )}
             </Button>
             <Button
               type="button"
               size="sm"
               onClick={() => setReportModalOpen(true)}
-              className="gap-1.5 text-xs"
             >
-              <Printer className="size-3.5" />
-              Template &amp; Cetak Laporan
+              <Printer className="size-4" aria-hidden="true" />
+              Cetak Laporan
             </Button>
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* 4 KPI Ringkas Menyatu di Dalam Kartu Atas */}
-        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-border/60 pt-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-muted/15 p-3.5">
-            <div>
-              <p className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
-                Total Saldo Kas &amp; Bank
-              </p>
-              <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-foreground">
-                {currency(totalBalance)}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {accounts.length} rekening / buku kas aktif
-              </p>
-            </div>
-            <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
-              <Wallet className="size-4" aria-hidden="true" />
-            </span>
+      {/* 4 KPI Ringkas */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="flex items-start justify-between gap-3 p-4 shadow-2xs">
+          <div className="min-w-0">
+            <p className="type-p3 font-semibold tracking-wide uppercase text-muted-foreground">
+              Saldo Kas &amp; Bank
+            </p>
+            <p className="type-kpi mt-1 text-foreground">
+              {currency(totalBalance)}
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              {accounts.length} buku kas aktif
+            </p>
           </div>
+          <span className="shrink-0 rounded-lg bg-primary/10 p-2.5 text-primary">
+            <Wallet className="size-4" aria-hidden="true" />
+          </span>
+        </Card>
 
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-muted/15 p-3.5">
-            <div>
-              <p className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
-                Dana Masuk (Bulan Ini)
-              </p>
-              <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-foreground">
-                +{currency(effectiveMonthInflow)}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Arus bersih:{" "}
-                <strong className="text-foreground">
-                  {monthNet >= 0 ? "+" : ""}
-                  {currency(monthNet)}
-                </strong>
-              </p>
-            </div>
-            <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
-              <TrendingUp className="size-4" aria-hidden="true" />
-            </span>
+        <Card className="flex items-start justify-between gap-3 p-4 shadow-2xs">
+          <div className="min-w-0">
+            <p className="type-p3 font-semibold tracking-wide uppercase text-muted-foreground">
+              Dana Masuk Bulan Ini
+            </p>
+            <p className="type-kpi mt-1 text-foreground">
+              +{currency(effectiveMonthInflow)}
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              Arus bersih:{" "}
+              <strong className="text-foreground">
+                {monthNet >= 0 ? "+" : ""}
+                {currency(monthNet)}
+              </strong>
+            </p>
           </div>
+          <span className="shrink-0 rounded-lg bg-primary/10 p-2.5 text-primary">
+            <TrendingUp className="size-4" aria-hidden="true" />
+          </span>
+        </Card>
 
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-muted/15 p-3.5">
-            <div>
-              <p className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
-                Dana Keluar (Bulan Ini)
-              </p>
-              <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-primary">
-                -{currency(effectiveMonthOutflow)}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                PO, tiket &amp; pengeluaran kantor
-              </p>
-            </div>
-            <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
-              <TrendingDown className="size-4" aria-hidden="true" />
-            </span>
+        <Card className="flex items-start justify-between gap-3 p-4 shadow-2xs">
+          <div className="min-w-0">
+            <p className="type-p3 font-semibold tracking-wide uppercase text-muted-foreground">
+              Dana Keluar Bulan Ini
+            </p>
+            <p className="type-kpi mt-1 text-primary">
+              -{currency(effectiveMonthOutflow)}
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              PO, tiket, sewa &amp; kas kantor
+            </p>
           </div>
+          <span className="shrink-0 rounded-lg bg-primary/10 p-2.5 text-primary">
+            <TrendingDown className="size-4" aria-hidden="true" />
+          </span>
+        </Card>
 
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-muted/15 p-3.5">
-            <div>
-              <p className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
-                Sisa Tagihan Belum Lunas
-              </p>
-              <p className="mt-1 text-xl font-bold tracking-tight tabular-nums text-foreground">
-                {currency(outstandingAmount)}
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {pendingPaymentCount} antrean bayar · {reviewCount} PO diperiksa
-              </p>
-            </div>
-            <span className="rounded-lg bg-primary/10 p-2.5 text-primary">
-              <FileCheck2 className="size-4" aria-hidden="true" />
-            </span>
+        <Card className="flex items-start justify-between gap-3 p-4 shadow-2xs">
+          <div className="min-w-0">
+            <p className="type-p3 font-semibold tracking-wide uppercase text-muted-foreground">
+              Tagihan Belum Lunas
+            </p>
+            <p className="type-kpi mt-1 text-foreground">
+              {currency(outstandingAmount)}
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              {pendingPaymentCount} antrean · {reviewCount} periksa PO
+            </p>
           </div>
-        </div>
-      </Card>
+          <span className="shrink-0 rounded-lg bg-primary/10 p-2.5 text-primary">
+            <FileCheck2 className="size-4" aria-hidden="true" />
+          </span>
+        </Card>
+      </div>
 
-      {/* Grafik Analitik Arus Kas (Hanya tampil jika dibuka, tanpa tabel/kartu berulang) */}
+      {/* Grafik Analitik Arus Kas */}
       {showCharts && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <Card className="p-4 sm:p-5 lg:col-span-8">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h2 className="text-sm font-semibold">
+                <h2 className="type-h3 text-foreground">
                   Tren Arus Kas (6 Bulan Terakhir)
                 </h2>
-                <p className="text-xs text-muted-foreground">
-                  Perbandingan bulanan antara Dana Masuk dan Dana Keluar.
+                <p className="type-p3 text-muted-foreground">
+                  Perbandingan bulanan Dana Masuk dan Dana Keluar.
                 </p>
               </div>
-              <Badge variant="outline" className="font-mono text-xs">
-                Total Masuk 6 Bln: +{currency(totalSixMonthInflow)}
+              <Badge variant="outline" className="font-mono">
+                Masuk 6 Bln: +{currency(totalSixMonthInflow)}
               </Badge>
             </div>
             <Chart
@@ -456,11 +448,11 @@ export default function FinanceDashboard({
 
           <Card className="p-4 sm:p-5 lg:col-span-4">
             <div className="mb-3">
-              <h2 className="text-sm font-semibold">
-                Komposisi Dana Masuk &amp; Pengeluaran
+              <h2 className="type-h3 text-foreground">
+                Komposisi Arus Kas
               </h2>
-              <p className="text-xs text-muted-foreground">
-                Proporsi Dana Masuk dibandingkan kategori pengeluaran.
+              <p className="type-p3 text-muted-foreground">
+                Proporsi Dana Masuk dan kategori pengeluaran.
               </p>
             </div>
             <Chart

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   updateTransactionDocumentSignature,
   type TransactionDocumentAction,
@@ -34,11 +35,9 @@ export default function DocumentSignoffQueue({
   description: string;
 }) {
   const router = useRouter();
-  const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const updateSignature = (task: DocumentSignoffTask) => {
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await updateTransactionDocumentSignature(
@@ -46,14 +45,16 @@ export default function DocumentSignoffQueue({
           task.id,
           task.action,
         );
-        setMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Document sign-off action failed:", error);
-        setMessage("Konfirmasi dokumen gagal disimpan. Silakan coba kembali.");
+        toast.error("Konfirmasi dokumen gagal disimpan. Silakan coba kembali.");
       }
     });
   };
@@ -63,25 +64,25 @@ export default function DocumentSignoffQueue({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <CardTitle className="type-h2">{title}</CardTitle>
+        <p className="type-p2 text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent className="space-y-3">
         {tasks.map((task) => (
           <article
             key={`${task.kind}:${task.id}`}
-            className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0 space-y-1">
-              <p className="font-semibold text-primary">
+              <p className="type-h3 text-primary">
                 {task.kind} · {task.number}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-p3 text-muted-foreground">
                 {task.signedByName
                   ? `Ditandatangani ${task.signedByName}${task.signedAt ? ` · ${new Date(task.signedAt).toLocaleString("id-ID")}` : ""}`
                   : "Belum ditandatangani"}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-p3 text-muted-foreground">
                 {task.acknowledgedByName
                   ? `Diketahui ${task.acknowledgedByName}${task.acknowledgedAt ? ` · ${new Date(task.acknowledgedAt).toLocaleString("id-ID")}` : ""}`
                   : "Belum diketahui"}
@@ -110,17 +111,12 @@ export default function DocumentSignoffQueue({
                   : task.action === "sign"
                     ? "Tanda Tangani"
                     : task.kind === "DO"
-                      ? "Konfirmasi Koordinator Lapangan"
-                      : "Konfirmasi Diketahui"}
+                      ? "Konfirmasi Lapangan"
+                      : "Konfirmasi"}
               </Button>
             </div>
           </article>
         ))}
-        {message && (
-          <p className="text-sm" role="status">
-            {message}
-          </p>
-        )}
       </CardContent>
     </Card>
   );

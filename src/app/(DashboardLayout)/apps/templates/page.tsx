@@ -4,7 +4,7 @@ import { UserRole } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { canManageUsers } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
-import BreadcrumbComp from "../../layout/shared/breadcrumb/BreadcrumbComp";
+import { PageHeader } from "@/components/ui/page-header";
 import TemplateEditorHub from "@/app/components/apps/templates/TemplateEditorHub";
 
 export const metadata: Metadata = {
@@ -58,12 +58,13 @@ export default async function TemplatesPage({
     : null;
 
   return (
-    <>
-      <BreadcrumbComp
+    <div className="space-y-5">
+      <PageHeader
         title="Template Dokumen"
-        items={[
-          { to: "/", title: "Beranda" },
-          { title: "Document Generator & Template Editor" },
+        description="Kelola dan pratinjau desain cetak dokumen operasional (PO, DO, Invoice, SPK, BAST)."
+        breadcrumbs={[
+          { label: "Beranda", href: "/" },
+          { label: "Template Dokumen" },
         ]}
       />
       <TemplateEditorHub
@@ -74,6 +75,6 @@ export default async function TemplatesPage({
         initialEditId={edit}
         initialTemplate={initialTemplate ?? undefined}
       />
-    </>
+    </div>
   );
 }

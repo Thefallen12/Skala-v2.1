@@ -38,6 +38,8 @@
   ],
   "exclude": [
     "node_modules",
-    "src/generated/prisma8"
+    "src/generated/prisma8",
+    "agency-agents-app",
+    "agency-agents"
   ]
 }

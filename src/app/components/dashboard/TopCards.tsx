@@ -1,9 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Autoplay, FreeMode } from "swiper/modules";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
 import {
   BriefcaseBusiness,
   Boxes,
@@ -94,22 +91,21 @@ const DashboardCardLink = ({
   return (
     <Link
       href={card.href}
-      aria-label={`${card.title}: ${card.value}`}
       style={{ animationDelay: `${index * 75}ms` }}
-      className={`dashboard-enter group relative block h-full min-w-0 rounded-xl border p-3 shadow-sm transition duration-300 ease-out hover:z-10 hover:-translate-y-1 hover:scale-[1.04] hover:saturate-110 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 sm:p-4 ${colors.card}`}
+      className={`dashboard-enter group relative block h-full min-w-0 rounded-xl border p-3 shadow-2xs transition duration-300 ease-out hover:z-10 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4 ${colors.card}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2 sm:gap-3">
-        <p className={`min-w-0 break-words text-xs font-bold ${colors.label}`}>
+        <p className={`type-p3 min-w-0 break-words font-bold ${colors.label}`}>
           {card.title}
         </p>
         <span className={`shrink-0 rounded-lg p-2 transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110 ${colors.icon}`}>
           <Icon className="size-4" aria-hidden="true" />
         </span>
       </div>
-      <p className={`text-xl font-extrabold tabular-nums sm:text-2xl ${colors.value}`}>
+      <p className={`type-kpi ${colors.value}`}>
         {card.value}
       </p>
-      <p className="mt-1 break-words text-[11px] text-slate-500 dark:text-slate-400">
+      <p className="type-p3 mt-1 break-words text-muted-foreground">
         {card.caption}
       </p>
     </Link>
@@ -118,7 +114,7 @@ const DashboardCardLink = ({
 
 const TopCards = ({ cards }: { cards: readonly DashboardCard[] }) => {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6 w-full min-w-0">
+    <div className="grid w-full min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
       {cards.map((card, index) => (
         <div key={card.title} className="h-full">
           <DashboardCardLink card={card} index={index} />

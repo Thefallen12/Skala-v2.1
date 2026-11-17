@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import {
   FulfillmentStatus,
+  TicketFulfillmentStatus,
   POPaymentMethod,
   DODeliveryMethod,
   DOStatus,
@@ -40,11 +41,20 @@ import {
   POItem,
   TicketItem,
   DeliveryOrder,
+  EquipmentRental,
   MaterialDelivery,
   OperationalDocument,
   StockItem,
 } from "@/models/finance-records";
 import PurchaseOrder from "@/models/purchase-order";
+import {
+  HOUSE_RENTAL_REQUEST_TYPE,
+  RENTAL_PERIOD_TYPES,
+  RENTAL_USAGE_SCOPES,
+  VEHICLE_RENTAL_REQUEST_TYPE,
+  type RentalPeriodType,
+  type RentalUsageScope,
+} from "@/lib/equipment-request";
 import {
   decimalFromScaledInteger,
   scaledIntegerFromDecimal,
@@ -94,6 +104,7 @@ import {
   removeTicketReceipt,
   saveTicketReceipt,
 } from "@/lib/ticket-receipts";
+import { VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER } from "@/lib/vehicle-fuel";
 import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
 import {
   getFinancePaymentProofMimeType,
@@ -203,6 +214,21 @@ type TicketItemInput = {
   materialContractId?: string | null;
 };
 
+export type TicketRentalDetailsInput = {
+  rentalType: "HOUSE" | "VEHICLE";
+  usageScope?: RentalUsageScope;
+  assetName: string;
+  propertyAddress?: string | null;
+  landlordName?: string | null;
+  landlordPhone?: string | null;
+  occupantCount?: number | null;
+  codeOrPlate?: string | null;
+  periodType?: RentalPeriodType;
+  startDate?: string | null;
+  endDate?: string | null;
+  duration?: number | null;
+};
+
 export type CreateTicketInput = {
   title: string;
   description?: string;
@@ -224,12 +250,15 @@ export type CreateTicketInput = {
   requestedAmount?: number;
   receiptFiles?: File[];
   items: TicketItemInput[];
+  submitImmediately?: boolean;
+  rentalDetails?: TicketRentalDetailsInput;
 };
 
 export type TicketActionResult = {
   success: boolean;
   message: string;
   fallbackRequired?: boolean;
+  ticketId?: string;
   ticketNumber?: string;
   purchaseNumber?: string;
   documentNumber?: string;
@@ -280,6 +309,8 @@ export type ShippingDocumentOptions = {
     }>;
   }>;
 };
+
+const LOGISTICS_DB_ROLES = [UserRole.LOGISTICS, "KOORDINATOR_LOGISTIK"];
 
 const actionFailure = (message: string): TicketActionResult => ({
   success: false,
@@ -1100,7 +1131,16 @@ export async function createDirectStockPurchase(input: {
             where: {
               id: input.ticketId,
               type: TicketType.MATERIAL,
-              status: TicketStatus.PROCESSED_LOGISTIC,
+              status: {
+                in: [
+                  TicketStatus.APPROVED_DIR,
+                  TicketStatus.PROCESSED_LOGISTIC,
+                  TicketStatus.PROCESSED_FINANCE,
+                  TicketStatus.WAITING_FINANCE_PAYMENT,
+                  TicketStatus.ASSIGNED_TO_MOVER,
+                  TicketStatus.IN_TRANSIT,
+                ],
+              },
             },
             select: {
               id: true,
@@ -1124,7 +1164,7 @@ export async function createDirectStockPurchase(input: {
         : null;
       if (input.ticketId && !ticket) {
         throw new Error(
-          "Tiket material harus berada pada tahap Diproses Logistik untuk pembelian langsung."
+          "Tiket material harus berada di antrean aktif Logistik dan belum selesai untuk pembelian langsung."
         );
       }
 
@@ -1830,6 +1870,93 @@ export async function receiveDirectStockPurchase(
         });
       }
       if (purchase.ticketId) {
+        const linkedTicket = await transaction.ticket.findUnique({
+          where: { id: purchase.ticketId },
+          select: {
+            id: true,
+            status: true,
+            items: {
+              select: {
+                id: true,
+                stockItemId: true,
+                itemName: true,
+                unit: true,
+                categoryHint: true,
+                status: true,
+              },
+            },
+          },
+        });
+        if (linkedTicket) {
+          for (const ticketItem of linkedTicket.items) {
+            if (
+              ticketItem.categoryHint === TicketCategoryHint.CONTRACT ||
+              ticketItem.stockItemId
+            ) {
+              continue;
+            }
+            const matchedReceivedItem =
+              receivedPurchase.items.find(
+                (item) =>
+                  normalizeTicketStockValue(item.itemName) ===
+                    normalizeTicketStockValue(ticketItem.itemName) &&
+                  normalizeTicketStockValue(item.unit) ===
+                    normalizeTicketStockValue(ticketItem.unit),
+              ) ??
+              receivedPurchase.items.find(
+                (item) =>
+                  normalizeTicketStockValue(item.itemName) ===
+                  normalizeTicketStockValue(ticketItem.itemName),
+              );
+            if (matchedReceivedItem) {
+              await transaction.ticketItem.update({
+                where: { id: ticketItem.id },
+                data: { stockItemId: matchedReceivedItem.stockItemId },
+              });
+            }
+          }
+          const [unpaidPoCount, unpaidDspCount] = await Promise.all([
+            transaction.purchaseOrder.count({
+              where: {
+                ticketId: purchase.ticketId,
+                paidAt: null,
+                status: { not: POStatus.REJECTED },
+              },
+            }),
+            transaction.directStockPurchase.count({
+              where: {
+                ticketId: purchase.ticketId,
+                id: { not: purchaseId },
+                paidAt: null,
+              },
+            }),
+          ]);
+          const hasPendingNonContractItems = linkedTicket.items.some(
+            (item) =>
+              item.categoryHint !== TicketCategoryHint.CONTRACT &&
+              item.status === FulfillmentStatus.PENDING,
+          );
+          if (
+            (linkedTicket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
+              linkedTicket.status === TicketStatus.APPROVED_DIR) &&
+            unpaidPoCount === 0 &&
+            unpaidDspCount === 0 &&
+            hasPendingNonContractItems
+          ) {
+            await transaction.ticket.update({
+              where: { id: purchase.ticketId },
+              data: {
+                status: TicketStatus.PROCESSED_LOGISTIC,
+                updatedAt: new Date(),
+              },
+            });
+          }
+          await syncTicketStatus(
+            transaction,
+            purchase.ticketId,
+            TicketStatus.COMPLETED,
+          );
+        }
         await transaction.ticketAuditLog.create({
           data: {
             ticketId: purchase.ticketId,
@@ -2123,6 +2250,143 @@ export async function createTicket(
   ) {
     return actionFailure("Jenis, prioritas, atau rincian tiket tidak valid.");
   }
+  const submitImmediately = input.submitImmediately === true;
+  const rawRental = input.rentalDetails;
+  const isRentalTicket = rawRental !== undefined && rawRental !== null;
+  let resolvedRentalTicketType:
+    | typeof HOUSE_RENTAL_REQUEST_TYPE
+    | typeof VEHICLE_RENTAL_REQUEST_TYPE
+    | null = null;
+  let normalizedRentalDetails: {
+    rentalType: "HOUSE" | "VEHICLE";
+    usageScope: RentalUsageScope;
+    assetName: string;
+    propertyAddress: string | null;
+    landlordName: string | null;
+    landlordPhone: string | null;
+    occupantCount: number | null;
+    codeOrPlate: string | null;
+    periodType: RentalPeriodType;
+    startDate: Date | null;
+    endDate: Date | null;
+    duration: number;
+  } | null = null;
+
+  if (isRentalTicket) {
+    if (typeof rawRental !== "object") {
+      return actionFailure("Detail sewa tidak valid.");
+    }
+    if (rawRental.rentalType !== "HOUSE" && rawRental.rentalType !== "VEHICLE") {
+      return actionFailure("Jenis sewa harus Rumah Sewa atau Kendaraan Sewa.");
+    }
+    if (
+      typeof rawRental.assetName !== "string" ||
+      rawRental.assetName.trim().length < 2 ||
+      rawRental.assetName.trim().length > 160
+    ) {
+      return actionFailure("Nama aset / properti / kendaraan sewa wajib diisi (2–160 karakter).");
+    }
+    const rentalUsageScope: RentalUsageScope =
+      rawRental.rentalType === "HOUSE"
+        ? "PROJECT"
+        : rawRental.usageScope === "OPERATIONAL"
+          ? "OPERATIONAL"
+          : "PROJECT";
+    if (
+      rawRental.usageScope !== undefined &&
+      !RENTAL_USAGE_SCOPES.includes(rawRental.usageScope)
+    ) {
+      return actionFailure("Cakupan penggunaan sewa tidak valid.");
+    }
+    if (rawRental.rentalType === "HOUSE" && !input.projectId?.trim()) {
+      return actionFailure(
+        "Biaya Rumah Sewa Tukang wajib dihubungkan ke Project aktif.",
+      );
+    }
+    if (
+      rawRental.rentalType === "VEHICLE" &&
+      rentalUsageScope === "PROJECT" &&
+      !input.projectId?.trim()
+    ) {
+      return actionFailure(
+        "Kendaraan Sewa untuk proyek wajib dihubungkan ke Project aktif.",
+      );
+    }
+    const periodType = rawRental.periodType ?? "MONTHLY";
+    if (!RENTAL_PERIOD_TYPES.includes(periodType)) {
+      return actionFailure("Periode sewa tidak valid.");
+    }
+    const duration = rawRental.duration ?? 1;
+    if (
+      typeof duration !== "number" ||
+      !Number.isFinite(duration) ||
+      duration <= 0 ||
+      duration > 3650
+    ) {
+      return actionFailure("Durasi sewa harus lebih besar dari 0.");
+    }
+    if (
+      rawRental.occupantCount !== undefined &&
+      rawRental.occupantCount !== null &&
+      (typeof rawRental.occupantCount !== "number" ||
+        !Number.isInteger(rawRental.occupantCount) ||
+        rawRental.occupantCount < 1 ||
+        rawRental.occupantCount > 1000)
+    ) {
+      return actionFailure("Jumlah penghuni rumah sewa harus berupa angka bulat minimal 1.");
+    }
+    const parseRentalDate = (raw: string | null | undefined, label: string) => {
+      if (!raw || typeof raw !== "string" || !raw.trim()) return { ok: true as const, date: null };
+      const parsed = new Date(raw.trim());
+      if (Number.isNaN(parsed.getTime())) {
+        return { ok: false as const, message: `${label} tidak valid.` };
+      }
+      return { ok: true as const, date: parsed };
+    };
+    const parsedStart = parseRentalDate(rawRental.startDate, "Tanggal mulai sewa");
+    if (!parsedStart.ok) return actionFailure(parsedStart.message);
+    const parsedEnd = parseRentalDate(rawRental.endDate, "Tanggal selesai sewa");
+    if (!parsedEnd.ok) return actionFailure(parsedEnd.message);
+    if (parsedStart.date && parsedEnd.date && parsedEnd.date < parsedStart.date) {
+      return actionFailure("Tanggal selesai sewa tidak boleh lebih awal dari tanggal mulai.");
+    }
+    if (
+      (rawRental.propertyAddress && rawRental.propertyAddress.length > 300) ||
+      (rawRental.landlordName && rawRental.landlordName.length > 120) ||
+      (rawRental.landlordPhone && rawRental.landlordPhone.length > 40) ||
+      (rawRental.codeOrPlate && rawRental.codeOrPlate.length > 40)
+    ) {
+      return actionFailure("Detail alamat, pemilik, telepon, atau plat kendaraan terlalu panjang.");
+    }
+    resolvedRentalTicketType =
+      rawRental.rentalType === "HOUSE"
+        ? HOUSE_RENTAL_REQUEST_TYPE
+        : VEHICLE_RENTAL_REQUEST_TYPE;
+    normalizedRentalDetails = {
+      rentalType: rawRental.rentalType,
+      usageScope: rentalUsageScope,
+      assetName: rawRental.assetName.trim(),
+      propertyAddress:
+        rawRental.rentalType === "HOUSE"
+          ? rawRental.propertyAddress?.trim() || null
+          : null,
+      landlordName: rawRental.landlordName?.trim() || null,
+      landlordPhone: rawRental.landlordPhone?.trim() || null,
+      occupantCount:
+        rawRental.rentalType === "HOUSE"
+          ? (rawRental.occupantCount ?? null)
+          : null,
+      codeOrPlate:
+        rawRental.rentalType === "VEHICLE"
+          ? rawRental.codeOrPlate?.trim() || null
+          : null,
+      periodType,
+      startDate: parsedStart.date,
+      endDate: parsedEnd.date,
+      duration,
+    };
+  }
+
   const requestCategory =
     input.requestCategory ??
     (input.type === TicketType.OPERATIONAL
@@ -2133,17 +2397,19 @@ export async function createTicket(
   const isWarehouseRequest =
     requestCategory === TicketRequestCategory.WAREHOUSE;
   const isFieldRequest =
-    requestCategory === TicketRequestCategory.FIELD;
+    !isRentalTicket && requestCategory === TicketRequestCategory.FIELD;
   const isShippingCostRequest =
     requestCategory === TicketRequestCategory.SHIPPING_COST;
   const isOfficeRequest =
-    requestCategory === TicketRequestCategory.OFFICE;
+    !isRentalTicket && requestCategory === TicketRequestCategory.OFFICE;
   const isAPHRequest = requestCategory === TicketRequestCategory.APH;
-  const isInternalFundingRequest = [
-    TicketRequestCategory.REIMBURSEMENT,
-    TicketRequestCategory.KASBON,
-    TicketRequestCategory.OPERATING_EXPENSE,
-  ].some((category) => category === requestCategory);
+  const isInternalFundingRequest =
+    !isRentalTicket &&
+    [
+      TicketRequestCategory.REIMBURSEMENT,
+      TicketRequestCategory.KASBON,
+      TicketRequestCategory.OPERATING_EXPENSE,
+    ].some((category) => category === requestCategory);
   if (
     isShippingCostRequest &&
     session.user.role !== UserRole.LOGISTICS &&
@@ -2196,7 +2462,7 @@ export async function createTicket(
         input.fieldCategory !== TicketFieldCategory.HAULING))
   ) {
     return actionFailure(
-      "Upah Tukang dan Upah Langsir hanya dapat diajukan oleh Direktur, Koordinator Lapangan, atau Tim Lapangan.",
+      "Biaya Upah Tukang dan Biaya Langsir hanya dapat diajukan oleh Direktur, Koordinator Lapangan, atau Tim Lapangan.",
     );
   }
   if (
@@ -2267,7 +2533,8 @@ export async function createTicket(
   const requiresProject =
     requestCategory === TicketRequestCategory.MATERIAL ||
     requestCategory === TicketRequestCategory.WAREHOUSE ||
-    isFieldRequest;
+    isFieldRequest ||
+    normalizedRentalDetails?.usageScope === "PROJECT";
   const isDirectStore =
     isFieldRequest &&
     input.fieldCategory === TicketFieldCategory.DIRECT_STORE;
@@ -2276,20 +2543,24 @@ export async function createTicket(
     input.fieldCategory !== undefined &&
     input.fieldCategory !== TicketFieldCategory.DIRECT_STORE;
   const isOperationalFunding =
-    requestCategory === TicketRequestCategory.OPS;
+    !isRentalTicket && requestCategory === TicketRequestCategory.OPS;
   const requiresRequestedAmount =
     requiresRecipientPayment ||
     isOperationalFunding ||
     isAPHRequest ||
     isInternalFundingRequest ||
-    isShippingCostRequest;
+    isShippingCostRequest ||
+    isRentalTicket;
   let operationalRecipient: {
     name: string;
     bankName: string;
     accountNumber: string;
   } | null = null;
-  const expectedType =
-    requestCategory === TicketRequestCategory.OPS
+  const expectedType = isRentalTicket
+    ? input.type === TicketType.COST
+      ? TicketType.COST
+      : TicketType.OPERATIONAL
+    : requestCategory === TicketRequestCategory.OPS
       ? TicketType.OPERATIONAL
       : requestCategory === TicketRequestCategory.MATERIAL ||
           isWarehouseRequest ||
@@ -2312,11 +2583,20 @@ export async function createTicket(
       );
     }
   } else if (
-    input.requestPaymentMethod !== undefined ||
-    input.transferDestination !== undefined ||
-    input.requestPaymentDescription !== undefined
+    !isRentalTicket &&
+    (input.requestPaymentMethod !== undefined ||
+      input.transferDestination !== undefined ||
+      input.requestPaymentDescription !== undefined)
   ) {
     return actionFailure("Detail pembayaran APH tidak boleh digunakan pada tiket lain.");
+  }
+  if (
+    isRentalTicket &&
+    input.transferDestination !== undefined &&
+    typeof input.transferDestination === "string" &&
+    input.transferDestination.trim().length > 300
+  ) {
+    return actionFailure("Keterangan tujuan transfer sewa maksimal 300 karakter.");
   }
 
   if (
@@ -2354,7 +2634,68 @@ export async function createTicket(
       "Mover hanya dapat dipilih oleh Koordinator Logistik.",
     );
   }
-  if (requiresRecipientPayment) {
+  if (isRentalTicket) {
+    if (
+      typeof input.requestedAmount !== "number" ||
+      !Number.isFinite(input.requestedAmount) ||
+      input.requestedAmount <= 0 ||
+      input.requestedAmount > Number.MAX_SAFE_INTEGER
+    ) {
+      return actionFailure("Nominal pengajuan sewa harus lebih besar dari 0.");
+    }
+    if (input.items.length > 0) {
+      return actionFailure(
+        "Pengajuan sewa tidak boleh berisi rincian item material.",
+      );
+    }
+    const hasAnyBankInput = Boolean(
+      input.recipientName?.trim() ||
+        input.bankName?.trim() ||
+        input.accountNumber?.trim(),
+    );
+    if (hasAnyBankInput) {
+      if (
+        typeof input.recipientName !== "string" ||
+        input.recipientName.trim().length < 2 ||
+        input.recipientName.trim().length > 120 ||
+        typeof input.bankName !== "string" ||
+        input.bankName.trim().length < 2 ||
+        input.bankName.trim().length > 80 ||
+        typeof input.accountNumber !== "string" ||
+        !/^[0-9]{6,30}$/.test(input.accountNumber.trim())
+      ) {
+        return actionFailure(
+          "Lengkapi nama pemilik rekening, nama bank, dan nomor rekening tujuan sewa dengan benar.",
+        );
+      }
+      operationalRecipient = {
+        name: input.recipientName.trim(),
+        bankName: input.bankName.trim(),
+        accountNumber: input.accountNumber.trim(),
+      };
+    } else if (requestCategory === TicketRequestCategory.OPS) {
+      const requesterProfile = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          bankName: true,
+          bankAccountName: true,
+          bankAccountNumber: true,
+        },
+      });
+      if (
+        requesterProfile?.bankName?.trim() &&
+        requesterProfile.bankAccountName?.trim() &&
+        requesterProfile.bankAccountNumber &&
+        /^[0-9]{6,30}$/.test(requesterProfile.bankAccountNumber)
+      ) {
+        operationalRecipient = {
+          name: requesterProfile.bankAccountName.trim(),
+          bankName: requesterProfile.bankName.trim(),
+          accountNumber: requesterProfile.bankAccountNumber,
+        };
+      }
+    }
+  } else if (requiresRecipientPayment) {
     if (
       typeof input.recipientName !== "string" ||
       input.recipientName.trim().length < 2 ||
@@ -2707,6 +3048,7 @@ export async function createTicket(
     return actionFailure("Mover tidak ditemukan atau sudah tidak aktif.");
   }
 
+  let projectFieldPic: { id: string; role: UserRole } | null = null;
   if (input.projectId) {
     const isFieldPic =
       session.user.role === UserRole.FIELD_TEAM ||
@@ -2717,12 +3059,22 @@ export async function createTicket(
         isDeleted: false,
         ...(isFieldPic ? { fieldPicId: session.user.id } : {}),
       },
-      select: { id: true },
+      select: {
+        id: true,
+        fieldPicId: true,
+        fieldPic: { select: { role: true } },
+      },
     });
     if (!project) {
       return actionFailure(
         "Proyek tidak ditemukan, telah diarsipkan, atau bukan proyek penugasan Anda.",
       );
+    }
+    if (project.fieldPicId && project.fieldPic) {
+      projectFieldPic = {
+        id: project.fieldPicId,
+        role: project.fieldPic.role,
+      };
     }
   }
 
@@ -2752,6 +3104,46 @@ export async function createTicket(
   }
 
   let ticketNumber = "";
+  let createdTicketId = "";
+  const isAutoSubmittedSpecial =
+    isInternalFundingRequest || isShippingCostRequest;
+  const shouldSubmitNow = submitImmediately || isAutoSubmittedSpecial;
+  const isMaterialSubmittedDirectly =
+    shouldSubmitNow && input.type === TicketType.MATERIAL;
+  const isDirectorSelfApproved =
+    shouldSubmitNow &&
+    !isMaterialSubmittedDirectly &&
+    !isAPHRequest &&
+    session.user.role === UserRole.DIRECTOR;
+  const initialStatus: TicketStatus = !shouldSubmitNow
+    ? TicketStatus.DRAFT
+    : isMaterialSubmittedDirectly
+      ? TicketStatus.PROCESSED_LOGISTIC
+      : isAPHRequest || isDirectorSelfApproved
+        ? TicketStatus.WAITING_FINANCE_PAYMENT
+        : TicketStatus.PENDING_DIRECTOR;
+  const initialAuditAction = !shouldSubmitNow
+    ? "CREATED"
+    : submitImmediately && !isAutoSubmittedSpecial
+      ? "SUBMITTED"
+      : "CREATED";
+  const initialAuditNotes = !shouldSubmitNow
+    ? "Draft tiket dibuat."
+    : isMaterialSubmittedDirectly
+      ? "Tiket material dibuat dan diteruskan langsung ke antrean Logistik (tanpa melewati antrean Direktur)."
+      : isAPHRequest
+        ? "Permintaan APH diajukan langsung ke antrean pembayaran Keuangan."
+        : isInternalFundingRequest
+          ? session.user.role === UserRole.DIRECTOR
+            ? "Pengajuan reimbursement/kasbon dibuat Direktur dan diteruskan langsung ke Keuangan."
+            : "Pengajuan reimbursement/kasbon diajukan untuk persetujuan Direktur."
+          : isShippingCostRequest
+            ? session.user.role === UserRole.DIRECTOR
+              ? "Pengajuan biaya pengiriman dibuat Direktur dan diteruskan langsung ke Keuangan."
+              : "Pengajuan biaya pengiriman diajukan untuk persetujuan Direktur."
+            : session.user.role === UserRole.DIRECTOR
+              ? "Pengajuan dibuat Direktur dan diteruskan langsung ke Keuangan."
+              : "Tiket diajukan untuk persetujuan Direktur.";
   const receiptUrls: string[] = [];
   let deliveryReceiptUrl: string | null = null;
   try {
@@ -2816,10 +3208,16 @@ export async function createTicket(
     if (receiptUrls.some((url) => !isTicketRequestReceiptUrl(url))) {
       throw new Error("URL bukti reimbursement yang diunggah tidak valid.");
     }
+    const rentalTransferDest = isRentalTicket
+      ? input.transferDestination?.trim() ||
+        (operationalRecipient
+          ? `${operationalRecipient.bankName} ${operationalRecipient.accountNumber} a/n ${operationalRecipient.name}`
+          : null)
+      : null;
     await retryTicketNumberTransaction(() =>
       nextTicketNumber(prisma).then((generatedTicketNumber) => {
         ticketNumber = generatedTicketNumber;
-        const createdTicketId = randomUUID();
+        createdTicketId = randomUUID();
         return prisma.$transaction(async (transaction) => {
       await transaction.ticket.create({
         data: {
@@ -2843,14 +3241,10 @@ export async function createTicket(
             : null,
           transferDestination: isAPHRequest
             ? input.transferDestination?.trim() || null
-            : null,
+            : rentalTransferDest,
           priority: input.priority,
-          status:
-            isInternalFundingRequest || isShippingCostRequest
-              ? session.user.role === UserRole.DIRECTOR
-                ? TicketStatus.WAITING_FINANCE_PAYMENT
-                : TicketStatus.PENDING_DIRECTOR
-              : TicketStatus.DRAFT,
+          status: initialStatus,
+          isApprovedByDirector: isDirectorSelfApproved,
           totalAmount:
             totalAmount === null ? null : scaledIntegerFromDecimal(totalAmount),
           requestedAmount: requiresRequestedAmount
@@ -2895,27 +3289,63 @@ export async function createTicket(
             create: {
               id: randomUUID(),
               userId: session.user.id,
-              action: "CREATED",
-              notes: isInternalFundingRequest
-                ? session.user.role === UserRole.DIRECTOR
-                  ? "Pengajuan reimbursement/kasbon dibuat Direktur dan diteruskan langsung ke Keuangan."
-                  : "Pengajuan reimbursement/kasbon diajukan untuk persetujuan Direktur."
-                : isShippingCostRequest
-                  ? session.user.role === UserRole.DIRECTOR
-                    ? "Pengajuan biaya pengiriman dibuat Direktur dan diteruskan langsung ke Keuangan."
-                    : "Pengajuan biaya pengiriman diajukan untuk persetujuan Direktur."
-                  : "Draft tiket dibuat.",
+              action: initialAuditAction,
+              notes: initialAuditNotes,
             },
           },
         },
       });
-      if (isInternalFundingRequest || isShippingCostRequest) {
-        if (session.user.role === UserRole.DIRECTOR) {
+      if (isMaterialSubmittedDirectly) {
+        await sendNotification({
+          roleTarget: UserRole.LOGISTICS,
+          title: "Tiket Material Baru - Proses Logistik",
+          message: `${ticketNumber} · ${input.title.trim()} diteruskan langsung ke antrean Logistik.`,
+          actionUrl: `/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(createdTicketId)}`,
+          type: NotificationType.APPROVAL,
+          database: transaction,
+        });
+        await sendNotification({
+          roleTarget: UserRole.KOORDINATOR,
+          title: "Permintaan Material Baru",
+          message: `${ticketNumber} · ${input.title.trim()} telah diteruskan ke Logistik.`,
+          actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(createdTicketId)}`,
+          type: NotificationType.INFO,
+          database: transaction,
+        });
+        if (
+          projectFieldPic &&
+          projectFieldPic.id !== session.user.id &&
+          projectFieldPic.role !== UserRole.KOORDINATOR
+        ) {
+          await sendNotification({
+            userId: projectFieldPic.id,
+            title: "Permintaan Material Proyek Baru",
+            message: `${ticketNumber} · ${input.title.trim()} telah diteruskan ke Logistik.`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(createdTicketId)}`,
+            type: NotificationType.INFO,
+            database: transaction,
+          });
+        }
+      } else if (shouldSubmitNow) {
+        if (isAPHRequest) {
+          if (session.user.role !== UserRole.FINANCE) {
+            await sendNotification({
+              roleTarget: UserRole.FINANCE,
+              title: "Permintaan APH Menunggu Pembayaran",
+              message: `${ticketNumber} · ${input.title.trim()} menunggu pembayaran Keuangan.`,
+              actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(createdTicketId)}`,
+              type: NotificationType.APPROVAL,
+              database: transaction,
+            });
+          }
+        } else if (isDirectorSelfApproved) {
           await sendNotification({
             roleTarget: UserRole.FINANCE,
             title: isShippingCostRequest
               ? "Biaya Pengiriman Menunggu Pembayaran"
-              : "Pengajuan Internal Menunggu Pembayaran",
+              : isRentalTicket
+                ? "Pengajuan Sewa Menunggu Pembayaran"
+                : "Pengajuan Disetujui - Menunggu Pembayaran",
             message: `${ticketNumber} · ${input.title.trim()} telah disetujui Direktur dan menunggu pembayaran Keuangan.`,
             actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(createdTicketId)}`,
             type: NotificationType.APPROVAL,
@@ -2926,7 +3356,9 @@ export async function createTicket(
             roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
             title: isShippingCostRequest
               ? "Biaya Pengiriman Menunggu Persetujuan"
-              : "Pengajuan Internal Menunggu Persetujuan",
+              : isInternalFundingRequest
+                ? "Pengajuan Internal Menunggu Persetujuan"
+                : "Tiket Menunggu Persetujuan",
             message: `${ticketNumber} · ${input.title.trim()} menunggu persetujuan Direktur.`,
             actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(createdTicketId)}`,
             type: NotificationType.APPROVAL,
@@ -2937,6 +3369,18 @@ export async function createTicket(
         }, { maxWait: 30000, timeout: 60000 });
       }),
     );
+    if (isRentalTicket && resolvedRentalTicketType && normalizedRentalDetails && createdTicketId) {
+      await connectToMongoDB();
+      await Ticket.updateOne(
+        { _id: createdTicketId },
+        {
+          $set: {
+            ticketType: resolvedRentalTicketType,
+            rentalDetails: normalizedRentalDetails,
+          },
+        },
+      );
+    }
   } catch (error) {
     await Promise.all(
       [
@@ -2980,18 +3424,25 @@ export async function createTicket(
   }
 
   revalidatePath("/apps/tickets");
+  revalidatePath("/apps/logistics");
   revalidatePath("/apps/project");
+  revalidatePath("/apps/projects");
   revalidatePath("/apps/approvals");
   revalidatePath("/apps/finance");
   return {
     success: true,
-    message:
-      isInternalFundingRequest || isShippingCostRequest
-        ? session.user.role === UserRole.DIRECTOR
+    ticketId: createdTicketId,
+    ticketNumber,
+    message: isMaterialSubmittedDirectly
+      ? "Tiket material berhasil dibuat dan diteruskan langsung ke Logistik."
+      : shouldSubmitNow
+        ? isDirectorSelfApproved
           ? isShippingCostRequest
             ? "Pengajuan pengiriman berhasil dibuat dan siap diproses Keuangan."
-            : "Pengajuan internal berhasil dibuat dan siap diproses Keuangan."
-          : "Pengajuan berhasil dikirim ke Direktur untuk persetujuan."
+            : "Pengajuan berhasil dibuat dan siap diproses Keuangan."
+          : isAPHRequest
+            ? "Permintaan APH berhasil diteruskan langsung ke Keuangan."
+            : "Pengajuan berhasil dikirim ke Direktur untuk persetujuan."
         : "Draft tiket berhasil dibuat.",
   };
 }
@@ -3986,11 +4437,18 @@ export async function submitTicket(
       requesterId: true,
       requestCategory: true,
       requester: { select: { role: true } },
+      project: {
+        select: {
+          fieldPicId: true,
+          fieldPic: { select: { role: true } },
+        },
+      },
     },
   });
   if (!ticket || ticket.requesterId !== session.user.id) {
     return actionFailure("Tiket tidak ditemukan atau bukan milik Anda.");
   }
+  const isMaterialTicket = ticket.type === TicketType.MATERIAL;
   const isAPHRequest = ticket.requestCategory === TicketRequestCategory.APH;
   if (
     isAPHRequest &&
@@ -4001,51 +4459,90 @@ export async function submitTicket(
   }
   const submittedByFinance =
     isAPHRequest && ticket.requester.role === UserRole.FINANCE;
-  const nextStatus =
-    isAPHRequest ? TicketStatus.WAITING_FINANCE_PAYMENT : TicketStatus.PENDING_DIRECTOR;
+  const submittedByDirector =
+    !isMaterialTicket &&
+    !isAPHRequest &&
+    ticket.requester.role === UserRole.DIRECTOR;
+  const nextStatus = isMaterialTicket
+    ? TicketStatus.PROCESSED_LOGISTIC
+    : isAPHRequest || submittedByDirector
+      ? TicketStatus.WAITING_FINANCE_PAYMENT
+      : TicketStatus.PENDING_DIRECTOR;
+  const projectCoordinatorId =
+    isMaterialTicket &&
+    ticket.project?.fieldPicId &&
+    ticket.project.fieldPicId !== session.user.id &&
+    ticket.project.fieldPic?.role !== UserRole.KOORDINATOR
+      ? ticket.project.fieldPicId
+      : null;
+
   return transitionTicket({
     ticketId,
     expectedStatus: TicketStatus.DRAFT,
     nextStatus,
     allowedRoles: null,
     action: "SUBMITTED",
-    notes: isAPHRequest
-      ? "Permintaan APH diajukan langsung ke antrean pembayaran Keuangan."
-      : "Tiket diajukan untuk persetujuan Direktur.",
+    directorApproval: submittedByDirector,
+    notes: isMaterialTicket
+      ? "Tiket material diajukan dan diteruskan langsung ke antrean Logistik (tanpa melewati antrean Direktur)."
+      : isAPHRequest
+        ? "Permintaan APH diajukan langsung ke antrean pembayaran Keuangan."
+        : submittedByDirector
+          ? "Pengajuan dibuat Direktur dan diteruskan langsung ke Keuangan."
+          : "Tiket diajukan untuk persetujuan Direktur.",
     requesterOnly: true,
     notifications: [
-      ...(isAPHRequest
-        ? submittedByFinance
-          ? []
-          : [
-              {
-                roleTarget: UserRole.FINANCE,
-                title: "Permintaan APH Menunggu Pembayaran",
-                message: `${ticket.ticketNumber} · ${ticket.title} menunggu pembayaran Keuangan.`,
-                actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(ticketId)}`,
-                type: NotificationType.APPROVAL,
-              },
-            ]
-        : [
+      ...(isMaterialTicket
+        ? [
             {
-              roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
-              title: "Tiket Menunggu Persetujuan",
-              message: `${ticket.ticketNumber} · ${ticket.title} membutuhkan persetujuan eksekutif.`,
-              actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(ticketId)}`,
+              roleTarget: UserRole.LOGISTICS,
+              title: "Tiket Material Baru - Proses Logistik",
+              message: `${ticket.ticketNumber} · ${ticket.title} diteruskan langsung dari lapangan untuk diproses Logistik.`,
+              actionUrl: `/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(ticketId)}`,
               type: NotificationType.APPROVAL,
             },
-          ]),
-      ...(ticket.type === TicketType.MATERIAL
-        ? [
             {
               roleTarget: UserRole.KOORDINATOR,
               title: "Permintaan Material Baru",
-              message: `${ticket.ticketNumber} · ${ticket.title} menunggu koordinasi lapangan.`,
+              message: `${ticket.ticketNumber} · ${ticket.title} telah diteruskan ke Logistik.`,
               actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
               type: NotificationType.INFO,
             },
+            ...(projectCoordinatorId
+              ? [
+                  {
+                    userId: projectCoordinatorId,
+                    title: "Permintaan Material Proyek Baru",
+                    message: `${ticket.ticketNumber} · ${ticket.title} telah diteruskan ke Logistik.`,
+                    actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticketId)}`,
+                    type: NotificationType.INFO,
+                  },
+                ]
+              : []),
           ]
-        : []),
+        : isAPHRequest || submittedByDirector
+          ? submittedByFinance
+            ? []
+            : [
+                {
+                  roleTarget: UserRole.FINANCE,
+                  title: isAPHRequest
+                    ? "Permintaan APH Menunggu Pembayaran"
+                    : "Pengajuan Menunggu Pembayaran Keuangan",
+                  message: `${ticket.ticketNumber} · ${ticket.title} menunggu pembayaran Keuangan.`,
+                  actionUrl: `/apps/finance?tab=payments&openSheet=${encodeURIComponent(ticketId)}`,
+                  type: NotificationType.APPROVAL,
+                },
+              ]
+          : [
+              {
+                roleTarget: [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR],
+                title: "Tiket Menunggu Persetujuan",
+                message: `${ticket.ticketNumber} · ${ticket.title} membutuhkan persetujuan eksekutif.`,
+                actionUrl: `/apps/approvals?tab=direct-purchase&openSheet=${encodeURIComponent(ticketId)}`,
+                type: NotificationType.APPROVAL,
+              },
+            ]),
     ],
   });
 }
@@ -4228,6 +4725,15 @@ export async function requestTicketRevisionByDirector(
   return decideTicketByDirector(ticketId, type, reason, "REVISION");
 }
 
+const LOGISTICS_PROCESSABLE_TICKET_STATUSES: TicketStatus[] = [
+  TicketStatus.APPROVED_DIR,
+  TicketStatus.PROCESSED_LOGISTIC,
+  TicketStatus.PROCESSED_FINANCE,
+  TicketStatus.WAITING_FINANCE_PAYMENT,
+  TicketStatus.ASSIGNED_TO_MOVER,
+  TicketStatus.IN_TRANSIT,
+];
+
 export async function processLogisticsMaterial(
   ticketId: string,
   actionType: "READY_WAREHOUSE" | "BUY_STORE",
@@ -4241,6 +4747,7 @@ export async function processLogisticsMaterial(
   },
   vehicleId?: string,
   invoiceInput?: Omit<VendorInvoiceInput, "documentUrl">,
+  poPublicCode?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -4270,10 +4777,30 @@ export async function processLogisticsMaterial(
     );
   }
 
-  const approvedPurchaseOrder = await prisma.purchaseOrder.findFirst({
-    where: { ticketId, status: POStatus.APPROVED },
-    select: { poNumber: true, paidAt: true, vendorPoSentAt: true },
+  const normalizedPoCode = poPublicCode?.trim() || undefined;
+  const approvedPurchaseOrders = await prisma.purchaseOrder.findMany({
+    where: {
+      ticketId,
+      status: POStatus.APPROVED,
+      ...(normalizedPoCode ? { publicCode: normalizedPoCode } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      publicCode: true,
+      poNumber: true,
+      paidAt: true,
+      vendorPoSentAt: true,
+      vendorInvoiceUrl: true,
+      invoices: { select: { id: true }, take: 1 },
+    },
   });
+  const approvedPurchaseOrder =
+    approvedPurchaseOrders.find(
+      (po) => !po.paidAt && !po.vendorInvoiceUrl && po.invoices.length === 0,
+    ) ??
+    approvedPurchaseOrders[0] ??
+    null;
   if (!approvedPurchaseOrder) {
     return actionFailure(
       "Buat PO untuk tiket ini dan tunggu persetujuan Finance serta Direktur sebelum mengirim invoice.",
@@ -4282,6 +4809,14 @@ export async function processLogisticsMaterial(
   if (approvedPurchaseOrder.paidAt) {
     return actionFailure(
       `PO ${approvedPurchaseOrder.poNumber} sudah dibayar dan masuk ke stok gudang. Terbitkan DO melalui opsi stok gudang.`,
+    );
+  }
+  if (
+    approvedPurchaseOrder.vendorInvoiceUrl ||
+    approvedPurchaseOrder.invoices.length > 0
+  ) {
+    return actionFailure(
+      `Invoice/bon untuk PO ${approvedPurchaseOrder.poNumber} sudah pernah dikirim.`,
     );
   }
   if (!approvedPurchaseOrder.vendorPoSentAt) {
@@ -4298,8 +4833,7 @@ export async function processLogisticsMaterial(
   if (
     !ticketBeforeUpload ||
     ticketBeforeUpload.type !== TicketType.MATERIAL ||
-    ticketBeforeUpload.status !== TicketStatus.PROCESSED_LOGISTIC ||
-    ticketBeforeUpload.purchaseReceiptUrl
+    !LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticketBeforeUpload.status)
   ) {
     return actionFailure("Tiket tidak lagi berada di antrean Logistik untuk invoice.");
   }
@@ -4384,9 +4918,11 @@ export async function processLogisticsMaterial(
           projectId: true,
           purchaseReceiptUrl: true,
           purchaseOrders: {
-            where: { status: POStatus.APPROVED },
+            where: {
+              status: POStatus.APPROVED,
+              ...(normalizedPoCode ? { publicCode: normalizedPoCode } : {}),
+            },
             orderBy: { createdAt: "desc" },
-            take: 1,
             select: {
               id: true,
               poNumber: true,
@@ -4397,6 +4933,8 @@ export async function processLogisticsMaterial(
               paymentAccountName: true,
               includeTax: true,
               vendorPoSentAt: true,
+              vendorInvoiceUrl: true,
+              invoices: { select: { id: true }, take: 1 },
               paidAt: true,
               paymentTransactions: {
                 where: { status: PaymentStatus.PAID },
@@ -4420,15 +4958,20 @@ export async function processLogisticsMaterial(
       if (!ticket || ticket.type !== TicketType.MATERIAL) {
         throw new Error("Tiket material tidak ditemukan.");
       }
-      if (ticket.status !== TicketStatus.PROCESSED_LOGISTIC) {
+      if (!LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)) {
         throw new Error("Tiket tidak lagi berada di antrean Logistik.");
       }
-      if (ticket.purchaseReceiptUrl) {
-        throw new Error("Invoice/bon untuk tiket ini sudah pernah dikirim.");
-      }
-      const order = ticket.purchaseOrders[0];
+      const order =
+        ticket.purchaseOrders.find(
+          (candidate) => candidate.id === approvedPurchaseOrder.id,
+        ) ?? null;
       if (!order || order.paidAt || order.paymentTransactions.length > 0) {
         throw new Error("PO tidak ditemukan atau pembayaran sudah dimulai.");
+      }
+      if (order.vendorInvoiceUrl || order.invoices.length > 0) {
+        throw new Error(
+          `Invoice/bon untuk PO ${order.poNumber} sudah pernah dikirim.`,
+        );
       }
       if (!order.vendorPoSentAt) {
         throw new Error("Logistik harus mengirim PO ke vendor sebelum mengunggah invoice.");
@@ -4448,26 +4991,41 @@ export async function processLogisticsMaterial(
       if (!Number.isFinite(grandTotal) || grandTotal <= 0) {
         throw new Error("Total invoice harus lebih besar dari nol.");
       }
-      const update = await transaction.ticket.updateMany({
+      const poUpdate = await transaction.purchaseOrder.updateMany({
         where: {
-          id: ticketId,
-          type: TicketType.MATERIAL,
-          status: TicketStatus.PROCESSED_LOGISTIC,
+          id: order.id,
+          status: POStatus.APPROVED,
           OR: [
-            { purchaseReceiptUrl: null },
-            { purchaseReceiptUrl: { isSet: false } },
-            { purchaseReceiptUrl: "" },
+            { vendorInvoiceUrl: null },
+            { vendorInvoiceUrl: { isSet: false } },
+            { vendorInvoiceUrl: "" },
           ],
         },
         data: {
-          status: TicketStatus.WAITING_FINANCE_PAYMENT,
-          purchaseReceiptUrl: parsedInvoice.data.documentUrl,
+          vendorInvoiceUrl: parsedInvoice.data.documentUrl,
+          vendorInvoiceUploadedAt: new Date(),
+          vendorInvoiceUploadedById: session.user.id,
+        },
+      });
+      if (poUpdate.count !== 1) {
+        throw new Error("Status PO berubah. Muat ulang sebelum mengirim invoice.");
+      }
+      const shouldMoveToWaitingFinance =
+        ticket.status === TicketStatus.APPROVED_DIR ||
+        ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+        ticket.status === TicketStatus.PROCESSED_FINANCE;
+      await transaction.ticket.update({
+        where: { id: ticketId },
+        data: {
+          ...(shouldMoveToWaitingFinance
+            ? { status: TicketStatus.WAITING_FINANCE_PAYMENT }
+            : {}),
+          ...(ticket.purchaseReceiptUrl
+            ? {}
+            : { purchaseReceiptUrl: parsedInvoice.data.documentUrl }),
           updatedAt: new Date(),
         },
       });
-      if (update.count !== 1) {
-        throw new Error("Status tiket berubah. Muat ulang sebelum mengirim invoice.");
-      }
       const invoice = await transaction.invoice.create({
         data: {
           publicCode: await generateAvailablePublicCode(transaction),
@@ -4633,7 +5191,7 @@ export async function checkTicketItemsStock(
       if (
         !ticket ||
         ticket.type !== TicketType.MATERIAL ||
-        ticket.status !== TicketStatus.PROCESSED_LOGISTIC
+        !LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)
       ) {
         throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
       }
@@ -4832,7 +5390,7 @@ export async function mapTicketItemToStock(
       if (
         !ticket ||
         ticket.type !== TicketType.MATERIAL ||
-        ticket.status !== TicketStatus.PROCESSED_LOGISTIC
+        !LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)
       ) {
         throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
       }
@@ -4948,7 +5506,7 @@ export async function switchTicketItemsToPurchase(
       if (
         !ticket ||
         ticket.type !== TicketType.MATERIAL ||
-        ticket.status !== TicketStatus.PROCESSED_LOGISTIC
+        !LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)
       ) {
         throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
       }
@@ -5050,7 +5608,7 @@ export async function createLogisticsPurchaseOrderForTicket(
   vendorName: string,
   items: Array<{
     ticketItemId?: string;
-    stockItemId: string;
+    stockItemId?: string | null;
     itemName: string;
     quantity: number;
     unit: string;
@@ -5098,20 +5656,31 @@ export async function createLogisticsPurchaseOrderForTicket(
     items.length === 0 ||
     items.length > 200 ||
     items.some(
-      (item) =>
-        !item ||
-        (item.ticketItemId !== undefined &&
-          !isBoundedText(item.ticketItemId, 64)) ||
-        !isBoundedText(item.stockItemId, 64) ||
-        !isBoundedText(item.itemName, 180) ||
-        !isBoundedText(item.unit, 40) ||
-        typeof item.quantity !== "number" ||
-        !Number.isFinite(item.quantity) ||
-        item.quantity <= 0 ||
-        typeof item.unitPrice !== "number" ||
-        !Number.isFinite(item.unitPrice) ||
-        item.unitPrice <= 0 ||
-        item.unitPrice > 1_000_000_000_000,
+      (item) => {
+        if (!item) return true;
+        const rawStockId =
+          typeof item.stockItemId === "string" ? item.stockItemId.trim() : "";
+        const hasStockId = rawStockId.length > 0;
+        const hasTicketItemId =
+          typeof item.ticketItemId === "string" &&
+          item.ticketItemId.trim().length > 0;
+        if (hasStockId && !isBoundedText(rawStockId, 64)) return true;
+        if (item.ticketItemId !== undefined && !isBoundedText(item.ticketItemId, 64)) {
+          return true;
+        }
+        if (!hasStockId && !hasTicketItemId) return true;
+        return (
+          !isBoundedText(item.itemName, 180) ||
+          !isBoundedText(item.unit, 40) ||
+          typeof item.quantity !== "number" ||
+          !Number.isFinite(item.quantity) ||
+          item.quantity <= 0 ||
+          typeof item.unitPrice !== "number" ||
+          !Number.isFinite(item.unitPrice) ||
+          item.unitPrice <= 0 ||
+          item.unitPrice > 1_000_000_000_000
+        );
+      },
     )
   ) {
     return actionFailure("Vendor dan rincian harga PO wajib diisi dengan benar.");
@@ -5144,7 +5713,7 @@ export async function createLogisticsPurchaseOrderForTicket(
       if (
         !ticket ||
         ticket.type !== TicketType.MATERIAL ||
-        ticket.status !== TicketStatus.PROCESSED_LOGISTIC
+        !LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)
       ) {
         throw new Error("Tiket material tidak lagi berada di antrean Logistik.");
       }
@@ -5203,14 +5772,19 @@ export async function createLogisticsPurchaseOrderForTicket(
       if (
         items.some((inputItem) => {
           if (!inputItem.ticketItemId) return false;
-          const ticketItem = ticketItemsById.get(inputItem.ticketItemId!);
+          const ticketItem = ticketItemsById.get(inputItem.ticketItemId);
+          const inputStockId =
+            typeof inputItem.stockItemId === "string"
+              ? inputItem.stockItemId.trim() || null
+              : null;
           return (
             !ticketItem ||
             ticketItem.status !== FulfillmentStatus.PENDING ||
-            (ticketItem.stockItemId
-              ? ticketItem.stockItemId !== inputItem.stockItemId
-              : ticketItem.itemName !== inputItem.itemName.trim() ||
-                ticketItem.unit !== inputItem.unit.trim()) ||
+            (ticketItem.stockItemId &&
+              inputStockId &&
+              ticketItem.stockItemId !== inputStockId) ||
+            ticketItem.itemName.trim() !== inputItem.itemName.trim() ||
+            ticketItem.unit.trim() !== inputItem.unit.trim() ||
             ticketItem.quantity !== inputItem.quantity
           );
         })
@@ -5245,8 +5819,14 @@ export async function createLogisticsPurchaseOrderForTicket(
         }
       }
       for (const item of items) {
+        const inputStockId =
+          typeof item.stockItemId === "string"
+            ? item.stockItemId.trim() || null
+            : null;
         const purchaseNumber =
-          activeDirectPurchaseByStockItemId.get(item.stockItemId) ??
+          (inputStockId
+            ? activeDirectPurchaseByStockItemId.get(inputStockId)
+            : undefined) ??
           activeDirectPurchaseByItem.get(
             ticketStockItemKey(item.itemName, item.unit),
           );
@@ -5256,10 +5836,21 @@ export async function createLogisticsPurchaseOrderForTicket(
           );
         }
       }
-      const selectedStockItems = await transaction.stockItem.findMany({
-        where: { id: { in: [...new Set(items.map((item) => item.stockItemId))] } },
-        select: { id: true, sku: true, name: true, unit: true },
-      });
+      const requestedStockIds = [
+        ...new Set(
+          items
+            .map((item) =>
+              typeof item.stockItemId === "string" ? item.stockItemId.trim() : "",
+            )
+            .filter(Boolean),
+        ),
+      ];
+      const selectedStockItems = requestedStockIds.length
+        ? await transaction.stockItem.findMany({
+            where: { id: { in: requestedStockIds } },
+            select: { id: true, sku: true, name: true, unit: true },
+          })
+        : [];
       const selectedStockById = new Map(
         selectedStockItems.map((item) => [item.id, item]),
       );
@@ -5267,7 +5858,14 @@ export async function createLogisticsPurchaseOrderForTicket(
         value.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
       if (
         items.some((item) => {
-          const stockItem = selectedStockById.get(item.stockItemId);
+          const inputStockId =
+            typeof item.stockItemId === "string"
+              ? item.stockItemId.trim() || null
+              : null;
+          if (!inputStockId) {
+            return !item.ticketItemId;
+          }
+          const stockItem = selectedStockById.get(inputStockId);
           if (!stockItem) return true;
           if (item.ticketItemId) return false;
           return (
@@ -5282,17 +5880,30 @@ export async function createLogisticsPurchaseOrderForTicket(
       }
       const publicCode = await generateAvailablePublicCode(transaction);
       const poNumber = await nextDocumentNumber(transaction, "PO");
-      const poItems = items.map((item) => ({
-        id: randomUUID(),
-        ticketItemId: item.ticketItemId,
-        stockItemId: item.stockItemId,
-        itemCode: selectedStockById.get(item.stockItemId)?.sku ?? null,
-        itemName: item.itemName.trim(),
-        quantity: item.quantity,
-        unit: item.unit.trim(),
-        unitPrice: item.unitPrice,
-        totalPrice: item.quantity * item.unitPrice,
-      }));
+      const poItems = items.map((item) => {
+        const linkedTicketItem = item.ticketItemId
+          ? ticketItemsById.get(item.ticketItemId)
+          : undefined;
+        const resolvedStockItemId =
+          (typeof item.stockItemId === "string"
+            ? item.stockItemId.trim() || null
+            : null) ??
+          linkedTicketItem?.stockItemId ??
+          null;
+        return {
+          id: randomUUID(),
+          ticketItemId: item.ticketItemId,
+          stockItemId: resolvedStockItemId,
+          itemCode: resolvedStockItemId
+            ? (selectedStockById.get(resolvedStockItemId)?.sku ?? null)
+            : null,
+          itemName: item.itemName.trim(),
+          quantity: item.quantity,
+          unit: item.unit.trim(),
+          unitPrice: item.unitPrice,
+          totalPrice: item.quantity * item.unitPrice,
+        };
+      });
       const vendorHasTransferDetails = Boolean(vendorBankAccount);
       const paymentMethod = vendorHasTransferDetails
         ? POPaymentMethod.TRANSFER
@@ -5344,7 +5955,8 @@ export async function createLogisticsPurchaseOrderForTicket(
           where: { id: item.ticketItemId },
           data: {
             status: FulfillmentStatus.PROCESSED_TO_PO,
-            stockItemId: item.stockItemId,
+            categoryHint: TicketCategoryHint.PURCHASE,
+            ...(item.stockItemId ? { stockItemId: item.stockItemId } : {}),
             poItemId: item.id,
           },
         });
@@ -5430,7 +6042,6 @@ async function createWarehouseDeliveryOrder(
               paidAt: { not: null },
             },
             orderBy: { createdAt: "desc" },
-            take: 1,
             select: { id: true, poNumber: true, paidAt: true },
           },
           items: {
@@ -5443,7 +6054,19 @@ async function createWarehouseDeliveryOrder(
               doItemId: true,
               status: true,
               categoryHint: true,
-              poItem: { select: { itemCode: true } },
+              poItem: {
+                select: {
+                  itemCode: true,
+                  po: {
+                    select: {
+                      id: true,
+                      poNumber: true,
+                      status: true,
+                      paidAt: true,
+                    },
+                  },
+                },
+              },
             },
             orderBy: { id: "asc" },
           },
@@ -5452,14 +6075,12 @@ async function createWarehouseDeliveryOrder(
       if (!ticket || ticket.type !== TicketType.MATERIAL) {
         throw new Error("Tiket material tidak ditemukan.");
       }
-      if (!ticket.isApprovedByDirector) {
+      if (!LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)) {
         throw new Error(
-          "Tiket harus memiliki persetujuan eksekutif sebelum DO diterbitkan.",
+          "Tiket material tidak berada di antrean Logistik untuk penerbitan DO.",
         );
       }
-      const paidPurchaseOrder = ticket.purchaseOrders[0] ?? null;
-      const hasPaidPurchaseOrder =
-        !selectedTicketItemIds && Boolean(paidPurchaseOrder);
+      const paidPurchaseOrders = ticket.purchaseOrders;
       const selectedItems = selectedTicketItemIds
         ? ticket.items.filter((item) =>
             selectedTicketItemIds.includes(item.id),
@@ -5468,8 +6089,29 @@ async function createWarehouseDeliveryOrder(
             (item) =>
               item.categoryHint !== TicketCategoryHint.CONTRACT &&
               item.doItemId === null &&
-              item.status !== FulfillmentStatus.PROCESSED_TO_DO,
+              item.status !== FulfillmentStatus.PROCESSED_TO_DO &&
+              (item.status === FulfillmentStatus.PENDING ||
+                (item.status === FulfillmentStatus.PROCESSED_TO_PO &&
+                  (item.poItem?.po
+                    ? item.poItem.po.status === POStatus.APPROVED &&
+                      item.poItem.po.paidAt !== null
+                    : paidPurchaseOrders.length > 0))),
           );
+      const paidPurchaseOrder =
+        selectedItems
+          .map((item) => item.poItem?.po)
+          .find(
+            (po) =>
+              po && po.status === POStatus.APPROVED && po.paidAt !== null,
+          ) ??
+        paidPurchaseOrders[0] ??
+        null;
+      const hasPaidPurchaseOrder =
+        !selectedTicketItemIds &&
+        Boolean(paidPurchaseOrder) &&
+        selectedItems.some(
+          (item) => item.status === FulfillmentStatus.PROCESSED_TO_PO,
+        );
       if (
         selectedItems.some(
           (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
@@ -5533,6 +6175,7 @@ async function createWarehouseDeliveryOrder(
         }
         return {
           ...existingOrder,
+          moverAssigneeId: null,
           message: `DO ${existingOrder.doNumber} sudah ada. Tiket dilanjutkan menggunakan DO tersebut tanpa membuat dokumen atau mengurangi stok lagi.`,
           pushRecipientId: null,
           pushTicketNumber: "",
@@ -5556,8 +6199,7 @@ async function createWarehouseDeliveryOrder(
         );
       }
       if (
-        ticket.status !== TicketStatus.PROCESSED_LOGISTIC &&
-        ticket.status !== TicketStatus.PROCESSED_FINANCE
+        !LOGISTICS_PROCESSABLE_TICKET_STATUSES.includes(ticket.status)
       ) {
         throw new Error("Tiket tidak lagi berada di antrean Logistik.");
       }
@@ -5792,6 +6434,7 @@ async function createWarehouseDeliveryOrder(
       }
       return {
         ...deliveryOrder,
+        moverAssigneeId: !hasPaidPurchaseOrder ? selectedMover?.id ?? null : null,
         message: hasPaidPurchaseOrder
           ? `DO ${deliveryOrder.doNumber} diterbitkan untuk pengiriman ekspedisi. Stok dicadangkan.`
           : `DO ${deliveryOrder.doNumber} diterbitkan. Stok dicadangkan dan tiket diteruskan ke ${selectedMover!.name}.`,
@@ -5800,6 +6443,14 @@ async function createWarehouseDeliveryOrder(
         pushTicketTitle: ticket.title,
       };
     });
+
+    if (result.moverAssigneeId && result.id) {
+      await connectToMongoDB();
+      await DeliveryOrder.updateOne(
+        { _id: result.id },
+        { $set: { moverAssigneeId: result.moverAssigneeId } },
+      );
+    }
 
     if (result.pushRecipientId) {
       try {
@@ -5850,6 +6501,7 @@ export async function processFinancePayment(
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
   requestedPaymentAmount?: number,
   paymentMethod?: POPaymentMethod,
+  poId?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -5894,6 +6546,7 @@ export async function processFinancePayment(
     );
   }
 
+  let paidProjectId: string | null = null;
   try {
     const mongoose = await connectToMongoDB();
     await mongoose.connection.transaction(async (mongoSession) => {
@@ -5902,12 +6555,17 @@ export async function processFinancePayment(
         .session(mongoSession)
         .lean();
       if (!ticket) throw new Error("Tiket tidak ditemukan.");
+      paidProjectId =
+        typeof ticket.projectId === "string" && ticket.projectId.trim()
+          ? ticket.projectId.trim()
+          : null;
       const requester = await User.findById(ticket.requesterId)
-        .select({ role: 1 })
+        .select({ role: 1, name: 1 })
         .session(mongoSession)
         .lean();
       if (!requester) throw new Error("Pemohon tiket tidak ditemukan.");
       const isPaymentEligibleTicketStatus: TicketStatus[] = [
+        TicketStatus.APPROVED_DIR,
         TicketStatus.WAITING_FINANCE_PAYMENT,
         TicketStatus.PROCESSED_FINANCE,
         TicketStatus.PROCESSED_LOGISTIC,
@@ -5934,7 +6592,8 @@ export async function processFinancePayment(
         isInternalFundingRequest &&
         (!paymentMethod ||
           paymentType !== PaymentType.FULL_PAYMENT ||
-          ticket.status !== TicketStatus.WAITING_FINANCE_PAYMENT)
+          (ticket.status !== TicketStatus.WAITING_FINANCE_PAYMENT &&
+            ticket.status !== TicketStatus.APPROVED_DIR))
       ) {
         throw new Error(
           "Pengajuan internal hanya dapat dibayar lunas dengan metode Cash atau Transfer setelah disetujui Direktur.",
@@ -5951,13 +6610,41 @@ export async function processFinancePayment(
         throw new Error("Metode pembayaran APH tidak valid.");
       }
 
-      const orderDocument = await PurchaseOrder.findOne({
+      const normalizedTargetPoId = poId?.trim() || null;
+      const approvedOrderDocuments = await PurchaseOrder.find({
         ticketId,
         status: POStatus.APPROVED,
       })
         .sort({ createdAt: -1 })
         .session(mongoSession)
         .lean();
+      let orderDocument: (typeof approvedOrderDocuments)[number] | null = null;
+      if (normalizedTargetPoId) {
+        orderDocument =
+          approvedOrderDocuments.find(
+            (doc) =>
+              String(doc._id) === normalizedTargetPoId ||
+              doc.publicCode === normalizedTargetPoId,
+          ) ?? null;
+        if (!orderDocument) {
+          throw new Error(
+            "Purchase Order pada tiket ini tidak ditemukan atau belum disetujui.",
+          );
+        }
+      } else if (approvedOrderDocuments.length > 0) {
+        const unpaidApprovedDocs = approvedOrderDocuments.filter(
+          (doc) => !doc.paidAt,
+        );
+        orderDocument =
+          unpaidApprovedDocs.find((doc) => Boolean(doc.vendorInvoiceUrl)) ??
+          unpaidApprovedDocs[0] ??
+          approvedOrderDocuments[0];
+      }
+      if (orderDocument?.paidAt) {
+        throw new Error(
+          `PO ${orderDocument.poNumber ?? ""} sudah dibayar lunas.`,
+        );
+      }
       const order = orderDocument
         ? {
             id: String(orderDocument._id),
@@ -5966,6 +6653,7 @@ export async function processFinancePayment(
             includeTax: Boolean(orderDocument.includeTax),
             vendorName: orderDocument.vendorName ?? "",
             paymentTerms: orderDocument.paymentTerms ?? null,
+            vendorInvoiceUrl: orderDocument.vendorInvoiceUrl ?? null,
             items: await POItem.find({ poId: String(orderDocument._id) })
               .sort({ _id: 1 })
               .session(mongoSession)
@@ -5993,12 +6681,28 @@ export async function processFinancePayment(
       if (
         ticket.type === TicketType.MATERIAL &&
         !order &&
+        ticket.requestCategory !== TicketRequestCategory.SHIPPING_COST &&
         !ticket.purchaseReceiptUrl
       ) {
         throw new Error("Tiket material belum memiliki bukti pembelian dari Logistik.");
       }
-      if (order && !ticket.purchaseReceiptUrl) {
-        throw new Error("Logistik harus mengunggah invoice/bon sebelum pembayaran PO.");
+      const activePoCount = order
+        ? await PurchaseOrder.countDocuments({
+            ticketId,
+            status: { $nin: [POStatus.REJECTED, POStatus.CANCELLED] },
+          }).session(mongoSession)
+        : 0;
+      if (
+        order &&
+        !order.vendorInvoiceUrl &&
+        !invoice &&
+        (activePoCount > 1 || !ticket.purchaseReceiptUrl)
+      ) {
+        throw new Error(
+          activePoCount > 1
+            ? `Logistik harus mengunggah invoice/bon khusus untuk PO ${order.poNumber} sebelum pembayaran.`
+            : "Logistik harus mengunggah invoice/bon sebelum pembayaran PO.",
+        );
       }
       const rawInvoiceTotal = order
         ? invoice?.grandTotal ??
@@ -6146,10 +6850,16 @@ export async function processFinancePayment(
             : "Buku bank/kas sumber pembayaran tidak ditemukan.",
         );
       }
+      const isHouseRentalTicket =
+        ticket.ticketType === HOUSE_RENTAL_REQUEST_TYPE;
+      const isVehicleRentalTicket =
+        ticket.ticketType === VEHICLE_RENTAL_REQUEST_TYPE;
+      const isRentalSyncTicket = isHouseRentalTicket || isVehicleRentalTicket;
+      const cashflowId = randomUUID();
       await Cashflow.create(
         [
           {
-            _id: randomUUID(),
+            _id: cashflowId,
             type: "OUT",
             amount,
             sourceDesc: `Pembayaran ${order?.poNumber ?? ticket.ticketNumber} · ${ticket.title}`,
@@ -6166,11 +6876,147 @@ export async function processFinancePayment(
             accountId: financeAccountId,
             recordedBy: session.user.id,
             paymentTransactionId: paymentId,
+            ...(isRentalSyncTicket
+              ? {
+                  category: "SEWA",
+                  expenseType: isHouseRentalTicket
+                    ? "RUMAH_SEWA"
+                    : "KENDARAAN_SEWA",
+                }
+              : {}),
             createdAt: now,
           },
         ],
         { session: mongoSession },
       );
+
+      if (isFullyPaid && isRentalSyncTicket) {
+        const rentalDetails = (
+          ticket as {
+            rentalDetails?: {
+              rentalType?: string | null;
+              usageScope?: string | null;
+              assetName?: string | null;
+              propertyAddress?: string | null;
+              landlordName?: string | null;
+              landlordPhone?: string | null;
+              occupantCount?: number | null;
+              codeOrPlate?: string | null;
+              periodType?: string | null;
+              startDate?: Date | string | null;
+              endDate?: Date | string | null;
+              duration?: number | null;
+            } | null;
+          }
+        ).rentalDetails;
+        const rentalType = isHouseRentalTicket ? "HOUSE" : "VEHICLE";
+        const usageScope = isHouseRentalTicket
+          ? "PROJECT"
+          : rentalDetails?.usageScope === "OPERATIONAL"
+            ? "OPERATIONAL"
+            : "PROJECT";
+        const effectiveRentalProjectId = isHouseRentalTicket
+          ? (ticket.projectId ?? null)
+          : usageScope === "OPERATIONAL"
+            ? null
+            : (ticket.projectId ?? null);
+        const rentalDuration =
+          typeof rentalDetails?.duration === "number" &&
+          Number.isFinite(rentalDetails.duration) &&
+          rentalDetails.duration > 0
+            ? rentalDetails.duration
+            : 1;
+        const totalCostScaled = scaledIntegerFromDecimal(invoiceTotal);
+        const ratePerPeriodScaled = scaledIntegerFromDecimal(
+          Math.round((invoiceTotal / rentalDuration) * 100) / 100,
+        );
+        const parsedStart = rentalDetails?.startDate
+          ? new Date(rentalDetails.startDate)
+          : now;
+        const rentalStartDate = Number.isNaN(parsedStart.getTime())
+          ? now
+          : parsedStart;
+        const parsedEnd = rentalDetails?.endDate
+          ? new Date(rentalDetails.endDate)
+          : rentalStartDate;
+        const rentalEndDate = Number.isNaN(parsedEnd.getTime())
+          ? rentalStartDate
+          : parsedEnd;
+        const rentalAssetName =
+          rentalDetails?.assetName?.trim() || ticket.title;
+        const rentalVendorName =
+          rentalDetails?.landlordName?.trim() ||
+          ticket.recipientName?.trim() ||
+          requester.name ||
+          "Vendor Sewa";
+
+        await EquipmentRental.findOneAndUpdate(
+          { sourceTicketId: ticketId },
+          {
+            $set: {
+              type: rentalType,
+              usageScope,
+              name: rentalAssetName,
+              codeOrPlate:
+                rentalType === "VEHICLE"
+                  ? rentalDetails?.codeOrPlate?.trim() || null
+                  : null,
+              vendorName: rentalVendorName,
+              vendorPhone: rentalDetails?.landlordPhone?.trim() || null,
+              propertyAddress:
+                rentalType === "HOUSE"
+                  ? rentalDetails?.propertyAddress?.trim() || null
+                  : null,
+              landlordName:
+                rentalType === "HOUSE"
+                  ? rentalDetails?.landlordName?.trim() ||
+                    ticket.recipientName?.trim() ||
+                    null
+                  : null,
+              landlordPhone:
+                rentalType === "HOUSE"
+                  ? rentalDetails?.landlordPhone?.trim() || null
+                  : null,
+              occupantCount:
+                rentalType === "HOUSE"
+                  ? (rentalDetails?.occupantCount ?? null)
+                  : null,
+              rentalPeriodType: rentalDetails?.periodType || "MONTHLY",
+              startDate: rentalStartDate,
+              endDate: rentalEndDate,
+              duration: rentalDuration,
+              ratePerPeriod: ratePerPeriodScaled,
+              additionalCost: BigInt(0),
+              totalCost: totalCostScaled,
+              status: "ACTIVE",
+              withOperator: false,
+              operatorName: null,
+              withFuel: false,
+              projectId: effectiveRentalProjectId,
+              sourceTicketId: ticketId,
+              cashflowId,
+              paymentTransactionId: paymentId,
+              paymentStatus: "PAID",
+              paidAt: now,
+              paidById: session.user.id,
+              paidByName: session.user.name || null,
+              proofOfPaymentUrl: receiptUrl,
+              paymentBankName: ticket.bankName ?? null,
+              paymentAccountNumber: ticket.accountNumber ?? null,
+              paymentAccountName: ticket.recipientName ?? null,
+              updatedAt: now,
+            },
+            $setOnInsert: {
+              _id: randomUUID(),
+              notes: ticket.description ?? null,
+              createdById: ticket.requesterId,
+              createdByName: requester.name || null,
+              createdAt: now,
+            },
+          },
+          { upsert: true, new: true, session: mongoSession },
+        );
+      }
 
       if (order && confirmationOrderNumber && confirmationPublicCode) {
         const subtotal =
@@ -6226,42 +7072,101 @@ export async function processFinancePayment(
         }
       }
 
-      if (order && isFullyPaid) {
+      if (order) {
         await PurchaseOrder.updateOne(
           { _id: order.id },
           {
             $set: {
-              paidAt: now,
-              paymentReceiptUrl: receiptUrl,
-              transferDestination: transferDestination.trim(),
+              paymentStatus: isFullyPaid ? "PAID" : "PARTIAL",
               updatedAt: now,
+              ...(isFullyPaid
+                ? {
+                    paidAt: now,
+                    paymentReceiptUrl: receiptUrl,
+                    transferDestination: transferDestination.trim(),
+                  }
+                : {}),
             },
           },
           { session: mongoSession },
         );
-        await receivePurchaseOrderStockMongo(mongoSession, {
-          purchaseOrderId: order.id,
-          poNumber: order.poNumber,
-          vendorName: order.vendorName,
-          projectId: ticket.projectId,
-          receivedById: session.user.id,
-          notes: `Penerimaan pembelian PO ${order.poNumber}; menunggu DO untuk pemenuhan tiket.`,
-          items: order.items,
-        });
+        if (isFullyPaid) {
+          await receivePurchaseOrderStockMongo(mongoSession, {
+            purchaseOrderId: order.id,
+            poNumber: order.poNumber,
+            vendorName: order.vendorName,
+            projectId: ticket.projectId,
+            receivedById: session.user.id,
+            notes: `Penerimaan pembelian PO ${order.poNumber}; menunggu DO untuk pemenuhan tiket.`,
+            items: order.items,
+          });
+        }
       }
 
       const isShippingCostRequest =
         ticket.requestCategory === TicketRequestCategory.SHIPPING_COST;
+      const [allTicketPos, ticketItemsAfterPayment] = await Promise.all([
+        PurchaseOrder.find({
+          ticketId,
+          status: { $ne: "REJECTED" },
+        })
+          .select({ _id: 1, paidAt: 1, vendorInvoiceUrl: 1, status: 1 })
+          .session(mongoSession)
+          .lean(),
+        TicketItem.find({ ticketId })
+          .select({ status: 1, categoryHint: 1 })
+          .session(mongoSession)
+          .lean(),
+      ]);
+      const unpaidTicketPos = allTicketPos.filter((po) => !po.paidAt);
+      const unpaidPoIds = unpaidTicketPos.map((po) => String(po._id));
+      const unpaidInvoiceExists =
+        unpaidPoIds.length > 0 &&
+        Boolean(
+          await Invoice.exists({
+            poId: { $in: unpaidPoIds },
+            status: { $ne: "PAID" },
+          }).session(mongoSession),
+        );
+      const hasOtherUnpaidInvoicedPo =
+        unpaidTicketPos.some((po) => Boolean(po.vendorInvoiceUrl)) ||
+        unpaidInvoiceExists;
+      const hasPendingNonContractItems = ticketItemsAfterPayment.some(
+        (item) =>
+          item.categoryHint !== TicketCategoryHint.CONTRACT &&
+          item.status === "PENDING",
+      );
+      const advanceableStatuses: TicketStatus[] = [
+        TicketStatus.APPROVED_DIR,
+        TicketStatus.WAITING_FINANCE_PAYMENT,
+        TicketStatus.PROCESSED_LOGISTIC,
+        TicketStatus.PROCESSED_FINANCE,
+      ];
       const shouldAdvanceTicketStatus =
         isFullyPaid &&
-        (ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
-          (ticket.status === TicketStatus.PROCESSED_LOGISTIC &&
-            Boolean(order || isShippingCostRequest)));
+        advanceableStatuses.includes(ticket.status as TicketStatus);
       const completedByFinance =
         shouldAdvanceTicketStatus && !order && !isShippingCostRequest;
+      const nextTicketStatus = shouldAdvanceTicketStatus
+        ? completedByFinance
+          ? TicketStatus.COMPLETED
+          : hasOtherUnpaidInvoicedPo
+            ? TicketStatus.WAITING_FINANCE_PAYMENT
+            : hasPendingNonContractItems || unpaidTicketPos.length > 0
+              ? TicketStatus.PROCESSED_LOGISTIC
+              : TicketStatus.PROCESSED_FINANCE
+        : null;
+      const ticketPaymentStatus = order
+        ? unpaidTicketPos.length === 0
+          ? "PAID"
+          : "PARTIAL"
+        : isFullyPaid
+          ? "PAID"
+          : "PARTIAL";
       const ticketUpdate: Record<string, unknown> = {
         transferReceiptUrl: receiptUrl,
         transferDestination: effectiveTransferDestination,
+        paymentStatus: ticketPaymentStatus,
         updatedAt: now,
         ...(isInternalFundingRequest ? { paymentProofUrl: receiptUrl } : {}),
         ...(establishedTicketNominal !== null
@@ -6270,14 +7175,7 @@ export async function processFinancePayment(
               totalAmount: scaledIntegerFromDecimal(establishedTicketNominal),
             }
           : {}),
-        ...(shouldAdvanceTicketStatus
-          ? {
-              status:
-                order || isShippingCostRequest
-                  ? TicketStatus.PROCESSED_FINANCE
-                  : TicketStatus.COMPLETED,
-            }
-          : {}),
+        ...(nextTicketStatus ? { status: nextTicketStatus } : {}),
       };
       await Ticket.updateOne(
         { _id: ticketId },
@@ -6350,7 +7248,7 @@ export async function processFinancePayment(
 
       const logisticsUsers = await User.find({
         isActive: true,
-        role: UserRole.LOGISTICS,
+        role: { $in: LOGISTICS_DB_ROLES },
       })
         .select({ _id: 1 })
         .session(mongoSession)
@@ -6449,6 +7347,10 @@ export async function processFinancePayment(
   revalidatePath("/apps/logistics/stock");
   revalidatePath("/apps/finance");
   revalidatePath("/apps/approvals");
+  revalidatePath("/apps/projects");
+  if (paidProjectId) {
+    revalidatePath(`/apps/projects/${paidProjectId}`);
+  }
   return {
     success: true,
     message:
@@ -6732,7 +7634,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
 
       const logisticsUsers = await User.find({
         isActive: true,
-        role: UserRole.LOGISTICS,
+        role: { $in: LOGISTICS_DB_ROLES },
       })
         .select({ _id: 1 })
         .session(mongoSession)
@@ -6863,6 +7765,7 @@ export async function processFinanceDirectStockPurchasePayment(
     );
   }
 
+  let paidDirectProjectId: string | null = null;
   try {
     const mongoose = await connectToMongoDB();
     await mongoose.connection.transaction(async (mongoSession) => {
@@ -6930,6 +7833,10 @@ export async function processFinanceDirectStockPurchasePayment(
             .session(mongoSession)
             .lean()
         : null;
+      paidDirectProjectId =
+        typeof ticket?.projectId === "string" && ticket.projectId.trim()
+          ? ticket.projectId.trim()
+          : null;
       const account = await FinanceAccount.findOneAndUpdate(
         { _id: financeAccountId, balance: { $gte: amount } },
         { $inc: { balance: -amount } },
@@ -7087,6 +7994,10 @@ export async function processFinanceDirectStockPurchasePayment(
   revalidatePath("/apps/logistics");
   revalidatePath("/apps/logistics/stock");
   revalidatePath("/apps/tickets");
+  revalidatePath("/apps/projects");
+  if (paidDirectProjectId) {
+    revalidatePath(`/apps/projects/${paidDirectProjectId}`);
+  }
   return {
     success: true,
     message:
@@ -7097,7 +8008,7 @@ export async function processFinanceDirectStockPurchasePayment(
 }
 
 export type PaymentRecordTarget =
-  | { kind: "ticket"; id: string }
+  | { kind: "ticket"; id: string; poId?: string }
   | { kind: "purchase-order"; id: string }
   | { kind: "direct-purchase"; id: string };
 
@@ -7111,6 +8022,7 @@ export async function submitPaymentRecord(input: {
   paymentType: PaymentType;
   amount?: number;
   paymentMethod?: POPaymentMethod;
+  poId?: string;
 }): Promise<TicketActionResult> {
   if (
     !input ||
@@ -7160,6 +8072,7 @@ export async function submitPaymentRecord(input: {
       input.paymentType,
       input.amount,
       input.paymentMethod,
+      input.poId ?? input.target.poId,
     );
   }
   if (input.target.kind === "purchase-order") {
@@ -7325,16 +8238,504 @@ export async function replaceFinancePaymentProof(
 }
 
 export async function processMoverDelivery(
-  _ticketId: string,
-  _file: File,
+  ticketId: string,
+  file: File,
+  options?: {
+    deliveryOrderPublicCode?: string;
+    kilometerStart?: number;
+    kilometerEnd?: number;
+    notes?: string;
+    receiverName?: string;
+  },
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== UserRole.MOVER) {
     return actionFailure("Hanya Mover yang dapat melakukan aksi pengiriman.");
   }
-  return actionFailure(
-    "Selesaikan pengiriman melalui Surat Jalan pada Ruang Kerja Mover.",
-  );
+
+  const normalizedTicketId = isBoundedText(ticketId, 64) ? ticketId.trim() : "";
+  if (!normalizedTicketId) {
+    return actionFailure("Tiket tidak valid.");
+  }
+
+  if (!(file instanceof File) || file.size <= 0) {
+    return actionFailure("Bukti foto serah terima wajib diunggah.");
+  }
+
+  const requestedPublicCode = isBoundedText(options?.deliveryOrderPublicCode, 64)
+    ? options?.deliveryOrderPublicCode.trim()
+    : "";
+  const normalizedNotes =
+    typeof options?.notes === "string" && options.notes.trim().length > 0
+      ? options.notes.trim().slice(0, 1000)
+      : null;
+  const normalizedReceiverName =
+    typeof options?.receiverName === "string" && options.receiverName.trim().length > 0
+      ? options.receiverName.trim().slice(0, 120)
+      : null;
+
+  let proofUrl = "";
+  try {
+    proofUrl = await saveTicketReceipt(file);
+  } catch (error) {
+    return actionFailure(
+      error instanceof Error
+        ? error.message
+        : "Gagal mengunggah foto bukti pengiriman.",
+    );
+  }
+
+  let updatedPublicCode: string | null = null;
+
+  try {
+    await connectToMongoDB();
+
+    const mongoDoMetas = await DeliveryOrder.find({ ticketId: normalizedTicketId })
+      .select({ _id: 1, publicCode: 1, moverAssigneeId: 1 })
+      .lean<Array<{ _id?: unknown; publicCode?: string; moverAssigneeId?: string | null }>>();
+    const mongoMoverByDoId = new Map<string, string>();
+    const mongoMoverByPublicCode = new Map<string, string>();
+    for (const meta of mongoDoMetas) {
+      const moverId =
+        typeof meta.moverAssigneeId === "string" ? meta.moverAssigneeId.trim() : "";
+      if (!moverId) continue;
+      if (meta._id != null) {
+        mongoMoverByDoId.set(String(meta._id), moverId);
+      }
+      if (typeof meta.publicCode === "string" && meta.publicCode.trim()) {
+        mongoMoverByPublicCode.set(meta.publicCode.trim(), moverId);
+      }
+    }
+
+    const moverUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, name: true },
+    });
+
+    await prisma.$transaction(async (transaction) => {
+      await lockTicketFulfillment(transaction, normalizedTicketId);
+
+      const ticket = await transaction.ticket.findUnique({
+        where: { id: normalizedTicketId },
+        select: {
+          id: true,
+          ticketNumber: true,
+          title: true,
+          status: true,
+          requesterId: true,
+          moverAssigneeId: true,
+          projectId: true,
+          receiptUrls: true,
+          deliveryReceiptUrl: true,
+          items: {
+            select: {
+              id: true,
+              status: true,
+              doItemId: true,
+              categoryHint: true,
+            },
+          },
+          deliveryOrders: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              publicCode: true,
+              doNumber: true,
+              status: true,
+              deliveryMethod: true,
+              vehicleId: true,
+              departureKilometer: true,
+              driverName: true,
+              createdById: true,
+              arrivalPhotoUrl: true,
+            },
+          },
+        },
+      });
+
+      if (!ticket) {
+        throw new Error("Tiket tidak ditemukan.");
+      }
+
+      if (
+        ticket.status === TicketStatus.DRAFT ||
+        ticket.status === TicketStatus.PENDING_DIRECTOR ||
+        ticket.status === TicketStatus.REJECTED ||
+        ticket.status === TicketStatus.COMPLETED
+      ) {
+        throw new Error(
+          `Tiket berstatus ${ticket.status} tidak dapat diselesaikan oleh Mover.`,
+        );
+      }
+
+      const activeInternalDos = ticket.deliveryOrders.filter(
+        (order) =>
+          order.deliveryMethod === DODeliveryMethod.INTERNAL_MOVER &&
+          (order.status === DOStatus.PENDING || order.status === DOStatus.IN_TRANSIT),
+      );
+
+      const isAuthorizedForDo = (order: (typeof ticket.deliveryOrders)[number]) => {
+        const assignedDoMover =
+          mongoMoverByDoId.get(order.id) ||
+          mongoMoverByPublicCode.get(order.publicCode) ||
+          "";
+        if (assignedDoMover) {
+          return assignedDoMover === session.user.id;
+        }
+        if (ticket.moverAssigneeId === session.user.id) {
+          return true;
+        }
+        if (
+          order.driverName &&
+          moverUser?.name &&
+          order.driverName.trim().toLowerCase() === moverUser.name.trim().toLowerCase()
+        ) {
+          return true;
+        }
+        return false;
+      };
+
+      if (activeInternalDos.length > 0) {
+        const targetDo = requestedPublicCode
+          ? activeInternalDos.find((order) => order.publicCode === requestedPublicCode)
+          : activeInternalDos.find(
+              (order) =>
+                order.status === DOStatus.IN_TRANSIT && isAuthorizedForDo(order),
+            ) ?? activeInternalDos.find((order) => isAuthorizedForDo(order));
+
+        if (!targetDo) {
+          throw new Error(
+            requestedPublicCode
+              ? "Surat Jalan tidak ditemukan atau sudah selesai."
+              : "Tidak ada Surat Jalan internal aktif yang ditugaskan kepada Anda.",
+          );
+        }
+
+        if (!isAuthorizedForDo(targetDo)) {
+          throw new Error("Anda tidak ditugaskan pada Surat Jalan ini.");
+        }
+
+        if (targetDo.vehicleId) {
+          const vehicle = await transaction.vehicle.findUnique({
+            where: { id: targetDo.vehicleId },
+            select: {
+              id: true,
+              currentKilometer: true,
+              odometerInitialized: true,
+            },
+          });
+
+          if (vehicle) {
+            const rawStart = options?.kilometerStart;
+            const startKmDecimal =
+              typeof rawStart === "number" && Number.isFinite(rawStart) && rawStart >= 0
+                ? new Prisma.Decimal(rawStart).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+                : targetDo.departureKilometer !== null
+                  ? decimalFromScaledInteger(targetDo.departureKilometer)
+                  : vehicle.odometerInitialized
+                    ? decimalFromScaledInteger(vehicle.currentKilometer)
+                    : new Prisma.Decimal(0);
+
+            const rawEnd = options?.kilometerEnd;
+            let endKmDecimal = startKmDecimal;
+            if (typeof rawEnd === "number" && Number.isFinite(rawEnd)) {
+              if (rawEnd < 0) {
+                throw new Error("Kilometer akhir tidak valid.");
+              }
+              endKmDecimal = new Prisma.Decimal(rawEnd).toDecimalPlaces(
+                2,
+                Prisma.Decimal.ROUND_HALF_UP,
+              );
+              if (endKmDecimal.lt(startKmDecimal)) {
+                throw new Error(
+                  "Kilometer akhir tidak boleh lebih kecil dari kilometer awal.",
+                );
+              }
+            }
+
+            const distanceDecimal = endKmDecimal
+              .minus(startKmDecimal)
+              .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+            const fuelLiterDecimal = distanceDecimal.gt(0)
+              ? distanceDecimal
+                  .div(VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER)
+                  .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+              : new Prisma.Decimal(0);
+
+            const existingTripLog = await transaction.vehicleTripLog.findUnique({
+              where: { deliveryOrderId: targetDo.id },
+              select: { id: true },
+            });
+            if (!existingTripLog) {
+              await transaction.vehicleTripLog.create({
+                data: {
+                  vehicleId: vehicle.id,
+                  deliveryOrderId: targetDo.id,
+                  projectId: ticket.projectId,
+                  kilometerStart: scaledIntegerFromDecimal(startKmDecimal),
+                  kilometerEnd: scaledIntegerFromDecimal(endKmDecimal),
+                  distanceKm: scaledIntegerFromDecimal(distanceDecimal),
+                  fuelLiter: scaledIntegerFromDecimal(fuelLiterDecimal),
+                  fuelEfficiencyKmPerL: scaledIntegerFromDecimal(
+                    VEHICLE_FUEL_EFFICIENCY_KM_PER_LITER,
+                  ),
+                  createdById: session.user.id,
+                },
+              });
+            }
+
+            const vehicleUpdates: Record<string, unknown> = { status: "AVAILABLE" };
+            if (
+              endKmDecimal.gt(decimalFromScaledInteger(vehicle.currentKilometer))
+            ) {
+              vehicleUpdates.currentKilometer = scaledIntegerFromDecimal(endKmDecimal);
+              vehicleUpdates.odometerInitialized = true;
+            }
+            await transaction.vehicle.update({
+              where: { id: vehicle.id },
+              data: vehicleUpdates,
+            });
+          }
+        }
+
+        await transaction.deliveryOrderProof.create({
+          data: {
+            deliveryOrderId: targetDo.id,
+            url: proofUrl,
+          },
+        });
+
+        await transaction.deliveryOrder.update({
+          where: { id: targetDo.id },
+          data: {
+            status: DOStatus.DELIVERED,
+            deliveryReceiptUrl: proofUrl,
+            ...(targetDo.arrivalPhotoUrl ? {} : { arrivalPhotoUrl: proofUrl }),
+            ...(normalizedReceiverName ? { receiverName: normalizedReceiverName } : {}),
+            receivedAt: new Date(),
+            receivedById: session.user.id,
+          },
+        });
+
+        const nextReceiptUrls = ticket.receiptUrls.includes(proofUrl)
+          ? ticket.receiptUrls
+          : [...ticket.receiptUrls, proofUrl];
+        await transaction.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            deliveryReceiptUrl: proofUrl,
+            receiptUrls: nextReceiptUrls,
+          },
+        });
+
+        const remainingDos = ticket.deliveryOrders.filter(
+          (order) => order.id !== targetDo.id,
+        );
+        const hasRemainingInTransit = remainingDos.some(
+          (order) => order.status === DOStatus.IN_TRANSIT,
+        );
+        const hasRemainingPending = remainingDos.some(
+          (order) => order.status === DOStatus.PENDING,
+        );
+        const hasRemainingPendingItems = ticket.items.some(
+          (item) =>
+            item.categoryHint !== TicketCategoryHint.CONTRACT &&
+            item.status === FulfillmentStatus.PENDING &&
+            !item.doItemId,
+        );
+
+        const [unpaidPoCount, unpaidDspCount, ticketContractDeliveries] =
+          await Promise.all([
+            transaction.purchaseOrder.count({
+              where: {
+                ticketId: ticket.id,
+                paidAt: null,
+                status: { notIn: [POStatus.REJECTED, POStatus.CANCELLED] },
+              },
+            }),
+            transaction.directStockPurchase.count({
+              where: {
+                ticketId: ticket.id,
+                paidAt: null,
+              },
+            }),
+            transaction.materialDelivery.findMany({
+              where: { ticketId: ticket.id },
+              select: {
+                billingStatus: true,
+                vendorInvoice: { select: { status: true } },
+              },
+            }),
+          ]);
+        const hasPendingContractItems = ticket.items.some(
+          (item) =>
+            item.categoryHint === TicketCategoryHint.CONTRACT &&
+            item.status !== FulfillmentStatus.PROCESSED_TO_DO,
+        );
+        const hasUnsettledContractDelivery =
+          ticketContractDeliveries.length > 0 &&
+          ticketContractDeliveries.some(
+            (delivery) =>
+              delivery.billingStatus !== "BILLED" ||
+              delivery.vendorInvoice?.status !== "PAID",
+          );
+        const hasUnsettledPayments =
+          unpaidPoCount > 0 ||
+          unpaidDspCount > 0 ||
+          hasUnsettledContractDelivery;
+
+        const completion =
+          hasUnsettledPayments || hasPendingContractItems
+            ? { statusChanged: false }
+            : await syncTicketStatus(
+                transaction,
+                ticket.id,
+                TicketStatus.COMPLETED,
+              );
+
+        if (!completion.statusChanged) {
+          if (hasRemainingInTransit) {
+            await syncTicketStatus(transaction, ticket.id, TicketStatus.IN_TRANSIT);
+          } else if (hasRemainingPending) {
+            await syncTicketStatus(
+              transaction,
+              ticket.id,
+              TicketStatus.ASSIGNED_TO_MOVER,
+            );
+          } else if (hasRemainingPendingItems || hasPendingContractItems) {
+            await syncTicketStatus(
+              transaction,
+              ticket.id,
+              TicketStatus.PROCESSED_LOGISTIC,
+            );
+          } else if (hasUnsettledPayments) {
+            await transaction.ticket.update({
+              where: { id: ticket.id },
+              data: {
+                status: TicketStatus.WAITING_FINANCE_PAYMENT,
+                fulfillmentStatus: TicketFulfillmentStatus.COMPLETED,
+                updatedAt: new Date(),
+              },
+            });
+          }
+        }
+
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: ticket.id,
+            userId: session.user.id,
+            action: "MOVER_DELIVERED",
+            notes: `${targetDo.doNumber} diselesaikan oleh Mover.${normalizedNotes ? ` Catatan: ${normalizedNotes}` : ""}`,
+          },
+        });
+
+        if (ticket.requesterId) {
+          await sendNotification({
+            userId: ticket.requesterId,
+            title: "Pengiriman Barang Tiba",
+            message: `${ticket.ticketNumber} (${targetDo.doNumber}) telah diterima & diselesaikan oleh Mover.`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticket.id)}`,
+            type: NotificationType.INFO,
+            database: transaction,
+          });
+        }
+        if (targetDo.createdById && targetDo.createdById !== ticket.requesterId) {
+          await sendNotification({
+            userId: targetDo.createdById,
+            title: "Surat Jalan Selesai Dikirim",
+            message: `${ticket.ticketNumber} · ${targetDo.doNumber} telah diselesaikan oleh Mover.`,
+            actionUrl: `/apps/logistics?openSheet=${encodeURIComponent(ticket.id)}`,
+            type: NotificationType.INFO,
+            database: transaction,
+          });
+        }
+
+        updatedPublicCode = targetDo.publicCode;
+      } else {
+        if (ticket.deliveryOrders.length > 0) {
+          throw new Error(
+            "Tidak ada Surat Jalan internal Mover yang menunggu penyelesaian pada tiket ini.",
+          );
+        }
+
+        if (ticket.moverAssigneeId !== session.user.id) {
+          throw new Error("Anda tidak ditugaskan sebagai Mover untuk tiket ini.");
+        }
+
+        const hasUnfulfilledNonContract = ticket.items.some(
+          (item) =>
+            item.categoryHint !== TicketCategoryHint.CONTRACT &&
+            item.status === FulfillmentStatus.PENDING &&
+            !item.doItemId,
+        );
+
+        const nextReceiptUrls = ticket.receiptUrls.includes(proofUrl)
+          ? ticket.receiptUrls
+          : [...ticket.receiptUrls, proofUrl];
+
+        await transaction.ticket.update({
+          where: { id: ticket.id },
+          data: {
+            deliveryReceiptUrl: proofUrl,
+            receiptUrls: nextReceiptUrls,
+            status: hasUnfulfilledNonContract
+              ? TicketStatus.PROCESSED_LOGISTIC
+              : TicketStatus.COMPLETED,
+            fulfillmentStatus: hasUnfulfilledNonContract
+              ? TicketFulfillmentStatus.PARTIALLY_FULFILLED
+              : TicketFulfillmentStatus.COMPLETED,
+          },
+        });
+
+        await transaction.ticketAuditLog.create({
+          data: {
+            id: randomUUID(),
+            ticketId: ticket.id,
+            userId: session.user.id,
+            action: "MOVER_DELIVERED",
+            notes: `Pengiriman tiket diselesaikan oleh Mover.${normalizedNotes ? ` Catatan: ${normalizedNotes}` : ""}`,
+          },
+        });
+
+        if (ticket.requesterId) {
+          await sendNotification({
+            userId: ticket.requesterId,
+            title: "Pengiriman Tiket Selesai",
+            message: `${ticket.ticketNumber} (${ticket.title}) telah diselesaikan oleh Mover.`,
+            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(ticket.id)}`,
+            type: NotificationType.INFO,
+            database: transaction,
+          });
+        }
+      }
+    });
+
+    if (normalizedNotes) {
+      await Ticket.updateOne(
+        { _id: normalizedTicketId },
+        { $set: { moverDeliveryNotes: normalizedNotes } },
+      ).catch(() => undefined);
+    }
+  } catch (error) {
+    await removeTicketReceipt(proofUrl).catch(() => undefined);
+    return actionFailure(
+      error instanceof Error
+        ? error.message
+        : "Gagal menyelesaikan pengiriman Mover.",
+    );
+  }
+
+  revalidatePath("/apps/tickets");
+  revalidatePath("/apps/logistics");
+  if (updatedPublicCode) {
+    revalidatePath(`/d/${updatedPublicCode}`);
+  }
+
+  return {
+    success: true,
+    message: "Bukti pengiriman berhasil diunggah dan pengiriman diselesaikan.",
+  };
 }
 
 async function transitionTicket({
@@ -7420,6 +8821,7 @@ async function transitionTicket({
   }
 
   revalidatePath("/apps/tickets");
+  revalidatePath("/apps/logistics");
   revalidatePath("/apps/project");
   revalidatePath("/apps/projects");
   revalidatePath("/apps/approvals");

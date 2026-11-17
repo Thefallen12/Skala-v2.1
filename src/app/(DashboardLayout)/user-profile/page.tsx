@@ -158,7 +158,7 @@ export default async function UserProfilePage({
     <>
       <BreadcrumbComp
         title="Profil Saya"
-        items={[{ to: "/", title: "Home" }, { title: "Profil Saya" }]}
+        items={[{ to: "/", title: "Beranda" }, { title: "Profil Saya" }]}
       />
       <UserProfile
         key={normalizedTab}

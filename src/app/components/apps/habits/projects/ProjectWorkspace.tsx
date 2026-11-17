@@ -35,6 +35,7 @@ import {
   getWeekDateKeys,
   shiftDateKey,
 } from "@/lib/habit-date";
+import { habitWorkspaceUrl } from "@/lib/habit-workspace-routes";
 import { getIndonesiaHolidayName } from "@/lib/indonesia-holidays";
 import { getHabitTaskColorClass } from "@/lib/habit-task-colors";
 
@@ -417,32 +418,32 @@ export default function ProjectWorkspace({
         : view === "week"
           ? shiftDateKey(selectedDate, offset * 7)
           : format(addMonths(selectedDay, offset), "yyyy-MM-dd");
-    return `/apps/habits/projects?date=${nextDate}&view=${view}`;
+    return habitWorkspaceUrl("calendar", { date: nextDate, calendarView: view });
   };
   const summary = [
     {
-      label: "Running",
+      label: "Berjalan",
       value: running,
-      note: `${projects.length} total projects`,
+      note: `${projects.length} total proyek`,
       icon: Clock3,
       color: "text-info",
     },
     {
-      label: "Completed",
+      label: "Selesai",
       value: complete,
-      note: "Based on project status",
+      note: "Berdasarkan status proyek",
       icon: CircleCheck,
       color: "text-success",
     },
     {
-      label: "Due soon",
+      label: "Segera Jatuh Tempo",
       value: deadlinesSoon,
       note:
         projectsWithEndDate === 0
-          ? "Set project end dates to track deadlines"
+          ? "Atur tanggal selesai untuk pantau tenggat"
           : overdue
-            ? `${overdue} overdue`
-            : "No overdue projects",
+            ? `${overdue} terlambat`
+            : "Tidak ada proyek terlambat",
       icon: AlertTriangle,
       color: overdue ? "text-warning" : "text-muted-foreground",
     },
@@ -452,24 +453,24 @@ export default function ProjectWorkspace({
     <div className="my-4 space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Project timeline</h1>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Status of completion for all projects
+          <h1 className="type-h1">Linimasa Proyek</h1>
+          <p className="type-p2 mt-1 text-muted-foreground">
+            Status penyelesaian seluruh proyek aktif
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="/apps/project"
-            className="text-xs font-medium text-primary hover:underline"
+            href="/apps/projects"
+            className="type-p3 font-medium text-primary hover:underline"
           >
             Kelola status &amp; tanggal proyek
             <ArrowRight className="ml-1 inline size-3.5" />
           </Link>
           <Link
-            href="/apps/habits/roadmap"
-            className="text-xs font-medium text-primary hover:underline"
+            href="/apps/projects/schedule"
+            className="type-p3 font-medium text-primary hover:underline"
           >
-            Buka product roadmap
+            Buka jadwal proyek
             <ArrowRight className="ml-1 inline size-3.5" />
           </Link>
         </div>
@@ -477,7 +478,7 @@ export default function ProjectWorkspace({
       {message && (
         <p
           role={message.success ? "status" : "alert"}
-          className={`rounded-md border px-3 py-2 text-xs ${
+          className={`type-p3 rounded-md border px-3 py-2 ${
             message.success
               ? "border-success/30 bg-success/10 text-success"
               : "border-destructive/30 bg-destructive/10 text-destructive"
@@ -494,10 +495,10 @@ export default function ProjectWorkspace({
               <Icon className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs">
-                {label}: <strong>{value}</strong>
+              <p className="type-p2">
+                {label}: <strong className="tabular-nums">{value}</strong>
               </p>
-              <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+              <p className="type-p3 mt-0.5 truncate text-muted-foreground">
                 {note}
               </p>
             </div>
@@ -510,8 +511,8 @@ export default function ProjectWorkspace({
         <CardBox className="min-w-0 gap-0 overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold">Project timeline</h2>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
+              <h2 className="type-h2">Linimasa Proyek</h2>
+              <p className="type-p3 mt-0.5 text-muted-foreground">
                 Rentang proyek dan {tasks.length} tugas terjadwal · {periodLabel}
               </p>
             </div>
@@ -526,16 +527,19 @@ export default function ProjectWorkspace({
               </Link>
               <div
                 role="group"
-                aria-label="Tampilan periode project timeline"
+                aria-label="Tampilan periode linimasa proyek"
                 className="inline-flex rounded-md border border-border bg-muted/30 p-1"
               >
                 {viewOptions.map((option) => (
                   <Link
                     key={option.id}
-                    href={`/apps/habits/projects?date=${selectedDate}&view=${option.id}`}
+                    href={habitWorkspaceUrl("calendar", {
+                      date: selectedDate,
+                      calendarView: option.id,
+                    })}
                     scroll={false}
                     aria-current={view === option.id ? "page" : undefined}
-                    className={`rounded px-2 py-1 text-[10px] font-medium transition-colors ${
+                    className={`type-p3 rounded px-2 py-1 font-medium transition-colors ${
                       view === option.id
                         ? "bg-primary text-white"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -565,11 +569,11 @@ export default function ProjectWorkspace({
                     : "grid-cols-[200px_minmax(700px,1fr)]"
                 }`}
               >
-                <div className="sticky left-0 z-[1] flex items-center bg-muted p-2.5 text-xs font-semibold">
+                <div className="type-p3 sticky left-0 z-[1] flex items-center bg-muted p-2.5 font-semibold">
                   <span>
-                    Projects & milestones
+                    Proyek &amp; Tonggak
                     {view === "day" && selectedDayLabel && (
-                      <span className="mt-1 block text-[9px] font-medium text-destructive">
+                      <span className="mt-1 block text-[11px] font-medium text-destructive">
                         {selectedDayLabel}
                       </span>
                     )}
@@ -688,15 +692,17 @@ export default function ProjectWorkspace({
                         <p className="truncate text-[9px] text-muted-foreground">
                           {project.code}
                         </p>
-                        <div className="mt-1 flex gap-2 text-[9px]">
+                        <div className="type-p3 mt-1 flex gap-2">
                           <Link
-                            href={`/apps/habits/roadmap?projectId=${encodeURIComponent(project.id)}`}
+                            href={`/apps/projects/schedule?projectId=${encodeURIComponent(project.id)}`}
                             className="text-primary hover:underline"
                           >
-                            Roadmap
+                            Jadwal
                           </Link>
                           <Link
-                            href={`/apps/habits/tasks?projectId=${encodeURIComponent(project.id)}`}
+                            href={habitWorkspaceUrl("tasks", {
+                              projectId: project.id,
+                            })}
                             className="text-primary hover:underline"
                           >
                             Tugas
@@ -806,7 +812,7 @@ export default function ProjectWorkspace({
                   setCurrentPage((page) => Math.max(1, page - 1))
                 }
               >
-                Previous
+                Sebelumnya
               </Button>
               {pageNumbers.map((page) => (
                 <Button
@@ -830,11 +836,11 @@ export default function ProjectWorkspace({
                   setCurrentPage((page) => Math.min(pageCount, page + 1))
                 }
               >
-                Next
+                Berikutnya
               </Button>
             </nav>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2.5 text-[10px] text-muted-foreground">
+          <div className="type-p3 flex items-center gap-2 px-4 py-2.5 text-muted-foreground">
             <CalendarDays className="size-3.5" aria-hidden="true" />
             {view === "day"
               ? "Tampilan harian memakai sumbu jam 00.00–23.00. Seret bar untuk menggeser jadwal per jam, atau tarik ujungnya untuk mengubah jam mulai/selesai."
@@ -843,8 +849,8 @@ export default function ProjectWorkspace({
           </div>
           <div className="flex justify-end px-4 pb-3">
             <Link
-              href="/apps/habits/tasks"
-              className="text-[10px] font-medium text-primary hover:underline"
+              href={habitWorkspaceUrl("tasks", {})}
+              className="type-p3 font-medium text-primary hover:underline"
             >
               Kelola tugas harian <ArrowRight className="ml-1 inline size-3" />
             </Link>
@@ -854,8 +860,8 @@ export default function ProjectWorkspace({
 
         <CardBox className="space-y-4 p-4">
           <div>
-            <h2 className="text-sm font-semibold">Project deadlines</h2>
-            <p className="mt-1 text-[10px] text-muted-foreground">
+            <h2 className="type-h2">Tenggat Proyek</h2>
+            <p className="type-p3 mt-1 text-muted-foreground">
               Status penyelesaian proyek
             </p>
           </div>
@@ -869,8 +875,8 @@ export default function ProjectWorkspace({
           >
             <div className="grid size-full place-items-center rounded-full bg-card">
               <div className="text-center">
-                <p className="text-2xl font-semibold">{projects.length}</p>
-                <p className="text-[10px] text-muted-foreground">projects</p>
+                <p className="type-kpi">{projects.length}</p>
+                <p className="type-p3 text-muted-foreground">proyek</p>
               </div>
             </div>
           </div>
@@ -886,16 +892,16 @@ export default function ProjectWorkspace({
                 key={item.label}
                 className={`flex items-center justify-between rounded border-l-2 bg-muted/30 px-3 py-2 ${item.color}`}
               >
-                <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                <span className="text-xs font-semibold">{item.value}</span>
+                <span className="type-p3 text-muted-foreground">{item.label}</span>
+                <span className="type-p3 font-semibold tabular-nums">{item.value}</span>
               </div>
             ))}
           </div>
           <Link
-            href="/apps/habits/roadmap"
-            className="block text-[10px] font-medium text-primary hover:underline"
+            href="/apps/projects/schedule"
+            className="type-p3 block font-medium text-primary hover:underline"
           >
-            Lihat roadmap pekerjaan <ArrowRight className="ml-1 inline size-3" />
+            Lihat jadwal pekerjaan <ArrowRight className="ml-1 inline size-3" />
           </Link>
         </CardBox>
       </div>
@@ -955,7 +961,10 @@ export default function ProjectWorkspace({
               <DialogFooter>
                 <Button asChild>
                   <Link
-                    href={`/apps/habits/tasks?projectId=${encodeURIComponent(selectedTask.projectId)}&date=${getJakartaDateKey(new Date(selectedTask.startsAt))}`}
+                    href={habitWorkspaceUrl("tasks", {
+                      projectId: selectedTask.projectId,
+                      date: getJakartaDateKey(new Date(selectedTask.startsAt)),
+                    })}
                     scroll={false}
                   >
                     Buka Tugas Harian <ArrowRight aria-hidden="true" />

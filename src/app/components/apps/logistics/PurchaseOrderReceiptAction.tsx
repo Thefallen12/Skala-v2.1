@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PackageCheck } from "lucide-react";
+import { toast } from "sonner";
 import { receiveStandalonePurchaseOrder } from "@/app/actions/orders";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import { Button } from "@/components/ui/button";
@@ -10,58 +11,76 @@ import { GlobalModal } from "@/components/ui/global-modal";
 
 export default function PurchaseOrderReceiptAction({
   publicCode,
+  poNumber,
+  open,
+  onOpenChange,
+  hideTrigger = false,
 }: {
   publicCode: string;
+  poNumber?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }) {
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState("");
+  const [internalOpen, setInternalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const isControlled = open !== undefined;
+  const resolvedOpen = isControlled ? open : internalOpen;
+  const setResolvedOpen = (next: boolean) => {
+    if (!isControlled) {
+      setInternalOpen(next);
+    }
+    onOpenChange?.(next);
+  };
 
   function confirmReceipt() {
     startTransition(async () => {
-      const result = await receiveStandalonePurchaseOrder(publicCode);
-      setMessage(result.message);
-      if (result.success) {
-        setIsOpen(false);
-        requestNotificationFeedRefresh();
-        router.refresh();
+      try {
+        const result = await receiveStandalonePurchaseOrder(publicCode);
+        if (result.success) {
+          toast.success(result.message);
+          setResolvedOpen(false);
+          requestNotificationFeedRefresh();
+          router.refresh();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Receive standalone PO failed:", error);
+        toast.error("Penerimaan barang PO gagal dicatat.");
       }
     });
   }
 
   return (
     <>
-      <Button
-        type="button"
-        size="sm"
-        variant="outlinesuccess"
-        onClick={() => {
-          setMessage("");
-          setIsOpen(true);
-        }}
-      >
-        <PackageCheck aria-hidden="true" />
-        Terima Barang
-      </Button>
-      {message && !isOpen && (
-        <p className="sr-only" role="status">
-          {message}
-        </p>
+      {!hideTrigger && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outlinesuccess"
+          onClick={() => setResolvedOpen(true)}
+        >
+          <PackageCheck className="size-4" aria-hidden="true" />
+          Terima Barang
+        </Button>
       )}
       <GlobalModal
-        isOpen={isOpen}
+        isOpen={resolvedOpen}
         onClose={() => {
-          if (!isPending) setIsOpen(false);
+          if (!isPending) setResolvedOpen(false);
         }}
-        title="Konfirmasi Penerimaan PO"
+        onOpenChange={setResolvedOpen}
+        title={poNumber ? `Terima Barang · ${poNumber}` : "Konfirmasi Penerimaan PO"}
         description="Stok akan bertambah setelah penerimaan ini dicatat."
         footer={
           <>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsOpen(false)}
+              onClick={() => setResolvedOpen(false)}
               disabled={isPending}
             >
               Batal
@@ -72,21 +91,16 @@ export default function PurchaseOrderReceiptAction({
               onClick={confirmReceipt}
               disabled={isPending}
             >
-              {isPending ? "Mencatat..." : "Konfirmasi Barang Diterima"}
+              {isPending ? "Mencatat..." : "Konfirmasi Diterima"}
             </Button>
           </>
         }
       >
-        <p className="text-sm leading-6 text-muted-foreground">
+        <p className="type-p2 text-muted-foreground">
           Pastikan barang dari vendor benar-benar sudah tiba. Setelah
           dikonfirmasi, jumlah stok akan diperbarui dan penerimaan PO tidak
           dapat dicatat ulang.
         </p>
-        {message && (
-          <p className="text-sm text-destructive" role="alert">
-            {message}
-          </p>
-        )}
       </GlobalModal>
     </>
   );

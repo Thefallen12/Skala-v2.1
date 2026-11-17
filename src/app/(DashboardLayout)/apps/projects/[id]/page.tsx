@@ -3,10 +3,15 @@ import type { Metadata } from "next";
 import { auth } from "../../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
-import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import {
+  decimalNumberFromScaledInteger,
+  decimalStringFromScaledInteger,
+} from "@/lib/scaled-decimal";
+import { getJakartaDateKey } from "@/lib/habit-date";
 import {
   calculateWeightedProjectProgress,
   clampProjectProgress,
+  toJakartaDateKey,
 } from "@/lib/project-progress";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import ProjectDetailView from "@/app/components/apps/projects/ProjectDetailView";
@@ -17,14 +22,40 @@ import {
   loadOpenContractDeliveryTickets,
 } from "@/lib/material-contracts-server";
 
+const projectRoles: UserRole[] = [
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.KOORDINATOR,
+  UserRole.FIELD_TEAM,
+  UserRole.DRAFTER,
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+  UserRole.MOVER,
+];
+
+function isFieldPicOnlyRole(role: UserRole): boolean {
+  return role === UserRole.FIELD_TEAM || role === UserRole.KOORDINATOR;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
+  const session = await auth();
+  if (!session?.user || !projectRoles.includes(session.user.role)) {
+    return { title: "Detail | Proyek" };
+  }
   const { id } = await params;
   const project = await prisma.project.findFirst({
-    where: { OR: [{ id }, { code: id }], isDeleted: false },
+    where: {
+      OR: [{ id }, { code: id }],
+      isDeleted: false,
+      ...(isFieldPicOnlyRole(session.user.role)
+        ? { fieldPicId: session.user.id }
+        : {}),
+    },
     select: { title: true, name: true },
   });
   return {
@@ -40,9 +71,16 @@ export default async function ProjectDetailPage({
   const { id } = await params;
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
+  if (!projectRoles.includes(session.user.role)) redirect("/");
+
+  const isFieldRole = isFieldPicOnlyRole(session.user.role);
 
   const project = await prisma.project.findFirst({
-    where: { OR: [{ id }, { code: id }], isDeleted: false },
+    where: {
+      OR: [{ id }, { code: id }],
+      isDeleted: false,
+      ...(isFieldRole ? { fieldPicId: session.user.id } : {}),
+    },
     include: {
       fieldPic: { select: { id: true, name: true, profilePhotoUrl: true } },
       dailyReports: {
@@ -167,14 +205,11 @@ export default async function ProjectDetailPage({
     },
   });
 
+  const todayJakartaKey = getJakartaDateKey();
   const initialMilestones = rawMilestones.map((m) => ({
     id: m.id,
     title: m.title,
-    date: m.startsAt
-      ? typeof m.startsAt === "string"
-        ? (m.startsAt as string).slice(0, 10)
-        : m.startsAt.toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10),
+    date: toJakartaDateKey(m.startsAt) ?? todayJakartaKey,
   }));
 
   const [realizationMap, materialContractsBundle, openContractTickets] =
@@ -191,7 +226,7 @@ export default async function ProjectDetailPage({
   const realization = realizationMap.get(project.id);
 
   const dateKey = (date: Date | string | null | undefined) =>
-    !date ? "" : typeof date === "string" ? date.slice(0, 10) : date.toISOString().slice(0, 10);
+    toJakartaDateKey(date) ?? "";
   const workPointPhotosByDate = new Map<string, string[]>();
   for (const point of project.workPoints) {
     for (const progressReport of point.progressReports) {
@@ -244,6 +279,114 @@ export default async function ProjectDetailPage({
     project.pagu && project.pagu > BigInt(0)
       ? project.pagu
       : computedWorkPointsWage;
+
+  const serializedReports = project.dailyReports.map((report) => {
+    const key = dateKey(report.reportDate);
+    const workPointPhotos = workPointPhotosByDate.get(key) ?? [];
+    return {
+      id: report.id,
+      reportDate: key,
+      weather: report.weather,
+      workersCount: report.workersCount,
+      progress: report.workPointId
+        ? getCumulativeProgressAtDate(report.reportDate, report.progress)
+        : report.progress === null
+          ? null
+          : clampProjectProgress(report.progress),
+      workPointId: report.workPointId,
+      dailyVolume: report.dailyVolume,
+      workSummary: report.workSummary,
+      notes: report.notes,
+      k3SafetyLog: report.k3SafetyLog ?? null,
+      photoUrls: [
+        ...new Set([
+          ...report.progressPhotos.map(
+            (photo) => photo.fileUrl ?? photo.url,
+          ),
+          ...workPointPhotos,
+        ]),
+      ],
+    };
+  });
+
+  const serializedWorkPoints = project.workPoints.map((point) => {
+    const seenDates = new Set<string>();
+    const progressReports = point.progressReports
+      .map((report) => ({
+        id: report.id,
+        reportDate: dateKey(report.reportDate),
+        progress: report.progress,
+        workSummary: report.workSummary,
+        photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
+      }))
+      .filter((report) => {
+        if (!report.reportDate || seenDates.has(report.reportDate)) return false;
+        seenDates.add(report.reportDate);
+        return true;
+      });
+
+    const approvedWageNum =
+      point.approvedTotalWage !== null
+        ? decimalNumberFromScaledInteger(point.approvedTotalWage)
+        : 0;
+    const proposedWageNum = decimalNumberFromScaledInteger(
+      point.proposedTotalWage,
+    );
+    const volumeNum =
+      point.proposedVolume !== null
+        ? decimalNumberFromScaledInteger(point.proposedVolume)
+        : 0;
+    const unitPriceNum =
+      point.proposedUnitPrice !== null
+        ? decimalNumberFromScaledInteger(point.proposedUnitPrice)
+        : 0;
+    const totalPrice =
+      approvedWageNum > 0
+        ? approvedWageNum
+        : proposedWageNum > 0
+          ? proposedWageNum
+          : Math.round(volumeNum * unitPriceNum * 100) / 100;
+
+    return {
+      id: point.id,
+      title: point.title,
+      location: point.location,
+      plannedStartDate: toJakartaDateKey(point.plannedStartDate),
+      targetDate: toJakartaDateKey(point.targetDate),
+      progress: point.progress,
+      proposedVolume:
+        point.proposedVolume !== null
+          ? decimalStringFromScaledInteger(point.proposedVolume)
+          : null,
+      proposedUnit: point.proposedUnit,
+      proposedUnitPrice:
+        point.proposedUnitPrice !== null
+          ? decimalStringFromScaledInteger(point.proposedUnitPrice)
+          : null,
+      completedVolume: point.completedVolume,
+      proposedTotalWage: decimalStringFromScaledInteger(
+        point.proposedTotalWage,
+      ),
+      approvedTotalWage:
+        point.approvedTotalWage !== null
+          ? decimalStringFromScaledInteger(point.approvedTotalWage)
+          : null,
+      totalPrice,
+      wageAuditLogs: point.wageAuditLogs.map((log) => ({
+        id: log.id,
+        oldWage: decimalStringFromScaledInteger(log.oldWage),
+        newWage: decimalStringFromScaledInteger(log.newWage),
+        reason: log.reason,
+        createdAt: log.createdAt
+          ? typeof log.createdAt === "string"
+            ? log.createdAt
+            : log.createdAt.toISOString()
+          : new Date().toISOString(),
+        changedByName: log.changedBy?.name ?? "Admin",
+      })),
+      progressReports,
+    };
+  });
 
   const formattedProject: ProjectWorkstationMasterData = {
     id: project.id,
@@ -310,119 +453,10 @@ export default async function ProjectDetailPage({
     operationalRequested: realization
       ? realization.requestedOperational.toString()
       : "0",
-    startDate: project.startDate
-      ? typeof project.startDate === "string"
-        ? (project.startDate as string).slice(0, 10)
-        : project.startDate.toISOString().slice(0, 10)
-      : null,
-    endDate: project.endDate
-      ? typeof project.endDate === "string"
-        ? (project.endDate as string).slice(0, 10)
-        : project.endDate.toISOString().slice(0, 10)
-      : null,
-    reports: project.dailyReports.map((report) => {
-      const key = dateKey(report.reportDate);
-      const workPointPhotos = workPointPhotosByDate.get(key) ?? [];
-      return {
-        id: report.id,
-        reportDate: key,
-        weather: report.weather,
-        workersCount: report.workersCount,
-        progress: report.workPointId
-          ? getCumulativeProgressAtDate(report.reportDate, report.progress)
-          : report.progress === null
-            ? null
-            : clampProjectProgress(report.progress),
-        workPointId: report.workPointId,
-        dailyVolume: report.dailyVolume,
-        workSummary: report.workSummary,
-        notes: report.notes,
-        photoUrls: [
-          ...new Set([
-            ...report.progressPhotos.map(
-              (photo) => photo.fileUrl ?? photo.url,
-            ),
-            ...workPointPhotos,
-          ]),
-        ],
-      };
-    }),
-    workPoints: project.workPoints.map((point) => ({
-      id: point.id,
-      title: point.title,
-      location: point.location,
-      plannedStartDate: point.plannedStartDate
-        ? typeof point.plannedStartDate === "string"
-          ? (point.plannedStartDate as string).slice(0, 10)
-          : point.plannedStartDate.toISOString().slice(0, 10)
-        : null,
-      targetDate: point.targetDate
-        ? typeof point.targetDate === "string"
-          ? (point.targetDate as string).slice(0, 10)
-          : point.targetDate.toISOString().slice(0, 10)
-        : null,
-      progress: point.progress,
-      proposedVolume:
-        point.proposedVolume !== null
-          ? decimalStringFromScaledInteger(point.proposedVolume)
-          : null,
-      proposedUnit: point.proposedUnit,
-      proposedUnitPrice:
-        point.proposedUnitPrice !== null
-          ? decimalStringFromScaledInteger(point.proposedUnitPrice)
-          : null,
-      completedVolume: point.completedVolume,
-      proposedTotalWage: decimalStringFromScaledInteger(
-        point.proposedTotalWage,
-      ),
-      approvedTotalWage:
-        point.approvedTotalWage !== null
-          ? decimalStringFromScaledInteger(point.approvedTotalWage)
-          : null,
-      wageAuditLogs: point.wageAuditLogs.map((log) => ({
-        id: log.id,
-        oldWage: decimalStringFromScaledInteger(log.oldWage),
-        newWage: decimalStringFromScaledInteger(log.newWage),
-        reason: log.reason,
-        createdAt: log.createdAt
-          ? typeof log.createdAt === "string"
-            ? log.createdAt
-            : log.createdAt.toISOString()
-          : new Date().toISOString(),
-        changedByName: log.changedBy?.name ?? "Admin",
-      })),
-      progressReports: [
-        ...point.progressReports.map((report) => ({
-          id: report.id,
-          reportDate: report.reportDate
-            ? typeof report.reportDate === "string"
-              ? (report.reportDate as string).slice(0, 10)
-              : report.reportDate.toISOString().slice(0, 10)
-            : "",
-          progress: report.progress,
-          workSummary: report.workSummary,
-          photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
-        })),
-        ...project.dailyReports
-          .filter(
-            (report) =>
-              report.workPointId === point.id && report.progress !== null,
-          )
-          .map((report) => ({
-            id: report.id,
-            reportDate: report.reportDate
-              ? typeof report.reportDate === "string"
-                ? (report.reportDate as string).slice(0, 10)
-                : report.reportDate.toISOString().slice(0, 10)
-              : "",
-            progress: report.progress!,
-            workSummary: report.workSummary,
-            photoUrls: report.progressPhotos.map(
-              (photo) => photo.fileUrl ?? photo.url,
-            ),
-          })),
-      ],
-    })),
+    startDate: toJakartaDateKey(project.startDate),
+    endDate: toJakartaDateKey(project.endDate),
+    reports: serializedReports,
+    workPoints: serializedWorkPoints,
     blueprints: [
       ...project.blueprints
         .filter(
@@ -480,11 +514,7 @@ export default async function ProjectDetailPage({
       publicCode: bast.publicCode,
       bastNumber: bast.bastNumber,
       type: bast.type,
-      date: bast.date
-        ? typeof bast.date === "string"
-          ? (bast.date as string).slice(0, 10)
-          : bast.date.toISOString().slice(0, 10)
-        : "",
+      date: toJakartaDateKey(bast.date) ?? "",
       isApproved: bast.isApproved,
     })),
     wageTicketPayments: (realization?.tickets ?? []).map((ticket) => {
@@ -534,11 +564,11 @@ export default async function ProjectDetailPage({
         requestCategory: ticket.requestCategory,
         fieldCategory: ticket.fieldCategory,
         fundCategory: ticket.fundCategory,
-        createdAt: ticket.createdAt ? ticket.createdAt.slice(0, 10) : "",
+        createdAt: toJakartaDateKey(ticket.createdAt) ?? "",
         status: ticket.status,
         amount: ticketTotal > 0 ? String(ticketTotal) : "0",
         paid: ticket.paid,
-        paidAt: ticket.paidAt ? ticket.paidAt.slice(0, 10) : null,
+        paidAt: toJakartaDateKey(ticket.paidAt),
         requesterName: ticket.requesterName || "Pemohon",
         items: ticket.items.map((it) => {
           const estCostNum = it.estimatedCost ? Number(it.estimatedCost) : 0;

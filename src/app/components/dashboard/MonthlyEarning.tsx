@@ -54,20 +54,20 @@ const MonthlyEarning = ({
   };
 
   return (
-    <CardBox className="mt-0! overflow-hidden border border-slate-200 bg-white p-0! shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <CardBox className="mt-0! overflow-hidden border border-border bg-card p-0! text-card-foreground shadow-2xs">
       <div className="px-5 pt-5">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-bold text-slate-900 dark:text-white">
+          <h2 className="type-h2 text-foreground">
             Timesheet Bulan Ini
           </h2>
-          <div className="flex size-10 items-center justify-center rounded-lg bg-orange-500 text-white">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Icon icon="tabler:clock-hour-4" className="text-xl" />
           </div>
         </div>
-        <h3 className="mb-1 text-xl font-black text-slate-900 dark:text-white">
+        <h3 className="type-kpi mb-1 text-foreground">
           {hours} jam
         </h3>
-        <p className="mb-4 text-xs text-muted-foreground">
+        <p className="type-p3 mb-4 text-muted-foreground">
           Total jam kerja tercatat
         </p>
       </div>

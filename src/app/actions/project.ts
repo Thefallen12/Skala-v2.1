@@ -11,11 +11,18 @@ import {
 import { z } from "zod";
 import { auth } from "../../../auth";
 import { prisma } from "@/lib/prisma";
-import { getJakartaDateKey } from "@/lib/habit-date";
+import {
+  getJakartaDateKey,
+  getJakartaDayRange,
+  isValidDateKey,
+} from "@/lib/habit-date";
 import {
   calculateWeightedProjectProgress,
   clampProjectProgress,
+  toJakartaDateKey,
+  toJakartaDayStartDate,
 } from "@/lib/project-progress";
+import { getFinancePaymentProofMimeType } from "@/lib/finance-payment-proof-file";
 import { sendNotification } from "@/lib/notifications";
 import { PrivatePhotoValidationError } from "@/lib/private-photos";
 import {
@@ -162,6 +169,30 @@ const setupProjectStatuses: ProjectStatus[] = [
   ProjectStatus.PENDING,
   ProjectStatus.PLANNED,
 ];
+
+const runningProjectStatuses: ProjectStatus[] = [
+  ProjectStatus.RUNNING,
+  ProjectStatus.ON_PROGRESS,
+  ProjectStatus.ACTIVE,
+];
+
+function parseWibDateInput(value: string | null | undefined): Date | null {
+  const key = toJakartaDateKey(value);
+  if (key) return toJakartaDayStartDate(key);
+  if (!value || !value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function revalidateProjectReportPaths(projectId: string) {
+  revalidatePath("/");
+  revalidatePath("/apps/project");
+  revalidatePath("/apps/projects");
+  revalidatePath(`/apps/projects/${projectId}`);
+  revalidatePath("/apps/projects/schedule");
+  revalidatePath("/apps/projects/reports/dinas");
+  revalidatePath("/apps/habits");
+}
 
 async function activateProjectIfReady(projectId: string) {
   return prisma.$transaction(async (transaction) => {
@@ -325,10 +356,10 @@ export async function saveProject(
     clientName: values.clientName || null,
     location: values.location || null,
     startDate: values.startDate
-      ? new Date(`${values.startDate}T00:00:00.000Z`)
+      ? toJakartaDayStartDate(values.startDate)
       : null,
     endDate: values.endDate
-      ? new Date(`${values.endDate}T00:00:00.000Z`)
+      ? toJakartaDayStartDate(values.endDate)
       : null,
     ...(values.budget !== undefined
       ? {
@@ -883,10 +914,10 @@ export async function createProjectWorkPoint(
           title: parsed.data.title,
           location: parsed.data.location || null,
           plannedStartDate: parsed.data.plannedStartDate
-            ? new Date(`${parsed.data.plannedStartDate}T00:00:00.000Z`)
+            ? toJakartaDayStartDate(parsed.data.plannedStartDate)
             : null,
           targetDate: parsed.data.targetDate
-            ? new Date(`${parsed.data.targetDate}T00:00:00.000Z`)
+            ? toJakartaDayStartDate(parsed.data.targetDate)
             : null,
           proposedVolume: scaledIntegerFromDecimal(parsed.data.proposedVolume),
           proposedUnit: parsed.data.proposedUnit,
@@ -947,14 +978,24 @@ export async function addProjectWorkPointProgress(
   }
   const workPoint = await prisma.projectWorkPoint.findUnique({
     where: { id: workPointId },
-    select: { id: true, projectId: true },
+    select: {
+      id: true,
+      projectId: true,
+      project: { select: { isDeleted: true, status: true, fieldPicId: true } },
+    },
   });
-  if (!workPoint) {
+  if (!workPoint || workPoint.project.isDeleted) {
     return { success: false, message: "Titik pekerjaan tidak ditemukan." };
+  }
+  if (!runningProjectStatuses.includes(workPoint.project.status)) {
+    return {
+      success: false,
+      message: "Progres titik hanya dapat dikirim pada proyek berstatus RUNNING.",
+    };
   }
   if (
     !isFieldPicRole(session.user.role) ||
-    !(await isAssignedProjectFieldPic(workPoint.projectId, session.user.id))
+    workPoint.project.fieldPicId !== session.user.id
   ) {
     return { success: false, message: "Anda tidak berhak mengirim progres titik ini." };
   }
@@ -965,6 +1006,7 @@ export async function addProjectWorkPointProgress(
     if (!(entry instanceof File)) {
       return { success: false, message: "Data foto progres titik tidak valid." };
     }
+    if (entry.size === 0 && !entry.name) continue;
     photos.push(entry);
   }
   if (photos.length > 5) {
@@ -972,17 +1014,21 @@ export async function addProjectWorkPointProgress(
   }
 
   const parsed = workPointProgressSchema.safeParse({
-    reportDate: input.get("reportDate"),
+    reportDate: input.get("reportDate") || getJakartaDateKey(),
     progress: input.get("progress"),
     workSummary: input.get("workSummary"),
   });
-  if (!parsed.success) {
+  if (!parsed.success || !isValidDateKey(parsed.data.reportDate)) {
     return {
       success: false,
-      message: parsed.error.issues[0]?.message ?? "Data progres titik tidak valid.",
+      message: !parsed.success
+        ? (parsed.error.issues[0]?.message ?? "Data progres titik tidak valid.")
+        : "Tanggal laporan tidak valid.",
     };
   }
 
+  const { start: reportDateStart, endExclusive: reportDateEndExclusive } =
+    getJakartaDayRange(parsed.data.reportDate);
   const storedPhotos: StoredProjectProgressPhoto[] = [];
   let transactionCommitted = false;
   try {
@@ -990,14 +1036,30 @@ export async function addProjectWorkPointProgress(
       storedPhotos.push(await saveProjectWorkPointPhoto(photo));
     }
     await prisma.$transaction(async (transaction) => {
-      const progressReport = await transaction.projectWorkPointProgress.create({
-        data: {
+      const existingProgress = await transaction.projectWorkPointProgress.findFirst({
+        where: {
           workPointId,
-          reportDate: new Date(`${parsed.data.reportDate}T00:00:00.000Z`),
-          progress: parsed.data.progress,
-          workSummary: parsed.data.workSummary || null,
+          reportDate: { gte: reportDateStart, lt: reportDateEndExclusive },
         },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
       });
+      const progressReport = existingProgress
+        ? await transaction.projectWorkPointProgress.update({
+            where: { id: existingProgress.id },
+            data: {
+              progress: parsed.data.progress,
+              workSummary: parsed.data.workSummary || null,
+            },
+          })
+        : await transaction.projectWorkPointProgress.create({
+            data: {
+              workPointId,
+              reportDate: reportDateStart,
+              progress: parsed.data.progress,
+              workSummary: parsed.data.workSummary || null,
+            },
+          });
       if (storedPhotos.length > 0) {
         await transaction.projectWorkPointProgressPhoto.createMany({
           data: storedPhotos.map((photo) => ({
@@ -1012,9 +1074,21 @@ export async function addProjectWorkPointProgress(
         where: { id: workPointId },
         data: { progress: parsed.data.progress },
       });
+      const allPoints = await transaction.projectWorkPoint.findMany({
+        where: { projectId: workPoint.projectId },
+        select: {
+          progress: true,
+          proposedTotalWage: true,
+          approvedTotalWage: true,
+        },
+      });
+      await transaction.project.update({
+        where: { id: workPoint.projectId },
+        data: { progress: calculateWeightedProjectProgress(allPoints) },
+      });
     });
     transactionCommitted = true;
-    revalidatePath("/apps/project");
+    revalidateProjectReportPaths(workPoint.projectId);
     return { success: true, message: "Progres titik dan foto berhasil dikirim." };
   } catch (error) {
     if (!transactionCommitted) {
@@ -1205,6 +1279,11 @@ export async function editApprovedProjectWorkPointWage(
   }
 }
 
+const progressWorkEntrySchema = z.object({
+  workPointId: z.string().trim().min(1).max(100),
+  dailyVolume: z.coerce.number().finite().positive("Volume harian harus lebih besar dari nol."),
+});
+
 const projectProgressSchema = z
   .object({
     reportDate: z.iso.date(),
@@ -1221,30 +1300,62 @@ const projectProgressSchema = z
       (value) => (value === "" || value === null ? undefined : value),
       z.coerce.number().finite().positive().optional(),
     ),
-    workSummary: z.string().trim().min(1).max(2000),
+    entries: z.array(progressWorkEntrySchema).optional().default([]),
+    workSummary: z.preprocess(
+      (value) => (typeof value === "string" ? value.trim() : ""),
+      z.string().max(2000),
+    ),
     weather: z.enum(["Cerah", "Hujan Gerimis", "Hujan Lebat", "Mendung"]),
     workersCount: z.coerce.number().int().min(0).max(100000),
+    issueNotes: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() ? value.trim() : undefined,
+      z.string().max(2000).optional(),
+    ),
+    k3SafetyLog: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() ? value.trim() : undefined,
+      z.string().max(2000).optional(),
+    ),
+    noWorkReason: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() ? value.trim() : undefined,
+      z.string().max(200).optional(),
+    ),
   })
   .superRefine((value, context) => {
-    if (value.workPointId && value.dailyVolume === undefined) {
+    const hasEntries = value.entries.length > 0;
+    if (!hasEntries && value.workPointId && value.dailyVolume === undefined) {
       context.addIssue({
         code: "custom",
         path: ["dailyVolume"],
         message: "Volume yang selesai hari ini wajib diisi.",
       });
     }
-    if (!value.workPointId && value.progress === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["progress"],
-        message: "Pilih item pekerjaan atau isi progres kumulatif proyek.",
-      });
-    }
-    if (!value.workPointId && value.dailyVolume !== undefined) {
+    if (!hasEntries && !value.workPointId && value.dailyVolume !== undefined) {
       context.addIssue({
         code: "custom",
         path: ["workPointId"],
         message: "Pilih item pekerjaan untuk mencatat volume harian.",
+      });
+    }
+    if (
+      !value.noWorkReason &&
+      !hasEntries &&
+      !value.workPointId &&
+      value.progress === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["progress"],
+        message: "Pilih item pekerjaan, isi progres kumulatif proyek, atau cantumkan alasan non-kerja.",
+      });
+    }
+    if (!value.noWorkReason && !hasEntries && value.workSummary.length < 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["workSummary"],
+        message: "Ringkasan pekerjaan hari ini wajib diisi.",
       });
     }
   });
@@ -1256,6 +1367,154 @@ const progressUpdateRoles: UserRole[] = [
   UserRole.KOORDINATOR,
   UserRole.FIELD_TEAM,
 ];
+
+function parseDailyProgressEntriesFromFormData(input: FormData): {
+  ok: true;
+  entries: Array<{ workPointId: string; dailyVolume: number }>;
+} | {
+  ok: false;
+  message: string;
+} {
+  if (!input.has("entries")) {
+    return { ok: true, entries: [] };
+  }
+  const rawValues = input.getAll("entries").filter((v) => typeof v === "string");
+  if (rawValues.length === 0) {
+    return { ok: true, entries: [] };
+  }
+
+  let rawParsed: unknown[] = [];
+  try {
+    if (rawValues.length === 1) {
+      const trimmed = (rawValues[0] as string).trim();
+      if (!trimmed) return { ok: true, entries: [] };
+      const parsedJson = JSON.parse(trimmed);
+      rawParsed = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+    } else {
+      rawParsed = rawValues.map((v) => JSON.parse(String(v)));
+    }
+  } catch {
+    return {
+      ok: false,
+      message: "Format daftar item pekerjaan harian tidak valid.",
+    };
+  }
+
+  const parsedEntries = z.array(progressWorkEntrySchema).safeParse(rawParsed);
+  if (!parsedEntries.success) {
+    return {
+      ok: false,
+      message:
+        parsedEntries.error.issues[0]?.message ??
+        "Daftar item pekerjaan harian tidak valid.",
+    };
+  }
+
+  const seenIds = new Set<string>();
+  for (const entry of parsedEntries.data) {
+    if (seenIds.has(entry.workPointId)) {
+      return {
+        ok: false,
+        message: "Setiap item pekerjaan hanya boleh dicatat satu kali dalam satu laporan.",
+      };
+    }
+    seenIds.add(entry.workPointId);
+  }
+
+  return { ok: true, entries: parsedEntries.data };
+}
+
+function extractDailyVolumeFromSummary(
+  workSummary: string | null | undefined,
+): number {
+  if (!workSummary) return 0;
+  const match = workSummary.match(/Volume hari ini:\s*\+?(\d+(?:\.\d+)?)/i);
+  if (!match) return 0;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function isAutoGeneratedSummary(summary: string | null | undefined): boolean {
+  if (!summary) return false;
+  const trimmed = summary.trim();
+  return (
+    /^Laporan Progres (Harian|Jadwal):/i.test(trimmed) ||
+    /^Opname (Harian|Mingguan)/i.test(trimmed)
+  );
+}
+
+function mergeDailyWorkSummary(
+  existingSummary: string | null | undefined,
+  nextSegments: Array<{ itemTitle?: string; line: string }>,
+  generalSummary?: string,
+): string {
+  const existingLines =
+    existingSummary && !isAutoGeneratedSummary(existingSummary)
+      ? existingSummary
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+      : [];
+
+  const resultLines = [...existingLines];
+  for (const segment of nextSegments) {
+    if (segment.itemTitle) {
+      const prefix = `• ${segment.itemTitle}:`;
+      const existingIndex = resultLines.findIndex((line) =>
+        line.startsWith(prefix),
+      );
+      if (existingIndex >= 0) {
+        resultLines[existingIndex] = segment.line;
+      } else {
+        resultLines.push(segment.line);
+      }
+    } else if (!resultLines.includes(segment.line)) {
+      resultLines.push(segment.line);
+    }
+  }
+
+  if (generalSummary && nextSegments.length > 1) {
+    const noteLine = `Ringkasan: ${generalSummary}`;
+    const existingNoteIdx = resultLines.findIndex((l) =>
+      l.startsWith("Ringkasan:"),
+    );
+    if (existingNoteIdx >= 0) {
+      resultLines[existingNoteIdx] = noteLine;
+    } else {
+      resultLines.push(noteLine);
+    }
+  }
+
+  return resultLines.join("\n").slice(0, 4000);
+}
+
+function mergeDailyNotes(
+  existingNotes: string | null | undefined,
+  options: { issueNotes?: string; noWorkReason?: string },
+): string | null {
+  const lines = existingNotes
+    ? existingNotes
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : [];
+
+  if (options.noWorkReason) {
+    const noWorkLine = `[Alasan Non-Kerja: ${options.noWorkReason}]`;
+    const idx = lines.findIndex((line) => line.startsWith("[Alasan Non-Kerja:"));
+    if (idx >= 0) lines[idx] = noWorkLine;
+    else lines.push(noWorkLine);
+  }
+  if (options.issueNotes) {
+    const issueLine = `[Kendala/Hambatan] ${options.issueNotes}`;
+    if (!lines.includes(issueLine)) {
+      lines.push(issueLine);
+    }
+  }
+
+  if (lines.length === 0) return null;
+  return lines.join("\n").slice(0, 4000);
+}
 
 export async function addProjectProgress(
   projectId: string,
@@ -1289,27 +1548,65 @@ export async function addProjectProgress(
     if (!(entry instanceof File)) {
       return { success: false, message: "Data foto tidak valid." };
     }
+    if (entry.size === 0 && !entry.name) continue;
     photos.push(entry);
   }
 
+  const parsedEntriesResult = parseDailyProgressEntriesFromFormData(input);
+  if (!parsedEntriesResult.ok) {
+    return { success: false, message: parsedEntriesResult.message };
+  }
+
+  const rawReportDate = input.get("reportDate");
+  const normalizedReportDateInput =
+    typeof rawReportDate === "string" && rawReportDate.trim()
+      ? rawReportDate.trim()
+      : getJakartaDateKey();
+
   const parsed = projectProgressSchema.safeParse({
-    reportDate: input.get("reportDate"),
+    reportDate: normalizedReportDateInput,
     progress: input.get("progress"),
     workPointId: input.get("workPointId"),
     dailyVolume: input.get("dailyVolume"),
-    workSummary: input.get("workSummary"),
+    entries: parsedEntriesResult.entries,
+    workSummary: input.get("workSummary") ?? "",
     weather: input.get("weather"),
     workersCount: input.get("workersCount"),
+    issueNotes: input.get("issueNotes") ?? input.get("notes") ?? undefined,
+    k3SafetyLog: input.get("k3SafetyLog") ?? undefined,
+    noWorkReason: input.get("noWorkReason") ?? undefined,
   });
-  if (!parsed.success) {
+  if (!parsed.success || !isValidDateKey(parsed.data.reportDate)) {
     return {
       success: false,
-      message: parsed.error.issues[0]?.message ?? "Data progres tidak valid.",
+      message: !parsed.success
+        ? (parsed.error.issues[0]?.message ?? "Data progres tidak valid.")
+        : "Tanggal laporan tidak valid.",
     };
   }
 
   const values = parsed.data;
-  const reportDate = new Date(`${values.reportDate}T00:00:00.000Z`);
+  const dateKey = values.reportDate;
+  const { start: reportDate, endExclusive: reportDateEndExclusive } =
+    getJakartaDayRange(dateKey);
+
+  const workEntries: Array<{ workPointId: string; dailyVolume: number }> =
+    values.entries.length > 0
+      ? values.entries
+      : values.workPointId && values.dailyVolume !== undefined
+        ? [{ workPointId: values.workPointId, dailyVolume: values.dailyVolume }]
+        : [];
+
+  const hasPositiveWork =
+    workEntries.length > 0 ||
+    (values.progress !== undefined && values.progress > 0);
+  if (!values.noWorkReason && hasPositiveWork && values.workersCount < 1) {
+    return {
+      success: false,
+      message: "Jumlah pekerja hadir minimal 1 orang pada hari kerja dengan progres.",
+    };
+  }
+
   if (photos.length > 5) {
     return {
       success: false,
@@ -1325,11 +1622,12 @@ export async function addProjectProgress(
         id: projectId,
         isDeleted: false,
         status: {
-          in: [ProjectStatus.RUNNING, ProjectStatus.ON_PROGRESS, ProjectStatus.ACTIVE],
+          in: runningProjectStatuses,
         },
       },
       select: {
         id: true,
+        title: true,
         fieldPicId: true,
         progress: true,
       },
@@ -1347,7 +1645,8 @@ export async function addProjectProgress(
       return { success: false, message: "Hanya PIC proyek yang dapat mengirim laporan harian." };
     }
     if (
-      !values.workPointId &&
+      !values.noWorkReason &&
+      workEntries.length === 0 &&
       values.progress !== undefined &&
       values.progress < project.progress
     ) {
@@ -1362,17 +1661,19 @@ export async function addProjectProgress(
     }
 
     await prisma.$transaction(async (transaction) => {
-      const existingReport = await transaction.dailyReport.findUnique({
+      const existingReport = await transaction.dailyReport.findFirst({
         where: {
-          projectId_reportDate: {
-            projectId,
-            reportDate,
-          },
+          projectId,
+          reportDate: { gte: reportDate, lt: reportDateEndExclusive },
         },
+        orderBy: { createdAt: "asc" },
         select: {
           id: true,
           workPointId: true,
           dailyVolume: true,
+          workSummary: true,
+          notes: true,
+          k3SafetyLog: true,
           _count: { select: { progressPhotos: true } },
         },
       });
@@ -1380,68 +1681,139 @@ export async function addProjectProgress(
         throw new Error("Laporan pada tanggal ini sudah memiliki 5 foto.");
       }
 
-      let reportProgress = clampProjectProgress(
-        values.progress ?? project.progress,
-      );
-      let cumulativeProjectProgress = reportProgress;
-      let dailyVolume: number | null = null;
-      let workPointId: string | null = null;
-      if (values.workPointId) {
-        const workPoint = await transaction.projectWorkPoint.findFirst({
-          where: { id: values.workPointId, projectId },
+      let cumulativeProjectProgress = clampProjectProgress(project.progress);
+      const summarySegments: Array<{ itemTitle?: string; line: string }> = [];
+      let dailyWorkPointId: string | null = existingReport?.workPointId ?? null;
+      let dailyVolumeHeader: number | null = existingReport?.dailyVolume ?? null;
+
+      if (workEntries.length > 0) {
+        const entryIds = workEntries.map((e) => e.workPointId);
+        const workPoints = await transaction.projectWorkPoint.findMany({
+          where: { id: { in: entryIds }, projectId },
           select: {
             id: true,
+            title: true,
             progress: true,
             completedVolume: true,
             proposedVolume: true,
+            proposedUnit: true,
           },
         });
-        if (!workPoint) {
+        const workPointMap = new Map(workPoints.map((wp) => [wp.id, wp]));
+        if (workPointMap.size !== entryIds.length) {
           throw new Error("ITEM_PEKERJAAN_TIDAK_DITEMUKAN");
         }
-        if (
-          existingReport?.workPointId &&
-          existingReport.workPointId !== workPoint.id
-        ) {
-          throw new Error("LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN");
+
+        const sameDayPointProgresses =
+          await transaction.projectWorkPointProgress.findMany({
+            where: {
+              workPointId: { in: entryIds },
+              reportDate: { gte: reportDate, lt: reportDateEndExclusive },
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              workPointId: true,
+              workSummary: true,
+            },
+          });
+        const sameDayByWorkPoint = new Map<
+          string,
+          { id: string; workSummary: string | null }
+        >();
+        for (const row of sameDayPointProgresses) {
+          if (!sameDayByWorkPoint.has(row.workPointId)) {
+            sameDayByWorkPoint.set(row.workPointId, row);
+          }
         }
-        if (!workPoint.proposedVolume) {
-          throw new Error("TARGET_VOLUME_TIDAK_VALID");
+
+        for (const entry of workEntries) {
+          const workPoint = workPointMap.get(entry.workPointId)!;
+          if (!workPoint.proposedVolume) {
+            throw new Error("TARGET_VOLUME_TIDAK_VALID");
+          }
+          const targetVolume = decimalNumberFromScaledInteger(
+            workPoint.proposedVolume,
+          );
+          if (targetVolume <= 0) {
+            throw new Error("TARGET_VOLUME_TIDAK_VALID");
+          }
+
+          const existingSameDay = sameDayByWorkPoint.get(workPoint.id);
+          const alreadyCompleted =
+            workPoint.completedVolume ??
+            (targetVolume * workPoint.progress) / 100;
+          let previousSameDayVolume = extractDailyVolumeFromSummary(
+            existingSameDay?.workSummary,
+          );
+          if (
+            previousSameDayVolume === 0 &&
+            existingReport?.workPointId === workPoint.id &&
+            (existingReport.dailyVolume ?? 0) > 0
+          ) {
+            previousSameDayVolume = existingReport.dailyVolume ?? 0;
+          }
+
+          const completedBeforeToday = Math.max(
+            0,
+            alreadyCompleted - previousSameDayVolume,
+          );
+          const nextCompleted = completedBeforeToday + entry.dailyVolume;
+          if (nextCompleted > targetVolume + 0.000001) {
+            throw new Error("VOLUME_MELEBIHI_TARGET");
+          }
+
+          const clampedCompleted = Math.min(
+            targetVolume,
+            Math.round(nextCompleted * 1000) / 1000,
+          );
+          const pointProgress = clampProjectProgress(
+            Math.round((clampedCompleted / targetVolume) * 1000) / 10,
+          );
+          const unitLabel = workPoint.proposedUnit || "unit";
+          const perPointSummary = `Volume hari ini: +${entry.dailyVolume} ${unitLabel} (${pointProgress}%)${
+            workEntries.length === 1 && values.workSummary
+              ? ` · ${values.workSummary}`
+              : ""
+          }`;
+
+          await transaction.projectWorkPoint.update({
+            where: { id: workPoint.id },
+            data: {
+              completedVolume: clampedCompleted,
+              progress: pointProgress,
+            },
+          });
+
+          if (existingSameDay) {
+            await transaction.projectWorkPointProgress.update({
+              where: { id: existingSameDay.id },
+              data: {
+                progress: pointProgress,
+                workSummary: perPointSummary,
+              },
+            });
+          } else {
+            await transaction.projectWorkPointProgress.create({
+              data: {
+                workPointId: workPoint.id,
+                reportDate,
+                progress: pointProgress,
+                workSummary: perPointSummary,
+              },
+            });
+          }
+
+          summarySegments.push({
+            itemTitle: workPoint.title,
+            line: `• ${workPoint.title}: +${entry.dailyVolume} ${unitLabel} (${pointProgress}%)${
+              workEntries.length === 1 && values.workSummary
+                ? ` — ${values.workSummary}`
+                : ""
+            }`,
+          });
         }
-        if (values.dailyVolume === undefined) {
-          throw new Error("VOLUME_HARIAN_TIDAK_VALID");
-        }
-        const targetVolume = decimalNumberFromScaledInteger(
-          workPoint.proposedVolume,
-        );
-        const alreadyCompleted =
-          workPoint.completedVolume ??
-          (targetVolume * workPoint.progress) / 100;
-        const previousSameDayVolume =
-          existingReport?.workPointId === workPoint.id
-            ? existingReport.dailyVolume ?? 0
-            : 0;
-        const completedBeforeToday = Math.max(
-          0,
-          alreadyCompleted - previousSameDayVolume,
-        );
-        const nextCompleted =
-          completedBeforeToday + values.dailyVolume;
-        if (nextCompleted > targetVolume + 0.000001) {
-          throw new Error("VOLUME_MELEBIHI_TARGET");
-        }
-        dailyVolume = values.dailyVolume;
-        workPointId = workPoint.id;
-        reportProgress =
-          Math.round((Math.min(nextCompleted, targetVolume) / targetVolume) * 1000) /
-          10;
-        await transaction.projectWorkPoint.update({
-          where: { id: workPoint.id },
-          data: {
-            completedVolume: Math.min(nextCompleted, targetVolume),
-            progress: reportProgress,
-          },
-        });
+
         const updatedPoints = await transaction.projectWorkPoint.findMany({
           where: { projectId },
           select: {
@@ -1458,10 +1830,40 @@ export async function addProjectProgress(
             progress: cumulativeProjectProgress,
           },
         });
-      } else {
-        if (existingReport?.workPointId) {
-          throw new Error("LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN");
+
+        const sameDayDistinctPoints =
+          await transaction.projectWorkPointProgress.findMany({
+            where: {
+              workPoint: { projectId },
+              reportDate: { gte: reportDate, lt: reportDateEndExclusive },
+            },
+            select: { workPointId: true },
+          });
+        const uniqueWorkPointIdsToday = new Set(
+          sameDayDistinctPoints.map((r) => r.workPointId),
+        );
+        const isSingleItemDay =
+          uniqueWorkPointIdsToday.size === 1 &&
+          workEntries.length === 1 &&
+          (!existingReport?.workPointId ||
+            existingReport.workPointId === workEntries[0].workPointId);
+        if (isSingleItemDay) {
+          dailyWorkPointId = workEntries[0].workPointId;
+          dailyVolumeHeader = workEntries[0].dailyVolume;
+        } else {
+          dailyWorkPointId = null;
+          dailyVolumeHeader = null;
         }
+      } else if (values.noWorkReason) {
+        dailyWorkPointId = existingReport?.workPointId ?? null;
+        dailyVolumeHeader = existingReport?.dailyVolume ?? null;
+        cumulativeProjectProgress = clampProjectProgress(project.progress);
+        summarySegments.push({
+          line: `Hari non-kerja (${values.noWorkReason})${
+            values.workSummary ? ` — ${values.workSummary}` : ""
+          }`,
+        });
+      } else {
         if (values.progress === undefined) {
           throw new Error("PROGRES_KUMULATIF_TIDAK_VALID");
         }
@@ -1473,36 +1875,53 @@ export async function addProjectProgress(
         if (updatedProject.count !== 1) {
           throw new Error("PROGRESS_CANNOT_DECREASE");
         }
-        reportProgress = newProjectProgress;
         cumulativeProjectProgress = newProjectProgress;
+        if (values.workSummary) {
+          summarySegments.push({ line: values.workSummary });
+        }
       }
 
-      const report = await transaction.dailyReport.upsert({
-        where: {
-          projectId_reportDate: {
-            projectId,
-            reportDate,
-          },
-        },
-        create: {
-          projectId,
-          reportDate,
-          workPointId,
-          dailyVolume,
-          progress: cumulativeProjectProgress,
-          workSummary: values.workSummary || null,
-          weather: values.weather,
-          workersCount: values.workersCount,
-        },
-        update: {
-          workPointId,
-          dailyVolume,
-          progress: cumulativeProjectProgress,
-          workSummary: values.workSummary || null,
-          weather: values.weather,
-          workersCount: values.workersCount,
-        },
+      const mergedWorkSummary = mergeDailyWorkSummary(
+        existingReport?.workSummary,
+        summarySegments,
+        workEntries.length > 1 ? values.workSummary : undefined,
+      );
+      const mergedNotes = mergeDailyNotes(existingReport?.notes, {
+        issueNotes: values.issueNotes,
+        noWorkReason: values.noWorkReason,
       });
+      const nextK3SafetyLog =
+        values.k3SafetyLog ?? existingReport?.k3SafetyLog ?? null;
+
+      const report = existingReport
+        ? await transaction.dailyReport.update({
+            where: { id: existingReport.id },
+            data: {
+              workPointId: dailyWorkPointId,
+              dailyVolume: dailyVolumeHeader,
+              progress: cumulativeProjectProgress,
+              workSummary: mergedWorkSummary || null,
+              notes: mergedNotes,
+              k3SafetyLog: nextK3SafetyLog,
+              weather: values.weather,
+              workersCount: values.workersCount,
+            },
+          })
+        : await transaction.dailyReport.create({
+            data: {
+              projectId,
+              reportDate,
+              workPointId: dailyWorkPointId,
+              dailyVolume: dailyVolumeHeader,
+              progress: cumulativeProjectProgress,
+              workSummary: mergedWorkSummary || null,
+              notes: mergedNotes,
+              k3SafetyLog: nextK3SafetyLog,
+              weather: values.weather,
+              workersCount: values.workersCount,
+            },
+          });
+
       if (storedPhotos.length > 0) {
         await transaction.projectProgressPhoto.createMany({
           data: storedPhotos.map((photo) => ({
@@ -1513,11 +1932,37 @@ export async function addProjectProgress(
           })),
         });
       }
+
+      const hasIssue = Boolean(values.issueNotes || values.noWorkReason);
+      const notifTitle = (
+        hasIssue
+          ? `Laporan Harian (Kendala): ${project.title}`
+          : `Laporan Progres Harian: ${project.title}`
+      ).slice(0, 180);
+      const notifMessage = [
+        `${session.user.name ?? "Tim Lapangan"} mengisi laporan harian (${dateKey}) — progres proyek ${cumulativeProjectProgress}%.`,
+        values.noWorkReason ? `Status: ${values.noWorkReason}.` : null,
+        values.issueNotes ? `Kendala: ${values.issueNotes}` : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 2000);
+
+      await sendNotification({
+        roleTarget: [
+          UserRole.KOORDINATOR,
+          UserRole.DIRECTOR,
+          UserRole.DEPUTY_DIRECTOR,
+        ],
+        title: notifTitle,
+        message: notifMessage,
+        actionUrl: `/apps/projects/${encodeURIComponent(projectId)}`,
+        type: hasIssue ? NotificationType.WARNING : NotificationType.INFO,
+        database: transaction,
+      });
     });
     transactionCommitted = true;
-    revalidatePath("/apps/project");
-    revalidatePath("/apps/projects");
-    revalidatePath("/apps/habits");
+    revalidateProjectReportPaths(projectId);
     return { success: true, message: "Progres proyek berhasil diperbarui." };
   } catch (error) {
     if (!transactionCommitted) {
@@ -1542,16 +1987,6 @@ export async function addProjectProgress(
       return {
         success: false,
         message: "Volume hari ini melebihi sisa target pekerjaan.",
-      };
-    }
-    if (
-      error instanceof Error &&
-      error.message === "LAPORAN_TANGGAL_TERKAIT_ITEM_LAIN"
-    ) {
-      return {
-        success: false,
-        message:
-          "Laporan pada tanggal ini sudah terkait item pekerjaan lain. Gunakan item yang sama atau ubah tanggal laporan.",
       };
     }
     if (
@@ -1589,6 +2024,16 @@ export async function addProjectProgress(
     }
     if (error instanceof PrivatePhotoValidationError) {
       return { success: false, message: error.message };
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes("Koneksi database MongoDB tidak tersedia")
+    ) {
+      return {
+        success: false,
+        message:
+          "Koneksi database terputus. Laporan tidak dapat disimpan ke server — simpan ke antrean offline terlebih dahulu.",
+      };
     }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -1749,6 +2194,10 @@ export async function saveProjectRab(
     };
   }
 
+  const isDirectorApprover =
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR;
+
   try {
     const activeItems = input.items.filter((item) => {
       const explicitTotal = Number((item as any).totalPrice ?? 0);
@@ -1809,12 +2258,13 @@ export async function saveProjectRab(
           existingByTitle.get(fullTitle.toLowerCase())?.id;
 
         if (targetExistingId) {
-          const existing = await tx.projectWorkPoint.findUnique({
-            where: { id: targetExistingId },
-            select: { id: true },
+          const existing = await tx.projectWorkPoint.findFirst({
+            where: { id: targetExistingId, projectId },
+            select: { id: true, proposedTotalWage: true },
           });
           if (existing) {
             keptIds.add(existing.id);
+            const wageChanged = existing.proposedTotalWage !== proposedTotalWage;
             await tx.projectWorkPoint.update({
               where: { id: existing.id },
               data: {
@@ -1824,9 +2274,21 @@ export async function saveProjectRab(
                 proposedUnit: item.unit || "paket",
                 proposedUnitPrice,
                 proposedTotalWage,
-                approvedTotalWage: proposedTotalWage,
-                plannedStartDate: item.startDate ? new Date(item.startDate) : null,
-                targetDate: item.endDate ? new Date(item.endDate) : null,
+                ...(isDirectorApprover
+                  ? {
+                      approvedTotalWage: proposedTotalWage,
+                      wageApprovedById: session.user.id,
+                      wageApprovedAt: new Date(),
+                    }
+                  : wageChanged
+                    ? {
+                        approvedTotalWage: null,
+                        wageApprovedById: null,
+                        wageApprovedAt: null,
+                      }
+                    : {}),
+                plannedStartDate: parseWibDateInput(item.startDate),
+                targetDate: parseWibDateInput(item.endDate),
               },
             });
             continue;
@@ -1842,12 +2304,20 @@ export async function saveProjectRab(
             proposedUnit: item.unit || "paket",
             proposedUnitPrice,
             proposedTotalWage,
-            approvedTotalWage: proposedTotalWage,
-            plannedStartDate: item.startDate ? new Date(item.startDate) : null,
-            targetDate: item.endDate ? new Date(item.endDate) : null,
+            ...(isDirectorApprover
+              ? {
+                  approvedTotalWage: proposedTotalWage,
+                  wageApprovedById: session.user.id,
+                  wageApprovedAt: new Date(),
+                }
+              : {
+                  approvedTotalWage: null,
+                  wageApprovedById: null,
+                  wageApprovedAt: null,
+                }),
+            plannedStartDate: parseWibDateInput(item.startDate),
+            targetDate: parseWibDateInput(item.endDate),
             proposedById: session.user.id,
-            wageApprovedById: session.user.id,
-            wageApprovedAt: new Date(),
             progress: 0,
             completedVolume: 0,
           },
@@ -1886,8 +2356,8 @@ export async function saveProjectRab(
           pagu: scaledIntegerFromDecimal(totalRab),
           budget: scaledIntegerFromDecimal(totalRap),
           progress: weightedProgress,
-          ...(firstStartDate ? { startDate: new Date(firstStartDate) } : {}),
-          ...(lastEndDate ? { endDate: new Date(lastEndDate) } : {}),
+          ...(firstStartDate ? { startDate: parseWibDateInput(firstStartDate) } : {}),
+          ...(lastEndDate ? { endDate: parseWibDateInput(lastEndDate) } : {}),
         },
       });
     });
@@ -1924,12 +2394,47 @@ export async function recordProjectOpname(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mencatat progres opname." };
   }
-  if (!projectId) {
+  if (!progressUpdateRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan mencatat progres opname.",
+    };
+  }
+  if (
+    typeof projectId !== "string" ||
+    projectId.length < 1 ||
+    projectId.length > 100
+  ) {
     return { success: false, message: "ID Proyek tidak valid." };
   }
 
+  const dateKey = toJakartaDateKey(input.reportDate);
+  if (!dateKey) {
+    return { success: false, message: "Tanggal laporan opname tidak valid." };
+  }
+  const { start: reportDate, endExclusive: reportDateEndExclusive } =
+    getJakartaDayRange(dateKey);
+
   try {
-    const reportDate = new Date(input.reportDate);
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true, fieldPicId: true, status: true },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan atau sudah diarsipkan." };
+    }
+    if (
+      isFieldPicRole(session.user.role) &&
+      project.fieldPicId !== session.user.id
+    ) {
+      return { success: false, message: "Hanya PIC proyek yang dapat mencatat progres opname." };
+    }
+    if (!runningProjectStatuses.includes(project.status)) {
+      return {
+        success: false,
+        message: "Progres opname hanya dapat dicatat pada proyek yang sedang berjalan (RUNNING).",
+      };
+    }
 
     await prisma.$transaction(async (tx) => {
       const workPoints = await tx.projectWorkPoint.findMany({
@@ -1946,28 +2451,55 @@ export async function recordProjectOpname(
       });
 
       const wpMap = new Map(workPoints.map((wp) => [wp.id, wp]));
+      const targetWpIds = input.items
+        .map((it) => it.workPointId)
+        .filter((id) => wpMap.has(id));
+      const sameDayExisting =
+        targetWpIds.length > 0
+          ? await tx.projectWorkPointProgress.findMany({
+              where: {
+                workPointId: { in: targetWpIds },
+                reportDate: { gte: reportDate, lt: reportDateEndExclusive },
+              },
+              orderBy: { createdAt: "desc" },
+              select: { id: true, workPointId: true },
+            })
+          : [];
+      const sameDayByWp = new Map<string, string>();
+      for (const row of sameDayExisting) {
+        if (!sameDayByWp.has(row.workPointId)) {
+          sameDayByWp.set(row.workPointId, row.id);
+        }
+      }
 
       for (const opnameItem of input.items) {
+        if (!Number.isFinite(opnameItem.volume) || opnameItem.volume < 0) {
+          throw new Error("VOLUME_OPNAME_TIDAK_VALID");
+        }
         const wp = wpMap.get(opnameItem.workPointId);
         if (!wp) continue;
 
         const targetVol = wp.proposedVolume
           ? decimalNumberFromScaledInteger(wp.proposedVolume)
           : 1;
+        const effectiveTarget = targetVol > 0 ? targetVol : 1;
         const currentCompleted = wp.completedVolume ?? 0;
-        const newCompleted = input.isAdditional
+        const rawCompleted = input.isAdditional
           ? currentCompleted + opnameItem.volume
           : opnameItem.volume;
+        const clampedCompleted = Math.min(
+          effectiveTarget,
+          Math.max(0, Math.round(rawCompleted * 1000) / 1000),
+        );
 
-        const progressPercent =
-          targetVol > 0
-            ? Math.min(100, Math.round((newCompleted / targetVol) * 1000) / 10)
-            : 100;
+        const progressPercent = clampProjectProgress(
+          Math.round((clampedCompleted / effectiveTarget) * 1000) / 10,
+        );
 
         await tx.projectWorkPoint.update({
           where: { id: wp.id },
           data: {
-            completedVolume: Math.max(0, newCompleted),
+            completedVolume: clampedCompleted,
             progress: progressPercent,
           },
         });
@@ -1975,15 +2507,27 @@ export async function recordProjectOpname(
         const periodLabel = input.periodType === "WEEKLY"
           ? `Opname Mingguan ${input.weekNumber ? `Minggu ke-${input.weekNumber}` : ""}`
           : "Opname Harian";
+        const itemSummary = `${periodLabel}: ${clampedCompleted} ${wp.proposedUnit || ""} (${progressPercent}%)`;
 
-        await tx.projectWorkPointProgress.create({
-          data: {
-            workPointId: wp.id,
-            reportDate,
-            progress: progressPercent,
-            workSummary: `${periodLabel}: ${newCompleted} ${wp.proposedUnit || ""} (${progressPercent}%)`,
-          },
-        });
+        const existingPointProgressId = sameDayByWp.get(wp.id);
+        if (existingPointProgressId) {
+          await tx.projectWorkPointProgress.update({
+            where: { id: existingPointProgressId },
+            data: {
+              progress: progressPercent,
+              workSummary: itemSummary,
+            },
+          });
+        } else {
+          await tx.projectWorkPointProgress.create({
+            data: {
+              workPointId: wp.id,
+              reportDate,
+              progress: progressPercent,
+              workSummary: itemSummary,
+            },
+          });
+        }
       }
 
       const updatedPoints = await tx.projectWorkPoint.findMany({
@@ -2007,32 +2551,52 @@ export async function recordProjectOpname(
         ? `Opname Mingguan ${input.weekNumber ? `(Minggu ke-${input.weekNumber})` : ""}: Progres proyek mencapai ${roundedOverallProgress}%`
         : `Laporan Progres Harian: Progres proyek mencapai ${roundedOverallProgress}%`;
 
-      await tx.dailyReport.upsert({
+      const existingDailyReport = await tx.dailyReport.findFirst({
         where: {
-          projectId_reportDate: {
+          projectId,
+          reportDate: { gte: reportDate, lt: reportDateEndExclusive },
+        },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, workSummary: true, notes: true },
+      });
+
+      if (existingDailyReport) {
+        const hasManualSummary = Boolean(
+          existingDailyReport.workSummary?.trim() &&
+            !isAutoGeneratedSummary(existingDailyReport.workSummary),
+        );
+        const nextNotes = input.notes?.trim()
+          ? mergeDailyNotes(existingDailyReport.notes, {
+              issueNotes: input.notes.trim(),
+            })
+          : undefined;
+        await tx.dailyReport.update({
+          where: { id: existingDailyReport.id },
+          data: {
+            progress: roundedOverallProgress,
+            ...(hasManualSummary ? {} : { workSummary: summaryText }),
+            ...(nextNotes !== undefined ? { notes: nextNotes } : {}),
+          },
+        });
+      } else {
+        await tx.dailyReport.create({
+          data: {
             projectId,
             reportDate,
+            progress: roundedOverallProgress,
+            workSummary: summaryText,
+            notes: input.notes?.trim() || null,
           },
-        },
-        create: {
-          projectId,
-          reportDate,
-          progress: roundedOverallProgress,
-          workSummary: summaryText,
-          notes: input.notes?.trim() || null,
-        },
-        update: {
-          progress: roundedOverallProgress,
-          workSummary: summaryText,
-          notes: input.notes?.trim() || undefined,
-        },
-      });
+        });
+      }
     });
 
-    revalidatePath("/apps/projects/" + projectId);
-    revalidatePath("/apps/projects");
+    revalidateProjectReportPaths(projectId);
     return { success: true, message: "Progres opname berhasil disimpan." };
   } catch (error) {
+    if (error instanceof Error && error.message === "VOLUME_OPNAME_TIDAK_VALID") {
+      return { success: false, message: "Volume opname tidak boleh bernilai negatif." };
+    }
     console.error("Record project opname failed:", error);
     return { success: false, message: "Gagal mencatat progres opname." };
   }
@@ -2056,13 +2620,43 @@ export async function saveProjectScheduleTask(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengelola jadwal task." };
   }
-  if (!projectId) {
+  if (!progressUpdateRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan mengelola jadwal task.",
+    };
+  }
+  if (
+    typeof projectId !== "string" ||
+    projectId.length < 1 ||
+    projectId.length > 100
+  ) {
     return { success: false, message: "ID Proyek tidak valid." };
+  }
+  if (!input.title || !input.title.trim()) {
+    return { success: false, message: "Judul task jadwal wajib diisi." };
   }
 
   try {
-    const startDate = input.plannedStartDate ? new Date(input.plannedStartDate) : null;
-    const endDate = input.targetDate ? new Date(input.targetDate) : null;
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true, fieldPicId: true, status: true },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan atau sudah diarsipkan." };
+    }
+    if (
+      isFieldPicRole(session.user.role) &&
+      project.fieldPicId !== session.user.id
+    ) {
+      return {
+        success: false,
+        message: "Hanya PIC proyek yang dapat mengelola jadwal task proyek ini.",
+      };
+    }
+
+    const startDate = parseWibDateInput(input.plannedStartDate);
+    const endDate = parseWibDateInput(input.targetDate);
     if (input.progress !== undefined && !Number.isFinite(input.progress)) {
       return { success: false, message: "Progress harus berupa angka valid." };
     }
@@ -2070,111 +2664,152 @@ export async function saveProjectScheduleTask(
       typeof input.progress === "number" ? input.progress : 0,
     );
 
-    let targetWpId = input.id;
-    let computedCompletedVolume: number | null = null;
+    if (progressVal > 0 && !runningProjectStatuses.includes(project.status)) {
+      return {
+        success: false,
+        message: "Progres task hanya dapat diperbarui setelah proyek berstatus RUNNING.",
+      };
+    }
 
-    if (input.id) {
-      const existingWp = await prisma.projectWorkPoint.findUnique({
-        where: { id: input.id },
-        select: { id: true, proposedVolume: true, proposedUnit: true, title: true },
-      });
+    const todayKey = getJakartaDateKey();
+    const { start: reportDate, endExclusive: reportDateEndExclusive } =
+      getJakartaDayRange(todayKey);
 
-      if (existingWp) {
+    const txResult = await prisma.$transaction(async (tx) => {
+      let targetWpId = input.id;
+      let computedCompletedVolume: number | null = null;
+
+      if (input.id) {
+        const existingWp = await tx.projectWorkPoint.findFirst({
+          where: { id: input.id, projectId },
+          select: { id: true, proposedVolume: true, proposedUnit: true, title: true },
+        });
+        if (!existingWp) {
+          throw new Error("TASK_TIDAK_DITEMUKAN");
+        }
+
         const targetVol = existingWp.proposedVolume
           ? decimalNumberFromScaledInteger(existingWp.proposedVolume)
           : 1;
         computedCompletedVolume = Math.round(targetVol * (progressVal / 100) * 1000) / 1000;
+
+        await tx.projectWorkPoint.update({
+          where: { id: existingWp.id },
+          data: {
+            title: input.title.trim(),
+            location: input.location,
+            plannedStartDate: startDate,
+            targetDate: endDate,
+            progress: progressVal,
+            completedVolume: computedCompletedVolume,
+          },
+        });
+      } else {
+        const created = await tx.projectWorkPoint.create({
+          data: {
+            projectId,
+            title: input.title.trim(),
+            location: input.location || "A. Persiapan",
+            plannedStartDate: startDate,
+            targetDate: endDate,
+            progress: progressVal,
+            completedVolume: Math.round((progressVal / 100) * 1000) / 1000,
+            proposedVolume: BigInt(1000), // scaled decimal 1.000
+            proposedUnit: "paket",
+            proposedUnitPrice: BigInt(0),
+            proposedTotalWage: BigInt(0),
+            proposedById: session.user.id,
+          },
+        });
+        targetWpId = created.id;
       }
 
-      await prisma.projectWorkPoint.update({
-        where: { id: input.id },
-        data: {
-          title: input.title,
-          location: input.location,
-          plannedStartDate: startDate,
-          targetDate: endDate,
-          progress: progressVal,
-          ...(computedCompletedVolume !== null ? { completedVolume: computedCompletedVolume } : {}),
+      let progressReportId: string | null = null;
+      if (targetWpId) {
+        const existingPointProgress = await tx.projectWorkPointProgress.findFirst({
+          where: {
+            workPointId: targetWpId,
+            reportDate: { gte: reportDate, lt: reportDateEndExclusive },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+        const progressReport = existingPointProgress
+          ? await tx.projectWorkPointProgress.update({
+              where: { id: existingPointProgress.id },
+              data: {
+                progress: progressVal,
+                workSummary: `Progres jadwal: ${progressVal}%`,
+              },
+            })
+          : await tx.projectWorkPointProgress.create({
+              data: {
+                workPointId: targetWpId,
+                reportDate,
+                progress: progressVal,
+                workSummary: `Progres jadwal: ${progressVal}%`,
+              },
+            });
+        progressReportId = progressReport.id;
+      }
+
+      const updatedPoints = await tx.projectWorkPoint.findMany({
+        where: { projectId },
+        select: {
+          progress: true,
+          proposedTotalWage: true,
+          approvedTotalWage: true,
         },
       });
-    } else {
-      const created = await prisma.projectWorkPoint.create({
+
+      const roundedOverallProgress =
+        calculateWeightedProjectProgress(updatedPoints);
+      await tx.project.update({
+        where: { id: projectId },
         data: {
+          progress: roundedOverallProgress,
+        },
+      });
+
+      const summaryText = `Laporan Progres Jadwal: Progres proyek mencapai ${roundedOverallProgress}%`;
+      const existingDailyReport = await tx.dailyReport.findFirst({
+        where: {
           projectId,
-          title: input.title,
-          location: input.location || "A. Persiapan",
-          plannedStartDate: startDate,
-          targetDate: endDate,
-          progress: progressVal,
-          proposedVolume: BigInt(1000), // scaled decimal 1.000
-          proposedUnit: "paket",
-          proposedUnitPrice: BigInt(0),
-          proposedTotalWage: BigInt(0),
-          proposedById: session.user.id,
+          reportDate: { gte: reportDate, lt: reportDateEndExclusive },
         },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, workSummary: true },
       });
-      targetWpId = created.id;
-    }
 
-    // Rekam riwayat progres tanggal hari ini
-    const reportDate = new Date(`${getJakartaDateKey()}T00:00:00.000Z`);
+      if (existingDailyReport) {
+        const hasManualSummary = Boolean(
+          existingDailyReport.workSummary?.trim() &&
+            !isAutoGeneratedSummary(existingDailyReport.workSummary),
+        );
+        await tx.dailyReport.update({
+          where: { id: existingDailyReport.id },
+          data: {
+            progress: roundedOverallProgress,
+            ...(hasManualSummary ? {} : { workSummary: summaryText }),
+          },
+        });
+      } else {
+        await tx.dailyReport.create({
+          data: {
+            projectId,
+            reportDate,
+            progress: roundedOverallProgress,
+            workSummary: summaryText,
+            notes: input.notes?.trim() || `Update task ${input.title.trim()} (${progressVal}%)`,
+          },
+        });
+      }
 
-    let progressReportId: string | null = null;
-    if (targetWpId) {
-      const progressReport = await prisma.projectWorkPointProgress.create({
-        data: {
-          workPointId: targetWpId,
-          reportDate,
-          progress: progressVal,
-          workSummary: `Progres jadwal: ${progressVal}%`,
-        },
-      });
-      progressReportId = progressReport.id;
-    }
-
-    // Sinkronkan agregat progres proyek & Kurva S
-    const updatedPoints = await prisma.projectWorkPoint.findMany({
-      where: { projectId },
-      select: {
-        progress: true,
-        proposedTotalWage: true,
-        approvedTotalWage: true,
-      },
+      return { targetWpId, progressReportId };
     });
 
-    const roundedOverallProgress =
-      calculateWeightedProjectProgress(updatedPoints);
-    await prisma.project.update({
-      where: { id: projectId },
-      data: {
-        progress: roundedOverallProgress,
-      },
-    });
-
-    const summaryText = `Laporan Progres Jadwal: Progres proyek mencapai ${roundedOverallProgress}%`;
-    await prisma.dailyReport.upsert({
-      where: {
-        projectId_reportDate: {
-          projectId,
-          reportDate,
-        },
-      },
-      create: {
-        projectId,
-        reportDate,
-        progress: roundedOverallProgress,
-        workSummary: summaryText,
-        notes: input.notes?.trim() || `Update task ${input.title} (${progressVal}%)`,
-      },
-      update: {
-        progress: roundedOverallProgress,
-        workSummary: summaryText,
-      },
-    });
-
-    revalidatePath("/apps/projects/schedule");
-    revalidatePath(`/apps/projects/${projectId}`);
-    if (!targetWpId || !progressReportId) {
+    revalidateProjectReportPaths(projectId);
+    if (!txResult.targetWpId || !txResult.progressReportId) {
       return {
         success: false,
         message: "Riwayat progres task gagal disiapkan untuk lampiran.",
@@ -2183,16 +2818,19 @@ export async function saveProjectScheduleTask(
     return {
       success: true,
       message: "Task jadwal berhasil disimpan.",
-      workPointId: targetWpId,
-      progressReportId,
+      workPointId: txResult.targetWpId,
+      progressReportId: txResult.progressReportId,
     };
   } catch (error) {
+    if (error instanceof Error && error.message === "TASK_TIDAK_DITEMUKAN") {
+      return { success: false, message: "Task jadwal tidak ditemukan di proyek ini." };
+    }
     console.error("Save schedule task error:", error);
     return { success: false, message: "Gagal menyimpan task jadwal." };
   }
 }
 
-const MAX_SCHEDULE_PHOTO_BYTES = 100 * 1024 * 1024;
+const MAX_SCHEDULE_PHOTO_BYTES = 10 * 1024 * 1024;
 
 export async function uploadProjectScheduleTaskPhoto(
   input: FormData,
@@ -2200,6 +2838,12 @@ export async function uploadProjectScheduleTaskPhoto(
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengunggah foto." };
+  }
+  if (!progressUpdateRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan mengunggah foto task.",
+    };
   }
   if (!(input instanceof FormData)) {
     return { success: false, message: "Data unggahan tidak valid." };
@@ -2216,6 +2860,14 @@ export async function uploadProjectScheduleTaskPhoto(
     return { success: false, message: "Foto atau laporan task tidak valid." };
   }
 
+  const mimeType = getFinancePaymentProofMimeType(photo);
+  if (!mimeType || mimeType === "application/pdf") {
+    return {
+      success: false,
+      message: "Format foto task harus JPG, PNG, atau WEBP.",
+    };
+  }
+
   let storedPhoto: StoredProjectProgressPhoto | null = null;
   try {
     const report = await prisma.projectWorkPointProgress.findUnique({
@@ -2223,19 +2875,37 @@ export async function uploadProjectScheduleTaskPhoto(
       select: {
         id: true,
         reportDate: true,
-        workPoint: { select: { projectId: true } },
-      },
-    });
-    if (!report) {
-      return { success: false, message: "Riwayat progres task tidak ditemukan." };
-    }
-    const dailyReport = await prisma.dailyReport.findUnique({
-      where: {
-        projectId_reportDate: {
-          projectId: report.workPoint.projectId,
-          reportDate: report.reportDate,
+        workPoint: {
+          select: {
+            projectId: true,
+            project: { select: { isDeleted: true, fieldPicId: true } },
+          },
         },
       },
+    });
+    if (!report || report.workPoint.project.isDeleted) {
+      return { success: false, message: "Riwayat progres task tidak ditemukan." };
+    }
+    if (
+      isFieldPicRole(session.user.role) &&
+      report.workPoint.project.fieldPicId !== session.user.id
+    ) {
+      return {
+        success: false,
+        message: "Anda tidak berhak mengunggah foto untuk proyek ini.",
+      };
+    }
+
+    const reportDateKey =
+      toJakartaDateKey(report.reportDate) ?? getJakartaDateKey();
+    const { start: dayStart, endExclusive: dayEnd } =
+      getJakartaDayRange(reportDateKey);
+    const dailyReport = await prisma.dailyReport.findFirst({
+      where: {
+        projectId: report.workPoint.projectId,
+        reportDate: { gte: dayStart, lt: dayEnd },
+      },
+      orderBy: { createdAt: "asc" },
       select: { id: true },
     });
     if (!dailyReport) {
@@ -2268,8 +2938,7 @@ export async function uploadProjectScheduleTaskPhoto(
         },
       });
     });
-    revalidatePath(`/apps/projects/${report.workPoint.projectId}`);
-    revalidatePath("/apps/projects/schedule");
+    revalidateProjectReportPaths(report.workPoint.projectId);
     return { success: true, message: "Foto task berhasil diunggah." };
   } catch (error) {
     if (storedPhoto) {
@@ -2297,22 +2966,61 @@ export async function deleteProjectScheduleTask(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk menghapus task." };
   }
+  if (!progressUpdateRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan menghapus task.",
+    };
+  }
+  if (
+    typeof workPointId !== "string" ||
+    workPointId.length < 1 ||
+    workPointId.length > 100
+  ) {
+    return { success: false, message: "ID task tidak valid." };
+  }
 
   try {
     const wp = await prisma.projectWorkPoint.findUnique({
       where: { id: workPointId },
-      select: { id: true, projectId: true },
+      select: {
+        id: true,
+        projectId: true,
+        project: { select: { isDeleted: true, fieldPicId: true } },
+      },
     });
-    if (!wp) {
+    if (!wp || wp.project.isDeleted) {
       return { success: false, message: "Task tidak ditemukan." };
     }
+    if (
+      isFieldPicRole(session.user.role) &&
+      wp.project.fieldPicId !== session.user.id
+    ) {
+      return {
+        success: false,
+        message: "Hanya PIC proyek atau manajemen proyek yang dapat menghapus task.",
+      };
+    }
 
-    await prisma.projectWorkPoint.delete({
-      where: { id: workPointId },
+    await prisma.$transaction(async (tx) => {
+      await tx.projectWorkPoint.delete({
+        where: { id: workPointId },
+      });
+      const remainingPoints = await tx.projectWorkPoint.findMany({
+        where: { projectId: wp.projectId },
+        select: {
+          progress: true,
+          proposedTotalWage: true,
+          approvedTotalWage: true,
+        },
+      });
+      await tx.project.update({
+        where: { id: wp.projectId },
+        data: { progress: calculateWeightedProjectProgress(remainingPoints) },
+      });
     });
 
-    revalidatePath("/apps/projects/schedule");
-    revalidatePath(`/apps/projects/${wp.projectId}`);
+    revalidateProjectReportPaths(wp.projectId);
     return { success: true, message: "Task berhasil dihapus." };
   } catch (error) {
     console.error("Delete schedule task error:", error);
@@ -2384,11 +3092,39 @@ export async function uploadProjectDocument(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengunggah dokumen." };
   }
-  if (!projectId || !input.title.trim()) {
+  if (!projectAccessRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan mengunggah dokumen proyek.",
+    };
+  }
+  if (
+    typeof projectId !== "string" ||
+    projectId.length < 1 ||
+    projectId.length > 100 ||
+    !input.title.trim()
+  ) {
     return { success: false, message: "Data dokumen tidak lengkap." };
   }
 
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true, fieldPicId: true },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan atau sudah diarsipkan." };
+    }
+    if (
+      isFieldPicRole(session.user.role) &&
+      project.fieldPicId !== session.user.id
+    ) {
+      return {
+        success: false,
+        message: "Anda tidak berhak mengunggah dokumen ke proyek ini.",
+      };
+    }
+
     const drawingCode = `DOC-${Date.now().toString().slice(-6)}`;
     await prisma.drawingDocument.create({
       data: {
@@ -2417,11 +3153,48 @@ export async function updateProjectCoreTeam(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengubah tim proyek." };
   }
-  if (!projectId) {
-    return { success: false, message: "ID Proyek tidak valid." };
+  if (!projectManagerRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan mengubah tim inti proyek.",
+    };
+  }
+  if (
+    typeof projectId !== "string" ||
+    projectId.length < 1 ||
+    projectId.length > 100 ||
+    typeof fieldPicId !== "string" ||
+    fieldPicId.length > 100
+  ) {
+    return { success: false, message: "ID Proyek atau PIC tidak valid." };
   }
 
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan atau sudah diarsipkan." };
+    }
+
+    if (fieldPicId) {
+      const fieldPic = await prisma.user.findFirst({
+        where: {
+          id: fieldPicId,
+          role: { in: [UserRole.FIELD_TEAM, UserRole.KOORDINATOR] },
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!fieldPic) {
+        return {
+          success: false,
+          message: "PIC harus akun aktif Tim Lapangan atau Koordinator Lapangan.",
+        };
+      }
+    }
+
     await prisma.project.update({
       where: { id: projectId },
       data: {
@@ -2431,8 +3204,7 @@ export async function updateProjectCoreTeam(
 
     await activateProjectIfReady(projectId);
 
-    revalidatePath(`/apps/projects/${projectId}`);
-    revalidatePath("/apps/projects");
+    revalidateProjectReportPaths(projectId);
     return { success: true, message: "Tim inti proyek berhasil diperbarui." };
   } catch (error) {
     console.error("Update core team error:", error);

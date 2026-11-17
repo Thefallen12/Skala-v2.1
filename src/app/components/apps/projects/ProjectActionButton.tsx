@@ -12,17 +12,19 @@ interface ProjectActionButtonProps extends Omit<ButtonProps, "children"> {
 export default function ProjectActionButton({
   label,
   icon,
+  size = "sm",
   className,
   ...props
 }: ProjectActionButtonProps) {
   return (
     <Button
+      size={size}
       {...props}
       aria-label={props["aria-label"] ?? label}
       title={props.title ?? label}
       className={cn(
+        "min-h-11 min-w-11 px-0 sm:min-h-8 sm:min-w-0 sm:px-3",
         className,
-        "min-h-11 min-w-11 px-0 sm:min-h-8 sm:min-w-0 sm:px-2.5",
       )}
     >
       <span aria-hidden="true" className="inline-flex shrink-0">

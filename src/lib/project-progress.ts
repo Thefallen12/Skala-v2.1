@@ -1,6 +1,37 @@
+import { getJakartaDateKey, isValidDateKey } from "@/lib/habit-date";
+
 export function clampProjectProgress(progress: number): number {
   if (!Number.isFinite(progress)) return 0;
   return Math.max(0, Math.min(100, progress));
+}
+
+/**
+ * Normalizes a Date or date string to a canonical Asia/Jakarta (WIB, YYYY-MM-DD) calendar key.
+ */
+export function toJakartaDateKey(
+  value: string | Date | null | undefined,
+): string | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return isValidDateKey(trimmed) ? trimmed : null;
+    }
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : getJakartaDateKey(parsed);
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : getJakartaDateKey(value);
+  }
+  return null;
+}
+
+/**
+ * Converts a YYYY-MM-DD key into a Date anchored at 00:00:00+07:00 (WIB).
+ */
+export function toJakartaDayStartDate(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00+07:00`);
 }
 
 export function calculateWeightedProjectProgress(
@@ -48,17 +79,9 @@ export function calculateWeightedProjectProgress(
 function parseProjectScheduleTime(
   value: string | Date | null | undefined,
 ): number | null {
-  if (!value) return null;
-  if (value instanceof Date) {
-    const ms = value.getTime();
-    return Number.isNaN(ms) ? null : ms;
-  }
-  const trimmed = String(value).trim();
-  if (!trimmed) return null;
-  const isoCandidate = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
-    ? `${trimmed}T00:00:00.000Z`
-    : trimmed;
-  const ms = new Date(isoCandidate).getTime();
+  const dateKey = toJakartaDateKey(value);
+  if (!dateKey) return null;
+  const ms = toJakartaDayStartDate(dateKey).getTime();
   return Number.isNaN(ms) ? null : ms;
 }
 

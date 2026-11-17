@@ -37,13 +37,56 @@ export function getTicketPageVisibilityWhere(
         ],
       };
     case UserRole.KOORDINATOR:
-      return { OR: [{ status: TicketStatus.PENDING_DIRECTOR }, requesterTickets] };
+      return {
+        OR: [
+          { status: TicketStatus.PENDING_DIRECTOR },
+          {
+            type: TicketType.MATERIAL,
+            status: {
+              in: [
+                TicketStatus.PROCESSED_LOGISTIC,
+                TicketStatus.WAITING_FINANCE_PAYMENT,
+                TicketStatus.ASSIGNED_TO_MOVER,
+                TicketStatus.IN_TRANSIT,
+                TicketStatus.COMPLETED,
+              ],
+            },
+          },
+          requesterTickets,
+        ],
+      };
     case UserRole.FINANCE:
       return {
         OR: [
+          { status: TicketStatus.APPROVED_DIR },
           { status: TicketStatus.WAITING_FINANCE_PAYMENT },
           { status: TicketStatus.PROCESSED_FINANCE },
           { status: TicketStatus.PROCESSED_LOGISTIC },
+          {
+            status: {
+              in: [TicketStatus.ASSIGNED_TO_MOVER, TicketStatus.IN_TRANSIT],
+            },
+            OR: [
+              {
+                purchaseOrders: {
+                  some: {
+                    paidAt: null,
+                    vendorInvoiceUrl: { not: null },
+                  },
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                materialDeliveries: {
+                  some: {},
+                },
+              },
+              {
+                type: { in: [TicketType.COST, TicketType.OPERATIONAL] },
+                transferReceiptUrl: null,
+              },
+            ],
+          },
           {
             status: TicketStatus.COMPLETED,
             OR: [
@@ -51,6 +94,33 @@ export function getTicketPageVisibilityWhere(
               {
                 type: TicketType.MATERIAL,
                 transferReceiptUrl: { not: null },
+              },
+              {
+                type: TicketType.MATERIAL,
+                purchaseOrders: {
+                  some: { paidAt: { not: null } },
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                purchaseOrders: {
+                  some: {
+                    paidAt: null,
+                    vendorInvoiceUrl: { not: null },
+                  },
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                materialDeliveries: {
+                  some: {},
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                directStockPurchases: {
+                  some: { paidAt: { not: null } },
+                },
               },
             ],
           },
@@ -60,6 +130,7 @@ export function getTicketPageVisibilityWhere(
     case UserRole.LOGISTICS:
       return {
         OR: [
+          { status: TicketStatus.APPROVED_DIR },
           { status: TicketStatus.PROCESSED_LOGISTIC },
           { status: TicketStatus.PROCESSED_FINANCE },
           { status: TicketStatus.ASSIGNED_TO_MOVER },
@@ -70,6 +141,30 @@ export function getTicketPageVisibilityWhere(
               {
                 type: TicketType.MATERIAL,
                 purchaseReceiptUrl: { not: null },
+              },
+              {
+                type: TicketType.MATERIAL,
+                purchaseOrders: {
+                  some: { vendorInvoiceUrl: { not: null } },
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                directStockPurchases: {
+                  some: {},
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                materialDeliveries: {
+                  some: {},
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                items: {
+                  some: { doItemId: null, poItemId: null },
+                },
               },
               { requestCategory: TicketRequestCategory.SHIPPING_COST },
             ],

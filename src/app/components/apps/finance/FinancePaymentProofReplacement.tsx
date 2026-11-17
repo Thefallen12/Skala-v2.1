@@ -1,15 +1,24 @@
 "use client";
 
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
+import { toast } from "sonner";
 import { replaceFinancePaymentProof } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
-import { Input } from "@/components/ui/input";
 import {
   FINANCE_PROOF_ACCEPT_ALL,
   FINANCE_PROOF_ACCEPT_IMAGES,
   prepareFinanceProofFile,
 } from "@/lib/finance-proof-client";
+
+export type ReplacingProofTarget = {
+  paymentTransactionId: string;
+  existingProofUrl: string;
+  proofIndex: number;
+  label: string;
+  buttonLabel?: string;
+};
 
 export default function FinancePaymentProofReplacement({
   paymentTransactionId,
@@ -18,6 +27,9 @@ export default function FinancePaymentProofReplacement({
   label,
   onSaved,
   buttonLabel = "Edit",
+  open: controlledOpen,
+  onOpenChange,
+  showTrigger = true,
 }: {
   paymentTransactionId: string;
   existingProofUrl?: string;
@@ -25,13 +37,29 @@ export default function FinancePaymentProofReplacement({
   label: string;
   onSaved: () => void;
   buttonLabel?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isControlled = controlledOpen !== undefined;
+  const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
+
+  const setOpenState = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setProofFile(null);
+      setMessage("");
+    }
+    if (!isControlled) {
+      setUncontrolledOpen(nextOpen);
+    }
+    onOpenChange?.(nextOpen);
+  };
 
   const submitReplacement = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,48 +84,52 @@ export default function FinancePaymentProofReplacement({
         );
         if (!result.success) {
           setMessage(result.message);
+          toast.error(result.message);
           return;
         }
 
-        setOpen(false);
-        setProofFile(null);
+        toast.success(result.message || "Bukti transfer berhasil diperbarui.");
+        setOpenState(false);
         onSaved();
       } catch (error) {
         console.error("Finance payment proof replacement failed:", error);
-        setMessage("Bukti transfer gagal diperbarui. Silakan coba kembali.");
+        const errMsg = "Bukti transfer gagal diperbarui. Silakan coba kembali.";
+        setMessage(errMsg);
+        toast.error(errMsg);
       }
     });
   };
 
+  const isImageMode = buttonLabel === "Edit";
+
   return (
     <>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={isPending}
-        onClick={(event) => {
-          event.stopPropagation();
-          setMessage("");
-          setOpen(true);
-        }}
-      >
-        {buttonLabel}
-      </Button>
+      {showTrigger && !isControlled && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={isPending}
+          onClick={(event) => {
+            event.stopPropagation();
+            setMessage("");
+            setOpenState(true);
+          }}
+        >
+          {buttonLabel}
+        </Button>
+      )}
       <GlobalModal
-        isOpen={open}
+        isOpen={isOpen}
         onClose={() => {
           if (isPending) return;
-          setOpen(false);
-          setProofFile(null);
-          setMessage("");
-          if (fileInputRef.current) fileInputRef.current.value = "";
+          setOpenState(false);
         }}
-        title={buttonLabel === "Edit" ? "Edit Foto Bukti" : "Unggah Ulang Bukti"}
+        title={isImageMode ? "Ganti Foto Bukti" : "Unggah Ulang Bukti"}
         description={
-          buttonLabel === "Edit"
+          isImageMode
             ? `Pilih foto asli untuk menggantikan ${label}. Foto pengganti akan disimpan sebagai bukti baru.`
-            : `Pilih file pengganti untuk ${label}. PDF disimpan sebagai aset privat.`
+            : `Pilih berkas pengganti untuk ${label}. PDF disimpan sebagai aset privat.`
         }
         className="sm:max-w-xl"
         footer={
@@ -105,12 +137,7 @@ export default function FinancePaymentProofReplacement({
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setOpen(false);
-                setProofFile(null);
-                setMessage("");
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
+              onClick={() => setOpenState(false)}
               disabled={isPending}
             >
               Batal
@@ -121,71 +148,68 @@ export default function FinancePaymentProofReplacement({
               disabled={isPending || isPreparing || !proofFile}
             >
               {isPending
-                ? "Mengunggah dan menyimpan..."
+                ? "Menyimpan..."
                 : isPreparing
-                  ? "Memproses file..."
+                  ? "Memproses..."
                   : "Simpan Bukti"}
             </Button>
           </>
         }
       >
-          <form
-            id="finance-proof-replacement-form"
-            className="space-y-4"
-            onSubmit={submitReplacement}
-          >
-            <Input
-              ref={fileInputRef}
-              type="file"
-              accept={
-                buttonLabel === "Edit"
-                  ? FINANCE_PROOF_ACCEPT_IMAGES
-                  : FINANCE_PROOF_ACCEPT_ALL
+        <form
+          id="finance-proof-replacement-form"
+          className="space-y-4"
+          onSubmit={submitReplacement}
+        >
+          <FileDropzone
+            accept={
+              isImageMode
+                ? FINANCE_PROOF_ACCEPT_IMAGES
+                : FINANCE_PROOF_ACCEPT_ALL
+            }
+            capture="environment"
+            maxFiles={1}
+            maxSizeMb={5}
+            files={proofFile ? [proofFile] : []}
+            label={isImageMode ? "Pilih Foto Pengganti" : "Pilih Berkas Pengganti"}
+            hint={
+              isImageMode
+                ? "JPG, PNG, WEBP, atau HEIC; maksimal 5 MB."
+                : "PDF, JPG, PNG, WEBP, atau HEIC; maksimal 5 MB."
+            }
+            disabled={isPending || isPreparing}
+            onError={(err) => setMessage(err)}
+            onFilesChange={async (files) => {
+              const rawFile = files[0] ?? null;
+              if (!rawFile) {
+                setProofFile(null);
+                return;
               }
-              onChange={async (event) => {
-                const input = event.currentTarget;
-                const rawFile = input.files?.[0] ?? null;
-                if (!rawFile) {
-                  setProofFile(null);
-                  return;
-                }
-                setIsPreparing(true);
-                setMessage("");
-                try {
-                  const prepared = await prepareFinanceProofFile(rawFile, {
-                    allowPdf: buttonLabel !== "Edit",
-                  });
-                  setProofFile(prepared);
-                } catch (err) {
-                  setProofFile(null);
-                  input.value = "";
-                  setMessage(
-                    err instanceof Error
-                      ? err.message
-                      : "File bukti tidak valid.",
-                  );
-                } finally {
-                  setIsPreparing(false);
-                }
-              }}
-              disabled={isPending || isPreparing}
-            />
-            <p className="text-xs text-muted-foreground">
-              {buttonLabel === "Edit"
-                ? "JPG, PNG, WEBP, atau foto iPhone (HEIC); maksimal 5 MB."
-                : "PDF, JPG, PNG, WEBP, atau foto iPhone (HEIC); maksimal 5 MB."}
+              setIsPreparing(true);
+              setMessage("");
+              try {
+                const prepared = await prepareFinanceProofFile(rawFile, {
+                  allowPdf: !isImageMode,
+                });
+                setProofFile(prepared);
+              } catch (err) {
+                setProofFile(null);
+                setMessage(
+                  err instanceof Error
+                    ? err.message
+                    : "Berkas bukti tidak valid.",
+                );
+              } finally {
+                setIsPreparing(false);
+              }
+            }}
+          />
+          {message && (
+            <p className="type-p2 text-destructive" role="alert">
+              {message}
             </p>
-            {proofFile && (
-              <p className="text-sm text-muted-foreground" role="status">
-                File dipilih: {proofFile.name}
-              </p>
-            )}
-            {message && (
-              <p className="text-sm text-destructive" role="alert">
-                {message}
-              </p>
-            )}
-          </form>
+          )}
+        </form>
       </GlobalModal>
     </>
   );

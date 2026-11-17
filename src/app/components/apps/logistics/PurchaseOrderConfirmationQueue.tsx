@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, Printer, Send } from "lucide-react";
+import { ExternalLink, FileCheck2, Printer, Send } from "lucide-react";
+import { toast } from "sonner";
 import { markPurchaseOrderConfirmationSent } from "@/app/actions/orders";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import { photoDownloadHref } from "@/lib/photo-urls";
@@ -45,6 +46,78 @@ const paymentLabel = (paymentType: string) =>
       ? "Pembayaran Termin"
       : "Pelunasan";
 
+function ConfirmationOrderRowCard({
+  row,
+  isPending,
+  onSelect,
+  onMarkSent,
+}: {
+  row: PurchaseOrderConfirmationRow;
+  isPending: boolean;
+  onSelect: (row: PurchaseOrderConfirmationRow) => void;
+  onMarkSent: (row: PurchaseOrderConfirmationRow) => void;
+}) {
+  return (
+    <article className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="type-h3 text-foreground">
+            {row.confirmationOrderNumber} · PO {row.po.poNumber}
+          </p>
+          <Badge variant={row.vendorSentAt ? "lightSuccess" : "lightWarning"}>
+            {row.vendorSentAt ? "Sudah Dikirim" : "Menunggu Dikirim"}
+          </Badge>
+        </div>
+        <p className="type-p2 text-muted-foreground">
+          {row.po.vendorName} · {paymentLabel(row.paymentType)} ·{" "}
+          <span className="font-semibold tabular-nums text-foreground">
+            {currency(row.amount)}
+          </span>
+        </p>
+        {row.vendorSentAt ? (
+          <p className="type-p3 text-muted-foreground">
+            Dikirim {new Date(row.vendorSentAt).toLocaleString("id-ID")} oleh{" "}
+            {row.vendorSentBy?.name ?? "Logistik"}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onSelect(row)}
+        >
+          <Printer className="size-3.5" aria-hidden="true" />
+          Cetak KO
+        </Button>
+        <Button type="button" size="sm" variant="outline" asChild>
+          <a
+            href={photoDownloadHref(row.proofOfTransferUrl)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink className="size-3.5" aria-hidden="true" />
+            Bukti Transfer
+          </a>
+        </Button>
+        {!row.vendorSentAt ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => onMarkSent(row)}
+            disabled={isPending}
+          >
+            <Send className="size-3.5" aria-hidden="true" />
+            Tandai Dikirim
+          </Button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 export default function PurchaseOrderConfirmationQueue({
   rows,
 }: {
@@ -54,22 +127,22 @@ export default function PurchaseOrderConfirmationQueue({
   const [selected, setSelected] = useState<PurchaseOrderConfirmationRow | null>(
     null,
   );
-  const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const markAsSent = (row: PurchaseOrderConfirmationRow) => {
-    setMessage("");
     startTransition(async () => {
       try {
         const result = await markPurchaseOrderConfirmationSent(row.id);
-        setMessage(result.message);
         if (result.success) {
+          toast.success(result.message);
           requestNotificationFeedRefresh();
           router.refresh();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("KO vendor handoff failed:", error);
-        setMessage("Status pengiriman KO gagal disimpan. Silakan coba kembali.");
+        toast.error("Status pengiriman KO gagal disimpan. Silakan coba kembali.");
       }
     });
   };
@@ -78,76 +151,33 @@ export default function PurchaseOrderConfirmationQueue({
     <>
       <section className="space-y-3">
         <div>
-          <h3 className="font-semibold">KO & Bukti Pembayaran untuk Vendor</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="type-h3 text-foreground">
+            KO &amp; Bukti Pembayaran Vendor
+          </h3>
+          <p className="type-p2 text-muted-foreground">
             Cetak KO, lampirkan bukti transfer, lalu tandai setelah dikirim ke
             vendor.
           </p>
         </div>
+
         {rows.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
-            Belum ada pembayaran PO yang menunggu atau memiliki riwayat
-            pengiriman KO.
-          </p>
+          <EmptyState
+            icon={FileCheck2}
+            title="Belum Ada Antrean KO"
+            description="Belum ada pembayaran PO yang menunggu atau memiliki riwayat pengiriman KO."
+          />
         ) : (
-          rows.map((row) => (
-            <article
-              key={row.id}
-              className="flex flex-col gap-3 rounded-lg border p-3 lg:flex-row lg:items-center lg:justify-between"
-            >
-              <div className="min-w-0 space-y-1">
-                <p className="font-semibold">
-                  {row.confirmationOrderNumber} · PO {row.po.poNumber}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {row.po.vendorName} · {paymentLabel(row.paymentType)} ·{" "}
-                  {currency(row.amount)}
-                </p>
-                <Badge variant={row.vendorSentAt ? "lightSuccess" : "warning"}>
-                  {row.vendorSentAt ? "Sudah dikirim ke vendor" : "Menunggu dikirim"}
-                </Badge>
-                {row.vendorSentAt && (
-                  <p className="text-xs text-muted-foreground">
-                    Dikirim{" "}
-                    {new Date(row.vendorSentAt).toLocaleString("id-ID")} oleh{" "}
-                    {row.vendorSentBy?.name ?? "Logistik"}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <ActionIconButton
-                  type="button"
-                  label={`Lihat atau cetak KO ${row.confirmationOrderNumber}`}
-                  tooltip="Lihat / Cetak KO"
-                  icon={Printer}
-                  onClick={() => setSelected(row)}
-                />
-                <ActionIconButton
-                  label={`Buka bukti transfer KO ${row.confirmationOrderNumber}`}
-                  tooltip="Bukti Transfer"
-                  icon={ExternalLink}
-                  href={photoDownloadHref(row.proofOfTransferUrl)}
-                  target="_blank"
-                  rel="noreferrer"
-                />
-                {!row.vendorSentAt && (
-                  <ActionIconButton
-                    type="button"
-                    label={`Tandai KO ${row.confirmationOrderNumber} sudah dikirim`}
-                    tooltip="Tandai Dikirim"
-                    icon={Send}
-                    onClick={() => markAsSent(row)}
-                    disabled={isPending}
-                  />
-                )}
-              </div>
-            </article>
-          ))
-        )}
-        {message && (
-          <p className="text-sm" role="status">
-            {message}
-          </p>
+          <div className="space-y-2.5">
+            {rows.map((row) => (
+              <ConfirmationOrderRowCard
+                key={row.id}
+                row={row}
+                isPending={isPending}
+                onSelect={setSelected}
+                onMarkSent={markAsSent}
+              />
+            ))}
+          </div>
         )}
       </section>
 
@@ -170,12 +200,12 @@ export default function PurchaseOrderConfirmationQueue({
                 `/api/documents/transactions?kind=KO&id=${encodeURIComponent(selected.id)}`,
               ).catch((error: unknown) => {
                 console.error("KO print failed:", error);
-                setMessage("KO gagal disiapkan untuk dicetak. Silakan coba kembali.");
+                toast.error("KO gagal disiapkan untuk dicetak. Silakan coba kembali.");
               });
             }}
             disabled={!selected}
           >
-            <Printer className="mr-2 size-4" aria-hidden="true" />
+            <Printer className="size-4" aria-hidden="true" />
             Cetak KO
           </Button>
         }
@@ -188,14 +218,16 @@ export default function PurchaseOrderConfirmationQueue({
               src={`/api/documents/transactions?kind=KO&id=${encodeURIComponent(selected.id)}`}
             />
             {selected.po.vendorInvoiceUrl && (
-              <a
-                className="text-sm underline"
-                href={photoDownloadHref(selected.po.vendorInvoiceUrl)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Referensi invoice/bon vendor
-              </a>
+              <Button variant="link" size="sm" asChild className="px-0">
+                <a
+                  href={photoDownloadHref(selected.po.vendorInvoiceUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                  Referensi Invoice Vendor
+                </a>
+              </Button>
             )}
           </div>
         )}

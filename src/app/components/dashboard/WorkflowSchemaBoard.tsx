@@ -1,19 +1,25 @@
+"use client";
+
 import Link from "next/link";
+import { UserRole } from "@prisma/client";
 import {
   ArrowRight,
-  Building2,
   CheckCircle2,
   ClipboardCheck,
   FileCheck2,
-  FilePlus2,
+  Lock,
   MapPin,
   Package,
   Plus,
-  Ruler,
   Ticket,
   Truck,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
+import { useDashboardMenuAccess } from "@/app/(DashboardLayout)/DashboardLayoutClient";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import type { AppMenuKey } from "@/lib/config/menus";
 
 export interface WorkflowPipelineCounts {
   totalProjects: number;
@@ -26,314 +32,475 @@ export interface WorkflowPipelineCounts {
   issuedDocsCount: number;
 }
 
+type RouteAccessRule = {
+  menuKey: AppMenuKey;
+  requiresNonMover?: boolean;
+  requiresLogistics?: boolean;
+  requiresExecutive?: boolean;
+  requiresFinance?: boolean;
+  requiresProjects?: boolean;
+  requiresDrafter?: boolean;
+  allowedRoles?: UserRole[];
+  moverOnly?: boolean;
+};
+
+type StageAction = {
+  label: string;
+  href: string;
+  access: RouteAccessRule;
+};
+
+type WorkflowStageItem = {
+  step: string;
+  title: string;
+  subtitle: string;
+  metricLabel: string;
+  metricValue: string;
+  accent: string;
+  badgeClass: string;
+  icon: LucideIcon;
+  primaryAction: StageAction;
+  secondaryAction: StageAction;
+};
+
+const DOCUMENT_ROLES: UserRole[] = [
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.ADMINISTRATIONS,
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+  UserRole.KOORDINATOR,
+];
+
+function StageActionButton({
+  action,
+  allowed,
+  variant,
+}: {
+  action: StageAction;
+  allowed: boolean;
+  variant: "primary" | "secondary";
+}) {
+  if (!allowed) {
+    return (
+      <span
+        aria-disabled="true"
+        title="Tidak tersedia untuk peran Anda"
+        className="type-p3 inline-flex h-8 cursor-not-allowed items-center justify-center gap-1 rounded-md border border-border bg-muted/60 px-2.5 text-center font-medium text-muted-foreground"
+      >
+        <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate">{action.label}</span>
+      </span>
+    );
+  }
+
+  return (
+    <Button
+      asChild
+      size="sm"
+      variant={variant === "primary" ? "default" : "outline"}
+      className="w-full"
+    >
+      <Link href={action.href} className="truncate">
+        {action.label}
+      </Link>
+    </Button>
+  );
+}
+
+export function WorkflowStageCard({
+  stage,
+  hasNext,
+  canAccessRule,
+}: {
+  stage: WorkflowStageItem;
+  hasNext: boolean;
+  canAccessRule: (rule: RouteAccessRule) => boolean;
+}) {
+  const StageIcon = stage.icon;
+  const primaryAllowed = canAccessRule(stage.primaryAction.access);
+  const secondaryAllowed = canAccessRule(stage.secondaryAction.access);
+  const hasAnyAllowedAction = primaryAllowed || secondaryAllowed;
+
+  return (
+    <article
+      className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all hover:shadow-sm ${stage.accent} ${
+        hasAnyAllowedAction ? "" : "opacity-80"
+      }`}
+    >
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <Badge variant="outline" className={`font-mono ${stage.badgeClass}`}>
+            TAHAP {stage.step}
+          </Badge>
+          <div className="flex items-center gap-1">
+            <StageIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+            {hasNext && (
+              <ArrowRight
+                className="hidden size-3.5 text-muted-foreground xl:inline"
+                aria-hidden="true"
+              />
+            )}
+          </div>
+        </div>
+
+        <h3 className="type-h3 mt-2.5 text-foreground">{stage.title}</h3>
+        <p className="type-p3 mt-1 leading-relaxed text-muted-foreground">
+          {stage.subtitle}
+        </p>
+      </div>
+
+      <div className="mt-4 space-y-3 border-t border-border/70 pt-3">
+        <div className="type-p3 flex items-center justify-between gap-2">
+          <span className="text-muted-foreground">{stage.metricLabel}</span>
+          <span className="font-mono font-bold tabular-nums text-foreground">
+            {stage.metricValue}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <StageActionButton
+            action={stage.primaryAction}
+            allowed={primaryAllowed}
+            variant="primary"
+          />
+          <StageActionButton
+            action={stage.secondaryAction}
+            allowed={secondaryAllowed}
+            variant="secondary"
+          />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function WorkflowSchemaBoard({
   counts,
+  allowedMenuKeys,
 }: {
   counts: WorkflowPipelineCounts;
+  allowedMenuKeys?: string[];
 }) {
-  const stages = [
+  const menuAccess = useDashboardMenuAccess();
+  const effectiveMenuKeys = allowedMenuKeys ?? menuAccess?.allowedMenuKeys;
+
+  const canAccessRule = (rule: RouteAccessRule): boolean => {
+    if (effectiveMenuKeys && !effectiveMenuKeys.includes(rule.menuKey)) {
+      return false;
+    }
+    if (!menuAccess) {
+      return !rule.moverOnly;
+    }
+    if (rule.moverOnly && !menuAccess.isMover) return false;
+    if (rule.requiresNonMover && menuAccess.isMover) return false;
+    if (rule.requiresLogistics && !menuAccess.canAccessLogistics) return false;
+    if (rule.requiresExecutive && !menuAccess.canAccessExecutive) return false;
+    if (rule.requiresFinance && !menuAccess.canAccessFinance) return false;
+    if (rule.requiresProjects && !menuAccess.canAccessProjects) return false;
+    if (rule.requiresDrafter && !menuAccess.canAccessDrafter) return false;
+    if (rule.allowedRoles && !rule.allowedRoles.includes(menuAccess.userRole)) {
+      return false;
+    }
+    return true;
+  };
+
+  const stages: WorkflowStageItem[] = [
     {
       step: "01",
-      title: "Perencanaan & Master Proyek",
-      subtitle: "Data Proyek, Rab/Pagu, Lokasi GIS & Kurva S",
-      metricLabel: "Proyek Berjalan",
-      metricValue: `${counts.runningProjects} / ${counts.totalProjects}`,
-      statusText: "Tahap Inisiasi & Monitoring",
+      title: "1. Tiket & Progres Lapangan",
+      subtitle: "Pengajuan material, data proyek berjalan, dan gambar kerja DED.",
+      metricLabel: "Proyek & Tiket",
+      metricValue: `${counts.runningProjects}/${counts.totalProjects} · ${counts.activeTicketsCount} Tiket`,
       accent: "border-blue-500/30 bg-blue-500/5",
-      badgeClass: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
-      icon: Building2,
+      badgeClass: "border-blue-500/20 bg-blue-500/15 text-blue-700 dark:text-blue-300",
+      icon: Ticket,
       primaryAction: {
-        label: "Buka Master Proyek",
-        href: "/apps/projects",
+        label: "Buka Tiket",
+        href: "/apps/tickets",
+        access: {
+          menuKey: "tickets",
+          requiresNonMover: true,
+        },
       },
       secondaryAction: {
-        label: "Peta GIS Survei",
-        href: "/apps/projects/map",
+        label: "Master Proyek",
+        href: "/apps/projects",
+        access: {
+          menuKey: "master_proyek",
+          requiresProjects: true,
+        },
       },
     },
     {
       step: "02",
-      title: "Enjiniring & Gambar Kerja (DED)",
-      subtitle: "Shop Drawing, As-Built & Dokumen Teknis",
-      metricLabel: "Dokumen Gambar",
-      metricValue: `${counts.drawingsCount} Berkas`,
-      statusText: "Tahap Desain & Revisi Teknis",
-      accent: "border-indigo-500/30 bg-indigo-500/5",
-      badgeClass: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
-      icon: Ruler,
+      title: "2. Proses Logistik & DO",
+      subtitle: "Pemenuhan material, kontrol stok gudang, dan pengiriman DO.",
+      metricLabel: "Stok & PO",
+      metricValue: `${counts.stockItemsCount} SKU · ${counts.pendingPOsCount} PO`,
+      accent: "border-orange-500/30 bg-orange-500/5",
+      badgeClass: "border-orange-500/20 bg-orange-500/15 text-orange-700 dark:text-orange-300",
+      icon: Truck,
       primaryAction: {
-        label: "Workspace Drafter",
-        href: "/apps/drafter",
+        label: menuAccess?.isMover ? "Tugas Mover" : "Buka Logistik",
+        href: "/apps/logistics",
+        access: {
+          menuKey: "logistik",
+          requiresLogistics: true,
+        },
       },
       secondaryAction: {
-        label: "Gambar Proyek",
-        href: "/apps/projects",
+        label: "Stok Gudang",
+        href: "/apps/logistics/stock",
+        access: {
+          menuKey: "logistik",
+          requiresLogistics: true,
+        },
       },
     },
     {
       step: "03",
-      title: "Tiket, Pengadaan & Logistik",
-      subtitle: "Permintaan Material, Stok Gudang, PO & DO",
-      metricLabel: "Tiket & Stok",
-      metricValue: `${counts.activeTicketsCount} Tiket · ${counts.stockItemsCount} SKU`,
-      statusText: "Tahap Permintaan & Distribusi",
-      accent: "border-orange-500/30 bg-orange-500/5",
-      badgeClass: "bg-orange-500/15 text-orange-700 dark:text-orange-300",
-      icon: Truck,
+      title: "3. Otorisasi & Tagihan",
+      subtitle: "Verifikasi direksi atas tiket permintaan dan pesanan pembelian.",
+      metricLabel: "Antrean Direksi",
+      metricValue: `${counts.pendingApprovalsCount} Menunggu`,
+      accent: "border-amber-500/30 bg-amber-500/5",
+      badgeClass: "border-amber-500/20 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+      icon: ClipboardCheck,
       primaryAction: {
-        label: "Tiket & Permintaan",
-        href: "/apps/tickets",
+        label: "Approval Hub",
+        href: "/apps/approvals",
+        access: {
+          menuKey: "approvals",
+          requiresExecutive: true,
+        },
       },
       secondaryAction: {
-        label: "Gudang & Stok",
-        href: "/apps/logistics/stock",
+        label: "Daftar Order",
+        href: "/apps/orders",
+        access: {
+          menuKey: "documents",
+          requiresNonMover: true,
+        },
       },
     },
     {
       step: "04",
-      title: "Otorisasi & Persetujuan Direksi",
-      subtitle: "Verifikasi Tiket, Purchase Order, SPK & BAST",
-      metricLabel: "Antrean Direksi",
-      metricValue: `${counts.pendingApprovalsCount} Menunggu`,
-      statusText:
-        counts.pendingApprovalsCount > 0
-          ? "Membutuhkan Persetujuan"
-          : "Semua Terverifikasi",
-      accent: "border-amber-500/30 bg-amber-500/5",
-      badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-      icon: ClipboardCheck,
-      primaryAction: {
-        label: "Buka Approval Hub",
-        href: "/apps/approvals",
-      },
-      secondaryAction: {
-        label: "Kelola PO & DO",
-        href: "/apps/orders",
-      },
-    },
-    {
-      step: "05",
-      title: "Keuangan & Dokumen Resmi QR",
-      subtitle: "Pencairan Dana, Buku Kas, Kwitansi & Arsip PO/DO",
-      metricLabel: "Dokumen & PO",
+      title: "4. Pembayaran Keuangan",
+      subtitle: "Pencairan dana, buku kas, dan arsip dokumen resmi QR.",
+      metricLabel: "Dokumen Resmi",
       metricValue: `${counts.issuedDocsCount} Dokumen`,
-      statusText: "Tahap Pencairan & Arsip",
       accent: "border-emerald-500/30 bg-emerald-500/5",
-      badgeClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+      badgeClass: "border-emerald-500/20 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
       icon: Wallet,
       primaryAction: {
-        label: "Buka Finance Hub",
+        label: "Finance Hub",
         href: "/apps/finance",
+        access: {
+          menuKey: "finance_hub",
+          requiresFinance: true,
+        },
       },
       secondaryAction: {
-        label: "Dokumen Terbit",
-        href: "/apps/documents/issued",
+        label: "Arsip Dokumen",
+        href: "/apps/documents",
+        access: {
+          menuKey: "documents",
+          requiresNonMover: true,
+          allowedRoles: DOCUMENT_ROLES,
+        },
       },
     },
   ];
 
-  const quickActions = [
+  const quickActions: Array<{
+    label: string;
+    desc: string;
+    href: string;
+    icon: LucideIcon;
+    primary: boolean;
+    access: RouteAccessRule;
+  }> = [
     {
-      label: "Buat Tiket Permintaan",
+      label: "Tugas Mover",
+      desc: "Pengiriman material dan laporan BBM harian",
+      href: "/apps/logistics",
+      icon: Truck,
+      primary: true,
+      access: {
+        menuKey: "logistik",
+        requiresLogistics: true,
+        moverOnly: true,
+      },
+    },
+    {
+      label: "Buat Tiket",
       desc: "Ajukan material, alat, atau dana lapangan",
       href: "/apps/tickets?create=1",
       icon: Ticket,
       primary: true,
+      access: {
+        menuKey: "tickets",
+        requiresNonMover: true,
+      },
     },
     {
-      label: "Buat Purchase Order (PO)",
-      desc: "Terbitkan pesanan pembelian ke vendor",
-      href: "/apps/orders/new?type=po",
-      icon: FilePlus2,
-      primary: false,
-    },
-    {
-      label: "Buat Surat Jalan (DO)",
-      desc: "Kirim material gudang ke lokasi proyek",
-      href: "/apps/orders/new?type=do",
-      icon: Truck,
-      primary: false,
-    },
-    {
-      label: "Cek & Beli Stok Gudang",
-      desc: "Kelola inventaris & pembelian langsung",
+      label: "Cek Stok",
+      desc: "Pantau inventaris dan mutasi gudang",
       href: "/apps/logistics/stock",
       icon: Package,
       primary: false,
+      access: {
+        menuKey: "logistik",
+        requiresLogistics: true,
+      },
     },
     {
-      label: "Peta GIS & Survei",
-      desc: "Input titik koordinat & foto lapangan",
+      label: "Peta Survei",
+      desc: "Titik koordinat dan dokumentasi lapangan",
       href: "/apps/projects/map",
       icon: MapPin,
       primary: false,
+      access: {
+        menuKey: "master_proyek",
+        requiresProjects: true,
+      },
     },
     {
-      label: "Cetak & Tanda Tangan QR",
-      desc: "Generator dokumen resmi perusahaan",
+      label: "Cetak Dokumen",
+      desc: "Dokumen resmi dan tanda tangan QR",
       href: "/apps/documents",
       icon: FileCheck2,
       primary: false,
+      access: {
+        menuKey: "documents",
+        requiresNonMover: true,
+        allowedRoles: DOCUMENT_ROLES,
+      },
     },
   ];
 
+  const visibleQuickActions = quickActions.filter((action) =>
+    canAccessRule(action.access),
+  );
+  const canAccessHabits = canAccessRule({ menuKey: "habits" });
+
+  const quickGridClass =
+    visibleQuickActions.length <= 2
+      ? "sm:grid-cols-2"
+      : visibleQuickActions.length === 3
+        ? "sm:grid-cols-2 lg:grid-cols-3"
+        : "sm:grid-cols-2 lg:grid-cols-4";
+
   return (
     <div className="space-y-4">
-      {/* Quick Action Command Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex size-2 rounded-full bg-[#F26522]" />
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                Pusat Aksi Cepat (Quick Actions)
-              </h2>
-            </div>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Pintasan langsung ke seluruh formulir dan tindakan operasional utama
-            </p>
-          </div>
-          <Link
-            href="/apps/habits"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-primary/40 hover:text-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            <span>Jadwal &amp; Timesheet Hari Ini</span>
-            <ArrowRight className="size-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {quickActions.map((action) => {
-            const IconComp = action.icon;
-            return (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={`group flex flex-col justify-between rounded-xl border p-3 transition-all ${
-                  action.primary
-                    ? "border-[#F26522] bg-[#F26522] text-white shadow-xs hover:bg-[#e05616]"
-                    : "border-slate-200/90 bg-slate-50/60 text-slate-900 hover:border-primary/50 hover:bg-white hover:shadow-xs dark:border-slate-800 dark:bg-slate-800/50 dark:text-white dark:hover:bg-slate-800"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`flex size-8 items-center justify-center rounded-lg ${
-                      action.primary
-                        ? "bg-white/20 text-white"
-                        : "bg-primary/10 text-primary"
-                    }`}
-                  >
-                    <IconComp className="size-4" />
-                  </span>
-                  <Plus
-                    className={`size-4 transition-transform group-hover:rotate-90 ${
-                      action.primary ? "text-white/80" : "text-slate-400"
-                    }`}
-                  />
-                </div>
-                <div className="mt-2.5">
-                  <p className="text-xs font-bold leading-snug">
-                    {action.label}
-                  </p>
-                  <p
-                    className={`mt-0.5 line-clamp-1 text-[11px] ${
-                      action.primary
-                        ? "text-white/85"
-                        : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
-                    {action.desc}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 5-Stage Integrated Workflow Schema */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3.5 dark:border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                Alur Skema Operasional Terpadu (End-to-End Schema)
-              </h2>
-            </div>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Urutan kerja sistematis dari perencanaan proyek, gambar kerja, pengadaan logistik, persetujuan direksi, hingga pencairan keuangan
-            </p>
-          </div>
-          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
-            5 Tahap Terintegrasi
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {stages.map((stage, idx) => {
-            const StageIcon = stage.icon;
-            return (
-              <div
-                key={stage.step}
-                className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition-all hover:shadow-sm ${stage.accent}`}
-              >
-                <div>
-                  {/* Step Header */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] font-bold ${stage.badgeClass}`}
-                    >
-                      TAHAP {stage.step}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <StageIcon className="size-4 text-slate-600 dark:text-slate-300" />
-                      {idx < stages.length - 1 && (
-                        <ArrowRight className="hidden size-3.5 text-slate-400 xl:inline" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Title & Subtitle */}
-                  <h3 className="mt-2.5 text-sm font-bold leading-snug text-slate-900 dark:text-white">
-                    {stage.title}
-                  </h3>
-                  <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-                    {stage.subtitle}
-                  </p>
-                </div>
-
-                {/* Live Metric Box & Action Buttons */}
-                <div className="mt-3.5 space-y-2.5 border-t border-slate-200/70 pt-2.5 dark:border-slate-800">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 dark:text-slate-400">
-                      {stage.metricLabel}
-                    </span>
-                    <span className="font-mono font-bold tabular-nums text-slate-900 dark:text-white">
-                      {stage.metricValue}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Link
-                      href={stage.primaryAction.href}
-                      className="flex items-center justify-center rounded-lg bg-slate-900 px-2.5 py-1.5 text-center text-[11px] font-semibold text-white transition hover:bg-slate-800 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
-                    >
-                      {stage.primaryAction.label}
-                    </Link>
-                    <Link
-                      href={stage.secondaryAction.href}
-                      className="flex items-center justify-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-center text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                    >
-                      {stage.secondaryAction.label}
-                    </Link>
-                  </div>
-                </div>
+      {(visibleQuickActions.length > 0 || canAccessHabits) && (
+        <section className="rounded-xl border border-border bg-card p-4 text-card-foreground shadow-2xs sm:p-5">
+          <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex size-2 rounded-full bg-primary" aria-hidden="true" />
+                <h2 className="type-h2 text-foreground">Aksi Cepat</h2>
               </div>
-            );
-          })}
+              <p className="type-p3 mt-0.5 text-muted-foreground">
+                Pintasan langsung ke formulir dan tindakan operasional sesuai hak akses Anda.
+              </p>
+            </div>
+            {canAccessHabits && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/apps/habits">
+                  <span>Jadwal Kerja</span>
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              </Button>
+            )}
+          </div>
+
+          {visibleQuickActions.length > 0 && (
+            <div className={`grid grid-cols-1 gap-2.5 ${quickGridClass}`}>
+              {visibleQuickActions.map((action) => {
+                const IconComp = action.icon;
+                return (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className={`group flex flex-col justify-between rounded-xl border p-3.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      action.primary
+                        ? "border-primary bg-primary text-primary-foreground shadow-2xs hover:bg-primary/90"
+                        : "border-border bg-muted/40 text-foreground hover:border-primary/50 hover:bg-card hover:shadow-2xs"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`flex size-8 items-center justify-center rounded-lg ${
+                          action.primary
+                            ? "bg-white/20 text-primary-foreground"
+                            : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        <IconComp className="size-4" aria-hidden="true" />
+                      </span>
+                      <Plus
+                        aria-hidden="true"
+                        className={`size-4 transition-transform group-hover:rotate-90 ${
+                          action.primary
+                            ? "text-primary-foreground/80"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    </div>
+                    <div className="mt-2.5">
+                      <p className="type-p2 font-bold leading-snug">
+                        {action.label}
+                      </p>
+                      <p
+                        className={`type-p3 mt-0.5 line-clamp-1 ${
+                          action.primary
+                            ? "text-primary-foreground/85"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {action.desc}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="rounded-xl border border-border bg-card p-4 text-card-foreground shadow-2xs sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3.5">
+          <div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2
+                className="size-4 text-emerald-600 dark:text-emerald-400"
+                aria-hidden="true"
+              />
+              <h2 className="type-h2 text-foreground">
+                Alur Operasional Terpadu
+              </h2>
+            </div>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              Alur kerja searah dari tiket lapangan, logistik, otorisasi direksi, hingga pembayaran keuangan.
+            </p>
+          </div>
+          <Badge variant="lightSuccess">4 Tahap Searah</Badge>
         </div>
-      </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {stages.map((stage, idx) => (
+            <WorkflowStageCard
+              key={stage.step}
+              stage={stage}
+              hasNext={idx < stages.length - 1}
+              canAccessRule={canAccessRule}
+            />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

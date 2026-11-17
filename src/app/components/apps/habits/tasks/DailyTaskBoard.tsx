@@ -24,17 +24,37 @@ import {
   deleteWorkspaceTask,
   updateWorkspaceTaskColor,
   updateWorkspaceTaskStatus,
-  type WorkspaceActionResult,
 } from "@/app/actions/habit-workspace";
+import { toast } from "sonner";
 import CardBox from "@/app/components/shared/CardBox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { FormLabel, Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { GlobalModal } from "@/components/ui/global-modal";
 import {
   formatJakartaTime,
@@ -79,10 +99,6 @@ const statuses: { value: WorkTaskStatus; label: string }[] = [
   { value: WorkTaskStatus.IN_PROGRESS, label: "Berjalan" },
   { value: WorkTaskStatus.DONE, label: "Selesai" },
 ];
-
-function toLocalInput(dateKey: string, hour: string) {
-  return `${dateKey}T${hour}`;
-}
 
 function parseJakartaDateTime(value: string) {
   if (!value) return null;
@@ -130,7 +146,7 @@ function TaskPeriodCalendar({
   return (
     <div className="overflow-x-auto rounded-md border border-border">
       <div className="min-w-[700px]">
-        <div className="grid grid-cols-7 border-b border-border bg-muted/30 text-center text-xs font-medium text-muted-foreground">
+        <div className="type-p3 grid grid-cols-7 border-b border-border bg-muted/30 text-center font-medium text-muted-foreground">
           {["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"].map((day) => (
             <span key={day} className="border-r border-border/70 py-2 last:border-r-0">
               {day}
@@ -160,7 +176,7 @@ function TaskPeriodCalendar({
                   aria-label={`Pilih ${format(dateFromKey(dateKey), "EEEE, d MMMM yyyy", { locale: id })}`}
                   aria-pressed={isSelected}
                   onClick={() => onSelectDate(dateKey)}
-                  className={`mb-1 grid size-7 place-items-center rounded-full text-xs ${
+                  className={`type-p3 mb-1 grid size-7 place-items-center rounded-full ${
                     isSelected
                       ? "bg-primary font-semibold text-white"
                       : "text-foreground hover:bg-muted"
@@ -172,17 +188,17 @@ function TaskPeriodCalendar({
                   {dayTasks.slice(0, view === "week" ? 5 : 3).map((task) => (
                     <div
                       key={`${dateKey}:${task.id}`}
-                      className={`overflow-hidden rounded px-1.5 py-1 text-[10px] leading-tight text-white ${getHabitTaskColorClass(task.color)}`}
+                      className={`type-p3 overflow-hidden rounded px-1.5 py-1 leading-tight text-white ${getHabitTaskColorClass(task.color)}`}
                       title={`${task.title} · ${task.project.name} · ${formatJakartaTime(new Date(task.startsAt))}–${formatJakartaTime(new Date(task.endsAt))}`}
                     >
                       <p className="truncate font-medium">{task.title}</p>
-                      <p className="truncate opacity-80">
+                      <p className="truncate opacity-85">
                         {formatJakartaTime(new Date(task.startsAt))} · {task.project.name}
                       </p>
                     </div>
                   ))}
                   {dayTasks.length > (view === "week" ? 5 : 3) && (
-                    <p className="px-1 text-[10px] text-muted-foreground">
+                    <p className="type-p3 px-1 text-muted-foreground">
                       +{dayTasks.length - (view === "week" ? 5 : 3)} tugas lainnya
                     </p>
                   )}
@@ -209,7 +225,7 @@ function DailyTaskTimeline({
   return (
     <div className="overflow-x-auto rounded-md border border-border">
       <div className="min-w-[840px]">
-        <div className="grid grid-cols-[180px_repeat(12,minmax(42px,1fr))] border-b border-border bg-muted/30 text-center text-[10px] text-muted-foreground">
+        <div className="type-p3 grid grid-cols-[180px_repeat(12,minmax(42px,1fr))] border-b border-border bg-muted/30 text-center text-muted-foreground">
           <span className="p-2 text-left font-semibold">Anggota / waktu</span>
           {Array.from({ length: 12 }, (_, index) => (
             <span key={index} className="border-l border-border p-2">
@@ -245,15 +261,15 @@ function DailyTaskTimeline({
               className="grid grid-cols-[180px_minmax(504px,1fr)] border-b border-border last:border-0"
             >
               <div className="min-w-0 border-r border-border p-3">
-                <p className="truncate text-sm font-medium">
+                <p className="type-h3 truncate">
                   {task.assignee?.name ?? "Belum ditugaskan"}
                 </p>
-                <div className="mt-1 flex items-center -space-x-1">
+                <div className="mt-1.5 flex items-center -space-x-1">
                   {taskMembers.slice(0, 4).map((member, index) => (
                     <span
                       key={member.id}
                       title={member.name}
-                      className={`grid size-5 place-items-center rounded-full border border-card text-[7px] text-white ${
+                      className={`type-p3 grid size-6 place-items-center rounded-full border border-card font-medium text-white ${
                         ["bg-info", "bg-primary", "bg-warning", "bg-success"][index]
                       }`}
                     >
@@ -266,7 +282,7 @@ function DailyTaskTimeline({
                     </span>
                   ))}
                   {taskMembers.length > 4 && (
-                    <span className="grid size-5 place-items-center rounded-full border border-card bg-muted text-[7px]">
+                    <span className="type-p3 grid size-6 place-items-center rounded-full border border-card bg-muted font-medium">
                       +{taskMembers.length - 4}
                     </span>
                   )}
@@ -274,7 +290,7 @@ function DailyTaskTimeline({
               </div>
               <div className="relative min-h-16 bg-[linear-gradient(to_right,var(--color-border)_1px,transparent_1px)] bg-[length:8.333%_100%]">
                 <div
-                  className={`absolute top-3 min-w-20 overflow-hidden rounded-md px-3 py-2 text-xs text-white ${getHabitTaskColorClass(task.color)}`}
+                  className={`type-p3 absolute top-3 min-w-20 overflow-hidden rounded-md px-3 py-2 text-white ${getHabitTaskColorClass(task.color)}`}
                   style={{
                     left: `${left}%`,
                     width: `${Math.max(5, right - left)}%`,
@@ -282,16 +298,21 @@ function DailyTaskTimeline({
                   title={`${task.title} • ${taskStatusLabel(task.status)} • ${formatJakartaTime(start)}–${formatJakartaTime(end)}`}
                 >
                   <span className="block truncate font-medium">{task.title}</span>
-                  <span className="block truncate opacity-80">{task.project.name}</span>
+                  <span className="block truncate opacity-85">{task.project.name}</span>
                 </div>
               </div>
             </div>
           );
         })}
         {tasks.length === 0 && (
-          <p className="p-10 text-center text-sm text-muted-foreground">
-            Tidak ada tugas untuk filter dan tanggal ini.
-          </p>
+          <div className="p-6">
+            <EmptyState
+              variant="inline"
+              icon={ListTodo}
+              title="Belum ada tugas di linimasa"
+              description="Tidak ada tugas untuk filter dan tanggal ini."
+            />
+          </div>
         )}
       </div>
     </div>
@@ -317,6 +338,10 @@ export default function DailyTaskBoard({
 }) {
   const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [search, setSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState(
@@ -324,8 +349,34 @@ export default function DailyTaskBoard({
       ? initialProjectId
       : "all",
   );
-  const [message, setMessage] = useState<WorkspaceActionResult | null>(null);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskProjectId, setTaskProjectId] = useState(projects[0]?.id ?? "");
+  const [taskAssigneeId, setTaskAssigneeId] = useState(currentUserId || "none");
+  const [taskStartDate, setTaskStartDate] = useState(selectedDate);
+  const [taskStartTime, setTaskStartTime] = useState("09:00");
+  const [taskEndDate, setTaskEndDate] = useState(selectedDate);
+  const [taskEndTime, setTaskEndTime] = useState("11:00");
+  const [taskMemberIds, setTaskMemberIds] = useState<string[]>(
+    currentUserId ? [currentUserId] : [],
+  );
+  const [taskColor, setTaskColor] = useState<string>(
+    habitTaskColors[0]?.value ?? "",
+  );
+  const [taskDescription, setTaskDescription] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const projectFilterOptions = [
+    { value: "all", label: "Semua proyek" },
+    ...projects.map((project) => ({
+      value: project.id,
+      label: project.name,
+      description: project.code,
+    })),
+  ];
+  const projectModalOptions = projects.map((project) => ({
+    value: project.id,
+    label: `${project.code} — ${project.name}`,
+  }));
   const filteredTasks = tasks.filter((task) => {
     const taskMembers = getTaskMembers(task);
     const searchMatch = `${task.title} ${task.project.name} ${taskMembers.map(({ name }) => name).join(" ")}`
@@ -407,35 +458,70 @@ export default function DailyTaskBoard({
     { id: "month", label: "Bulanan" },
   ];
 
-  const onCreateTask = (formData: FormData) => {
-    const startsAtValue = String(formData.get("startsAt") ?? "");
-    const endsAtValue = String(formData.get("endsAt") ?? "");
+  const openCreateTaskModal = () => {
+    setFormError(null);
+    setTaskTitle("");
+    setTaskProjectId(
+      projectFilter !== "all" ? projectFilter : (projects[0]?.id ?? ""),
+    );
+    setTaskAssigneeId(currentUserId || "none");
+    setTaskStartDate(selectedDate);
+    setTaskStartTime("09:00");
+    setTaskEndDate(selectedDate);
+    setTaskEndTime("11:00");
+    setTaskMemberIds(currentUserId ? [currentUserId] : []);
+    setTaskColor(habitTaskColors[0]?.value ?? "");
+    setTaskDescription("");
+    setIsDialogOpen(true);
+  };
+
+  const toggleTaskMember = (memberId: string, checked: boolean) => {
+    setTaskMemberIds((prev) =>
+      checked
+        ? [...new Set([...prev, memberId])]
+        : prev.filter((idValue) => idValue !== memberId),
+    );
+  };
+
+  const onCreateTask = () => {
+    const startsAtValue = `${taskStartDate}T${taskStartTime}`;
+    const endsAtValue = `${taskEndDate}T${taskEndTime}`;
     const startsAt = parseJakartaDateTime(startsAtValue);
     const endsAt = parseJakartaDateTime(endsAtValue);
     if (
-      !startsAtValue ||
-      !endsAtValue ||
+      !taskStartDate ||
+      !taskStartTime ||
+      !taskEndDate ||
+      !taskEndTime ||
       !startsAt ||
       !endsAt
     ) {
-      setMessage({ success: false, message: "Periksa jadwal mulai dan selesai." });
+      setFormError("Periksa jadwal mulai dan selesai.");
       return;
     }
+    if (!taskProjectId) {
+      setFormError("Pilih proyek untuk tugas ini.");
+      return;
+    }
+    setFormError(null);
     startTransition(async () => {
       const result = await createWorkspaceTask({
-        title: String(formData.get("title") ?? ""),
-        description: String(formData.get("description") ?? ""),
-        projectId: String(formData.get("projectId") ?? ""),
-        assigneeId: String(formData.get("assigneeId") ?? ""),
-        memberIds: formData.getAll("memberIds").map(String),
+        title: taskTitle,
+        description: taskDescription,
+        projectId: taskProjectId,
+        assigneeId: taskAssigneeId === "none" ? "" : taskAssigneeId,
+        memberIds: taskMemberIds,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
-        color: String(formData.get("color") ?? ""),
+        color: taskColor,
       });
-      setMessage(result);
       if (result.success) {
+        toast.success(result.message);
         setIsDialogOpen(false);
         router.refresh();
+      } else {
+        setFormError(result.message);
+        toast.error(result.message);
       }
     });
   };
@@ -443,10 +529,12 @@ export default function DailyTaskBoard({
   const onStatusChange = (taskId: string, status: string) => {
     startTransition(async () => {
       const result = await updateWorkspaceTaskStatus(taskId, status);
-      setMessage(result);
       if (result.success) {
+        toast.success(result.message);
         requestNotificationFeedRefresh();
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     });
   };
@@ -454,17 +542,27 @@ export default function DailyTaskBoard({
   const onColorChange = (taskId: string, color: string) => {
     startTransition(async () => {
       const result = await updateWorkspaceTaskColor(taskId, color);
-      setMessage(result);
-      if (result.success) router.refresh();
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
     });
   };
 
-  const onDelete = (taskId: string) => {
-    if (!window.confirm("Hapus tugas ini?")) return;
+  const confirmDeleteTask = () => {
+    if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
     startTransition(async () => {
-      const result = await deleteWorkspaceTask(taskId);
-      setMessage(result);
-      if (result.success) router.refresh();
+      const result = await deleteWorkspaceTask(targetId);
+      setDeleteTarget(null);
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
     });
   };
 
@@ -480,8 +578,12 @@ export default function DailyTaskBoard({
         durationMinutes: Math.min(1440, diffMinutes),
         note: `Tugas: ${task.title}`,
       });
-      setMessage(result);
-      if (result.success) router.refresh();
+      if (result.success) {
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
     });
   };
 
@@ -489,21 +591,18 @@ export default function DailyTaskBoard({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Papan Tugas Harian &amp; Proyek</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="type-h2">Papan Tugas Harian &amp; Proyek</h2>
+          <p className="type-p2 text-muted-foreground">
             Atur jadwal pekerjaan tim, perbarui status eksekusi, dan kirim realisasi jam kerja langsung ke Timesheet.
           </p>
         </div>
         <Button
           size="sm"
-          onClick={() => {
-            setMessage(null);
-            setIsDialogOpen(true);
-          }}
+          onClick={openCreateTaskModal}
           disabled={!projects.length}
         >
           <Plus className="mr-1.5 size-4" aria-hidden="true" />
-          Tambah Tugas Proyek
+          Tambah Tugas
         </Button>
       </div>
 
@@ -519,25 +618,12 @@ export default function DailyTaskBoard({
               <Icon className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">{label}</p>
-              <p className="mt-0.5 text-xl font-bold leading-none">{value}</p>
+              <p className="type-p3 font-medium text-muted-foreground">{label}</p>
+              <p className="type-kpi mt-0.5">{value}</p>
             </div>
           </CardBox>
         ))}
       </div>
-
-      {message && !isDialogOpen && (
-        <p
-          role={message.success ? "status" : "alert"}
-          className={`rounded-md border px-4 py-3 text-sm ${
-            message.success
-              ? "border-success/30 bg-lightsuccess text-success"
-              : "border-destructive/30 bg-destructive/10 text-destructive"
-          }`}
-        >
-          {message.message}
-        </p>
-      )}
 
       <CardBox className="space-y-5 rounded-2xl p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -552,6 +638,7 @@ export default function DailyTaskBoard({
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => updateUrl(getJakartaDateKey())}
             >
               Hari ini
@@ -564,7 +651,7 @@ export default function DailyTaskBoard({
             >
               <ChevronRight className="size-4" aria-hidden="true" />
             </Button>
-            <span className="ml-1 inline-flex min-w-0 items-center gap-2 text-sm font-semibold capitalize">
+            <span className="type-h3 ml-1 inline-flex min-w-0 items-center gap-2 capitalize">
               <CalendarDays className="size-4 text-primary" aria-hidden="true" />
               {periodLabel}
             </span>
@@ -582,7 +669,6 @@ export default function DailyTaskBoard({
                 variant={view === option.id ? "default" : "ghost"}
                 aria-pressed={view === option.id}
                 onClick={() => updateUrl(selectedDate, option.id)}
-                className="h-8 px-3"
               >
                 {option.label}
               </Button>
@@ -590,40 +676,37 @@ export default function DailyTaskBoard({
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_minmax(180px,0.7fr)_minmax(180px,0.7fr)]">
-            <div className="relative sm:col-span-2 lg:col-span-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Cari tugas, proyek, atau anggota"
-                aria-label="Cari tugas, proyek, atau anggota"
-                className="pl-9"
-              />
-            </div>
-            <select
-              aria-label="Filter anggota"
-              value={memberFilter}
-              onChange={(event) => setMemberFilter(event.target.value)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">Semua anggota</option>
+          <div className="relative sm:col-span-2 lg:col-span-1">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari tugas, proyek, atau anggota"
+              aria-label="Cari tugas, proyek, atau anggota"
+              className="pl-9"
+            />
+          </div>
+          <Select value={memberFilter} onValueChange={setMemberFilter}>
+            <SelectTrigger aria-label="Filter anggota">
+              <SelectValue placeholder="Semua anggota" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua anggota</SelectItem>
               {members.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
+                <SelectItem key={member.id} value={member.id}>
+                  {member.name}
+                </SelectItem>
               ))}
-            </select>
-            <select
-              aria-label="Filter proyek"
-              value={projectFilter}
-              onChange={(event) => setProjectFilter(event.target.value)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">Semua proyek</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+            </SelectContent>
+          </Select>
+          <Combobox
+            options={projectFilterOptions}
+            value={projectFilter}
+            onValueChange={setProjectFilter}
+            placeholder="Semua proyek"
+            searchPlaceholder="Cari proyek..."
+            emptyText="Proyek tidak ditemukan."
+          />
         </div>
 
         {view === "day" ? (
@@ -645,10 +728,10 @@ export default function DailyTaskBoard({
       <CardBox className="overflow-hidden rounded-2xl p-0 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border p-4 sm:p-5">
           <div>
-            <h2 className="font-semibold">Daftar tugas</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {filteredTasks.length} tugas ditampilkan. Status dapat diubah oleh pembuat atau anggota yang ditugaskan.
-          </p>
+            <h2 className="type-h2">Daftar tugas</h2>
+            <p className="type-p2 mt-1 text-muted-foreground">
+              {filteredTasks.length} tugas ditampilkan. Status dapat diubah oleh pembuat atau anggota yang ditugaskan.
+            </p>
           </div>
           {(search || memberFilter !== "all" || projectFilter !== "all") && (
             <Button
@@ -679,8 +762,8 @@ export default function DailyTaskBoard({
             return (
               <div key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/20 sm:px-5">
                 <div className="min-w-0 flex-1">
-                  <p className="break-words font-medium">{task.title}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="type-h3 break-words">{task.title}</p>
+                  <p className="type-p3 mt-1 text-muted-foreground">
                     {task.project.name} · {memberNames.join(", ") || "Belum ditugaskan"} ·{" "}
                     {view !== "day" && (
                       <>
@@ -693,35 +776,60 @@ export default function DailyTaskBoard({
                     )}
                     {formatJakartaTime(new Date(task.startsAt))}–{formatJakartaTime(new Date(task.endsAt))}
                   </p>
-                  {task.description && <p className="mt-1 text-sm text-muted-foreground">{task.description}</p>}
+                  {task.description && (
+                    <p className="type-p2 mt-1 text-muted-foreground">
+                      {task.description}
+                    </p>
+                  )}
                 </div>
                 {canEdit ? (
-                  <select
-                    aria-label={`Status ${task.title}`}
+                  <Select
                     value={task.status}
                     disabled={isPending}
-                    onChange={(event) => onStatusChange(task.id, event.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+                    onValueChange={(nextStatus) => onStatusChange(task.id, nextStatus)}
                   >
-                    {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-                  </select>
+                    <SelectTrigger
+                      aria-label={`Status ${task.title}`}
+                      className="h-8 w-[136px]"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statuses.map((status) => (
+                        <SelectItem key={status.value} value={status.value}>
+                          {status.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
-                  <Badge variant="gray">{statuses.find((status) => status.value === task.status)?.label}</Badge>
+                  <Badge variant="gray">
+                    {statuses.find((status) => status.value === task.status)?.label}
+                  </Badge>
                 )}
                 {canEdit && (
-                  <select
-                    aria-label={`Warna bar ${task.title}`}
+                  <Select
                     value={task.color}
                     disabled={isPending}
-                    onChange={(event) => onColorChange(task.id, event.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-2 text-xs"
+                    onValueChange={(nextColor) => onColorChange(task.id, nextColor)}
                   >
-                    {habitTaskColors.map((color) => (
-                      <option key={color.value} value={color.value}>
-                        Warna: {color.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      aria-label={`Warna bar ${task.title}`}
+                      className="h-8 w-[144px]"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {habitTaskColors.map((color) => (
+                        <SelectItem key={color.value} value={color.value}>
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`size-2.5 rounded-full ${color.className}`} />
+                            <span>Warna: {color.label}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
                 {canEdit && (
                   <Button
@@ -731,9 +839,9 @@ export default function DailyTaskBoard({
                     disabled={isPending}
                     onClick={() => onLogToTimesheet(task)}
                     title="Catat durasi tugas ini langsung ke Timesheet proyek"
-                    className="h-9 gap-1.5 text-xs"
+                    className="gap-1.5"
                   >
-                    <Clock3 className="size-3.5 text-primary" />
+                    <Clock3 className="size-3.5 text-primary" aria-hidden="true" />
                     <span>+ Timesheet</span>
                   </Button>
                 )}
@@ -743,7 +851,9 @@ export default function DailyTaskBoard({
                     tooltip={`Hapus tugas ${task.title}`}
                     icon={Trash2}
                     disabled={isPending}
-                    onClick={() => onDelete(task.id)}
+                    onClick={() =>
+                      setDeleteTarget({ id: task.id, title: task.title })
+                    }
                     className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
                     variant="ghost"
                   />
@@ -752,47 +862,47 @@ export default function DailyTaskBoard({
             );
           })}
           {filteredTasks.length === 0 && (
-            <div className="px-4 py-12 text-center sm:px-6">
-              <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
-                <ListTodo className="size-6" aria-hidden="true" />
-              </span>
-              <h3 className="mt-3 font-semibold">
-                {tasks.length === 0
-                  ? "Belum ada tugas pada periode ini"
-                  : "Tugas tidak ditemukan"}
-              </h3>
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                {tasks.length === 0
-                  ? "Buat tugas pertama untuk mulai menyusun pekerjaan tim."
-                  : "Coba ubah kata kunci atau filter anggota dan proyek."}
-              </p>
-              {tasks.length === 0 ? (
-                <Button
-                  type="button"
-                  className="mt-4"
-                  onClick={() => {
-                    setMessage(null);
-                    setIsDialogOpen(true);
-                  }}
-                  disabled={!projects.length}
-                >
-                  <Plus className="mr-2 size-4" aria-hidden="true" />
-                  Tambah tugas
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => {
-                    setSearch("");
-                    setMemberFilter("all");
-                    setProjectFilter("all");
-                  }}
-                >
-                  Hapus filter
-                </Button>
-              )}
+            <div className="p-6">
+              <EmptyState
+                variant="inline"
+                icon={ListTodo}
+                title={
+                  tasks.length === 0
+                    ? "Belum ada tugas pada periode ini"
+                    : "Tugas tidak ditemukan"
+                }
+                description={
+                  tasks.length === 0
+                    ? "Buat tugas pertama untuk mulai menyusun pekerjaan tim."
+                    : "Coba ubah kata kunci atau filter anggota dan proyek."
+                }
+                action={
+                  tasks.length === 0 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={openCreateTaskModal}
+                      disabled={!projects.length}
+                    >
+                      <Plus className="mr-1.5 size-4" aria-hidden="true" />
+                      Tambah tugas
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSearch("");
+                        setMemberFilter("all");
+                        setProjectFilter("all");
+                      }}
+                    >
+                      Hapus filter
+                    </Button>
+                  )
+                }
+              />
             </div>
           )}
         </div>
@@ -809,6 +919,7 @@ export default function DailyTaskBoard({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => setIsDialogOpen(false)}
               disabled={isPending}
             >
@@ -817,6 +928,7 @@ export default function DailyTaskBoard({
             <Button
               type="submit"
               form="workspace-task-form"
+              size="sm"
               disabled={isPending || !projects.length}
             >
               {isPending ? "Menyimpan..." : "Simpan Tugas"}
@@ -825,16 +937,12 @@ export default function DailyTaskBoard({
         }
       >
         <div className="space-y-4">
-          {message && (
+          {formError && (
             <p
-              role={message.success ? "status" : "alert"}
-              className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                message.success
-                  ? "border-success/30 bg-lightsuccess text-success"
-                  : "border-destructive/30 bg-destructive/10 text-destructive"
-              }`}
+              role="alert"
+              className="type-p3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 font-medium text-destructive"
             >
-              {message.message}
+              {formError}
             </p>
           )}
           <form
@@ -842,14 +950,15 @@ export default function DailyTaskBoard({
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={(event) => {
               event.preventDefault();
-              onCreateTask(new FormData(event.currentTarget));
+              onCreateTask();
             }}
           >
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="workspace-task-title">Nama Tugas Pekerjaan</Label>
               <Input
                 id="workspace-task-title"
-                name="title"
+                value={taskTitle}
+                onChange={(event) => setTaskTitle(event.target.value)}
                 placeholder="Contoh: Pemasangan bekisting / Pengecekan struktur"
                 required
                 minLength={2}
@@ -857,114 +966,170 @@ export default function DailyTaskBoard({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="workspace-task-project">Proyek</Label>
-              <select
-                id="workspace-task-project"
-                name="projectId"
-                required
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.code} — {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workspace-task-assignee">Penanggung Jawab (Lead)</Label>
-              <select
-                id="workspace-task-assignee"
-                name="assigneeId"
-                defaultValue={currentUserId}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">Tanpa lead</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workspace-task-start">Mulai (WIB)</Label>
-              <Input
-                id="workspace-task-start"
-                name="startsAt"
-                type="datetime-local"
-                defaultValue={toLocalInput(selectedDate, "09:00")}
-                required
+              <Label>Proyek</Label>
+              <Combobox
+                options={projectModalOptions}
+                value={taskProjectId}
+                onValueChange={setTaskProjectId}
+                placeholder="Pilih proyek"
+                searchPlaceholder="Cari proyek..."
+                emptyText="Proyek tidak ditemukan."
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="workspace-task-end">Selesai (WIB)</Label>
-              <Input
-                id="workspace-task-end"
-                name="endsAt"
-                type="datetime-local"
-                defaultValue={toLocalInput(selectedDate, "11:00")}
-                required
-              />
+              <Label>Penanggung Jawab (Lead)</Label>
+              <Select value={taskAssigneeId} onValueChange={setTaskAssigneeId}>
+                <SelectTrigger aria-label="Penanggung Jawab (Lead)">
+                  <SelectValue placeholder="Pilih lead" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Tanpa lead</SelectItem>
+                  {members.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workspace-task-start-date">Mulai (WIB)</Label>
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <DatePicker
+                    id="workspace-task-start-date"
+                    value={taskStartDate}
+                    onValueChange={setTaskStartDate}
+                    placeholder="Tanggal mulai"
+                  />
+                </div>
+                <Input
+                  aria-label="Jam mulai (WIB)"
+                  type="time"
+                  value={taskStartTime}
+                  onChange={(event) => setTaskStartTime(event.target.value)}
+                  className="w-28 shrink-0"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workspace-task-end-date">Selesai (WIB)</Label>
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <DatePicker
+                    id="workspace-task-end-date"
+                    value={taskEndDate}
+                    onValueChange={setTaskEndDate}
+                    placeholder="Tanggal selesai"
+                  />
+                </div>
+                <Input
+                  aria-label="Jam selesai (WIB)"
+                  type="time"
+                  value={taskEndTime}
+                  onChange={(event) => setTaskEndTime(event.target.value)}
+                  className="w-28 shrink-0"
+                  required
+                />
+              </div>
             </div>
             <fieldset className="space-y-2 sm:col-span-2">
-              <legend className="text-xs font-semibold">Anggota Tim Terlibat</legend>
+              <legend className="type-p3 font-semibold">Anggota Tim Terlibat</legend>
               <div className="grid max-h-28 gap-2 overflow-y-auto rounded-lg border border-input bg-muted/20 p-3 sm:grid-cols-2">
-                {members.map((member) => (
-                  <FormLabel
-                    key={member.id}
-                    className="flex cursor-pointer items-center gap-2 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      name="memberIds"
-                      value={member.id}
-                      defaultChecked={member.id === currentUserId}
-                      className="size-3.5 accent-primary"
-                    />
-                    <span className="truncate">{member.name}</span>
-                  </FormLabel>
-                ))}
+                {members.map((member) => {
+                  const checkboxId = `workspace-member-${member.id}`;
+                  return (
+                    <div key={member.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={checkboxId}
+                        checked={taskMemberIds.includes(member.id)}
+                        onCheckedChange={(checked) =>
+                          toggleTaskMember(member.id, checked === true)
+                        }
+                      />
+                      <Label
+                        htmlFor={checkboxId}
+                        className="type-p3 cursor-pointer truncate font-normal"
+                      >
+                        {member.name}
+                      </Label>
+                    </div>
+                  );
+                })}
               </div>
             </fieldset>
             <fieldset className="space-y-2 sm:col-span-2">
-              <legend className="text-xs font-semibold">Warna Label Tugas</legend>
-              <div className="flex flex-wrap gap-2">
-                {habitTaskColors.map((color, index) => (
-                  <FormLabel
-                    key={color.value}
-                    title={color.label}
-                    className="cursor-pointer"
-                  >
-                    <input
-                      type="radio"
-                      name="color"
-                      value={color.value}
-                      defaultChecked={index === 0}
-                      aria-label={`Warna ${color.label}`}
-                      className="peer sr-only"
-                    />
-                    <span
-                      className={`block size-7 rounded-full ring-offset-2 peer-checked:ring-2 peer-checked:ring-primary ${color.className}`}
-                    />
-                  </FormLabel>
-                ))}
-              </div>
+              <legend className="type-p3 font-semibold">Warna Label Tugas</legend>
+              <RadioGroup
+                value={taskColor}
+                onValueChange={setTaskColor}
+                className="flex flex-wrap gap-2"
+              >
+                {habitTaskColors.map((color) => {
+                  const radioId = `workspace-task-color-${color.value}`;
+                  const isSelected = taskColor === color.value;
+                  return (
+                    <div key={color.value} className="flex items-center">
+                      <RadioGroupItem
+                        id={radioId}
+                        value={color.value}
+                        aria-label={`Warna ${color.label}`}
+                        className="sr-only"
+                      />
+                      <Label
+                        htmlFor={radioId}
+                        title={color.label}
+                        className={`block size-7 cursor-pointer rounded-full ring-offset-2 transition ${color.className} ${
+                          isSelected ? "ring-2 ring-primary" : ""
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
+              </RadioGroup>
             </fieldset>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="workspace-task-description">Catatan (Opsional)</Label>
-              <textarea
+              <Textarea
                 id="workspace-task-description"
-                name="description"
+                value={taskDescription}
+                onChange={(event) => setTaskDescription(event.target.value)}
                 rows={2}
                 maxLength={1000}
                 placeholder="Detail instruksi atau target capaian..."
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="mt-0"
               />
             </div>
           </form>
         </div>
       </GlobalModal>
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Tugas Proyek</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tugas &ldquo;{deleteTarget?.title}&rdquo; akan dihapus permanen dari jadwal tim.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTask}
+              disabled={isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isPending ? "Menghapus..." : "Hapus Tugas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

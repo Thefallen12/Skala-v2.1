@@ -1,10 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   recordIncomingFund,
   recordOutgoingFund,
@@ -17,9 +18,19 @@ import type {
 } from "@/app/actions/finance-cashflow";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { FormLabel, Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
 import { Wallet } from "lucide-react";
@@ -120,6 +131,36 @@ export default function IncomingFundModal({
     control: form.control,
     name: "paymentMethod",
   });
+  const transactionDate = useWatch({
+    control: form.control,
+    name: "transactionDate",
+  });
+  const accountId = useWatch({
+    control: form.control,
+    name: "accountId",
+  });
+  const projectId = useWatch({
+    control: form.control,
+    name: "projectId",
+  });
+  const sourceAccountId = useWatch({
+    control: form.control,
+    name: "sourceAccountId",
+  });
+  const destinationAccountId = useWatch({
+    control: form.control,
+    name: "destinationAccountId",
+  });
+  const projectOptions = useMemo(
+    () => [
+      { value: "__NONE__", label: "Tanpa proyek" },
+      ...projects.map((project) => ({
+        value: project.id,
+        label: project.name,
+      })),
+    ],
+    [projects],
+  );
   useEffect(() => {
     if (!open) return;
     form.reset({
@@ -219,13 +260,18 @@ export default function IncomingFundModal({
       setMessage(result.message);
       setIsError(!result.success);
       if (result.success) {
+        toast.success(result.message || "Transaksi kas berhasil dicatat.");
         handleClose();
         router.refresh();
+      } else {
+        toast.error(result.message);
       }
     } catch (error) {
       console.error("Cashflow form submission failed:", error);
-      setMessage("Transaksi gagal dicatat. Silakan coba kembali.");
+      const errMsg = "Transaksi gagal dicatat. Silakan coba kembali.";
+      setMessage(errMsg);
       setIsError(true);
+      toast.error(errMsg);
     } finally {
       setIsPending(false);
     }
@@ -283,29 +329,34 @@ export default function IncomingFundModal({
       }
     >
       {accounts.length === 0 ? (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="type-p2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-300">
           Buat akun bank/kas terlebih dahulu sebelum mencatat transaksi.
         </p>
       ) : (
-        <form id={formId} className="space-y-5" onSubmit={submit}>
+        <form id={formId} className="space-y-4" onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor={`${formId}-date`}>Tanggal Transaksi</Label>
-              <Input
+              <DatePicker
                 id={`${formId}-date`}
-                type="date"
-                className="h-10 w-full"
-                {...form.register("transactionDate")}
+                value={transactionDate}
+                onValueChange={(dateKey) =>
+                  form.setValue("transactionDate", dateKey, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                disabled={isPending}
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="type-p3 text-muted-foreground">
                 {mode === "incoming"
-                  ? "Tanggal dana masuk (bebas disesuaikan jika input susulan/terlambat)."
+                  ? "Sesuaikan tanggal jika input susulan."
                   : mode === "outgoing"
-                    ? "Tanggal dana keluar (bebas disesuaikan jika pengeluaran telat di-input)."
-                    : "Tanggal transaksi (bebas disesuaikan jika input susulan/terlambat)."}
+                    ? "Sesuaikan tanggal jika pengeluaran susulan."
+                    : "Sesuaikan tanggal transaksi bila perlu."}
               </p>
               {form.formState.errors.transactionDate && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="type-p2 text-destructive" role="alert">
                   {form.formState.errors.transactionDate.message}
                 </p>
               )}
@@ -327,19 +378,20 @@ export default function IncomingFundModal({
                 required
               />
               {form.formState.errors.amount && (
-                <p className="text-sm text-destructive" role="alert">
+                <p className="type-p2 text-destructive" role="alert">
                   {form.formState.errors.amount.message}
                 </p>
               )}
             </div>
           </div>
+
           <div className="space-y-2">
             <Label htmlFor={`${formId}-description`}>
               {mode === "incoming"
-                ? "Sumber Dana / Keterangan"
+                ? "Sumber Dana"
                 : mode === "outgoing"
-                  ? "Keperluan Pengeluaran / Keterangan"
-                  : "Keterangan Transfer"}
+                  ? "Keperluan"
+                  : "Keterangan"}
             </Label>
             <Input
               id={`${formId}-description`}
@@ -348,13 +400,13 @@ export default function IncomingFundModal({
                 mode === "incoming"
                   ? "Contoh: Pembayaran Termin 1 Project A"
                   : mode === "outgoing"
-                    ? "Contoh: Pembelian ATK kantor, bensin armada proyek, dsb"
+                    ? "Contoh: Pembelian ATK kantor, bensin armada"
                     : "Contoh: Pindah kas operasional mingguan"
               }
               {...form.register("sourceDesc")}
             />
             {form.formState.errors.sourceDesc && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="type-p2 text-destructive" role="alert">
                 {form.formState.errors.sourceDesc.message}
               </p>
             )}
@@ -365,122 +417,177 @@ export default function IncomingFundModal({
               <div className="space-y-2">
                 <Label htmlFor={`${formId}-account`}>
                   {mode === "incoming"
-                    ? "Disimpan Ke (Buku Kas/Bank)"
-                    : "Sumber Dana / Dipotong Dari"}
+                    ? "Simpan Ke Rekening"
+                    : "Sumber Rekening"}
                 </Label>
-                <select
-                  id={`${formId}-account`}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                  {...form.register("accountId")}
+                <Select
+                  value={accountId}
+                  onValueChange={(value) =>
+                    form.setValue("accountId", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  disabled={isPending}
                 >
-                  <option value="">Pilih buku bank/kas</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.accountName} · {currency(account.balance)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id={`${formId}-account`}>
+                    <SelectValue placeholder="Pilih buku bank/kas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.accountName} · {currency(account.balance)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {form.formState.errors.accountId && (
-                  <p className="text-sm text-destructive" role="alert">
+                  <p className="type-p2 text-destructive" role="alert">
                     {form.formState.errors.accountId.message}
                   </p>
                 )}
               </div>
+
               <div className="space-y-2">
-                <Label>Metode {mode === "incoming" ? "Penerimaan" : "Pembayaran"}</Label>
-                <div className="flex flex-wrap gap-4">
+                <Label>
+                  {mode === "incoming" ? "Metode Masuk" : "Metode Keluar"}
+                </Label>
+                <RadioGroup
+                  value={paymentMethod}
+                  onValueChange={(value) => {
+                    if (
+                      value === "TRANSFER" ||
+                      value === "CASH" ||
+                      value === "DEPOSIT"
+                    ) {
+                      form.setValue("paymentMethod", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                  }}
+                  className="flex flex-wrap gap-3"
+                >
                   {[
                     ["TRANSFER", "Transfer"],
                     ["CASH", "Tunai"],
                     ...(mode === "incoming" ? [["DEPOSIT", "Setor Tunai"]] : []),
                   ].map(([value, label]) => (
-                    <FormLabel
+                    <Label
                       key={value}
-                      className="flex items-center gap-2 text-sm"
+                      htmlFor={`${formId}-method-${value}`}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2 font-normal hover:bg-muted/40"
                     >
-                      <input
-                        type="radio"
+                      <RadioGroupItem
+                        id={`${formId}-method-${value}`}
                         value={value}
-                        {...form.register("paymentMethod")}
                       />
-                      {label}
-                    </FormLabel>
+                      <span className="type-p2">{label}</span>
+                    </Label>
                   ))}
+                </RadioGroup>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`${formId}-sender`}>
+                    {mode === "incoming"
+                      ? "Pengirim"
+                      : "Penerima (Opsional)"}
+                  </Label>
+                  <Input
+                    id={`${formId}-sender`}
+                    maxLength={160}
+                    placeholder={
+                      mode === "incoming"
+                        ? "Contoh: PT Mitra Sejahtera"
+                        : "Contoh: Toko Bangunan Berkah"
+                    }
+                    {...form.register("senderName")}
+                  />
+                  {form.formState.errors.senderName && (
+                    <p className="type-p2 text-destructive" role="alert">
+                      {form.formState.errors.senderName.message}
+                    </p>
+                  )}
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`${formId}-sender`}>
-                  {mode === "incoming"
-                    ? "Nama Pengirim / Bank Pengirim"
-                    : "Nama Penerima / Toko / Vendor (Opsional)"}
-                </Label>
-                <Input
-                  id={`${formId}-sender`}
-                  maxLength={160}
-                  placeholder={
-                    mode === "incoming"
-                      ? "Contoh: PT Mitra Sejahtera / Bank BCA"
-                      : "Contoh: Toko Bangunan Berkah / Penerima"
-                  }
-                  {...form.register("senderName")}
-                />
-                {form.formState.errors.senderName && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {form.formState.errors.senderName.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`${formId}-project`}>
-                  Proyek terkait (opsional)
-                </Label>
-                <select
-                  id={`${formId}-project`}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                  {...form.register("projectId")}
-                >
-                  <option value="">Tanpa proyek</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`${formId}-project`}>
+                    Proyek (Opsional)
+                  </Label>
+                  <Combobox
+                    id={`${formId}-project`}
+                    options={projectOptions}
+                    value={projectId || "__NONE__"}
+                    onValueChange={(value) =>
+                      form.setValue(
+                        "projectId",
+                        value === "__NONE__" ? "" : value,
+                        { shouldDirty: true },
+                      )
+                    }
+                    placeholder="Tanpa proyek"
+                    searchPlaceholder="Cari proyek..."
+                    disabled={isPending}
+                  />
+                </div>
               </div>
             </>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={`${formId}-source-account`}>Akun Sumber</Label>
-                <select
-                  id={`${formId}-source-account`}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                  {...form.register("sourceAccountId")}
+                <Select
+                  value={sourceAccountId}
+                  onValueChange={(value) =>
+                    form.setValue("sourceAccountId", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  disabled={isPending}
                 >
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.accountName} · {currency(account.balance)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id={`${formId}-source-account`}>
+                    <SelectValue placeholder="Pilih akun sumber" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.accountName} · {currency(account.balance)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor={`${formId}-destination-account`}>
                   Akun Tujuan
                 </Label>
-                <select
-                  id={`${formId}-destination-account`}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                  {...form.register("destinationAccountId")}
+                <Select
+                  value={destinationAccountId}
+                  onValueChange={(value) =>
+                    form.setValue("destinationAccountId", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  disabled={isPending}
                 >
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.accountName} · {currency(account.balance)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id={`${formId}-destination-account`}>
+                    <SelectValue placeholder="Pilih akun tujuan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.accountName} · {currency(account.balance)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {form.formState.errors.destinationAccountId && (
-                  <p className="text-sm text-destructive" role="alert">
+                  <p className="type-p2 text-destructive" role="alert">
                     Pilih akun tujuan yang berbeda.
                   </p>
                 )}
@@ -488,13 +595,13 @@ export default function IncomingFundModal({
             </div>
           )}
 
-          <div className="space-y-2 rounded-lg border border-slate-700 p-4">
+          <div className="space-y-2 rounded-lg border border-border p-4">
             <Label>
               {mode === "incoming"
                 ? proofLabels[paymentMethod]
                 : mode === "outgoing"
-                  ? "Unggah Bukti Transaksi / Nota / Struk / Kwitansi"
-                  : "Unggah Bukti Transfer Antar Akun"}
+                  ? "Bukti Pengeluaran"
+                  : "Bukti Transfer"}
             </Label>
             <FinancePaymentProofUpload
               value={proofFile}
@@ -505,14 +612,14 @@ export default function IncomingFundModal({
               disabled={isPending}
             />
             {proofError && (
-              <p className="text-sm text-destructive" role="alert">
+              <p className="type-p2 text-destructive" role="alert">
                 {proofError}
               </p>
             )}
           </div>
           {message && (
             <p
-              className={`text-sm ${isError ? "text-destructive" : "text-emerald-500"}`}
+              className={`type-p2 ${isError ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}
               role={isError ? "alert" : "status"}
             >
               {message}

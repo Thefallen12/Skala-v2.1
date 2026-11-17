@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
+import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { FileCheck2, Loader2, Upload } from "lucide-react";
+import { Loader2, Ticket } from "lucide-react";
+import { toast } from "sonner";
 import { recordMaterialDelivery } from "@/app/actions/material-contracts";
+import { getJakartaDateKey } from "@/lib/habit-date";
 import { compressFieldImageFile } from "@/lib/image-compression-client";
 import {
   calculateContractDeliverySubtotal,
@@ -14,6 +16,10 @@ import {
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,12 +44,6 @@ function currency(amount: number): string {
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(amount);
-}
-
-function getLocalTodayIsoDate(): string {
-  const now = new Date();
-  const offsetMs = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
 }
 
 export default function MaterialDeliveryModal({
@@ -77,8 +77,8 @@ export default function MaterialDeliveryModal({
       isOpen={open}
       onClose={() => onOpenChange(false)}
       onOpenChange={onOpenChange}
-      title="Catat Surat Jalan Material Curah (DO)"
-      description="Pencatatan penerimaan pasir/batu berdasarkan Kontrak Payung. Status awal otomatis UNBILLED untuk ditarik Keuangan saat vendor menagih."
+      title="Catat Surat Jalan Material"
+      description="Pencatatan penerimaan material alam berdasarkan tiket lapangan aktif & kontrak payung."
       className="sm:max-w-xl"
     >
       <MaterialDeliveryFormBody
@@ -120,16 +120,39 @@ function MaterialDeliveryFormBody({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const availableTickets = lockedProjectId
-    ? contractTickets.filter((ticket) => ticket.projectId === lockedProjectId)
-    : contractTickets;
+
+  const availableTickets = useMemo(() => {
+    const projectFiltered = lockedProjectId
+      ? contractTickets.filter((ticket) => ticket.projectId === lockedProjectId)
+      : contractTickets;
+    if (!defaultContractId || lockedTicketId || defaultTicketId) {
+      return projectFiltered;
+    }
+    const matchingContractTickets = projectFiltered.filter((ticket) =>
+      ticket.items.some((item) => item.materialContractId === defaultContractId),
+    );
+    return matchingContractTickets.length > 0
+      ? matchingContractTickets
+      : projectFiltered;
+  }, [
+    contractTickets,
+    defaultContractId,
+    defaultTicketId,
+    lockedProjectId,
+    lockedTicketId,
+  ]);
+
   const initialTicketId = (() => {
     const candidateId = lockedTicketId || defaultTicketId || "";
-    if (!candidateId) return "";
-    return availableTickets.some((ticket) => ticket.id === candidateId)
-      ? candidateId
-      : "";
+    if (candidateId && availableTickets.some((t) => t.id === candidateId)) {
+      return candidateId;
+    }
+    if (availableTickets.length === 1) {
+      return availableTickets[0].id;
+    }
+    return "";
   })();
+
   const initialTicket =
     availableTickets.find((ticket) => ticket.id === initialTicketId) ?? null;
   const initialTicketItem =
@@ -156,7 +179,7 @@ function MaterialDeliveryFormBody({
   const [projectId, setProjectId] = useState(
     () => lockedProjectId || initialTicket?.projectId || projects[0]?.id || "",
   );
-  const [deliveryDate, setDeliveryDate] = useState(() => getLocalTodayIsoDate());
+  const [deliveryDate, setDeliveryDate] = useState(() => getJakartaDateKey());
   const [doNumber, setDoNumber] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [driverName, setDriverName] = useState("");
@@ -166,15 +189,51 @@ function MaterialDeliveryFormBody({
       : "",
   );
   const [notes, setNotes] = useState("");
-  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofFiles, setProofFiles] = useState<File[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
 
   const selectedTicket =
     availableTickets.find((ticket) => ticket.id === ticketId) ?? null;
+
+  const selectableContracts = useMemo(() => {
+    if (!selectedTicket || selectedTicket.items.length === 0) {
+      return activeContracts;
+    }
+    const ticketContractIds = new Set(
+      selectedTicket.items.map((item) => item.materialContractId),
+    );
+    const matched = activeContracts.filter((c) => ticketContractIds.has(c.id));
+    return matched.length > 0 ? matched : activeContracts;
+  }, [activeContracts, selectedTicket]);
+
   const selectedContract =
-    activeContracts.find((contract) => contract.id === contractId) ?? null;
+    selectableContracts.find((contract) => contract.id === contractId) ??
+    activeContracts.find((contract) => contract.id === contractId) ??
+    null;
+
+  const ticketComboboxOptions = useMemo<ComboboxOption[]>(
+    () =>
+      availableTickets.map((ticket) => ({
+        value: ticket.id,
+        label: `${ticket.ticketNumber} · ${ticket.title}`,
+        description: `${ticket.projectName} — ${ticket.items
+          .map(
+            (item) =>
+              `${item.materialType} (sisa ${formatMaterialVolume(item.remainingQuantity, item.unit)})`,
+          )
+          .join(", ")}`,
+        keywords: [
+          ticket.ticketNumber,
+          ticket.title,
+          ticket.projectName,
+          ...ticket.items.map(
+            (item) => `${item.materialType} ${item.contractNumber}`,
+          ),
+        ],
+      })),
+    [availableTickets],
+  );
+
   const parsedQty = Number(quantityReceived);
   const estimatedSubtotal =
     selectedContract && Number.isFinite(parsedQty) && parsedQty > 0
@@ -182,10 +241,6 @@ function MaterialDeliveryFormBody({
       : 0;
 
   const handleTicketChange = (nextValue: string) => {
-    if (nextValue === "__NONE__") {
-      setTicketId("");
-      return;
-    }
     setTicketId(nextValue);
     const matchedTicket = availableTickets.find(
       (ticket) => ticket.id === nextValue,
@@ -195,6 +250,11 @@ function MaterialDeliveryFormBody({
       setProjectId(matchedTicket.projectId);
     }
     const preferredItem =
+      (defaultContractId
+        ? matchedTicket.items.find(
+            (item) => item.materialContractId === defaultContractId,
+          )
+        : undefined) ??
       matchedTicket.items.find((item) => item.remainingQuantity > 0) ??
       matchedTicket.items[0];
     if (
@@ -208,24 +268,23 @@ function MaterialDeliveryFormBody({
     }
   };
 
-  const handleFileChange = async (file: File | null) => {
+  const handleProofFilesChange = async (files: File[]) => {
+    const file = files[0] ?? null;
     if (!file) {
-      setProofFile(null);
+      setProofFiles([]);
       return;
     }
     setIsCompressing(true);
-    setMessage("");
-    setIsError(false);
     try {
       const prepared = await compressFieldImageFile(file, {
         allowPdfPassthrough: true,
         maxSizeMB: 1,
         maxWidthOrHeight: 1920,
       });
-      setProofFile(prepared);
+      setProofFiles([prepared]);
     } catch (error) {
       console.error("DO proof photo compression failed:", error);
-      setProofFile(file);
+      setProofFiles([file]);
     } finally {
       setIsCompressing(false);
     }
@@ -235,149 +294,151 @@ function MaterialDeliveryFormBody({
     event.preventDefault();
     if (isPending || isCompressing) return;
 
-    if (!contractId || !projectId || !doNumber.trim()) {
-      setMessage("Kontrak, proyek tujuan, dan nomor Surat Jalan wajib diisi.");
-      setIsError(true);
+    if (!ticketId.trim()) {
+      toast.error("Pilih Tiket Material Alam aktif dari Tim Lapangan terlebih dahulu.");
+      return;
+    }
+    if (!contractId || !projectId || !deliveryDate || !doNumber.trim()) {
+      toast.error("Kontrak, proyek tujuan, tanggal, dan nomor Surat Jalan wajib diisi.");
       return;
     }
     if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
-      setMessage("Volume / jumlah rit diterima harus lebih dari 0.");
-      setIsError(true);
+      toast.error("Volume / jumlah rit diterima harus lebih dari 0.");
       return;
     }
 
     const formData = new FormData();
     formData.set("contractId", contractId);
     formData.set("projectId", projectId);
-    if (ticketId) {
-      formData.set("ticketId", ticketId);
-    }
+    formData.set("ticketId", ticketId);
     formData.set("deliveryDate", deliveryDate);
     formData.set("doNumber", doNumber.trim());
     formData.set("vehiclePlate", vehiclePlate.trim());
     formData.set("driverName", driverName.trim());
     formData.set("quantityReceived", String(parsedQty));
     formData.set("notes", notes.trim());
-    if (proofFile) {
-      formData.set("proof", proofFile);
+    if (proofFiles[0]) {
+      formData.set("proof", proofFiles[0]);
     }
-
-    setMessage("");
-    setIsError(false);
 
     startTransition(async () => {
       try {
         const result = await recordMaterialDelivery(formData);
-        setMessage(result.message);
-        setIsError(!result.success);
         if (result.success) {
+          toast.success(result.message);
           requestNotificationFeedRefresh();
           router.refresh();
           onSaved?.();
           onClose();
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
         console.error("Record material delivery failed:", error);
-        setMessage("Gagal mencatat Surat Jalan material. Silakan coba lagi.");
-        setIsError(true);
+        toast.error("Gagal mencatat Surat Jalan material. Silakan coba lagi.");
       }
     });
   };
 
   if (activeContracts.length === 0) {
     return (
-      <div className="space-y-4 py-2 text-sm">
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-200">
-          Belum ada Kontrak Payung material curah yang aktif. Logistik atau
-          Administrasi perlu membuat Kontrak Payung terlebih dahulu pada menu
-          <strong> Logistik &rarr; Kontrak Curah</strong>.
-        </div>
-        <div className="flex justify-end">
+      <EmptyState
+        title="Belum Ada Kontrak Aktif"
+        description="Logistik atau Administrasi perlu membuat Kontrak Payung Material Alam yang aktif sebelum mencatat Surat Jalan."
+        action={
           <Button type="button" variant="outline" onClick={onClose}>
             Tutup
           </Button>
-        </div>
-      </div>
+        }
+      />
     );
   }
 
+  if (availableTickets.length === 0) {
+    return (
+      <EmptyState
+        icon={Ticket}
+        title="Belum Ada Tiket Material Alam Aktif"
+        description="Surat Jalan Material Alam wajib ditautkan ke tiket permintaan aktif dari Tim Lapangan."
+        action={
+          <Button type="button" variant="outline" onClick={onClose}>
+            Tutup
+          </Button>
+        }
+      />
+    );
+  }
+
+  const resolvedProjectLabel = (() => {
+    const targetId = selectedTicket?.projectId || projectId;
+    const match = projects.find((p) => p.id === targetId);
+    if (match) return `${match.kelompokTani} · ${match.title}`;
+    return selectedTicket?.projectName ?? "Proyek Terkait Tiket";
+  })();
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {(lockedTicketId && selectedTicket) || availableTickets.length > 0 ? (
-        <div className="space-y-1.5">
-          <Label htmlFor="md-ticket">
-            {lockedTicketId
-              ? "Tiket Permintaan Terkait"
-              : "Tautkan ke Tiket Permintaan (Opsional)"}
-          </Label>
-          {lockedTicketId && selectedTicket ? (
-            <Input
-              id="md-ticket"
-              readOnly
-              value={`${selectedTicket.ticketNumber} · ${selectedTicket.title}`}
-              className="bg-muted/50"
-            />
-          ) : (
-            <Select
-              value={ticketId || "__NONE__"}
-              onValueChange={handleTicketChange}
-            >
-              <SelectTrigger id="md-ticket">
-                <SelectValue placeholder="Pilih tiket permintaan material alam..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__NONE__">
-                  Tanpa tautan tiket (pengiriman langsung proyek)
-                </SelectItem>
-                {availableTickets.map((ticket) => (
-                  <SelectItem key={ticket.id} value={ticket.id}>
-                    {ticket.ticketNumber} · {ticket.projectName} —{" "}
-                    {ticket.items
-                      .map(
-                        (item) =>
-                          `${item.materialType} (sisa ${formatMaterialVolume(item.remainingQuantity, item.unit)})`,
-                      )
-                      .join(", ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {selectedTicket && (
-            <div className="space-y-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-900 dark:text-sky-200">
-              {selectedTicket.items.map((item) => (
-                <div
-                  key={item.ticketItemId}
-                  className="flex flex-wrap items-center justify-between gap-2"
-                >
-                  <span className="font-medium">
-                    {item.materialType} ({item.contractNumber})
-                  </span>
-                  <span>
-                    Diminta {formatMaterialVolume(item.requestedQuantity, item.unit)} ·
-                    Terkirim {formatMaterialVolume(item.deliveredQuantity, item.unit)} ·
-                    Sisa{" "}
-                    <strong>
-                      {formatMaterialVolume(item.remainingQuantity, item.unit)}
-                    </strong>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : null}
+      <div className="space-y-1.5">
+        <Label htmlFor="md-ticket" className="type-p2 font-medium">
+          Tiket Material Alam <span className="text-destructive">*</span>
+        </Label>
+        {lockedTicketId && selectedTicket ? (
+          <Input
+            id="md-ticket"
+            readOnly
+            value={`${selectedTicket.ticketNumber} · ${selectedTicket.title}`}
+            className="bg-muted/50"
+          />
+        ) : (
+          <Combobox
+            id="md-ticket"
+            options={ticketComboboxOptions}
+            value={ticketId}
+            onValueChange={handleTicketChange}
+            placeholder="Pilih tiket material alam aktif..."
+            searchPlaceholder="Cari nomor tiket, proyek, atau material..."
+            emptyText="Tiket material alam aktif tidak ditemukan."
+          />
+        )}
+
+        {selectedTicket ? (
+          <div className="space-y-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sky-900 dark:text-sky-200">
+            {selectedTicket.items.map((item) => (
+              <div
+                key={item.ticketItemId}
+                className="type-p3 flex flex-wrap items-center justify-between gap-2"
+              >
+                <span className="font-medium">
+                  {item.materialType} ({item.contractNumber})
+                </span>
+                <span className="tabular-nums">
+                  Diminta {formatMaterialVolume(item.requestedQuantity, item.unit)} ·
+                  Terkirim {formatMaterialVolume(item.deliveredQuantity, item.unit)} ·
+                  Sisa{" "}
+                  <strong>
+                    {formatMaterialVolume(item.remainingQuantity, item.unit)}
+                  </strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="type-p3 text-muted-foreground">
+            Setiap Surat Jalan wajib ditautkan ke tiket permintaan dari Tim Lapangan.
+          </p>
+        )}
+      </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="md-contract">
+        <Label htmlFor="md-contract" className="type-p2 font-medium">
           Kontrak Payung Material <span className="text-destructive">*</span>
         </Label>
         <Select value={contractId} onValueChange={setContractId}>
-          <SelectTrigger id="md-contract">
+          <SelectTrigger id="md-contract" className="w-full">
             <SelectValue placeholder="Pilih kontrak vendor..." />
           </SelectTrigger>
           <SelectContent>
-            {activeContracts.map((contract) => (
+            {selectableContracts.map((contract) => (
               <SelectItem key={contract.id} value={contract.id}>
                 {contract.vendorName} · {contract.materialType} (
                 {contract.contractNumber}) — {currency(contract.unitPrice)}/
@@ -387,14 +448,13 @@ function MaterialDeliveryFormBody({
           </SelectContent>
         </Select>
         {selectedContract && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-xs">
+          <div className="type-p3 flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
             <Badge variant="outline">{selectedContract.materialType}</Badge>
             <span className="font-medium text-foreground">
               {selectedContract.vendorName}
             </span>
-            <span className="text-muted-foreground">
-              Harga Kontrak: {currency(selectedContract.unitPrice)} /{" "}
-              {selectedContract.unit}
+            <span className="text-muted-foreground tabular-nums">
+              {currency(selectedContract.unitPrice)} / {selectedContract.unit}
             </span>
           </div>
         )}
@@ -402,55 +462,34 @@ function MaterialDeliveryFormBody({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="md-project">
-            Lokasi Proyek Penerima <span className="text-destructive">*</span>
+          <Label htmlFor="md-project" className="type-p2 font-medium">
+            Proyek Tujuan <span className="text-destructive">*</span>
           </Label>
-          {lockedProjectId ? (
-            <Input
-              id="md-project"
-              readOnly
-              value={(() => {
-                const match = projects.find((p) => p.id === lockedProjectId);
-                return match
-                  ? `${match.kelompokTani} · ${match.title}`
-                  : "Proyek Saat Ini";
-              })()}
-              className="bg-muted/50"
-            />
-          ) : (
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger id="md-project">
-                <SelectValue placeholder="Pilih proyek..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.kelompokTani} · {project.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Input
+            id="md-project"
+            readOnly
+            value={resolvedProjectLabel}
+            className="bg-muted/50"
+          />
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="md-date">
-            Tanggal Terima / Pengiriman <span className="text-destructive">*</span>
+          <Label htmlFor="md-date" className="type-p2 font-medium">
+            Tanggal Pengiriman <span className="text-destructive">*</span>
           </Label>
-          <Input
+          <DatePicker
             id="md-date"
-            type="date"
-            required
             value={deliveryDate}
-            onChange={(event) => setDeliveryDate(event.target.value)}
+            onValueChange={setDeliveryDate}
+            placeholder="Pilih tanggal"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="md-do-number">
-            Nomor Surat Jalan (DO Vendor) <span className="text-destructive">*</span>
+          <Label htmlFor="md-do-number" className="type-p2 font-medium">
+            Nomor Surat Jalan <span className="text-destructive">*</span>
           </Label>
           <Input
             id="md-do-number"
@@ -462,8 +501,8 @@ function MaterialDeliveryFormBody({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="md-qty">
-            Volume / Jumlah Diterima ({selectedContract?.unit ?? "RIT"}){" "}
+          <Label htmlFor="md-qty" className="type-p2 font-medium">
+            Volume ({selectedContract?.unit ?? "RIT"}){" "}
             <span className="text-destructive">*</span>
           </Label>
           <Input
@@ -480,12 +519,12 @@ function MaterialDeliveryFormBody({
       </div>
 
       {estimatedSubtotal > 0 && selectedContract && (
-        <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+        <div className="type-p3 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
           <span className="text-emerald-800 dark:text-emerald-200">
-            Nilai DO Kontrak ({parsedQty} {selectedContract.unit} &times;{" "}
+            Nilai DO ({parsedQty} {selectedContract.unit} &times;{" "}
             {currency(selectedContract.unitPrice)})
           </span>
-          <span className="font-bold text-emerald-700 dark:text-emerald-300">
+          <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
             {currency(estimatedSubtotal)}
           </span>
         </div>
@@ -493,7 +532,9 @@ function MaterialDeliveryFormBody({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="md-plate">Plat Nomor Truk</Label>
+          <Label htmlFor="md-plate" className="type-p2 font-medium">
+            Plat Nomor Truk
+          </Label>
           <Input
             id="md-plate"
             placeholder="Contoh: B 9123 KDA"
@@ -503,7 +544,9 @@ function MaterialDeliveryFormBody({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="md-driver">Nama Supir</Label>
+          <Label htmlFor="md-driver" className="type-p2 font-medium">
+            Nama Supir
+          </Label>
           <Input
             id="md-driver"
             placeholder="Opsional"
@@ -514,42 +557,28 @@ function MaterialDeliveryFormBody({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="md-proof">Foto Bukti Surat Jalan Fisik</Label>
-        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-3">
-          <Input
-            id="md-proof"
-            type="file"
-            accept="image/*,.heic,.heif,.pdf,application/pdf"
-            disabled={isCompressing || isPending}
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              void handleFileChange(file);
-            }}
-          />
-          {isCompressing && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              Mengompres foto Surat Jalan agar ringan saat diunggah...
-            </p>
-          )}
-          {proofFile && !isCompressing && (
-            <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              <FileCheck2 className="size-3.5" />
-              Siap diunggah: {proofFile.name} (
-              {Math.max(1, Math.round(proofFile.size / 1024))} KB)
-            </p>
-          )}
-          {!proofFile && !isCompressing && (
-            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Upload className="size-3.5" />
-              Foto kamera HP otomatis dikompres sebelum dikirim (JPG/PNG/WEBP/PDF).
-            </p>
-          )}
-        </div>
+        <Label htmlFor="md-proof" className="type-p2 font-medium">
+          Foto Surat Jalan Fisik
+        </Label>
+        <FileDropzone
+          id="md-proof"
+          accept="image/*,.heic,.heif,.pdf,application/pdf"
+          capture="environment"
+          maxFiles={1}
+          maxSizeMb={10}
+          files={proofFiles}
+          disabled={isCompressing || isPending}
+          label={isCompressing ? "Mengompres foto..." : "Unggah Foto Surat Jalan"}
+          hint="JPG, PNG, WEBP, atau PDF. Foto kamera otomatis dikompres."
+          onFilesChange={(files) => void handleProofFilesChange(files)}
+          onError={(err) => toast.error(err)}
+        />
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="md-notes">Catatan Lokasi / Kondisi Barang</Label>
+        <Label htmlFor="md-notes" className="type-p2 font-medium">
+          Catatan Lokasi
+        </Label>
         <Textarea
           id="md-notes"
           rows={2}
@@ -558,18 +587,6 @@ function MaterialDeliveryFormBody({
           onChange={(event) => setNotes(event.target.value)}
         />
       </div>
-
-      {message && (
-        <div
-          className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-            isError
-              ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <div className="flex justify-end gap-2 pt-2">
         <Button
@@ -580,11 +597,14 @@ function MaterialDeliveryFormBody({
         >
           Batal
         </Button>
-        <Button type="submit" disabled={isPending || isCompressing}>
+        <Button
+          type="submit"
+          disabled={isPending || isCompressing || !ticketId.trim()}
+        >
           {isPending ? (
             <>
-              <Loader2 className="mr-1.5 size-4 animate-spin" />
-              Menyimpan DO...
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Menyimpan...
             </>
           ) : (
             "Simpan Surat Jalan"

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import BreadcrumbComp from "../../../layout/shared/breadcrumb/BreadcrumbComp";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   DirectStockPurchaseStatus,
   FulfillmentStatus,
@@ -159,12 +159,13 @@ export default async function LogisticsStockPage({
 
   return (
     <>
-      <BreadcrumbComp
+      <PageHeader
         title="Stok Logistik"
-        items={[
-          { to: "/", title: "Beranda" },
-          { to: "/apps/logistics", title: "Logistik Lapangan" },
-          { title: "Stok Logistik" },
+        description="Pantau ketersediaan SKU material, katalog gudang, dan penerimaan pembelian langsung."
+        breadcrumbs={[
+          { label: "Beranda", href: "/" },
+          { label: "Logistik Lapangan", href: "/apps/logistics" },
+          { label: "Stok Logistik" },
         ]}
       />
       <LogisticsWorkspace
@@ -179,16 +180,16 @@ export default async function LogisticsStockPage({
               ticket.directStockPurchases.flatMap((purchase) =>
                 purchase.items
                   .map((purchaseItem) => purchaseItem.stockItemId)
-                  .filter((id): id is string => Boolean(id))
-              )
+                  .filter((id): id is string => Boolean(id)),
+              ),
             );
             const activeNameUnits = new Set(
               ticket.directStockPurchases.flatMap((purchase) =>
                 purchase.items.map(
                   (purchaseItem) =>
-                    `${purchaseItem.itemName.trim().toLowerCase()}::${purchaseItem.unit.trim().toLowerCase()}`
-                )
-              )
+                    `${purchaseItem.itemName.trim().toLowerCase()}::${purchaseItem.unit.trim().toLowerCase()}`,
+                ),
+              ),
             );
             const eligibleItems = ticket.items
               .filter((item) => {
@@ -231,8 +232,8 @@ export default async function LogisticsStockPage({
         stockPurchases={directStockPurchases.map((purchase) => ({
           ...purchase,
           totalAmount: decimalStringFromScaledInteger(purchase.totalAmount),
-          hasFinanceProof: purchase.paymentTransactions.some(
-            (payment) => Boolean(payment.proofOfTransferUrl),
+          hasFinanceProof: purchase.paymentTransactions.some((payment) =>
+            Boolean(payment.proofOfTransferUrl),
           ),
           createdAt: purchase.createdAt.toISOString(),
           receivedAt: purchase.receivedAt?.toISOString() ?? null,

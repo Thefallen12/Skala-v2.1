@@ -7,14 +7,15 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://www.skala-prioritas.com',
     cleartext: false,
-    androidScheme: 'https'
+    androidScheme: 'https',
+    errorPath: 'offline.html'
   },
   android: {
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    // Paksa WebView memakai lebar layar perangkat sesungguhnya
-    overrideUserAgent: 'Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 SkalaApp/2.1'
+    // Pertahankan User-Agent WebView asli perangkat sambil menyertakan token SkalaApp/2.1
+    appendUserAgent: 'SkalaApp/2.1'
   }
 };
 

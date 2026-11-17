@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./css/globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import ServiceWorkerRegister from "@/app/components/service-worker/ServiceWorkerRegister";
 import InAppUpdateManager from "@/app/components/pwa/InAppUpdateManager";
+import ApkBackButtonHandler from "@/app/components/apk/ApkBackButtonHandler";
 import PageTransition from "@/app/components/layout/PageTransition";
 
 const dmSans = DM_Sans({
@@ -30,7 +32,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" suppressHydrationWarning data-scroll-behavior="smooth">
+    <html
+      lang="id"
+      className={dmSans.variable}
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+    >
       <head>
         <link
           rel="icon"
@@ -44,7 +51,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={`${dmSans.className}`}>
+      <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -53,7 +60,9 @@ export default function RootLayout({
         >
           <ServiceWorkerRegister />
           <InAppUpdateManager />
+          <ApkBackButtonHandler />
           <PageTransition>{children}</PageTransition>
+          <Toaster position="top-center" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

@@ -15,8 +15,14 @@ import {
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
-import { calculateWeightedProjectProgress } from "@/lib/project-progress";
-import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
+import {
+  calculateWeightedProjectProgress,
+  toJakartaDateKey,
+} from "@/lib/project-progress";
+import {
+  decimalNumberFromScaledInteger,
+  decimalStringFromScaledInteger,
+} from "@/lib/scaled-decimal";
 import { loadActiveTicketMaterialContractOptions } from "@/lib/material-contracts-server";
 
 export const metadata: Metadata = {
@@ -84,7 +90,7 @@ export default async function ProjectsWorkstationPage({
       fieldPic: { select: { name: true, profilePhotoUrl: true } },
       dailyReports: {
         orderBy: [{ reportDate: "desc" }, { createdAt: "desc" }],
-        take: 100,
+        take: 200,
         select: {
           id: true,
           reportDate: true,
@@ -95,6 +101,7 @@ export default async function ProjectsWorkstationPage({
           dailyVolume: true,
           workSummary: true,
           notes: true,
+          k3SafetyLog: true,
           progressPhotos: {
             orderBy: { createdAt: "asc" },
             select: { url: true, fileUrl: true },
@@ -129,7 +136,7 @@ export default async function ProjectsWorkstationPage({
           },
           progressReports: {
             orderBy: [{ reportDate: "desc" }, { createdAt: "desc" }],
-            take: 50,
+            take: 200,
             select: {
               id: true,
               reportDate: true,
@@ -348,6 +355,101 @@ export default async function ProjectsWorkstationPage({
         ? project.pagu
         : computedWorkPointsWage;
 
+    const serializedReports = project.dailyReports.map((report) => ({
+      id: report.id,
+      reportDate: toJakartaDateKey(report.reportDate) ?? "",
+      weather: report.weather,
+      workersCount: report.workersCount,
+      progress: report.progress,
+      workPointId: report.workPointId,
+      dailyVolume: report.dailyVolume,
+      workSummary: report.workSummary,
+      notes: report.notes,
+      k3SafetyLog: report.k3SafetyLog ?? null,
+      photoUrls: report.progressPhotos.map(
+        (photo) => photo.fileUrl ?? photo.url,
+      ),
+    }));
+
+    const serializedWorkPoints = project.workPoints.map((point) => {
+      const seenDates = new Set<string>();
+      const progressReports = point.progressReports
+        .map((report) => ({
+          id: report.id,
+          reportDate: toJakartaDateKey(report.reportDate) ?? "",
+          progress: report.progress,
+          workSummary: report.workSummary,
+          photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
+        }))
+        .filter((report) => {
+          if (!report.reportDate || seenDates.has(report.reportDate)) return false;
+          seenDates.add(report.reportDate);
+          return true;
+        });
+
+      const approvedWageNum =
+        point.approvedTotalWage !== null
+          ? decimalNumberFromScaledInteger(point.approvedTotalWage)
+          : 0;
+      const proposedWageNum = decimalNumberFromScaledInteger(
+        point.proposedTotalWage,
+      );
+      const volumeNum =
+        point.proposedVolume !== null
+          ? decimalNumberFromScaledInteger(point.proposedVolume)
+          : 0;
+      const unitPriceNum =
+        point.proposedUnitPrice !== null
+          ? decimalNumberFromScaledInteger(point.proposedUnitPrice)
+          : 0;
+      const totalPrice =
+        approvedWageNum > 0
+          ? approvedWageNum
+          : proposedWageNum > 0
+            ? proposedWageNum
+            : Math.round(volumeNum * unitPriceNum * 100) / 100;
+
+      return {
+        id: point.id,
+        title: point.title,
+        location: point.location,
+        plannedStartDate: toJakartaDateKey(point.plannedStartDate),
+        targetDate: toJakartaDateKey(point.targetDate),
+        progress: point.progress,
+        proposedVolume:
+          point.proposedVolume !== null
+            ? decimalStringFromScaledInteger(point.proposedVolume)
+            : null,
+        proposedUnit: point.proposedUnit,
+        proposedUnitPrice:
+          point.proposedUnitPrice !== null
+            ? decimalStringFromScaledInteger(point.proposedUnitPrice)
+            : null,
+        completedVolume: point.completedVolume,
+        proposedTotalWage: decimalStringFromScaledInteger(
+          point.proposedTotalWage,
+        ),
+        approvedTotalWage:
+          point.approvedTotalWage !== null
+            ? decimalStringFromScaledInteger(point.approvedTotalWage)
+            : null,
+        totalPrice,
+        wageAuditLogs: point.wageAuditLogs.map((log) => ({
+          id: log.id,
+          oldWage: decimalStringFromScaledInteger(log.oldWage),
+          newWage: decimalStringFromScaledInteger(log.newWage),
+          reason: log.reason,
+          createdAt: log.createdAt
+            ? typeof log.createdAt === "string"
+              ? log.createdAt
+              : log.createdAt.toISOString()
+            : new Date().toISOString(),
+          changedByName: log.changedBy?.name ?? "Admin",
+        })),
+        progressReports,
+      };
+    });
+
     return {
       id: project.id,
       code: project.code,
@@ -377,8 +479,8 @@ export default async function ProjectsWorkstationPage({
         project.budget !== null
           ? decimalStringFromScaledInteger(project.budget)
           : null,
-      startDate: project.startDate?.toISOString().slice(0, 10) ?? null,
-      endDate: project.endDate?.toISOString().slice(0, 10) ?? null,
+      startDate: toJakartaDateKey(project.startDate),
+      endDate: toJakartaDateKey(project.endDate),
       realized: realizedEntry?.total.toString() ?? "0",
       requestedTotal: realizedEntry?.requestedTotal.toString() ?? "0",
       laborRealized: realizedEntry?.labor.toString() ?? "0",
@@ -390,100 +492,8 @@ export default async function ProjectsWorkstationPage({
         : "0",
       operationalRequested:
         realizedEntry?.requestedOperational.toString() ?? "0",
-      reports: project.dailyReports.map((report) => ({
-        id: report.id,
-        reportDate: report.reportDate
-          ? typeof report.reportDate === "string"
-            ? (report.reportDate as string).slice(0, 10)
-            : report.reportDate.toISOString().slice(0, 10)
-          : "",
-        weather: report.weather,
-        workersCount: report.workersCount,
-        progress: report.progress,
-        workPointId: report.workPointId,
-        dailyVolume: report.dailyVolume,
-        workSummary: report.workSummary,
-        notes: report.notes,
-        photoUrls: report.progressPhotos.map(
-          (photo) => photo.fileUrl ?? photo.url,
-        ),
-      })),
-      workPoints: project.workPoints.map((point) => ({
-        id: point.id,
-        title: point.title,
-        location: point.location,
-        plannedStartDate: point.plannedStartDate
-          ? typeof point.plannedStartDate === "string"
-            ? (point.plannedStartDate as string).slice(0, 10)
-            : point.plannedStartDate.toISOString().slice(0, 10)
-          : null,
-        targetDate: point.targetDate
-          ? typeof point.targetDate === "string"
-            ? (point.targetDate as string).slice(0, 10)
-            : point.targetDate.toISOString().slice(0, 10)
-          : null,
-        progress: point.progress,
-        proposedVolume:
-          point.proposedVolume !== null
-            ? decimalStringFromScaledInteger(point.proposedVolume)
-            : null,
-        proposedUnit: point.proposedUnit,
-        proposedUnitPrice:
-          point.proposedUnitPrice !== null
-            ? decimalStringFromScaledInteger(point.proposedUnitPrice)
-            : null,
-        completedVolume: point.completedVolume,
-        proposedTotalWage: decimalStringFromScaledInteger(
-          point.proposedTotalWage,
-        ),
-        approvedTotalWage:
-          point.approvedTotalWage !== null
-            ? decimalStringFromScaledInteger(point.approvedTotalWage)
-            : null,
-        wageAuditLogs: point.wageAuditLogs.map((log) => ({
-          id: log.id,
-          oldWage: decimalStringFromScaledInteger(log.oldWage),
-          newWage: decimalStringFromScaledInteger(log.newWage),
-          reason: log.reason,
-          createdAt: log.createdAt
-            ? typeof log.createdAt === "string"
-              ? log.createdAt
-              : log.createdAt.toISOString()
-            : new Date().toISOString(),
-          changedByName: log.changedBy?.name ?? "Admin",
-        })),
-        progressReports: [
-          ...point.progressReports.map((report) => ({
-            id: report.id,
-            reportDate: report.reportDate
-              ? typeof report.reportDate === "string"
-                ? (report.reportDate as string).slice(0, 10)
-                : report.reportDate.toISOString().slice(0, 10)
-              : "",
-            progress: report.progress,
-            workSummary: report.workSummary,
-            photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
-          })),
-          ...project.dailyReports
-            .filter(
-              (report) =>
-                report.workPointId === point.id && report.progress !== null,
-            )
-            .map((report) => ({
-              id: report.id,
-              reportDate: report.reportDate
-                ? typeof report.reportDate === "string"
-                  ? (report.reportDate as string).slice(0, 10)
-                  : report.reportDate.toISOString().slice(0, 10)
-                : "",
-              progress: report.progress!,
-              workSummary: report.workSummary,
-              photoUrls: report.progressPhotos.map(
-                (photo) => photo.fileUrl ?? photo.url,
-              ),
-            })),
-        ],
-      })),
+      reports: serializedReports,
+      workPoints: serializedWorkPoints,
       blueprints: [
         ...project.blueprints
           .filter(
@@ -546,11 +556,7 @@ export default async function ProjectsWorkstationPage({
             publicCode: bast.publicCode,
             bastNumber: bast.bastNumber,
             type: bast.type,
-            date: bast.date
-              ? typeof bast.date === "string"
-                ? (bast.date as string).slice(0, 10)
-                : bast.date.toISOString().slice(0, 10)
-              : "",
+            date: toJakartaDateKey(bast.date) ?? "",
             isApproved: bast.isApproved,
           })),
       wageTicketPayments: realizedEntry
@@ -561,13 +567,13 @@ export default async function ProjectsWorkstationPage({
             status: t.status,
             amount: t.amount,
             paid: t.paid,
-            paidAt: t.paidAt ? t.paidAt.slice(0, 10) : null,
+            paidAt: toJakartaDateKey(t.paidAt),
             requesterName: t.requesterName,
             type: t.type,
             requestCategory: t.requestCategory,
             fieldCategory: t.fieldCategory,
             fundCategory: t.fundCategory,
-            createdAt: t.createdAt ? t.createdAt.slice(0, 10) : null,
+            createdAt: toJakartaDateKey(t.createdAt),
             items: t.items,
           }))
         : project.tickets.map((ticket) => ({
@@ -580,11 +586,7 @@ export default async function ProjectsWorkstationPage({
                 ? decimalStringFromScaledInteger(ticket.totalAmount)
                 : null,
             paid: ticket.transferReceiptUrl !== null,
-            paidAt: ticket.auditLogs[0]?.createdAt
-              ? typeof ticket.auditLogs[0].createdAt === "string"
-                ? (ticket.auditLogs[0].createdAt as string).slice(0, 10)
-                : ticket.auditLogs[0].createdAt.toISOString().slice(0, 10)
-              : null,
+            paidAt: toJakartaDateKey(ticket.auditLogs[0]?.createdAt),
             requesterName: ticket.requester?.name ?? "Pemohon",
             fundCategory: "TUKANG" as const,
           })),

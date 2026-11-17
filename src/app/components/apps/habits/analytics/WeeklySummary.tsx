@@ -5,10 +5,12 @@ import Link from "next/link";
 import type { ApexOptions } from "apexcharts";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { ArrowLeft, ArrowRight, Ellipsis } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getWeekDateKeys } from "@/lib/habit-date";
 import CardBox from "@/app/components/shared/CardBox";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -85,7 +87,7 @@ export default function WeeklySummary({
     grid: { show: false },
     xaxis: {
       categories: dates.map((date) => format(new Date(`${date}T12:00:00`), "EEE", { locale: id })),
-      labels: { style: { fontSize: "10px" } },
+      labels: { style: { fontSize: "12px" } },
       axisBorder: { show: false },
       axisTicks: { show: false },
     },
@@ -124,24 +126,24 @@ export default function WeeklySummary({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Evaluasi &amp; Produktivitas Mingguan</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="type-h2 text-foreground">Evaluasi &amp; Produktivitas Mingguan</h2>
+          <p className="type-p3 text-muted-foreground">
             Rekapitulasi jam kerja aktual dan keterlibatan proyek untuk periode minggu terpilih.
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <Button asChild variant="outline" size="icon" className="size-8" aria-label="Minggu sebelumnya">
-            <Link href={navigate(previousStart)} scroll={false}><ArrowLeft className="size-3.5" /></Link>
+          <Button asChild variant="outline" size="icon" aria-label="Minggu sebelumnya">
+            <Link href={navigate(previousStart)} scroll={false}><ArrowLeft className="size-4" /></Link>
           </Button>
-          <span className="min-w-36 text-center text-xs font-medium text-foreground">
+          <span className="type-p3 min-w-36 text-center font-medium text-foreground">
             {format(new Date(`${weekStart}T12:00:00`), "d MMM", { locale: id })} –{" "}
             {format(new Date(`${dates[6]}T12:00:00`), "d MMM yyyy", { locale: id })}
           </span>
-          <Button asChild variant="outline" size="icon" className="size-8" aria-label="Minggu berikutnya">
-            <Link href={navigate(nextWeekStart)} scroll={false}><ArrowRight className="size-3.5" /></Link>
+          <Button asChild variant="outline" size="icon" aria-label="Minggu berikutnya">
+            <Link href={navigate(nextWeekStart)} scroll={false}><ArrowRight className="size-4" /></Link>
           </Button>
           {!isCurrentWeek && (
-            <Button asChild variant="outline" size="sm" className="h-8 px-2.5 text-xs">
+            <Button asChild variant="outline" size="sm">
               <Link href={navigate(today)} scroll={false}>Minggu ini</Link>
             </Button>
           )}
@@ -150,16 +152,16 @@ export default function WeeklySummary({
 
       <div className="grid gap-3 xl:grid-cols-2">
         <CardBox className="overflow-hidden p-4">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <h3 className="text-sm font-semibold">Jam Kerja Harian</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <h3 className="type-h3 text-foreground">Jam Kerja Harian</h3>
+              <p className="type-p3 mt-0.5 text-muted-foreground">
                 Total minggu ini: <strong className="text-foreground">{totalWeeklyHours} jam</strong>
               </p>
             </div>
-            <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
+            <Badge variant="lightPrimary">
               {entries.length} entri
-            </span>
+            </Badge>
           </div>
           {entries.length ? (
             <div className="pt-2">
@@ -172,25 +174,27 @@ export default function WeeklySummary({
               />
             </div>
           ) : (
-            <p className="py-10 text-center text-xs text-muted-foreground">
-              Belum ada catatan jam kerja minggu ini. Gunakan tombol &ldquo;+ Catat Jam Kerja&rdquo; di bawah.
-            </p>
+            <EmptyState
+              variant="inline"
+              title="Belum ada jam kerja minggu ini"
+              description="Gunakan tombol Catat Jam Kerja di bawah untuk menambah catatan."
+            />
           )}
         </CardBox>
 
         <CardBox className="overflow-hidden p-4">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <h3 className="text-sm font-semibold">Proyek Dikerjakan</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">Jumlah proyek aktif yang tercatat minggu ini</p>
+              <h3 className="type-h3 text-foreground">Proyek Dikerjakan</h3>
+              <p className="type-p3 mt-0.5 text-muted-foreground">Jumlah proyek aktif yang tercatat minggu ini</p>
             </div>
-            <span className="rounded-lg bg-info/10 px-2.5 py-1 text-xs font-bold text-info">
+            <Badge variant="lightInfo">
               {currentProjects} proyek
-            </span>
+            </Badge>
           </div>
           <div className="pt-2">
-            <p className="text-2xl font-bold">{currentProjects}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="type-kpi text-foreground">{currentProjects}</p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
               {projectChange === null
                 ? previousProjects === 0
                   ? "Belum ada proyek pada minggu pembanding"
@@ -212,7 +216,11 @@ export default function WeeklySummary({
               />
             </div>
           ) : (
-            <p className="py-6 text-xs text-muted-foreground">Belum ada aktivitas timesheet untuk dibandingkan.</p>
+            <EmptyState
+              variant="inline"
+              title="Belum ada aktivitas pembanding"
+              description="Catatan timesheet minggu ini dan minggu lalu akan tampil di sini."
+            />
           )}
         </CardBox>
       </div>

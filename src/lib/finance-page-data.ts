@@ -9,14 +9,18 @@ import {
   TicketType,
   UserRole,
 } from "@prisma/client";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
 import Ticket from "@/models/ticket";
 import PaymentTransaction from "@/models/payment-transaction";
 import PurchaseOrder from "@/models/purchase-order";
 import DirectStockPurchase from "@/models/direct-stock-purchase";
 import Project from "@/models/project";
 import User from "@/models/user";
-import { EQUIPMENT_REQUEST_TYPE } from "@/lib/equipment-request";
+import {
+  EQUIPMENT_REQUEST_TYPE,
+  HOUSE_RENTAL_REQUEST_TYPE,
+  VEHICLE_RENTAL_REQUEST_TYPE,
+} from "@/lib/equipment-request";
 import {
   BASTDocument,
   DeliveryOrder,
@@ -24,10 +28,12 @@ import {
   DocumentTemplate,
   EquipmentRental,
   Invoice,
+  MaterialDelivery,
   OrderConfirmation,
   POItem,
   SubkonContract,
   SubkonTermyn,
+  TicketItem,
   Vehicle,
   VehicleFuelRequest,
   VehicleTripLog,
@@ -42,6 +48,7 @@ const byId = <T extends { _id: unknown }>(rows: T[]) =>
   new Map(rows.map((row) => [String(row._id), row]));
 
 const financeStatuses = [
+  TicketStatus.APPROVED_DIR,
   TicketStatus.WAITING_FINANCE_PAYMENT,
   TicketStatus.PROCESSED_FINANCE,
   TicketStatus.PROCESSED_LOGISTIC,
@@ -106,15 +113,44 @@ function mapVendor(
   };
 }
 
-export async function loadFinancePageMongooseData(
+async function loadFinancePageMongooseDataImpl(
   role: UserRole,
   canViewAPH: boolean,
 ) {
-  await connectToMongoDB();
-
-  const approvedTicketIds = await PurchaseOrder.distinct("ticketId", {
-    status: POStatus.APPROVED,
-  });
+  const [
+    rawApprovedTicketIds,
+    rawInvoicedTicketIds,
+    rawDirectPurchaseTicketIds,
+    rawContractDeliveryTicketIds,
+  ] = await Promise.all([
+    PurchaseOrder.distinct("ticketId", {
+      status: POStatus.APPROVED,
+      ticketId: { $ne: null },
+    }),
+    PurchaseOrder.distinct("ticketId", {
+      vendorInvoiceUrl: { $ne: null },
+      status: { $nin: [POStatus.CANCELLED, POStatus.REJECTED] },
+      ticketId: { $ne: null },
+    }),
+    DirectStockPurchase.distinct("ticketId", {
+      ticketId: { $ne: null },
+    }),
+    MaterialDelivery.distinct("ticketId", {
+      ticketId: { $ne: null },
+    }),
+  ]);
+  const approvedTicketIds = [
+    ...new Set(
+      [
+        ...rawApprovedTicketIds,
+        ...rawInvoicedTicketIds,
+        ...rawDirectPurchaseTicketIds,
+        ...rawContractDeliveryTicketIds,
+      ].filter(
+        (id): id is string => typeof id === "string" && id.trim().length > 0,
+      ),
+    ),
+  ];
   const [orderRows, standaloneRows, directPurchaseRows, ticketRows, termynRows, retentionRows, vendorRows, documentTemplates, tripRows, fuelRows, signoffInvoiceRows, signoffConfirmationRows, rentalRows] =
     await Promise.all([
       PurchaseOrder.find({
@@ -139,8 +175,36 @@ export async function loadFinancePageMongooseData(
               { isApprovedByDirector: true },
               { requestCategory: TicketRequestCategory.APH },
               {
-                ticketType: EQUIPMENT_REQUEST_TYPE,
-                status: TicketStatus.WAITING_FINANCE_PAYMENT,
+                ticketType: {
+                  $in: [
+                    EQUIPMENT_REQUEST_TYPE,
+                    HOUSE_RENTAL_REQUEST_TYPE,
+                    VEHICLE_RENTAL_REQUEST_TYPE,
+                  ],
+                },
+                status: {
+                  $in: [
+                    TicketStatus.APPROVED_DIR,
+                    TicketStatus.WAITING_FINANCE_PAYMENT,
+                    TicketStatus.PROCESSED_FINANCE,
+                    TicketStatus.COMPLETED,
+                  ],
+                },
+              },
+              {
+                type: TicketType.MATERIAL,
+                $or: [
+                  { purchaseReceiptUrl: { $ne: null } },
+                  { _id: { $in: approvedTicketIds } },
+                  {
+                    status: {
+                      $in: [
+                        TicketStatus.WAITING_FINANCE_PAYMENT,
+                        TicketStatus.PROCESSED_FINANCE,
+                      ],
+                    },
+                  },
+                ],
               },
             ],
           },
@@ -149,6 +213,14 @@ export async function loadFinancePageMongooseData(
               { type: { $ne: TicketType.MATERIAL } },
               { purchaseReceiptUrl: { $ne: null } },
               { _id: { $in: approvedTicketIds } },
+              {
+                status: {
+                  $in: [
+                    TicketStatus.WAITING_FINANCE_PAYMENT,
+                    TicketStatus.PROCESSED_FINANCE,
+                  ],
+                },
+              },
             ],
           },
           ...(!canViewAPH
@@ -450,6 +522,7 @@ export async function loadFinancePageMongooseData(
     vendorName: order.vendorName ?? "",
     vendor: vendorFor(order.vendorId),
     paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus ?? null,
     paymentBankName: order.paymentBankName ?? null,
     paymentAccountNumber: order.paymentAccountNumber ?? null,
     paymentAccountName: order.paymentAccountName ?? null,
@@ -495,9 +568,55 @@ export async function loadFinancePageMongooseData(
   }));
   const ticketProjects = projectById;
   const requesterIds = [...new Set(ticketRows.map((ticket) => ticket.requesterId))];
-  const requesters = requesterIds.length
-    ? await User.find({ _id: { $in: requesterIds } }).lean()
-    : [];
+  const [requesters, ticketItemRows, ticketDeliveryOrderRows, ticketMaterialDeliveryRows] =
+    await Promise.all([
+      requesterIds.length
+        ? User.find({ _id: { $in: requesterIds } }).lean()
+        : Promise.resolve([]),
+      ticketIds.length
+        ? TicketItem.find({ ticketId: { $in: ticketIds } })
+            .select({ ticketId: 1, itemName: 1, quantity: 1, unit: 1 })
+            .sort({ _id: 1 })
+            .lean()
+        : Promise.resolve([]),
+      ticketIds.length
+        ? DeliveryOrder.find({ ticketId: { $in: ticketIds } })
+            .select({ ticketId: 1 })
+            .lean()
+        : Promise.resolve([]),
+      ticketIds.length
+        ? MaterialDelivery.find({ ticketId: { $in: ticketIds } })
+            .select({ ticketId: 1 })
+            .lean()
+        : Promise.resolve([]),
+    ]);
+  const itemsByTicketId = new Map<
+    string,
+    Array<{ itemName: string; quantity: number; unit: string }>
+  >();
+  for (const item of ticketItemRows) {
+    const key = String(item.ticketId ?? "");
+    if (!key) continue;
+    const list = itemsByTicketId.get(key) ?? [];
+    list.push({
+      itemName: String(item.itemName ?? ""),
+      quantity: Number(item.quantity ?? 0),
+      unit: String(item.unit ?? ""),
+    });
+    itemsByTicketId.set(key, list);
+  }
+  const deliveryOrderCountByTicketId = new Map<string, number>();
+  for (const deliveryOrder of [
+    ...ticketDeliveryOrderRows,
+    ...ticketMaterialDeliveryRows,
+  ]) {
+    const key = String(deliveryOrder.ticketId ?? "");
+    if (!key) continue;
+    deliveryOrderCountByTicketId.set(
+      key,
+      (deliveryOrderCountByTicketId.get(key) ?? 0) + 1,
+    );
+  }
   const requesterById = byId(requesters);
   const approvedOrderByTicketId = new Map<
     string,
@@ -510,22 +629,116 @@ export async function loadFinancePageMongooseData(
       hydrateOrder(order),
     ]);
   }
+  for (const [ticketId, orders] of approvedOrderByTicketId.entries()) {
+    approvedOrderByTicketId.set(
+      ticketId,
+      [...orders].sort((a, b) => {
+        const aPaid = a.paidAt ? 1 : 0;
+        const bPaid = b.paidAt ? 1 : 0;
+        if (aPaid !== bPaid) return aPaid - bPaid;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }),
+    );
+  }
+  const toSafeBigInt = (value: unknown): bigint => {
+    if (typeof value === "bigint") return value;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return BigInt(Math.round(value));
+    }
+    if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+      return BigInt(value.trim());
+    }
+    return BigInt(0);
+  };
+  const computeOrderScaledTotal = (
+    order: ReturnType<typeof hydrateOrder>,
+  ): bigint => {
+    const itemsSum = order.items.reduce(
+      (sum, item) => sum + toSafeBigInt(item.totalPrice),
+      BigInt(0),
+    );
+    if (!order.includeTax) return itemsSum;
+    return (itemsSum * BigInt(111) + BigInt(50)) / BigInt(100);
+  };
   const hydratedTickets = ticketRows.map((ticket) => {
     const requester = requesterById.get(ticket.requesterId);
-    if (!requester) {
-      throw new Error(`Finance ticket requester ${ticket.requesterId} was not found`);
-    }
+    const safeRequester = requester
+      ? {
+          id: String(requester._id),
+          name: requester.name ?? "",
+          role: requester.role,
+          bankName: requester.bankName ?? null,
+          bankAccountName: requester.bankAccountName ?? null,
+          bankAccountNumber: requester.bankAccountNumber ?? null,
+        }
+      : {
+          id: String(ticket.requesterId ?? ""),
+          name: "Pemohon tidak ditemukan",
+          role: UserRole.FIELD_TEAM,
+          bankName: null,
+          bankAccountName: null,
+          bankAccountNumber: null,
+        };
+    const ticketIdStr = String(ticket._id);
+    const ticketPurchaseOrders = approvedOrderByTicketId.get(String(ticket._id)) ?? [];
+    const aggregatedPoTotalScaled =
+      ticketPurchaseOrders.length > 0
+        ? ticketPurchaseOrders.reduce(
+            (sum, order) => sum + computeOrderScaledTotal(order),
+            BigInt(0),
+          )
+        : null;
+    const invoicedUnpaidPo = ticketPurchaseOrders.find(
+      (order) => !order.paidAt && Boolean(order.vendorInvoiceUrl),
+    );
+    const invoicedAnyPo = ticketPurchaseOrders.find((order) =>
+      Boolean(order.vendorInvoiceUrl),
+    );
+    const effectivePurchaseReceiptUrl =
+      ticket.purchaseReceiptUrl ??
+      invoicedUnpaidPo?.vendorInvoiceUrl ??
+      invoicedAnyPo?.vendorInvoiceUrl ??
+      null;
+    const poSummaries = ticketPurchaseOrders.map((order) => {
+      const scaledTotal = computeOrderScaledTotal(order);
+      const paidScaled = order.paymentTransactions.reduce(
+        (sum, payment) => sum + toSafeBigInt(payment.amount),
+        BigInt(0),
+      );
+      const remainingScaled =
+        scaledTotal > paidScaled ? scaledTotal - paidScaled : BigInt(0);
+      return {
+        id: order.id,
+        publicCode: order.publicCode,
+        poNumber: order.poNumber,
+        scaledTotal,
+        paidScaled,
+        remainingScaled,
+        isPaid: Boolean(order.paidAt) || remainingScaled === BigInt(0),
+        hasInvoice: Boolean(order.vendorInvoiceUrl),
+      };
+    });
     return {
-      id: String(ticket._id),
+      id: ticketIdStr,
       ticketType: ticket.ticketType ?? null,
+      rentalDetails: (ticket as { rentalDetails?: unknown }).rentalDetails ?? null,
+      status: ticket.status,
       ticketNumber: ticket.ticketNumber,
       title: ticket.title,
       type: ticket.type,
-      totalAmount: ticket.totalAmount ?? null,
+      itemsSummary: itemsByTicketId.get(ticketIdStr) ?? [],
+      deliveryOrderCount: deliveryOrderCountByTicketId.get(ticketIdStr) ?? 0,
+      totalAmount:
+        aggregatedPoTotalScaled !== null
+          ? aggregatedPoTotalScaled
+          : (ticket.totalAmount ?? null),
+      aggregatedPoTotalAmount: aggregatedPoTotalScaled,
+      poSummaries,
       requestedAmount: ticket.requestedAmount ?? null,
-      purchaseReceiptUrl: ticket.purchaseReceiptUrl ?? null,
+      purchaseReceiptUrl: effectivePurchaseReceiptUrl,
       receiptUrls: ticket.receiptUrls ?? [],
       requestCategory: ticket.requestCategory ?? null,
+      fieldCategory: ticket.fieldCategory ?? null,
       relatedPoIds: ticket.relatedPoIds ?? [],
       requestPaymentMethod: ticket.requestPaymentMethod ?? null,
       requestPaymentDescription: ticket.requestPaymentDescription ?? null,
@@ -533,19 +746,12 @@ export async function loadFinancePageMongooseData(
       recipientName: ticket.recipientName ?? null,
       bankName: ticket.bankName ?? null,
       accountNumber: ticket.accountNumber ?? null,
-      requester: {
-        id: String(requester._id),
-        name: requester.name ?? "",
-        role: requester.role,
-        bankName: requester.bankName ?? null,
-        bankAccountName: requester.bankAccountName ?? null,
-        bankAccountNumber: requester.bankAccountNumber ?? null,
-      },
-      purchaseOrders: approvedOrderByTicketId.get(String(ticket._id)) ?? [],
+      requester: safeRequester,
+      purchaseOrders: ticketPurchaseOrders,
       project: ticket.projectId
         ? ticketProjects.get(ticket.projectId) ?? null
         : null,
-      paymentTransactions: paymentsByTicketId.get(String(ticket._id)) ?? [],
+      paymentTransactions: paymentsByTicketId.get(ticketIdStr) ?? [],
     };
   });
   const subkonContractsForRetention = retentionRows;
@@ -840,9 +1046,38 @@ export async function loadFinancePageMongooseData(
   };
 }
 
+export type FinancePageMongooseData = Awaited<
+  ReturnType<typeof loadFinancePageMongooseDataImpl>
+>;
+
+export async function loadFinancePageMongooseData(
+  role: UserRole,
+  canViewAPH: boolean,
+): Promise<FinancePageMongooseData> {
+  if (!(await connectToMongoDBOptional())) {
+    return {
+      orders: [],
+      standalonePayments: [],
+      directPurchases: [],
+      tickets: [],
+      termyns: [],
+      retentionContracts: [],
+      vendors: [],
+      documentTemplates: [],
+      vehicleTripLogs: [],
+      vehicleFuelRequests: [],
+      documentSignoffInvoices: [],
+      documentSignoffConfirmations: [],
+      equipmentRentals: [],
+      standaloneOrderIds: [],
+      ticketOrderIds: [],
+    } satisfies FinancePageMongooseData;
+  }
+  return loadFinancePageMongooseDataImpl(role, canViewAPH);
+}
+
 export async function loadRelatedFinancePurchaseOrders(ids: string[]) {
-  if (ids.length === 0) return [];
-  await connectToMongoDB();
+  if (ids.length === 0 || !(await connectToMongoDBOptional())) return [];
   const orderRows = await PurchaseOrder.find({ _id: { $in: ids } }).lean();
   const vendorIds = [
     ...new Set(

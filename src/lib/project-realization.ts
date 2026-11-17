@@ -8,10 +8,11 @@ import {
   TicketType,
   VendorInvoiceStatus,
 } from "@prisma/client";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
 import DirectStockPurchase from "@/models/direct-stock-purchase";
 import {
   DeliveryOrder,
+  EquipmentRental,
   MaterialContract,
   MaterialDelivery,
   POItem,
@@ -28,6 +29,13 @@ import TicketAuditLog from "@/models/ticket-audit-log";
 import User from "@/models/user";
 import { decimalFromScaledInteger } from "@/lib/scaled-decimal";
 
+export type ProjectFundCategory =
+  | "TUKANG"
+  | "BAHAN"
+  | "SEWA"
+  | "INVENTARIS"
+  | "OPERASIONAL";
+
 export type ProjectTicketSummaryItem = {
   id: string;
   ticketNumber: string;
@@ -38,9 +46,10 @@ export type ProjectTicketSummaryItem = {
   paidAt: string | null;
   requesterName: string;
   type: TicketType;
+  ticketType?: string | null;
   requestCategory: TicketRequestCategory | null;
   fieldCategory: TicketFieldCategory | null;
-  fundCategory: "TUKANG" | "BAHAN" | "INVENTARIS" | "OPERASIONAL";
+  fundCategory: ProjectFundCategory;
   createdAt: string;
   items: Array<{
     itemName: string;
@@ -56,10 +65,12 @@ export type PaidProjectTicketRealization = {
   labor: Prisma.Decimal;
   transport: Prisma.Decimal;
   operational: Prisma.Decimal;
+  rental: Prisma.Decimal;
   requestedTotal: Prisma.Decimal;
   requestedMaterial: Prisma.Decimal;
   requestedLabor: Prisma.Decimal;
   requestedOperational: Prisma.Decimal;
+  requestedRental: Prisma.Decimal;
   tickets: ProjectTicketSummaryItem[];
 };
 
@@ -99,17 +110,41 @@ function cleanCatalogName(value: string): string {
     .trim();
 }
 
-function classifyServerTicketCategory(input: {
+const SEWA_RENTAL_TEXT_PATTERN =
+  /rumah\s*sewa|mess\s*(tukang|pekerja|proyek)?|kontrakan|basecamp|kendaraan\s*sewa|sewa\s*(rumah|mess|kos|kendaraan|armada|alat|truk|truck|mobil|pickup|excavator|molen|genset|stamper)|\bsewa\b/i;
+
+export function classifyServerTicketCategory(input: {
   title: string;
   itemNames: string[];
   type: TicketType | string;
+  ticketType?: string | null;
   requestCategory: TicketRequestCategory | string | null;
   fieldCategory: TicketFieldCategory | string | null;
-}): "TUKANG" | "BAHAN" | "INVENTARIS" | "OPERASIONAL" {
+  fundCategory?: ProjectFundCategory | null;
+}): ProjectFundCategory {
   const text = `${input.title} ${input.itemNames.join(" ")}`.toLowerCase();
   const reqCat = (input.requestCategory || "").toUpperCase();
   const fieldCat = (input.fieldCategory || "").toUpperCase();
   const type = (input.type || "").toUpperCase();
+  const ticketType = (input.ticketType || "").toUpperCase();
+
+  // 1. Aturan SEWA wajib dievaluasi SEBELUM regex TUKANG & INVENTARIS
+  //    agar "Rumah Sewa Tukang" / "Mess Tukang" / "Sewa Kendaraan" tidak salah masuk TUKANG/INVENTARIS
+  if (
+    input.fundCategory === "SEWA" ||
+    reqCat === "HOUSE_RENTAL" ||
+    reqCat === "VEHICLE_RENTAL" ||
+    reqCat === "EQUIPMENT_REQUEST" ||
+    fieldCat === "HOUSE_RENTAL" ||
+    fieldCat === "VEHICLE_RENTAL" ||
+    fieldCat === "RENTAL" ||
+    ticketType === "EQUIPMENT_REQUEST" ||
+    ticketType === "HOUSE_RENTAL" ||
+    ticketType === "VEHICLE_RENTAL" ||
+    SEWA_RENTAL_TEXT_PATTERN.test(text)
+  ) {
+    return "SEWA";
+  }
 
   // Upah Langsir (HAULING) dipisahkan ke Operasional/Transportasi Lapangan
   if (fieldCat === "HAULING" || /langsir/.test(text)) {
@@ -127,7 +162,7 @@ function classifyServerTicketCategory(input: {
   }
 
   if (
-    /inventaris|alat|sewa|mesin|genset|molen|peralatan|perkakas|gerobak|scaffolding|helm|rompi|cangkul|meteran|equipment|aset/.test(
+    /inventaris|alat|mesin|genset|molen|peralatan|perkakas|gerobak|scaffolding|helm|rompi|cangkul|meteran|equipment|aset/.test(
       text,
     )
   ) {
@@ -166,20 +201,24 @@ export async function getPaidProjectTicketRealization(
         labor: zero,
         transport: zero,
         operational: zero,
+        rental: zero,
         requestedTotal: zero,
         requestedMaterial: zero,
         requestedLabor: zero,
         requestedOperational: zero,
+        requestedRental: zero,
         tickets: [],
       },
     ]),
   );
   if (ids.length === 0) return result;
 
-  await connectToMongoDB();
+  const mongo = await connectToMongoDBOptional();
+  if (!mongo) return result;
 
   const [
     ticketRows,
+    projectRentals,
     projectStockMovements,
     catalogStockItems,
     materialContracts,
@@ -190,6 +229,13 @@ export async function getPaidProjectTicketRealization(
       status: { $ne: TicketStatus.REJECTED },
     })
       .sort({ createdAt: -1 })
+      .lean(),
+    EquipmentRental.find({
+      projectId: { $in: ids },
+      status: { $ne: "CANCELLED" },
+      $or: [{ type: "HOUSE" }, { usageScope: { $ne: "OPERATIONAL" } }],
+    })
+      .sort({ startDate: -1, createdAt: -1 })
       .lean(),
     StockMovement.find({
       projectId: { $in: ids },
@@ -575,6 +621,13 @@ export async function getPaidProjectTicketRealization(
           ? new Prisma.Decimal(ticket.requestedAmount)
           : zero;
 
+    const quotedEquipmentCost =
+      ticket.equipmentDetails &&
+      typeof ticket.equipmentDetails.quotedCost === "number" &&
+      ticket.equipmentDetails.quotedCost > 0
+        ? new Prisma.Decimal(ticket.equipmentDetails.quotedCost)
+        : zero;
+
     const procurementTotal = poTotal
       .plus(directPurchaseTotal)
       .plus(materialDeliveryTotal);
@@ -585,7 +638,15 @@ export async function getPaidProjectTicketRealization(
         ? procurementTotal
         : explicitTicketAmount.greaterThan(0)
           ? explicitTicketAmount
-          : itemsFallbackSum;
+          : quotedEquipmentCost.greaterThan(0)
+            ? quotedEquipmentCost
+            : itemsFallbackSum;
+
+    const linkedRental = projectRentals.find(
+      (rental) =>
+        typeof rental.sourceTicketId === "string" &&
+        rental.sourceTicketId === ticketId,
+    );
 
     const isPaid =
       Boolean(
@@ -607,6 +668,7 @@ export async function getPaidProjectTicketRealization(
         return inv?.status === VendorInvoiceStatus.PAID;
       }) ||
       Boolean(latestAudit) ||
+      linkedRental?.paymentStatus === "PAID" ||
       ticket.status === TicketStatus.COMPLETED;
 
     const createdAtDate = toDateOrNow(
@@ -631,12 +693,14 @@ export async function getPaidProjectTicketRealization(
         ) as { paidAt?: Date | null } | undefined
       )?.paidAt ??
       paidDeliveryInvoice?.paidAt ??
+      linkedRental?.paidAt ??
       (isPaid ? createdAtDate : null);
 
     const fundCategory = classifyServerTicketCategory({
       title: ticket.title,
       itemNames: tItems.map((it) => it.itemName ?? ""),
       type: ticket.type,
+      ticketType: (ticket as { ticketType?: string | null }).ticketType ?? null,
       requestCategory: ticket.requestCategory,
       fieldCategory: ticket.fieldCategory,
     });
@@ -664,6 +728,13 @@ export async function getPaidProjectTicketRealization(
         current.requestedMaterial = current.requestedMaterial.plus(
           canonicalTicketAmount,
         );
+      } else if (fundCategory === "SEWA") {
+        current.requestedRental = current.requestedRental.plus(
+          canonicalTicketAmount,
+        );
+        current.requestedOperational = current.requestedOperational.plus(
+          canonicalTicketAmount,
+        );
       } else {
         current.requestedOperational = current.requestedOperational.plus(
           canonicalTicketAmount,
@@ -677,6 +748,9 @@ export async function getPaidProjectTicketRealization(
         current.labor = current.labor.plus(canonicalTicketAmount);
       } else if (fundCategory === "BAHAN" || fundCategory === "INVENTARIS") {
         current.material = current.material.plus(canonicalTicketAmount);
+      } else if (fundCategory === "SEWA") {
+        current.rental = current.rental.plus(canonicalTicketAmount);
+        current.operational = current.operational.plus(canonicalTicketAmount);
       } else if (
         ticket.fieldCategory === TicketFieldCategory.HAULING ||
         /langsir|transport|mobilisasi|angkut/i.test(ticket.title)
@@ -699,6 +773,7 @@ export async function getPaidProjectTicketRealization(
       paidAt: paidAtDate ? toDateOrNow(paidAtDate).toISOString() : null,
       requesterName: requester?.name ?? "Staf Proyek",
       type: ticket.type as TicketType,
+      ticketType: (ticket as { ticketType?: string | null }).ticketType ?? null,
       requestCategory:
         (ticket.requestCategory as TicketRequestCategory | null) ?? null,
       fieldCategory:
@@ -884,6 +959,119 @@ export async function getPaidProjectTicketRealization(
           estimatedCost: unitCostDecimal.greaterThan(0)
             ? unitCostDecimal.toString()
             : null,
+        },
+      ],
+    });
+  }
+
+  // Tambahkan Biaya Sewa (Rumah Sewa Tukang, Kendaraan Sewa, Alat Sewa) dari EquipmentRental
+  // Anti-double-counting: jika sourceTicketId sudah ada di ticketRows proyek, jangan dihitung dua kali!
+  const processedTicketIdSet = new Set(ticketIds);
+  for (const rental of projectRentals) {
+    if (!rental.projectId) continue;
+    if (
+      rental.type !== "HOUSE" &&
+      String(rental.usageScope || "").toUpperCase() === "OPERATIONAL"
+    ) {
+      continue;
+    }
+
+    const sourceTicketId =
+      typeof rental.sourceTicketId === "string"
+        ? rental.sourceTicketId.trim()
+        : "";
+    if (sourceTicketId && processedTicketIdSet.has(sourceTicketId)) {
+      continue;
+    }
+
+    const current = result.get(rental.projectId);
+    if (!current) continue;
+
+    const rawTotal = toBigIntOrNull(rental.totalCost);
+    const rentalCost =
+      rawTotal !== null && rawTotal > BigInt(0)
+        ? decimalFromScaledInteger(rawTotal)
+        : zero;
+    if (rentalCost.lte(0)) continue;
+
+    const isRentalPaid = rental.paymentStatus === "PAID";
+
+    current.requestedTotal = current.requestedTotal.plus(rentalCost);
+    current.requestedRental = current.requestedRental.plus(rentalCost);
+    current.requestedOperational = current.requestedOperational.plus(rentalCost);
+
+    if (isRentalPaid) {
+      current.total = current.total.plus(rentalCost);
+      current.rental = current.rental.plus(rentalCost);
+      current.operational = current.operational.plus(rentalCost);
+    }
+
+    const rentalType =
+      rental.type === "HOUSE"
+        ? "HOUSE"
+        : rental.type === "VEHICLE"
+          ? "VEHICLE"
+          : "EQUIPMENT";
+    const rentalTypeLabel =
+      rentalType === "HOUSE"
+        ? "Rumah Sewa"
+        : rentalType === "VEHICLE"
+          ? "Kendaraan Sewa"
+          : "Alat Sewa";
+    const ownerName =
+      (rental.landlordName as string | null | undefined) ||
+      (rental.vendorName as string | null | undefined) ||
+      "Logistik";
+    const startDate = toDateOrNow(rental.startDate ?? rental.createdAt);
+    const paidAtDate = rental.paidAt ? toDateOrNow(rental.paidAt) : null;
+    const durationNum =
+      typeof rental.duration === "number" && Number.isFinite(rental.duration)
+        ? rental.duration
+        : 1;
+    const periodUnit =
+      rental.rentalPeriodType === "WEEKLY"
+        ? rentalType === "HOUSE"
+          ? "Periode"
+          : "Minggu"
+        : rental.rentalPeriodType === "MONTHLY"
+          ? "Bulan"
+          : "Hari";
+
+    current.tickets.push({
+      id: `rental-${String(rental._id)}`,
+      ticketNumber:
+        rentalType === "HOUSE"
+          ? "SEWA-RUMAH"
+          : rentalType === "VEHICLE"
+            ? "SEWA-ARMADA"
+            : "SEWA-ALAT",
+      title: `${rentalTypeLabel}: ${rental.name ?? "-"}${rental.propertyAddress ? ` · ${rental.propertyAddress}` : ""}`,
+      status: isRentalPaid
+        ? TicketStatus.COMPLETED
+        : rental.paymentStatus === "PENDING_PAYMENT"
+          ? TicketStatus.WAITING_FINANCE_PAYMENT
+          : TicketStatus.PROCESSED_LOGISTIC,
+      amount: rentalCost.toString(),
+      paid: isRentalPaid,
+      paidAt: paidAtDate ? paidAtDate.toISOString() : null,
+      requesterName: `${ownerName}${rental.createdByName ? ` (${rental.createdByName})` : ""}`,
+      type: TicketType.OPERATIONAL,
+      ticketType:
+        rentalType === "HOUSE"
+          ? "HOUSE_RENTAL"
+          : rentalType === "VEHICLE"
+            ? "VEHICLE_RENTAL"
+            : "EQUIPMENT_RENTAL",
+      requestCategory: null,
+      fieldCategory: null,
+      fundCategory: "SEWA",
+      createdAt: startDate.toISOString(),
+      items: [
+        {
+          itemName: `${rentalTypeLabel}: ${rental.name ?? "-"}`,
+          quantity: durationNum,
+          unit: periodUnit,
+          estimatedCost: null,
         },
       ],
     });

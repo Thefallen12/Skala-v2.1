@@ -2,46 +2,58 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format, startOfDay } from "date-fns";
-import { id } from "date-fns/locale";
-import { CalendarDays, Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react";
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { z } from "zod";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  Car,
+  Home,
+  Loader2,
+  Plus,
+  Send,
+  Trash2,
+} from "lucide-react";
+import {
+  Controller,
+  useFieldArray,
+  useForm,
+  useWatch,
+  type Control,
+  type FieldErrors,
+  type UseFormClearErrors,
+  type UseFormRegister,
+  type UseFormSetValue,
+} from "react-hook-form";
+import { z } from "zod";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  POPaymentMethod,
   TicketCategoryHint,
   TicketFieldCategory,
   TicketPriority,
   TicketRequestCategory,
   TicketType,
   UserRole,
-  POPaymentMethod,
 } from "@prisma/client";
 import type { TicketMaterialContractOption } from "@/lib/material-contracts";
 import type { TicketProjectOption } from "@/app/(DashboardLayout)/types/ticket";
 import {
   createTicket,
   getShippingDocumentOptions,
+  type ShippingDocumentOptions,
 } from "@/app/actions/tickets";
 import { createEquipmentRequest } from "@/app/actions/equipment-requests";
-import type { ShippingDocumentOptions } from "@/app/actions/tickets";
 import { Button } from "@/components/ui/button";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { FormLabel, Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
-import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import {
   Select,
   SelectContent,
@@ -49,44 +61,64 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Stepper, type StepperStep } from "@/components/ui/stepper";
+import { Textarea } from "@/components/ui/textarea";
+import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
+import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import { cn } from "@/lib/utils";
 import { formatRupiahNumber, parseRupiahInput } from "@/lib/indonesian-currency";
+import { getJakartaDateKey, isValidDateKey } from "@/lib/habit-date";
+import { FIELD_COST_LABELS } from "@/lib/ticket-field-costs";
 import {
   DEFAULT_EQUIPMENT_TIME_UNIT,
   EQUIPMENT_REQUEST_TYPE,
   EQUIPMENT_TIME_UNITS,
   EQUIPMENT_TIME_UNIT_LABELS,
+  HOUSE_RENTAL_REQUEST_TYPE,
+  RENTAL_PERIOD_TYPES,
+  RENTAL_PERIOD_TYPE_LABELS,
+  RENTAL_USAGE_SCOPES,
+  VEHICLE_RENTAL_REQUEST_TYPE,
 } from "@/lib/equipment-request";
 
 const requestCategorySchema = z
   .nativeEnum(TicketRequestCategory)
-  .or(z.literal(EQUIPMENT_REQUEST_TYPE));
+  .or(z.literal(EQUIPMENT_REQUEST_TYPE))
+  .or(z.literal(HOUSE_RENTAL_REQUEST_TYPE))
+  .or(z.literal(VEHICLE_RENTAL_REQUEST_TYPE));
+
 type RequestCategoryValue = z.infer<typeof requestCategorySchema>;
+
 const fieldCategories = Object.values(TicketFieldCategory).filter(
   (category) => category !== TicketFieldCategory.DIRECT_STORE,
 );
 const itemCategoryHints = Object.values(TicketCategoryHint);
 const priorities = ["NON_URGENT", "URGENT", "EMERGENCY"] as const;
 
+const CREATE_TICKET_STEPS: StepperStep[] = [
+  { id: "type", label: "1. Jenis & Proyek", description: "Kategori & proyek" },
+  {
+    id: "details",
+    label: "2. Rincian & Nominal",
+    description: "Barang, sewa, atau dana",
+  },
+  { id: "target", label: "3. Target & Kirim", description: "Prioritas & kirim" },
+];
+
 const requestCategoryLabels: Record<RequestCategoryValue, string> = {
   OPS: "Operasional (OPS)",
   MATERIAL: "Belanja Material / Alam",
-  WAREHOUSE: "Permintaan Material dari Gudang",
+  WAREHOUSE: "Material dari Gudang",
   OFFICE: "Belanja Kantor",
-  FIELD: "Belanja Kebutuhan Tim Lapangan",
+  FIELD: "Kebutuhan Tim Lapangan",
   APH: "APH",
   REIMBURSEMENT: "Reimbursement",
   KASBON: "Kasbon / Ambilan",
   OPERATING_EXPENSE: "Biaya Operasional",
   SHIPPING_COST: "Pengiriman Barang PO",
-  [EQUIPMENT_REQUEST_TYPE]: "Permintaan Alat Berat & Kendaraan",
+  [EQUIPMENT_REQUEST_TYPE]: "Alat Berat & Kendaraan",
+  [HOUSE_RENTAL_REQUEST_TYPE]: "Biaya Rumah Sewa / Mess Tukang",
+  [VEHICLE_RENTAL_REQUEST_TYPE]: "Biaya Kendaraan Sewa",
 };
 
 const internalFundingCategories = [
@@ -100,9 +132,17 @@ const isInternalFundingCategory = (
 ): category is (typeof internalFundingCategories)[number] =>
   internalFundingCategories.some((value) => value === category);
 
+const isRentalCategory = (
+  category: RequestCategoryValue,
+): category is
+  | typeof HOUSE_RENTAL_REQUEST_TYPE
+  | typeof VEHICLE_RENTAL_REQUEST_TYPE =>
+  category === HOUSE_RENTAL_REQUEST_TYPE ||
+  category === VEHICLE_RENTAL_REQUEST_TYPE;
+
 const fieldCategoryLabels: Record<TicketFieldCategory, string> = {
-  HAULING: "Upah Langsir",
-  LABOR: "Upah Tukang",
+  HAULING: FIELD_COST_LABELS.HAULING,
+  LABOR: FIELD_COST_LABELS.LABOR,
   DIRECT_STORE: "Belanja Langsung Ketoko",
 };
 
@@ -113,7 +153,7 @@ const ticketFormSchema = z
     requestCategory: requestCategorySchema,
     fieldCategory: z.enum(fieldCategories).optional(),
     priority: z.enum(priorities),
-    neededDate: z.date().optional(),
+    neededDate: z.string().optional(),
     itemSource: z.enum(itemCategoryHints),
     itemsExpectedDeliveryDate: z.string().optional(),
     items: z
@@ -174,32 +214,60 @@ const ticketFormSchema = z
       duration: z.number().optional(),
       timeUnit: z.enum(EQUIPMENT_TIME_UNITS),
     }),
+    rentalDetails: z.object({
+      usageScope: z.enum(RENTAL_USAGE_SCOPES),
+      assetName: z.string().optional(),
+      propertyAddress: z.string().optional(),
+      landlordName: z.string().optional(),
+      landlordPhone: z.string().optional(),
+      occupantCount: z.number().optional(),
+      codeOrPlate: z.string().optional(),
+      periodType: z.enum(RENTAL_PERIOD_TYPES),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      duration: z.number().optional(),
+    }),
   })
   .superRefine((values, context) => {
+    const isHouseRental =
+      values.requestCategory === HOUSE_RENTAL_REQUEST_TYPE;
+    const isVehicleRental =
+      values.requestCategory === VEHICLE_RENTAL_REQUEST_TYPE;
+    const isRental = isHouseRental || isVehicleRental;
+    const isEquipmentRequest =
+      values.requestCategory === EQUIPMENT_REQUEST_TYPE;
+    const isAPHRequest = values.requestCategory === TicketRequestCategory.APH;
+    const isInternalFunding = isInternalFundingCategory(values.requestCategory);
+    const isShippingCostRequest =
+      values.requestCategory === TicketRequestCategory.SHIPPING_COST;
+
     const projectLinkedRequest =
       values.requestCategory === TicketRequestCategory.MATERIAL ||
       values.requestCategory === TicketRequestCategory.WAREHOUSE ||
       values.requestCategory === TicketRequestCategory.FIELD ||
-      values.requestCategory === EQUIPMENT_REQUEST_TYPE;
-    const isAPHRequest = values.requestCategory === TicketRequestCategory.APH;
-    const isInternalFunding = isInternalFundingCategory(values.requestCategory);
-    const isEquipmentRequest =
-      values.requestCategory === EQUIPMENT_REQUEST_TYPE;
-    const isShippingCostRequest =
-      values.requestCategory === TicketRequestCategory.SHIPPING_COST;
-    if (projectLinkedRequest && !values.projectId) {
+      isEquipmentRequest ||
+      isHouseRental ||
+      (isVehicleRental && values.rentalDetails.usageScope === "PROJECT");
+
+    if (projectLinkedRequest && !values.projectId.trim()) {
       context.addIssue({
         code: "custom",
         path: ["projectId"],
-        message: "Pilih proyek agar biaya dan pengiriman material dapat dilacak.",
+        message: isHouseRental
+          ? "Biaya Rumah Sewa / Mess Tukang wajib memilih Proyek aktif."
+          : isVehicleRental
+            ? "Kendaraan sewa lingkup Proyek wajib memilih Proyek aktif."
+            : "Pilih proyek agar biaya dan pengiriman dapat dilacak.",
       });
     }
+
     const usesItemDeliveryDates =
       values.requestCategory === TicketRequestCategory.MATERIAL ||
       values.requestCategory === TicketRequestCategory.WAREHOUSE;
     const usesStockCatalog =
       usesItemDeliveryDates &&
       values.itemSource === TicketCategoryHint.WAREHOUSE;
+
     if (
       values.requestCategory === TicketRequestCategory.WAREHOUSE &&
       values.itemSource !== TicketCategoryHint.WAREHOUSE
@@ -210,12 +278,14 @@ const ticketFormSchema = z
         message: "Permintaan material dari gudang hanya menggunakan stok gudang.",
       });
     }
+
     if (
       !usesItemDeliveryDates &&
       !isAPHRequest &&
       !isInternalFunding &&
       !isEquipmentRequest &&
-      (!values.neededDate || Number.isNaN(values.neededDate.getTime()))
+      !isRental &&
+      (!values.neededDate || !isValidDateKey(values.neededDate))
     ) {
       context.addIssue({
         code: "custom",
@@ -223,26 +293,18 @@ const ticketFormSchema = z
         message: "Tanggal perlu dibayarkan/disediakan wajib dipilih.",
       });
     }
+
     if (usesItemDeliveryDates) {
       if (
         values.itemSource === TicketCategoryHint.WAREHOUSE &&
         (!values.itemsExpectedDeliveryDate ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(values.itemsExpectedDeliveryDate) ||
-          (() => {
-            const parsedDate = new Date(
-              `${values.itemsExpectedDeliveryDate}T00:00:00.000Z`,
-            );
-            return (
-              Number.isNaN(parsedDate.getTime()) ||
-              parsedDate.toISOString().slice(0, 10) !==
-                values.itemsExpectedDeliveryDate
-            );
-          })())
+          !isValidDateKey(values.itemsExpectedDeliveryDate))
       ) {
         context.addIssue({
           code: "custom",
           path: ["itemsExpectedDeliveryDate"],
-          message: "Tanggal diperlukan wajib diisi untuk permintaan barang gudang.",
+          message:
+            "Tanggal diperlukan wajib diisi untuk permintaan barang gudang.",
         });
       }
       values.items.forEach((item, index) => {
@@ -265,6 +327,7 @@ const ticketFormSchema = z
         }
       });
     }
+
     if (values.requestCategory === "FIELD" && !values.fieldCategory) {
       context.addIssue({
         code: "custom",
@@ -272,31 +335,19 @@ const ticketFormSchema = z
         message: "Pilih jenis kebutuhan lapangan.",
       });
     }
+
     if (isEquipmentRequest) {
-      if (
-        !values.equipmentDetails.equipmentName?.trim() ||
-        values.equipmentDetails.equipmentName.trim().length < 2 ||
-        values.equipmentDetails.equipmentName.trim().length > 120
-      ) {
+      const equipName = values.equipmentDetails.equipmentName?.trim() ?? "";
+      if (equipName.length < 2 || equipName.length > 120) {
         context.addIssue({
           code: "custom",
           path: ["equipmentDetails", "equipmentName"],
-          message: "Nama alat/kendaraan wajib diisi (maksimal 120 karakter).",
+          message: "Nama alat/kendaraan wajib diisi (2–120 karakter).",
         });
       }
       if (
         !values.equipmentDetails.startDate ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(values.equipmentDetails.startDate) ||
-        (() => {
-          const parsedDate = new Date(
-            `${values.equipmentDetails.startDate}T00:00:00.000Z`,
-          );
-          return (
-            Number.isNaN(parsedDate.getTime()) ||
-            parsedDate.toISOString().slice(0, 10) !==
-              values.equipmentDetails.startDate
-          );
-        })()
+        !isValidDateKey(values.equipmentDetails.startDate)
       ) {
         context.addIssue({
           code: "custom",
@@ -315,14 +366,132 @@ const ticketFormSchema = z
           message: "Lama pemakaian harus lebih besar dari 0.",
         });
       }
-      if (values.items.length > 0) {
+    }
+
+    if (isRental) {
+      const assetName = values.rentalDetails.assetName?.trim() ?? "";
+      if (assetName.length < 2 || assetName.length > 160) {
         context.addIssue({
           code: "custom",
-          path: ["items"],
-          message: "Permintaan alat tidak menggunakan rincian barang.",
+          path: ["rentalDetails", "assetName"],
+          message: isHouseRental
+            ? "Nama rumah sewa / mess wajib diisi (2–160 karakter)."
+            : "Jenis / nama kendaraan sewa wajib diisi (2–160 karakter).",
         });
       }
+      if (isHouseRental && !values.rentalDetails.propertyAddress?.trim()) {
+        context.addIssue({
+          code: "custom",
+          path: ["rentalDetails", "propertyAddress"],
+          message: "Alamat / lokasi rumah sewa wajib diisi.",
+        });
+      }
+      if (
+        isHouseRental &&
+        values.rentalDetails.occupantCount !== undefined &&
+        (!Number.isInteger(values.rentalDetails.occupantCount) ||
+          values.rentalDetails.occupantCount < 1 ||
+          values.rentalDetails.occupantCount > 1000)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["rentalDetails", "occupantCount"],
+          message: "Jumlah penghuni harus berupa bilangan bulat minimal 1.",
+        });
+      }
+      if (
+        !values.rentalDetails.startDate ||
+        !isValidDateKey(values.rentalDetails.startDate)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["rentalDetails", "startDate"],
+          message: "Tanggal mulai sewa wajib dipilih.",
+        });
+      }
+      if (
+        values.rentalDetails.endDate &&
+        !isValidDateKey(values.rentalDetails.endDate)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["rentalDetails", "endDate"],
+          message: "Tanggal selesai sewa tidak valid.",
+        });
+      }
+      if (
+        values.rentalDetails.startDate &&
+        values.rentalDetails.endDate &&
+        isValidDateKey(values.rentalDetails.startDate) &&
+        isValidDateKey(values.rentalDetails.endDate) &&
+        values.rentalDetails.endDate < values.rentalDetails.startDate
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["rentalDetails", "endDate"],
+          message: "Tanggal selesai tidak boleh lebih awal dari tanggal mulai.",
+        });
+      }
+      if (
+        values.rentalDetails.duration === undefined ||
+        !Number.isFinite(values.rentalDetails.duration) ||
+        values.rentalDetails.duration <= 0 ||
+        values.rentalDetails.duration > 3650
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["rentalDetails", "duration"],
+          message: "Durasi sewa wajib diisi lebih dari 0.",
+        });
+      }
+      if (values.requestedAmount === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["requestedAmount"],
+          message: "Nominal biaya sewa wajib lebih besar dari 0.",
+        });
+      }
+      const hasAnyBankInput = Boolean(
+        values.recipientName?.trim() ||
+          values.bankName?.trim() ||
+          values.accountNumber?.trim(),
+      );
+      if (hasAnyBankInput) {
+        if (
+          !values.recipientName?.trim() ||
+          values.recipientName.trim().length < 2 ||
+          values.recipientName.trim().length > 120
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["recipientName"],
+            message: "Nama penerima rekening wajib diisi (2–120 karakter).",
+          });
+        }
+        if (
+          !values.bankName?.trim() ||
+          values.bankName.trim().length < 2 ||
+          values.bankName.trim().length > 80
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["bankName"],
+            message: "Nama bank wajib diisi (2–80 karakter).",
+          });
+        }
+        if (
+          !values.accountNumber?.trim() ||
+          !/^[0-9]{6,30}$/.test(values.accountNumber.trim())
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["accountNumber"],
+            message: "Nomor rekening harus berisi 6–30 angka.",
+          });
+        }
+      }
     }
+
     if (isAPHRequest) {
       if (!values.requestPaymentMethod) {
         context.addIssue({
@@ -359,6 +528,7 @@ const ticketFormSchema = z
         });
       }
     }
+
     if (isInternalFunding) {
       if (values.requestedAmount === undefined) {
         context.addIssue({
@@ -384,29 +554,18 @@ const ticketFormSchema = z
         context.addIssue({
           code: "custom",
           path: ["receiptFiles"],
-          message: "Unggah minimal satu struk atau nota asli untuk reimbursement.",
-        });
-      }
-      if (values.items.length > 0) {
-        context.addIssue({
-          code: "custom",
-          path: ["items"],
-          message: "Pengajuan internal tidak menggunakan rincian barang.",
+          message:
+            "Unggah minimal satu struk atau nota asli untuk reimbursement.",
         });
       }
     }
+
     if (isShippingCostRequest) {
       if (!values.relatedDocumentNumbers.trim()) {
         context.addIssue({
           code: "custom",
           path: ["relatedDocumentNumbers"],
           message: "Pilih setidaknya satu PO barang.",
-        });
-      } else if (values.relatedDocumentNumbers.length > 2000) {
-        context.addIssue({
-          code: "custom",
-          path: ["relatedDocumentNumbers"],
-          message: "Daftar PO terlalu panjang.",
         });
       }
       if (values.requestedAmount === undefined) {
@@ -420,25 +579,22 @@ const ticketFormSchema = z
         context.addIssue({
           code: "custom",
           path: ["deliveryReceiptFile"],
-          message: "Unggah resi pengiriman sebelum menyimpan tiket.",
-        });
-      }
-      if (values.items.length > 0) {
-        context.addIssue({
-          code: "custom",
-          path: ["items"],
-          message:
-            "Tiket pengiriman barang menggunakan rincian PO, bukan rincian item manual.",
+          message: "Unggah resi pengiriman sebelum mengajukan tiket.",
         });
       }
     }
+
     const requiresRecipientPayment =
       values.requestCategory === TicketRequestCategory.FIELD &&
       values.fieldCategory !== undefined;
     const isOperationalFunding =
       values.requestCategory === TicketRequestCategory.OPS;
+
     if (requiresRecipientPayment) {
-      if (!values.recipientName?.trim() || values.recipientName.trim().length > 120) {
+      if (
+        !values.recipientName?.trim() ||
+        values.recipientName.trim().length > 120
+      ) {
         context.addIssue({
           code: "custom",
           path: ["recipientName"],
@@ -452,7 +608,10 @@ const ticketFormSchema = z
           message: "Nama bank wajib diisi (maksimal 80 karakter).",
         });
       }
-      if (!values.accountNumber || !/^[0-9]{6,30}$/.test(values.accountNumber.trim())) {
+      if (
+        !values.accountNumber ||
+        !/^[0-9]{6,30}$/.test(values.accountNumber.trim())
+      ) {
         context.addIssue({
           code: "custom",
           path: ["accountNumber"],
@@ -493,19 +652,12 @@ const ticketFormSchema = z
         }
       }
     } else if (
-      isAPHRequest ||
-      isInternalFunding ||
-      isShippingCostRequest ||
-      isEquipmentRequest
+      !isAPHRequest &&
+      !isInternalFunding &&
+      !isShippingCostRequest &&
+      !isEquipmentRequest &&
+      !isRental
     ) {
-      if (values.items.length > 0) {
-        context.addIssue({
-          code: "custom",
-          path: ["items"],
-          message: "Pengajuan ini tidak menggunakan rincian item.",
-        });
-      }
-    } else {
       if (values.items.length === 0) {
         context.addIssue({
           code: "custom",
@@ -516,6 +668,7 @@ const ticketFormSchema = z
       values.items.forEach((item, index) => {
         if (
           !usesStockCatalog &&
+          values.itemSource !== TicketCategoryHint.CONTRACT &&
           (!item.itemName?.trim() || item.itemName.trim().length > 160)
         ) {
           context.addIssue({
@@ -526,6 +679,7 @@ const ticketFormSchema = z
         }
         if (
           !usesStockCatalog &&
+          values.itemSource !== TicketCategoryHint.CONTRACT &&
           (!item.unit?.trim() || item.unit.trim().length > 32)
         ) {
           context.addIssue({
@@ -568,51 +722,93 @@ const formatCurrency = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount);
 
+const getDefaultItemSourceForCategory = (
+  category: RequestCategoryValue,
+  contractsCount: number,
+): TicketCategoryHint => {
+  if (category === TicketRequestCategory.WAREHOUSE) {
+    return TicketCategoryHint.WAREHOUSE;
+  }
+  if (category === TicketRequestCategory.MATERIAL) {
+    return contractsCount > 0
+      ? TicketCategoryHint.CONTRACT
+      : TicketCategoryHint.PURCHASE;
+  }
+  return TicketCategoryHint.PURCHASE;
+};
+
+const createBlankItem = (hint: TicketCategoryHint) => ({
+  stockItemId: "",
+  itemName: "",
+  unit: "",
+  quantity: 1,
+  estimatedCost: undefined,
+  categoryHint: hint,
+  materialContractId: "",
+  expectedDeliveryDate: "",
+});
+
 const getRequestTypeOptions = (
   role?: UserRole,
   selectedProjectId?: string,
 ): { label: string; value: RequestCategoryValue }[] => {
   const options: { label: string; value: RequestCategoryValue }[] = [
     {
-      label: "Operasional (OPS)",
+      label: requestCategoryLabels[TicketRequestCategory.OPS],
       value: TicketRequestCategory.OPS,
     },
   ];
 
-  if (selectedProjectId) {
-    if (role === UserRole.FIELD_TEAM) {
-      options.push(
-        {
-            label: requestCategoryLabels[TicketRequestCategory.WAREHOUSE],
-            value: TicketRequestCategory.WAREHOUSE,
-          },
-        {
-          label: "Permintaan Material / Alam",
-          value: TicketRequestCategory.MATERIAL,
-        },
-      );
-    } else {
-      options.push({
-        label: "Permintaan Material / Alam",
+  if (role === UserRole.FIELD_TEAM) {
+    options.push(
+      {
+        label: requestCategoryLabels[TicketRequestCategory.WAREHOUSE],
+        value: TicketRequestCategory.WAREHOUSE,
+      },
+      {
+        label: requestCategoryLabels[TicketRequestCategory.MATERIAL],
         value: TicketRequestCategory.MATERIAL,
-      });
-    }
-    if (
-      role === UserRole.DIRECTOR ||
-      role === UserRole.KOORDINATOR ||
-      role === UserRole.FIELD_TEAM
-    ) {
-      options.push({
-        label: requestCategoryLabels[TicketRequestCategory.FIELD],
-        value: TicketRequestCategory.FIELD,
-      });
-    }
-    if (role === UserRole.FIELD_TEAM || role === UserRole.KOORDINATOR) {
-      options.push({
-        label: "Permintaan Alat Berat & Kendaraan",
-        value: EQUIPMENT_REQUEST_TYPE,
-      });
-    }
+      },
+    );
+  } else {
+    options.push({
+      label: requestCategoryLabels[TicketRequestCategory.MATERIAL],
+      value: TicketRequestCategory.MATERIAL,
+    });
+  }
+
+  if (
+    role === UserRole.DIRECTOR ||
+    role === UserRole.KOORDINATOR ||
+    role === UserRole.FIELD_TEAM
+  ) {
+    options.push({
+      label: requestCategoryLabels[TicketRequestCategory.FIELD],
+      value: TicketRequestCategory.FIELD,
+    });
+  }
+
+  if (
+    (role === UserRole.FIELD_TEAM || role === UserRole.KOORDINATOR) &&
+    selectedProjectId
+  ) {
+    options.push({
+      label: requestCategoryLabels[EQUIPMENT_REQUEST_TYPE],
+      value: EQUIPMENT_REQUEST_TYPE,
+    });
+  }
+
+  if (role !== UserRole.MOVER) {
+    options.push(
+      {
+        label: requestCategoryLabels[HOUSE_RENTAL_REQUEST_TYPE],
+        value: HOUSE_RENTAL_REQUEST_TYPE,
+      },
+      {
+        label: requestCategoryLabels[VEHICLE_RENTAL_REQUEST_TYPE],
+        value: VEHICLE_RENTAL_REQUEST_TYPE,
+      },
+    );
   }
 
   if (
@@ -621,7 +817,7 @@ const getRequestTypeOptions = (
     role === UserRole.FINANCE
   ) {
     options.push({
-      label: "Belanja Kantor",
+      label: requestCategoryLabels[TicketRequestCategory.OFFICE],
       value: TicketRequestCategory.OFFICE,
     });
   }
@@ -668,12 +864,273 @@ const getRequestTypeOptions = (
   return options;
 };
 
+function MaterialItemRow({
+  index,
+  canRemove,
+  itemSource,
+  usesStockCatalog,
+  materialContracts,
+  stockComboboxOptions,
+  contractComboboxOptions,
+  control,
+  register,
+  errors,
+  setValue,
+  clearErrors,
+  onRemove,
+  watchedQuantity,
+  watchedMaterialContractId,
+}: {
+  index: number;
+  canRemove: boolean;
+  itemSource: TicketCategoryHint;
+  usesStockCatalog: boolean;
+  materialContracts: TicketMaterialContractOption[];
+  stockComboboxOptions: ComboboxOption[];
+  contractComboboxOptions: ComboboxOption[];
+  control: Control<TicketFormValues>;
+  register: UseFormRegister<TicketFormValues>;
+  errors: FieldErrors<TicketFormValues>;
+  setValue: UseFormSetValue<TicketFormValues>;
+  clearErrors: UseFormClearErrors<TicketFormValues>;
+  onRemove: (index: number) => void;
+  watchedQuantity?: number;
+  watchedMaterialContractId?: string;
+}) {
+  const itemErrors = errors.items?.[index];
+  const matchedContract =
+    itemSource === TicketCategoryHint.CONTRACT && watchedMaterialContractId
+      ? materialContracts.find((c) => c.id === watchedMaterialContractId)
+      : undefined;
+  const qty = Number(watchedQuantity ?? 0);
+  const lineEstimate =
+    matchedContract && Number.isFinite(qty) && qty > 0
+      ? Math.round(qty * matchedContract.unitPrice)
+      : 0;
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-3.5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,2fr)_6.5rem_6.5rem_auto] sm:items-end">
+        {itemSource === TicketCategoryHint.CONTRACT ? (
+          <div className="space-y-1.5">
+            <Label
+              className="type-p2 font-medium"
+              htmlFor={`ticket-material-contract-${index}`}
+            >
+              Material Alam (Kontrak) <span className="text-destructive">*</span>
+            </Label>
+            <Controller
+              control={control}
+              name={`items.${index}.materialContractId`}
+              render={({ field }) => (
+                <Combobox
+                  id={`ticket-material-contract-${index}`}
+                  options={contractComboboxOptions}
+                  value={field.value ?? ""}
+                  placeholder="Pilih kontrak material alam..."
+                  searchPlaceholder="Cari pasir, batu, atau vendor..."
+                  emptyText="Kontrak material tidak ditemukan."
+                  onValueChange={(contractId) => {
+                    field.onChange(contractId);
+                    const contract = materialContracts.find(
+                      (option) => option.id === contractId,
+                    );
+                    if (!contract) return;
+                    setValue(`items.${index}.itemName`, contract.materialType, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    setValue(`items.${index}.unit`, contract.unit, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    setValue(
+                      `items.${index}.estimatedCost`,
+                      contract.unitPrice,
+                      { shouldDirty: true, shouldValidate: true },
+                    );
+                    clearErrors([
+                      `items.${index}.materialContractId`,
+                      `items.${index}.itemName`,
+                      `items.${index}.unit`,
+                    ]);
+                  }}
+                />
+              )}
+            />
+            {itemErrors?.materialContractId && (
+              <p className="type-p3 text-destructive" role="alert">
+                {itemErrors.materialContractId.message}
+              </p>
+            )}
+          </div>
+        ) : usesStockCatalog ? (
+          <div className="space-y-1.5">
+            <Label
+              className="type-p2 font-medium"
+              htmlFor={`ticket-stock-item-${index}`}
+            >
+              Barang Gudang <span className="text-destructive">*</span>
+            </Label>
+            <Controller
+              control={control}
+              name={`items.${index}.stockItemId`}
+              render={({ field }) => (
+                <Combobox
+                  id={`ticket-stock-item-${index}`}
+                  options={stockComboboxOptions}
+                  value={field.value ?? ""}
+                  placeholder="Pilih barang dari stok gudang..."
+                  searchPlaceholder="Cari nama atau satuan barang..."
+                  emptyText="Barang tidak ditemukan."
+                  onValueChange={(stockId) => {
+                    field.onChange(stockId);
+                    const stock = stockComboboxOptions.find(
+                      (option) => option.value === stockId,
+                    );
+                    if (!stock) return;
+                    const [namePart, unitPart] = stock.label.split(" · ");
+                    setValue(`items.${index}.itemName`, namePart ?? stock.label, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    setValue(`items.${index}.unit`, unitPart ?? "pcs", {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    setValue(`items.${index}.estimatedCost`, undefined);
+                    clearErrors([
+                      `items.${index}.stockItemId`,
+                      `items.${index}.itemName`,
+                      `items.${index}.unit`,
+                    ]);
+                  }}
+                />
+              )}
+            />
+            {itemErrors?.stockItemId && (
+              <p className="type-p3 text-destructive" role="alert">
+                {itemErrors.stockItemId.message}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label
+              className="type-p2 font-medium"
+              htmlFor={`ticket-item-${index}`}
+            >
+              Nama Barang <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id={`ticket-item-${index}`}
+              placeholder="Contoh: Pasir Pasang / Semen"
+              aria-invalid={!!itemErrors?.itemName}
+              {...register(`items.${index}.itemName`)}
+            />
+            {itemErrors?.itemName && (
+              <p className="type-p3 text-destructive" role="alert">
+                {itemErrors.itemName.message}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <Label
+            className="type-p2 font-medium"
+            htmlFor={`ticket-quantity-${index}`}
+          >
+            Qty <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id={`ticket-quantity-${index}`}
+            type="number"
+            min="0.001"
+            step="any"
+            aria-invalid={!!itemErrors?.quantity}
+            {...register(`items.${index}.quantity`, {
+              valueAsNumber: true,
+            })}
+          />
+          {itemErrors?.quantity && (
+            <p className="type-p3 text-destructive" role="alert">
+              {itemErrors.quantity.message}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label
+            className="type-p2 font-medium"
+            htmlFor={`ticket-unit-${index}`}
+          >
+            Satuan <span className="text-destructive">*</span>
+          </Label>
+          {usesStockCatalog || itemSource === TicketCategoryHint.CONTRACT ? (
+            <Controller
+              control={control}
+              name={`items.${index}.unit`}
+              render={({ field }) => (
+                <Input
+                  id={`ticket-unit-${index}`}
+                  value={field.value ?? ""}
+                  readOnly
+                  className="bg-muted/50"
+                />
+              )}
+            />
+          ) : (
+            <Input
+              id={`ticket-unit-${index}`}
+              placeholder="m3 / sak / pcs"
+              maxLength={32}
+              aria-invalid={!!itemErrors?.unit}
+              {...register(`items.${index}.unit`)}
+            />
+          )}
+          {itemErrors?.unit && (
+            <p className="type-p3 text-destructive" role="alert">
+              {itemErrors.unit.message}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end">
+          {canRemove ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Hapus item ${index + 1}`}
+              onClick={() => onRemove(index)}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {matchedContract ? (
+        <p className="type-p3 text-muted-foreground">
+          Kontrak{" "}
+          <span className="font-semibold text-foreground">
+            {matchedContract.contractNumber}
+          </span>{" "}
+          · {formatCurrency(matchedContract.unitPrice)}/{matchedContract.unit}
+          {lineEstimate > 0 ? ` · Estimasi: ${formatCurrency(lineEstimate)}` : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function CreateTicketModal({
   projects,
   stockItems = [],
   requesterRole,
-  movers = [],
-  triggerLabel = "Tambah Tiket Baru",
+  triggerLabel = "Tambah Tiket",
   defaultOpen = false,
   defaultRequestCategory,
   fixedProjectId,
@@ -700,49 +1157,48 @@ export default function CreateTicketModal({
     workPointTitle: string;
   };
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [error, setError] = useState("");
-  const [requestedAmountEdit, setRequestedAmountEdit] = useState<string | null>(
-    null,
+  const router = useRouter();
+  const initialCategory: RequestCategoryValue = initialWageRequest
+    ? TicketRequestCategory.FIELD
+    : defaultRequestCategory ?? TicketRequestCategory.OPS;
+  const initialSource = getDefaultItemSourceForCategory(
+    initialCategory,
+    materialContracts.length,
   );
+  const needsInitialItems =
+    initialCategory === TicketRequestCategory.MATERIAL ||
+    initialCategory === TicketRequestCategory.WAREHOUSE;
+
+  const [open, setOpen] = useState(defaultOpen);
+  const [activeStep, setActiveStep] = useState(0);
+  const [error, setError] = useState("");
   const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [receiptUploadError, setReceiptUploadError] = useState("");
-  const [stockPickerIndex, setStockPickerIndex] = useState<number | null>(null);
-  const [shippingDocumentOptions, setShippingDocumentOptions] = useState<
-    ShippingDocumentOptions | null
-  >(null);
+  const [shippingDocumentOptions, setShippingDocumentOptions] =
+    useState<ShippingDocumentOptions | null>(null);
   const [shippingDocumentsLoaded, setShippingDocumentsLoaded] =
     useState(false);
   const [shippingDocumentsAttempt, setShippingDocumentsAttempt] = useState(0);
   const [shippingDocumentsError, setShippingDocumentsError] = useState("");
   const [selectedShippingDocumentKeys, setSelectedShippingDocumentKeys] =
     useState<string[]>([]);
-  const router = useRouter();
+
+  const todayDateKey = useMemo(() => getJakartaDateKey(), []);
+
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
     defaultValues: {
       projectId: initialWageRequest?.projectId ?? fixedProjectId ?? "",
       moverAssigneeId: "",
-      requestCategory: initialWageRequest
-        ? TicketRequestCategory.FIELD
-        : defaultRequestCategory ?? TicketRequestCategory.OPS,
+      requestCategory: initialCategory,
       fieldCategory: initialWageRequest
         ? TicketFieldCategory.LABOR
         : undefined,
       priority: "NON_URGENT",
-      neededDate: undefined,
-      itemSource: TicketCategoryHint.WAREHOUSE,
+      neededDate: "",
+      itemSource: initialSource,
       itemsExpectedDeliveryDate: "",
-      items: [{
-        stockItemId: "",
-        itemName: "",
-        unit: "",
-        quantity: 1,
-        estimatedCost: undefined,
-        categoryHint: TicketCategoryHint.WAREHOUSE,
-        materialContractId: "",
-        expectedDeliveryDate: "",
-      }],
+      items: needsInitialItems ? [createBlankItem(initialSource)] : [],
       recipientName: "",
       bankName: "",
       accountNumber: "",
@@ -763,25 +1219,35 @@ export default function CreateTicketModal({
         duration: undefined,
         timeUnit: DEFAULT_EQUIPMENT_TIME_UNIT,
       },
+      rentalDetails: {
+        usageScope: "PROJECT",
+        assetName: "",
+        propertyAddress: "",
+        landlordName: "",
+        landlordPhone: "",
+        occupantCount: undefined,
+        codeOrPlate: "",
+        periodType: "MONTHLY",
+        startDate: "",
+        endDate: "",
+        duration: 1,
+      },
     },
   });
+
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "items",
   });
+
   const selectedProjectId = useWatch({
     control: form.control,
     name: "projectId",
   });
-  const selectedRequestType = useWatch({
+  const requestCategory = useWatch({
     control: form.control,
     name: "requestCategory",
   });
-  const requestCategory = selectedRequestType;
-  const requestTypeOptions = useMemo(
-    () => getRequestTypeOptions(requesterRole, selectedProjectId),
-    [requesterRole, selectedProjectId],
-  );
   const fieldCategory = useWatch({
     control: form.control,
     name: "fieldCategory",
@@ -814,13 +1280,65 @@ export default function CreateTicketModal({
     control: form.control,
     name: "surveyFuelAmount",
   });
+  const itemSource = useWatch({ control: form.control, name: "itemSource" });
+  const watchedItems = useWatch({ control: form.control, name: "items" });
+  const itemsExpectedDeliveryDate = useWatch({
+    control: form.control,
+    name: "itemsExpectedDeliveryDate",
+  });
+  const rentalUsageScope = useWatch({
+    control: form.control,
+    name: "rentalDetails.usageScope",
+  });
+  const rentalStartDate = useWatch({
+    control: form.control,
+    name: "rentalDetails.startDate",
+  });
+  const watchedPriority = useWatch({
+    control: form.control,
+    name: "priority",
+  });
+  const watchedNeededDate = useWatch({
+    control: form.control,
+    name: "neededDate",
+  });
+
+  const requestTypeOptions = useMemo(
+    () => getRequestTypeOptions(requesterRole, selectedProjectId),
+    [requesterRole, selectedProjectId],
+  );
+
+  const isHouseRental = requestCategory === HOUSE_RENTAL_REQUEST_TYPE;
+  const isVehicleRental = requestCategory === VEHICLE_RENTAL_REQUEST_TYPE;
+  const isRentalRequest = isHouseRental || isVehicleRental;
+  const isEquipmentRequest = requestCategory === EQUIPMENT_REQUEST_TYPE;
+  const isAPHRequest = requestCategory === TicketRequestCategory.APH;
+  const isInternalFunding = isInternalFundingCategory(requestCategory);
+  const isShippingCostRequest =
+    requestCategory === TicketRequestCategory.SHIPPING_COST;
+  const isOperationalFunding =
+    requestCategory === TicketRequestCategory.OPS;
+  const requiresRecipientPayment =
+    requestCategory === TicketRequestCategory.FIELD &&
+    fieldCategory !== undefined;
+  const usesItemDeliveryDates =
+    requestCategory === TicketRequestCategory.MATERIAL ||
+    requestCategory === TicketRequestCategory.WAREHOUSE;
+  const usesStockCatalog =
+    usesItemDeliveryDates && itemSource === TicketCategoryHint.WAREHOUSE;
+
+  const isProjectRequired =
+    requestCategory === TicketRequestCategory.MATERIAL ||
+    requestCategory === TicketRequestCategory.WAREHOUSE ||
+    requestCategory === TicketRequestCategory.FIELD ||
+    isEquipmentRequest ||
+    isHouseRental ||
+    (isVehicleRental && rentalUsageScope === "PROJECT");
+
   useEffect(() => {
-    if (
-      requestTypeOptions.some((option) => option.value === requestCategory)
-    ) {
+    if (requestTypeOptions.some((option) => option.value === requestCategory)) {
       return;
     }
-
     const nextRequestCategory =
       requestTypeOptions[0]?.value ?? TicketRequestCategory.OPS;
     form.setValue("requestCategory", nextRequestCategory, {
@@ -832,82 +1350,29 @@ export default function CreateTicketModal({
       nextRequestCategory === TicketRequestCategory.MATERIAL ||
       nextRequestCategory === TicketRequestCategory.WAREHOUSE
     ) {
-      form.setValue(
-        "items",
-        [
-          {
-            stockItemId: "",
-            itemName: "",
-            unit: "",
-            quantity: 1,
-            estimatedCost: undefined,
-            categoryHint:
-              nextRequestCategory === TicketRequestCategory.WAREHOUSE
-                ? TicketCategoryHint.WAREHOUSE
-                : TicketCategoryHint.PURCHASE,
-            materialContractId: "",
-            expectedDeliveryDate: "",
-          },
-        ],
-        { shouldValidate: true },
+      const nextHint = getDefaultItemSourceForCategory(
+        nextRequestCategory,
+        materialContracts.length,
       );
-      form.setValue(
-        "itemSource",
-        nextRequestCategory === TicketRequestCategory.WAREHOUSE
-          ? TicketCategoryHint.WAREHOUSE
-          : TicketCategoryHint.PURCHASE,
-      );
+      form.setValue("itemSource", nextHint);
       form.setValue("itemsExpectedDeliveryDate", "");
-    } else if (requestCategory === EQUIPMENT_REQUEST_TYPE) {
-      form.setValue(
-        "items",
-        [
-          {
-            stockItemId: "",
-            itemName: "",
-            unit: "",
-            quantity: 1,
-            estimatedCost: undefined,
-            categoryHint: TicketCategoryHint.PURCHASE,
-            expectedDeliveryDate: "",
-          },
-        ],
-        { shouldValidate: true },
-      );
-      form.setValue("itemSource", TicketCategoryHint.PURCHASE);
-      form.setValue("itemsExpectedDeliveryDate", "");
+      form.setValue("items", [createBlankItem(nextHint)], {
+        shouldValidate: true,
+      });
     } else {
       form.setValue("items", [], { shouldValidate: true });
     }
-    if (nextRequestCategory !== EQUIPMENT_REQUEST_TYPE) {
-      form.setValue("equipmentDetails.equipmentName", "");
-      form.setValue("equipmentDetails.startDate", "");
-      form.setValue("equipmentDetails.duration", undefined);
-      form.setValue(
-        "equipmentDetails.timeUnit",
-        DEFAULT_EQUIPMENT_TIME_UNIT,
-      );
-    }
     form.clearErrors(["fieldCategory", "items"]);
-  }, [form, requestCategory, requestTypeOptions]);
-  const requiresRecipientPayment =
-    requestCategory === TicketRequestCategory.FIELD &&
-    fieldCategory !== undefined;
-  const isOperationalFunding =
-    requestCategory === TicketRequestCategory.OPS;
-  const isEquipmentRequest = requestCategory === EQUIPMENT_REQUEST_TYPE;
-  const isAPHRequest = requestCategory === TicketRequestCategory.APH;
-  const isInternalFunding = isInternalFundingCategory(requestCategory);
-  const isShippingCostRequest =
-    requestCategory === TicketRequestCategory.SHIPPING_COST;
+  }, [form, materialContracts.length, requestCategory, requestTypeOptions]);
+
   const shippingDocumentsLoading =
     open &&
     isShippingCostRequest &&
     !shippingDocumentsLoaded &&
     !shippingDocumentsError;
+
   useEffect(() => {
     if (!open || !isShippingCostRequest) return;
-
     let active = true;
     void getShippingDocumentOptions()
       .then((result) => {
@@ -929,12 +1394,149 @@ export default function CreateTicketModal({
           );
           setShippingDocumentsLoaded(true);
         }
-      })
+      });
 
     return () => {
       active = false;
     };
   }, [open, isShippingCostRequest, shippingDocumentsAttempt]);
+
+  const projectComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    const projectItems = projects.map((project) => ({
+      value: project.id,
+      label: `${project.kelompokTani} - ${project.title}`,
+      keywords: [project.kelompokTani, project.title],
+    }));
+    if (isProjectRequired) {
+      return projectItems;
+    }
+    return [
+      {
+        value: "__NONE__",
+        label: "Kantor Pusat / Overhead Umum",
+        description: "Tanpa ikatan proyek tertentu",
+        keywords: ["kantor", "pusat", "operasional", "umum"],
+      },
+      ...projectItems,
+    ];
+  }, [isProjectRequired, projects]);
+
+  const stockComboboxOptions = useMemo<ComboboxOption[]>(
+    () =>
+      stockItems.map((item) => ({
+        value: item.id,
+        label: `${item.name} · ${item.unit}`,
+        description:
+          itemSource === TicketCategoryHint.WAREHOUSE
+            ? `Tersedia ${item.stockQuantity} ${item.unit}`
+            : undefined,
+        keywords: [item.name, item.unit],
+      })),
+    [itemSource, stockItems],
+  );
+
+  const contractComboboxOptions = useMemo<ComboboxOption[]>(
+    () =>
+      materialContracts.map((contract) => ({
+        value: contract.id,
+        label: `${contract.materialType} · ${contract.vendorName}`,
+        description: `${contract.contractNumber} · ${formatCurrency(contract.unitPrice)}/${contract.unit}`,
+        keywords: [
+          contract.materialType,
+          contract.vendorName,
+          contract.contractNumber,
+        ],
+      })),
+    [materialContracts],
+  );
+
+  const handleCategoryChange = (value: string) => {
+    const nextCategory = value as RequestCategoryValue;
+    form.setValue("requestCategory", nextCategory, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setError("");
+
+    if (nextCategory !== TicketRequestCategory.REIMBURSEMENT) {
+      setReceiptUploadError("");
+      setReceiptFiles([]);
+      form.setValue("receiptFiles", [], { shouldValidate: true });
+    }
+    if (nextCategory !== TicketRequestCategory.SHIPPING_COST) {
+      setSelectedShippingDocumentKeys([]);
+      form.setValue("relatedDocumentNumbers", "");
+      form.setValue("deliveryReceiptFile", null, { shouldValidate: false });
+      form.clearErrors("deliveryReceiptFile");
+    }
+    if (nextCategory !== TicketRequestCategory.FIELD) {
+      form.setValue("fieldCategory", undefined);
+      form.clearErrors("fieldCategory");
+    }
+
+    if (
+      nextCategory === TicketRequestCategory.MATERIAL ||
+      nextCategory === TicketRequestCategory.WAREHOUSE
+    ) {
+      const nextHint = getDefaultItemSourceForCategory(
+        nextCategory,
+        materialContracts.length,
+      );
+      form.setValue("itemSource", nextHint, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      form.setValue("itemsExpectedDeliveryDate", "");
+      form.setValue("items", [createBlankItem(nextHint)], {
+        shouldValidate: true,
+      });
+    } else {
+      form.setValue("items", [], { shouldValidate: true });
+      form.setValue("itemSource", TicketCategoryHint.PURCHASE);
+      form.setValue("itemsExpectedDeliveryDate", "");
+    }
+
+    if (nextCategory === HOUSE_RENTAL_REQUEST_TYPE) {
+      form.setValue("rentalDetails.usageScope", "PROJECT");
+    }
+    if (nextCategory !== EQUIPMENT_REQUEST_TYPE) {
+      form.setValue("equipmentDetails.equipmentName", "");
+      form.setValue("equipmentDetails.startDate", "");
+      form.setValue("equipmentDetails.duration", undefined);
+      form.setValue("equipmentDetails.timeUnit", DEFAULT_EQUIPMENT_TIME_UNIT);
+    }
+    form.clearErrors([
+      "fieldCategory",
+      "items",
+      "itemsExpectedDeliveryDate",
+      "rentalDetails",
+      "requestedAmount",
+      "neededDate",
+    ]);
+  };
+
+  const switchMaterialSourceToPurchase = () => {
+    form.setValue("itemSource", TicketCategoryHint.PURCHASE, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    replace(
+      (form.getValues("items") ?? [createBlankItem(TicketCategoryHint.PURCHASE)]).map(
+        (item) => ({
+          ...item,
+          stockItemId: "",
+          itemName: "",
+          unit: "",
+          estimatedCost: undefined,
+          categoryHint: TicketCategoryHint.PURCHASE,
+          materialContractId: "",
+          expectedDeliveryDate: "",
+        }),
+      ),
+    );
+    form.setValue("itemsExpectedDeliveryDate", "");
+    form.clearErrors(["items", "itemsExpectedDeliveryDate"]);
+  };
 
   const updateSelectedShippingDocuments = (nextKeys: string[]) => {
     setSelectedShippingDocumentKeys(nextKeys);
@@ -957,6 +1559,7 @@ export default function CreateTicketModal({
       : selectedShippingDocumentKeys.filter((selected) => selected !== key);
     updateSelectedShippingDocuments(nextKeys);
   };
+
   const shippingDocumentGroups = [
     {
       key: "PO",
@@ -971,577 +1574,1458 @@ export default function CreateTicketModal({
       ),
     },
   ] as const;
+
   const requiresFundingRequest =
     requiresRecipientPayment ||
     isOperationalFunding ||
     isAPHRequest ||
     isInternalFunding ||
     isShippingCostRequest ||
-    isEquipmentRequest;
+    isEquipmentRequest ||
+    isRentalRequest;
+
   const operationalRequestedAmount =
     operationalRequestType === "SURVEY"
       ? (watchedSurveyConsumptionAmount ?? 0) + (watchedSurveyFuelAmount ?? 0)
       : watchedOperationalAmount ?? 0;
-  const itemSource = useWatch({ control: form.control, name: "itemSource" });
-  const watchedItems = useWatch({ control: form.control, name: "items" });
-  const itemsExpectedDeliveryDate = useWatch({
-    control: form.control,
-    name: "itemsExpectedDeliveryDate",
-  });
+
   const contractEstimatedTotal = useMemo(() => {
     if (itemSource !== TicketCategoryHint.CONTRACT) return 0;
     return (watchedItems ?? []).reduce((sum, item) => {
       const qty = Number(item?.quantity ?? 0);
       const unitPrice = Number(item?.estimatedCost ?? 0);
-      if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      if (
+        !Number.isFinite(qty) ||
+        qty <= 0 ||
+        !Number.isFinite(unitPrice) ||
+        unitPrice <= 0
+      ) {
         return sum;
       }
       return sum + Math.round(qty * unitPrice);
     }, 0);
   }, [itemSource, watchedItems]);
-  const usesItemDeliveryDates =
-    requestCategory === TicketRequestCategory.MATERIAL ||
-    requestCategory === TicketRequestCategory.WAREHOUSE;
-  const usesStockCatalog =
-    usesItemDeliveryDates && itemSource === TicketCategoryHint.WAREHOUSE;
-  const submit = form.handleSubmit(async (values) => {
+
+  const handleNextStep = async () => {
     setError("");
-    if (
-      !usesItemDeliveryDates &&
-      !isAPHRequest &&
-      !isInternalFunding &&
-      !isEquipmentRequest &&
-      !values.neededDate
-    ) {
-      setError("Pilih tanggal perlu dibayarkan/disediakan terlebih dahulu.");
-      return;
-    }
-    const categoryLabel = requestCategoryLabels[values.requestCategory];
-    const subCategoryLabel = values.fieldCategory
-      ? fieldCategoryLabels[values.fieldCategory]
-      : undefined;
-    const firstItemName = values.items[0]?.itemName?.trim() ?? "";
-    const operationalRequestLabel =
-      values.operationalRequestType === "SURVEY"
-        ? "Biaya Survei Lapangan"
-        : "Dana Operasional";
-    const operationalAmount =
-      values.operationalRequestType === "SURVEY"
-        ? (values.surveyConsumptionAmount ?? 0) +
-          (values.surveyFuelAmount ?? 0)
-        : values.operationalAmount;
-    const shortDetail = (values.requestPaymentDescription?.trim() ?? "").replace(/\s+/g, " ");
-    const conciseTitle = `${categoryLabel}: ${
-      shortDetail.length > 50 ? `${shortDetail.slice(0, 47).trimEnd()}...` : shortDetail
-    }`;
-    const title = isEquipmentRequest
-      ? `${categoryLabel}: ${values.equipmentDetails.equipmentName?.trim() ?? ""}`.slice(0, 160)
-      : isOperationalFunding
-      ? `Operasional: ${operationalRequestLabel}`
-      : isAPHRequest
-        ? "Permintaan APH"
-      : isInternalFunding
-        ? conciseTitle
-      : isShippingCostRequest
-        ? `${categoryLabel}: ${values.relatedDocumentNumbers.trim()}`.slice(0, 80)
-      : requiresRecipientPayment
-      ? `${subCategoryLabel}: ${values.recipientName?.trim()}`.slice(0, 80)
-      : `${categoryLabel}: ${firstItemName}`.slice(0, 80);
-    const description = [
-      `Jenis permintaan: ${categoryLabel}`,
-      isAPHRequest
-        ? `Metode pembayaran: ${values.requestPaymentMethod === POPaymentMethod.CASH ? "Cash" : "Transfer"}`
-        : null,
-      isAPHRequest &&
-      values.requestPaymentMethod === POPaymentMethod.TRANSFER &&
-      values.transferDestination?.trim()
-        ? `Tujuan transfer: ${values.transferDestination.trim()}`
-        : null,
-      isAPHRequest
-        ? `Keterangan: ${values.requestPaymentDescription?.trim()}`
-        : null,
-      isAPHRequest
-        ? `Jumlah dana diminta: ${formatCurrency(values.requestedAmount ?? 0)}`
-        : null,
-      isInternalFunding
-        ? `Nominal pengajuan: ${formatCurrency(values.requestedAmount ?? 0)}`
-        : null,
-      isInternalFunding
-        ? `Keterangan: ${values.requestPaymentDescription?.trim()}`
-        : null,
-      isShippingCostRequest && values.relatedDocumentNumbers.trim()
-        ? `PO barang: ${values.relatedDocumentNumbers
-            .split(",")
-            .map((number) => number.trim())
-            .filter(Boolean)
-            .join(", ")}`
-        : null,
-      isShippingCostRequest
-        ? `Biaya pengiriman: ${formatCurrency(values.requestedAmount ?? 0)}`
-        : null,
-      isOperationalFunding
-        ? `Keperluan: ${operationalRequestLabel}`
-        : null,
-      isOperationalFunding && values.operationalRequestType === "SURVEY"
-        ? `Biaya konsumsi: ${formatCurrency(values.surveyConsumptionAmount ?? 0)}\nBiaya BBM: ${formatCurrency(values.surveyFuelAmount ?? 0)}`
-        : isOperationalFunding
-          ? `Jumlah dana: ${formatCurrency(values.operationalAmount ?? 0)}`
-          : null,
-      subCategoryLabel ? `Sub-menu lapangan: ${subCategoryLabel}` : null,
-      initialWageRequest
-        ? `Proyek: ${initialWageRequest.projectTitle}\nTitik kerja: ${initialWageRequest.workPointTitle}`
-        : null,
-      values.neededDate
-        ? `Tanggal perlu dibayarkan/disediakan: ${format(values.neededDate, "yyyy-MM-dd")}`
-        : null,
-      isEquipmentRequest
-        ? `Nama alat/kendaraan: ${values.equipmentDetails.equipmentName?.trim()}\nTanggal mulai pemakaian: ${values.equipmentDetails.startDate}\nDurasi pemakaian: ${values.equipmentDetails.duration} ${values.equipmentDetails.timeUnit.toLowerCase()}`
-        : null,
-      values.itemSource === TicketCategoryHint.WAREHOUSE &&
-      values.itemsExpectedDeliveryDate
-        ? `Tanggal diperlukan untuk seluruh barang gudang: ${values.itemsExpectedDeliveryDate}`
-        : values.itemSource === TicketCategoryHint.CONTRACT &&
-            values.itemsExpectedDeliveryDate
-          ? `Target tanggal pengiriman material alam: ${values.itemsExpectedDeliveryDate}`
-          : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const ticketType =
-      values.requestCategory === "OPS"
-        ? TicketType.OPERATIONAL
-        : values.requestCategory === "MATERIAL" ||
-              values.requestCategory === TicketRequestCategory.WAREHOUSE
-          ? TicketType.MATERIAL
-          : TicketType.COST;
-    const priority =
-      values.priority === "EMERGENCY"
-        ? TicketPriority.URGENT
-        : values.priority === "URGENT"
-          ? TicketPriority.HIGH
-          : TicketPriority.LOW;
-
-    try {
-      const result = values.requestCategory === EQUIPMENT_REQUEST_TYPE
-        ? await createEquipmentRequest({
-            projectId: values.projectId,
-            equipmentName: values.equipmentDetails.equipmentName ?? "",
-            startDate: values.equipmentDetails.startDate ?? "",
-            duration: values.equipmentDetails.duration ?? 0,
-            timeUnit: values.equipmentDetails.timeUnit,
-            priority,
-          })
-        : await createTicket({
-            title,
-            description,
-            type: ticketType,
-            requestCategory: values.requestCategory,
-            fieldCategory: values.fieldCategory,
-            requestPaymentMethod: isAPHRequest
-              ? values.requestPaymentMethod
-              : undefined,
-            transferDestination:
-              isAPHRequest &&
-              values.requestPaymentMethod === POPaymentMethod.TRANSFER
-                ? values.transferDestination
-                : undefined,
-            requestPaymentDescription: isAPHRequest
-              ? values.requestPaymentDescription
-              : undefined,
-            relatedDocumentNumbers: isShippingCostRequest
-              ? values.relatedDocumentNumbers
-              : undefined,
-            deliveryReceiptFile: isShippingCostRequest
-              ? values.deliveryReceiptFile ?? undefined
-              : undefined,
-            priority,
-            projectId: values.projectId || undefined,
-            moverAssigneeId: undefined,
-            recipientName: requiresRecipientPayment
-              ? values.recipientName
-              : undefined,
-            bankName: requiresRecipientPayment ? values.bankName : undefined,
-            accountNumber: requiresRecipientPayment
-              ? values.accountNumber
-              : undefined,
-            requestedAmount: requiresRecipientPayment
-              ? values.requestedAmount
-              : isOperationalFunding
-                ? operationalAmount
-                : isAPHRequest || isInternalFunding || isShippingCostRequest
-                  ? values.requestedAmount
-                  : undefined,
-            receiptFiles: isInternalFunding ? values.receiptFiles : [],
-            items: requiresFundingRequest
-              ? []
-              : values.items.map((item) => ({
-                  ...(item.stockItemId
-                    ? { stockItemId: item.stockItemId }
-                    : {}),
-                  itemName: item.itemName ?? "",
-                  quantity: item.quantity ?? 0,
-                  unit: item.unit ?? "",
-                  estimatedCost:
-                    values.itemSource === TicketCategoryHint.CONTRACT
-                      ? item.estimatedCost
-                      : undefined,
-                  categoryHint: values.itemSource,
-                  materialContractId:
-                    values.itemSource === TicketCategoryHint.CONTRACT
-                      ? item.materialContractId
-                      : undefined,
-                  expectedDeliveryDate:
-                    (values.itemSource === TicketCategoryHint.WAREHOUSE ||
-                      values.itemSource === TicketCategoryHint.CONTRACT) &&
-                    values.itemsExpectedDeliveryDate
-                      ? values.itemsExpectedDeliveryDate
-                      : undefined,
-                })),
-          });
-      if (!result.success) {
-        setError(result.message);
+    if (activeStep === 0) {
+      const fieldsToValidate: (keyof TicketFormValues)[] = [
+        "requestCategory",
+        "projectId",
+      ];
+      if (requestCategory === TicketRequestCategory.FIELD) {
+        fieldsToValidate.push("fieldCategory");
+      }
+      const valid = await form.trigger(fieldsToValidate);
+      if (isProjectRequired && !form.getValues("projectId").trim()) {
+        form.setError("projectId", {
+          type: "manual",
+          message: isHouseRental
+            ? "Biaya Rumah Sewa / Mess Tukang wajib memilih Proyek aktif."
+            : "Pilih proyek tujuan terlebih dahulu.",
+        });
         return;
       }
-      setOpen(false);
-      form.reset();
-      setReceiptFiles([]);
-      setSelectedShippingDocumentKeys([]);
-      setReceiptUploadError("");
-      setRequestedAmountEdit(null);
-      router.refresh();
-    } catch (submitError) {
-      console.error("Ticket form submission failed:", submitError);
-      setError("Tiket gagal disimpan. Periksa koneksi lalu coba kembali.");
+      if (!valid) return;
+      setActiveStep(1);
+      return;
     }
-  }, (invalidFields) => {
-    const messages = [
-      invalidFields.neededDate?.message,
-      invalidFields.projectId?.message,
-      invalidFields.requestCategory?.message,
-      invalidFields.fieldCategory?.message,
-      invalidFields.recipientName?.message,
-      invalidFields.bankName?.message,
-      invalidFields.accountNumber?.message,
-      invalidFields.requestedAmount?.message,
-      invalidFields.equipmentDetails?.equipmentName?.message,
-      invalidFields.equipmentDetails?.startDate?.message,
-      invalidFields.equipmentDetails?.duration?.message,
-      invalidFields.itemsExpectedDeliveryDate?.message,
-      invalidFields.items?.root?.message,
-      invalidFields.items?.message,
-      ...(Array.isArray(invalidFields.items)
-        ? invalidFields.items.flatMap((item) => [
-            item?.stockItemId?.message,
-            item?.itemName?.message,
-            item?.unit?.message,
-            item?.quantity?.message,
-            item?.estimatedCost?.message,
-            item?.expectedDeliveryDate?.message,
-          ])
-        : []),
-    ].filter((message): message is string => Boolean(message));
-    setError(
-      messages.length > 0
-        ? `Tiket belum dikirim: ${messages.join(" ")}`
-        : "Tiket belum dikirim. Periksa data wajib yang ditandai, lalu coba lagi.",
-    );
-  });
+
+    if (activeStep === 1) {
+      const step2Paths: string[] = [];
+      if (usesItemDeliveryDates) {
+        step2Paths.push("itemSource", "itemsExpectedDeliveryDate", "items");
+      } else if (isEquipmentRequest) {
+        step2Paths.push("equipmentDetails");
+      } else if (isRentalRequest) {
+        step2Paths.push(
+          "rentalDetails",
+          "requestedAmount",
+          "recipientName",
+          "bankName",
+          "accountNumber",
+        );
+      } else if (isAPHRequest) {
+        step2Paths.push(
+          "requestPaymentMethod",
+          "transferDestination",
+          "requestPaymentDescription",
+          "requestedAmount",
+        );
+      } else if (isInternalFunding) {
+        step2Paths.push(
+          "requestedAmount",
+          "requestPaymentDescription",
+          "receiptFiles",
+        );
+      } else if (isShippingCostRequest) {
+        step2Paths.push(
+          "relatedDocumentNumbers",
+          "requestedAmount",
+          "deliveryReceiptFile",
+        );
+      } else if (requiresRecipientPayment) {
+        step2Paths.push(
+          "recipientName",
+          "bankName",
+          "accountNumber",
+          "requestedAmount",
+        );
+      } else if (isOperationalFunding) {
+        step2Paths.push(
+          "operationalRequestType",
+          "operationalAmount",
+          "surveyConsumptionAmount",
+          "surveyFuelAmount",
+        );
+      }
+      const valid = await form.trigger(
+        step2Paths as (keyof TicketFormValues)[],
+      );
+      if (!valid) return;
+      setActiveStep(2);
+    }
+  };
+
+  const handleValidSubmit = async (
+    values: TicketFormValues,
+    submitImmediately: boolean,
+  ) => {
+    setError("");
+
+      const categoryLabel = requestCategoryLabels[values.requestCategory];
+      const subCategoryLabel = values.fieldCategory
+        ? fieldCategoryLabels[values.fieldCategory]
+        : undefined;
+      const firstItemName = values.items[0]?.itemName?.trim() ?? "";
+      const operationalRequestLabel =
+        values.operationalRequestType === "SURVEY"
+          ? "Biaya Survei Lapangan"
+          : "Dana Operasional";
+      const operationalAmount =
+        values.operationalRequestType === "SURVEY"
+          ? (values.surveyConsumptionAmount ?? 0) +
+            (values.surveyFuelAmount ?? 0)
+          : values.operationalAmount;
+      const shortDetail = (values.requestPaymentDescription?.trim() ?? "").replace(
+        /\s+/g,
+        " ",
+      );
+      const conciseTitle = `${categoryLabel}: ${
+        shortDetail.length > 50
+          ? `${shortDetail.slice(0, 47).trimEnd()}...`
+          : shortDetail
+      }`;
+
+      const title = isEquipmentRequest
+        ? `${categoryLabel}: ${values.equipmentDetails.equipmentName?.trim() ?? ""}`.slice(
+            0,
+            160,
+          )
+        : isHouseRental
+          ? `Rumah Sewa: ${values.rentalDetails.assetName?.trim() ?? ""}`.slice(
+              0,
+              160,
+            )
+          : isVehicleRental
+            ? `Kendaraan Sewa: ${values.rentalDetails.assetName?.trim() ?? ""}`.slice(
+                0,
+                160,
+              )
+            : isOperationalFunding
+              ? `Operasional: ${operationalRequestLabel}`
+              : isAPHRequest
+                ? "Permintaan APH"
+                : isInternalFunding
+                  ? conciseTitle
+                  : isShippingCostRequest
+                    ? `${categoryLabel}: ${values.relatedDocumentNumbers.trim()}`.slice(
+                        0,
+                        80,
+                      )
+                    : requiresRecipientPayment
+                      ? `${subCategoryLabel}: ${values.recipientName?.trim()}`.slice(
+                          0,
+                          80,
+                        )
+                      : `${categoryLabel}: ${firstItemName}`.slice(0, 80);
+
+      const description = [
+        `Jenis permintaan: ${categoryLabel}`,
+        isAPHRequest
+          ? `Metode pembayaran: ${values.requestPaymentMethod === POPaymentMethod.CASH ? "Cash" : "Transfer"}`
+          : null,
+        isAPHRequest &&
+        values.requestPaymentMethod === POPaymentMethod.TRANSFER &&
+        values.transferDestination?.trim()
+          ? `Tujuan transfer: ${values.transferDestination.trim()}`
+          : null,
+        isAPHRequest
+          ? `Keterangan: ${values.requestPaymentDescription?.trim()}`
+          : null,
+        isAPHRequest
+          ? `Jumlah dana diminta: ${formatCurrency(values.requestedAmount ?? 0)}`
+          : null,
+        isInternalFunding
+          ? `Nominal pengajuan: ${formatCurrency(values.requestedAmount ?? 0)}`
+          : null,
+        isInternalFunding
+          ? `Keterangan: ${values.requestPaymentDescription?.trim()}`
+          : null,
+        isShippingCostRequest && values.relatedDocumentNumbers.trim()
+          ? `PO barang: ${values.relatedDocumentNumbers
+              .split(",")
+              .map((number) => number.trim())
+              .filter(Boolean)
+              .join(", ")}`
+          : null,
+        isShippingCostRequest
+          ? `Biaya pengiriman: ${formatCurrency(values.requestedAmount ?? 0)}`
+          : null,
+        isOperationalFunding
+          ? `Keperluan: ${operationalRequestLabel}`
+          : null,
+        isOperationalFunding && values.operationalRequestType === "SURVEY"
+          ? `Biaya konsumsi: ${formatCurrency(values.surveyConsumptionAmount ?? 0)}\nBiaya BBM: ${formatCurrency(values.surveyFuelAmount ?? 0)}`
+          : isOperationalFunding
+            ? `Jumlah dana: ${formatCurrency(values.operationalAmount ?? 0)}`
+            : null,
+        subCategoryLabel ? `Sub-menu lapangan: ${subCategoryLabel}` : null,
+        initialWageRequest
+          ? `Proyek: ${initialWageRequest.projectTitle}\nTitik kerja: ${initialWageRequest.workPointTitle}`
+          : null,
+        values.neededDate
+          ? `Tanggal perlu dibayarkan/disediakan: ${values.neededDate}`
+          : null,
+        isEquipmentRequest
+          ? `Nama alat/kendaraan: ${values.equipmentDetails.equipmentName?.trim()}\nTanggal mulai pemakaian: ${values.equipmentDetails.startDate}\nDurasi pemakaian: ${values.equipmentDetails.duration} ${values.equipmentDetails.timeUnit.toLowerCase()}`
+          : null,
+        isRentalRequest
+          ? [
+              `Aset / Properti: ${values.rentalDetails.assetName?.trim()}`,
+              isVehicleRental
+                ? `Lingkup Sewa: ${values.rentalDetails.usageScope === "PROJECT" ? "Proyek" : "Operasional Umum"}`
+                : null,
+              isVehicleRental && values.rentalDetails.codeOrPlate?.trim()
+                ? `Nopol / Kode: ${values.rentalDetails.codeOrPlate.trim()}`
+                : null,
+              isHouseRental && values.rentalDetails.propertyAddress?.trim()
+                ? `Alamat / Lokasi: ${values.rentalDetails.propertyAddress.trim()}`
+                : null,
+              values.rentalDetails.landlordName?.trim()
+                ? `Pemilik / Vendor: ${values.rentalDetails.landlordName.trim()}`
+                : null,
+              values.rentalDetails.landlordPhone?.trim()
+                ? `No. HP Pemilik: ${values.rentalDetails.landlordPhone.trim()}`
+                : null,
+              isHouseRental && values.rentalDetails.occupantCount
+                ? `Jumlah Penghuni: ${values.rentalDetails.occupantCount} orang`
+                : null,
+              `Periode Sewa: ${RENTAL_PERIOD_TYPE_LABELS[values.rentalDetails.periodType]} (${values.rentalDetails.duration ?? 1}x)`,
+              values.rentalDetails.startDate
+                ? `Tanggal Mulai: ${values.rentalDetails.startDate}`
+                : null,
+              values.rentalDetails.endDate
+                ? `Tanggal Selesai: ${values.rentalDetails.endDate}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join("\n")
+          : null,
+        values.itemSource === TicketCategoryHint.WAREHOUSE &&
+        values.itemsExpectedDeliveryDate
+          ? `Tanggal diperlukan untuk seluruh barang gudang: ${values.itemsExpectedDeliveryDate}`
+          : values.itemSource === TicketCategoryHint.CONTRACT &&
+              values.itemsExpectedDeliveryDate
+            ? `Target tanggal pengiriman material alam: ${values.itemsExpectedDeliveryDate}`
+            : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const ticketType =
+        values.requestCategory === TicketRequestCategory.OPS
+          ? TicketType.OPERATIONAL
+          : values.requestCategory === TicketRequestCategory.MATERIAL ||
+              values.requestCategory === TicketRequestCategory.WAREHOUSE
+            ? TicketType.MATERIAL
+            : TicketType.COST;
+
+      const priority =
+        values.priority === "EMERGENCY"
+          ? TicketPriority.URGENT
+          : values.priority === "URGENT"
+            ? TicketPriority.HIGH
+            : TicketPriority.LOW;
+
+      try {
+        const result =
+          values.requestCategory === EQUIPMENT_REQUEST_TYPE
+            ? await createEquipmentRequest({
+                projectId: values.projectId,
+                equipmentName: values.equipmentDetails.equipmentName ?? "",
+                startDate: values.equipmentDetails.startDate ?? "",
+                duration: values.equipmentDetails.duration ?? 0,
+                timeUnit: values.equipmentDetails.timeUnit,
+                priority,
+              })
+            : await createTicket({
+                title,
+                description,
+                type: ticketType,
+                requestCategory: isRentalRequest
+                  ? TicketRequestCategory.OPS
+                  : (values.requestCategory as TicketRequestCategory),
+                fieldCategory: values.fieldCategory,
+                requestPaymentMethod: isAPHRequest
+                  ? values.requestPaymentMethod
+                  : undefined,
+                transferDestination:
+                  isAPHRequest &&
+                  values.requestPaymentMethod === POPaymentMethod.TRANSFER
+                    ? values.transferDestination
+                    : undefined,
+                requestPaymentDescription: isAPHRequest
+                  ? values.requestPaymentDescription
+                  : undefined,
+                relatedDocumentNumbers: isShippingCostRequest
+                  ? values.relatedDocumentNumbers
+                  : undefined,
+                deliveryReceiptFile: isShippingCostRequest
+                  ? (values.deliveryReceiptFile ?? undefined)
+                  : undefined,
+                priority,
+                projectId: values.projectId || undefined,
+                moverAssigneeId: undefined,
+                recipientName:
+                  requiresRecipientPayment || isRentalRequest
+                    ? values.recipientName?.trim() || undefined
+                    : undefined,
+                bankName:
+                  requiresRecipientPayment || isRentalRequest
+                    ? values.bankName?.trim() || undefined
+                    : undefined,
+                accountNumber:
+                  requiresRecipientPayment || isRentalRequest
+                    ? values.accountNumber?.trim() || undefined
+                    : undefined,
+                requestedAmount: requiresRecipientPayment
+                  ? values.requestedAmount
+                  : isOperationalFunding
+                    ? operationalAmount
+                    : isAPHRequest ||
+                        isInternalFunding ||
+                        isShippingCostRequest ||
+                        isRentalRequest
+                      ? values.requestedAmount
+                      : undefined,
+                receiptFiles: isInternalFunding ? values.receiptFiles : [],
+                items: requiresFundingRequest
+                  ? []
+                  : values.items.map((item) => ({
+                      ...(item.stockItemId
+                        ? { stockItemId: item.stockItemId }
+                        : {}),
+                      itemName: item.itemName ?? "",
+                      quantity: item.quantity ?? 0,
+                      unit: item.unit ?? "",
+                      estimatedCost:
+                        values.itemSource === TicketCategoryHint.CONTRACT
+                          ? item.estimatedCost
+                          : undefined,
+                      categoryHint: values.itemSource,
+                      materialContractId:
+                        values.itemSource === TicketCategoryHint.CONTRACT
+                          ? item.materialContractId
+                          : undefined,
+                      expectedDeliveryDate:
+                        (values.itemSource === TicketCategoryHint.WAREHOUSE ||
+                          values.itemSource === TicketCategoryHint.CONTRACT) &&
+                        values.itemsExpectedDeliveryDate
+                          ? values.itemsExpectedDeliveryDate
+                          : undefined,
+                    })),
+                submitImmediately,
+                ...(isRentalRequest
+                  ? {
+                      rentalDetails: {
+                        rentalType: isHouseRental ? "HOUSE" : "VEHICLE",
+                        usageScope: isHouseRental
+                          ? "PROJECT"
+                          : values.rentalDetails.usageScope,
+                        assetName:
+                          values.rentalDetails.assetName?.trim() ?? "",
+                        propertyAddress: isHouseRental
+                          ? values.rentalDetails.propertyAddress?.trim() || null
+                          : null,
+                        landlordName:
+                          values.rentalDetails.landlordName?.trim() || null,
+                        landlordPhone:
+                          values.rentalDetails.landlordPhone?.trim() || null,
+                        occupantCount: isHouseRental
+                          ? (values.rentalDetails.occupantCount ?? null)
+                          : null,
+                        codeOrPlate: isVehicleRental
+                          ? values.rentalDetails.codeOrPlate?.trim() || null
+                          : null,
+                        periodType: values.rentalDetails.periodType,
+                        startDate: values.rentalDetails.startDate || null,
+                        endDate: values.rentalDetails.endDate || null,
+                        duration: values.rentalDetails.duration ?? 1,
+                      },
+                    }
+                  : {}),
+              });
+
+        if (!result.success) {
+          setError(result.message);
+          return;
+        }
+        toast.success(result.message || "Tiket berhasil diproses.");
+        setOpen(false);
+        setActiveStep(0);
+        form.reset();
+        setReceiptFiles([]);
+        setSelectedShippingDocumentKeys([]);
+        setReceiptUploadError("");
+        router.refresh();
+      } catch (submitError) {
+        console.error("Ticket form submission failed:", submitError);
+        setError("Tiket gagal disimpan. Periksa koneksi lalu coba kembali.");
+      }
+  };
+
+  const handleInvalidSubmit = (
+    invalidFields: FieldErrors<TicketFormValues>,
+  ) => {
+      const step1Error = Boolean(
+        invalidFields.projectId ||
+          invalidFields.requestCategory ||
+          invalidFields.fieldCategory,
+      );
+      const step2Error = Boolean(
+        invalidFields.itemsExpectedDeliveryDate ||
+          invalidFields.items ||
+          invalidFields.requestedAmount ||
+          invalidFields.operationalAmount ||
+          invalidFields.surveyConsumptionAmount ||
+          invalidFields.surveyFuelAmount ||
+          invalidFields.recipientName ||
+          invalidFields.bankName ||
+          invalidFields.accountNumber ||
+          invalidFields.requestPaymentMethod ||
+          invalidFields.transferDestination ||
+          invalidFields.requestPaymentDescription ||
+          invalidFields.relatedDocumentNumbers ||
+          invalidFields.deliveryReceiptFile ||
+          invalidFields.receiptFiles ||
+          invalidFields.equipmentDetails ||
+          invalidFields.rentalDetails,
+      );
+
+      if (step1Error) {
+        setActiveStep(0);
+      } else if (step2Error) {
+        setActiveStep(1);
+      }
+
+      const messages = [
+        invalidFields.projectId?.message,
+        invalidFields.requestCategory?.message,
+        invalidFields.fieldCategory?.message,
+        invalidFields.neededDate?.message,
+        invalidFields.recipientName?.message,
+        invalidFields.bankName?.message,
+        invalidFields.accountNumber?.message,
+        invalidFields.requestedAmount?.message,
+        invalidFields.operationalAmount?.message,
+        invalidFields.surveyConsumptionAmount?.message,
+        invalidFields.requestPaymentMethod?.message,
+        invalidFields.transferDestination?.message,
+        invalidFields.requestPaymentDescription?.message,
+        invalidFields.relatedDocumentNumbers?.message,
+        invalidFields.deliveryReceiptFile?.message,
+        invalidFields.receiptFiles?.message,
+        invalidFields.equipmentDetails?.equipmentName?.message,
+        invalidFields.equipmentDetails?.startDate?.message,
+        invalidFields.equipmentDetails?.duration?.message,
+        invalidFields.rentalDetails?.assetName?.message,
+        invalidFields.rentalDetails?.propertyAddress?.message,
+        invalidFields.rentalDetails?.occupantCount?.message,
+        invalidFields.rentalDetails?.startDate?.message,
+        invalidFields.rentalDetails?.endDate?.message,
+        invalidFields.rentalDetails?.duration?.message,
+        invalidFields.itemsExpectedDeliveryDate?.message,
+        invalidFields.items?.root?.message,
+        invalidFields.items?.message,
+        ...(Array.isArray(invalidFields.items)
+          ? invalidFields.items.flatMap((item) => [
+              item?.stockItemId?.message,
+              item?.materialContractId?.message,
+              item?.itemName?.message,
+              item?.unit?.message,
+              item?.quantity?.message,
+              item?.estimatedCost?.message,
+              item?.expectedDeliveryDate?.message,
+            ])
+          : []),
+      ].filter((message): message is string => Boolean(message));
+
+      setError(
+        messages.length > 0
+          ? `Periksa isian: ${messages.join(" ")}`
+          : "Tiket belum dikirim. Periksa data wajib yang ditandai.",
+      );
+  };
+
+  const submit = form.handleSubmit(
+    (values) => handleValidSubmit(values, true),
+    handleInvalidSubmit,
+  );
+  const saveDraft = form.handleSubmit(
+    (values) => handleValidSubmit(values, false),
+    handleInvalidSubmit,
+  );
+
+  const selectedProjectLabel =
+    projects.find((p) => p.id === selectedProjectId)
+      ? `${projects.find((p) => p.id === selectedProjectId)!.kelompokTani} - ${projects.find((p) => p.id === selectedProjectId)!.title}`
+      : "Kantor Pusat / Overhead Umum";
+
+  const isMaterialOrWarehouse =
+    requestCategory === TicketRequestCategory.MATERIAL ||
+    requestCategory === TicketRequestCategory.WAREHOUSE;
+  const isAutoSubmitOnly =
+    isEquipmentRequest || isInternalFunding || isShippingCostRequest;
+  const primarySubmitLabel =
+    isMaterialOrWarehouse || isEquipmentRequest
+      ? "Kirim ke Logistik"
+      : "Ajukan Sekarang";
+
+  const handleClose = () => {
+    setOpen(false);
+    setError("");
+    setActiveStep(0);
+  };
 
   return (
     <>
-        <Button
-          type="button"
-          onClick={() => {
-            setError("");
-            setOpen(true);
-          }}
-        >
-          <Plus aria-hidden="true" />
-          {triggerLabel}
-        </Button>
+      <Button
+        type="button"
+        size="default"
+        onClick={() => {
+          setError("");
+          setActiveStep(0);
+          setOpen(true);
+        }}
+      >
+        <Plus aria-hidden="true" />
+        {triggerLabel}
+      </Button>
+
       <GlobalModal
         isOpen={open}
-        onClose={() => setOpen(false)}
-        title="Buat Tiket & Permintaan Baru"
-        description={
-          isEquipmentRequest
-            ? "Lengkapi spesifikasi alat dan durasi pemakaian. Permintaan langsung masuk ke antrean Logistik."
-            : "Lengkapi 3 langkah di bawah ini: (1) Proyek & Jenis Permintaan, (2) Rincian Barang / Dana & Bukti, dan (3) Prioritas & Target Tanggal."
-        }
+        onClose={handleClose}
+        title="Buat Tiket Baru"
+        description="Ikuti 3 langkah ringkas untuk membuat dan mengirim permintaan."
         className="max-w-4xl"
         footer={
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              {isEquipmentRequest
-                ? "Permintaan alat langsung diteruskan ke Logistik setelah dikirim."
-                : <>Setelah draft disimpan, klik tombol <strong>Ajukan</strong> pada tabel untuk meneruskan ke Direktur.</>}
-            </span>
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={form.formState.isSubmitting}
-              >
-                Batal
-              </Button>
-              <Button
-                type="submit"
-                form="ticket-form"
-                disabled={form.formState.isSubmitting}
-                aria-busy={form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? (
-                  <>
-                    <Loader2 className="animate-spin" aria-hidden="true" />
-                    Menyimpan...
-                  </>
-                ) : (
-                  isEquipmentRequest
-                    ? "Kirim Permintaan ke Logistik"
-                    : "Simpan Draft Tiket"
-                )}
-              </Button>
+              {activeStep > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setError("");
+                    setActiveStep((step) => Math.max(0, step - 1));
+                  }}
+                  disabled={form.formState.isSubmitting}
+                >
+                  <ArrowLeft className="size-4" aria-hidden="true" />
+                  Kembali
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={form.formState.isSubmitting}
+                >
+                  Batal
+                </Button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {activeStep < 2 ? (
+                <Button
+                  type="button"
+                  onClick={() => void handleNextStep()}
+                  disabled={form.formState.isSubmitting}
+                >
+                  Lanjut
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Button>
+              ) : (
+                <>
+                  {!isAutoSubmitOnly && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={form.formState.isSubmitting}
+                      onClick={() => void saveDraft()}
+                    >
+                      Simpan Draft
+                    </Button>
+                  )}
+                  <Button
+                    type="submit"
+                    form="ticket-form"
+                    disabled={form.formState.isSubmitting}
+                    aria-busy={form.formState.isSubmitting}
+                  >
+                    {form.formState.isSubmitting ? (
+                      <>
+                        <Loader2 className="animate-spin" aria-hidden="true" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="size-4" aria-hidden="true" />
+                        {primarySubmitLabel}
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         }
       >
+        <Stepper
+          steps={CREATE_TICKET_STEPS}
+          currentStep={activeStep}
+          onStepClick={(stepIndex) => {
+            if (stepIndex <= activeStep) {
+              setError("");
+              setActiveStep(stepIndex);
+            }
+          }}
+        />
+
         {error && (
-          <p
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+          <div
+            className="flex items-start gap-2.5 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-destructive"
             role="alert"
             aria-live="assertive"
           >
-            {error}
-          </p>
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <p className="type-p2">{error}</p>
+          </div>
         )}
 
-        <form id="ticket-form" onSubmit={submit} className="space-y-5">
+        <form id="ticket-form" onSubmit={submit} className="space-y-4">
           <fieldset
             disabled={form.formState.isSubmitting}
             className="contents"
           >
-          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center gap-2 border-b border-border pb-2.5">
-              <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">
-                1
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-foreground">
-                  Proyek &amp; Kategori Permintaan
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Pilih proyek tujuan dan kategori kebutuhan lapangan atau operasional
-                </p>
-              </div>
-            </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="ticket-project-field space-y-2">
-              <Label htmlFor="ticket-project">Pilih Proyek</Label>
-              <Controller
-                control={form.control}
-                name="projectId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value || "none"}
-                    onValueChange={(value) =>
-                      field.onChange(value === "none" ? "" : value)
-                    }
-                  >
-                    <SelectTrigger
-                      id="ticket-project"
-                      className="w-full"
-                      aria-invalid={!!form.formState.errors.projectId}
-                      disabled={Boolean(fixedProjectId)}
-                    >
-                      <SelectValue placeholder="Pilih proyek" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">
-                        {requestCategory === TicketRequestCategory.MATERIAL ||
-                        requestCategory === TicketRequestCategory.WAREHOUSE ||
-                        requestCategory === TicketRequestCategory.FIELD
-                          ? "Pilih proyek"
-                          : "Kantor Pusat / Overhead Umum"}
-                      </SelectItem>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.kelompokTani} - {project.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {form.formState.errors.projectId && (
-                <p className="text-sm text-destructive" role="alert">
-                  {form.formState.errors.projectId.message}
-                </p>
-              )}
-            </div>
-            <div className="ticket-request-field space-y-2">
-              <Label htmlFor="ticket-request-category">Jenis Permintaan</Label>
-              <Controller
-                control={form.control}
-                name="requestCategory"
-                render={({ field }) => (
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      if (value !== TicketRequestCategory.REIMBURSEMENT) {
-                        setReceiptUploadError("");
-                        setReceiptFiles([]);
-                        form.setValue("receiptFiles", [], {
-                          shouldValidate: true,
-                        });
-                      }
-                      if (value !== TicketRequestCategory.SHIPPING_COST) {
-                        setSelectedShippingDocumentKeys([]);
-                        form.setValue("relatedDocumentNumbers", "");
-                        form.setValue("deliveryReceiptFile", null, {
-                          shouldValidate: false,
-                        });
-                        form.clearErrors("deliveryReceiptFile");
-                      }
-                      if (value !== "FIELD") {
-                        form.setValue("fieldCategory", undefined);
-                        form.clearErrors("fieldCategory");
-                      }
-                      if (value === TicketRequestCategory.WAREHOUSE) {
-                        form.setValue(
-                          "itemSource",
-                          TicketCategoryHint.WAREHOUSE,
-                        );
-                        form.setValue("itemsExpectedDeliveryDate", "");
-                        form.setValue(
-                          "items",
-                          [{
-                            stockItemId: "",
-                            itemName: "",
-                            unit: "",
-                            quantity: 1,
-                            estimatedCost: undefined,
-                            categoryHint: TicketCategoryHint.WAREHOUSE,
-                            materialContractId: "",
-                            expectedDeliveryDate: "",
-                          }],
-                          { shouldValidate: true },
-                        );
-                      }
-                      if (
-                        value === TicketRequestCategory.APH ||
-                        value === TicketRequestCategory.SHIPPING_COST ||
-                        value === EQUIPMENT_REQUEST_TYPE
-                      ) {
-                        form.setValue(
-                          "items",
-                          [],
-                          { shouldValidate: true },
-                        );
-                      } else if (
-                        internalFundingCategories.some(
-                          (category) => category === value,
-                        )
-                      ) {
-                        form.setValue("items", [], { shouldValidate: true });
-                      } else if (
-                        requestCategory === TicketRequestCategory.APH ||
-                        isInternalFundingCategory(requestCategory) ||
-                        requestCategory === TicketRequestCategory.SHIPPING_COST ||
-                        requestCategory === EQUIPMENT_REQUEST_TYPE
-                      ) {
-                        form.setValue(
-                          "itemSource",
-                          TicketCategoryHint.PURCHASE,
-                        );
-                        form.setValue("itemsExpectedDeliveryDate", "");
-                        form.setValue(
-                          "items",
-                          [{
-                            stockItemId: "",
-                            itemName: "",
-                            unit: "",
-                            quantity: 1,
-                            estimatedCost: undefined,
-                            categoryHint: TicketCategoryHint.PURCHASE,
-                            materialContractId: "",
-                            expectedDeliveryDate: "",
-                          }],
-                          { shouldValidate: true },
-                        );
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      id="ticket-request-category"
-                      className="w-full"
-                      aria-invalid={!!form.formState.errors.requestCategory}
-                    >
-                      <SelectValue placeholder="Pilih jenis permintaan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {requestTypeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {form.formState.errors.requestCategory && (
-                <p className="text-sm text-destructive" role="alert">
-                  {form.formState.errors.requestCategory.message}
-                </p>
-              )}
-            </div>
-
-            {isShippingCostRequest && (
-              <section className="space-y-4 rounded-lg border border-sky-500/30 bg-sky-500/5 p-4 md:col-span-2">
+            {activeStep === 0 && (
+              <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
                 <div>
-                  <h3 className="font-semibold">Barang yang Akan Dikirim</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Pilih PO yang berisi barang pengiriman dan masukkan biaya
-                    pengirimannya.
+                  <h3 className="type-h3 text-foreground">
+                    Pilih Jenis &amp; Proyek
+                  </h3>
+                  <p className="type-p3 text-muted-foreground">
+                    Tentukan kategori permintaan dan proyek tujuan agar alur
+                    persetujuan tepat sasaran.
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {shippingDocumentGroups.map((group) => (
-                      <fieldset
-                        key={group.key}
-                        className="min-w-0 space-y-2 rounded-md border p-3"
-                        disabled={shippingDocumentsLoading}
-                        aria-invalid={
-                          !!form.formState.errors.relatedDocumentNumbers
-                        }
-                        aria-describedby={
-                          form.formState.errors.relatedDocumentNumbers
-                            ? "ticket-related-po-error"
-                            : undefined
-                        }
-                      >
-                        <legend className="px-1 text-sm font-medium">
-                          Pilih PO Barang{" "}
-                          <span className="text-destructive" aria-hidden="true">
-                            *
-                          </span>
-                        </legend>
-                        <div className="max-h-40 space-y-1 overflow-y-auto">
-                          {group.options.length === 0 ? (
-                            <p className="py-2 text-xs text-muted-foreground">
-                              Belum ada PO.
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="ticket-request-category"
+                      className="type-p2 font-medium"
+                    >
+                      Jenis Permintaan <span className="text-destructive">*</span>
+                    </Label>
+                    <Controller
+                      control={form.control}
+                      name="requestCategory"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={handleCategoryChange}
+                        >
+                          <SelectTrigger
+                            id="ticket-request-category"
+                            className="h-10 w-full"
+                            aria-invalid={!!form.formState.errors.requestCategory}
+                          >
+                            <SelectValue placeholder="Pilih jenis permintaan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {requestTypeOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {form.formState.errors.requestCategory && (
+                      <p className="type-p3 text-destructive" role="alert">
+                        {form.formState.errors.requestCategory.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ticket-project" className="type-p2 font-medium">
+                      Proyek Tujuan{" "}
+                      {isProjectRequired ? (
+                        <span className="text-destructive">* Wajib</span>
+                      ) : (
+                        <span className="type-p3 text-muted-foreground">
+                          (Opsional)
+                        </span>
+                      )}
+                    </Label>
+                    <Controller
+                      control={form.control}
+                      name="projectId"
+                      render={({ field }) => (
+                        <Combobox
+                          id="ticket-project"
+                          options={projectComboboxOptions}
+                          value={
+                            field.value
+                              ? field.value
+                              : isProjectRequired
+                                ? ""
+                                : "__NONE__"
+                          }
+                          disabled={Boolean(fixedProjectId)}
+                          placeholder={
+                            isProjectRequired
+                              ? "Cari & pilih proyek wajib..."
+                              : "Kantor Pusat / Overhead Umum"
+                          }
+                          searchPlaceholder="Ketik nama proyek atau kelompok tani..."
+                          emptyText="Proyek tidak ditemukan."
+                          onValueChange={(value) => {
+                            const nextVal = value === "__NONE__" ? "" : value;
+                            field.onChange(nextVal);
+                            if (nextVal) {
+                              form.clearErrors("projectId");
+                            }
+                          }}
+                        />
+                      )}
+                    />
+                    {form.formState.errors.projectId && (
+                      <p className="type-p3 text-destructive" role="alert">
+                        {form.formState.errors.projectId.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {requestCategory === TicketRequestCategory.FIELD && (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="ticket-field-category"
+                      className="type-p2 font-medium"
+                    >
+                      Kebutuhan Lapangan{" "}
+                      <span className="text-destructive">*</span>
+                    </Label>
+                    <Controller
+                      control={form.control}
+                      name="fieldCategory"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value ?? "none"}
+                          onValueChange={(value) =>
+                            field.onChange(value === "none" ? undefined : value)
+                          }
+                        >
+                          <SelectTrigger
+                            id="ticket-field-category"
+                            className="h-10 w-full md:max-w-[calc(50%-0.5rem)]"
+                            aria-invalid={!!form.formState.errors.fieldCategory}
+                          >
+                            <SelectValue placeholder="Pilih kebutuhan lapangan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              Pilih kebutuhan lapangan
+                            </SelectItem>
+                            {fieldCategories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {fieldCategoryLabels[category]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {form.formState.errors.fieldCategory && (
+                      <p className="type-p3 text-destructive" role="alert">
+                        {form.formState.errors.fieldCategory.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {isVehicleRental && (
+                  <div className="space-y-2 rounded-xl border border-border bg-card p-3.5">
+                    <Label className="type-p2 font-semibold">
+                      Cakupan Penggunaan Kendaraan Sewa
+                    </Label>
+                    <Controller
+                      control={form.control}
+                      name="rentalDetails.usageScope"
+                      render={({ field }) => (
+                        <RadioGroup
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            form.clearErrors("projectId");
+                          }}
+                          className="grid gap-2.5 sm:grid-cols-2"
+                        >
+                          <Label
+                            htmlFor="vehicle-scope-project"
+                            className={cn(
+                              "flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors",
+                              field.value === "PROJECT"
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/40",
+                            )}
+                          >
+                            <RadioGroupItem
+                              id="vehicle-scope-project"
+                              value="PROJECT"
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <span className="type-p2 block font-semibold text-foreground">
+                                Proyek (Wajib Pilih Proyek)
+                              </span>
+                              <span className="type-p3 block text-muted-foreground">
+                                Biaya sewa kendaraan dibebankan ke proyek
+                              </span>
+                            </div>
+                          </Label>
+                          <Label
+                            htmlFor="vehicle-scope-ops"
+                            className={cn(
+                              "flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors",
+                              field.value === "OPERATIONAL"
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/40",
+                            )}
+                          >
+                            <RadioGroupItem
+                              id="vehicle-scope-ops"
+                              value="OPERATIONAL"
+                              className="mt-0.5"
+                            />
+                            <div>
+                              <span className="type-p2 block font-semibold text-foreground">
+                                Operasional Umum
+                              </span>
+                              <span className="type-p3 block text-muted-foreground">
+                                Digunakan untuk operasional kantor / lintas tim
+                              </span>
+                            </div>
+                          </Label>
+                        </RadioGroup>
+                      )}
+                    />
+                  </div>
+                )}
+
+                {isHouseRental && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                    <Home
+                      className="mt-0.5 size-4 shrink-0 text-primary"
+                      aria-hidden="true"
+                    />
+                    <p className="type-p3 text-foreground">
+                      Pengajuan <strong>Biaya Rumah Sewa / Mess Tukang</strong>{" "}
+                      wajib dihubungkan ke proyek aktif agar biaya sewa tercatat
+                      di laporan proyek.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeStep === 1 && (
+              <div className="space-y-4">
+                {isEquipmentRequest && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div>
+                      <h3 className="type-h3 text-foreground">
+                        Detail Alat Berat &amp; Kendaraan
+                      </h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Permintaan langsung diteruskan ke antrean Logistik.
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="space-y-1.5 sm:col-span-3">
+                        <Label
+                          htmlFor="equipment-name"
+                          className="type-p2 font-medium"
+                        >
+                          Alat / Kendaraan <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="equipment-name"
+                          placeholder="Contoh: Excavator Komatsu PC200, Dump Truck"
+                          aria-invalid={
+                            !!form.formState.errors.equipmentDetails
+                              ?.equipmentName
+                          }
+                          {...form.register("equipmentDetails.equipmentName")}
+                        />
+                        {form.formState.errors.equipmentDetails
+                          ?.equipmentName && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.equipmentDetails
+                                .equipmentName.message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="equipment-start-date"
+                          className="type-p2 font-medium"
+                        >
+                          Tgl Mulai Pakai{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Controller
+                          control={form.control}
+                          name="equipmentDetails.startDate"
+                          render={({ field }) => (
+                            <DatePicker
+                              id="equipment-start-date"
+                              value={field.value ?? ""}
+                              onValueChange={field.onChange}
+                              placeholder="Pilih tanggal mulai"
+                            />
+                          )}
+                        />
+                        {form.formState.errors.equipmentDetails?.startDate && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.equipmentDetails.startDate
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="equipment-duration"
+                          className="type-p2 font-medium"
+                        >
+                          Lama Pakai <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="equipment-duration"
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          placeholder="Contoh: 3"
+                          aria-invalid={
+                            !!form.formState.errors.equipmentDetails?.duration
+                          }
+                          {...form.register("equipmentDetails.duration", {
+                            setValueAs: (value: string) =>
+                              value === "" ? undefined : Number(value),
+                          })}
+                        />
+                        {form.formState.errors.equipmentDetails?.duration && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.equipmentDetails.duration
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="equipment-time-unit"
+                          className="type-p2 font-medium"
+                        >
+                          Satuan Waktu
+                        </Label>
+                        <Controller
+                          control={form.control}
+                          name="equipmentDetails.timeUnit"
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger
+                                id="equipment-time-unit"
+                                className="h-10 w-full"
+                              >
+                                <SelectValue placeholder="Pilih satuan" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {EQUIPMENT_TIME_UNITS.map((unit) => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {EQUIPMENT_TIME_UNIT_LABELS[unit]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {isRentalRequest && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        {isHouseRental ? (
+                          <Building2 className="size-4" aria-hidden="true" />
+                        ) : (
+                          <Car className="size-4" aria-hidden="true" />
+                        )}
+                      </span>
+                      <div>
+                        <h3 className="type-h3 text-foreground">
+                          {isHouseRental
+                            ? "Rincian Rumah Sewa / Mess Tukang"
+                            : "Rincian Kendaraan Sewa"}
+                        </h3>
+                        <p className="type-p3 text-muted-foreground">
+                          Lengkapi identitas sewa, periode pemakaian, nominal,
+                          serta rekening pencairan.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-asset-name"
+                          className="type-p2 font-medium"
+                        >
+                          {isHouseRental
+                            ? "Nama Rumah / Mess"
+                            : "Jenis & Nama Kendaraan"}{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="rental-asset-name"
+                          placeholder={
+                            isHouseRental
+                              ? "Contoh: Mess Tukang Blok C2"
+                              : "Contoh: Pick Up L300 / Kijang Innova"
+                          }
+                          aria-invalid={
+                            !!form.formState.errors.rentalDetails?.assetName
+                          }
+                          {...form.register("rentalDetails.assetName")}
+                        />
+                        {form.formState.errors.rentalDetails?.assetName && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.rentalDetails.assetName
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      {isVehicleRental ? (
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="rental-plate"
+                            className="type-p2 font-medium"
+                          >
+                            Nopol / Kode Kendaraan
+                          </Label>
+                          <Input
+                            id="rental-plate"
+                            placeholder="Contoh: BL 1234 AB"
+                            {...form.register("rentalDetails.codeOrPlate")}
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="rental-occupants"
+                            className="type-p2 font-medium"
+                          >
+                            Jumlah Tukang / Penghuni
+                          </Label>
+                          <Input
+                            id="rental-occupants"
+                            type="number"
+                            min="1"
+                            step="1"
+                            placeholder="Contoh: 8"
+                            {...form.register("rentalDetails.occupantCount", {
+                              setValueAs: (val: string) =>
+                                val === "" ? undefined : Number(val),
+                            })}
+                          />
+                          {form.formState.errors.rentalDetails
+                            ?.occupantCount && (
+                            <p className="type-p3 text-destructive" role="alert">
+                              {
+                                form.formState.errors.rentalDetails
+                                  .occupantCount.message
+                              }
                             </p>
-                          ) : (
-                            group.options.map((option) => {
-                              const key = `${group.key}:${option.id}`;
-                              return (
-                                <div key={key} className="space-y-1">
-                                  <FormLabel
+                          )}
+                        </div>
+                      )}
+
+                      {isHouseRental && (
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <Label
+                            htmlFor="rental-address"
+                            className="type-p2 font-medium"
+                          >
+                            Alamat / Lokasi{" "}
+                            <span className="text-destructive">*</span>
+                          </Label>
+                          <Textarea
+                            id="rental-address"
+                            rows={2}
+                            maxLength={300}
+                            placeholder="Alamat lengkap rumah atau mess tukang"
+                            {...form.register("rentalDetails.propertyAddress")}
+                          />
+                          {form.formState.errors.rentalDetails
+                            ?.propertyAddress && (
+                            <p className="type-p3 text-destructive" role="alert">
+                              {
+                                form.formState.errors.rentalDetails
+                                  .propertyAddress.message
+                              }
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-landlord-name"
+                          className="type-p2 font-medium"
+                        >
+                          {isHouseRental
+                            ? "Nama Pemilik / Ibu Kos"
+                            : "Nama Pemilik / Rental"}
+                        </Label>
+                        <Input
+                          id="rental-landlord-name"
+                          maxLength={120}
+                          placeholder="Nama pemilik"
+                          {...form.register("rentalDetails.landlordName")}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-landlord-phone"
+                          className="type-p2 font-medium"
+                        >
+                          No. HP Pemilik
+                        </Label>
+                        <Input
+                          id="rental-landlord-phone"
+                          type="tel"
+                          maxLength={40}
+                          placeholder="Contoh: 0812xxxxxxxx"
+                          {...form.register("rentalDetails.landlordPhone")}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-period-type"
+                          className="type-p2 font-medium"
+                        >
+                          Tipe Periode
+                        </Label>
+                        <Controller
+                          control={form.control}
+                          name="rentalDetails.periodType"
+                          render={({ field }) => (
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger
+                                id="rental-period-type"
+                                className="h-10 w-full"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {RENTAL_PERIOD_TYPES.map((period) => (
+                                  <SelectItem key={period} value={period}>
+                                    {RENTAL_PERIOD_TYPE_LABELS[period]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-duration"
+                          className="type-p2 font-medium"
+                        >
+                          Durasi (Jumlah Periode){" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="rental-duration"
+                          type="number"
+                          min="1"
+                          step="any"
+                          placeholder="1"
+                          {...form.register("rentalDetails.duration", {
+                            setValueAs: (val: string) =>
+                              val === "" ? undefined : Number(val),
+                          })}
+                        />
+                        {form.formState.errors.rentalDetails?.duration && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.rentalDetails.duration
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-start-date"
+                          className="type-p2 font-medium"
+                        >
+                          Tanggal Mulai{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Controller
+                          control={form.control}
+                          name="rentalDetails.startDate"
+                          render={({ field }) => (
+                            <DatePicker
+                              id="rental-start-date"
+                              value={field.value ?? ""}
+                              onValueChange={field.onChange}
+                              placeholder="Pilih tanggal mulai"
+                            />
+                          )}
+                        />
+                        {form.formState.errors.rentalDetails?.startDate && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.rentalDetails.startDate
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="rental-end-date"
+                          className="type-p2 font-medium"
+                        >
+                          Tanggal Selesai
+                        </Label>
+                        <Controller
+                          control={form.control}
+                          name="rentalDetails.endDate"
+                          render={({ field }) => (
+                            <DatePicker
+                              id="rental-end-date"
+                              value={field.value ?? ""}
+                              minDate={rentalStartDate || undefined}
+                              clearable
+                              onValueChange={field.onChange}
+                              placeholder="Pilih tanggal selesai"
+                            />
+                          )}
+                        />
+                        {form.formState.errors.rentalDetails?.endDate && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.rentalDetails.endDate
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label
+                          htmlFor="rental-amount"
+                          className="type-p2 font-medium"
+                        >
+                          Nominal Biaya Sewa (Rp){" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <RupiahAmountInput
+                          id="rental-amount"
+                          value={
+                            watchedRequestedAmount === undefined
+                              ? ""
+                              : formatRupiahNumber(watchedRequestedAmount)
+                          }
+                          onChange={(val) => {
+                            const amount = parseRupiahInput(val);
+                            form.setValue(
+                              "requestedAmount",
+                              amount > 0 ? amount : undefined,
+                              { shouldDirty: true, shouldValidate: true },
+                            );
+                          }}
+                          required
+                        />
+                        {form.formState.errors.requestedAmount && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.requestedAmount.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-xl border border-border bg-card p-3.5">
+                      <div>
+                        <h4 className="type-p2 font-semibold text-foreground">
+                          Rekening Pencairan Keuangan (Opsional)
+                        </h4>
+                        <p className="type-p3 text-muted-foreground">
+                          Isi rekening pemilik sewa atau kosongkan untuk memakai
+                          rekening profil Anda.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="rental-recipient"
+                            className="type-p2 font-medium"
+                          >
+                            Nama Penerima
+                          </Label>
+                          <Input
+                            id="rental-recipient"
+                            placeholder="Nama pemilik rekening"
+                            {...form.register("recipientName")}
+                          />
+                          {form.formState.errors.recipientName && (
+                            <p className="type-p3 text-destructive" role="alert">
+                              {form.formState.errors.recipientName.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="rental-bank"
+                            className="type-p2 font-medium"
+                          >
+                            Nama Bank
+                          </Label>
+                          <Input
+                            id="rental-bank"
+                            placeholder="Contoh: BRI / BCA"
+                            {...form.register("bankName")}
+                          />
+                          {form.formState.errors.bankName && (
+                            <p className="type-p3 text-destructive" role="alert">
+                              {form.formState.errors.bankName.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="rental-account"
+                            className="type-p2 font-medium"
+                          >
+                            Nomor Rekening
+                          </Label>
+                          <Input
+                            id="rental-account"
+                            inputMode="numeric"
+                            placeholder="6–30 digit angka"
+                            {...form.register("accountNumber")}
+                          />
+                          {form.formState.errors.accountNumber && (
+                            <p className="type-p3 text-destructive" role="alert">
+                              {form.formState.errors.accountNumber.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {isShippingCostRequest && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div>
+                      <h3 className="type-h3 text-foreground">
+                        Barang yang Akan Dikirim
+                      </h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Pilih PO barang terkait, isi ongkos kirim, dan unggah
+                        resi pengiriman.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {shippingDocumentGroups.map((group) => (
+                        <fieldset
+                          key={group.key}
+                          className="min-w-0 space-y-2 rounded-xl border border-border bg-card p-3"
+                          disabled={shippingDocumentsLoading}
+                        >
+                          <legend className="type-p2 px-1 font-medium">
+                            Pilih PO Barang{" "}
+                            <span className="text-destructive">*</span>
+                          </legend>
+                          <div className="max-h-44 space-y-1.5 overflow-y-auto">
+                            {group.options.length === 0 ? (
+                              <p className="type-p3 py-2 text-muted-foreground">
+                                Belum ada PO.
+                              </p>
+                            ) : (
+                              group.options.map((option) => {
+                                const key = `${group.key}:${option.id}`;
+                                return (
+                                  <Label
+                                    key={key}
                                     htmlFor={`shipping-document-${key}`}
-                                    className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-muted/60"
+                                    className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60"
                                   >
                                     <Checkbox
                                       id={`shipping-document-${key}`}
@@ -1555,47 +3039,343 @@ export default function CreateTicketModal({
                                         )
                                       }
                                     />
-                                    <span className="min-w-0 text-xs">
-                                      <span className="block font-medium">
+                                    <span className="min-w-0">
+                                      <span className="type-p2 block font-medium text-foreground">
                                         {option.number}
                                       </span>
-                                      <span className="block truncate text-muted-foreground">
+                                      <span className="type-p3 block truncate text-muted-foreground">
                                         {option.detail}
                                       </span>
                                     </span>
-                                  </FormLabel>
-                                  <div className="flex flex-wrap gap-x-3 gap-y-1 pl-8 text-xs">
-                                    {option.deliveryOrders.length > 0 ? (
-                                      option.deliveryOrders.map((order) => (
-                                        <a
-                                          key={order.publicCode}
-                                          href={`/d/${order.publicCode}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="text-primary underline underline-offset-4 hover:text-primary/80"
-                                        >
-                                          Lihat DO {order.doNumber}
-                                        </a>
-                                      ))
-                                    ) : (
-                                      <span className="text-muted-foreground">
-                                        DO belum diterbitkan
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </fieldset>
-                    ))}
+                                  </Label>
+                                );
+                              })
+                            )}
+                          </div>
+                        </fieldset>
+                      ))}
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="ticket-shipping-cost"
+                          className="type-p2 font-medium"
+                        >
+                          Biaya Pengiriman (Rp){" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <RupiahAmountInput
+                          id="ticket-shipping-cost"
+                          value={
+                            watchedRequestedAmount === undefined
+                              ? ""
+                              : formatRupiahNumber(watchedRequestedAmount)
+                          }
+                          onChange={(value) => {
+                            const amount = parseRupiahInput(value);
+                            form.setValue(
+                              "requestedAmount",
+                              amount > 0 ? amount : undefined,
+                              { shouldDirty: true, shouldValidate: true },
+                            );
+                          }}
+                          required
+                        />
+                        {form.formState.errors.requestedAmount && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.requestedAmount.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {shippingDocumentsLoading && (
+                      <p className="type-p3 text-muted-foreground" role="status">
+                        Memuat daftar PO...
+                      </p>
+                    )}
+                    {shippingDocumentsError && (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="type-p3 text-destructive" role="alert">
+                          {shippingDocumentsError}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setShippingDocumentsError("");
+                            setShippingDocumentsLoaded(false);
+                            setShippingDocumentsAttempt(
+                              (attempt) => attempt + 1,
+                            );
+                          }}
+                        >
+                          Muat Ulang
+                        </Button>
+                      </div>
+                    )}
+                    {form.formState.errors.relatedDocumentNumbers && (
+                      <p className="type-p3 text-destructive" role="alert">
+                        {form.formState.errors.relatedDocumentNumbers.message}
+                      </p>
+                    )}
+
                     <div className="space-y-2">
-                      <Label htmlFor="ticket-shipping-cost">
-                        Biaya Pengiriman
+                      <Label className="type-p2 font-medium">
+                        Resi Pengiriman <span className="text-destructive">*</span>
+                      </Label>
+                      <FileDropzone
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        multiple={false}
+                        maxSizeMb={10}
+                        capture="environment"
+                        files={
+                          watchedDeliveryReceiptFile
+                            ? [watchedDeliveryReceiptFile]
+                            : []
+                        }
+                        onFilesChange={(nextFiles) => {
+                          const next = nextFiles[0] ?? null;
+                          form.setValue("deliveryReceiptFile", next, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.clearErrors("deliveryReceiptFile");
+                        }}
+                        onError={(msg) =>
+                          form.setError("deliveryReceiptFile", {
+                            type: "validate",
+                            message: msg,
+                          })
+                        }
+                        label="Unggah Resi Pengiriman"
+                        hint="PDF, JPG, PNG, atau WEBP maksimal 10 MB."
+                      />
+                      {watchedDeliveryReceiptFile && (
+                        <div className="flex items-center gap-2">
+                          <InvoiceFilePreview
+                            file={watchedDeliveryReceiptFile}
+                            title="Pratinjau Resi Pengiriman"
+                            label="Pratinjau resi"
+                            tooltip="Pratinjau resi pengiriman"
+                          />
+                        </div>
+                      )}
+                      {form.formState.errors.deliveryReceiptFile && (
+                        <p className="type-p3 text-destructive" role="alert">
+                          {form.formState.errors.deliveryReceiptFile.message}
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                )}
+
+                {isInternalFunding && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div>
+                      <h3 className="type-h3 text-foreground">
+                        {requestCategoryLabels[requestCategory]}
+                      </h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Pengajuan diteruskan ke Direktur dan Keuangan setelah
+                        dikirim.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-internal-amount"
+                          className="type-p2 font-medium"
+                        >
+                          Nominal Pengajuan (Rp){" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <RupiahAmountInput
+                          id="ticket-internal-amount"
+                          value={
+                            watchedRequestedAmount === undefined
+                              ? ""
+                              : formatRupiahNumber(watchedRequestedAmount)
+                          }
+                          onChange={(value) => {
+                            const amount = parseRupiahInput(value);
+                            form.setValue(
+                              "requestedAmount",
+                              amount > 0 ? amount : undefined,
+                              { shouldDirty: true, shouldValidate: true },
+                            );
+                          }}
+                          required
+                        />
+                        {form.formState.errors.requestedAmount && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.requestedAmount.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-internal-description"
+                          className="type-p2 font-medium"
+                        >
+                          Keterangan / Rincian{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Textarea
+                          id="ticket-internal-description"
+                          maxLength={5000}
+                          rows={3}
+                          placeholder="Jelaskan rincian pengeluaran atau keperluan dana"
+                          {...form.register("requestPaymentDescription")}
+                        />
+                        {form.formState.errors.requestPaymentDescription && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {
+                              form.formState.errors.requestPaymentDescription
+                                .message
+                            }
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {requestCategory === TicketRequestCategory.REIMBURSEMENT && (
+                      <div className="space-y-2">
+                        <Label className="type-p2 font-medium">
+                          Struk / Nota Asli{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <FileDropzone
+                          accept="image/jpeg,image/png,image/webp,application/pdf"
+                          multiple
+                          maxFiles={5}
+                          maxSizeMb={10}
+                          capture="environment"
+                          files={receiptFiles}
+                          onFilesChange={(next) => {
+                            setReceiptFiles(next);
+                            setReceiptUploadError("");
+                            form.setValue("receiptFiles", next, {
+                              shouldValidate: true,
+                            });
+                          }}
+                          onError={setReceiptUploadError}
+                          label="Unggah Foto Struk / Nota"
+                          hint="Maksimal 5 berkas (PDF/JPG/PNG/WEBP, maks. 10 MB)."
+                        />
+                        {receiptUploadError && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {receiptUploadError}
+                          </p>
+                        )}
+                        {form.formState.errors.receiptFiles && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.receiptFiles.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {isAPHRequest && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div>
+                      <h3 className="type-h3 text-foreground">
+                        Detail Permintaan APH
+                      </h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Diteruskan ke Keuangan untuk pencairan dana.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="type-p2 font-medium">
+                        Metode Pembayaran
+                      </Label>
+                      <Controller
+                        control={form.control}
+                        name="requestPaymentMethod"
+                        render={({ field }) => (
+                          <RadioGroup
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            className="flex flex-wrap gap-3"
+                            aria-label="Metode pembayaran APH"
+                          >
+                            <Label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                              <RadioGroupItem value={POPaymentMethod.CASH} />
+                              <span className="type-p2">Cash</span>
+                            </Label>
+                            <Label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                              <RadioGroupItem value={POPaymentMethod.TRANSFER} />
+                              <span className="type-p2">Transfer</span>
+                            </Label>
+                          </RadioGroup>
+                        )}
+                      />
+                    </div>
+
+                    {watchedRequestPaymentMethod ===
+                      POPaymentMethod.TRANSFER && (
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-aph-transfer-destination"
+                          className="type-p2 font-medium"
+                        >
+                          Tujuan Transfer{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="ticket-aph-transfer-destination"
+                          maxLength={300}
+                          placeholder="Nama penerima, bank, dan nomor rekening"
+                          aria-invalid={
+                            !!form.formState.errors.transferDestination
+                          }
+                          {...form.register("transferDestination")}
+                        />
+                        {form.formState.errors.transferDestination && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.transferDestination.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="ticket-aph-description"
+                        className="type-p2 font-medium"
+                      >
+                        Keterangan <span className="text-destructive">*</span>
+                      </Label>
+                      <Textarea
+                        id="ticket-aph-description"
+                        maxLength={2000}
+                        rows={3}
+                        placeholder="Jelaskan keperluan permintaan APH"
+                        {...form.register("requestPaymentDescription")}
+                      />
+                      {form.formState.errors.requestPaymentDescription && (
+                        <p className="type-p3 text-destructive" role="alert">
+                          {
+                            form.formState.errors.requestPaymentDescription
+                              .message
+                          }
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="ticket-aph-amount"
+                        className="type-p2 font-medium"
+                      >
+                        Nominal Dana (Rp){" "}
+                        <span className="text-destructive">*</span>
                       </Label>
                       <RupiahAmountInput
-                        id="ticket-shipping-cost"
+                        id="ticket-aph-amount"
                         value={
                           watchedRequestedAmount === undefined
                             ? ""
@@ -1612,1394 +3392,691 @@ export default function CreateTicketModal({
                         required
                       />
                       {form.formState.errors.requestedAmount && (
-                        <p className="text-sm text-destructive" role="alert">
+                        <p className="type-p3 text-destructive" role="alert">
                           {form.formState.errors.requestedAmount.message}
                         </p>
                       )}
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-shipping-receipt">
-                      Resi Pengiriman (wajib)
-                    </Label>
-                    <Input
-                      id="ticket-shipping-receipt"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
-                      onChange={(event) => {
-                        const file = event.currentTarget.files?.[0] ?? null;
-                        if (!file) return;
-                        const extension =
-                          file.name.split(".").pop()?.toLowerCase() ?? "";
-                        if (
-                          file.size < 1 ||
-                          file.size > 10 * 1024 * 1024 ||
-                          !["pdf", "jpg", "jpeg", "png", "webp"].includes(
-                            extension,
-                          )
-                        ) {
-                          form.setValue("deliveryReceiptFile", null, {
-                            shouldDirty: true,
-                            shouldValidate: false,
-                          });
-                          form.setError("deliveryReceiptFile", {
-                            type: "validate",
-                            message:
-                              "Pilih resi PDF, JPG, PNG, atau WEBP maksimal 10 MB.",
-                          });
-                        } else {
-                          form.setValue("deliveryReceiptFile", file, {
-                            shouldDirty: true,
-                            shouldValidate: true,
-                          });
-                          form.clearErrors("deliveryReceiptFile");
-                        }
-                        event.currentTarget.value = "";
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Resi disimpan bersama tiket saat Anda menekan Simpan draft.
-                    </p>
-                    {watchedDeliveryReceiptFile && (
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <span
-                          className="min-w-0 truncate text-muted-foreground"
-                          role="status"
-                        >
-                          {watchedDeliveryReceiptFile.name}
-                        </span>
-                        <InvoiceFilePreview
-                          file={watchedDeliveryReceiptFile}
-                          title="Pratinjau Resi Pengiriman"
-                          label="Pratinjau resi pengiriman"
-                          tooltip="Pratinjau resi pengiriman"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="link"
-                          className="h-auto p-0 text-destructive"
-                          onClick={() => {
-                            form.setValue("deliveryReceiptFile", null, {
-                              shouldDirty: true,
-                              shouldValidate: true,
-                            });
-                            form.clearErrors("deliveryReceiptFile");
-                          }}
-                        >
-                          Hapus
-                        </Button>
-                      </div>
-                    )}
-                    {form.formState.errors.deliveryReceiptFile && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.deliveryReceiptFile.message}
+                  </section>
+                )}
+
+                {requiresRecipientPayment && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div>
+                      <h3 className="type-h3 text-foreground">
+                        Data Penerima Pembayaran
+                      </h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Keuangan menggunakan rekening ini sebagai tujuan
+                        transfer.
                       </p>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Pilih satu atau beberapa PO yang memuat barang.
-                  </p>
-                  {shippingDocumentsLoading && (
-                    <p className="text-xs text-muted-foreground" role="status">
-                      Memuat daftar PO...
-                    </p>
-                  )}
-                  {shippingDocumentsError && (
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm text-destructive" role="alert">
-                        {shippingDocumentsError}
-                      </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setShippingDocumentsError("");
-                          setShippingDocumentsLoaded(false);
-                          setShippingDocumentsAttempt((attempt) => attempt + 1);
-                        }}
-                      >
-                        Muat ulang
-                      </Button>
                     </div>
-                  )}
-                  {form.formState.errors.relatedDocumentNumbers && (
-                    <p
-                      id="ticket-related-po-error"
-                      className="text-sm text-destructive"
-                      role="alert"
-                    >
-                      {form.formState.errors.relatedDocumentNumbers.message}
-                    </p>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {isInternalFunding && (
-              <section className="space-y-4 rounded-lg border border-orange-500/30 bg-orange-500/5 p-4 md:col-span-2">
-                <div>
-                  <h3 className="font-semibold">
-                    Pengajuan {requestCategoryLabels[requestCategory]}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Pengajuan akan masuk ke Direktur untuk persetujuan, lalu
-                    diteruskan ke Keuangan untuk pembayaran.
-                  </p>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-internal-amount">
-                      Nominal Pengajuan (Rp)
-                    </Label>
-                    <RupiahAmountInput
-                      id="ticket-internal-amount"
-                      value={
-                        watchedRequestedAmount === undefined
-                          ? ""
-                          : formatRupiahNumber(watchedRequestedAmount)
-                      }
-                      onChange={(value) => {
-                        const amount = parseRupiahInput(value);
-                        form.setValue(
-                          "requestedAmount",
-                          amount > 0 ? amount : undefined,
-                          { shouldDirty: true, shouldValidate: true },
-                        );
-                      }}
-                      required
-                    />
-                    {form.formState.errors.requestedAmount && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.requestedAmount.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-internal-description">
-                      Keterangan / Rincian
-                    </Label>
-                    <Textarea
-                      id="ticket-internal-description"
-                      maxLength={5000}
-                      rows={3}
-                      placeholder="Jelaskan rincian pengeluaran, tanggal, atau keperluan dana"
-                      {...form.register("requestPaymentDescription")}
-                    />
-                    {form.formState.errors.requestPaymentDescription && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.requestPaymentDescription.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {requestCategory === TicketRequestCategory.REIMBURSEMENT && (
-                  <div className="space-y-2">
-                    <Label>Unggah Struk / Nota Asli (wajib)</Label>
-                    <Input
-                      type="file"
-                      accept="application/pdf,image/jpeg,image/png,image/webp"
-                      multiple
-                      disabled={receiptFiles.length >= 5}
-                      onChange={(event) => {
-                        const selected = Array.from(event.currentTarget.files ?? []);
-                        const invalid = selected.find(
-                          (file) =>
-                            file.size < 1 ||
-                            file.size > 10 * 1024 * 1024 ||
-                            ![
-                              "application/pdf",
-                              "image/jpeg",
-                              "image/png",
-                              "image/webp",
-                            ].includes(file.type),
-                        );
-                        if (invalid) {
-                          setReceiptUploadError(
-                            "Pilih file PDF, JPG, PNG, atau WEBP maksimal 10 MB.",
-                          );
-                        } else {
-                          const next = [...receiptFiles, ...selected].slice(0, 5);
-                          setReceiptFiles(next);
-                          form.setValue("receiptFiles", next, {
-                            shouldValidate: true,
-                          });
-                          setReceiptUploadError("");
-                        }
-                        event.currentTarget.value = "";
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      File tetap lokal sampai Kirim Pengajuan ditekan; maksimal 5 file.
-                    </p>
-                    {receiptUploadError && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {receiptUploadError}
-                      </p>
-                    )}
-                    {form.formState.errors.receiptFiles && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.receiptFiles.message}
-                      </p>
-                    )}
-                    {receiptFiles.length > 0 && (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {receiptFiles.map((file, index) => (
-                          <div
-                            key={`${file.name}-${file.lastModified}-${file.size}`}
-                            className="flex items-center justify-between gap-2 rounded-md border bg-background p-2 text-xs"
-                          >
-                            <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                            <div className="flex shrink-0 items-center gap-1.5">
-                              <InvoiceFilePreview
-                                file={file}
-                                title={`Pratinjau ${file.name}`}
-                                label={`Pratinjau ${file.name}`}
-                                tooltip="Pratinjau struk / nota"
-                              />
-                              <button
-                                type="button"
-                                className="shrink-0 py-1 text-destructive"
-                                onClick={() => {
-                                  const next = receiptFiles.filter(
-                                    (_, fileIndex) => fileIndex !== index,
-                                  );
-                                  setReceiptFiles(next);
-                                  form.setValue("receiptFiles", next, {
-                                    shouldValidate: true,
-                                  });
-                                }}
-                              >
-                                Hapus bukti
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {receiptFiles.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Reimbursement wajib memiliki minimal satu struk atau nota.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
-
-            {requestCategory === "FIELD" && (
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="ticket-field-category">Kebutuhan Lapangan</Label>
-                <Controller
-                  control={form.control}
-                  name="fieldCategory"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ?? "none"}
-                      onValueChange={(value) =>
-                        field.onChange(value === "none" ? undefined : value)
-                      }
-                    >
-                      <SelectTrigger
-                        id="ticket-field-category"
-                        className="w-full md:max-w-[calc(50%-0.5rem)]"
-                        aria-invalid={!!form.formState.errors.fieldCategory}
-                      >
-                        <SelectValue placeholder="Pilih kebutuhan lapangan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          Pilih kebutuhan lapangan
-                        </SelectItem>
-                        {fieldCategories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {fieldCategoryLabels[category]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {form.formState.errors.fieldCategory && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {form.formState.errors.fieldCategory.message}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {isEquipmentRequest && (
-              <section className="space-y-4 rounded-lg border border-slate-500/30 bg-slate-500/5 p-4 md:col-span-2">
-                <div>
-                  <h3 className="font-semibold">
-                    Permintaan Alat Berat & Kendaraan
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Permintaan akan langsung diteruskan ke antrean Logistik.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="space-y-2 sm:col-span-3">
-                    <Label htmlFor="equipment-name">
-                      Pilih Alat / Kendaraan Khusus
-                    </Label>
-                    <Input
-                      id="equipment-name"
-                      placeholder="Contoh: Excavator Komatsu PC200, Dump Truck Tronton"
-                      aria-invalid={
-                        !!form.formState.errors.equipmentDetails?.equipmentName
-                      }
-                      {...form.register("equipmentDetails.equipmentName")}
-                    />
-                    {form.formState.errors.equipmentDetails?.equipmentName && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {
-                          form.formState.errors.equipmentDetails.equipmentName
-                            .message
-                        }
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="equipment-start-date">
-                      Tgl Mulai Pakai
-                    </Label>
-                    <Input
-                      id="equipment-start-date"
-                      type="date"
-                      aria-invalid={
-                        !!form.formState.errors.equipmentDetails?.startDate
-                      }
-                      {...form.register("equipmentDetails.startDate")}
-                    />
-                    {form.formState.errors.equipmentDetails?.startDate && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {
-                          form.formState.errors.equipmentDetails.startDate
-                            .message
-                        }
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="equipment-duration">Lama Pakai</Label>
-                    <Input
-                      id="equipment-duration"
-                      type="number"
-                      min="0.01"
-                      step="any"
-                      placeholder="Contoh: 3"
-                      aria-invalid={
-                        !!form.formState.errors.equipmentDetails?.duration
-                      }
-                      {...form.register("equipmentDetails.duration", {
-                        setValueAs: (value: string) =>
-                          value === "" ? undefined : Number(value),
-                      })}
-                    />
-                    {form.formState.errors.equipmentDetails?.duration && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {
-                          form.formState.errors.equipmentDetails.duration
-                            .message
-                        }
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="equipment-time-unit">Satuan Waktu</Label>
-                    <Controller
-                      control={form.control}
-                      name="equipmentDetails.timeUnit"
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-recipient"
+                          className="type-p2 font-medium"
                         >
-                          <SelectTrigger
-                            id="equipment-time-unit"
-                            className="w-full"
-                          >
-                            <SelectValue placeholder="Pilih satuan" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {EQUIPMENT_TIME_UNITS.map((unit) => (
-                              <SelectItem key={unit} value={unit}>
-                                {EQUIPMENT_TIME_UNIT_LABELS[unit]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
-                </div>
-              </section>
-            )}
-
-          </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">
-              2
-            </span>
-            <div>
-              <h3 className="text-sm font-bold text-foreground">
-                Rincian Kebutuhan (Barang / Dana / Rekening Penerima)
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Masukkan daftar item material, nominal dana, atau tujuan transfer sesuai jenis permintaan
-              </p>
-            </div>
-          </div>
-
-          {isAPHRequest && (
-            <section className="space-y-4 rounded-md border p-4">
-              <div>
-                <h3 className="font-semibold">Detail Permintaan APH</h3>
-                <p className="text-sm text-muted-foreground">
-                  Permintaan akan diteruskan ke Keuangan setelah diajukan.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Type pembayaran</Label>
-                <Controller
-                  control={form.control}
-                  name="requestPaymentMethod"
-                  render={({ field }) => (
-                    <RadioGroup
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      className="flex flex-wrap gap-4"
-                      aria-label="Type pembayaran APH"
-                    >
-                      <Label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2">
-                        <RadioGroupItem value={POPaymentMethod.CASH} />
-                        Cash
-                      </Label>
-                      <Label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2">
-                        <RadioGroupItem value={POPaymentMethod.TRANSFER} />
-                        Transfer
-                      </Label>
-                    </RadioGroup>
-                  )}
-                />
-                {form.formState.errors.requestPaymentMethod && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {form.formState.errors.requestPaymentMethod.message}
-                  </p>
-                )}
-              </div>
-              {watchedRequestPaymentMethod === POPaymentMethod.TRANSFER && (
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-aph-transfer-destination">
-                    Tujuan transfer
-                  </Label>
-                  <Input
-                    id="ticket-aph-transfer-destination"
-                    maxLength={300}
-                    placeholder="Nama penerima, bank, atau nomor rekening"
-                    aria-invalid={!!form.formState.errors.transferDestination}
-                    {...form.register("transferDestination")}
-                  />
-                  {form.formState.errors.transferDestination && (
-                    <p className="text-sm text-destructive" role="alert">
-                      {form.formState.errors.transferDestination.message}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="ticket-aph-description">Keterangan</Label>
-                <Textarea
-                  id="ticket-aph-description"
-                  maxLength={2000}
-                  rows={3}
-                  placeholder="Jelaskan keperluan permintaan APH"
-                  aria-invalid={
-                    !!form.formState.errors.requestPaymentDescription
-                  }
-                  {...form.register("requestPaymentDescription")}
-                />
-                {form.formState.errors.requestPaymentDescription && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {
-                      form.formState.errors.requestPaymentDescription.message
-                    }
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ticket-aph-amount">Jumlah dana yang diminta</Label>
-                <RupiahAmountInput
-                  id="ticket-aph-amount"
-                  value={
-                    watchedRequestedAmount === undefined
-                      ? ""
-                      : formatRupiahNumber(watchedRequestedAmount)
-                  }
-                  onChange={(value) => {
-                    const amount = parseRupiahInput(value);
-                    form.setValue(
-                      "requestedAmount",
-                      amount > 0 ? amount : undefined,
-                      { shouldDirty: true, shouldValidate: true },
-                    );
-                  }}
-                  required
-                />
-                {form.formState.errors.requestedAmount && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {form.formState.errors.requestedAmount.message}
-                  </p>
-                )}
-              </div>
-            </section>
-          )}
-
-          {!isAPHRequest && !isInternalFunding && !isShippingCostRequest && <section className="space-y-3">
-            {requiresRecipientPayment ? (
-              <div className="mb-3 space-y-4 rounded-md border p-4">
-                <div>
-                  <h3 className="font-semibold">Data Penerima Pembayaran</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Permintaan biaya lapangan tidak memerlukan rincian material.
-                    Keuangan akan menggunakan data ini sebagai tujuan transfer.
-                  </p>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-recipient">Nama Penerima</Label>
-                    <Input
-                      id="ticket-recipient"
-                      autoComplete="name"
-                      placeholder="Nama pemilik rekening"
-                      aria-invalid={!!form.formState.errors.recipientName}
-                      {...form.register("recipientName")}
-                    />
-                    {form.formState.errors.recipientName && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.recipientName.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-bank">Nama Bank</Label>
-                    <Input
-                      id="ticket-bank"
-                      placeholder="Contoh: BRI"
-                      aria-invalid={!!form.formState.errors.bankName}
-                      {...form.register("bankName")}
-                    />
-                    {form.formState.errors.bankName && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.bankName.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-account-number">Nomor Rekening</Label>
-                    <Input
-                      id="ticket-account-number"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      placeholder="Nomor rekening penerima"
-                      aria-invalid={!!form.formState.errors.accountNumber}
-                      {...form.register("accountNumber")}
-                    />
-                    {form.formState.errors.accountNumber && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.accountNumber.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ticket-requested-amount">Biaya</Label>
-                    <div className="flex h-10 items-center rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring/50">
-                      <span className="pl-3 text-sm text-muted-foreground">
-                        Rp
-                      </span>
-                      <Input
-                        id="ticket-requested-amount"
-                        type="text"
-                        inputMode="numeric"
-                        className="h-full border-0 shadow-none focus-visible:ring-0"
-                        placeholder="0"
-                        aria-invalid={!!form.formState.errors.requestedAmount}
-                        value={
-                          requestedAmountEdit ??
-                          (watchedRequestedAmount === undefined
-                            ? ""
-                            : new Intl.NumberFormat("id-ID", {
-                                maximumFractionDigits: 0,
-                              }).format(watchedRequestedAmount))
-                        }
-                        onFocus={() =>
-                          setRequestedAmountEdit(
-                            form.getValues("requestedAmount")?.toString() ?? "",
-                          )
-                        }
-                        onChange={(event) => {
-                          const digits = event.target.value.replace(/\D/g, "");
-                          setRequestedAmountEdit(digits);
-                          form.setValue(
-                            "requestedAmount",
-                            digits ? Number(digits) : undefined,
-                            { shouldDirty: true, shouldValidate: true },
-                          );
-                        }}
-                        onBlur={() => {
-                          setRequestedAmountEdit(null);
-                          void form.trigger("requestedAmount");
-                        }}
-                      />
-                    </div>
-                    {form.formState.errors.requestedAmount && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.requestedAmount.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : isOperationalFunding ? (
-              <div className="space-y-3 rounded-md border p-2 sm:space-y-4 sm:p-4">
-                <div>
-                  <h3 className="font-semibold">Permintaan Dana Operasional</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Permintaan operasional berupa dana dan tidak menggunakan
-                    daftar material atau stok gudang. Tujuan transfer otomatis
-                    menggunakan data rekening pemohon di Profil Saya.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ticket-operational-request-type">
-                    Keperluan Dana
-                  </Label>
-                  <Controller
-                    control={form.control}
-                    name="operationalRequestType"
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger
-                          id="ticket-operational-request-type"
-                          className="w-full md:max-w-[calc(50%-0.5rem)]"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="GENERAL">
-                            Dana Operasional
-                          </SelectItem>
-                          <SelectItem value="SURVEY">
-                            Biaya Survei Lapangan
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-                {operationalRequestType === "SURVEY" ? (
-                  <>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="ticket-survey-consumption">
-                          Biaya Konsumsi (Rp)
+                          Nama Penerima{" "}
+                          <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                          id="ticket-survey-consumption"
-                          type="number"
-                          min="0"
-                          step="1"
-                          inputMode="numeric"
-                          placeholder="0"
-                          aria-invalid={
-                            !!form.formState.errors.surveyConsumptionAmount
-                          }
-                          {...form.register("surveyConsumptionAmount", {
-                            setValueAs: (value) =>
-                              value === "" ? undefined : Number(value),
-                          })}
+                          id="ticket-recipient"
+                          autoComplete="name"
+                          placeholder="Nama pemilik rekening"
+                          aria-invalid={!!form.formState.errors.recipientName}
+                          {...form.register("recipientName")}
                         />
+                        {form.formState.errors.recipientName && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.recipientName.message}
+                          </p>
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ticket-survey-fuel">
-                          Biaya BBM (Rp)
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-bank"
+                          className="type-p2 font-medium"
+                        >
+                          Nama Bank <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                          id="ticket-survey-fuel"
-                          type="number"
-                          min="0"
-                          step="1"
-                          inputMode="numeric"
-                          placeholder="0"
-                          aria-invalid={
-                            !!form.formState.errors.surveyFuelAmount
-                          }
-                          {...form.register("surveyFuelAmount", {
-                            setValueAs: (value) =>
-                              value === "" ? undefined : Number(value),
-                          })}
+                          id="ticket-bank"
+                          placeholder="Contoh: BRI / BSI"
+                          aria-invalid={!!form.formState.errors.bankName}
+                          {...form.register("bankName")}
                         />
+                        {form.formState.errors.bankName && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.bankName.message}
+                          </p>
+                        )}
                       </div>
-                    </div>
-                    {(form.formState.errors.surveyConsumptionAmount ||
-                      form.formState.errors.surveyFuelAmount) && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.surveyConsumptionAmount?.message ??
-                          form.formState.errors.surveyFuelAmount?.message}
-                      </p>
-                    )}
-                    <p className="text-right font-semibold">
-                      Total dana survei: {formatCurrency(operationalRequestedAmount)}
-                    </p>
-                  </>
-                ) : (
-                  <div className="space-y-2 md:max-w-[calc(50%-0.5rem)]">
-                    <Label htmlFor="ticket-operational-amount">
-                      Jumlah Dana Operasional (Rp)
-                    </Label>
-                    <Input
-                      id="ticket-operational-amount"
-                      type="number"
-                      min="1"
-                      step="1"
-                      inputMode="numeric"
-                      placeholder="Masukkan jumlah dana"
-                      aria-invalid={
-                        !!form.formState.errors.operationalAmount
-                      }
-                      {...form.register("operationalAmount", {
-                        setValueAs: (value) =>
-                          value === "" ? undefined : Number(value),
-                      })}
-                    />
-                    {form.formState.errors.operationalAmount && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.operationalAmount.message}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-            {usesItemDeliveryDates && (
-              <div
-                className={cn(
-                  "ticket-item-source-row grid items-end gap-2 rounded-md border p-2 text-xs sm:gap-3 sm:p-3 sm:text-sm",
-                  requestCategory === TicketRequestCategory.WAREHOUSE
-                    ? "grid-cols-1"
-                    : "grid-cols-2",
-                )}
-              >
-                {requestCategory !== TicketRequestCategory.WAREHOUSE && (
-                  <div className="space-y-2">
-                    <Label className="hidden sm:flex" htmlFor="ticket-item-source">
-                      Sumber Barang
-                    </Label>
-                    <Controller
-                      control={form.control}
-                      name="itemSource"
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={(value: TicketCategoryHint) => {
-                            field.onChange(value);
-                            replace(
-                              (form.getValues("items") ?? []).map((item) => ({
-                                ...item,
-                                stockItemId: "",
-                                itemName: "",
-                                unit: "",
-                                estimatedCost: undefined,
-                                categoryHint: value,
-                                materialContractId: "",
-                                expectedDeliveryDate: "",
-                              })),
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-account-number"
+                          className="type-p2 font-medium"
+                        >
+                          Nomor Rekening{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <Input
+                          id="ticket-account-number"
+                          inputMode="numeric"
+                          placeholder="6–30 digit angka"
+                          aria-invalid={!!form.formState.errors.accountNumber}
+                          {...form.register("accountNumber")}
+                        />
+                        {form.formState.errors.accountNumber && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.accountNumber.message}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ticket-requested-amount"
+                          className="type-p2 font-medium"
+                        >
+                          {fieldCategory === TicketFieldCategory.HAULING ||
+                          fieldCategory === TicketFieldCategory.LABOR
+                            ? "Total Biaya Borongan (Rp)"
+                            : "Nominal Biaya (Rp)"}{" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        {(fieldCategory === TicketFieldCategory.HAULING ||
+                          fieldCategory === TicketFieldCategory.LABOR) && (
+                          <p className="type-p3 text-muted-foreground">
+                            Isi satu total biaya borongan untuk pengajuan ini.
+                          </p>
+                        )}
+                        <RupiahAmountInput
+                          id="ticket-requested-amount"
+                          value={
+                            watchedRequestedAmount === undefined
+                              ? ""
+                              : formatRupiahNumber(watchedRequestedAmount)
+                          }
+                          onChange={(value) => {
+                            const amount = parseRupiahInput(value);
+                            form.setValue(
+                              "requestedAmount",
+                              amount > 0 ? amount : undefined,
+                              { shouldDirty: true, shouldValidate: true },
                             );
-                            if (value !== TicketCategoryHint.WAREHOUSE) {
-                              form.setValue("itemsExpectedDeliveryDate", "");
-                            }
-                            form.clearErrors([
-                              "items",
-                              "itemsExpectedDeliveryDate",
-                            ]);
                           }}
-                        >
-                          <SelectTrigger id="ticket-item-source" className="h-9 w-full text-xs sm:h-10 sm:text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={TicketCategoryHint.WAREHOUSE}>
-                              Gudang (Stok)
-                            </SelectItem>
-                            <SelectItem value={TicketCategoryHint.PURCHASE}>
-                              Pembelian Baru
-                            </SelectItem>
-                            <SelectItem value={TicketCategoryHint.CONTRACT}>
-                              Kontrak Material Alam
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
+                          required
+                        />
+                        {form.formState.errors.requestedAmount && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.requestedAmount.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </section>
                 )}
-                {(itemSource === TicketCategoryHint.WAREHOUSE ||
-                  itemSource === TicketCategoryHint.CONTRACT) && (
-                  <div className="space-y-2">
-                    <Label className="hidden sm:flex" htmlFor="ticket-items-delivery-date">
-                      {itemSource === TicketCategoryHint.CONTRACT
-                        ? "Target Tanggal Kirim (Opsional)"
-                        : "Tanggal Diperlukan"}
-                    </Label>
-                    <Input
-                      id="ticket-items-delivery-date"
-                      type="date"
-                      className="h-9 text-xs sm:h-10 sm:text-sm"
-                      required={itemSource === TicketCategoryHint.WAREHOUSE}
-                      value={itemsExpectedDeliveryDate ?? ""}
-                      min={format(new Date(), "yyyy-MM-dd")}
-                      onChange={(event) =>
-                        form.setValue(
-                          "itemsExpectedDeliveryDate",
-                          event.target.value,
-                          { shouldDirty: true, shouldValidate: true },
-                        )
-                      }
-                      aria-invalid={
-                        !!form.formState.errors.itemsExpectedDeliveryDate
-                      }
-                    />
-                    {form.formState.errors.itemsExpectedDeliveryDate && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.itemsExpectedDeliveryDate.message}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="ticket-items-heading flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">Rincian Item</h3>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  append({
-                    itemName: "",
-                    unit: "",
-                    quantity: 1,
-                    estimatedCost: undefined,
-                    categoryHint: itemSource ?? TicketCategoryHint.WAREHOUSE,
-                    materialContractId: "",
-                    expectedDeliveryDate: "",
-                  })
-                }
-                disabled={fields.length >= 100}
-              >
-                <Plus aria-hidden="true" />
-                Tambah Item
-              </Button>
-            </div>
 
-            <div className="ticket-items-box space-y-4 rounded-md border p-4">
-              {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className={cn(
-                    "ticket-item-row grid items-end gap-2 sm:gap-4",
-                    usesItemDeliveryDates
-                      ? "grid-cols-[minmax(0,1fr)_4.25rem_4.25rem_2.5rem] sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]"
-                      : "grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(7rem,0.85fr)_minmax(9rem,1fr)_3rem]",
-                  )}
-                >
-                  {itemSource === TicketCategoryHint.CONTRACT ? (
-                    <div className="space-y-2">
+                {isOperationalFunding && (
+                  <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                    <div>
+                      <h3 className="type-h3 text-foreground">
+                        Permintaan Dana Operasional
+                      </h3>
+                      <p className="type-p3 text-muted-foreground">
+                        Pencairan otomatis menuju rekening yang terdaftar pada
+                        Profil Anda.
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
                       <Label
-                        className="text-xs sm:text-sm"
-                        htmlFor={`ticket-material-contract-${index}`}
+                        htmlFor="ticket-operational-request-type"
+                        className="type-p2 font-medium"
                       >
-                        Material Alam
+                        Keperluan Dana
                       </Label>
                       <Controller
                         control={form.control}
-                        name={`items.${index}.materialContractId`}
-                        render={({ field: contractField }) => (
+                        name="operationalRequestType"
+                        render={({ field }) => (
                           <Select
-                            value={contractField.value || undefined}
-                            onValueChange={(contractId) => {
-                              const contract = materialContracts.find(
-                                (option) => option.id === contractId,
-                              );
-                              contractField.onChange(contractId);
-                              if (!contract) return;
-                              form.setValue(
-                                `items.${index}.itemName`,
-                                contract.materialType,
-                                { shouldDirty: true, shouldValidate: true },
-                              );
-                              form.setValue(
-                                `items.${index}.unit`,
-                                contract.unit,
-                                { shouldDirty: true, shouldValidate: true },
-                              );
-                              form.setValue(
-                                `items.${index}.estimatedCost`,
-                                contract.unitPrice,
-                                { shouldDirty: true, shouldValidate: true },
-                              );
-                              form.clearErrors([
-                                `items.${index}.materialContractId`,
-                                `items.${index}.itemName`,
-                                `items.${index}.unit`,
-                              ]);
-                            }}
+                            value={field.value}
+                            onValueChange={field.onChange}
                           >
                             <SelectTrigger
-                              id={`ticket-material-contract-${index}`}
-                              className="h-9 w-full text-xs sm:h-10 sm:text-sm"
-                              aria-invalid={
-                                !!form.formState.errors.items?.[index]
-                                  ?.materialContractId
-                              }
+                              id="ticket-operational-request-type"
+                              className="h-10 w-full md:max-w-[calc(50%-0.5rem)]"
                             >
-                              <SelectValue placeholder="Pilih kontrak material alam" />
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {materialContracts.map((contract) => (
-                                <SelectItem
-                                  key={contract.id}
-                                  value={contract.id}
-                                >
-                                  {contract.materialType} · {contract.vendorName} ·{" "}
-                                  {formatCurrency(contract.unitPrice)}/{contract.unit}
-                                </SelectItem>
-                              ))}
+                              <SelectItem value="GENERAL">
+                                Dana Operasional
+                              </SelectItem>
+                              <SelectItem value="SURVEY">
+                                Biaya Survei Lapangan
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         )}
                       />
-                      {form.formState.errors.items?.[index]
-                        ?.materialContractId && (
-                        <p className="text-sm text-destructive" role="alert">
-                          {
-                            form.formState.errors.items[index]
-                              ?.materialContractId?.message
-                          }
-                        </p>
-                      )}
-                      {materialContracts.length === 0 ? (
-                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
-                          Belum ada Kontrak Material Alam yang aktif.{" "}
-                          <Link
-                            href="/apps/logistics?tab=bulk-contracts"
-                            className="font-semibold underline underline-offset-2"
-                          >
-                            Buka Logistik &rarr; Kontrak Curah
-                          </Link>{" "}
-                          untuk menambah kontrak pasir/batu, atau ubah Sumber Barang ke Pembelian Baru.
-                        </div>
-                      ) : (
-                        (() => {
-                          const selectedId = watchedItems?.[index]?.materialContractId;
-                          const matched = selectedId
-                            ? materialContracts.find((c) => c.id === selectedId)
-                            : undefined;
-                          if (!matched) return null;
-                          const qty = Number(watchedItems?.[index]?.quantity ?? 0);
-                          const lineEstimate =
-                            Number.isFinite(qty) && qty > 0
-                              ? Math.round(qty * matched.unitPrice)
-                              : 0;
-                          return (
-                            <p className="text-[11px] text-muted-foreground">
-                              Kontrak{" "}
-                              <span className="font-semibold text-foreground">
-                                {matched.contractNumber}
-                              </span>{" "}
-                              &middot; {formatCurrency(matched.unitPrice)}/{matched.unit}
-                              {lineEstimate > 0
-                                ? ` · Estimasi: ${formatCurrency(lineEstimate)}`
-                                : ""}
-                            </p>
-                          );
-                        })()
-                      )}
                     </div>
-                  ) : usesStockCatalog ? (
-                    <div className="space-y-2">
-                      <Label className="text-xs sm:text-sm" htmlFor={`ticket-stock-item-${index}`}>Barang</Label>
-                      <Controller
-                        control={form.control}
-                        name={`items.${index}.stockItemId`}
-                        render={({ field: stockField }) => (
-                          <Popover
-                            open={stockPickerIndex === index}
-                            onOpenChange={(open) =>
-                              setStockPickerIndex(open ? index : null)
-                            }
-                          >
-                            <PopoverTrigger asChild>
-                              <button
-                                type="button"
-                                role="combobox"
-                                aria-expanded={stockPickerIndex === index}
-                                id={`ticket-stock-item-${index}`}
-                                className="flex h-9 min-w-0 w-full items-center justify-between gap-1 overflow-hidden rounded-md border border-input bg-transparent px-2 py-1.5 text-left text-xs shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/20 sm:h-10 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
-                                aria-invalid={
-                                  !!form.formState.errors.items?.[index]?.stockItemId
-                                }
-                              >
-                                <span className="min-w-0 truncate">
-                                  {(() => {
-                                    const selected = stockItems.find(
-                                      (item) => item.id === stockField.value,
-                                    );
-                                    return selected
-                                      ? `${selected.name} · ${selected.unit}${
-                                          itemSource === TicketCategoryHint.WAREHOUSE
-                                            ? ` · tersedia ${selected.stockQuantity}`
-                                            : ""
-                                        }`
-                                      : "Pilih barang";
-                                  })()}
-                                </span>
-                                <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              align="start"
-                              className="w-[--radix-popover-trigger-width] min-w-72 p-0"
+
+                    {operationalRequestType === "SURVEY" ? (
+                      <>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label
+                              htmlFor="ticket-survey-consumption"
+                              className="type-p2 font-medium"
                             >
-                              <Command>
-                                <CommandInput placeholder="Cari nama barang..." />
-                                <CommandList>
-                                  <CommandEmpty>Barang tidak ditemukan.</CommandEmpty>
-                                  <CommandItem
-                                    value="none"
-                                    onSelect={() => {
-                                      stockField.onChange("");
-                                      setStockPickerIndex(null);
+                              Biaya Konsumsi (Rp)
+                            </Label>
+                            <RupiahAmountInput
+                              id="ticket-survey-consumption"
+                              value={
+                                watchedSurveyConsumptionAmount === undefined
+                                  ? ""
+                                  : formatRupiahNumber(
+                                      watchedSurveyConsumptionAmount,
+                                    )
+                              }
+                              onChange={(value) =>
+                                form.setValue(
+                                  "surveyConsumptionAmount",
+                                  parseRupiahInput(value),
+                                  { shouldDirty: true, shouldValidate: true },
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label
+                              htmlFor="ticket-survey-fuel"
+                              className="type-p2 font-medium"
+                            >
+                              Biaya BBM (Rp)
+                            </Label>
+                            <RupiahAmountInput
+                              id="ticket-survey-fuel"
+                              value={
+                                watchedSurveyFuelAmount === undefined
+                                  ? ""
+                                  : formatRupiahNumber(watchedSurveyFuelAmount)
+                              }
+                              onChange={(value) =>
+                                form.setValue(
+                                  "surveyFuelAmount",
+                                  parseRupiahInput(value),
+                                  { shouldDirty: true, shouldValidate: true },
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                        {(form.formState.errors.surveyConsumptionAmount ||
+                          form.formState.errors.surveyFuelAmount) && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.surveyConsumptionAmount
+                              ?.message ??
+                              form.formState.errors.surveyFuelAmount?.message}
+                          </p>
+                        )}
+                        <p className="type-p2 text-right font-semibold text-foreground">
+                          Total dana survei:{" "}
+                          {formatCurrency(operationalRequestedAmount)}
+                        </p>
+                      </>
+                    ) : (
+                      <div className="space-y-1.5 md:max-w-[calc(50%-0.5rem)]">
+                        <Label
+                          htmlFor="ticket-operational-amount"
+                          className="type-p2 font-medium"
+                        >
+                          Jumlah Dana Operasional (Rp){" "}
+                          <span className="text-destructive">*</span>
+                        </Label>
+                        <RupiahAmountInput
+                          id="ticket-operational-amount"
+                          value={
+                            watchedOperationalAmount === undefined
+                              ? ""
+                              : formatRupiahNumber(watchedOperationalAmount)
+                          }
+                          onChange={(value) => {
+                            const amount = parseRupiahInput(value);
+                            form.setValue(
+                              "operationalAmount",
+                              amount > 0 ? amount : undefined,
+                              { shouldDirty: true, shouldValidate: true },
+                            );
+                          }}
+                          required
+                        />
+                        {form.formState.errors.operationalAmount && (
+                          <p className="type-p3 text-destructive" role="alert">
+                            {form.formState.errors.operationalAmount.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                {!isAPHRequest &&
+                  !isInternalFunding &&
+                  !isShippingCostRequest &&
+                  !isEquipmentRequest &&
+                  !isRentalRequest &&
+                  !requiresRecipientPayment &&
+                  !isOperationalFunding && (
+                    <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                      {usesItemDeliveryDates && (
+                        <div
+                          className={cn(
+                            "grid items-end gap-3",
+                            requestCategory === TicketRequestCategory.WAREHOUSE
+                              ? "grid-cols-1"
+                              : "grid-cols-1 sm:grid-cols-2",
+                          )}
+                        >
+                          {requestCategory !==
+                            TicketRequestCategory.WAREHOUSE && (
+                            <div className="space-y-1.5">
+                              <Label
+                                htmlFor="ticket-item-source"
+                                className="type-p2 font-medium"
+                              >
+                                Sumber Barang
+                              </Label>
+                              <Controller
+                                control={form.control}
+                                name="itemSource"
+                                render={({ field }) => (
+                                  <Select
+                                    value={field.value}
+                                    onValueChange={(
+                                      value: TicketCategoryHint,
+                                    ) => {
+                                      field.onChange(value);
+                                      replace(
+                                        (form.getValues("items") ?? []).map(
+                                          (item) => ({
+                                            ...item,
+                                            stockItemId: "",
+                                            itemName: "",
+                                            unit: "",
+                                            estimatedCost: undefined,
+                                            categoryHint: value,
+                                            materialContractId: "",
+                                            expectedDeliveryDate: "",
+                                          }),
+                                        ),
+                                      );
+                                      if (
+                                        value !== TicketCategoryHint.WAREHOUSE
+                                      ) {
+                                        form.setValue(
+                                          "itemsExpectedDeliveryDate",
+                                          "",
+                                        );
+                                      }
+                                      form.clearErrors([
+                                        "items",
+                                        "itemsExpectedDeliveryDate",
+                                      ]);
                                     }}
                                   >
-                                    Pilih barang
-                                  </CommandItem>
-                                  {stockItems.map((item) => (
-                                    <CommandItem
-                                      key={item.id}
-                                      value={`${item.name} ${item.unit}`}
-                                      onSelect={() => {
-                                        stockField.onChange(item.id);
-                                        form.setValue(
-                                          `items.${index}.itemName`,
-                                          item.name,
-                                          { shouldDirty: true, shouldValidate: true },
-                                        );
-                                        form.setValue(
-                                          `items.${index}.unit`,
-                                          item.unit,
-                                          { shouldDirty: true, shouldValidate: true },
-                                        );
-                                        form.setValue(
-                                          `items.${index}.estimatedCost`,
-                                          undefined,
-                                        );
-                                        form.clearErrors([
-                                          `items.${index}.stockItemId`,
-                                          `items.${index}.itemName`,
-                                          `items.${index}.unit`,
-                                        ]);
-                                        setStockPickerIndex(null);
-                                      }}
+                                    <SelectTrigger
+                                      id="ticket-item-source"
+                                      className="h-10 w-full"
                                     >
-                                      <Check
-                                        className={`size-4 ${
-                                          stockField.value === item.id
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        }`}
-                                      />
-                                      <span className="truncate">
-                                        {item.name} · {item.unit}
-                                        {itemSource === TicketCategoryHint.WAREHOUSE
-                                          ? ` · tersedia ${item.stockQuantity}`
-                                          : ""}
-                                      </span>
-                                    </CommandItem>
-                                  ))}
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem
+                                        value={TicketCategoryHint.CONTRACT}
+                                      >
+                                        Kontrak Material Alam
+                                      </SelectItem>
+                                      <SelectItem
+                                        value={TicketCategoryHint.PURCHASE}
+                                      >
+                                        Pembelian Baru (Vendor)
+                                      </SelectItem>
+                                      <SelectItem
+                                        value={TicketCategoryHint.WAREHOUSE}
+                                      >
+                                        Gudang (Stok)
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+                          )}
+
+                          {(itemSource === TicketCategoryHint.WAREHOUSE ||
+                            itemSource === TicketCategoryHint.CONTRACT) && (
+                            <div className="space-y-1.5">
+                              <Label
+                                htmlFor="ticket-items-delivery-date"
+                                className="type-p2 font-medium"
+                              >
+                                {itemSource === TicketCategoryHint.CONTRACT
+                                  ? "Target Tanggal Kirim (Opsional)"
+                                  : "Tanggal Diperlukan *"}
+                              </Label>
+                              <Controller
+                                control={form.control}
+                                name="itemsExpectedDeliveryDate"
+                                render={({ field }) => (
+                                  <DatePicker
+                                    id="ticket-items-delivery-date"
+                                    value={field.value ?? ""}
+                                    minDate={todayDateKey}
+                                    clearable={
+                                      itemSource === TicketCategoryHint.CONTRACT
+                                    }
+                                    onValueChange={(val) =>
+                                      field.onChange(val)
+                                    }
+                                    placeholder="Pilih tanggal diperlukan"
+                                  />
+                                )}
+                              />
+                              {form.formState.errors
+                                .itemsExpectedDeliveryDate && (
+                                <p
+                                  className="type-p3 text-destructive"
+                                  role="alert"
+                                >
+                                  {
+                                    form.formState.errors
+                                      .itemsExpectedDeliveryDate.message
+                                  }
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {itemSource === TicketCategoryHint.CONTRACT &&
+                        materialContracts.length === 0 && (
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+                            <p className="type-p3 text-amber-900 dark:text-amber-200">
+                              Belum ada kontrak payung material alam yang aktif.
+                              Gunakan mode <strong>Pembelian Baru</strong> agar
+                              permintaan tetap langsung diproses Logistik.
+                            </p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={switchMaterialSourceToPurchase}
+                            >
+                              Pakai Pembelian Baru
+                            </Button>
+                          </div>
                         )}
-                      />
-                      {form.formState.errors.items?.[index]?.stockItemId && (
-                        <p
-                          className="text-sm text-destructive"
-                          role="alert"
+
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="type-h3 text-foreground">
+                          Rincian Item ({fields.length})
+                        </h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            append(
+                              createBlankItem(
+                                itemSource ?? TicketCategoryHint.PURCHASE,
+                              ),
+                            )
+                          }
+                          disabled={fields.length >= 100}
                         >
-                          {form.formState.errors.items[index]?.stockItemId?.message}
+                          <Plus className="size-4" aria-hidden="true" />
+                          Tambah Item
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {fields.map((fieldItem, index) => (
+                          <MaterialItemRow
+                            key={fieldItem.id}
+                            index={index}
+                            canRemove={index > 0}
+                            itemSource={itemSource}
+                            usesStockCatalog={usesStockCatalog}
+                            materialContracts={materialContracts}
+                            stockComboboxOptions={stockComboboxOptions}
+                            contractComboboxOptions={contractComboboxOptions}
+                            control={form.control}
+                            register={form.register}
+                            errors={form.formState.errors}
+                            setValue={form.setValue}
+                            clearErrors={form.clearErrors}
+                            onRemove={remove}
+                            watchedQuantity={watchedItems?.[index]?.quantity}
+                            watchedMaterialContractId={
+                              watchedItems?.[index]?.materialContractId
+                            }
+                          />
+                        ))}
+                      </div>
+
+                      {itemSource === TicketCategoryHint.CONTRACT &&
+                        materialContracts.length > 0 && (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5">
+                            <span className="type-p3 text-sky-900 dark:text-sky-200">
+                              Menggunakan Kontrak Payung vendor tanpa PO baru.
+                            </span>
+                            {contractEstimatedTotal > 0 && (
+                              <span className="type-p2 font-bold text-foreground tabular-nums">
+                                Estimasi: {formatCurrency(contractEstimatedTotal)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                      {(form.formState.errors.items?.root?.message ||
+                        form.formState.errors.items?.message) && (
+                        <p className="type-p3 text-destructive" role="alert">
+                          {form.formState.errors.items.root?.message ||
+                            form.formState.errors.items.message}
                         </p>
                       )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label htmlFor={`ticket-item-${index}`}>Barang</Label>
-                      <Input
-                        id={`ticket-item-${index}`}
-                        placeholder="Nama item"
-                        aria-invalid={!!form.formState.errors.items?.[index]?.itemName}
-                        {...form.register(`items.${index}.itemName`)}
-                      />
-                      {form.formState.errors.items?.[index]?.itemName && (
-                        <p className="text-sm text-destructive" role="alert">
-                          {form.formState.errors.items[index]?.itemName?.message}
-                        </p>
-                      )}
-                    </div>
+                    </section>
                   )}
+              </div>
+            )}
 
-                  <div className="space-y-2">
-                    <Label className="text-xs sm:text-sm" htmlFor={`ticket-quantity-${index}`}>Qty</Label>
-                    <Input
-                      id={`ticket-quantity-${index}`}
-                      type="number"
-                      min="0.001"
-                      step="any"
-                      aria-invalid={
-                        !!form.formState.errors.items?.[index]?.quantity
-                      }
-                      {...form.register(`items.${index}.quantity`, {
-                        valueAsNumber: true,
-                      })}
-                    />
-                    {form.formState.errors.items?.[index]?.quantity && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.items[index]?.quantity?.message}
-                      </p>
+            {activeStep === 2 && (
+              <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                <div>
+                  <h3 className="type-h3 text-foreground">
+                    Prioritas &amp; Target Waktu
+                  </h3>
+                  <p className="type-p3 text-muted-foreground">
+                    Tentukan urgensi dan konfirmasi ringkasan sebelum
+                    dikirimkan.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="type-p2 font-medium">
+                    Tingkat Prioritas
+                  </Label>
+                  <Controller
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="grid grid-cols-1 gap-2.5 sm:grid-cols-3"
+                        aria-label="Tingkat Prioritas"
+                      >
+                        <Label
+                          htmlFor="priority-non-urgent"
+                          className={cn(
+                            "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 transition-all",
+                            field.value === "NON_URGENT"
+                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/30"
+                              : "border-border hover:border-primary/40",
+                          )}
+                        >
+                          <RadioGroupItem
+                            id="priority-non-urgent"
+                            value="NON_URGENT"
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <span className="type-p2 block font-semibold">
+                              Standar
+                            </span>
+                            <span className="type-p3 block text-muted-foreground">
+                              Kebutuhan terjadwal normal
+                            </span>
+                          </div>
+                        </Label>
+
+                        <Label
+                          htmlFor="priority-urgent"
+                          className={cn(
+                            "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 transition-all",
+                            field.value === "URGENT"
+                              ? "border-amber-500 bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/30"
+                              : "border-border hover:border-primary/40",
+                          )}
+                        >
+                          <RadioGroupItem
+                            id="priority-urgent"
+                            value="URGENT"
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <span className="type-p2 block font-semibold">
+                              Urgent
+                            </span>
+                            <span className="type-p3 block text-muted-foreground">
+                              Perlu diproses hari ini
+                            </span>
+                          </div>
+                        </Label>
+
+                        <Label
+                          htmlFor="priority-emergency"
+                          className={cn(
+                            "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 transition-all",
+                            field.value === "EMERGENCY"
+                              ? "border-rose-500 bg-rose-500/10 text-rose-500 ring-1 ring-rose-500/30"
+                              : "border-border hover:border-primary/40",
+                          )}
+                        >
+                          <RadioGroupItem
+                            id="priority-emergency"
+                            value="EMERGENCY"
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <span className="type-p2 block font-semibold">
+                              Emergency
+                            </span>
+                            <span className="type-p3 block text-muted-foreground">
+                              Kondisi kritis lapangan
+                            </span>
+                          </div>
+                        </Label>
+                      </RadioGroup>
                     )}
-                  </div>
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs sm:text-sm" htmlFor={`ticket-unit-${index}`}>Satuan</Label>
-                    {usesStockCatalog ||
-                    itemSource === TicketCategoryHint.CONTRACT ? (
+                {!usesItemDeliveryDates &&
+                  !isAPHRequest &&
+                  !isInternalFunding &&
+                  !isEquipmentRequest &&
+                  !isRentalRequest && (
+                    <div className="space-y-1.5 md:max-w-[calc(50%-0.5rem)]">
+                      <Label
+                        htmlFor="ticket-needed-date"
+                        className="type-p2 font-medium"
+                      >
+                        Tanggal Dibutuhkan{" "}
+                        <span className="text-destructive">*</span>
+                      </Label>
                       <Controller
                         control={form.control}
-                        name={`items.${index}.unit`}
-                        render={({ field: unitField }) => (
-                          <Input
-                            id={`ticket-unit-${index}`}
-                            value={unitField.value ?? ""}
-                            readOnly
+                        name="neededDate"
+                        render={({ field }) => (
+                          <DatePicker
+                            id="ticket-needed-date"
+                            value={field.value ?? ""}
+                            minDate={todayDateKey}
+                            onValueChange={field.onChange}
+                            placeholder="Pilih tanggal target kebutuhan"
                           />
                         )}
                       />
-                    ) : (
-                      <Input
-                        id={`ticket-unit-${index}`}
-                        placeholder="Masukkan satuan"
-                        maxLength={32}
-                        aria-invalid={!!form.formState.errors.items?.[index]?.unit}
-                        {...form.register(`items.${index}.unit`)}
-                      />
-                    )}
-                    {form.formState.errors.items?.[index]?.unit && (
-                      <p className="text-sm text-destructive" role="alert">
-                        {form.formState.errors.items[index]?.unit?.message}
-                      </p>
-                    )}
-                  </div>
+                      {form.formState.errors.neededDate && (
+                        <p className="type-p3 text-destructive" role="alert">
+                          {form.formState.errors.neededDate.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                  {index > 0 && (
-                    <ActionIconButton
-                      label={`Hapus item ${index + 1}`}
-                      tooltip={`Hapus item ${index + 1}`}
-                      icon={Trash2}
-                      className="justify-self-end self-end text-red-500 hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={() => remove(index)}
-                      variant="ghost"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            {itemSource === TicketCategoryHint.CONTRACT && materialContracts.length > 0 && (
-              <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-900 dark:text-sky-200">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span>
-                    Pengajuan memakai Kontrak Payung vendor (tanpa PO/pembelian baru). Surat Jalan (DO) truk dicatat saat pengiriman tiba.
-                  </span>
-                  {contractEstimatedTotal > 0 && (
-                    <span className="font-bold">
-                      Total Estimasi: {formatCurrency(contractEstimatedTotal)}
-                    </span>
-                  )}
+                <div className="rounded-xl border border-border bg-card p-3.5">
+                  <p className="type-p3 font-semibold uppercase tracking-wide text-muted-foreground">
+                    Ringkasan Pengajuan
+                  </p>
+                  <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <dt className="type-p3 text-muted-foreground">
+                        Jenis Permintaan
+                      </dt>
+                      <dd className="type-p2 font-semibold text-foreground">
+                        {requestCategoryLabels[requestCategory]}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="type-p3 text-muted-foreground">Proyek</dt>
+                      <dd className="type-p2 font-semibold text-foreground">
+                        {selectedProjectLabel}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="type-p3 text-muted-foreground">
+                        Prioritas
+                      </dt>
+                      <dd className="type-p2 font-semibold text-foreground">
+                        {watchedPriority === "EMERGENCY"
+                          ? "Emergency"
+                          : watchedPriority === "URGENT"
+                            ? "Urgent"
+                            : "Standar"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="type-p3 text-muted-foreground">
+                        Target / Rincian
+                      </dt>
+                      <dd className="type-p2 font-semibold text-foreground">
+                        {isMaterialOrWarehouse
+                          ? `${fields.length} item (${itemSource === TicketCategoryHint.CONTRACT ? "Kontrak Alam" : itemSource === TicketCategoryHint.WAREHOUSE ? "Gudang" : "Pembelian Baru"})`
+                          : isRentalRequest
+                            ? formatCurrency(watchedRequestedAmount ?? 0)
+                            : watchedNeededDate || "Sesuai jadwal"}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
               </div>
             )}
-            {(form.formState.errors.items?.root?.message ||
-              form.formState.errors.items?.message) && (
-              <p className="text-sm text-destructive" role="alert">
-                {form.formState.errors.items.root?.message ||
-                  form.formState.errors.items.message}
-              </p>
-            )}
-
-              </>
-            )}
-          </section>}
-
-          <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
-            <div className="flex items-center gap-2 border-b border-border pb-2.5">
-              <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">
-                3
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-foreground">
-                  Tingkat Prioritas &amp; Target Waktu
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Tentukan urgensi penanganan dan tanggal kapan barang/dana dibutuhkan
-                </p>
-              </div>
-            </div>
-
-          <div className="space-y-3">
-            <Label>Tingkat Prioritas Penanganan</Label>
-            <Controller
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <RadioGroup
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  className="grid grid-cols-1 gap-2.5 sm:grid-cols-3"
-                  aria-label="Tingkat Prioritas"
-                >
-                  <Label
-                    htmlFor="priority-non-urgent"
-                    className={cn(
-                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-xs transition-all sm:text-sm",
-                      field.value === "NON_URGENT"
-                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/30"
-                        : "border-border hover:border-primary/40",
-                    )}
-                  >
-                    <RadioGroupItem
-                      id="priority-non-urgent"
-                      value="NON_URGENT"
-                      className="mt-0.5 !min-h-0"
-                    />
-                    <div>
-                      <span className="block font-bold">Non-Urgent (Standar)</span>
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                        Kebutuhan terjadwal normal
-                      </span>
-                    </div>
-                  </Label>
-                  <Label
-                    htmlFor="priority-urgent"
-                    className={cn(
-                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-xs transition-all sm:text-sm",
-                      field.value === "URGENT"
-                        ? "border-amber-500 bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/30"
-                        : "border-border hover:border-primary/40",
-                    )}
-                  >
-                    <RadioGroupItem
-                      id="priority-urgent"
-                      value="URGENT"
-                      className="mt-0.5 !min-h-0"
-                    />
-                    <div>
-                      <span className="block font-bold">Urgent (Tinggi)</span>
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                        Perlu segera diproses hari ini
-                      </span>
-                    </div>
-                  </Label>
-                  <Label
-                    htmlFor="priority-emergency"
-                    className={cn(
-                      "flex min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-xs transition-all sm:text-sm",
-                      field.value === "EMERGENCY"
-                        ? "border-rose-500 bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/30"
-                        : "border-border hover:border-primary/40",
-                    )}
-                  >
-                    <RadioGroupItem
-                      id="priority-emergency"
-                      value="EMERGENCY"
-                      className="mt-0.5 !min-h-0"
-                    />
-                    <div>
-                      <span className="block font-bold">Emergency (Mendesak)</span>
-                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                        Kondisi kritis / darurat lapangan
-                      </span>
-                    </div>
-                  </Label>
-                </RadioGroup>
-              )}
-            />
-          </div>
-
-          {!usesItemDeliveryDates && !isAPHRequest && !isInternalFunding && (
-            <div className="space-y-2 pt-1">
-              <Label>Tanggal Perlu Dibayarkan / Disediakan</Label>
-              <Controller
-                control={form.control}
-                name="neededDate"
-                render={({ field }) => (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal md:max-w-[calc(50%-0.5rem)]",
-                          !field.value && "text-muted-foreground",
-                        )}
-                        aria-invalid={!!form.formState.errors.neededDate}
-                      >
-                        <CalendarDays aria-hidden="true" />
-                        {field.value
-                          ? format(field.value, "d MMMM yyyy", { locale: id })
-                          : "Pilih tanggal target kebutuhan"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={{ before: startOfDay(new Date()) }}
-                        autoFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              />
-              {form.formState.errors.neededDate && (
-                <p className="text-sm text-destructive" role="alert">
-                  {form.formState.errors.neededDate.message}
-                </p>
-              )}
-            </div>
-          )}
-          </div>
-
           </fieldset>
         </form>
       </GlobalModal>

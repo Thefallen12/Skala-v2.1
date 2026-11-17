@@ -26,6 +26,8 @@ import type {
   NotificationFeed,
   NotificationFeedItem,
 } from "@/lib/notification-types";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
+import { EquipmentRental, VendorInvoice } from "@/models/finance-records";
 import { prisma } from "@/lib/prisma";
 
 const ticketActionLabels: Record<string, string> = {
@@ -63,6 +65,7 @@ type ParsedNotificationTarget = {
   pathname: string;
   tab: string;
   openSheet: string | null;
+  openInvoice: string | null;
   ticketIdParam: string | null;
   projectIdParam: string | null;
   documentCode: string | null;
@@ -94,6 +97,7 @@ function parseNotificationTarget(
   const pathname = parsed?.pathname ?? "";
   const tab = parsed?.searchParams.get("tab") ?? "";
   const openSheet = parsed?.searchParams.get("openSheet") ?? null;
+  const openInvoice = parsed?.searchParams.get("openInvoice") ?? null;
   const ticketIdParam = parsed?.searchParams.get("ticketId") ?? null;
   const projectIdParam = parsed?.searchParams.get("projectId") ?? null;
   const documentCode = pathname.match(/^\/d\/([^/]+)$/)?.[1] ?? null;
@@ -140,6 +144,7 @@ function parseNotificationTarget(
     pathname,
     tab,
     openSheet,
+    openInvoice,
     ticketIdParam,
     projectIdParam,
     documentCode,
@@ -292,6 +297,7 @@ type NotificationResolutionContext = {
   blueprintsByRef: Map<string, BlueprintLookupRecord>;
   drawingsByRef: Map<string, DrawingLookupRecord>;
   rentalsList: RentalLookupRecord[];
+  vendorInvoicesById: Map<string, { id: string; status: string }>;
   invoicesByNumber: Map<string, InvoiceLookupRecord>;
   deliveryOrdersByNumber: Map<string, DeliveryOrderLookupRecord>;
   fuelRequestsByDo: Map<string, FuelRequestLookupRecord[]>;
@@ -315,6 +321,7 @@ async function buildNotificationResolutionContext(
   const bastNumbers = new Set<string>();
   const drafterCodes = new Set<string>();
   const invoiceNumbers = new Set<string>();
+  const vendorInvoiceIds = new Set<string>();
   let needsRentalsLookup = false;
 
   for (const { target } of parsedEntries) {
@@ -349,6 +356,9 @@ async function buildNotificationResolutionContext(
     if (target.pathname === "/apps/finance" && target.tab === "rentals") {
       needsRentalsLookup = true;
     }
+    if (target.openInvoice) {
+      vendorInvoiceIds.add(target.openInvoice);
+    }
     if (target.subkonTermyn) {
       subkonContracts.add(target.subkonTermyn.contractNumber);
     }
@@ -369,6 +379,7 @@ async function buildNotificationResolutionContext(
     blueprintsRows,
     drawingsRows,
     rentalsRows,
+    vendorInvoicesRows,
     invoicesRows,
     deliveryOrdersRows,
     fuelRequests,
@@ -557,11 +568,40 @@ async function buildNotificationResolutionContext(
         })
       : [],
     needsRentalsLookup
-      ? prisma.equipmentRental.findMany({
-          where: { paymentStatus: { in: ["PENDING_PAYMENT", "PAID"] } },
-          select: { name: true, vendorName: true, paymentStatus: true },
-        })
-      : [],
+      ? connectToMongoDBOptional().then((conn) =>
+          conn
+            ? EquipmentRental.find({
+                paymentStatus: { $in: ["PENDING_PAYMENT", "PAID"] },
+              })
+                .select({ name: 1, vendorName: 1, paymentStatus: 1 })
+                .lean()
+                .then((rows) =>
+                  rows.map((row) => ({
+                    name: String(row.name ?? ""),
+                    vendorName: String(row.vendorName ?? ""),
+                    paymentStatus: String(row.paymentStatus ?? ""),
+                  })),
+                )
+            : [],
+        )
+      : Promise.resolve([]),
+    vendorInvoiceIds.size > 0
+      ? connectToMongoDBOptional().then((conn) =>
+          conn
+            ? VendorInvoice.find({
+                _id: { $in: [...vendorInvoiceIds] },
+              })
+                .select({ _id: 1, status: 1 })
+                .lean()
+                .then((rows) =>
+                  rows.map((row) => ({
+                    id: String(row._id),
+                    status: String(row.status ?? ""),
+                  })),
+                )
+            : [],
+        )
+      : Promise.resolve([]),
     invoiceNumbers.size > 0
       ? prisma.invoice.findMany({
           where: { invoiceNumber: { in: [...invoiceNumbers] } },
@@ -716,6 +756,9 @@ async function buildNotificationResolutionContext(
     blueprintsByRef,
     drawingsByRef,
     rentalsList: rentalsRows,
+    vendorInvoicesById: new Map(
+      vendorInvoicesRows.map((inv) => [inv.id, inv]),
+    ),
     invoicesByNumber,
     deliveryOrdersByNumber,
     fuelRequestsByDo,
@@ -887,6 +930,13 @@ function resolveNotificationCompleted(
         return false;
       }
     }
+    if (target.tab === "vendor-contracts") {
+      if (target.openInvoice) {
+        const vendorInvoice = ctx.vendorInvoicesById.get(target.openInvoice);
+        return !vendorInvoice || vendorInvoice.status === "PAID";
+      }
+      return notification.isRead;
+    }
     if (target.tab === "rentals") {
       const matchingRentals = ctx.rentalsList.filter(
         (rental) =>
@@ -956,7 +1006,7 @@ function resolveNotificationCompleted(
           ticket.status !== TicketStatus.PROCESSED_LOGISTIC)
       );
     }
-    if (target.tab === "equipment") {
+    if (target.tab === "equipment" || target.tab === "bulk-contracts") {
       return notification.isRead;
     }
     if (target.tab === "stock") {

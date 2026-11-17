@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import type { ClientSession } from "mongoose";
 import {
   DOStatus,
   FulfillmentStatus,
@@ -9,29 +10,34 @@ import {
   NotificationType,
   POPaymentMethod,
   PaymentType,
-  Prisma,
   TicketCategoryHint,
   TicketFulfillmentStatus,
   TicketStatus,
+  TicketType,
   UserRole,
   VendorInvoiceStatus,
 } from "@prisma/client";
 import { auth } from "../../../auth";
-import { prisma } from "@/lib/prisma";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Cashflow from "@/models/cashflow";
+import DirectStockPurchase from "@/models/direct-stock-purchase";
 import DocumentNumberSequence from "@/models/document-number-sequence";
 import FinanceAccount from "@/models/finance-account";
 import Notification from "@/models/notification";
 import Project from "@/models/project";
+import PurchaseOrder from "@/models/purchase-order";
+import Ticket from "@/models/ticket";
+import TicketAuditLog from "@/models/ticket-audit-log";
 import User from "@/models/user";
 import {
+  DeliveryOrder,
   MaterialContract,
   MaterialDelivery,
+  TicketItem,
+  Vendor,
   VendorInvoice,
   VendorInvoicePayment,
 } from "@/models/finance-records";
-import { sendNotification } from "@/lib/notifications";
 import {
   CloudinaryConfigurationError,
   CloudinaryPhotoValidationError,
@@ -53,6 +59,7 @@ import {
   calculateContractDeliverySubtotal,
   canBillAndPayVendorContracts,
   canManageMaterialContracts,
+  canPrepareVendorInvoices,
   canRecordMaterialDeliveries,
   createMaterialContractSchema,
   createVendorInvoiceSchema,
@@ -87,63 +94,75 @@ function sanitizeContractMaterialSlug(materialType: string): string {
   return cleaned || "MATERIAL";
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function generateNextContractNumber(
-  tx: Prisma.TransactionClient,
+  mongoSession: ClientSession,
   materialType: string,
 ): Promise<string> {
   const year = new Date().getUTCFullYear();
   const slug = sanitizeContractMaterialSlug(materialType);
-  const sequence = await tx.documentNumberSequence.upsert({
-    where: {
-      kind_year: {
-        kind: `KONTRAK_${slug}`,
-        year,
-      },
+  const sequence = await DocumentNumberSequence.findOneAndUpdate(
+    { kind: `KONTRAK_${slug}`, year },
+    {
+      $inc: { value: 1 },
+      $setOnInsert: { _id: randomUUID() },
     },
-    update: { value: { increment: 1 } },
-    create: {
-      kind: `KONTRAK_${slug}`,
-      year,
-      value: 1,
+    {
+      upsert: true,
+      returnDocument: "after",
+      setDefaultsOnInsert: true,
+      session: mongoSession,
     },
-    select: { value: true },
-  });
-  return `KONTRAK/${slug}/${year}/${String(sequence.value).padStart(3, "0")}`;
+  )
+    .select({ value: 1 })
+    .lean();
+  return `KONTRAK/${slug}/${year}/${String(sequence?.value ?? 1).padStart(3, "0")}`;
 }
 
+const LOGISTICS_DB_ROLES = [UserRole.LOGISTICS, "KOORDINATOR_LOGISTIK"];
+const FINANCE_DB_ROLES = [UserRole.FINANCE, "KEUANGAN"];
+
 async function syncContractTicketFulfillment(
-  tx: Prisma.TransactionClient,
+  mongoSession: ClientSession,
   ticketId: string,
   contractNumber: string,
   userId: string,
   doNumber: string,
-  mode: "RECORDED" | "REMOVED" = "RECORDED",
+  mode: "RECORDED" | "REMOVED" | "PAID" = "RECORDED",
 ) {
   const [ticket, ticketItems, deliveries] = await Promise.all([
-    tx.ticket.findUnique({
-      where: { id: ticketId },
-      select: {
-        id: true,
-        ticketNumber: true,
-        title: true,
-        status: true,
-        requesterId: true,
-      },
-    }),
-    tx.ticketItem.findMany({
-      where: { ticketId },
-      select: {
-        id: true,
-        quantity: true,
-        status: true,
-        categoryHint: true,
-        materialContractId: true,
-      },
-    }),
-    tx.materialDelivery.findMany({
-      where: { ticketId },
-      select: { contractId: true, quantityReceived: true },
-    }),
+    Ticket.findById(ticketId)
+      .session(mongoSession)
+      .select({
+        _id: 1,
+        ticketNumber: 1,
+        title: 1,
+        status: 1,
+        requesterId: 1,
+      })
+      .lean(),
+    TicketItem.find({ ticketId })
+      .session(mongoSession)
+      .select({
+        _id: 1,
+        quantity: 1,
+        status: 1,
+        categoryHint: 1,
+        materialContractId: 1,
+      })
+      .lean(),
+    MaterialDelivery.find({ ticketId })
+      .session(mongoSession)
+      .select({
+        contractId: 1,
+        quantityReceived: 1,
+        billingStatus: 1,
+        vendorInvoiceId: 1,
+      })
+      .lean(),
   ]);
   if (!ticket) {
     return null;
@@ -157,18 +176,19 @@ async function syncContractTicketFulfillment(
       item.categoryHint === TicketCategoryHint.CONTRACT &&
       item.materialContractId
     ) {
+      const contractIdKey = String(item.materialContractId);
       requestedByContract.set(
-        item.materialContractId,
-        (requestedByContract.get(item.materialContractId) ?? 0) +
-          item.quantity,
+        contractIdKey,
+        (requestedByContract.get(contractIdKey) ?? 0) + Number(item.quantity ?? 0),
       );
     }
   }
   for (const delivery of deliveries) {
+    const contractIdKey = String(delivery.contractId);
     deliveredByContract.set(
-      delivery.contractId,
-      (deliveredByContract.get(delivery.contractId) ?? 0) +
-        delivery.quantityReceived,
+      contractIdKey,
+      (deliveredByContract.get(contractIdKey) ?? 0) +
+        Number(delivery.quantityReceived ?? 0),
     );
   }
 
@@ -181,43 +201,53 @@ async function syncContractTicketFulfillment(
     ) {
       continue;
     }
+    const contractIdKey = String(item.materialContractId);
     const delivered = roundMaterialNumber(
-      deliveredByContract.get(item.materialContractId) ?? 0,
+      deliveredByContract.get(contractIdKey) ?? 0,
       2,
     );
     const requested = roundMaterialNumber(
-      requestedByContract.get(item.materialContractId) ?? 0,
+      requestedByContract.get(contractIdKey) ?? 0,
       2,
     );
     if (delivered >= requested && requested > 0) {
-      completedContractItemIds.push(item.id);
+      completedContractItemIds.push(String(item._id));
     } else {
-      pendingContractItemIds.push(item.id);
+      pendingContractItemIds.push(String(item._id));
     }
   }
 
   if (completedContractItemIds.length > 0) {
-    await tx.ticketItem.updateMany({
-      where: { id: { in: completedContractItemIds } },
-      data: { status: FulfillmentStatus.PROCESSED_TO_DO },
-    });
+    await TicketItem.updateMany(
+      { _id: { $in: completedContractItemIds } },
+      { $set: { status: FulfillmentStatus.PROCESSED_TO_DO } },
+      { session: mongoSession },
+    );
   }
   if (pendingContractItemIds.length > 0) {
-    await tx.ticketItem.updateMany({
-      where: { id: { in: pendingContractItemIds } },
-      data: { status: FulfillmentStatus.PENDING },
-    });
+    await TicketItem.updateMany(
+      { _id: { $in: pendingContractItemIds } },
+      { $set: { status: FulfillmentStatus.PENDING } },
+      { session: mongoSession },
+    );
   }
 
   const completedSet = new Set(completedContractItemIds);
   const pendingSet = new Set(pendingContractItemIds);
-  const effectiveItemStatus = (item: (typeof ticketItems)[number]) =>
-    completedSet.has(item.id)
-      ? FulfillmentStatus.PROCESSED_TO_DO
-      : pendingSet.has(item.id)
-        ? FulfillmentStatus.PENDING
-        : item.status;
+  const effectiveItemStatus = (item: (typeof ticketItems)[number]) => {
+    const itemId = String(item._id);
+    if (completedSet.has(itemId)) {
+      return FulfillmentStatus.PROCESSED_TO_DO;
+    }
+    if (pendingSet.has(itemId)) {
+      return FulfillmentStatus.PENDING;
+    }
+    return item.status;
+  };
 
+  const contractItems = ticketItems.filter(
+    (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+  );
   const nonContractItems = ticketItems.filter(
     (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
   );
@@ -232,35 +262,92 @@ async function syncContractTicketFulfillment(
       (item) => effectiveItemStatus(item) !== FulfillmentStatus.PENDING,
     );
 
-  const regularDeliveryOrders =
-    nonContractItems.length > 0 && allItemsFulfilled
-      ? await tx.deliveryOrder.findMany({
-          where: { ticketId },
-          select: { status: true },
-        })
-      : [];
+  const vendorInvoiceIds = [
+    ...new Set(
+      deliveries
+        .map((delivery) => delivery.vendorInvoiceId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const [regularDeliveryOrders, unpaidPoCount, unpaidDspCount, vendorInvoices] =
+    await Promise.all([
+      nonContractItems.length > 0 && allItemsFulfilled
+        ? DeliveryOrder.find({ ticketId })
+            .session(mongoSession)
+            .select({ status: 1 })
+            .lean()
+        : Promise.resolve([]),
+      PurchaseOrder.countDocuments({
+        ticketId,
+        paidAt: null,
+        status: { $nin: ["REJECTED", "CANCELLED"] },
+      }).session(mongoSession),
+      DirectStockPurchase.countDocuments({
+        ticketId,
+        paidAt: null,
+      }).session(mongoSession),
+      vendorInvoiceIds.length > 0
+        ? VendorInvoice.find({ _id: { $in: vendorInvoiceIds } })
+            .session(mongoSession)
+            .select({ _id: 1, status: 1 })
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+  const invoiceStatusById = new Map(
+    vendorInvoices.map((inv) => [String(inv._id), inv.status]),
+  );
+  const allContractDeliveriesSettled =
+    deliveries.length > 0 &&
+    deliveries.every(
+      (delivery) =>
+        delivery.billingStatus === MaterialDeliveryBillingStatus.BILLED &&
+        Boolean(delivery.vendorInvoiceId) &&
+        invoiceStatusById.get(String(delivery.vendorInvoiceId)) ===
+          VendorInvoiceStatus.PAID,
+    );
+  const allPaymentsSettled =
+    unpaidPoCount === 0 &&
+    unpaidDspCount === 0 &&
+    (contractItems.length === 0 || allContractDeliveriesSettled);
+
   const nonContractReadyForCompletion =
     nonContractItems.length === 0 ||
     (regularDeliveryOrders.length > 0 &&
-      regularDeliveryOrders.every((order) => order.status === DOStatus.DELIVERED));
+      regularDeliveryOrders.every(
+        (order) => order.status === DOStatus.DELIVERED,
+      ));
 
-  const completableStatuses: TicketStatus[] = [
+  const currentStatus = String(ticket.status ?? "") as TicketStatus;
+  const activeStatuses: TicketStatus[] = [
     TicketStatus.APPROVED_DIR,
     TicketStatus.PROCESSED_FINANCE,
     TicketStatus.PROCESSED_LOGISTIC,
     TicketStatus.ASSIGNED_TO_MOVER,
     TicketStatus.IN_TRANSIT,
+    TicketStatus.WAITING_FINANCE_PAYMENT,
   ];
-  let nextStatus = ticket.status;
+  let nextStatus = currentStatus;
   if (
     allItemsFulfilled &&
     nonContractReadyForCompletion &&
-    completableStatuses.includes(ticket.status)
+    activeStatuses.includes(currentStatus)
   ) {
-    nextStatus = TicketStatus.COMPLETED;
+    nextStatus = allPaymentsSettled
+      ? TicketStatus.COMPLETED
+      : TicketStatus.WAITING_FINANCE_PAYMENT;
   } else if (
     !allItemsFulfilled &&
-    ticket.status === TicketStatus.COMPLETED
+    (currentStatus === TicketStatus.COMPLETED ||
+      (mode === "REMOVED" &&
+        currentStatus === TicketStatus.WAITING_FINANCE_PAYMENT &&
+        unpaidPoCount === 0 &&
+        unpaidDspCount === 0 &&
+        deliveries.every(
+          (delivery) =>
+            delivery.billingStatus !== MaterialDeliveryBillingStatus.BILLED,
+        )))
   ) {
     nextStatus = TicketStatus.PROCESSED_LOGISTIC;
   }
@@ -271,39 +358,59 @@ async function syncContractTicketFulfillment(
       ? TicketFulfillmentStatus.PARTIALLY_FULFILLED
       : TicketFulfillmentStatus.PENDING;
 
-  await tx.ticket.update({
-    where: { id: ticketId },
-    data: {
-      fulfillmentStatus: nextFulfillmentStatus,
-      ...(nextStatus !== ticket.status
-        ? { status: nextStatus, updatedAt: new Date() }
-        : {}),
+  await Ticket.updateOne(
+    { _id: ticketId },
+    {
+      $set: {
+        fulfillmentStatus: nextFulfillmentStatus,
+        ...(nextStatus !== currentStatus
+          ? { status: nextStatus, updatedAt: new Date() }
+          : {}),
+      },
     },
-  });
+    { session: mongoSession },
+  );
 
-  await tx.ticketAuditLog.create({
-    data: {
-      id: randomUUID(),
-      ticketId,
-      userId,
-      action:
-        mode === "REMOVED"
-          ? "MATERIAL_CONTRACT_DELIVERY_REMOVED"
-          : "MATERIAL_CONTRACT_DELIVERY_RECORDED",
-      notes:
-        mode === "REMOVED"
-          ? `Surat Jalan ${doNumber} pada kontrak ${contractNumber} dihapus; status pemenuhan tiket disinkronkan ulang.`
-          : nextStatus === TicketStatus.COMPLETED
-            ? `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; seluruh volume kontrak pada tiket telah terpenuhi.`
-            : `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; pemenuhan tiket disinkronkan.`,
-    },
-  });
+  const auditAction =
+    mode === "REMOVED"
+      ? "MATERIAL_CONTRACT_DELIVERY_REMOVED"
+      : mode === "PAID"
+        ? "MATERIAL_CONTRACT_INVOICE_PAID"
+        : "MATERIAL_CONTRACT_DELIVERY_RECORDED";
+  const auditNotes =
+    mode === "REMOVED"
+      ? `Surat Jalan ${doNumber} pada kontrak ${contractNumber} dihapus; status pemenuhan tiket disinkronkan ulang.`
+      : mode === "PAID"
+        ? nextStatus === TicketStatus.COMPLETED
+          ? `Tagihan Material Alam ${doNumber} pada kontrak ${contractNumber} telah dibayar lunas oleh Keuangan; tiket selesai.`
+          : `Tagihan Material Alam ${doNumber} pada kontrak ${contractNumber} telah dibayar lunas oleh Keuangan; menunggu pemenuhan item/tagihan tersisa.`
+        : nextStatus === TicketStatus.COMPLETED
+          ? `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; seluruh volume kontrak dan tagihan telah selesai.`
+          : nextStatus === TicketStatus.WAITING_FINANCE_PAYMENT
+            ? `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; seluruh volume kontrak telah tiba dan menunggu tagihan/pembayaran Keuangan.`
+            : `Surat Jalan ${doNumber} untuk kontrak ${contractNumber} dicatat; pemenuhan tiket disinkronkan.`;
+
+  await TicketAuditLog.create(
+    [
+      {
+        _id: randomUUID(),
+        ticketId,
+        userId,
+        action: auditAction,
+        notes: auditNotes,
+        createdAt: new Date(),
+      },
+    ],
+    { session: mongoSession },
+  );
 
   return {
-    ticketNumber: ticket.ticketNumber,
-    title: ticket.title,
-    requesterId: ticket.requesterId,
+    ticketNumber: String(ticket.ticketNumber ?? ""),
+    title: String(ticket.title ?? ""),
+    requesterId: String(ticket.requesterId ?? ""),
     isCompleted: nextStatus === TicketStatus.COMPLETED,
+    isWaitingFinancePayment: nextStatus === TicketStatus.WAITING_FINANCE_PAYMENT,
+    nextStatus,
   };
 }
 
@@ -381,55 +488,64 @@ export async function createMaterialContract(
       : null;
 
   try {
-    const created = await prisma.$transaction(async (tx) => {
+    const mongoose = await connectToMongoDB();
+    const created = await mongoose.connection.transaction(async (mongoSession) => {
       let resolvedVendorId: string | null = data.vendorId?.trim() || null;
       let resolvedVendorName = data.vendorName.trim();
 
       if (resolvedVendorId) {
-        const vendor = await tx.vendor.findUnique({
-          where: { id: resolvedVendorId },
-          select: { id: true, name: true },
-        });
+        const vendor = await Vendor.findById(resolvedVendorId)
+          .session(mongoSession)
+          .select({ _id: 1, name: 1 })
+          .lean();
         if (!vendor) {
           throw new Error("Vendor yang dipilih tidak ditemukan.");
         }
-        resolvedVendorId = vendor.id;
-        resolvedVendorName = vendor.name;
+        resolvedVendorId = String(vendor._id);
+        resolvedVendorName = String(vendor.name ?? resolvedVendorName);
       }
 
       let contractNumber = data.contractNumber?.trim().toUpperCase() || "";
       if (contractNumber) {
-        const duplicate = await tx.materialContract.findUnique({
-          where: { contractNumber },
-          select: { id: true },
-        });
+        const duplicate = await MaterialContract.findOne({ contractNumber })
+          .session(mongoSession)
+          .select({ _id: 1 })
+          .lean();
         if (duplicate) {
           throw new Error(`Nomor kontrak ${contractNumber} sudah digunakan.`);
         }
       } else {
         contractNumber = await generateNextContractNumber(
-          tx,
+          mongoSession,
           normalizedMaterialType,
         );
       }
 
-      return tx.materialContract.create({
-        data: {
-          contractNumber,
-          vendorId: resolvedVendorId,
-          vendorName: resolvedVendorName,
-          materialType: normalizedMaterialType,
-          unitPrice: normalizedUnitPrice,
-          unit: normalizedUnit,
-          estimatedVolume: normalizedEstimatedVolume,
-          notes: data.notes?.trim() || null,
-          startDate,
-          endDate,
-          isActive: true,
-          createdById: session.user.id,
-        },
-        select: { id: true, contractNumber: true },
-      });
+      const newContractId = randomUUID();
+      const now = new Date();
+      await MaterialContract.create(
+        [
+          {
+            _id: newContractId,
+            contractNumber,
+            vendorId: resolvedVendorId,
+            vendorName: resolvedVendorName,
+            materialType: normalizedMaterialType,
+            unitPrice: normalizedUnitPrice,
+            unit: normalizedUnit,
+            estimatedVolume: normalizedEstimatedVolume,
+            notes: data.notes?.trim() || null,
+            startDate,
+            endDate,
+            isActive: true,
+            createdById: session.user.id,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        { session: mongoSession },
+      );
+      return { id: newContractId, contractNumber };
     });
 
     revalidatePath("/apps/logistics");
@@ -467,11 +583,17 @@ export async function toggleMaterialContractActive(
   }
 
   try {
-    const updated = await prisma.materialContract.update({
-      where: { id: contractId },
-      data: { isActive },
-      select: { contractNumber: true, isActive: true },
-    });
+    await connectToMongoDB();
+    const updated = await MaterialContract.findByIdAndUpdate(
+      contractId,
+      { $set: { isActive, updatedAt: new Date() } },
+      { returnDocument: "after" },
+    )
+      .select({ contractNumber: 1, isActive: 1 })
+      .lean();
+    if (!updated) {
+      throw new Error("Kontrak material tidak ditemukan.");
+    }
 
     revalidatePath("/apps/logistics");
     revalidatePath("/apps/finance");
@@ -561,20 +683,22 @@ export async function recordMaterialDelivery(
   const normalizedQty = roundMaterialNumber(data.quantityReceived, 2);
 
   try {
-    const created = await prisma.$transaction(async (tx) => {
+    const mongoose = await connectToMongoDB();
+    const created = await mongoose.connection.transaction(async (mongoSession) => {
       const [contract, project] = await Promise.all([
-        tx.materialContract.findUnique({
-          where: { id: data.contractId },
-          select: {
-            id: true,
-            contractNumber: true,
-            isActive: true,
-          },
-        }),
-        tx.project.findFirst({
-          where: { id: data.projectId, isDeleted: false },
-          select: { id: true },
-        }),
+        MaterialContract.findById(data.contractId)
+          .session(mongoSession)
+          .select({
+            _id: 1,
+            contractNumber: 1,
+            unit: 1,
+            isActive: 1,
+          })
+          .lean(),
+        Project.findOne({ _id: data.projectId, isDeleted: { $ne: true } })
+          .session(mongoSession)
+          .select({ _id: 1 })
+          .lean(),
       ]);
 
       if (!contract) {
@@ -589,118 +713,206 @@ export async function recordMaterialDelivery(
         throw new Error("Proyek tujuan pengiriman tidak ditemukan.");
       }
 
-      const duplicateDo = await tx.materialDelivery.findFirst({
-        where: {
-          contractId: contract.id,
-          doNumber: {
-            equals: normalizedDoNumber,
-            mode: "insensitive",
-          },
+      const duplicateDo = await MaterialDelivery.findOne({
+        contractId: String(contract._id),
+        doNumber: {
+          $regex: new RegExp(`^${escapeRegExp(normalizedDoNumber)}$`, "i"),
         },
-        select: { id: true },
-      });
+      })
+        .session(mongoSession)
+        .select({ _id: 1 })
+        .lean();
       if (duplicateDo) {
         throw new Error(
           `Nomor Surat Jalan "${normalizedDoNumber}" sudah pernah dicatat pada kontrak ${contract.contractNumber}.`,
         );
       }
 
-      let linkedTicketId: string | null = null;
-      if (data.ticketId) {
-        const ticket = await tx.ticket.findUnique({
-          where: { id: data.ticketId },
-          select: {
-            id: true,
-            ticketNumber: true,
-            projectId: true,
-            status: true,
-            items: {
-              select: {
-                id: true,
-                quantity: true,
-                status: true,
-                categoryHint: true,
-                materialContractId: true,
-              },
-            },
+      if (!data.ticketId?.trim()) {
+        throw new Error(
+          "Surat Jalan Material Alam wajib ditautkan ke Tiket dari Tim Lapangan.",
+        );
+      }
+
+      const [ticket, ticketItems] = await Promise.all([
+        Ticket.findOne({
+          _id: data.ticketId,
+          isDeleted: { $ne: true },
+        })
+          .session(mongoSession)
+          .select({
+            _id: 1,
+            ticketNumber: 1,
+            title: 1,
+            type: 1,
+            projectId: 1,
+            status: 1,
+          })
+          .lean(),
+        TicketItem.find({ ticketId: data.ticketId })
+          .session(mongoSession)
+          .select({
+            _id: 1,
+            quantity: 1,
+            status: 1,
+            categoryHint: 1,
+            materialContractId: 1,
+          })
+          .lean(),
+      ]);
+      if (!ticket) {
+        throw new Error("Tiket yang dipilih tidak ditemukan atau telah dihapus.");
+      }
+      if (ticket.type !== TicketType.MATERIAL) {
+        throw new Error(
+          "Surat Jalan Material Alam hanya dapat ditautkan ke Tiket Material.",
+        );
+      }
+      const blockedStatuses: TicketStatus[] = [
+        TicketStatus.DRAFT,
+        TicketStatus.PENDING_DIRECTOR,
+        TicketStatus.REJECTED,
+        TicketStatus.COMPLETED,
+      ];
+      if (blockedStatuses.includes(ticket.status as TicketStatus)) {
+        throw new Error(
+          `Tiket ${ticket.ticketNumber} belum aktif di antrean Logistik atau sudah selesai, sehingga tidak dapat dikaitkan dengan Surat Jalan.`,
+        );
+      }
+      if (String(ticket.projectId ?? "") !== String(project._id)) {
+        throw new Error(
+          `Proyek Surat Jalan harus sama dengan proyek pada tiket ${ticket.ticketNumber}.`,
+        );
+      }
+      const hasContractItem = ticketItems.some(
+        (item) =>
+          item.categoryHint === TicketCategoryHint.CONTRACT &&
+          String(item.materialContractId ?? "") === String(contract._id),
+      );
+      if (!hasContractItem) {
+        throw new Error(
+          `Tiket ${ticket.ticketNumber} tidak memiliki item dari kontrak ${contract.contractNumber}.`,
+        );
+      }
+      const linkedTicketId = String(ticket._id);
+
+      const newDeliveryId = randomUUID();
+      const now = new Date();
+      await MaterialDelivery.create(
+        [
+          {
+            _id: newDeliveryId,
+            contractId: String(contract._id),
+            projectId: String(project._id),
+            ticketId: linkedTicketId,
+            deliveryDate,
+            doNumber: normalizedDoNumber,
+            vehiclePlate: data.vehiclePlate?.trim().toUpperCase() || null,
+            driverName: data.driverName?.trim() || null,
+            quantityReceived: normalizedQty,
+            billingStatus: MaterialDeliveryBillingStatus.UNBILLED,
+            vendorInvoiceId: null,
+            receivedById: session.user.id,
+            proofUrl: uploadedProofUrl,
+            notes: data.notes?.trim() || null,
+            createdAt: now,
+            updatedAt: now,
           },
-        });
-        if (!ticket) {
-          throw new Error("Tiket yang dipilih tidak ditemukan.");
-        }
-        const blockedStatuses: TicketStatus[] = [
-          TicketStatus.DRAFT,
-          TicketStatus.PENDING_DIRECTOR,
-          TicketStatus.REJECTED,
-          TicketStatus.COMPLETED,
-        ];
-        if (blockedStatuses.includes(ticket.status)) {
-          throw new Error(
-            `Tiket ${ticket.ticketNumber} belum disetujui atau sudah selesai, sehingga tidak dapat dikaitkan dengan Surat Jalan.`,
-          );
-        }
-        if (ticket.projectId !== project.id) {
-          throw new Error(
-            `Proyek Surat Jalan harus sama dengan proyek pada tiket ${ticket.ticketNumber}.`,
-          );
-        }
-        const hasContractItem = ticket.items.some(
-          (item) =>
-            item.categoryHint === TicketCategoryHint.CONTRACT &&
-            item.materialContractId === contract.id,
-        );
-        if (!hasContractItem) {
-          throw new Error(
-            `Tiket ${ticket.ticketNumber} tidak memiliki item dari kontrak ${contract.contractNumber}.`,
-          );
-        }
-        linkedTicketId = ticket.id;
-      }
+        ],
+        { session: mongoSession },
+      );
 
-      const createdDelivery = await tx.materialDelivery.create({
-        data: {
-          contractId: contract.id,
-          projectId: project.id,
-          ticketId: linkedTicketId,
-          deliveryDate,
-          doNumber: normalizedDoNumber,
-          vehiclePlate: data.vehiclePlate?.trim().toUpperCase() || null,
-          driverName: data.driverName?.trim() || null,
-          quantityReceived: normalizedQty,
-          billingStatus: MaterialDeliveryBillingStatus.UNBILLED,
-          receivedById: session.user.id,
-          proofUrl: uploadedProofUrl,
-          notes: data.notes?.trim() || null,
-        },
-        select: { id: true, projectId: true },
-      });
+      const synced = await syncContractTicketFulfillment(
+        mongoSession,
+        linkedTicketId,
+        String(contract.contractNumber),
+        session.user.id,
+        normalizedDoNumber,
+        "RECORDED",
+      );
 
-      if (linkedTicketId) {
-        const synced = await syncContractTicketFulfillment(
-          tx,
-          linkedTicketId,
-          contract.contractNumber,
-          session.user.id,
-          normalizedDoNumber,
-          "RECORDED",
-        );
-        if (synced && synced.requesterId !== session.user.id) {
-          await sendNotification({
-            userId: synced.requesterId,
-            title: synced.isCompleted
-              ? "Pengiriman Material Alam Selesai"
+      const [financeUsers, logisticsUsers] = await Promise.all([
+        User.find({
+          isActive: true,
+          role: { $in: FINANCE_DB_ROLES },
+        })
+          .select({ _id: 1 })
+          .session(mongoSession)
+          .lean(),
+        User.find({
+          isActive: true,
+          role: { $in: LOGISTICS_DB_ROLES },
+        })
+          .select({ _id: 1 })
+          .session(mongoSession)
+          .lean(),
+      ]);
+
+      const notificationRows: Array<Record<string, unknown>> = [];
+      const unitLabel = String(contract.unit ?? "");
+      const deliverySummary = `${synced?.ticketNumber ?? ticket.ticketNumber} · ${synced?.title ?? ticket.title} — Surat Jalan ${normalizedDoNumber} (${normalizedQty} ${unitLabel}) pada kontrak ${contract.contractNumber}`;
+
+      if (synced?.requesterId && synced.requesterId !== session.user.id) {
+        notificationRows.push({
+          _id: randomUUID(),
+          userId: synced.requesterId,
+          title: synced.isCompleted
+            ? "Pengiriman Material Alam Selesai"
+            : synced.isWaitingFinancePayment
+              ? "Material Alam Tiba - Menunggu Pembayaran Keuangan"
               : "Surat Jalan Material Alam Dicatat",
-            message: `${synced.ticketNumber} · ${synced.title} — Surat Jalan ${normalizedDoNumber} (${normalizedQty}) telah dicatat pada kontrak ${contract.contractNumber}.`,
-            actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(linkedTicketId)}`,
-            type: synced.isCompleted
-              ? NotificationType.SUCCESS
-              : NotificationType.INFO,
-            database: tx,
-          });
-        }
+          message: synced.isWaitingFinancePayment
+            ? `${deliverySummary} telah tiba seluruhnya dan diteruskan untuk proses tagihan/pembayaran Keuangan.`
+            : `${deliverySummary} telah dicatat.`,
+          actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(linkedTicketId)}`,
+          type: synced.isCompleted
+            ? NotificationType.SUCCESS
+            : NotificationType.INFO,
+          isRead: false,
+          createdAt: now,
+        });
       }
 
-      return createdDelivery;
+      for (const financeUser of financeUsers) {
+        const financeUserId = String(financeUser._id);
+        if (financeUserId === session.user.id) continue;
+        notificationRows.push({
+          _id: randomUUID(),
+          userId: financeUserId,
+          title: "Surat Jalan Material Alam Siap Ditagihkan",
+          message: `${deliverySummary} telah dicatat dan siap ditagihkan/dibayar.`,
+          actionUrl: "/apps/finance?tab=vendor-contracts",
+          type: NotificationType.INFO,
+          isRead: false,
+          createdAt: now,
+        });
+      }
+
+      for (const logisticsUser of logisticsUsers) {
+        const logisticsUserId = String(logisticsUser._id);
+        if (
+          logisticsUserId === session.user.id ||
+          logisticsUserId === synced?.requesterId
+        ) {
+          continue;
+        }
+        notificationRows.push({
+          _id: randomUUID(),
+          userId: logisticsUserId,
+          title: "Surat Jalan Material Alam Dicatat",
+          message: `${deliverySummary} siap disusun ke tagihan vendor.`,
+          actionUrl: "/apps/logistics?tab=bulk-contracts",
+          type: NotificationType.INFO,
+          isRead: false,
+          createdAt: now,
+        });
+      }
+
+      if (notificationRows.length > 0) {
+        await Notification.insertMany(notificationRows, { session: mongoSession });
+      }
+
+      return { id: newDeliveryId, projectId: String(project._id) };
     });
 
     revalidatePath("/apps/logistics");
@@ -740,20 +952,20 @@ export async function deleteUnbilledMaterialDelivery(
   }
 
   try {
-    const existing = await prisma.materialDelivery.findUnique({
-      where: { id: deliveryId },
-      select: {
-        id: true,
-        doNumber: true,
-        projectId: true,
-        ticketId: true,
-        billingStatus: true,
-        vendorInvoiceId: true,
-        receivedById: true,
-        proofUrl: true,
-        contract: { select: { contractNumber: true } },
-      },
-    });
+    const mongoose = await connectToMongoDB();
+    const existing = await MaterialDelivery.findById(deliveryId)
+      .select({
+        _id: 1,
+        contractId: 1,
+        doNumber: 1,
+        projectId: 1,
+        ticketId: 1,
+        billingStatus: 1,
+        vendorInvoiceId: 1,
+        receivedById: 1,
+        proofUrl: 1,
+      })
+      .lean();
     if (!existing) {
       return { success: false, message: "Surat Jalan tidak ditemukan." };
     }
@@ -781,30 +993,40 @@ export async function deleteUnbilledMaterialDelivery(
       };
     }
 
-    const deletedCount = await prisma.$transaction(async (tx) => {
-      const deleted = await tx.materialDelivery.deleteMany({
-        where: {
-          id: existing.id,
-          billingStatus: MaterialDeliveryBillingStatus.UNBILLED,
-          vendorInvoiceId: null,
-        },
-      });
-      if (deleted.count !== 1) {
-        return 0;
-      }
+    const contract = await MaterialContract.findById(existing.contractId)
+      .select({ contractNumber: 1 })
+      .lean();
 
-      if (existing.ticketId) {
-        await syncContractTicketFulfillment(
-          tx,
-          existing.ticketId,
-          existing.contract.contractNumber,
-          session.user.id,
-          existing.doNumber,
-          "REMOVED",
+    const deletedCount = await mongoose.connection.transaction(
+      async (mongoSession) => {
+        const deleted = await MaterialDelivery.deleteOne(
+          {
+            _id: existing._id,
+            billingStatus: MaterialDeliveryBillingStatus.UNBILLED,
+            $or: [
+              { vendorInvoiceId: null },
+              { vendorInvoiceId: { $exists: false } },
+            ],
+          },
+          { session: mongoSession },
         );
-      }
-      return 1;
-    });
+        if (deleted.deletedCount !== 1) {
+          return 0;
+        }
+
+        if (existing.ticketId) {
+          await syncContractTicketFulfillment(
+            mongoSession,
+            String(existing.ticketId),
+            String(contract?.contractNumber ?? "-"),
+            session.user.id,
+            String(existing.doNumber ?? ""),
+            "REMOVED",
+          );
+        }
+        return 1;
+      },
+    );
     if (deletedCount !== 1) {
       return {
         success: false,
@@ -839,10 +1061,10 @@ export async function getUnbilledDeliveriesForContract(
   deliveries: MaterialDeliveryRow[];
 }> {
   const session = await auth();
-  if (!session?.user?.id || !canBillAndPayVendorContracts(session.user.role)) {
+  if (!session?.user?.id || !canPrepareVendorInvoices(session.user.role)) {
     return {
       success: false,
-      message: "Akses Keuangan diperlukan untuk memuat daftar Surat Jalan belum ditagih.",
+      message: "Akses Logistik atau Keuangan diperlukan untuk memuat daftar Surat Jalan belum ditagih.",
       deliveries: [],
     };
   }
@@ -903,10 +1125,9 @@ export async function getUnbilledDeliveriesForContract(
             .lean()
         : Promise.resolve([]),
       ticketIds.length
-        ? prisma.ticket.findMany({
-            where: { id: { in: ticketIds } },
-            select: { id: true, ticketNumber: true },
-          })
+        ? Ticket.find({ _id: { $in: ticketIds } })
+            .select({ _id: 1, ticketNumber: 1 })
+            .lean()
         : Promise.resolve([]),
     ]);
     const projectsById = new Map(
@@ -916,52 +1137,54 @@ export async function getUnbilledDeliveriesForContract(
       receivers.map((receiver) => [String(receiver._id), receiver]),
     );
     const ticketNumbersById = new Map(
-      linkedTickets.map((ticket) => [ticket.id, ticket.ticketNumber]),
+      linkedTickets.map((ticket) => [
+        String(ticket._id),
+        String(ticket.ticketNumber ?? ""),
+      ]),
     );
 
     return {
       success: true,
       deliveries: rows.map((delivery) => {
         const project = projectsById.get(delivery.projectId);
-        if (!project) {
-          throw new Error(`Proyek pengiriman ${delivery.projectId} tidak ditemukan.`);
-        }
         const receiver = delivery.receivedById
           ? receiversById.get(delivery.receivedById)
           : null;
         return {
-            id: String(delivery._id),
-            contractId: delivery.contractId,
-            contractNumber: contract.contractNumber,
-            vendorName: contract.vendorName,
-            materialType: contract.materialType,
-            unitPrice: contract.unitPrice,
-            unit: contract.unit,
-            projectId: delivery.projectId,
-            projectName: `${project.kelompokTani} · ${project.title}`,
-            ticketId: delivery.ticketId ?? null,
-            ticketNumber: delivery.ticketId
-              ? (ticketNumbersById.get(delivery.ticketId) ?? null)
-              : null,
-            deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
-            doNumber: delivery.doNumber,
-            vehiclePlate: delivery.vehiclePlate ?? null,
-            driverName: delivery.driverName ?? null,
-            quantityReceived: roundMaterialNumber(delivery.quantityReceived, 2),
-            estimatedAmount: calculateContractDeliverySubtotal(
-              delivery.quantityReceived,
-              contract.unitPrice,
-            ),
-            billingStatus: delivery.billingStatus,
-            vendorInvoiceId: null,
-            vendorInvoiceNumber: null,
-            receivedById: delivery.receivedById ?? null,
-            receivedByName: receiver?.name ?? null,
-            proofUrl: delivery.proofUrl ?? null,
-            notes: delivery.notes ?? null,
-            createdAt: delivery.createdAt.toISOString(),
-          };
-        }),
+          id: String(delivery._id),
+          contractId: delivery.contractId,
+          contractNumber: contract.contractNumber,
+          vendorName: contract.vendorName,
+          materialType: contract.materialType,
+          unitPrice: contract.unitPrice,
+          unit: contract.unit,
+          projectId: delivery.projectId,
+          projectName: project
+            ? `${project.kelompokTani} · ${project.title}`
+            : "Proyek tidak ditemukan",
+          ticketId: delivery.ticketId ?? null,
+          ticketNumber: delivery.ticketId
+            ? (ticketNumbersById.get(delivery.ticketId) ?? null)
+            : null,
+          deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
+          doNumber: delivery.doNumber,
+          vehiclePlate: delivery.vehiclePlate ?? null,
+          driverName: delivery.driverName ?? null,
+          quantityReceived: roundMaterialNumber(delivery.quantityReceived, 2),
+          estimatedAmount: calculateContractDeliverySubtotal(
+            delivery.quantityReceived,
+            contract.unitPrice,
+          ),
+          billingStatus: delivery.billingStatus,
+          vendorInvoiceId: null,
+          vendorInvoiceNumber: null,
+          receivedById: delivery.receivedById ?? null,
+          receivedByName: receiver?.name ?? null,
+          proofUrl: delivery.proofUrl ?? null,
+          notes: delivery.notes ?? null,
+          createdAt: delivery.createdAt.toISOString(),
+        };
+      }),
     };
   } catch (error) {
     console.error("Query unbilled deliveries error:", error);
@@ -980,10 +1203,10 @@ export async function createVendorInvoiceFromDeliveries(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan login terlebih dahulu." };
   }
-  if (!canBillAndPayVendorContracts(session.user.role)) {
+  if (!canPrepareVendorInvoices(session.user.role)) {
     return {
       success: false,
-      message: "Hanya Keuangan, Administrasi, atau Direksi yang dapat menerbitkan tagihan vendor.",
+      message: "Hanya Logistik, Keuangan, Administrasi, atau Direksi yang dapat menerbitkan tagihan vendor.",
     };
   }
 
@@ -1033,7 +1256,7 @@ export async function createVendorInvoiceFromDeliveries(
         vendorInvoiceId: null,
       })
         .session(mongoSession)
-        .select({ _id: 1, projectId: 1, quantityReceived: 1 })
+        .select({ _id: 1, projectId: 1, ticketId: 1, quantityReceived: 1 })
         .lean();
       if (deliveries.length !== uniqueDeliveryIds.length) {
         throw new Error(
@@ -1113,6 +1336,33 @@ export async function createVendorInvoiceFromDeliveries(
         );
       }
 
+      const now = new Date();
+      const financeUsers = await User.find({
+        isActive: true,
+        role: { $in: FINANCE_DB_ROLES },
+      })
+        .select({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+      const financeNotifications = financeUsers
+        .map((user) => String(user._id))
+        .filter((financeUserId) => financeUserId !== session.user.id)
+        .map((financeUserId) => ({
+          _id: randomUUID(),
+          userId: financeUserId,
+          title: "Tagihan Kontrak Material Alam Siap Dibayar",
+          message: `Tagihan ${invoiceNumber} (${uniqueDeliveryIds.length} Surat Jalan · ${totalQuantity} ${contract.unit} · Rp${Math.round(grandTotal).toLocaleString("id-ID")}) untuk ${contract.vendorName} (${contract.contractNumber}) menunggu pembayaran Keuangan.`,
+          type: NotificationType.APPROVAL,
+          actionUrl: `/apps/finance?tab=vendor-contracts&openInvoice=${encodeURIComponent(invoiceId)}`,
+          isRead: false,
+          createdAt: now,
+        }));
+      if (financeNotifications.length > 0) {
+        await Notification.insertMany(financeNotifications, {
+          session: mongoSession,
+        });
+      }
+
       return {
         invoiceId,
         invoiceNumber,
@@ -1125,6 +1375,7 @@ export async function createVendorInvoiceFromDeliveries(
 
     revalidatePath("/apps/finance");
     revalidatePath("/apps/logistics");
+    revalidatePath("/apps/tickets");
     for (const projectId of created.projectIds) {
       revalidatePath(`/apps/projects/${projectId}`);
     }
@@ -1276,7 +1527,7 @@ export async function payVendorInvoice(input: {
         vendorInvoiceId,
       })
         .session(mongoSession)
-        .select({ projectId: 1 })
+        .select({ projectId: 1, ticketId: 1, doNumber: 1 })
         .lean();
       const projectIds = Array.from(
         new Set(invoiceDeliveries.map((delivery) => delivery.projectId)),
@@ -1372,23 +1623,122 @@ export async function payVendorInvoice(input: {
         );
       }
 
-      if (contract.createdById && contract.createdById !== session.user.id) {
-        await Notification.create(
-          [
-            {
-              _id: randomUUID(),
-              userId: contract.createdById,
-              title: isSettled
-                ? `Tagihan Kontrak ${invoice.invoiceNumber} Lunas`
-                : `Pembayaran ${paymentTypeLabel} Kontrak ${invoice.invoiceNumber}`,
-              message: `Keuangan telah memproses ${paymentTypeLabel.toLowerCase()} sebesar Rp${Math.round(paymentAmount).toLocaleString("id-ID")} untuk ${contract.vendorName} (${contract.contractNumber}).`,
-              type: isSettled ? NotificationType.SUCCESS : NotificationType.INFO,
-              actionUrl: "/apps/logistics?tab=bulk-contracts",
-              createdAt: now,
-            },
-          ],
-          { session: mongoSession },
-        );
+      const deliveryDosByTicketId = new Map<string, string[]>();
+      for (const delivery of invoiceDeliveries) {
+        if (!delivery.ticketId) continue;
+        const ticketIdKey = String(delivery.ticketId);
+        const list = deliveryDosByTicketId.get(ticketIdKey) ?? [];
+        if (delivery.doNumber) list.push(String(delivery.doNumber));
+        deliveryDosByTicketId.set(ticketIdKey, list);
+      }
+
+      const notificationRows: Array<Record<string, unknown>> = [];
+      const syncedRequesterIds = new Map<
+        string,
+        {
+          ticketId: string;
+          requesterId: string;
+          ticketNumber: string;
+          title: string;
+          isCompleted: boolean;
+        }
+      >();
+
+      if (isSettled) {
+        for (const [linkedTicketId, doNumbers] of deliveryDosByTicketId) {
+          const synced = await syncContractTicketFulfillment(
+            mongoSession,
+            linkedTicketId,
+            String(contract.contractNumber),
+            session.user.id,
+            `${invoice.invoiceNumber} (${doNumbers.join(", ") || "-"})`,
+            "PAID",
+          );
+          if (synced && synced.requesterId && synced.requesterId !== session.user.id) {
+            syncedRequesterIds.set(linkedTicketId, {
+              ticketId: linkedTicketId,
+              requesterId: synced.requesterId,
+              ticketNumber: synced.ticketNumber,
+              title: synced.title,
+              isCompleted: synced.isCompleted,
+            });
+          }
+        }
+      }
+
+      const logisticsUsers = await User.find({
+        isActive: true,
+        role: { $in: LOGISTICS_DB_ROLES },
+      })
+        .select({ _id: 1 })
+        .session(mongoSession)
+        .lean();
+
+      const logisticsRecipientIds = new Set<string>(
+        logisticsUsers.map((user) => String(user._id)),
+      );
+      if (contract.createdById) {
+        logisticsRecipientIds.add(String(contract.createdById));
+      }
+      if (invoice.processedById) {
+        logisticsRecipientIds.add(String(invoice.processedById));
+      }
+
+      for (const {
+        ticketId: linkedTicketId,
+        requesterId,
+        ticketNumber,
+        title,
+        isCompleted,
+      } of syncedRequesterIds.values()) {
+        notificationRows.push({
+          _id: randomUUID(),
+          userId: requesterId,
+          title: isCompleted
+            ? "Tiket Material Alam Selesai & Lunas"
+            : `Tagihan Material Alam ${invoice.invoiceNumber} Lunas`,
+          message: isCompleted
+            ? `${ticketNumber} · ${title} — seluruh tagihan Material Alam (${invoice.invoiceNumber}) telah dibayar lunas oleh Keuangan.`
+            : `${ticketNumber} · ${title} — tagihan ${invoice.invoiceNumber} telah dibayar lunas oleh Keuangan; menunggu pemenuhan item/tagihan tersisa.`,
+          type: NotificationType.SUCCESS,
+          actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(linkedTicketId)}`,
+          isRead: false,
+          createdAt: now,
+        });
+      }
+
+      const notifiedRequesters = new Set(
+        notificationRows.map((row) => String(row.userId)),
+      );
+      for (const recipientId of logisticsRecipientIds) {
+        if (
+          !recipientId ||
+          recipientId === session.user.id ||
+          notifiedRequesters.has(recipientId)
+        ) {
+          continue;
+        }
+        notificationRows.push({
+          _id: randomUUID(),
+          userId: recipientId,
+          title: isSettled
+            ? `Tagihan Kontrak ${invoice.invoiceNumber} Lunas`
+            : `Pembayaran ${paymentTypeLabel} Kontrak ${invoice.invoiceNumber}`,
+          message: `Keuangan telah memproses ${paymentTypeLabel.toLowerCase()} sebesar Rp${Math.round(paymentAmount).toLocaleString("id-ID")} untuk ${contract.vendorName} (${contract.contractNumber}).`,
+          type: isSettled ? NotificationType.SUCCESS : NotificationType.INFO,
+          actionUrl: "/apps/logistics?tab=bulk-contracts",
+          isRead: false,
+          createdAt: now,
+        });
+      }
+
+      const validNotifications = notificationRows.filter(
+        (row) => typeof row.userId === "string" && row.userId.length > 0,
+      );
+      if (validNotifications.length > 0) {
+        await Notification.insertMany(validNotifications, {
+          session: mongoSession,
+        });
       }
 
       return {
@@ -1401,6 +1751,8 @@ export async function payVendorInvoice(input: {
 
     revalidatePath("/apps/finance");
     revalidatePath("/apps/logistics");
+    revalidatePath("/apps/tickets");
+    revalidatePath("/apps/projects");
     for (const projectId of result.projectIds) {
       revalidatePath(`/apps/projects/${projectId}`);
     }

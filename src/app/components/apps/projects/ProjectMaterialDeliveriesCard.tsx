@@ -4,15 +4,22 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Layers, Plus, Trash2, Truck } from "lucide-react";
 import { UserRole } from "@prisma/client";
+import { toast } from "sonner";
 import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts";
+import MaterialDeliveryModal, {
+  type DeliveryProjectOption,
+} from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
+import MaterialDeliveryProofModal from "@/app/components/apps/material-contracts/MaterialDeliveryProofModal";
 import {
-  canRecordMaterialDeliveries,
-  formatMaterialVolume,
-  type ContractTicketDeliveryOption,
-  type MaterialContractRow,
-  type MaterialDeliveryRow,
-} from "@/lib/material-contracts";
-import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -30,10 +38,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import MaterialDeliveryModal, {
-  type DeliveryProjectOption,
-} from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
-import MaterialDeliveryProofModal from "@/app/components/apps/material-contracts/MaterialDeliveryProofModal";
+import {
+  canRecordMaterialDeliveries,
+  formatMaterialVolume,
+  type ContractTicketDeliveryOption,
+  type MaterialContractRow,
+  type MaterialDeliveryRow,
+} from "@/lib/material-contracts";
+import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 
 function currency(amount: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -61,8 +73,8 @@ export default function ProjectMaterialDeliveriesCard({
   const [preview, setPreview] = useState<{ title: string; url: string } | null>(
     null,
   );
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [pendingDeleteDelivery, setPendingDeleteDelivery] =
+    useState<MaterialDeliveryRow | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const canRecord = canRecordMaterialDeliveries(currentUserRole);
@@ -75,24 +87,18 @@ export default function ProjectMaterialDeliveriesCard({
     0,
   );
 
-  const handleDelete = (delivery: MaterialDeliveryRow) => {
-    if (
-      !window.confirm(
-        `Hapus Surat Jalan ${delivery.doNumber} (${formatMaterialVolume(delivery.quantityReceived, delivery.unit)})?`,
-      )
-    ) {
-      return;
-    }
-
-    setMessage("");
-    setIsError(false);
+  const confirmDelete = () => {
+    if (!pendingDeleteDelivery) return;
+    const deliveryId = pendingDeleteDelivery.id;
     startTransition(async () => {
-      const result = await deleteUnbilledMaterialDelivery(delivery.id);
-      setMessage(result.message);
-      setIsError(!result.success);
+      const result = await deleteUnbilledMaterialDelivery(deliveryId);
       if (result.success) {
+        toast.success(result.message || "Surat jalan berhasil dihapus.");
+        setPendingDeleteDelivery(null);
         requestNotificationFeedRefresh();
         router.refresh();
+      } else {
+        toast.error(result.message || "Gagal menghapus surat jalan.");
       }
     });
   };
@@ -101,13 +107,13 @@ export default function ProjectMaterialDeliveriesCard({
     <Card className="border-border/80 shadow-2xs">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle className="flex items-center gap-2 text-base font-bold">
-            <Layers className="size-4 text-primary" />
-            Penerimaan Material Curah (Kontrak Payung / Surat Jalan DO)
+          <CardTitle className="type-h2 flex items-center gap-2">
+            <Layers className="size-4 text-primary" aria-hidden="true" />
+            Penerimaan Material Curah (Surat Jalan DO)
           </CardTitle>
-          <CardDescription className="text-xs">
-            Catat kedatangan truk pasir, batu, sirtu, atau tanah urug di lokasi
-            proyek ini berdasarkan Kontrak Payung vendor.
+          <CardDescription className="type-p3">
+            Catat kedatangan truk pasir, batu, sirtu, atau tanah urug berdasarkan
+            Kontrak Payung vendor.
           </CardDescription>
         </div>
         {canRecord && (
@@ -117,61 +123,46 @@ export default function ProjectMaterialDeliveriesCard({
             onClick={() => setModalOpen(true)}
             className="shrink-0 gap-1.5"
           >
-            <Plus className="size-4" />
-            Catat Surat Jalan (DO)
+            <Plus className="size-4" aria-hidden="true" />
+            Catat Surat Jalan
           </Button>
         )}
       </CardHeader>
 
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Total DO Masuk ke Proyek
+          <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+            <p className="type-p3 font-medium text-muted-foreground">
+              Total DO Masuk
             </p>
-            <p className="mt-0.5 text-lg font-bold">{deliveries.length} DO</p>
+            <p className="type-kpi mt-0.5 text-foreground">
+              {deliveries.length} DO
+            </p>
           </div>
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
-            <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+          <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
+            <p className="type-p3 font-medium text-warning">
               Status Penagihan Vendor
             </p>
-            <p className="mt-0.5 text-sm font-bold">
+            <p className="type-p1 mt-1 font-bold text-foreground tabular-nums">
               {unbilledCount} Unbilled · {billedCount} Billed
             </p>
           </div>
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
-            <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+          <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
+            <p className="type-p3 font-medium text-success">
               Akumulasi Nilai Kontrak
             </p>
-            <p className="mt-0.5 text-lg font-bold text-emerald-700 dark:text-emerald-300">
+            <p className="type-kpi mt-0.5 text-success">
               {currency(totalEstimated)}
             </p>
           </div>
         </div>
 
-        {message && (
-          <div
-            className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-              isError
-                ? "border-destructive/40 bg-destructive/10 text-destructive"
-                : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-
         {deliveries.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border py-10 text-center">
-            <Truck className="mx-auto size-8 text-muted-foreground/60" />
-            <p className="mt-2 text-sm font-semibold text-foreground">
-              Belum ada pengiriman material curah tercatat
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Tim lapangan atau Logistik dapat mencatat setiap kedatangan truk
-              pasir/batu beserta foto Surat Jalan fisik.
-            </p>
-          </div>
+          <EmptyState
+            icon={Truck}
+            title="Belum ada pengiriman material curah"
+            description="Tim lapangan atau Logistik dapat mencatat setiap kedatangan truk pasir/batu beserta foto Surat Jalan fisik."
+          />
         ) : (
           <>
             {/* Mobile Card View (< 768px) */}
@@ -179,56 +170,57 @@ export default function ProjectMaterialDeliveriesCard({
               {deliveries.map((delivery) => (
                 <div
                   key={delivery.id}
-                  className="space-y-2 rounded-lg border border-border/80 bg-card p-3"
+                  className="space-y-2.5 rounded-xl border border-border bg-card p-3.5"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-mono text-xs font-bold text-primary">
+                        <span className="type-p2 font-mono font-bold text-primary">
                           {delivery.doNumber}
                         </span>
                         {delivery.ticketNumber && (
-                          <Badge variant="outline" className="text-[10px]">
-                            {delivery.ticketNumber}
-                          </Badge>
+                          <Badge variant="outline">{delivery.ticketNumber}</Badge>
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs font-medium text-foreground">
+                      <p className="type-p2 mt-0.5 font-medium text-foreground">
                         {delivery.materialType} · {delivery.vendorName}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="type-p3 text-muted-foreground">
                         {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
                         {delivery.driverName ? ` (${delivery.driverName})` : ""}
                       </p>
                     </div>
-                    {delivery.billingStatus === "BILLED" ? (
-                      <Badge variant="success" className="shrink-0 text-[10px]">
-                        BILLED
-                      </Badge>
-                    ) : (
-                      <Badge variant="warning" className="shrink-0 text-[10px]">
-                        UNBILLED
-                      </Badge>
-                    )}
+                    <Badge
+                      variant={
+                        delivery.billingStatus === "BILLED"
+                          ? "success"
+                          : "warning"
+                      }
+                      className="shrink-0"
+                    >
+                      {delivery.billingStatus}
+                    </Badge>
                   </div>
-                  <div className="flex items-center justify-between rounded-md bg-muted/30 p-2 text-xs">
-                    <span className="font-semibold text-foreground">
+
+                  <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
+                    <span className="type-p2 font-semibold text-foreground tabular-nums">
                       {formatMaterialVolume(
                         delivery.quantityReceived,
                         delivery.unit,
                       )}
                     </span>
-                    <span className="font-mono font-bold text-foreground">
+                    <span className="type-p2 font-mono font-bold text-foreground tabular-nums">
                       {currency(delivery.estimatedAmount)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-end gap-1.5 pt-0.5">
+
+                  <div className="flex items-center justify-end gap-2 pt-0.5">
                     {delivery.proofUrl && (
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-7 gap-1 px-2 text-xs"
+                        className="gap-1.5"
                         onClick={() =>
                           setPreview({
                             title: `Surat Jalan ${delivery.doNumber}`,
@@ -236,7 +228,7 @@ export default function ProjectMaterialDeliveriesCard({
                           })
                         }
                       >
-                        <Eye className="size-3" />
+                        <Eye className="size-3.5" aria-hidden="true" />
                         Surat Jalan
                       </Button>
                     )}
@@ -246,10 +238,10 @@ export default function ProjectMaterialDeliveriesCard({
                         size="sm"
                         variant="outline"
                         disabled={isPending}
-                        className="h-7 gap-1 px-2 text-xs text-destructive"
-                        onClick={() => handleDelete(delivery)}
+                        className="gap-1.5 text-destructive hover:text-destructive"
+                        onClick={() => setPendingDeleteDelivery(delivery)}
                       >
-                        <Trash2 className="size-3" />
+                        <Trash2 className="size-3.5" aria-hidden="true" />
                         Hapus
                       </Button>
                     )}
@@ -259,114 +251,118 @@ export default function ProjectMaterialDeliveriesCard({
             </div>
 
             {/* Desktop Table View (>= 768px) */}
-            <div className="hidden overflow-x-auto rounded-lg border border-border/80 md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>No. DO &amp; Truk</TableHead>
-                  <TableHead>Kontrak &amp; Vendor</TableHead>
-                  <TableHead className="text-right">Volume</TableHead>
-                  <TableHead className="text-right">Nilai Kontrak</TableHead>
-                  <TableHead>Penagihan</TableHead>
-                  <TableHead className="text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {deliveries.map((delivery) => (
-                  <TableRow key={delivery.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {delivery.deliveryDate}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
-                        <span>{delivery.doNumber}</span>
-                        {delivery.ticketNumber && (
-                          <Badge variant="outline" className="text-[10px] font-medium">
-                            {delivery.ticketNumber}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {delivery.vehiclePlate || "-"}
-                        {delivery.driverName ? ` · ${delivery.driverName}` : ""}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5 text-xs font-medium">
-                        <Badge variant="outline" className="text-[10px]">
-                          {delivery.materialType}
-                        </Badge>
-                        <span>{delivery.vendorName}</span>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {delivery.contractNumber}
-                      </div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-xs font-semibold">
-                      {formatMaterialVolume(
-                        delivery.quantityReceived,
-                        delivery.unit,
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-xs font-medium">
-                      {currency(delivery.estimatedAmount)}
-                    </TableCell>
-                    <TableCell>
-                      {delivery.billingStatus === "BILLED" ? (
-                        <div className="space-y-0.5">
-                          <Badge variant="success" className="text-[10px]">
-                            BILLED
-                          </Badge>
-                          {delivery.vendorInvoiceNumber && (
-                            <p className="text-[10px] font-medium text-muted-foreground">
-                              {delivery.vendorInvoiceNumber}
-                            </p>
+            <div className="hidden md:block">
+              <Table pagination={false}>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>No. DO &amp; Truk</TableHead>
+                    <TableHead>Kontrak &amp; Vendor</TableHead>
+                    <TableHead className="text-right">Volume</TableHead>
+                    <TableHead className="text-right">Nilai Kontrak</TableHead>
+                    <TableHead>Penagihan</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deliveries.map((delivery) => (
+                    <TableRow key={delivery.id}>
+                      <TableCell className="type-p3 whitespace-nowrap tabular-nums">
+                        {delivery.deliveryDate}
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
+                        <div className="type-p2 flex flex-wrap items-center gap-1.5 font-semibold">
+                          <span>{delivery.doNumber}</span>
+                          {delivery.ticketNumber && (
+                            <Badge variant="outline">
+                              {delivery.ticketNumber}
+                            </Badge>
                           )}
                         </div>
-                      ) : (
-                        <Badge variant="warning" className="text-[10px]">
-                          UNBILLED
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {delivery.proofUrl && (
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            title="Lihat Bukti Surat Jalan"
-                            onClick={() =>
-                              setPreview({
-                                title: `Surat Jalan ${delivery.doNumber}`,
-                                url: delivery.proofUrl!,
-                              })
-                            }
-                          >
-                            <Eye className="size-3.5" />
-                          </Button>
+                        <p className="type-p3 text-muted-foreground">
+                          {delivery.vehiclePlate || "-"}
+                          {delivery.driverName
+                            ? ` · ${delivery.driverName}`
+                            : ""}
+                        </p>
+                      </TableCell>
+                      <TableCell className="whitespace-normal">
+                        <div className="type-p2 flex items-center gap-1.5 font-medium">
+                          <Badge variant="outline">{delivery.materialType}</Badge>
+                          <span>{delivery.vendorName}</span>
+                        </div>
+                        <p className="type-p3 text-muted-foreground">
+                          {delivery.contractNumber}
+                        </p>
+                      </TableCell>
+                      <TableCell className="type-p2 whitespace-nowrap text-right font-semibold tabular-nums">
+                        {formatMaterialVolume(
+                          delivery.quantityReceived,
+                          delivery.unit,
                         )}
-                        {canRecord && delivery.billingStatus === "UNBILLED" && (
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="outline"
-                            disabled={isPending}
-                            title="Hapus DO belum ditagih"
-                            onClick={() => handleDelete(delivery)}
-                          >
-                            <Trash2 className="size-3.5 text-destructive" />
-                          </Button>
+                      </TableCell>
+                      <TableCell className="type-p2 whitespace-nowrap text-right font-medium tabular-nums">
+                        {currency(delivery.estimatedAmount)}
+                      </TableCell>
+                      <TableCell>
+                        {delivery.billingStatus === "BILLED" ? (
+                          <div className="space-y-0.5">
+                            <Badge variant="success">BILLED</Badge>
+                            {delivery.vendorInvoiceNumber && (
+                              <p className="type-p3 font-medium text-muted-foreground">
+                                {delivery.vendorInvoiceNumber}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="warning">UNBILLED</Badge>
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {delivery.proofUrl && (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              aria-label="Lihat bukti surat jalan"
+                              title="Lihat Bukti Surat Jalan"
+                              onClick={() =>
+                                setPreview({
+                                  title: `Surat Jalan ${delivery.doNumber}`,
+                                  url: delivery.proofUrl!,
+                                })
+                              }
+                            >
+                              <Eye className="size-4" aria-hidden="true" />
+                            </Button>
+                          )}
+                          {canRecord &&
+                            delivery.billingStatus === "UNBILLED" && (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="outline"
+                                disabled={isPending}
+                                aria-label="Hapus DO belum ditagih"
+                                title="Hapus DO belum ditagih"
+                                onClick={() =>
+                                  setPendingDeleteDelivery(delivery)
+                                }
+                              >
+                                <Trash2
+                                  className="size-4 text-destructive"
+                                  aria-hidden="true"
+                                />
+                              </Button>
+                            )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </>
         )}
       </CardContent>
@@ -384,6 +380,36 @@ export default function ProjectMaterialDeliveriesCard({
         preview={preview}
         onClose={() => setPreview(null)}
       />
+
+      <AlertDialog
+        open={pendingDeleteDelivery !== null}
+        onOpenChange={(open) => {
+          if (!open && !isPending) setPendingDeleteDelivery(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Surat Jalan (DO)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteDelivery
+                ? `Hapus Surat Jalan ${pendingDeleteDelivery.doNumber} (${formatMaterialVolume(pendingDeleteDelivery.quantityReceived, pendingDeleteDelivery.unit)})? Tindakan ini tidak dapat dibatalkan.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                confirmDelete();
+              }}
+            >
+              {isPending ? "Menghapus..." : "Ya, Hapus DO"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

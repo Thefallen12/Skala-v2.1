@@ -6,36 +6,34 @@ import {
   useRef,
   useState,
   useTransition,
-  type ChangeEvent,
   type FormEvent,
 } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Boxes,
-  ClipboardList,
   CircleDollarSign,
+  ClipboardList,
   Copy,
   Download,
   ExternalLink,
   Eye,
   FileUp,
   MoreHorizontal,
-  Pencil,
   PackageOpen,
+  Pencil,
   Plus,
   Search,
+  ShoppingBag,
   Trash2,
   Truck,
   Upload,
-  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import CardBox from "@/app/components/shared/CardBox";
 import TicketListing from "@/app/components/apps/tickets/TicketListing";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import type {
   ContractTicketDeliveryOption,
@@ -52,9 +50,7 @@ import type {
 } from "@/app/(DashboardLayout)/types/ticket";
 import { TicketRequestCategory, TicketStatus } from "@prisma/client";
 import { getCountableTickets } from "./ticket-statistics";
-import {
-  MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS,
-} from "@/lib/direct-stock-purchase-photo-config";
+import { MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS } from "@/lib/direct-stock-purchase-photo-config";
 import { getJakartaDateKey, shiftDateKey } from "@/lib/habit-date";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import { compressFieldImageFile } from "@/lib/image-compression-client";
@@ -67,9 +63,6 @@ import {
 } from "@/app/actions/tickets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { FormLabel, Label } from "@/components/ui/label";
-import { GlobalModal } from "@/components/ui/global-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,11 +70,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FileDropzone } from "@/components/ui/file-dropzone";
+import { GlobalModal } from "@/components/ui/global-modal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -110,14 +103,14 @@ const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 const statusLabels: Record<TicketRow["status"], string> = {
   [TicketStatus.DRAFT]: "Draf",
-  [TicketStatus.PENDING_DIRECTOR]: "Menunggu persetujuan Direktur",
-  PENDING_LOGISTIK: "Menunggu diproses Logistik",
+  [TicketStatus.PENDING_DIRECTOR]: "Menunggu Direktur",
+  PENDING_LOGISTIK: "Menunggu Logistik",
   [TicketStatus.APPROVED_DIR]: "Disetujui Direktur",
   [TicketStatus.PROCESSED_FINANCE]: "Diproses Finance",
   [TicketStatus.PROCESSED_LOGISTIC]: "Diproses Logistik",
   [TicketStatus.ASSIGNED_TO_MOVER]: "Ditugaskan ke Mover",
-  [TicketStatus.IN_TRANSIT]: "Dalam perjalanan (ekspedisi)",
-  [TicketStatus.WAITING_FINANCE_PAYMENT]: "Menunggu pembayaran Finance",
+  [TicketStatus.IN_TRANSIT]: "Dalam Perjalanan",
+  [TicketStatus.WAITING_FINANCE_PAYMENT]: "Menunggu Finance",
   [TicketStatus.COMPLETED]: "Selesai",
   [TicketStatus.REJECTED]: "Ditolak",
 };
@@ -192,133 +185,6 @@ type DirectStockPurchaseRow = {
   ticket: { id: string; ticketNumber: string; title: string } | null;
 };
 
-function DirectPurchaseInvoiceAction({
-  purchase,
-  onPreview,
-}: {
-  purchase: DirectStockPurchaseRow;
-  onPreview: (url: string, label: string) => void;
-}) {
-  const router = useRouter();
-  const invoicePhotoInput = useRef<HTMLInputElement>(null);
-  const [documentPhoto, setDocumentPhoto] = useState<File | null>(null);
-  const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
-  const inputId = `direct-purchase-invoice-${purchase.id}`;
-
-  const saveDocument = () => {
-    if (!documentPhoto) {
-      setMessage("Pilih foto invoice/bon terlebih dahulu.");
-      return;
-    }
-    setMessage("");
-    startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.set("purchaseId", purchase.id);
-        formData.set("invoicePhoto", documentPhoto, documentPhoto.name);
-        const result = await submitDirectStockPurchaseInvoice(formData);
-        setMessage(result.message);
-        if (result.success) {
-          setDocumentPhoto(null);
-          requestNotificationFeedRefresh();
-          router.refresh();
-        }
-      } catch (error) {
-        console.error("Saving direct purchase invoice failed:", error);
-        setMessage("Invoice/bon gagal disimpan. Coba kembali.");
-      }
-    });
-  };
-
-  const invoiceUrl = purchase.vendorInvoiceUrl;
-  if (invoiceUrl) {
-    return (
-      <ActionIconButton
-        type="button"
-        label={`Lihat invoice/bon faktur pembelian ${purchase.purchaseNumber}`}
-        tooltip="Lihat Invoice/Bon"
-        icon={ExternalLink}
-        onClick={() =>
-          onPreview(
-            invoiceUrl,
-            `${purchase.purchaseNumber} · Invoice / BON Faktur`,
-          )
-        }
-      />
-    );
-  }
-  if (!purchase.isApprovedByDirector) {
-    return null;
-  }
-  if (purchase.status !== "PENDING_RECEIPT") {
-    return null;
-  }
-
-  return (
-    <div className="space-y-2">
-      <FormLabel htmlFor={inputId} className="relative block space-y-1">
-        <span className="text-xs font-medium">Foto Invoice / BON Faktur</span>
-        <input
-          id={inputId}
-          ref={invoicePhotoInput}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="sr-only"
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0] ?? null;
-            setDocumentPhoto(file);
-            setMessage(file ? `${file.name} dipilih.` : "");
-          }}
-          disabled={isPending}
-          aria-label="Pilih foto Invoice atau BON Faktur"
-        />
-      </FormLabel>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => invoicePhotoInput.current?.click()}
-          disabled={isPending}
-        >
-          <Upload aria-hidden="true" />
-          {documentPhoto ? "Ganti Foto Invoice/Bon" : "Unggah Invoice/Bon"}
-        </Button>
-        <InvoiceFilePreview
-          file={documentPhoto}
-          title={`Pratinjau Invoice / BON · ${purchase.purchaseNumber}`}
-          label="Pratinjau invoice atau bon"
-          tooltip="Pratinjau Invoice / Bon"
-        />
-      </div>
-      {documentPhoto && (
-        <Button
-          type="button"
-          size="sm"
-          onClick={saveDocument}
-          disabled={isPending}
-        >
-          {isPending
-            ? "Mengunggah dan mengirim..."
-            : "Simpan & Kirim ke Keuangan"}
-        </Button>
-      )}
-      {message && (
-        <p className="max-w-48 text-xs text-muted-foreground" role="status">
-          {message}
-        </p>
-      )}
-    </div>
-  );
-}
-
-type ReceivingPhoto = {
-  id: string;
-  file: File;
-  previewUrl: string;
-};
-
 type PurchaseTicketOption = {
   id: string;
   ticketNumber: string;
@@ -341,6 +207,246 @@ type LogisticsVendor = {
   bankHolder: string | null;
   bankAccounts: VendorBankAccountOption[];
 };
+
+function getDirectPurchaseStatusLabel(purchase: DirectStockPurchaseRow): string {
+  if (purchase.status === "RECEIVED") return "Diterima";
+  if (!purchase.isApprovedByDirector) return "Menunggu Direktur";
+  if (!purchase.vendorInvoiceUrl) return "Menunggu Nota";
+  if (!purchase.hasFinanceProof) return "Menunggu Finance";
+  return "Siap Diterima";
+}
+
+function canUploadDirectPurchaseInvoice(
+  purchase: DirectStockPurchaseRow,
+): boolean {
+  return (
+    !purchase.vendorInvoiceUrl &&
+    purchase.isApprovedByDirector &&
+    purchase.status === "PENDING_RECEIPT"
+  );
+}
+
+function canReceiveDirectPurchase(
+  purchase: DirectStockPurchaseRow,
+  canCreatePurchaseOrder: boolean,
+): boolean {
+  return (
+    canCreatePurchaseOrder &&
+    purchase.status === "PENDING_RECEIPT" &&
+    purchase.isApprovedByDirector &&
+    purchase.hasFinanceProof
+  );
+}
+
+function StockItemMobileCard({
+  item,
+  canManage,
+  onEdit,
+  onDetail,
+  onDuplicate,
+  onDelete,
+}: {
+  item: LogisticsStockItem;
+  canManage: boolean;
+  onEdit: (item: LogisticsStockItem) => void;
+  onDetail: (item: LogisticsStockItem) => void;
+  onDuplicate: (item: LogisticsStockItem) => void;
+  onDelete: (item: LogisticsStockItem) => void;
+}) {
+  const quantity = Number(item.stockQuantity);
+  const minimum = Number(item.minimumStock);
+  const isOutOfStock = quantity <= 0;
+  const isLowStock = !isOutOfStock && quantity <= minimum;
+
+  return (
+    <div className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="shrink-0 rounded-md border border-border bg-muted p-2 text-muted-foreground">
+            <Boxes className="size-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="type-p1 truncate font-semibold text-foreground">
+              {item.name}
+            </p>
+            <p className="type-p3 text-muted-foreground">SKU: {item.sku}</p>
+          </div>
+        </div>
+        <Badge
+          variant={
+            isOutOfStock
+              ? "lightError"
+              : isLowStock
+                ? "lightWarning"
+                : "lightSuccess"
+          }
+          className="shrink-0"
+        >
+          {isOutOfStock ? "Habis" : isLowStock ? "Menipis" : "Aman"}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-2.5">
+        <div>
+          <span className="type-p3 text-muted-foreground">Stok</span>
+          <p className="type-p2 font-semibold text-foreground">
+            {new Intl.NumberFormat("id-ID").format(quantity)} {item.unit}
+          </p>
+        </div>
+        <div>
+          <span className="type-p3 text-muted-foreground">Harga</span>
+          <p className="type-p2 font-semibold tabular-nums text-foreground">
+            {currency.format(Number(item.unitPrice))}
+          </p>
+        </div>
+        <div>
+          <span className="type-p3 text-muted-foreground">Nilai</span>
+          <p className="type-p2 font-semibold tabular-nums text-foreground">
+            {currency.format(quantity * Number(item.unitPrice))}
+          </p>
+        </div>
+      </div>
+
+      {canManage && (
+        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border/60 pt-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onDetail(item)}
+          >
+            <Eye className="size-3.5" aria-hidden="true" />
+            Detail
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onEdit(item)}
+          >
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Edit
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onDuplicate(item)}
+          >
+            <Copy className="size-3.5" aria-hidden="true" />
+            Duplikat
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="text-destructive"
+            onClick={() => onDelete(item)}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            Hapus
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DirectPurchaseMobileCard({
+  purchase,
+  canManage,
+  onOpenInvoiceModal,
+  onOpenDetailModal,
+  onOpenReceiveModal,
+}: {
+  purchase: DirectStockPurchaseRow;
+  canManage: boolean;
+  onOpenInvoiceModal: (purchase: DirectStockPurchaseRow) => void;
+  onOpenDetailModal: (purchase: DirectStockPurchaseRow) => void;
+  onOpenReceiveModal: (purchase: DirectStockPurchaseRow) => void;
+}) {
+  const itemNamesSummary = purchase.items
+    .map((item) => item.itemName)
+    .join(", ");
+  const itemQtySummary = purchase.items
+    .map((item) => `${item.quantity} ${item.unit}`)
+    .join(" · ");
+  const needsInvoice =
+    canManage && canUploadDirectPurchaseInvoice(purchase);
+  const readyToReceive = canReceiveDirectPurchase(purchase, canManage);
+
+  return (
+    <div className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="type-p2 font-mono font-bold text-primary">
+            {purchase.purchaseNumber}
+          </p>
+          <p className="type-p3 text-muted-foreground">
+            {purchase.vendorName} ·{" "}
+            {stockDateLabel.format(new Date(purchase.createdAt))}
+          </p>
+          {purchase.ticket && (
+            <Badge variant="outline" className="mt-1">
+              {purchase.ticket.ticketNumber}
+            </Badge>
+          )}
+        </div>
+        <Badge
+          variant={
+            purchase.status === "RECEIVED" ? "lightSuccess" : "lightWarning"
+          }
+          className="shrink-0"
+        >
+          {getDirectPurchaseStatusLabel(purchase)}
+        </Badge>
+      </div>
+
+      <div>
+        <p className="type-p2 font-medium text-foreground">
+          {itemNamesSummary}
+        </p>
+        <p className="type-p3 text-muted-foreground">{itemQtySummary}</p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
+        <span className="type-p1 font-mono font-bold tabular-nums text-foreground">
+          {currency.format(Number(purchase.totalAmount))}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {needsInvoice ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onOpenInvoiceModal(purchase)}
+            >
+              <Upload className="size-3.5" aria-hidden="true" />
+              Unggah Nota
+            </Button>
+          ) : readyToReceive ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => onOpenReceiveModal(purchase)}
+            >
+              <PackageOpen className="size-3.5" aria-hidden="true" />
+              Terima
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onOpenDetailModal(purchase)}
+          >
+            Detail
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LogisticsWorkspace({
   tickets,
@@ -377,43 +483,44 @@ export default function LogisticsWorkspace({
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [purchaseOpen, setPurchaseOpen] = useState(Boolean(initialAction));
+
+  // Hoisted Single Action Controllers for Direct Purchases & Stock
+  const [directPurchaseModal, setDirectPurchaseModal] = useState<{
+    purchase: DirectStockPurchaseRow;
+    mode: "invoice" | "detail";
+  } | null>(null);
+  const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
+  const [isInvoicePending, startInvoiceTransition] = useTransition();
+
   const [receivingPurchase, setReceivingPurchase] =
     useState<DirectStockPurchaseRow | null>(null);
   const [receivingPurchaseSubmitting, setReceivingPurchaseSubmitting] =
     useState(false);
-  const [receivingPurchaseError, setReceivingPurchaseError] = useState("");
-  const [receivingPhotos, setReceivingPhotos] = useState<ReceivingPhoto[]>([]);
-  const receivingPreviewUrls = useRef(new Set<string>());
-  const receivingPhotoInput = useRef<HTMLInputElement>(null);
+  const [receivingFiles, setReceivingFiles] = useState<File[]>([]);
+
   const [stockReceiptPreview, setStockReceiptPreview] = useState<{
     url: string;
     label: string;
   } | null>(null);
   const [stockReceiptPreviewFailed, setStockReceiptPreviewFailed] =
     useState(false);
+
   const [stockQuery, setStockQuery] = useState("");
   const [stockFilter, setStockFilter] = useState("ALL");
   const [stockPage, setStockPage] = useState(1);
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
+  const [csvFiles, setCsvFiles] = useState<File[]>([]);
   const [stockImporting, setStockImporting] = useState(false);
   const [stockDialogOpen, setStockDialogOpen] = useState(false);
   const [stockSubmitting, setStockSubmitting] = useState(false);
-  const [stockFormError, setStockFormError] = useState("");
-  const [stockNotice, setStockNotice] = useState("");
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
-  const [stockDetail, setStockDetail] = useState<LogisticsStockItem | null>(null);
+  const [stockDetail, setStockDetail] = useState<LogisticsStockItem | null>(
+    null,
+  );
   const [stockDeleteTarget, setStockDeleteTarget] =
     useState<LogisticsStockItem | null>(null);
   const [stockDeleteSubmitting, setStockDeleteSubmitting] = useState(false);
 
-  useEffect(
-    () => () => {
-      receivingPreviewUrls.current.forEach((url) => URL.revokeObjectURL(url));
-      receivingPreviewUrls.current.clear();
-    },
-    [],
-  );
-  const [stockDeleteError, setStockDeleteError] = useState("");
-  const [stockActionError, setStockActionError] = useState("");
   const [stockDraft, setStockDraft] = useState({
     sku: "",
     name: "",
@@ -422,7 +529,6 @@ export default function LogisticsWorkspace({
     minimumStock: "0",
     unitPrice: "0",
   });
-  const stockImportInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const today = getJakartaDateKey();
   const startDate = shiftDateKey(today, 1 - period);
@@ -441,27 +547,29 @@ export default function LogisticsWorkspace({
 
   const visibleTickets = useMemo(
     () =>
-      periodTickets.filter(
-        (ticket) =>
-          ticket.id === initialOpenSheet ||
-          ((statusFilter === "ALL" ||
-            (statusFilter === "PENDING_LOGISTICS" &&
-              (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
-                ticket.status === TicketStatus.PROCESSED_FINANCE)) ||
-            (statusFilter === "IN_DELIVERY" &&
-              (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
-                ticket.status === TicketStatus.IN_TRANSIT)) ||
-            ticket.status === statusFilter) &&
-          (!search.trim() ||
-            `${ticket.ticketNumber} ${ticket.title} ${ticket.requester.name} ${
-              ticket.project?.title ?? ""
-            } ${ticket.items.map((item) => item.itemName).join(" ")}`
-              .toLocaleLowerCase("id-ID")
-              .includes(search.trim().toLocaleLowerCase("id-ID")))),
-      ).sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
+      periodTickets
+        .filter(
+          (ticket) =>
+            ticket.id === initialOpenSheet ||
+            ((statusFilter === "ALL" ||
+              (statusFilter === "PENDING_LOGISTICS" &&
+                (ticket.status === TicketStatus.PROCESSED_LOGISTIC ||
+                  ticket.status === TicketStatus.PROCESSED_FINANCE)) ||
+              (statusFilter === "IN_DELIVERY" &&
+                (ticket.status === TicketStatus.ASSIGNED_TO_MOVER ||
+                  ticket.status === TicketStatus.IN_TRANSIT)) ||
+              ticket.status === statusFilter) &&
+              (!search.trim() ||
+                `${ticket.ticketNumber} ${ticket.title} ${ticket.requester.name} ${
+                  ticket.project?.title ?? ""
+                } ${ticket.items.map((item) => item.itemName).join(" ")}`
+                  .toLocaleLowerCase("id-ID")
+                  .includes(search.trim().toLocaleLowerCase("id-ID")))),
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
     [initialOpenSheet, periodTickets, search, statusFilter],
   );
 
@@ -497,7 +605,8 @@ export default function LogisticsWorkspace({
       Object.values(TicketStatus)
         .map((status) => ({
           status,
-          count: countableTickets.filter((ticket) => ticket.status === status).length,
+          count: countableTickets.filter((ticket) => ticket.status === status)
+            .length,
         }))
         .filter((entry) => entry.count > 0),
     [countableTickets],
@@ -589,7 +698,10 @@ export default function LogisticsWorkspace({
           labels: {
             show: true,
             name: { show: true },
-            value: { show: true, formatter: (value: string) => `${value} pesanan` },
+            value: {
+              show: true,
+              formatter: (value: string) => `${value} pesanan`,
+            },
             total: {
               show: true,
               label: "Total",
@@ -621,7 +733,9 @@ export default function LogisticsWorkspace({
         ? `${ticket.project.kelompokTani} - ${ticket.project.title}`
         : "",
       statusLabels[ticket.status],
-      ticket.items.map((item) => `${item.itemName}: ${item.quantity} ${item.unit}`).join("; "),
+      ticket.items
+        .map((item) => `${item.itemName}: ${item.quantity} ${item.unit}`)
+        .join("; "),
       ticket.totalAmount ?? "",
       getJakartaDateKey(new Date(ticket.createdAt)),
     ]);
@@ -655,7 +769,7 @@ export default function LogisticsWorkspace({
     {
       label: "Menunggu Logistik",
       value: pendingCount,
-      note: "Klik untuk melihat tiket yang perlu diproses",
+      note: "Klik untuk melihat tiket pending",
       filter: "PENDING_LOGISTICS",
       Icon: PackageOpen,
       color: "text-warning",
@@ -664,7 +778,7 @@ export default function LogisticsWorkspace({
     {
       label: "Dalam Pengiriman",
       value: deliveryCount,
-      note: "Klik untuk melihat tiket yang sedang dikirim",
+      note: "Klik untuk tiket dalam kirim",
       filter: "IN_DELIVERY",
       Icon: Truck,
       color: "text-info",
@@ -673,7 +787,7 @@ export default function LogisticsWorkspace({
     {
       label: "Total Nilai",
       value: currency.format(totalValue),
-      note: "Klik untuk kembali ke seluruh tiket",
+      note: "Akumulasi pesanan aktif",
       filter: "ALL",
       Icon: CircleDollarSign,
       color: "text-success",
@@ -681,81 +795,71 @@ export default function LogisticsWorkspace({
     },
   ];
 
-  const clearReceivingPhotos = () => {
-    receivingPhotos.forEach(({ previewUrl }) => {
-      URL.revokeObjectURL(previewUrl);
-      receivingPreviewUrls.current.delete(previewUrl);
-    });
-    setReceivingPhotos([]);
-  };
-
-  const selectReceivingPhotos = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.currentTarget.files ?? []);
-    event.currentTarget.value = "";
-    if (files.length === 0) return;
-
-    const newPhotos: ReceivingPhoto[] = [];
-    const errors: string[] = [];
-    const remainingSlots =
-      MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS - receivingPhotos.length;
-
-    for (const file of files) {
-      if (
-        receivingPhotos.length + newPhotos.length >=
-        MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS
-      ) {
-        errors.push(`Maksimal ${MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS} foto.`);
-        break;
-      }
-      if (file.size < 1) {
-        errors.push(`${file.name}: file foto kosong.`);
-        continue;
-      }
-
-      const previewUrl = URL.createObjectURL(file);
-      receivingPreviewUrls.current.add(previewUrl);
-      newPhotos.push({ id: crypto.randomUUID(), file, previewUrl });
-    }
-
-    if (newPhotos.length > 0) {
-      setReceivingPhotos((current) => [...current, ...newPhotos]);
-    }
-    setReceivingPurchaseError(errors.join(" "));
-
-    if (files.length > remainingSlots && !errors.length) {
-      setReceivingPurchaseError(
-        `Maksimal ${MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS} foto.`,
-      );
-    }
-  };
-
-  const submitStockPurchaseReceipt = async (event: FormEvent<HTMLFormElement>) => {
+  const handleUploadDirectPurchaseInvoice = (event: FormEvent) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    setReceivingPurchaseError("");
+    if (!directPurchaseModal) return;
+    const file = invoiceFiles[0];
+    if (!file) {
+      toast.error("Pilih foto nota/invoice terlebih dahulu.");
+      return;
+    }
+    const purchaseId = directPurchaseModal.purchase.id;
+    startInvoiceTransition(async () => {
+      try {
+        const compressed = await compressFieldImageFile(file);
+        const formData = new FormData();
+        formData.set("purchaseId", purchaseId);
+        formData.set("invoicePhoto", compressed, compressed.name);
+        const result = await submitDirectStockPurchaseInvoice(formData);
+        if (result.success) {
+          toast.success(result.message);
+          setInvoiceFiles([]);
+          setDirectPurchaseModal(null);
+          requestNotificationFeedRefresh();
+          router.refresh();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Saving direct purchase invoice failed:", error);
+        toast.error("Invoice/bon gagal disimpan. Coba kembali.");
+      }
+    });
+  };
+
+  const submitStockPurchaseReceipt = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    if (!receivingPurchase) return;
+    if (receivingFiles.length === 0) {
+      toast.error("Pilih minimal 1 foto bukti penerimaan barang.");
+      return;
+    }
+    const formData = new FormData();
+    formData.set("purchaseId", receivingPurchase.id);
     setReceivingPurchaseSubmitting(true);
     try {
-      for (const { file } of receivingPhotos) {
+      for (const file of receivingFiles) {
         const compressed = await compressFieldImageFile(file);
         formData.append("receivedPhotos", compressed, compressed.name);
       }
       const result = await receiveDirectStockPurchase(formData);
       if (!result.success) {
-        setReceivingPurchaseError(result.message);
+        toast.error(result.message);
         return;
       }
-      setStockNotice(result.message);
+      toast.success(result.message);
       setReceivingPurchase(null);
-      clearReceivingPhotos();
+      setReceivingFiles([]);
       requestNotificationFeedRefresh();
       router.refresh();
     } catch (error) {
       console.error("Receiving direct stock purchase failed:", error);
-      setReceivingPurchaseError(
+      toast.error(
         error instanceof Error && error.message
           ? error.message
-          : "Penerimaan barang gagal dicatat. Periksa koneksi lalu coba kembali.",
+          : "Penerimaan barang gagal dicatat.",
       );
     } finally {
       setReceivingPurchaseSubmitting(false);
@@ -829,6 +933,7 @@ export default function LogisticsWorkspace({
       (currentStockPage - 1) * stockPageSize,
       currentStockPage * stockPageSize,
     );
+
     const stockChartOptions = {
       chart: {
         type: "bar" as const,
@@ -855,6 +960,7 @@ export default function LogisticsWorkspace({
         },
       },
     };
+
     const stockDistributionOptions = {
       chart: { type: "donut" as const, fontFamily: "inherit" },
       labels: stockGroups.map((group) => group.label),
@@ -869,7 +975,10 @@ export default function LogisticsWorkspace({
             labels: {
               show: true,
               name: { show: true },
-              value: { show: true, formatter: (value: string) => `${value} barang` },
+              value: {
+                show: true,
+                formatter: (value: string) => `${value} barang`,
+              },
               total: {
                 show: true,
                 label: "Jenis Barang",
@@ -903,64 +1012,62 @@ export default function LogisticsWorkspace({
               unitPrice: "0",
             },
       );
-      setStockFormError("");
       setStockDialogOpen(true);
     };
 
     const saveStockItem = async () => {
       setStockSubmitting(true);
-      setStockFormError("");
       try {
         const result = await saveLogisticsStockItem({
           ...stockDraft,
           ...(editingStockId ? { id: editingStockId } : {}),
         });
         if (!result.success) {
-          setStockFormError(result.message);
+          toast.error(result.message);
           return;
         }
-        setStockNotice(result.message);
+        toast.success(result.message);
         setStockDialogOpen(false);
         router.refresh();
       } catch (error) {
         console.error("Saving logistics stock item failed:", error);
-        setStockFormError("Barang gagal disimpan. Periksa koneksi lalu coba kembali.");
+        toast.error("Barang gagal disimpan. Periksa koneksi lalu coba kembali.");
       } finally {
         setStockSubmitting(false);
       }
     };
 
-    const importStockCsv = async (
-      event: ChangeEvent<HTMLInputElement>,
-    ) => {
-      const file = event.currentTarget.files?.[0];
-      event.currentTarget.value = "";
-      if (!file) return;
+    const handleImportStockCsv = async () => {
+      const file = csvFiles[0];
+      if (!file) {
+        toast.error("Pilih berkas CSV terlebih dahulu.");
+        return;
+      }
       if (file.size > 1_000_000) {
-        setStockActionError("File CSV tidak boleh melebihi 1 MB.");
+        toast.error("File CSV tidak boleh melebihi 1 MB.");
         return;
       }
       setStockImporting(true);
-      setStockActionError("");
       try {
         const result = await importLogisticsStockCsv(await file.text());
         if (!result.success) {
-          setStockActionError(result.message);
+          toast.error(result.message);
           return;
         }
-        setStockNotice(result.message);
+        toast.success(result.message);
+        setCsvFiles([]);
+        setCsvModalOpen(false);
         setStockPage(1);
         router.refresh();
       } catch (error) {
         console.error("Importing logistics stock CSV failed:", error);
-        setStockActionError("Impor CSV gagal. Periksa file lalu coba kembali.");
+        toast.error("Impor CSV gagal. Periksa file lalu coba kembali.");
       } finally {
         setStockImporting(false);
       }
     };
 
     const duplicateStockItem = async (item: LogisticsStockItem) => {
-      setStockActionError("");
       const suffix = `-COPY-${Date.now().toString(36).toUpperCase()}`;
       try {
         const result = await saveLogisticsStockItem({
@@ -972,33 +1079,32 @@ export default function LogisticsWorkspace({
           unitPrice: item.unitPrice,
         });
         if (!result.success) {
-          setStockActionError(result.message);
+          toast.error(result.message);
           return;
         }
-        setStockNotice(result.message);
+        toast.success(result.message);
         router.refresh();
       } catch (error) {
         console.error("Duplicating logistics stock item failed:", error);
-        setStockActionError("Barang gagal diduplikat. Silakan coba kembali.");
+        toast.error("Barang gagal diduplikat. Silakan coba kembali.");
       }
     };
 
     const confirmDeleteStockItem = async () => {
       if (!stockDeleteTarget) return;
       setStockDeleteSubmitting(true);
-      setStockDeleteError("");
       try {
         const result = await deleteLogisticsStockItem(stockDeleteTarget.id);
         if (!result.success) {
-          setStockDeleteError(result.message);
+          toast.error(result.message);
           return;
         }
-        setStockNotice(result.message);
+        toast.success(result.message);
         setStockDeleteTarget(null);
         router.refresh();
       } catch (error) {
         console.error("Deleting logistics stock item failed:", error);
-        setStockDeleteError("Barang gagal dihapus. Periksa koneksi lalu coba kembali.");
+        toast.error("Barang gagal dihapus. Periksa koneksi lalu coba kembali.");
       } finally {
         setStockDeleteSubmitting(false);
       }
@@ -1045,59 +1151,52 @@ export default function LogisticsWorkspace({
     };
 
     return (
-      <div className="my-6 space-y-6">
+      <div className="my-4 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold">Stok Logistik</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h2 className="type-h2 text-foreground">Katalog &amp; Stok Gudang</h2>
+            <p className="type-p2 mt-1 text-muted-foreground">
               {canCreatePurchaseOrder
-                ? "Kelola katalog material, pantau ketersediaan, dan ajukan pembelian PO maupun langsung."
+                ? "Kelola katalog material, pantau ketersediaan, dan catat pembelian langsung."
                 : "Pantau persediaan material dan status pemenuhannya."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canCreatePurchaseOrder && (
-              <>
-                <input
-                  ref={stockImportInput}
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  aria-label="Pilih file CSV stok"
-                  onChange={importStockCsv}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => stockImportInput.current?.click()}
-                  disabled={stockImporting}
-                >
-                  <FileUp aria-hidden="true" />
-                  {stockImporting ? "Mengimpor..." : "Import"}
-                </Button>
-              </>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setCsvFiles([]);
+                  setCsvModalOpen(true);
+                }}
+              >
+                <FileUp className="size-4" aria-hidden="true" />
+                Import CSV
+              </Button>
             )}
             {canCreatePurchaseOrder && (
               <Button
                 type="button"
-                onClick={() => {
-                  setStockNotice("");
-                  setPurchaseOpen(true);
-                }}
+                onClick={() => setPurchaseOpen(true)}
               >
-                <Plus aria-hidden="true" />
-                Tambah Pembelian
+                <Plus className="size-4" aria-hidden="true" />
+                + Pembelian
               </Button>
             )}
             <Button type="button" variant="outline" onClick={exportStockCsv}>
-              <Download aria-hidden="true" />
+              <Download className="size-4" aria-hidden="true" />
               Export
             </Button>
             {canCreatePurchaseOrder && (
               <>
-                <Button type="button" variant="outline" onClick={() => openStockEditor()}>
-                  <Plus aria-hidden="true" />
-                  Tambah Barang
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => openStockEditor()}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  + Barang
                 </Button>
                 <CreatePurchaseModal
                   open={purchaseOpen}
@@ -1111,7 +1210,7 @@ export default function LogisticsWorkspace({
                   stockItems={stockItems}
                   tickets={purchaseTickets}
                   onCreated={(message) => {
-                    setStockNotice(message);
+                    toast.success(message);
                     setPurchaseOpen(false);
                   }}
                 />
@@ -1119,20 +1218,6 @@ export default function LogisticsWorkspace({
             )}
           </div>
         </div>
-
-        {stockNotice && (
-          <p
-            className="rounded-md border border-success/30 bg-lightsuccess px-4 py-3 text-sm text-success"
-            role="status"
-          >
-            {stockNotice}
-          </p>
-        )}
-        {stockActionError && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
-            {stockActionError}
-          </p>
-        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -1155,7 +1240,7 @@ export default function LogisticsWorkspace({
             {
               label: "Stok Menipis",
               value: lowStockCount,
-              note: "Menyentuh batas minimum atau habis",
+              note: "Menyentuh batas minimum",
               Icon: AlertTriangle,
               background: "bg-lightwarning",
               color: "text-warning",
@@ -1172,11 +1257,11 @@ export default function LogisticsWorkspace({
             <CardBox key={label} className="p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="type-p3 font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="mt-1.5 text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+                  <p className="type-kpi mt-1.5">{value}</p>
+                  <p className="type-p3 mt-1 text-muted-foreground">{note}</p>
                 </div>
                 <span className={`shrink-0 rounded-md p-2 ${background} ${color}`}>
                   <Icon className="size-5" aria-hidden="true" />
@@ -1189,8 +1274,8 @@ export default function LogisticsWorkspace({
         <div className="grid gap-6 xl:grid-cols-3">
           <CardBox className="overflow-hidden p-0 xl:col-span-2">
             <div className="border-b border-border px-5 py-4">
-              <h3 className="font-semibold">Stok per Material</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h3 className="type-h3 font-semibold">Stok per Material</h3>
+              <p className="type-p2 mt-1 text-muted-foreground">
                 Perbandingan jumlah tersedia dengan batas minimum
               </p>
             </div>
@@ -1213,16 +1298,20 @@ export default function LogisticsWorkspace({
                   width="100%"
                 />
               ) : (
-                <p className="py-24 text-center text-sm text-muted-foreground">
-                  Belum ada data persediaan untuk ditampilkan.
-                </p>
+                <EmptyState
+                  icon={Boxes}
+                  variant="inline"
+                  title="Belum Ada Data Persediaan"
+                  description="Tambahkan barang baru untuk melihat grafik perbandingan stok."
+                />
               )}
             </div>
           </CardBox>
+
           <CardBox className="overflow-hidden p-0">
             <div className="border-b border-border px-5 py-4">
-              <h3 className="font-semibold">Kondisi Persediaan</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h3 className="type-h3 font-semibold">Kondisi Persediaan</h3>
+              <p className="type-p2 mt-1 text-muted-foreground">
                 Jumlah barang berdasarkan tingkat stok
               </p>
             </div>
@@ -1241,7 +1330,7 @@ export default function LogisticsWorkspace({
                   {stockGroups.map((group) => (
                     <div
                       key={group.label}
-                      className="flex items-center justify-between text-sm"
+                      className="type-p2 flex items-center justify-between"
                     >
                       <span className="flex items-center gap-2">
                         <span
@@ -1250,15 +1339,20 @@ export default function LogisticsWorkspace({
                         />
                         {group.label}
                       </span>
-                      <span className="font-medium">{group.count}</span>
+                      <span className="font-medium tabular-nums">
+                        {group.count}
+                      </span>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <p className="py-24 text-center text-sm text-muted-foreground">
-                Belum ada data kondisi stok.
-              </p>
+              <EmptyState
+                icon={Boxes}
+                variant="inline"
+                title="Belum Ada Data Stok"
+                description="Belum ada data kondisi persediaan."
+              />
             )}
           </CardBox>
         </div>
@@ -1266,8 +1360,8 @@ export default function LogisticsWorkspace({
         <CardBox className="gap-0 overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div>
-              <h3 className="font-semibold">Katalog Material</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h3 className="type-h3 font-semibold">Katalog Material</h3>
+              <p className="type-p2 mt-1 text-muted-foreground">
                 {canCreatePurchaseOrder
                   ? "Kelola katalog barang dan pantau kebutuhan restock."
                   : "Stok ditampilkan dalam mode baca saja untuk role Anda."}
@@ -1309,278 +1403,181 @@ export default function LogisticsWorkspace({
               </Select>
             </div>
           </div>
+
           {stockItems.length ? (
             <div className="space-y-4 p-4 sm:p-5">
-              {/* Mobile Card View (< 768px) */}
-              <div className="space-y-2.5 md:hidden">
-                {paginatedStockItems.map((item) => {
-                  const quantity = Number(item.stockQuantity);
-                  const minimum = Number(item.minimumStock);
-                  const isOutOfStock = quantity <= 0;
-                  const isLowStock = !isOutOfStock && quantity <= minimum;
-                  return (
-                    <div
-                      key={item.id}
-                      className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <span className="shrink-0 rounded-md border border-border bg-muted p-2 text-muted-foreground">
-                            <Boxes className="size-4" aria-hidden="true" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {item.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              SKU: {item.sku}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge
-                          variant={
-                            isOutOfStock
-                              ? "lightError"
-                              : isLowStock
-                                ? "lightWarning"
-                                : "lightSuccess"
-                          }
-                          className="shrink-0"
-                        >
-                          {isOutOfStock
-                            ? "Habis"
-                            : isLowStock
-                              ? "Menipis"
-                              : "Aman"}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/30 p-2 text-xs">
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Stok</span>
-                          <p className="font-semibold text-foreground">
-                            {new Intl.NumberFormat("id-ID").format(quantity)} {item.unit}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Harga</span>
-                          <p className="font-semibold tabular-nums text-foreground">
-                            {currency.format(Number(item.unitPrice))}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-muted-foreground">Nilai</span>
-                          <p className="font-semibold tabular-nums text-foreground">
-                            {currency.format(quantity * Number(item.unitPrice))}
-                          </p>
-                        </div>
-                      </div>
-
-                      {canCreatePurchaseOrder && (
-                        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border/60 pt-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 px-2 text-xs"
-                            onClick={() => openStockEditor(item)}
-                          >
-                            <Pencil className="size-3" />
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 px-2 text-xs"
-                            onClick={() => setStockDetail(item)}
-                          >
-                            <Eye className="size-3" />
-                            Detail
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 px-2 text-xs"
-                            onClick={() => void duplicateStockItem(item)}
-                          >
-                            <Copy className="size-3" />
-                            Duplikat
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 gap-1 px-2 text-xs text-destructive"
-                            onClick={() => {
-                              setStockDeleteError("");
-                              setStockDeleteTarget(item);
-                            }}
-                          >
-                            <Trash2 className="size-3" />
-                            Hapus
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {!visibleStockItems.length && (
-                  <div className="rounded-xl border border-dashed border-border py-10 text-center text-xs text-muted-foreground">
-                    Tidak ada barang yang cocok dengan pencarian atau filter.
+              {!visibleStockItems.length ? (
+                <EmptyState
+                  icon={Search}
+                  title="Barang Tidak Ditemukan"
+                  description="Tidak ada barang yang cocok dengan pencarian atau filter."
+                />
+              ) : (
+                <>
+                  <div className="space-y-2.5 md:hidden">
+                    {paginatedStockItems.map((item) => (
+                      <StockItemMobileCard
+                        key={item.id}
+                        item={item}
+                        canManage={canCreatePurchaseOrder}
+                        onEdit={openStockEditor}
+                        onDetail={setStockDetail}
+                        onDuplicate={(target) => void duplicateStockItem(target)}
+                        onDelete={setStockDeleteTarget}
+                      />
+                    ))}
                   </div>
-                )}
-              </div>
 
-              {/* Desktop Table View (>= 768px) */}
-              <div className="hidden md:block">
-              <Table pagination={false}>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Material</TableHead>
-                    <TableHead>Kategori</TableHead>
-                    <TableHead>Satuan</TableHead>
-                    <TableHead>Harga</TableHead>
-                    <TableHead>Stok</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Dibuat</TableHead>
-                    <TableHead>Nilai Stok</TableHead>
-                    {canCreatePurchaseOrder && <TableHead>Aksi</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedStockItems.map((item) => {
-                    const quantity = Number(item.stockQuantity);
-                    const minimum = Number(item.minimumStock);
-                    const isOutOfStock = quantity <= 0;
-                    const isLowStock =
-                      !isOutOfStock && quantity <= minimum;
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <span className="rounded-md border border-border bg-muted p-2 text-muted-foreground">
-                              <Boxes className="size-4" aria-hidden="true" />
-                            </span>
-                            <span>
-                              <span className="block font-medium">{item.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                SKU: {item.sku}
-                              </span>
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="gray">Material</Badge>
-                        </TableCell>
-                        <TableCell>{item.unit}</TableCell>
-                        <TableCell>{currency.format(Number(item.unitPrice))}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              isOutOfStock
-                                ? "lightError"
-                                : isLowStock
-                                  ? "lightWarning"
-                                  : "lightInfo"
-                            }
-                          >
-                            {new Intl.NumberFormat("id-ID").format(quantity)} {item.unit}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              isOutOfStock
-                                ? "lightError"
-                                : isLowStock
-                                  ? "lightWarning"
-                                  : "lightSuccess"
-                            }
-                          >
-                            {isOutOfStock
-                              ? "Habis"
-                              : isLowStock
-                                ? "Menipis"
-                                : "Aman"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {stockDateLabel.format(new Date(item.createdAt))}
-                        </TableCell>
-                        <TableCell>
-                          {currency.format(quantity * Number(item.unitPrice))}
-                        </TableCell>
-                        {canCreatePurchaseOrder && (
-                          <TableCell>
-                            <Tooltip>
-                              <DropdownMenu>
-                                <TooltipTrigger asChild>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon"
-                                      className="size-10"
-                                      aria-label={`Aksi untuk ${item.name}`}
+                  <div className="hidden md:block">
+                    <Table pagination={false}>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Material</TableHead>
+                          <TableHead>Kategori</TableHead>
+                          <TableHead>Satuan</TableHead>
+                          <TableHead>Harga</TableHead>
+                          <TableHead>Stok</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Dibuat</TableHead>
+                          <TableHead>Nilai Stok</TableHead>
+                          {canCreatePurchaseOrder && <TableHead>Aksi</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedStockItems.map((item) => {
+                          const quantity = Number(item.stockQuantity);
+                          const minimum = Number(item.minimumStock);
+                          const isOutOfStock = quantity <= 0;
+                          const isLowStock =
+                            !isOutOfStock && quantity <= minimum;
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <div className="flex items-center gap-3">
+                                  <span className="rounded-md border border-border bg-muted p-2 text-muted-foreground">
+                                    <Boxes className="size-4" aria-hidden="true" />
+                                  </span>
+                                  <span>
+                                    <span className="type-p2 block font-medium">
+                                      {item.name}
+                                    </span>
+                                    <span className="type-p3 text-muted-foreground">
+                                      SKU: {item.sku}
+                                    </span>
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="gray">Material</Badge>
+                              </TableCell>
+                              <TableCell className="type-p2">
+                                {item.unit}
+                              </TableCell>
+                              <TableCell className="type-p2 tabular-nums">
+                                {currency.format(Number(item.unitPrice))}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    isOutOfStock
+                                      ? "lightError"
+                                      : isLowStock
+                                        ? "lightWarning"
+                                        : "lightInfo"
+                                  }
+                                >
+                                  {new Intl.NumberFormat("id-ID").format(
+                                    quantity,
+                                  )}{" "}
+                                  {item.unit}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    isOutOfStock
+                                      ? "lightError"
+                                      : isLowStock
+                                        ? "lightWarning"
+                                        : "lightSuccess"
+                                  }
+                                >
+                                  {isOutOfStock
+                                    ? "Habis"
+                                    : isLowStock
+                                      ? "Menipis"
+                                      : "Aman"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="type-p2">
+                                {stockDateLabel.format(
+                                  new Date(item.createdAt),
+                                )}
+                              </TableCell>
+                              <TableCell className="type-p2 tabular-nums">
+                                {currency.format(
+                                  quantity * Number(item.unitPrice),
+                                )}
+                              </TableCell>
+                              {canCreatePurchaseOrder && (
+                                <TableCell>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Aksi untuk ${item.name}`}
+                                      >
+                                        <MoreHorizontal aria-hidden="true" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      className="w-44"
                                     >
-                                      <MoreHorizontal aria-hidden="true" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                </TooltipTrigger>
-                                <DropdownMenuContent align="end" className="w-44">
-                                  <DropdownMenuItem
-                                    onSelect={() => openStockEditor(item)}
-                                  >
-                                    <Pencil aria-hidden="true" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onSelect={() => setStockDetail(item)}
-                                  >
-                                    <Eye aria-hidden="true" />
-                                    Lihat Detail
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onSelect={() => void duplicateStockItem(item)}
-                                  >
-                                    <Copy aria-hidden="true" />
-                                    Duplikat
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onSelect={() => {
-                                      setStockDeleteError("");
-                                      setStockDeleteTarget(item);
-                                    }}
-                                  >
-                                    <Trash2 aria-hidden="true" />
-                                    Hapus
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                              <TooltipContent>Aksi barang {item.name}</TooltipContent>
-                            </Tooltip>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                  {!visibleStockItems.length && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={canCreatePurchaseOrder ? 9 : 8}
-                        className="py-10 text-center text-sm text-muted-foreground"
-                      >
-                        Tidak ada barang yang cocok dengan pencarian atau filter.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              </div>
+                                      <DropdownMenuItem
+                                        onSelect={() => openStockEditor(item)}
+                                      >
+                                        <Pencil aria-hidden="true" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onSelect={() => setStockDetail(item)}
+                                      >
+                                        <Eye aria-hidden="true" />
+                                        Detail
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onSelect={() =>
+                                          void duplicateStockItem(item)
+                                        }
+                                      >
+                                        <Copy aria-hidden="true" />
+                                        Duplikat
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onSelect={() =>
+                                          setStockDeleteTarget(item)
+                                        }
+                                      >
+                                        <Trash2 aria-hidden="true" />
+                                        Hapus
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
               <TablePaginationControls
                 count={visibleStockItems.length}
                 pageSize={stockPageSize}
@@ -1590,434 +1587,532 @@ export default function LogisticsWorkspace({
               />
             </div>
           ) : (
-            <p className="p-8 text-center text-sm text-muted-foreground">
-              Belum ada barang persediaan. Tambahkan barang baru atau jalankan{" "}
-              <code>npm run db:seed:inventory</code> untuk memuat lima barang contoh.
-            </p>
+            <div className="p-4 sm:p-5">
+              <EmptyState
+                icon={Boxes}
+                title="Belum Ada Barang Persediaan"
+                description="Tambahkan barang baru ke katalog material untuk mulai memantau stok gudang."
+                action={
+                  canCreatePurchaseOrder ? (
+                    <Button type="button" onClick={() => openStockEditor()}>
+                      <Plus className="size-4" aria-hidden="true" />
+                      + Barang
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </div>
           )}
         </CardBox>
 
+        {/* Pembelian Langsung — ZERO Components Inside Rows, ZERO Circular Back-Links */}
         <CardBox className="gap-0 overflow-hidden p-0">
           <div className="border-b border-border px-5 py-4">
-            <h3 className="font-semibold">Pembelian Langsung</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Stok diperbarui hanya setelah Logistik mencatat penerimaan dan foto bukti.
+            <h3 className="type-h3 font-semibold">Pembelian Langsung</h3>
+            <p className="type-p2 mt-1 text-muted-foreground">
+              Stok diperbarui setelah Logistik mengunggah nota dan mencatat penerimaan barang.
             </p>
           </div>
           <div className="p-4 sm:p-5">
-            {/* Mobile Card View (< 768px) */}
-            <div className="space-y-2.5 md:hidden">
-              {stockPurchases.map((purchase) => {
-                const itemNamesSummary = purchase.items
-                  .map((item) => item.itemName)
-                  .join(", ");
-                const itemQtySummary = purchase.items
-                  .map((item) => `${item.quantity} ${item.unit}`)
-                  .join(" · ");
-                return (
-                  <div
-                    key={purchase.id}
-                    className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-mono text-xs font-bold text-primary">
-                          {purchase.purchaseNumber}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {purchase.vendorName} · {stockDateLabel.format(new Date(purchase.createdAt))}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={
-                          purchase.status === "RECEIVED" ? "lightSuccess" : "lightWarning"
-                        }
-                        className="shrink-0"
-                      >
-                        {purchase.status === "RECEIVED"
-                          ? "Diterima"
-                          : !purchase.isApprovedByDirector
-                            ? "Menunggu Direktur"
-                            : !purchase.vendorInvoiceUrl
-                              ? "Menunggu Invoice"
-                              : !purchase.hasFinanceProof
-                                ? "Menunggu Keuangan"
-                                : "Siap Diterima"}
-                      </Badge>
-                    </div>
-                    <div className="text-xs">
-                      <p className="font-medium text-foreground">{itemNamesSummary}</p>
-                      <p className="text-muted-foreground">{itemQtySummary}</p>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-border/60 pt-2">
-                      <span className="font-mono text-sm font-bold text-foreground tabular-nums">
-                        {currency.format(Number(purchase.totalAmount))}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {canCreatePurchaseOrder &&
-                          purchase.status === "PENDING_RECEIPT" &&
-                          purchase.isApprovedByDirector &&
-                          purchase.hasFinanceProof && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-7 gap-1 px-2.5 text-xs"
-                              onClick={() => {
-                                setReceivingPurchaseError("");
-                                clearReceivingPhotos();
-                                setReceivingPurchase(purchase);
-                              }}
-                            >
-                              <PackageOpen className="size-3.5" />
-                              Terima
-                            </Button>
-                          )}
-                        {purchase.ticket && (
-                          <Button asChild type="button" size="sm" variant="outline" className="h-7 gap-1 px-2.5 text-xs">
-                            <Link
-                              href={`/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(purchase.ticket.id)}`}
-                            >
-                              <Eye className="size-3.5" />
-                              Tiket
-                            </Link>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {stockPurchases.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
-                  Belum ada pembelian langsung.
+            {stockPurchases.length === 0 ? (
+              <EmptyState
+                icon={ShoppingBag}
+                title="Belum Ada Pembelian Langsung"
+                description="Catat pembelian langsung melalui tombol + Pembelian di bagian atas."
+              />
+            ) : (
+              <>
+                <div className="space-y-2.5 md:hidden">
+                  {stockPurchases.map((purchase) => (
+                    <DirectPurchaseMobileCard
+                      key={purchase.id}
+                      purchase={purchase}
+                      canManage={canCreatePurchaseOrder}
+                      onOpenInvoiceModal={(target) => {
+                        setInvoiceFiles([]);
+                        setDirectPurchaseModal({
+                          purchase: target,
+                          mode: "invoice",
+                        });
+                      }}
+                      onOpenDetailModal={(target) => {
+                        setInvoiceFiles([]);
+                        setDirectPurchaseModal({
+                          purchase: target,
+                          mode: "detail",
+                        });
+                      }}
+                      onOpenReceiveModal={(target) => {
+                        setReceivingFiles([]);
+                        setReceivingPurchase(target);
+                      }}
+                    />
+                  ))}
                 </div>
-              )}
-            </div>
 
-            {/* Desktop Table View (>= 768px) */}
-            <div className="hidden overflow-x-auto md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pembelian &amp; Vendor</TableHead>
-                  <TableHead>Tiket / Permintaan</TableHead>
-                  <TableHead>Barang</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Invoice / BON</TableHead>
-                  <TableHead>Penerimaan</TableHead>
-                  {canCreatePurchaseOrder && (
-                    <TableHead className="w-[72px] text-right">Aksi</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stockPurchases.map((purchase) => {
-                  const receiptPhotos =
-                    purchase.receivedPhotos.length > 0
-                      ? purchase.receivedPhotos
-                      : purchase.arrivalPhotoUrl
-                        ? [purchase.arrivalPhotoUrl]
-                        : [];
-                  const itemNamesSummary = purchase.items
-                    .map((item) => item.itemName)
-                    .join(", ");
-                  const itemQtySummary = purchase.items
-                    .map((item) => `${item.quantity} ${item.unit}`)
-                    .join(" · ");
-                  return (
-                  <TableRow key={purchase.id}>
-                    <TableCell className="align-top font-medium whitespace-normal">
-                      <p className="whitespace-nowrap">{purchase.purchaseNumber}</p>
-                      <p className="text-xs font-normal text-muted-foreground">
-                        {purchase.vendorName} · {stockDateLabel.format(new Date(purchase.createdAt))}
-                      </p>
-                    </TableCell>
-                    <TableCell className="max-w-[170px] align-top whitespace-normal">
-                      {purchase.ticket ? (
-                        <Link
-                          className="font-medium text-primary underline-offset-4 hover:underline"
-                          href={`/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(purchase.ticket.id)}`}
-                        >
-                          {purchase.ticket.ticketNumber}
-                          <span className="block truncate text-xs font-normal text-muted-foreground">
-                            {purchase.ticket.title}
-                          </span>
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="max-w-[180px] align-top whitespace-normal">
-                      <p className="line-clamp-2" title={itemNamesSummary}>
-                        {itemNamesSummary}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {itemQtySummary}
-                      </p>
-                    </TableCell>
-                    <TableCell className="align-top text-right whitespace-nowrap font-medium tabular-nums">
-                      {currency.format(Number(purchase.totalAmount))}
-                    </TableCell>
-                    <TableCell className="align-top whitespace-normal">
-                      <Badge
-                        variant={
-                          purchase.status === "RECEIVED" ? "lightSuccess" : "lightWarning"
-                        }
-                        className="whitespace-normal text-left"
-                      >
-                        {purchase.status === "RECEIVED"
-                          ? "Diterima"
-                          : !purchase.isApprovedByDirector
-                            ? "Menunggu persetujuan Direktur"
-                            : !purchase.vendorInvoiceUrl
-                              ? "Menunggu invoice/bon Logistik"
-                            : !purchase.hasFinanceProof
-                              ? "Menunggu pembayaran Keuangan"
-                              : "Siap diterima Logistik"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="space-y-1">
-                        {purchase.vendorInvoiceUploadedAt && (
-                          <>
-                          <p className="whitespace-nowrap">
-                            {stockDateLabel.format(
-                              new Date(purchase.vendorInvoiceUploadedAt),
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {purchase.vendorInvoiceUploadedBy?.name ??
-                              "Logistik"}
-                          </p>
-                          </>
-                        )}
-                        <DirectPurchaseInvoiceAction
-                          key={purchase.id}
-                          purchase={purchase}
-                          onPreview={(url, label) => {
-                            setStockReceiptPreviewFailed(false);
-                            setStockReceiptPreview({ url, label });
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {purchase.receivedAt ? (
-                        <>
-                          <p className="whitespace-nowrap">
-                            {stockDateLabel.format(new Date(purchase.receivedAt))}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {purchase.receivedBy?.name ?? "Logistik"}
-                          </p>
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                      {receiptPhotos.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          {receiptPhotos.map((photo, index) => (
-                            <ActionIconButton
-                              key={`${purchase.id}-${photo}`}
-                              type="button"
-                              label={`Lihat foto penerimaan ${index + 1} pembelian ${purchase.purchaseNumber}`}
-                              tooltip={`Lihat foto penerimaan ${index + 1}`}
-                              icon={Eye}
-                              onClick={() => {
-                                setStockReceiptPreviewFailed(false);
-                                setStockReceiptPreview({
-                                  url: photo,
-                                  label: `${purchase.purchaseNumber} · Foto penerimaan ${index + 1}`,
-                                });
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </TableCell>
-                    {canCreatePurchaseOrder && (
-                      <TableCell className="align-top text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {purchase.status === "PENDING_RECEIPT" &&
-                            purchase.isApprovedByDirector &&
-                            purchase.hasFinanceProof && (
-                              <ActionIconButton
-                                type="button"
-                                label={`Terima barang pembelian ${purchase.purchaseNumber}`}
-                                tooltip="Terima Barang"
-                                icon={PackageOpen}
-                                onClick={() => {
-                                  setReceivingPurchaseError("");
-                                  clearReceivingPhotos();
-                                  setReceivingPurchase(purchase);
-                                }}
-                              />
-                            )}
-                          {purchase.ticket && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  asChild
-                                  type="button"
-                                  size="icon"
-                                  variant="outline"
-                                  className="h-8 w-8 shrink-0"
-                                >
-                                  <Link
-                                    href={`/apps/logistics?tab=tickets&openSheet=${encodeURIComponent(purchase.ticket.id)}`}
-                                    aria-label={`Lihat tiket ${purchase.ticket.ticketNumber}`}
+                <div className="hidden md:block">
+                  <Table itemLabel="pembelian langsung">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Pembelian &amp; Vendor</TableHead>
+                        <TableHead>Tiket</TableHead>
+                        <TableHead>Barang</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Nota / Penerimaan</TableHead>
+                        <TableHead className="text-right">Aksi</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockPurchases.map((purchase) => {
+                        const itemNamesSummary = purchase.items
+                          .map((item) => item.itemName)
+                          .join(", ");
+                        const itemQtySummary = purchase.items
+                          .map((item) => `${item.quantity} ${item.unit}`)
+                          .join(" · ");
+                        const needsInvoice =
+                          canCreatePurchaseOrder &&
+                          canUploadDirectPurchaseInvoice(purchase);
+                        const readyToReceive = canReceiveDirectPurchase(
+                          purchase,
+                          canCreatePurchaseOrder,
+                        );
+
+                        return (
+                          <TableRow key={purchase.id}>
+                            <TableCell className="whitespace-normal">
+                              <p className="type-p2 font-mono font-semibold text-foreground">
+                                {purchase.purchaseNumber}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {purchase.vendorName} ·{" "}
+                                {stockDateLabel.format(
+                                  new Date(purchase.createdAt),
+                                )}
+                              </p>
+                            </TableCell>
+                            <TableCell className="max-w-[180px] whitespace-normal">
+                              {purchase.ticket ? (
+                                <div className="space-y-0.5">
+                                  <Badge variant="outline">
+                                    {purchase.ticket.ticketNumber}
+                                  </Badge>
+                                  <p className="type-p3 truncate text-muted-foreground">
+                                    {purchase.ticket.title}
+                                  </p>
+                                </div>
+                              ) : (
+                                <span className="type-p3 text-muted-foreground">
+                                  —
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="max-w-[180px] whitespace-normal">
+                              <p
+                                className="type-p2 line-clamp-2 font-medium"
+                                title={itemNamesSummary}
+                              >
+                                {itemNamesSummary}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {itemQtySummary}
+                              </p>
+                            </TableCell>
+                            <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                              {currency.format(Number(purchase.totalAmount))}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  purchase.status === "RECEIVED"
+                                    ? "lightSuccess"
+                                    : "lightWarning"
+                                }
+                              >
+                                {getDirectPurchaseStatusLabel(purchase)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="whitespace-normal">
+                              <div className="space-y-0.5">
+                                {purchase.vendorInvoiceUrl ? (
+                                  <p className="type-p3 font-medium text-emerald-700 dark:text-emerald-300">
+                                    Nota diunggah
+                                    {purchase.vendorInvoiceUploadedBy?.name
+                                      ? ` (${purchase.vendorInvoiceUploadedBy.name})`
+                                      : ""}
+                                  </p>
+                                ) : (
+                                  <p className="type-p3 text-muted-foreground">
+                                    Belum ada nota
+                                  </p>
+                                )}
+                                {purchase.receivedAt && (
+                                  <p className="type-p3 text-muted-foreground">
+                                    Diterima{" "}
+                                    {stockDateLabel.format(
+                                      new Date(purchase.receivedAt),
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {needsInvoice ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setInvoiceFiles([]);
+                                      setDirectPurchaseModal({
+                                        purchase,
+                                        mode: "invoice",
+                                      });
+                                    }}
                                   >
-                                    <Eye className="size-4" />
-                                  </Link>
+                                    <Upload
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Unggah Nota
+                                  </Button>
+                                ) : readyToReceive ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => {
+                                      setReceivingFiles([]);
+                                      setReceivingPurchase(purchase);
+                                    }}
+                                  >
+                                    <PackageOpen
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Terima
+                                  </Button>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setInvoiceFiles([]);
+                                    setDirectPurchaseModal({
+                                      purchase,
+                                      mode: "detail",
+                                    });
+                                  }}
+                                >
+                                  Detail
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Lihat tiket {purchase.ticket.ticketNumber}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                  );
-                })}
-                {stockPurchases.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={canCreatePurchaseOrder ? 8 : 7}
-                      className="py-8 text-center text-sm text-muted-foreground"
-                    >
-                      Belum ada pembelian langsung.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
           </div>
         </CardBox>
 
+        {/* HOISTED SINGLE DIRECT PURCHASE MODAL (Unggah Nota / Detail) */}
+        <GlobalModal
+          isOpen={directPurchaseModal !== null}
+          onClose={() => {
+            if (!isInvoicePending) {
+              setDirectPurchaseModal(null);
+              setInvoiceFiles([]);
+            }
+          }}
+          title={
+            directPurchaseModal?.mode === "invoice"
+              ? `Unggah Nota · ${directPurchaseModal.purchase.purchaseNumber}`
+              : `Detail Pembelian · ${directPurchaseModal?.purchase.purchaseNumber ?? ""}`
+          }
+          description={directPurchaseModal?.purchase.vendorName}
+          className="sm:max-w-lg"
+          footer={
+            directPurchaseModal ? (
+              directPurchaseModal.mode === "invoice" ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isInvoicePending}
+                    onClick={() => setDirectPurchaseModal(null)}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="hoisted-direct-purchase-invoice-form"
+                    disabled={isInvoicePending || invoiceFiles.length === 0}
+                  >
+                    {isInvoicePending ? "Mengirim..." : "Kirim ke Keuangan"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDirectPurchaseModal(null)}
+                  >
+                    Tutup
+                  </Button>
+                  {canCreatePurchaseOrder &&
+                    canUploadDirectPurchaseInvoice(
+                      directPurchaseModal.purchase,
+                    ) && (
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          setDirectPurchaseModal({
+                            purchase: directPurchaseModal.purchase,
+                            mode: "invoice",
+                          })
+                        }
+                      >
+                        <Upload className="size-4" aria-hidden="true" />
+                        Unggah Nota
+                      </Button>
+                    )}
+                  {canReceiveDirectPurchase(
+                    directPurchaseModal.purchase,
+                    canCreatePurchaseOrder,
+                  ) && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const target = directPurchaseModal.purchase;
+                        setDirectPurchaseModal(null);
+                        setReceivingFiles([]);
+                        setReceivingPurchase(target);
+                      }}
+                    >
+                      <PackageOpen className="size-4" aria-hidden="true" />
+                      Terima Barang
+                    </Button>
+                  )}
+                </>
+              )
+            ) : undefined
+          }
+        >
+          {directPurchaseModal ? (
+            directPurchaseModal.mode === "invoice" ? (
+              <form
+                id="hoisted-direct-purchase-invoice-form"
+                className="space-y-4"
+                onSubmit={handleUploadDirectPurchaseInvoice}
+              >
+                <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-3">
+                  <div>
+                    <p className="type-p3 text-muted-foreground">Total Belanja</p>
+                    <p className="type-h3 font-bold tabular-nums text-primary">
+                      {currency.format(
+                        Number(directPurchaseModal.purchase.totalAmount),
+                      )}
+                    </p>
+                  </div>
+                  {invoiceFiles[0] ? (
+                    <InvoiceFilePreview
+                      file={invoiceFiles[0]}
+                      title={`Pratinjau Nota · ${directPurchaseModal.purchase.purchaseNumber}`}
+                    />
+                  ) : null}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="type-p2 font-semibold">
+                    Foto Invoice / Bon Faktur{" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <FileDropzone
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    maxFiles={1}
+                    maxSizeMb={5}
+                    files={invoiceFiles}
+                    disabled={isInvoicePending}
+                    label="Unggah Foto Nota / Bon"
+                    hint="Format JPG, PNG, atau WEBP (maksimal 5 MB)."
+                    onFilesChange={setInvoiceFiles}
+                    onError={(err) => toast.error(err)}
+                  />
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <dl className="type-p2 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd className="text-right font-medium">
+                    {getDirectPurchaseStatusLabel(directPurchaseModal.purchase)}
+                  </dd>
+                  <dt className="text-muted-foreground">Vendor</dt>
+                  <dd className="text-right font-medium">
+                    {directPurchaseModal.purchase.vendorName}
+                  </dd>
+                  <dt className="text-muted-foreground">Total</dt>
+                  <dd className="text-right font-bold tabular-nums text-primary">
+                    {currency.format(
+                      Number(directPurchaseModal.purchase.totalAmount),
+                    )}
+                  </dd>
+                  {directPurchaseModal.purchase.ticket && (
+                    <>
+                      <dt className="text-muted-foreground">Tiket Terkait</dt>
+                      <dd className="text-right font-medium">
+                        {directPurchaseModal.purchase.ticket.ticketNumber} ·{" "}
+                        {directPurchaseModal.purchase.ticket.title}
+                      </dd>
+                    </>
+                  )}
+                </dl>
+
+                <div className="rounded-xl border border-border bg-muted/20 p-3">
+                  <p className="type-p3 font-semibold uppercase tracking-wide text-muted-foreground">
+                    Daftar Barang
+                  </p>
+                  <ul className="mt-2 divide-y divide-border/50">
+                    {directPurchaseModal.purchase.items.map((item) => (
+                      <li
+                        key={item.id}
+                        className="type-p2 flex items-center justify-between py-1.5"
+                      >
+                        <span>{item.itemName}</span>
+                        <Badge variant="gray">
+                          {item.quantity} {item.unit}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {directPurchaseModal.purchase.vendorInvoiceUrl && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setStockReceiptPreviewFailed(false);
+                        setStockReceiptPreview({
+                          url: directPurchaseModal.purchase.vendorInvoiceUrl!,
+                          label: `${directPurchaseModal.purchase.purchaseNumber} · Invoice / BON`,
+                        });
+                      }}
+                    >
+                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                      Lihat Nota Vendor
+                    </Button>
+                  </div>
+                )}
+
+                {(() => {
+                  const p = directPurchaseModal.purchase;
+                  const photos =
+                    p.receivedPhotos.length > 0
+                      ? p.receivedPhotos
+                      : p.arrivalPhotoUrl
+                        ? [p.arrivalPhotoUrl]
+                        : [];
+                  if (photos.length === 0) return null;
+                  return (
+                    <div className="space-y-2">
+                      <p className="type-p3 font-semibold uppercase tracking-wide text-muted-foreground">
+                        Foto Penerimaan ({photos.length})
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {photos.map((photo, index) => (
+                          <Button
+                            key={`${p.id}-${photo}`}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setStockReceiptPreviewFailed(false);
+                              setStockReceiptPreview({
+                                url: photo,
+                                label: `${p.purchaseNumber} · Foto penerimaan ${index + 1}`,
+                              });
+                            }}
+                          >
+                            <Eye className="size-3.5" aria-hidden="true" />
+                            Foto #{index + 1}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )
+          ) : null}
+        </GlobalModal>
+
+        {/* CSV Import Modal */}
+        {canCreatePurchaseOrder && (
+          <GlobalModal
+            isOpen={csvModalOpen}
+            onClose={() => {
+              if (!stockImporting) setCsvModalOpen(false);
+            }}
+            title="Impor Stok CSV"
+            description="Unggah berkas CSV berisi daftar SKU dan jumlah stok material."
+            className="sm:max-w-md"
+            footer={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={stockImporting}
+                  onClick={() => setCsvModalOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  disabled={stockImporting || csvFiles.length === 0}
+                  onClick={() => void handleImportStockCsv()}
+                >
+                  {stockImporting ? "Mengimpor..." : "Mulai Impor"}
+                </Button>
+              </>
+            }
+          >
+            <FileDropzone
+              accept=".csv,text/csv"
+              maxFiles={1}
+              maxSizeMb={1}
+              files={csvFiles}
+              disabled={stockImporting}
+              label="Pilih Berkas CSV"
+              hint="Maksimal 1 MB."
+              onFilesChange={setCsvFiles}
+              onError={(err) => toast.error(err)}
+            />
+          </GlobalModal>
+        )}
+
+        {/* Stock Item Editor Modal */}
         {canCreatePurchaseOrder && (
           <GlobalModal
             isOpen={stockDialogOpen}
             onClose={() => {
-              setStockDialogOpen(false);
-              setStockFormError("");
+              if (!stockSubmitting) setStockDialogOpen(false);
             }}
-            title={editingStockId ? "Edit Barang Persediaan" : "Tambah Barang Persediaan"}
+            title={editingStockId ? "Edit Barang" : "Tambah Barang"}
             description="Perbarui katalog material dan saldo stok yang tercatat."
             className="sm:max-w-xl"
-          >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="stock-item-name">Nama barang</Label>
-                  <Input
-                    id="stock-item-name"
-                    value={stockDraft.name}
-                    maxLength={120}
-                    onChange={(event) =>
-                      setStockDraft((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stock-item-sku">SKU</Label>
-                  <Input
-                    id="stock-item-sku"
-                    value={stockDraft.sku}
-                    placeholder={
-                      editingStockId ? "Masukkan SKU" : "Dibuat otomatis saat disimpan"
-                    }
-                    disabled={!editingStockId}
-                    readOnly={!editingStockId}
-                    maxLength={64}
-                    onChange={(event) =>
-                      setStockDraft((current) => ({
-                        ...current,
-                        sku: event.target.value.toUpperCase(),
-                      }))
-                    }
-                  />
-                  {!editingStockId && (
-                    <p className="text-xs text-muted-foreground">
-                      Sistem akan membuat SKU unik secara otomatis.
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stock-item-unit">Satuan</Label>
-                  <Input
-                    id="stock-item-unit"
-                    value={stockDraft.unit}
-                    maxLength={24}
-                    onChange={(event) =>
-                      setStockDraft((current) => ({
-                        ...current,
-                        unit: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stock-item-price">Harga satuan (Rp)</Label>
-                  <Input
-                    id="stock-item-price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={stockDraft.unitPrice}
-                    onChange={(event) =>
-                      setStockDraft((current) => ({
-                        ...current,
-                        unitPrice: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stock-item-quantity">Stok tersedia</Label>
-                  <Input
-                    id="stock-item-quantity"
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={stockDraft.stockQuantity}
-                    onChange={(event) =>
-                      setStockDraft((current) => ({
-                        ...current,
-                        stockQuantity: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stock-item-minimum">Batas minimum</Label>
-                  <Input
-                    id="stock-item-minimum"
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    value={stockDraft.minimumStock}
-                    onChange={(event) =>
-                      setStockDraft((current) => ({
-                        ...current,
-                        minimumStock: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              {stockFormError && (
-                <p className="text-sm text-destructive" role="alert">
-                  {stockFormError}
-                </p>
-              )}
-              <div className="flex justify-end gap-2">
+            footer={
+              <>
                 <Button
                   type="button"
                   variant="outline"
@@ -2033,91 +2128,203 @@ export default function LogisticsWorkspace({
                 >
                   {stockSubmitting ? "Menyimpan..." : "Simpan Barang"}
                 </Button>
+              </>
+            }
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="stock-item-name" className="type-p2 font-medium">
+                  Nama Barang
+                </Label>
+                <Input
+                  id="stock-item-name"
+                  value={stockDraft.name}
+                  maxLength={120}
+                  onChange={(event) =>
+                    setStockDraft((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="stock-item-sku" className="type-p2 font-medium">
+                  SKU
+                </Label>
+                <Input
+                  id="stock-item-sku"
+                  value={stockDraft.sku}
+                  placeholder={
+                    editingStockId
+                      ? "Masukkan SKU"
+                      : "Dibuat otomatis saat disimpan"
+                  }
+                  disabled={!editingStockId}
+                  readOnly={!editingStockId}
+                  maxLength={64}
+                  onChange={(event) =>
+                    setStockDraft((current) => ({
+                      ...current,
+                      sku: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="stock-item-unit" className="type-p2 font-medium">
+                  Satuan
+                </Label>
+                <Input
+                  id="stock-item-unit"
+                  value={stockDraft.unit}
+                  maxLength={24}
+                  onChange={(event) =>
+                    setStockDraft((current) => ({
+                      ...current,
+                      unit: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="stock-item-price"
+                  className="type-p2 font-medium"
+                >
+                  Harga Satuan (Rp)
+                </Label>
+                <Input
+                  id="stock-item-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={stockDraft.unitPrice}
+                  onChange={(event) =>
+                    setStockDraft((current) => ({
+                      ...current,
+                      unitPrice: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="stock-item-quantity"
+                  className="type-p2 font-medium"
+                >
+                  Stok Tersedia
+                </Label>
+                <Input
+                  id="stock-item-quantity"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={stockDraft.stockQuantity}
+                  onChange={(event) =>
+                    setStockDraft((current) => ({
+                      ...current,
+                      stockQuantity: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="stock-item-minimum"
+                  className="type-p2 font-medium"
+                >
+                  Batas Minimum
+                </Label>
+                <Input
+                  id="stock-item-minimum"
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={stockDraft.minimumStock}
+                  onChange={(event) =>
+                    setStockDraft((current) => ({
+                      ...current,
+                      minimumStock: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
           </GlobalModal>
         )}
+
+        {/* Stock Detail Modal */}
         <GlobalModal
           isOpen={stockDetail !== null}
           onClose={() => setStockDetail(null)}
           title="Detail Barang"
           description="Informasi katalog dan posisi stok material."
           className="sm:max-w-md"
+          footer={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setStockDetail(null)}
+            >
+              Tutup
+            </Button>
+          }
         >
-            {stockDetail && (
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <dt className="text-muted-foreground">Nama Barang</dt>
-                <dd className="text-right font-medium">{stockDetail.name}</dd>
-                <dt className="text-muted-foreground">SKU</dt>
-                <dd className="text-right font-medium">{stockDetail.sku}</dd>
-                <dt className="text-muted-foreground">Satuan</dt>
-                <dd className="text-right font-medium">{stockDetail.unit}</dd>
-                <dt className="text-muted-foreground">Stok Tersedia</dt>
-                <dd className="text-right font-medium">
-                  {new Intl.NumberFormat("id-ID").format(
-                    Number(stockDetail.stockQuantity),
-                  )}{" "}
-                  {stockDetail.unit}
-                </dd>
-                <dt className="text-muted-foreground">Batas Minimum</dt>
-                <dd className="text-right font-medium">
-                  {new Intl.NumberFormat("id-ID").format(
-                    Number(stockDetail.minimumStock),
-                  )}{" "}
-                  {stockDetail.unit}
-                </dd>
-                <dt className="text-muted-foreground">Harga Satuan</dt>
-                <dd className="text-right font-medium">
-                  {currency.format(Number(stockDetail.unitPrice))}
-                </dd>
-                <dt className="text-muted-foreground">Nilai Persediaan</dt>
-                <dd className="text-right font-medium">
-                  {currency.format(
-                    Number(stockDetail.stockQuantity) *
-                      Number(stockDetail.unitPrice),
-                  )}
-                </dd>
-                <dt className="text-muted-foreground">Tanggal Dibuat</dt>
-                <dd className="text-right font-medium">
-                  {stockDateLabel.format(new Date(stockDetail.createdAt))}
-                </dd>
-              </dl>
-            )}
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setStockDetail(null)}
-              >
-                Tutup
-              </Button>
-            </div>
+          {stockDetail && (
+            <dl className="type-p2 grid grid-cols-2 gap-x-4 gap-y-3">
+              <dt className="text-muted-foreground">Nama Barang</dt>
+              <dd className="text-right font-medium">{stockDetail.name}</dd>
+              <dt className="text-muted-foreground">SKU</dt>
+              <dd className="text-right font-mono font-medium">
+                {stockDetail.sku}
+              </dd>
+              <dt className="text-muted-foreground">Satuan</dt>
+              <dd className="text-right font-medium">{stockDetail.unit}</dd>
+              <dt className="text-muted-foreground">Stok Tersedia</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {new Intl.NumberFormat("id-ID").format(
+                  Number(stockDetail.stockQuantity),
+                )}{" "}
+                {stockDetail.unit}
+              </dd>
+              <dt className="text-muted-foreground">Batas Minimum</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {new Intl.NumberFormat("id-ID").format(
+                  Number(stockDetail.minimumStock),
+                )}{" "}
+                {stockDetail.unit}
+              </dd>
+              <dt className="text-muted-foreground">Harga Satuan</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {currency.format(Number(stockDetail.unitPrice))}
+              </dd>
+              <dt className="text-muted-foreground">Nilai Persediaan</dt>
+              <dd className="text-right font-medium tabular-nums">
+                {currency.format(
+                  Number(stockDetail.stockQuantity) *
+                    Number(stockDetail.unitPrice),
+                )}
+              </dd>
+              <dt className="text-muted-foreground">Tanggal Dibuat</dt>
+              <dd className="text-right font-medium">
+                {stockDateLabel.format(new Date(stockDetail.createdAt))}
+              </dd>
+            </dl>
+          )}
         </GlobalModal>
+
+        {/* Stock Delete Modal */}
         <GlobalModal
           isOpen={stockDeleteTarget !== null}
           onClose={() => {
-            if (stockDeleteSubmitting) return;
-            setStockDeleteTarget(null);
-            setStockDeleteError("");
+            if (!stockDeleteSubmitting) setStockDeleteTarget(null);
           }}
           title="Hapus Barang Persediaan?"
-          description="Barang ini akan dihapus permanen dari katalog dan tidak dapat dipilih untuk PO baru. Riwayat tiket yang sudah dibuat tidak terhapus."
+          description="Barang ini akan dihapus permanen dari katalog dan tidak dapat dipilih untuk PO baru."
           className="sm:max-w-md"
-          footerNote="Tindakan ini tidak dapat dibatalkan."
-        >
-            {stockDeleteTarget && (
-              <div className="rounded-md border border-border bg-muted p-3 text-sm">
-                <p className="font-medium">{stockDeleteTarget.name}</p>
-                <p className="text-muted-foreground">
-                  SKU: {stockDeleteTarget.sku}
-                </p>
-              </div>
-            )}
-            {stockDeleteError && (
-              <p className="text-sm text-destructive" role="alert">
-                {stockDeleteError}
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
+          footer={
+            <>
               <Button
                 type="button"
                 variant="outline"
@@ -2132,173 +2339,109 @@ export default function LogisticsWorkspace({
                 onClick={confirmDeleteStockItem}
                 disabled={stockDeleteSubmitting}
               >
-                {stockDeleteSubmitting ? "Menghapus..." : "Hapus Permanen"}
+                {stockDeleteSubmitting ? "Menghapus..." : "Hapus"}
               </Button>
+            </>
+          }
+        >
+          {stockDeleteTarget && (
+            <div className="rounded-md border border-border bg-muted p-3">
+              <p className="type-p2 font-medium">{stockDeleteTarget.name}</p>
+              <p className="type-p3 text-muted-foreground">
+                SKU: {stockDeleteTarget.sku}
+              </p>
             </div>
+          )}
         </GlobalModal>
+
+        {/* Direct Purchase Receive Modal */}
         <GlobalModal
           isOpen={receivingPurchase !== null}
           onClose={() => {
-            if (receivingPurchaseSubmitting) return;
-            setReceivingPurchase(null);
-            setReceivingPurchaseError("");
-            clearReceivingPhotos();
+            if (!receivingPurchaseSubmitting) {
+              setReceivingPurchase(null);
+              setReceivingFiles([]);
+            }
           }}
           title="Terima Pembelian Stok"
           description={
             receivingPurchase
-              ? `${receivingPurchase.purchaseNumber} · ${receivingPurchase.vendorName}. Stok bertambah setelah penerimaan ini tersimpan.`
-              : "Unggah foto sebagai bukti barang telah tiba di gudang."
+              ? `${receivingPurchase.purchaseNumber} · ${receivingPurchase.vendorName}. Stok bertambah setelah penerimaan tersimpan.`
+              : "Unggah foto bukti barang telah tiba di gudang."
           }
           className="sm:max-w-lg"
-        >
-            {receivingPurchase && (
-              <form
-                key={receivingPurchase.id}
-                className="space-y-4"
-                onSubmit={submitStockPurchaseReceipt}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setReceivingPurchase(null);
+                  setReceivingFiles([]);
+                }}
+                disabled={receivingPurchaseSubmitting}
               >
-                <input
-                  type="hidden"
-                  name="purchaseId"
-                  value={receivingPurchase.id}
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                form="direct-purchase-receive-form"
+                disabled={
+                  receivingPurchaseSubmitting ||
+                  receivingFiles.length === 0 ||
+                  receivingFiles.length >
+                    MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS
+                }
+              >
+                {receivingPurchaseSubmitting ? "Mencatat..." : "Terima Barang"}
+              </Button>
+            </>
+          }
+        >
+          {receivingPurchase && (
+            <form
+              id="direct-purchase-receive-form"
+              key={receivingPurchase.id}
+              className="space-y-4"
+              onSubmit={submitStockPurchaseReceipt}
+            >
+              <div className="space-y-1.5">
+                <Label className="type-p2 font-semibold">
+                  Foto Bukti Barang Tiba (1–
+                  {MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS} Foto)
+                </Label>
+                <FileDropzone
+                  accept="image/*,.heic,.heif"
+                  multiple
+                  capture="environment"
+                  maxFiles={MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS}
+                  maxSizeMb={5}
+                  files={receivingFiles}
+                  disabled={receivingPurchaseSubmitting}
+                  label="Unggah Foto Penerimaan"
+                  hint="Format JPG, PNG, atau WEBP; maksimal 5 MB per foto."
+                  onFilesChange={setReceivingFiles}
+                  onError={(err) => toast.error(err)}
                 />
-                <div className="space-y-3">
-                  <Label>Foto bukti barang tiba</Label>
-                  <input
-                    ref={receivingPhotoInput}
-                    type="file"
-                    accept="image/*,.heic,.heif"
-                    multiple
-                    className="sr-only"
-                    onChange={selectReceivingPhotos}
-                    disabled={
-                      receivingPurchaseSubmitting ||
-                      receivingPhotos.length >=
-                        MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS
-                    }
-                    aria-label="Pilih foto bukti barang tiba"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => receivingPhotoInput.current?.click()}
-                    disabled={
-                      receivingPurchaseSubmitting ||
-                      receivingPhotos.length >=
-                        MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS
-                    }
-                  >
-                    <FileUp aria-hidden="true" />
-                    Pilih Foto ({receivingPhotos.length}/
-                    {MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS})
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Foto disimpan di formulir terlebih dahulu dan baru diunggah
-                    ke Cloudinary saat Anda menekan Terima Barang. Pilih 1–
-                    {MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS} foto JPG, PNG,
-                    atau WEBP; maksimal 5 MB per foto.
-                  </p>
-                  {receivingPhotos.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2">
-                      {receivingPhotos.map((photo, index) => (
-                        <div
-                          key={photo.id}
-                          className="relative aspect-[4/3] overflow-hidden rounded-md border"
-                        >
-                          <button
-                            type="button"
-                            className="relative block size-full cursor-zoom-in"
-                            aria-label={`Pratinjau foto ${index + 1}`}
-                            onClick={() => {
-                              setStockReceiptPreviewFailed(false);
-                              setStockReceiptPreview({
-                                label: `Pratinjau foto ${index + 1} · ${photo.file.name}`,
-                                url: photo.previewUrl,
-                              });
-                            }}
-                          >
-                            <Image
-                              src={photo.previewUrl}
-                              alt={`Bukti penerimaan ${index + 1}`}
-                              fill
-                              unoptimized
-                              className="object-cover"
-                              sizes="(max-width: 640px) 30vw, 140px"
-                            />
-                          </button>
-                          <ActionIconButton
-                            label={`Hapus foto ${index + 1}`}
-                            tooltip={`Hapus foto ${index + 1}`}
-                            icon={X}
-                            variant="destructive"
-                            className="absolute right-1 top-1"
-                            onClick={() => {
-                              URL.revokeObjectURL(photo.previewUrl);
-                              receivingPreviewUrls.current.delete(
-                                photo.previewUrl,
-                              );
-                              setReceivingPhotos((current) =>
-                                current.filter(
-                                  (currentPhoto) => currentPhoto.id !== photo.id,
-                                ),
-                              );
-                            }}
-                            disabled={receivingPurchaseSubmitting}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {receivingPurchaseError && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {receivingPurchaseError}
-                  </p>
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setReceivingPurchase(null);
-                      setReceivingPurchaseError("");
-                      clearReceivingPhotos();
-                    }}
-                    disabled={receivingPurchaseSubmitting}
-                  >
-                    Batal
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={
-                      receivingPurchaseSubmitting ||
-                      receivingPhotos.length === 0 ||
-                      receivingPhotos.length >
-                        MAX_DIRECT_STOCK_PURCHASE_RECEIPT_PHOTOS
-                    }
-                  >
-                    {receivingPurchaseSubmitting
-                      ? "Mengunggah foto dan mencatat..."
-                      : "Terima Barang"}
-                  </Button>
-                </div>
-              </form>
-            )}
+              </div>
+            </form>
+          )}
         </GlobalModal>
+
+        {/* Receipt / Invoice Preview Modal */}
         <GlobalModal
           isOpen={stockReceiptPreview !== null}
           onClose={() => {
             setStockReceiptPreview(null);
             setStockReceiptPreviewFailed(false);
           }}
-          title={stockReceiptPreview?.label ?? "Bukti penerimaan"}
-          description="Pratinjau dokumen/foto bukti penerimaan barang."
-          className="sm:max-w-5xl"
+          title={stockReceiptPreview?.label ?? "Bukti Dokumen"}
+          description="Pratinjau dokumen atau foto bukti."
+          className="sm:max-w-4xl"
           footer={
             stockReceiptPreview &&
             !stockReceiptPreview.url.startsWith("blob:") ? (
-              <div className="flex w-full items-center justify-end gap-2">
+              <>
                 <Button
                   type="button"
                   variant="outline"
@@ -2314,60 +2457,59 @@ export default function LogisticsWorkspace({
                     href={photoDownloadHref(stockReceiptPreview.url)}
                     {...photoDownloadLinkProps(stockReceiptPreview.url)}
                   >
-                    <Download className="mr-1.5 size-4" aria-hidden="true" />
+                    <Download className="size-4" aria-hidden="true" />
                     {photoDownloadLabel(stockReceiptPreview.url)}
                   </a>
                 </Button>
-              </div>
+              </>
             ) : undefined
           }
         >
-            {stockReceiptPreview && (
-              <>
-                <div className="relative flex min-h-64 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 sm:min-h-[60vh]">
-                  {stockReceiptPreview.url
-                    .split(/[?#]/, 1)[0]
-                    .toLowerCase()
-                    .endsWith(".pdf") ? (
-                    <iframe
-                      key={stockReceiptPreview.url}
-                      src={withLocalPhotoPreview(stockReceiptPreview.url)}
-                      title={`Pratinjau ${stockReceiptPreview.label}`}
-                      className="h-[65vh] w-full"
-                    />
-                  ) : stockReceiptPreviewFailed ? (
-                    <p className="max-w-lg p-6 text-center text-sm text-muted-foreground" role="status">
-                      Foto ini tidak dapat dimuat. Jika URL menggunakan rute
-                      penyimpanan lokal lama, file sumbernya mungkin sudah tidak
-                      tersedia di server asal. Foto baru akan tersimpan di
-                      Cloudinary.
-                    </p>
-                  ) : (
-                    <Image
-                      key={stockReceiptPreview.url}
-                      src={withLocalPhotoPreview(stockReceiptPreview.url)}
-                      alt={stockReceiptPreview.label}
-                      fill
-                      unoptimized
-                      className="object-contain"
-                      sizes="(max-width: 640px) 100vw, 80vw"
-                      onError={() => setStockReceiptPreviewFailed(true)}
-                    />
-                  )}
-                </div>
-              </>
-            )}
+          {stockReceiptPreview && (
+            <div className="relative flex min-h-64 items-center justify-center overflow-hidden rounded-lg border bg-muted/30 sm:min-h-[60vh]">
+              {stockReceiptPreview.url
+                .split(/[?#]/, 1)[0]
+                .toLowerCase()
+                .endsWith(".pdf") ? (
+                <iframe
+                  key={stockReceiptPreview.url}
+                  src={withLocalPhotoPreview(stockReceiptPreview.url)}
+                  title={`Pratinjau ${stockReceiptPreview.label}`}
+                  className="h-[65vh] w-full"
+                />
+              ) : stockReceiptPreviewFailed ? (
+                <p
+                  className="type-p2 max-w-lg p-6 text-center text-muted-foreground"
+                  role="status"
+                >
+                  Foto ini tidak dapat dimuat. Gunakan tombol unduh untuk memeriksa berkas asli.
+                </p>
+              ) : (
+                <Image
+                  key={stockReceiptPreview.url}
+                  src={withLocalPhotoPreview(stockReceiptPreview.url)}
+                  alt={stockReceiptPreview.label}
+                  fill
+                  unoptimized
+                  className="object-contain"
+                  sizes="(max-width: 640px) 100vw, 80vw"
+                  onError={() => setStockReceiptPreviewFailed(true)}
+                />
+              )}
+            </div>
+          )}
         </GlobalModal>
       </div>
     );
   }
 
+  // MODE = "logistics" (Tiket Masuk & Overview)
   return (
     <div className="my-4 space-y-5 pb-12">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Manajemen Logistik</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h2 className="type-h2 text-foreground">Manajemen Tiket Logistik</h2>
+          <p className="type-p2 mt-1 text-muted-foreground">
             Pantau permintaan material, status pemenuhan, dan pengiriman.
           </p>
         </div>
@@ -2395,7 +2537,6 @@ export default function LogisticsWorkspace({
             key={label}
             type="button"
             className="rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`${label}: ${value}. ${note}`}
             onClick={() => {
               setStatusFilter(filter);
               setSearch("");
@@ -2404,11 +2545,11 @@ export default function LogisticsWorkspace({
             <CardBox className="h-full p-3.5 transition-colors hover:bg-muted/40">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="type-p3 font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="mt-1.5 text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{note}</p>
+                  <p className="type-kpi mt-1.5">{value}</p>
+                  <p className="type-p3 mt-1 text-muted-foreground">{note}</p>
                 </div>
                 <span className={`shrink-0 rounded-md p-2 ${background} ${color}`}>
                   <Icon className="size-5" aria-hidden="true" />
@@ -2423,8 +2564,8 @@ export default function LogisticsWorkspace({
         <CardBox className="overflow-hidden p-0 xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div>
-              <h3 className="font-semibold">Tren Pesanan</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <h3 className="type-h3 font-semibold">Tren Pesanan</h3>
+              <p className="type-p2 mt-1 text-muted-foreground">
                 Jumlah permintaan dan nilai estimasi
               </p>
             </div>
@@ -2460,17 +2601,20 @@ export default function LogisticsWorkspace({
                 width="100%"
               />
             ) : (
-              <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
-                Tidak ada pesanan dalam {period} hari terakhir.
-              </div>
+              <EmptyState
+                icon={ClipboardList}
+                variant="inline"
+                title="Belum Ada Pesanan"
+                description={`Tidak ada pesanan dalam ${period} hari terakhir.`}
+              />
             )}
           </div>
         </CardBox>
 
         <CardBox className="overflow-hidden p-0">
           <div className="border-b border-border px-5 py-4">
-            <h3 className="font-semibold">Status Pesanan</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h3 className="type-h3 font-semibold">Status Pesanan</h3>
+            <p className="type-p2 mt-1 text-muted-foreground">
               Distribusi status seluruh tiket material
             </p>
           </div>
@@ -2487,7 +2631,7 @@ export default function LogisticsWorkspace({
                 {statusCounts.map(({ status, count }) => (
                   <li
                     key={status}
-                    className="flex items-center justify-between gap-3 text-sm"
+                    className="type-p2 flex items-center justify-between gap-3"
                   >
                     <span className="flex items-center gap-2">
                       <span
@@ -2502,9 +2646,12 @@ export default function LogisticsWorkspace({
               </ul>
             </>
           ) : (
-            <p className="p-8 text-center text-sm text-muted-foreground">
-              Belum ada pesanan material.
-            </p>
+            <EmptyState
+              icon={ClipboardList}
+              variant="inline"
+              title="Belum Ada Pesanan"
+              description="Belum ada pesanan material tercatat."
+            />
           )}
         </CardBox>
       </div>
@@ -2512,9 +2659,9 @@ export default function LogisticsWorkspace({
       <CardBox className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
           <div>
-            <h3 className="font-semibold">Pesanan Material</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Lihat rincian, lacak aktivitas, dan lanjutkan proses pemenuhan.
+            <h3 className="type-h3 font-semibold">Pesanan Material</h3>
+            <p className="type-p2 mt-1 text-muted-foreground">
+              Lihat rincian, lacak aktivitas, dan lanjutkan pemenuhan.
             </p>
           </div>
           <div className="flex w-full flex-wrap gap-2 sm:w-auto">
@@ -2527,7 +2674,10 @@ export default function LogisticsWorkspace({
               className="sm:w-52"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48" aria-label="Filter status">
+              <SelectTrigger
+                className="w-full sm:w-48"
+                aria-label="Filter status"
+              >
                 <SelectValue placeholder="Semua status" />
               </SelectTrigger>
               <SelectContent>

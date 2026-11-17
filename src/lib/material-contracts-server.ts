@@ -10,7 +10,7 @@ import {
   formatVendorBankAccount,
   getVendorBankAccounts,
 } from "@/lib/vendor-bank-accounts";
-import { connectToMongoDB } from "@/lib/mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
 import FinanceAccount from "@/models/finance-account";
 import Project from "@/models/project";
 import Ticket from "@/models/ticket";
@@ -72,7 +72,7 @@ function mapVendorBankOptions(
 export async function loadActiveTicketMaterialContractOptions(): Promise<
   TicketMaterialContractOption[]
 > {
-  await connectToMongoDB();
+  if (!(await connectToMongoDBOptional())) return [];
   const today = getJakartaDateOnlyUtc();
   const contracts = await MaterialContract.find({
     isActive: true,
@@ -105,12 +105,39 @@ const OPEN_CONTRACT_DELIVERY_TICKET_STATUSES: TicketStatus[] = [
   TicketStatus.PROCESSED_LOGISTIC,
   TicketStatus.ASSIGNED_TO_MOVER,
   TicketStatus.IN_TRANSIT,
+  TicketStatus.WAITING_FINANCE_PAYMENT,
 ];
+
+function safeIsoDateOnly(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+  return new Date(0).toISOString().slice(0, 10);
+}
+
+function safeIsoDateTime(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+  }
+  return new Date(0).toISOString();
+}
 
 export async function loadOpenContractDeliveryTickets(options?: {
   projectId?: string;
 }): Promise<ContractTicketDeliveryOption[]> {
-  await connectToMongoDB();
+  if (!(await connectToMongoDBOptional())) return [];
 
   const contractTicketItems = await TicketItem.find({
     categoryHint: TicketCategoryHint.CONTRACT,
@@ -132,7 +159,7 @@ export async function loadOpenContractDeliveryTickets(options?: {
   const tickets = await Ticket.find({
     _id: { $in: candidateTicketIds },
     type: TicketType.MATERIAL,
-    isApprovedByDirector: true,
+    isDeleted: { $ne: true },
     status: { $in: OPEN_CONTRACT_DELIVERY_TICKET_STATUSES },
     ...(options?.projectId
       ? { projectId: options.projectId }
@@ -275,7 +302,13 @@ export async function loadMaterialContractsBundle(options?: {
   projectId?: string;
   includeInvoices?: boolean;
 }): Promise<MaterialContractsBundle> {
-  await connectToMongoDB();
+  if (!(await connectToMongoDBOptional())) {
+    return {
+      contracts: [],
+      deliveries: [],
+      vendorInvoices: [],
+    };
+  }
   const includeInvoices = options?.includeInvoices ?? true;
   const deliveryFilter = options?.projectId
     ? { projectId: options.projectId }
@@ -361,7 +394,7 @@ export async function loadMaterialContractsBundle(options?: {
   ];
   const deliveryTicketIds = [
     ...new Set(
-      deliveryRows
+      [...deliveryRows, ...allDeliveryRows]
         .map((row) => row.ticketId)
         .filter((id): id is string => Boolean(id)),
     ),
@@ -522,9 +555,6 @@ export async function loadMaterialContractsBundle(options?: {
   const deliveries: MaterialDeliveryRow[] = deliveryRows.map((delivery) => {
     const contract = contractsById.get(delivery.contractId);
     const project = projectsById.get(delivery.projectId);
-    if (!contract || !project) {
-      throw new Error(`Material delivery ${delivery._id} has a missing contract or project`);
-    }
     const receiver = delivery.receivedById
       ? usersById.get(delivery.receivedById)
       : null;
@@ -536,26 +566,29 @@ export async function loadMaterialContractsBundle(options?: {
     const linkedTicket = delivery.ticketId
       ? ticketsById.get(delivery.ticketId)
       : null;
+    const unitPrice = contract?.unitPrice ?? 0;
     return {
       id: String(delivery._id),
       contractId: delivery.contractId,
-      contractNumber: contract.contractNumber,
-      vendorName: contract.vendorName,
-      materialType: contract.materialType,
-      unitPrice: contract.unitPrice,
-      unit: contract.unit,
+      contractNumber: contract?.contractNumber ?? "Kontrak tidak ditemukan",
+      vendorName: contract?.vendorName ?? "Vendor tidak ditemukan",
+      materialType: contract?.materialType ?? "-",
+      unitPrice,
+      unit: contract?.unit ?? "-",
       projectId: delivery.projectId,
-      projectName: `${project.kelompokTani} · ${project.title}`,
+      projectName: project
+        ? `${project.kelompokTani} · ${project.title}`
+        : "Proyek tidak ditemukan",
       ticketId: delivery.ticketId ?? null,
       ticketNumber: linkedTicket?.ticketNumber ?? null,
-      deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
+      deliveryDate: safeIsoDateOnly(delivery.deliveryDate),
       doNumber: delivery.doNumber,
       vehiclePlate: delivery.vehiclePlate ?? null,
       driverName: delivery.driverName ?? null,
       quantityReceived: roundMaterialNumber(delivery.quantityReceived, 2),
       estimatedAmount: calculateContractDeliverySubtotal(
         delivery.quantityReceived,
-        contract.unitPrice,
+        unitPrice,
       ),
       billingStatus: delivery.billingStatus,
       vendorInvoiceId: delivery.vendorInvoiceId ?? null,
@@ -564,33 +597,38 @@ export async function loadMaterialContractsBundle(options?: {
       receivedByName: receiver?.name ?? null,
       proofUrl: delivery.proofUrl ?? null,
       notes: delivery.notes ?? null,
-      createdAt: delivery.createdAt.toISOString(),
+      createdAt: safeIsoDateTime(delivery.createdAt),
     };
   });
 
   const vendorInvoices: VendorInvoiceRow[] = invoiceRows.map((invoice) => {
     const contract = contractsById.get(invoice.contractId);
-    if (!contract) {
-      throw new Error(`Vendor invoice ${invoice._id} has a missing contract`);
-    }
     const invoiceDeliveries = (
       deliveriesByInvoiceId.get(String(invoice._id)) ?? []
     ).sort(
       (left, right) =>
-        left.deliveryDate.getTime() - right.deliveryDate.getTime() ||
-        left.createdAt.getTime() - right.createdAt.getTime(),
+        (left.deliveryDate instanceof Date ? left.deliveryDate.getTime() : 0) -
+          (right.deliveryDate instanceof Date
+            ? right.deliveryDate.getTime()
+            : 0) ||
+        (left.createdAt instanceof Date ? left.createdAt.getTime() : 0) -
+          (right.createdAt instanceof Date ? right.createdAt.getTime() : 0),
     );
     const deliverySummaries = invoiceDeliveries.map((delivery) => {
       const project = projectsById.get(delivery.projectId);
-      if (!project) {
-        throw new Error(`Material delivery ${delivery._id} has a missing project`);
-      }
+      const linkedTicket = delivery.ticketId
+        ? ticketsById.get(delivery.ticketId)
+        : null;
       return {
         id: String(delivery._id),
         doNumber: delivery.doNumber,
-        deliveryDate: delivery.deliveryDate.toISOString().slice(0, 10),
+        deliveryDate: safeIsoDateOnly(delivery.deliveryDate),
         projectId: delivery.projectId,
-        projectName: `${project.kelompokTani} · ${project.title}`,
+        projectName: project
+          ? `${project.kelompokTani} · ${project.title}`
+          : "Proyek tidak ditemukan",
+        ticketId: delivery.ticketId ?? null,
+        ticketNumber: linkedTicket?.ticketNumber ?? null,
         vehiclePlate: delivery.vehiclePlate ?? null,
         driverName: delivery.driverName ?? null,
         quantityReceived: roundMaterialNumber(delivery.quantityReceived, 2),
@@ -610,10 +648,9 @@ export async function loadMaterialContractsBundle(options?: {
       : null;
     const payments = (paymentsByInvoiceId.get(String(invoice._id)) ?? []).map(
       (payment) => {
-        const paymentProcessor = usersById.get(payment.processedById);
-        if (!paymentProcessor) {
-          throw new Error(`Vendor invoice payment ${payment._id} has no processor`);
-        }
+        const paymentProcessor = payment.processedById
+          ? usersById.get(payment.processedById)
+          : null;
         const account = payment.financeAccountId
           ? accountsById.get(payment.financeAccountId)
           : null;
@@ -627,8 +664,9 @@ export async function loadMaterialContractsBundle(options?: {
           financeAccountId: payment.financeAccountId ?? null,
           financeAccountName: account?.accountName ?? null,
           notes: payment.notes ?? null,
-          processedByName: paymentProcessor.name ?? "",
-          paidAt: payment.paidAt.toISOString(),
+          processedByName:
+            paymentProcessor?.name ?? "Pengguna tidak ditemukan",
+          paidAt: safeIsoDateTime(payment.paidAt),
         };
       },
     );
@@ -637,16 +675,16 @@ export async function loadMaterialContractsBundle(options?: {
       id: String(invoice._id),
       invoiceNumber: invoice.invoiceNumber,
       contractId: invoice.contractId,
-      contractNumber: contract.contractNumber,
-      vendorId: contract.vendorId ?? null,
-      vendorName: contract.vendorName,
+      contractNumber: contract?.contractNumber ?? "Kontrak tidak ditemukan",
+      vendorId: contract?.vendorId ?? null,
+      vendorName: contract?.vendorName ?? "Vendor tidak ditemukan",
       vendorBankAccounts: mapVendorBankOptions(
-        contract.vendorId
+        contract?.vendorId
           ? vendorDetailsById.get(contract.vendorId)
           : null,
       ),
-      materialType: contract.materialType,
-      unit: contract.unit,
+      materialType: contract?.materialType ?? "-",
+      unit: contract?.unit ?? "-",
       unitPrice: invoice.unitPrice,
       deliveryIds: deliverySummaries.map((delivery) => delivery.id),
       deliveryCount: deliverySummaries.length,
@@ -658,12 +696,12 @@ export async function loadMaterialContractsBundle(options?: {
       grandTotal: roundMaterialNumber(invoice.grandTotal, 2),
       paidAmount: roundMaterialNumber(invoice.paidAmount, 2),
       remainingAmount,
-      dueDate: invoice.dueDate?.toISOString().slice(0, 10) ?? null,
+      dueDate: invoice.dueDate ? safeIsoDateOnly(invoice.dueDate) : null,
       status: invoice.status,
       notes: invoice.notes ?? null,
       processedByName: processor?.name ?? null,
-      paidAt: invoice.paidAt?.toISOString() ?? null,
-      createdAt: invoice.createdAt.toISOString(),
+      paidAt: invoice.paidAt ? safeIsoDateTime(invoice.paidAt) : null,
+      createdAt: safeIsoDateTime(invoice.createdAt),
       payments,
     };
   });
