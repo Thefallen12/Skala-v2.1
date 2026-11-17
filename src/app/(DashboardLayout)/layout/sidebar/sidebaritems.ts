@@ -148,9 +148,18 @@ const SidebarContent: MenuItem[] = [
       {
         id: 'nav-logistics-hub',
         name: 'Logistik',
-        subtitle: 'Pengiriman & DO',
+        subtitle: 'Material & Pengiriman',
         icon: 'solar:delivery-bold-duotone',
         url: '/apps/logistics',
+        menuKey: 'logistik',
+        requiresLogistics: true,
+      },
+      {
+        id: 'nav-logistics-docs',
+        name: 'PO, KO & DO',
+        subtitle: 'Penerbitan Dokumen',
+        icon: 'solar:document-text-bold-duotone',
+        url: '/apps/logistics?tab=documents',
         menuKey: 'logistik',
         requiresLogistics: true,
       },
@@ -193,7 +202,7 @@ const SidebarContent: MenuItem[] = [
     children: [
       {
         name: 'Dokumen',
-        subtitle: 'PO, DO & Arsip',
+        subtitle: 'Arsip & Tanda Tangan',
         icon: 'solar:document-text-bold-duotone',
         url: '/apps/documents',
         menuKey: 'documents',

@@ -326,7 +326,9 @@ export default async function ProjectsWorkstationPage({
     })),
   }));
   const fieldTeamUsers =
-    isDirector || session.user.role === UserRole.ADMINISTRATIONS
+    isDirector ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
+    session.user.role === UserRole.ADMINISTRATIONS
       ? await prisma.user.findMany({
           where: {
             role: { in: [UserRole.FIELD_TEAM, UserRole.KOORDINATOR] },

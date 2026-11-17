@@ -266,6 +266,7 @@ export default function ProjectDetailView({
     currentUserRole === UserRole.FIELD_TEAM;
   const canAccessMaterialPlanning =
     currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.DEPUTY_DIRECTOR ||
     currentUserRole === UserRole.ADMINISTRATIONS ||
     currentUserRole === UserRole.LOGISTICS;
   const canEditProjectRab =

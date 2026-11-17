@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import FinanceHub from "@/app/components/apps/finance/FinanceHub";
+import { canOperateFinanceActions, canViewAphRecords } from "@/lib/user-access";
 import type {
   FinanceDashboardMonth,
   FinanceDashboardTransaction,
@@ -539,9 +540,7 @@ export default async function FinancePage({
   const cashflowDashboardStart = new Date(
     Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth() - 5, 1),
   );
-  const canViewAPH =
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.DIRECTOR;
+  const canViewAPH = canViewAphRecords(session.user.role);
   const mongo = await connectToMongoDBOptional();
   const financeData = await loadFinancePageMongooseData(
     session.user.role,
@@ -599,7 +598,7 @@ export default async function FinancePage({
           )
       : Promise.resolve([]),
     mongo &&
-    (session.user.role === UserRole.FINANCE ||
+    (canOperateFinanceActions(session.user.role) ||
       session.user.role === UserRole.ADMINISTRATIONS)
       ? loadOfficeExpenseRows({}, 200)
       : Promise.resolve([]),
@@ -659,7 +658,7 @@ export default async function FinancePage({
       ? loadOfficeExpenseRows({ createdAt: { $gte: cashflowDashboardStart } })
       : Promise.resolve([]),
     mongo &&
-    (session.user.role === UserRole.FINANCE ||
+    (canOperateFinanceActions(session.user.role) ||
       session.user.role === UserRole.ADMINISTRATIONS)
       ? loadOfficeExpenseRows({ expenseType: { $in: ["SALARY", "ADVANCE"] } })
       : Promise.resolve([]),
@@ -1268,7 +1267,9 @@ export default async function FinancePage({
             kind: "INVOICE" as const,
             number: document.invoiceNumber ?? "Tanpa Nomor",
             action:
-              session.user.role === UserRole.FINANCE
+              session.user.role === UserRole.FINANCE ||
+              (session.user.role === UserRole.DEPUTY_DIRECTOR &&
+                !document.signedAt)
                 ? ("sign" as const)
                 : ("acknowledge" as const),
             signedByName: document.signedBy?.name ?? null,

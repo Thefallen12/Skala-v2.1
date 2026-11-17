@@ -87,7 +87,9 @@ export async function GET(request: Request) {
   };
 
   try {
-    const isDirector = session.user.role === UserRole.DIRECTOR;
+    const isDirector =
+      session.user.role === UserRole.DIRECTOR ||
+      session.user.role === UserRole.DEPUTY_DIRECTOR;
     const visibleHeaders = isDirector
       ? exportHeaders
       : exportHeaders.filter(

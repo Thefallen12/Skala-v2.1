@@ -20,6 +20,7 @@ import {
   UserRole,
 } from "@prisma/client";
 import { auth } from "../../../auth";
+import { canOperateLogisticsActions } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Notification from "@/models/notification";
@@ -1247,8 +1248,8 @@ export async function markPurchaseOrderSentToVendor(
   publicCode: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
-  if (!session?.user || session.user.role !== UserRole.LOGISTICS) {
-    return fail("Hanya Logistik yang dapat mencatat pengiriman PO ke vendor.");
+  if (!session?.user || !canOperateLogisticsActions(session.user.role)) {
+    return fail("Hanya Logistik atau pimpinan berwenang yang dapat mencatat pengiriman PO ke vendor.");
   }
   if (!validPublicCode(publicCode)) {
     return fail("Kode Purchase Order tidak valid.");
@@ -1300,8 +1301,8 @@ export async function receiveStandalonePurchaseOrder(
   publicCode: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return fail("Hanya Logistik yang dapat mengonfirmasi penerimaan barang PO.");
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
+    return fail("Hanya Logistik atau pimpinan berwenang yang dapat mengonfirmasi penerimaan barang PO.");
   }
   if (!isValidPublicCode(publicCode)) {
     return fail("Kode Purchase Order tidak valid.");
@@ -1413,8 +1414,8 @@ export async function markPurchaseOrderConfirmationSent(
   paymentTransactionId: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
-  if (!session?.user || session.user.role !== UserRole.LOGISTICS) {
-    return fail("Hanya Logistik yang dapat menandai KO dikirim ke vendor.");
+  if (!session?.user || !canOperateLogisticsActions(session.user.role)) {
+    return fail("Hanya Logistik atau pimpinan berwenang yang dapat menandai KO dikirim ke vendor.");
   }
   if (!isText(paymentTransactionId, 191)) {
     return fail("Data pembayaran KO tidak valid.");
@@ -1516,9 +1517,9 @@ export async function createDeliveryOrder(
 
   if (
     deliveryMethod === DODeliveryMethod.INTERNAL_MOVER &&
-    session.user.role !== UserRole.LOGISTICS
+    !canOperateLogisticsActions(session.user.role)
   ) {
-    return fail("Hanya Logistik yang dapat menetapkan kendaraan master pada DO internal.");
+    return fail("Hanya Logistik atau pimpinan berwenang yang dapat menetapkan kendaraan master pada DO internal.");
   }
   if (!input) {
     return fail("Data Delivery Order tidak valid.");
@@ -2376,9 +2377,9 @@ export async function updateDeliveryOrder(
       deliveryMethod === DODeliveryMethod.EXPEDITION &&
       input.status === DOStatus.DELIVERED;
     if (isExpeditionArrival) {
-      if (session.user.role !== UserRole.LOGISTICS) {
+      if (!canOperateLogisticsActions(session.user.role)) {
         return fail(
-          "Material ekspedisi harus diterima dan diselesaikan oleh bagian Logistik.",
+          "Material ekspedisi harus diterima dan diselesaikan oleh bagian Logistik atau pimpinan berwenang.",
         );
       }
       if (
@@ -2471,7 +2472,7 @@ export async function updateDeliveryOrder(
       let assignedVehicle: { id: string; plateNumber: string } | null = null;
       if (input.vehicleId && input.vehicleId !== currentOrder.vehicleId) {
         if (
-          session.user.role !== UserRole.LOGISTICS ||
+          !canOperateLogisticsActions(session.user.role) ||
           currentOrder.deliveryMethod !== DODeliveryMethod.INTERNAL_MOVER ||
           currentOrder.status !== DOStatus.PENDING ||
           currentOrder.vehicleId
@@ -3439,8 +3440,8 @@ export async function receiveExpeditionDeliveryOrder(
   arrivalPhotoFile: File,
 ): Promise<OrderActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return fail("Hanya Logistik yang dapat menerima material ekspedisi.");
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
+    return fail("Hanya Logistik atau pimpinan berwenang yang dapat menerima material ekspedisi.");
   }
   if (
     !isValidPublicCode(publicCode) ||

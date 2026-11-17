@@ -53,6 +53,7 @@ export const REQUIRED_MENU_ACCESS_BY_ROLE: Partial<
 > = {
   [UserRole.ADMINISTRATIONS]: ["drafter"],
   [UserRole.DIRECTOR]: ["drafter"],
+  [UserRole.DEPUTY_DIRECTOR]: APP_MENUS.map((menu) => menu.key),
 };
 
 export function isMenuAccessRequired(

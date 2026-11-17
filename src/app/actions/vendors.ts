@@ -266,8 +266,12 @@ export async function updateVendorRating(
   rating: number,
 ): Promise<VendorActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.DIRECTOR) {
-    return failure("Hanya Direktur yang dapat mengubah rating vendor.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return failure("Hanya Direktur atau Wakil Direktur yang dapat mengubah rating vendor.");
   }
   if (
     typeof vendorId !== "string" ||

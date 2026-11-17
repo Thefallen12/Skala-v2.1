@@ -125,6 +125,7 @@ export default async function UserProfilePage({
           AND: [
             { requesterId: userId },
             ...(session.user.role === UserRole.DIRECTOR ||
+            session.user.role === UserRole.DEPUTY_DIRECTOR ||
             session.user.role === UserRole.FINANCE
               ? []
               : [

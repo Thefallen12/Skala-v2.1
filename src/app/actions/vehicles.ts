@@ -54,7 +54,12 @@ function isVehicleStatus(status: string): status is VehicleStatus {
 }
 
 function isVehicleManager(role: UserRole) {
-  return role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS;
+  return (
+    role === UserRole.LOGISTICS ||
+    role === UserRole.ADMINISTRATIONS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR
+  );
 }
 
 function validateVehicleInput(input: VehicleInput) {

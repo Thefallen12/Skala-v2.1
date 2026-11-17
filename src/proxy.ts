@@ -6,7 +6,11 @@ import {
 import { authForProxy } from "../auth";
 import { UserRole } from "@/generated/prisma/enums";
 import { getRoleHomePath, sanitizeCallbackUrl } from "@/lib/role-home";
-import { drawingAccessRoles } from "@/lib/user-access";
+import {
+  drawingAccessRoles,
+  financeDashboardRoles,
+  userManagerRoles,
+} from "@/lib/user-access";
 import { isMarkdownPreferred } from "@/lib/accept-markdown";
 import { createMarkdownResponse } from "@/lib/public-markdown";
 
@@ -36,18 +40,19 @@ const projectRoles = [
   UserRole.DRAFTER,
 ];
 
-const financeRoles = [UserRole.FINANCE, UserRole.ADMINISTRATIONS];
+const financeRoles = financeDashboardRoles;
 const approvalRoles = [UserRole.DIRECTOR, UserRole.DEPUTY_DIRECTOR];
 const logisticsRoles = [
   UserRole.LOGISTICS,
   UserRole.MOVER,
   UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
   UserRole.ADMINISTRATIONS,
 ];
 const logisticsManagementRoles = logisticsRoles.filter(
   (role) => role !== UserRole.MOVER,
 );
-const userManagementRoles = [UserRole.ADMINISTRATIONS, UserRole.DIRECTOR];
+const userManagementRoles = userManagerRoles;
 const orderRoles = [
   UserRole.LOGISTICS,
   UserRole.ADMINISTRATIONS,

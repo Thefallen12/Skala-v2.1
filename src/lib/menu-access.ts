@@ -10,11 +10,11 @@ import {
 
 export async function ensureMenuAccessDefaults() {
   const existing = await prisma.menuAccess.findMany({
-    select: { role: true, menuKey: true },
+    select: { role: true, menuKey: true, isAllowed: true },
   });
 
-  const existingSet = new Set(
-    existing.map((entry) => `${entry.role}:${entry.menuKey}`),
+  const existingMap = new Map(
+    existing.map((entry) => [`${entry.role}:${entry.menuKey}`, entry.isAllowed]),
   );
 
   const rowsToCreate: Array<{
@@ -23,13 +23,18 @@ export async function ensureMenuAccessDefaults() {
     menuName: string;
     isAllowed: boolean;
   }> = [];
+  const rowsToRequire: Array<{ role: string; menuKey: string }> = [];
 
   for (const role of APP_ROLES) {
     const defaultAllowedKeys = new Set(DEFAULT_MENU_ACCESS_BY_ROLE[role] ?? []);
 
     for (const menu of APP_MENUS) {
       const compositeKey = `${role}:${menu.key}`;
-      if (existingSet.has(compositeKey)) {
+      const required = isMenuAccessRequired(role, menu.key);
+      if (existingMap.has(compositeKey)) {
+        if (required && existingMap.get(compositeKey) !== true) {
+          rowsToRequire.push({ role, menuKey: menu.key });
+        }
         continue;
       }
 
@@ -37,7 +42,7 @@ export async function ensureMenuAccessDefaults() {
         role,
         menuKey: menu.key,
         menuName: menu.name,
-        isAllowed: defaultAllowedKeys.has(menu.key),
+        isAllowed: required || defaultAllowedKeys.has(menu.key),
       });
     }
   }
@@ -47,6 +52,13 @@ export async function ensureMenuAccessDefaults() {
       where: { role_menuKey: { role: row.role, menuKey: row.menuKey } },
       create: row,
       update: {},
+    });
+  }
+
+  for (const row of rowsToRequire) {
+    await prisma.menuAccess.update({
+      where: { role_menuKey: { role: row.role, menuKey: row.menuKey } },
+      data: { isAllowed: true },
     });
   }
 }

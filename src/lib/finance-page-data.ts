@@ -290,8 +290,17 @@ async function loadFinancePageMongooseDataImpl(
             })
               .sort({ createdAt: 1 })
               .lean()
-          : Promise.resolve([]),
-      role === UserRole.FINANCE
+          : role === UserRole.DEPUTY_DIRECTOR
+            ? Invoice.find({
+                $or: [
+                  { signedAt: null },
+                  { signedAt: { $ne: null }, acknowledgedAt: null },
+                ],
+              })
+                .sort({ createdAt: 1 })
+                .lean()
+            : Promise.resolve([]),
+      role === UserRole.FINANCE || role === UserRole.DEPUTY_DIRECTOR
         ? OrderConfirmation.find({
             signedAt: { $ne: null },
             acknowledgedAt: null,

@@ -341,7 +341,7 @@ export default function ExecutiveConstructionApprovals({
 
   return (
     <div className="space-y-5">
-      {role === UserRole.DIRECTOR && (
+      {(role === UserRole.DIRECTOR || role === UserRole.DEPUTY_DIRECTOR) && (
         <Card>
           <CardHeader>
             <CardTitle className="type-h3">

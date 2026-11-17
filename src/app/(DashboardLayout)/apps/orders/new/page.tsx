@@ -14,7 +14,10 @@ import {
   UserRole,
 } from "@prisma/client";
 import { auth } from "../../../../../../auth";
-import { canManageUsers } from "@/lib/user-access";
+import {
+  canIssuePurchaseOrders,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { projectSiteName } from "@/lib/documents/project-site-name";
@@ -37,17 +40,9 @@ export default async function NewOrderPage({
   if (!session?.user) redirect("/auth/login");
   const { type, ticketId } = await searchParams;
   const isDeliveryOrder = type === "do";
-  const canManagePurchaseOrders =
-    session.user.role === UserRole.LOGISTICS ||
-    session.user.role === UserRole.ADMINISTRATIONS ||
-    session.user.role === UserRole.DIRECTOR ||
-    session.user.role === UserRole.DEPUTY_DIRECTOR ||
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.KOORDINATOR;
+  const canManagePurchaseOrders = canIssuePurchaseOrders(session.user.role);
   const canManageDeliveryOrders =
-    canManageUsers(session.user.role) ||
-    session.user.role === UserRole.DEPUTY_DIRECTOR ||
-    session.user.role === UserRole.LOGISTICS ||
+    canOperateLogisticsActions(session.user.role) ||
     session.user.role === UserRole.FIELD_TEAM ||
     session.user.role === UserRole.KOORDINATOR ||
     session.user.role === UserRole.MOVER;
@@ -126,7 +121,7 @@ export default async function NewOrderPage({
             },
           },
         }),
-        session.user.role === UserRole.LOGISTICS
+        canOperateLogisticsActions(session.user.role)
           ? prisma.vehicle.findMany({
               where: {
                 status: "AVAILABLE",
@@ -186,7 +181,7 @@ export default async function NewOrderPage({
         }
         breadcrumbs={[
           { label: "Beranda", href: "/" },
-          { label: "PO & Surat Jalan", href: "/apps/orders" },
+          { label: "Logistik (PO, KO & DO)", href: "/apps/logistics?tab=documents" },
           { label: isDeliveryOrder ? "DO Baru" : "PO Baru" },
         ]}
       />
@@ -201,9 +196,9 @@ export default async function NewOrderPage({
                 vehicle.currentKilometer,
               ),
             }))}
-            canCreateInternalDelivery={
-              session.user.role === UserRole.LOGISTICS
-            }
+            canCreateInternalDelivery={canOperateLogisticsActions(
+              session.user.role,
+            )}
             ticketId={ticketId}
             ticketOptions={ticketOptions
               .map((ticket) => {

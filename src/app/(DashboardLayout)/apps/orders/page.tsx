@@ -18,7 +18,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { canManageUsers } from "@/lib/user-access";
+import {
+  canIssuePurchaseOrders,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -45,20 +48,14 @@ const doStatusLabels: Record<DOStatus, string> = {
 export default async function OrdersPage() {
   const session = await auth();
   if (!session?.user) redirect("/auth/login");
-  const canEditPO =
-    session.user.role === UserRole.LOGISTICS ||
-    session.user.role === UserRole.ADMINISTRATIONS ||
-    session.user.role === UserRole.DIRECTOR ||
-    session.user.role === UserRole.DEPUTY_DIRECTOR ||
-    session.user.role === UserRole.FINANCE ||
-    session.user.role === UserRole.KOORDINATOR;
+  const canEditPO = canIssuePurchaseOrders(session.user.role);
   const canViewPO =
     canEditPO ||
+    session.user.role === UserRole.FINANCE ||
+    session.user.role === UserRole.KOORDINATOR ||
     session.user.role === UserRole.FIELD_TEAM;
   const canEditDO =
-    canManageUsers(session.user.role) ||
-    session.user.role === UserRole.DEPUTY_DIRECTOR ||
-    session.user.role === UserRole.LOGISTICS ||
+    canOperateLogisticsActions(session.user.role) ||
     session.user.role === UserRole.FIELD_TEAM ||
     session.user.role === UserRole.KOORDINATOR ||
     session.user.role === UserRole.MOVER;
@@ -99,7 +96,8 @@ export default async function OrdersPage() {
         description="Kelola data Purchase Order dan Delivery Order melalui tautan dokumen resmi."
         breadcrumbs={[
           { label: "Beranda", href: "/" },
-          { label: "PO & Surat Jalan" },
+          { label: "Logistik (PO, KO & DO)", href: "/apps/logistics?tab=documents" },
+          { label: "Daftar Order" },
         ]}
         actions={
           <div className="flex flex-wrap gap-2">

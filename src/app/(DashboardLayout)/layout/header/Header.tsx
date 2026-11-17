@@ -34,6 +34,7 @@ const MODULE_LABELS: Array<{ prefix: string; title: string; stage: string }> = [
   { prefix: "/apps/projects", title: "Proyek", stage: "02 · Proyek" },
   { prefix: "/apps/drafter", title: "Gambar DED", stage: "02 · Proyek" },
   { prefix: "/apps/tickets", title: "Tiket", stage: "03 · Logistik" },
+  { prefix: "/apps/orders", title: "PO, KO & DO", stage: "03 · Logistik" },
   { prefix: "/apps/logistics/stock", title: "Stok Gudang", stage: "03 · Logistik" },
   { prefix: "/apps/logistics", title: "Logistik", stage: "03 · Logistik" },
   { prefix: "/apps/approvals", title: "Persetujuan", stage: "04 · Keuangan" },

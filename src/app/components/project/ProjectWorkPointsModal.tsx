@@ -67,7 +67,9 @@ export default function ProjectWorkPointsModal({
       currentUserRole === UserRole.KOORDINATOR) &&
     project?.fieldPicId === currentUserId;
   const canManagePoints = isAssignedPic;
-  const isDirector = currentUserRole === UserRole.DIRECTOR;
+  const isDirector =
+    currentUserRole === UserRole.DIRECTOR ||
+    currentUserRole === UserRole.DEPUTY_DIRECTOR;
 
   useEffect(
     () => () => photoPreviews.forEach((previewUrl) => URL.revokeObjectURL(previewUrl)),

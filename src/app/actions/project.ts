@@ -315,9 +315,10 @@ export async function saveProject(
   if (
     projectId &&
     session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR &&
     (values.pagu !== undefined || values.budget !== undefined)
   ) {
-    return { success: false, message: "Hanya Direktur yang dapat mengubah pagu atau anggaran proyek." };
+    return { success: false, message: "Hanya Direktur atau Wakil Direktur yang dapat mengubah pagu atau anggaran proyek." };
   }
   if (projectId && values.pagu === "") {
     return { success: false, message: "Pagu proyek wajib diisi." };
@@ -621,7 +622,10 @@ export async function deleteProject(
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk menghapus proyek." };
   }
-  if (session.user.role !== UserRole.DIRECTOR) {
+  if (
+    session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
+  ) {
     return { success: false, message: "Role Anda tidak diizinkan menghapus proyek." };
   }
   if (typeof projectId !== "string" || projectId.length < 1 || projectId.length > 100) {
@@ -1227,7 +1231,8 @@ export async function editApprovedProjectWorkPointWage(
   }
   if (
     session.user.role !== UserRole.ADMINISTRATIONS &&
-    session.user.role !== UserRole.DIRECTOR
+    session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
   ) {
     return { success: false, message: "Hanya Admin/Direktur yang dapat mengubah nilai upah." };
   }

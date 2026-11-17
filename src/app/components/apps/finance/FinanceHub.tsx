@@ -123,6 +123,7 @@ import {
   TicketType,
   UserRole,
 } from "@prisma/client";
+import { canOperateFinanceActions } from "@/lib/user-access";
 import {
   AlertTriangle,
   Download,
@@ -516,6 +517,7 @@ export default function FinanceHub({
   vendorInvoices?: VendorInvoiceRow[];
 }) {
   const router = useRouter();
+  const canOperateFinance = canOperateFinanceActions(role);
   const legacyOperationalTabs = ["subcontract", "rentals", "fuel-logs", "fuel-requests"];
   const tabAliases: Record<string, string> = {
     "po-check": "check",
@@ -1638,7 +1640,7 @@ export default function FinanceHub({
               proofUrl,
               urls.length > 1 ? `${label} ${index + 1}` : label,
               index,
-              role === UserRole.FINANCE && !editDisabledUrls.includes(proofUrl),
+              canOperateFinance && !editDisabledUrls.includes(proofUrl),
             )}
           </div>
         ))}
@@ -1965,10 +1967,10 @@ export default function FinanceHub({
               historicalPayments={historicalPayments}
               projects={financeProjects}
               canManage={
-                role === UserRole.FINANCE ||
+                canOperateFinance ||
                 role === UserRole.ADMINISTRATIONS
               }
-              canEditProof={role === UserRole.FINANCE}
+              canEditProof={canOperateFinance}
               fundMode={ledgerFundMode}
               onFundModeChange={setLedgerFundMode}
               typeFilter={ledgerTypeFilter}
@@ -2295,7 +2297,7 @@ export default function FinanceHub({
                           </button>
 
                           <div className="flex justify-end pt-1">
-                            {role === UserRole.FINANCE && !order.paidAt ? (
+                            {canOperateFinance && !order.paidAt ? (
                               <Button
                                 type="button"
                                 size="sm"
@@ -2415,7 +2417,7 @@ export default function FinanceHub({
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
-                                {role === UserRole.FINANCE && !order.paidAt ? (
+                                {canOperateFinance && !order.paidAt ? (
                                   <Button
                                     type="button"
                                     size="sm"
@@ -2655,7 +2657,7 @@ export default function FinanceHub({
 
                         <div className="flex justify-end pt-0.5">
                           {(outstanding > 0 || needsNominal) &&
-                          role === UserRole.FINANCE ? (
+                          canOperateFinance ? (
                             waitingInvoice ? (
                               <Button
                                 type="button"
@@ -2852,7 +2854,7 @@ export default function FinanceHub({
                             </TableCell>
                             <TableCell className="text-right">
                               {(outstanding > 0 || needsNominal) &&
-                              role === UserRole.FINANCE ? (
+                              canOperateFinance ? (
                                 waitingInvoice ? (
                                   <Button
                                     type="button"
@@ -3182,7 +3184,7 @@ export default function FinanceHub({
                       </span>
                     </p>
                   </div>
-                  {termyn.status === "FIELD_VERIFIED" && role === UserRole.FINANCE && (
+                  {termyn.status === "FIELD_VERIFIED" && canOperateFinance && (
                     <Button
                       className="mt-3"
                       disabled={isPending}
@@ -3195,7 +3197,7 @@ export default function FinanceHub({
                       Checked By Finance
                     </Button>
                   )}
-                  {termyn.status === "APPROVED" && role === UserRole.FINANCE && (
+                  {termyn.status === "APPROVED" && canOperateFinance && (
                     <form
                       className="mt-3 flex flex-wrap items-end gap-3"
                       onSubmit={(event) => submitTermynPayment(event, termyn.id)}
@@ -3252,7 +3254,7 @@ export default function FinanceHub({
                       Terbilang: {terbilangRupiah(Number(contract.retainedAmount))}
                     </span>
                   </p>
-                  {contract.eligible && role === UserRole.FINANCE ? (
+                  {contract.eligible && canOperateFinance ? (
                     <form
                       className="mt-3 flex flex-wrap items-end gap-3"
                       onSubmit={(event) => submitRetentionRelease(event, contract.id)}
@@ -3478,7 +3480,7 @@ export default function FinanceHub({
                       </Button>
                     )}
                   </div>
-                  {request.status === "PENDING_FINANCE" && role === UserRole.FINANCE && (
+                  {request.status === "PENDING_FINANCE" && canOperateFinance && (
                     <form
                       className="grid gap-3 rounded-md border bg-muted/20 p-3 md:grid-cols-2"
                       onSubmit={(event) =>
@@ -3611,7 +3613,7 @@ export default function FinanceHub({
                     </form>
                   )}
                   {request.status === "PROOF_SUBMITTED" &&
-                    role === UserRole.FINANCE && (
+                    canOperateFinance && (
                       <form
                         className="grid gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 md:grid-cols-[1fr_auto]"
                         onSubmit={(event) =>
@@ -3719,7 +3721,7 @@ export default function FinanceHub({
         className="sm:max-w-2xl"
         footer={
           previewOrder ? (
-            activeOrder && role === UserRole.FINANCE && !activeOrder.paidAt ? (
+            activeOrder && canOperateFinance && !activeOrder.paidAt ? (
               <div className="flex w-full items-center justify-between gap-2">
                 <span className="type-p3 text-muted-foreground">
                   PO ini menunggu pemeriksaan Finance sebelum diajukan ke Direktur.
@@ -3836,7 +3838,7 @@ export default function FinanceHub({
           )}
           {activeStandaloneOrder &&
             Boolean(activeStandaloneOrder.vendorInvoiceUrl) &&
-            role === UserRole.FINANCE &&
+            canOperateFinance &&
             !isPaymentSettled && (
               <form className="space-y-3" onSubmit={submitPayment}>
                 <section className="space-y-2 rounded-lg border p-3 text-sm">
@@ -4074,7 +4076,7 @@ export default function FinanceHub({
                   pembelian langsung ini sebelum pembayaran dapat diproses.
                 </p>
               )}
-              {role === UserRole.FINANCE &&
+              {canOperateFinance &&
                 activeDirectPurchase.vendorInvoiceUrl &&
                 remainingAmount > 0 && (
                   <form
@@ -4388,7 +4390,7 @@ export default function FinanceHub({
                     Boolean(activeTicket.hasApprovedPo)) &&
                   !activeTicket.purchaseReceiptUrl;
               const canShowTicketPaymentForm =
-                role === UserRole.FINANCE &&
+                canOperateFinance &&
                 !activeTicketNeedsInvoice &&
                 (selectedTicketPo
                   ? !selectedTicketPo.isPaid && remainingAmount > 0

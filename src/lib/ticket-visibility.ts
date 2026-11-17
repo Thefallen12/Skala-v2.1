@@ -186,7 +186,12 @@ export function getTicketPageVisibilityWhere(
     }
   })();
 
-  if (role === UserRole.DIRECTOR || role === UserRole.FINANCE) {
+  if (
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.FINANCE ||
+    role === UserRole.ADMINISTRATIONS
+  ) {
     return roleWhere;
   }
 

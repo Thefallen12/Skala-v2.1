@@ -44,6 +44,10 @@ import {
 } from "@prisma/client";
 import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts";
 import {
+  canOperateFinanceActions,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
+import {
   canRecordMaterialDeliveries,
   formatMaterialVolume,
   type ContractTicketDeliveryOption,
@@ -438,7 +442,7 @@ function workflowFor(
     return "LOGISTICS";
   }
   if (
-    role === UserRole.FINANCE &&
+    canOperateFinanceActions(role) &&
     (ticket.status === TicketStatus.WAITING_FINANCE_PAYMENT ||
       (ticket.status === TicketStatus.APPROVED_DIR &&
         ticket.type !== TicketType.MATERIAL) ||
@@ -595,8 +599,9 @@ function TicketRowActionControls({
     hasNonContractItems &&
     (workflow !== "LOGISTICS" || hasPendingNonContractItems);
 
-  const financeTarget =
-    role === UserRole.FINANCE ? getFinanceActionTarget(ticket) : null;
+  const financeTarget = canOperateFinanceActions(role)
+    ? getFinanceActionTarget(ticket)
+    : null;
   const { canEdit, canDelete } = getTicketManagementPermissions(ticket, role);
 
   const workflowShortLabels = {
@@ -2560,7 +2565,7 @@ export default function TicketListing({
                       : null);
                   const workflow = workflowFor(role, selectedTicket);
                   if (
-                    role === UserRole.LOGISTICS &&
+                    canOperateLogisticsActions(role) &&
                     selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE &&
                     (selectedTicket.status === "PENDING_LOGISTIK" ||
                       selectedTicket.status === TicketStatus.APPROVED_DIR ||
@@ -2608,7 +2613,7 @@ export default function TicketListing({
                       </Button>
                     );
                   }
-                  if (role === UserRole.FINANCE) {
+                  if (canOperateFinanceActions(role)) {
                     const financeTarget = getFinanceActionTarget(selectedTicket);
                     if (financeTarget) {
                       return (
@@ -3193,7 +3198,7 @@ export default function TicketListing({
                                 {stageLabel}
                               </Badge>
                               {purchase.status === "PENDING_RECEIPT" &&
-                                role === UserRole.FINANCE &&
+                                canOperateFinanceActions(role) &&
                                 purchase.isApprovedByDirector &&
                                 Boolean(purchase.vendorInvoiceUrl) &&
                                 !purchase.hasFinanceProof && (
@@ -3206,7 +3211,7 @@ export default function TicketListing({
                                   </Button>
                                 )}
                               {purchase.status === "PENDING_RECEIPT" &&
-                                role !== UserRole.FINANCE && (
+                                !canOperateFinanceActions(role) && (
                                   <Button asChild size="sm" variant="outline">
                                     <Link href="/apps/logistics?tab=stock">
                                       Kelola Stok

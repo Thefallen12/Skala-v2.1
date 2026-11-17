@@ -62,9 +62,16 @@ export async function submitEquipmentRequest(ticketId: string) {
       .lean();
     if (
       !account?.isActive ||
-      (account.role !== "FIELD_TEAM" && account.role !== "TIM_LAPANGAN")
+      ![
+        "FIELD_TEAM",
+        "TIM_LAPANGAN",
+        "KOORDINATOR",
+        "KOORDINATOR_LAPANGAN",
+        "DEPUTY_DIRECTOR",
+        "WAKIL_DIRECTUR",
+      ].includes(account.role)
     ) {
-      return failure("Hanya Tim Lapangan aktif yang dapat mengajukan tiket ini.");
+      return failure("Hanya Tim Lapangan atau pimpinan berwenang yang dapat mengajukan tiket ini.");
     }
 
     await mongoose.connection.transaction(async (transactionSession) => {
@@ -395,8 +402,14 @@ export async function processEquipmentRequestAtLogistics(
   if (!userId) {
     return failure("Silakan masuk sebelum memproses tiket.");
   }
-  if (role !== "LOGISTICS" && String(role ?? "") !== "KOORDINATOR_LOGISTIK") {
-    return failure("Hanya Logistik yang dapat memproses permintaan alat.");
+  if (
+    role !== "LOGISTICS" &&
+    role !== "DIRECTOR" &&
+    role !== "DEPUTY_DIRECTOR" &&
+    role !== "ADMINISTRATIONS" &&
+    String(role ?? "") !== "KOORDINATOR_LOGISTIK"
+  ) {
+    return failure("Hanya Logistik atau pimpinan berwenang yang dapat memproses permintaan alat.");
   }
   if (
     typeof ticketId !== "string" ||
@@ -427,6 +440,9 @@ export async function processEquipmentRequestAtLogistics(
     if (
       !account?.isActive ||
       (account.role !== "LOGISTICS" &&
+        account.role !== "DIRECTOR" &&
+        account.role !== "DEPUTY_DIRECTOR" &&
+        account.role !== "ADMINISTRATIONS" &&
         account.role !== "KOORDINATOR_LOGISTIK")
     ) {
       return failure("Akun tidak memiliki izin Logistik yang aktif.");
@@ -630,8 +646,12 @@ export async function submitEquipmentRentalPayment(input: {
 }) {
   const session = await authForProxy();
   const userId = session?.user?.id;
-  if (!userId || session.user.role !== "FINANCE") {
-    return failure("Hanya Keuangan yang dapat menyelesaikan pembayaran.");
+  if (
+    !userId ||
+    (session.user.role !== "FINANCE" &&
+      session.user.role !== "DEPUTY_DIRECTOR")
+  ) {
+    return failure("Hanya Keuangan atau Wakil Direktur yang dapat menyelesaikan pembayaran.");
   }
   if (
     typeof input?.ticketId !== "string" ||
@@ -658,9 +678,12 @@ export async function submitEquipmentRentalPayment(input: {
       .lean();
     if (
       !financeUser?.isActive ||
-      (financeUser.role !== "FINANCE" && financeUser.role !== "KEUANGAN")
+      (financeUser.role !== "FINANCE" &&
+        financeUser.role !== "KEUANGAN" &&
+        financeUser.role !== "DEPUTY_DIRECTOR" &&
+        financeUser.role !== "WAKIL_DIRECTUR")
     ) {
-      return failure("Akun Keuangan tidak aktif atau tidak memiliki izin.");
+      return failure("Akun Keuangan atau Wakil Direktur tidak aktif atau tidak memiliki izin.");
     }
     const ticket = await Ticket.findOne({
       _id: input.ticketId,
@@ -935,10 +958,12 @@ export async function createEquipmentRequest(
         "TIM_LAPANGAN",
         "KOORDINATOR",
         "KOORDINATOR_LAPANGAN",
+        "DEPUTY_DIRECTOR",
+        "WAKIL_DIRECTUR",
       ].includes(account.role)
     ) {
       return failure(
-        "Permintaan alat hanya dapat dibuat Tim Lapangan atau Koordinator Lapangan yang aktif.",
+        "Permintaan alat hanya dapat dibuat Tim Lapangan, Koordinator Lapangan, atau Wakil Direktur yang aktif.",
       );
     }
 

@@ -13,7 +13,10 @@ import {
   UserRole,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { canManageUsers } from "@/lib/user-access";
+import {
+  canManageUsers,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
 import {
   PrivatePhotoValidationError,
   saveDocumentTemplateImage,
@@ -275,8 +278,8 @@ export async function createSignedOperationalDocument(
   input: SignedDocumentInput,
 ): Promise<DocumentActionResult> {
   const session = await auth();
-  if (!session?.user?.id || !canManageUsers(session.user.role)) {
-    return failure("Hanya Direktur atau Administrasi yang dapat menyiapkan dan menandatangani dokumen.");
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
+    return failure("Hanya Logistik, Direktur, atau Administrasi yang dapat menyiapkan dan menandatangani dokumen.");
   }
   if (
     !input ||
@@ -371,8 +374,8 @@ export async function issueOperationalDocument(
   documentId: string,
 ): Promise<DocumentActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.LOGISTICS) {
-    return failure("Hanya Logistik yang dapat menerbitkan dokumen.");
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
+    return failure("Hanya Logistik atau pimpinan berwenang yang dapat menerbitkan dokumen.");
   }
 
   if (typeof documentId !== "string" || !documentId.trim()) {
@@ -515,7 +518,7 @@ export async function loadOperationalDocumentSignature(
   }
   if (
     document.status !== OperationalDocumentStatus.ISSUED &&
-    !canManageUsers(session.user.role)
+    !canOperateLogisticsActions(session.user.role)
   ) {
     return { success: false, message: "Dokumen ini belum diterbitkan." };
   }

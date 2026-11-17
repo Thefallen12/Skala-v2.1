@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Boxes,
@@ -28,6 +29,8 @@ import {
   createEquipmentLog,
   createEquipmentMaster,
 } from "@/app/actions/construction";
+import { issueOperationalDocument } from "@/app/actions/documents";
+import { canOperateLogisticsActions } from "@/lib/user-access";
 import {
   approvePurchaseOrder,
   markPurchaseOrderSentToVendor,
@@ -66,6 +69,7 @@ import type {
   TicketRow,
 } from "@/app/(DashboardLayout)/types/ticket";
 import {
+  OperationalDocumentKind,
   POPaymentMethod,
   POStatus,
   TicketStatus,
@@ -300,7 +304,7 @@ function PurchaseOrderRowCard({
           </p>
         )}
         {order.status === POStatus.APPROVED &&
-          role === UserRole.LOGISTICS &&
+          canOperateLogisticsActions(role) &&
           order.vendorPoSentAt &&
           !order.vendorInvoiceUrl &&
           order.paidAt && (
@@ -315,20 +319,19 @@ function PurchaseOrderRowCard({
           <>
             <ActionIconButton
               label={
-                role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS
+                canOperateLogisticsActions(role)
                   ? "Lanjutkan Draft"
                   : "Lihat Draft"
               }
               tooltip={
-                role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS
+                canOperateLogisticsActions(role)
                   ? "Lanjutkan Draft"
                   : "Lihat Draft"
               }
               icon={FilePenLine}
               href={`/d/${encodeURIComponent(order.publicCode)}`}
             />
-            {(role === UserRole.LOGISTICS ||
-              role === UserRole.ADMINISTRATIONS) && (
+            {canOperateLogisticsActions(role) && (
               <Button
                 type="button"
                 size="sm"
@@ -381,7 +384,7 @@ function PurchaseOrderRowCard({
           </>
         ) : (
           <>
-            {role === UserRole.LOGISTICS && (
+            {canOperateLogisticsActions(role) && (
               <>
                 {!order.vendorPoSentAt ? (
                   <Button
@@ -599,6 +602,17 @@ function EquipmentLogMobileCard({ log }: { log: EquipmentLogRow }) {
   );
 }
 
+type SignedOperationalDocumentRow = {
+  id: string;
+  documentNumber: string;
+  kind: OperationalDocumentKind;
+  title: string;
+  signerName: string;
+  signedAt: string;
+  ticketNumber: string;
+  ticketTitle: string;
+};
+
 export default function LogisticsHub({
   tickets,
   projects,
@@ -608,6 +622,7 @@ export default function LogisticsHub({
   stockPurchases,
   purchaseOrderConfirmations,
   documentSignoffTasks,
+  signedOperationalDocuments = [],
   purchaseOrders,
   deliveryOrders,
   equipmentLogs,
@@ -633,6 +648,7 @@ export default function LogisticsHub({
   stockPurchases: DirectStockPurchaseRow[];
   purchaseOrderConfirmations: PurchaseOrderConfirmationRow[];
   documentSignoffTasks: DocumentSignoffTask[];
+  signedOperationalDocuments?: SignedOperationalDocumentRow[];
   purchaseOrders: HubPurchaseOrder[];
   deliveryOrders: HubDeliveryOrder[];
   equipmentLogs: EquipmentLogRow[];
@@ -763,6 +779,26 @@ export default function LogisticsHub({
       } catch (error) {
         console.error("Purchase order vendor dispatch failed:", error);
         toast.error("Pengiriman PO gagal dicatat. Silakan coba kembali.");
+      }
+    });
+  };
+
+  const canOperateLogistics = canOperateLogisticsActions(role);
+
+  const handleIssueOperationalDocument = (documentId: string) => {
+    startTransition(async () => {
+      try {
+        const result = await issueOperationalDocument(documentId);
+        if (result.success) {
+          toast.success(result.message);
+          requestNotificationFeedRefresh();
+          router.refresh();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Operational document issuance failed:", error);
+        toast.error("Dokumen gagal diterbitkan. Silakan coba kembali.");
       }
     });
   };
@@ -923,7 +959,7 @@ export default function LogisticsHub({
           className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
         >
           <FileText className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">PO &amp; DO</span>
+          <span className="truncate">PO, KO &amp; DO</span>
         </TabsTrigger>
         <TabsTrigger
           value="equipment"
@@ -986,11 +1022,93 @@ export default function LogisticsHub({
 
       <TabsContent value="documents">
         <div className="space-y-5">
+          <Card>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="type-h3">Penerbitan PO, KO &amp; DO</CardTitle>
+                <p className="type-p3 mt-0.5 text-muted-foreground">
+                  Penerbitan PO, tanda tangan KO &amp; DO, serta pengiriman resmi berada di Logistik.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {canOperateLogistics && (
+                  <>
+                    <Button size="sm" asChild>
+                      <Link href="/apps/orders/new?type=po">
+                        <Plus className="mr-1.5 size-4" aria-hidden="true" />
+                        Terbitkan PO
+                      </Link>
+                    </Button>
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href="/apps/orders/new?type=do">
+                        <Truck className="mr-1.5 size-4" aria-hidden="true" />
+                        Terbitkan DO
+                      </Link>
+                    </Button>
+                  </>
+                )}
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/apps/orders">
+                    <FileText className="mr-1.5 size-4" aria-hidden="true" />
+                    Daftar Order
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+
           <DocumentSignoffQueue
             tasks={documentSignoffTasks}
-            title="Tanda Tangan Dokumen Logistik"
-            description="Logistik menandatangani KO dan DO sebelum pengiriman lapangan."
+            title="Tanda Tangan KO & DO"
+            description="Logistik menandatangani KO dan DO sebelum pengiriman vendor atau lapangan."
           />
+
+          {canOperateLogistics && signedOperationalDocuments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="type-h3">
+                  Dokumen PO &amp; DO Siap Terbit ({signedOperationalDocuments.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {signedOperationalDocuments.map((doc) => (
+                  <article
+                    key={doc.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5"
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="type-p1 font-semibold text-primary">
+                          {doc.documentNumber}
+                        </span>
+                        <Badge variant="outline">
+                          {doc.kind === OperationalDocumentKind.PURCHASE_ORDER
+                            ? "PO"
+                            : "DO"}
+                        </Badge>
+                      </div>
+                      <p className="type-p3 text-muted-foreground">
+                        {doc.ticketNumber} · {doc.title}
+                      </p>
+                      <p className="type-p3 text-muted-foreground">
+                        Ditandatangani {doc.signerName} ·{" "}
+                        {new Date(doc.signedAt).toLocaleDateString("id-ID")}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleIssueOperationalDocument(doc.id)}
+                    >
+                      <CheckCircle2 className="mr-1.5 size-3.5" aria-hidden="true" />
+                      Terbitkan
+                    </Button>
+                  </article>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-5 xl:grid-cols-2">
             <Card>
@@ -1051,7 +1169,7 @@ export default function LogisticsHub({
               </CardContent>
             </Card>
 
-            {role === UserRole.LOGISTICS && (
+            {canOperateLogistics && (
               <Card className="xl:col-span-2">
                 <CardContent className="pt-6">
                   <PurchaseOrderConfirmationQueue
@@ -1168,9 +1286,7 @@ export default function LogisticsHub({
       <TabsContent value="vehicles">
         <VehicleFleetPanel
           vehicles={vehicles}
-          canManage={
-            role === UserRole.LOGISTICS || role === UserRole.ADMINISTRATIONS
-          }
+          canManage={canOperateLogistics}
         />
       </TabsContent>
 
@@ -1372,10 +1488,7 @@ export default function LogisticsHub({
                 logs={vehicleTripLogs}
                 projects={projects}
                 deliveryOrders={deliveryOrders}
-                canManageVehicles={
-                  role === UserRole.LOGISTICS ||
-                  role === UserRole.ADMINISTRATIONS
-                }
+                canManageVehicles={canOperateLogistics}
               />
             </TabsContent>
           </Tabs>

@@ -1434,12 +1434,14 @@ export async function getNotificationFeedForUser({
     (row) =>
       startsWith(row.actionUrl, "/apps/logistics") ||
       startsWith(row.actionUrl, "/apps/orders/new") ||
-      (role === UserRole.LOGISTICS && startsWith(row.actionUrl, "/d/")),
+      ((role === UserRole.LOGISTICS || role === UserRole.DEPUTY_DIRECTOR) &&
+        startsWith(row.actionUrl, "/d/")),
   ).length;
   const financeCount = activeUnread.filter(
     (row) =>
       startsWith(row.actionUrl, "/apps/finance") ||
-      (role === UserRole.FINANCE && startsWith(row.actionUrl, "/d/")),
+      ((role === UserRole.FINANCE || role === UserRole.DEPUTY_DIRECTOR) &&
+        startsWith(row.actionUrl, "/d/")),
   ).length;
 
   const visibleNotifications: NotificationFeedItem[] = activeRows

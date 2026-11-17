@@ -234,8 +234,8 @@ export function WorkflowSchemaBoard({
     },
     {
       step: "02",
-      title: "2. Proses Logistik & DO",
-      subtitle: "Pemenuhan material, kontrol stok gudang, dan pengiriman DO.",
+      title: "2. Logistik, PO, KO & DO",
+      subtitle: "Penerbitan PO, KO, DO, kontrol stok, dan pengiriman.",
       metricLabel: "Stok & PO",
       metricValue: `${counts.stockItemsCount} SKU · ${counts.pendingPOsCount} PO`,
       accent: "border-orange-500/30 bg-orange-500/5",
@@ -250,8 +250,8 @@ export function WorkflowSchemaBoard({
         },
       },
       secondaryAction: {
-        label: "Stok Gudang",
-        href: "/apps/logistics/stock",
+        label: "PO, KO & DO",
+        href: "/apps/logistics?tab=documents",
         access: {
           menuKey: "logistik",
           requiresLogistics: true,
@@ -260,7 +260,7 @@ export function WorkflowSchemaBoard({
     },
     {
       step: "03",
-      title: "3. Otorisasi & Tagihan",
+      title: "3. Otorisasi Direksi",
       subtitle: "Verifikasi direksi atas tiket permintaan dan pesanan pembelian.",
       metricLabel: "Antrean Direksi",
       metricValue: `${counts.pendingApprovalsCount} Menunggu`,
@@ -276,10 +276,10 @@ export function WorkflowSchemaBoard({
         },
       },
       secondaryAction: {
-        label: "Daftar Order",
-        href: "/apps/orders",
+        label: "Daftar Proyek",
+        href: "/apps/projects",
         access: {
-          menuKey: "documents",
+          menuKey: "master_proyek",
           requiresNonMover: true,
         },
       },

@@ -23,6 +23,10 @@ import {
   DirectStockPurchaseStatus,
 } from "@prisma/client";
 import { auth } from "../../../auth";
+import {
+  canOperateFinanceActions,
+  canOperateLogisticsActions,
+} from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Cashflow from "@/models/cashflow";
@@ -662,11 +666,8 @@ export async function createLogisticsPurchaseOrder(input: {
   if (!session?.user?.id) {
     return actionFailure("Silakan masuk sebelum membuat PO.");
   }
-  if (
-    session.user.role !== UserRole.LOGISTICS &&
-    session.user.role !== UserRole.ADMINISTRATIONS
-  ) {
-    return actionFailure("Hanya Logistik yang dapat mengajukan PO material.");
+  if (!canOperateLogisticsActions(session.user.role)) {
+    return actionFailure("Hanya Logistik atau pimpinan berwenang yang dapat mengajukan PO material.");
   }
   if (
     !input ||
@@ -1515,13 +1516,9 @@ export async function submitDirectStockPurchaseInvoice(
   const purchaseId = formData.get("purchaseId");
   const documentPhoto = formData.get("invoicePhoto");
   const session = await auth();
-  if (
-    !session?.user?.id ||
-    (session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.ADMINISTRATIONS)
-  ) {
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
     return directPurchaseFailure(
-      "Hanya Logistik atau Administrasi yang dapat melampirkan invoice/bon.",
+      "Hanya Logistik, pimpinan berwenang, atau Administrasi yang dapat melampirkan invoice/bon.",
     );
   }
   if (
@@ -1670,13 +1667,9 @@ export async function receiveDirectStockPurchase(
   formData: FormData,
 ): Promise<DirectStockPurchaseActionResult> {
   const session = await auth();
-  if (
-    !session?.user?.id ||
-    (session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.ADMINISTRATIONS)
-  ) {
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
     return directPurchaseFailure(
-      "Hanya Logistik atau Administrasi yang dapat menerima pembelian stok.",
+      "Hanya Logistik, pimpinan berwenang, atau Administrasi yang dapat menerima pembelian stok.",
     );
   }
 
@@ -2065,11 +2058,8 @@ export async function importLogisticsStockCsv(
   if (!session?.user?.id) {
     return actionFailure("Silakan masuk sebelum mengimpor katalog stok.");
   }
-  if (
-    session.user.role !== UserRole.LOGISTICS &&
-    session.user.role !== UserRole.ADMINISTRATIONS
-  ) {
-    return actionFailure("Hanya Logistik yang dapat mengimpor katalog stok.");
+  if (!canOperateLogisticsActions(session.user.role)) {
+    return actionFailure("Hanya Logistik atau pimpinan berwenang yang dapat mengimpor katalog stok.");
   }
   if (typeof csvText !== "string" || csvText.length > 1_000_000) {
     return actionFailure("File CSV tidak valid atau melebihi batas 1 MB.");
@@ -2413,10 +2403,11 @@ export async function createTicket(
   if (
     isShippingCostRequest &&
     session.user.role !== UserRole.LOGISTICS &&
-    session.user.role !== UserRole.DIRECTOR
+    session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
   ) {
     return actionFailure(
-      "Permintaan biaya pengiriman hanya dapat dibuat oleh Logistik atau Direktur.",
+      "Permintaan biaya pengiriman hanya dapat dibuat oleh Logistik, Direktur, atau Wakil Direktur.",
     );
   }
   const isFieldTeamInternalFundingRequest =
@@ -2427,6 +2418,7 @@ export async function createTicket(
   if (
     isInternalFundingRequest &&
     session.user.role !== UserRole.DRAFTER &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR &&
     !(
       (session.user.role === UserRole.FIELD_TEAM ||
         session.user.role === UserRole.KOORDINATOR) &&
@@ -2445,14 +2437,16 @@ export async function createTicket(
     isOfficeRequest &&
     session.user.role !== UserRole.ADMINISTRATIONS &&
     session.user.role !== UserRole.DRAFTER &&
-    session.user.role !== UserRole.FINANCE
+    session.user.role !== UserRole.FINANCE &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
   ) {
     return actionFailure(
-      "Permintaan belanja kantor hanya dapat dibuat oleh Admin, Drafter, atau Keuangan.",
+      "Permintaan belanja kantor hanya dapat dibuat oleh Admin, Drafter, Keuangan, atau Wakil Direktur.",
     );
   }
   const canRequestFieldCost =
     session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR ||
     session.user.role === UserRole.KOORDINATOR ||
     session.user.role === UserRole.FIELD_TEAM;
   if (
@@ -2526,9 +2520,10 @@ export async function createTicket(
   if (
     isAPHRequest &&
     session.user.role !== UserRole.DIRECTOR &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR &&
     session.user.role !== UserRole.FINANCE
   ) {
-    return actionFailure("APH hanya dapat diminta oleh Direktur atau Keuangan.");
+    return actionFailure("APH hanya dapat diminta oleh Direktur, Wakil Direktur, atau Keuangan.");
   }
   const requiresProject =
     requestCategory === TicketRequestCategory.MATERIAL ||
@@ -2627,11 +2622,10 @@ export async function createTicket(
   }
   if (
     input.moverAssigneeId !== undefined &&
-    session.user.role !== UserRole.LOGISTICS &&
-    session.user.role !== UserRole.ADMINISTRATIONS
+    !canOperateLogisticsActions(session.user.role)
   ) {
     return actionFailure(
-      "Mover hanya dapat dipilih oleh Koordinator Logistik.",
+      "Mover hanya dapat dipilih oleh Koordinator Logistik atau pimpinan berwenang.",
     );
   }
   if (isRentalTicket) {
@@ -3110,11 +3104,14 @@ export async function createTicket(
   const shouldSubmitNow = submitImmediately || isAutoSubmittedSpecial;
   const isMaterialSubmittedDirectly =
     shouldSubmitNow && input.type === TicketType.MATERIAL;
+  const isExecutiveCreator =
+    session.user.role === UserRole.DIRECTOR ||
+    session.user.role === UserRole.DEPUTY_DIRECTOR;
   const isDirectorSelfApproved =
     shouldSubmitNow &&
     !isMaterialSubmittedDirectly &&
     !isAPHRequest &&
-    session.user.role === UserRole.DIRECTOR;
+    isExecutiveCreator;
   const initialStatus: TicketStatus = !shouldSubmitNow
     ? TicketStatus.DRAFT
     : isMaterialSubmittedDirectly
@@ -3134,15 +3131,15 @@ export async function createTicket(
       : isAPHRequest
         ? "Permintaan APH diajukan langsung ke antrean pembayaran Keuangan."
         : isInternalFundingRequest
-          ? session.user.role === UserRole.DIRECTOR
-            ? "Pengajuan reimbursement/kasbon dibuat Direktur dan diteruskan langsung ke Keuangan."
+          ? isExecutiveCreator
+            ? "Pengajuan reimbursement/kasbon dibuat Direksi dan diteruskan langsung ke Keuangan."
             : "Pengajuan reimbursement/kasbon diajukan untuk persetujuan Direktur."
           : isShippingCostRequest
-            ? session.user.role === UserRole.DIRECTOR
-              ? "Pengajuan biaya pengiriman dibuat Direktur dan diteruskan langsung ke Keuangan."
+            ? isExecutiveCreator
+              ? "Pengajuan biaya pengiriman dibuat Direksi dan diteruskan langsung ke Keuangan."
               : "Pengajuan biaya pengiriman diajukan untuk persetujuan Direktur."
-            : session.user.role === UserRole.DIRECTOR
-              ? "Pengajuan dibuat Direktur dan diteruskan langsung ke Keuangan."
+            : isExecutiveCreator
+              ? "Pengajuan dibuat Direksi dan diteruskan langsung ke Keuangan."
               : "Tiket diajukan untuk persetujuan Direktur.";
   const receiptUrls: string[] = [];
   let deliveryReceiptUrl: string | null = null;
@@ -3452,14 +3449,10 @@ export async function getShippingDocumentOptions(): Promise<
   | { success: false; message: string }
 > {
   const session = await auth();
-  if (
-    !session?.user?.id ||
-    (session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.DIRECTOR)
-  ) {
+  if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
     return {
       success: false,
-      message: "Pilihan PO hanya tersedia untuk Logistik atau Direktur.",
+      message: "Pilihan PO hanya tersedia untuk Logistik atau pimpinan berwenang.",
     };
   }
 
@@ -4453,16 +4446,18 @@ export async function submitTicket(
   if (
     isAPHRequest &&
     ticket.requester.role !== UserRole.DIRECTOR &&
+    ticket.requester.role !== UserRole.DEPUTY_DIRECTOR &&
     ticket.requester.role !== UserRole.FINANCE
   ) {
-    return actionFailure("APH hanya dapat diajukan oleh Direktur atau Keuangan.");
+    return actionFailure("APH hanya dapat diajukan oleh Direktur, Wakil Direktur, atau Keuangan.");
   }
   const submittedByFinance =
     isAPHRequest && ticket.requester.role === UserRole.FINANCE;
   const submittedByDirector =
     !isMaterialTicket &&
     !isAPHRequest &&
-    ticket.requester.role === UserRole.DIRECTOR;
+    (ticket.requester.role === UserRole.DIRECTOR ||
+      ticket.requester.role === UserRole.DEPUTY_DIRECTOR);
   const nextStatus = isMaterialTicket
     ? TicketStatus.PROCESSED_LOGISTIC
     : isAPHRequest || submittedByDirector
@@ -6507,8 +6502,8 @@ export async function processFinancePayment(
   if (!session?.user?.id) {
     return actionFailure("Silakan masuk untuk memproses pembayaran.");
   }
-  if (session.user.role !== UserRole.FINANCE) {
-    return actionFailure("Hanya Keuangan yang dapat menyelesaikan pembayaran.");
+  if (!canOperateFinanceActions(session.user.role)) {
+    return actionFailure("Hanya Keuangan atau Wakil Direktur yang dapat menyelesaikan pembayaran.");
   }
   if (
     (!isBoundedText(transferDestination, 300) &&
@@ -6672,6 +6667,7 @@ export async function processFinancePayment(
       const isDirectAPHRequest =
         isAPHRequest &&
         (requester.role === UserRole.DIRECTOR ||
+          requester.role === UserRole.DEPUTY_DIRECTOR ||
           requester.role === UserRole.FINANCE);
       if (!order && !ticket.isApprovedByDirector && !isDirectAPHRequest) {
         throw new Error(
@@ -7369,8 +7365,8 @@ export async function processFinanceStandalonePurchaseOrderPayment(
   requestedPaymentAmount?: number,
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
-    return actionFailure("Hanya Keuangan yang dapat menyelesaikan pembayaran PO.");
+  if (!session?.user?.id || !canOperateFinanceActions(session.user.role)) {
+    return actionFailure("Hanya Keuangan atau Wakil Direktur yang dapat menyelesaikan pembayaran PO.");
   }
   if (!isValidPublicCode(publicCode)) {
     return actionFailure("Kode Purchase Order tidak valid.");
@@ -7722,9 +7718,9 @@ export async function processFinanceDirectStockPurchasePayment(
   requestedPaymentMethod?: POPaymentMethod,
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
+  if (!session?.user?.id || !canOperateFinanceActions(session.user.role)) {
     return actionFailure(
-      "Hanya Keuangan yang dapat memproses pembayaran pembelian langsung.",
+      "Hanya Keuangan atau Wakil Direktur yang dapat memproses pembayaran pembelian langsung.",
     );
   }
   if (typeof purchaseId !== "string" || !purchaseId.trim()) {
@@ -8106,8 +8102,8 @@ export async function replaceFinancePaymentProof(
   file: File,
 ): Promise<TicketActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
-    return actionFailure("Hanya Keuangan yang dapat mengganti bukti transfer.");
+  if (!session?.user?.id || !canOperateFinanceActions(session.user.role)) {
+    return actionFailure("Hanya Keuangan atau Wakil Direktur yang dapat mengganti bukti transfer.");
   }
   const normalizedFile =
     file instanceof File ? normalizeFinancePaymentProofFile(file) : null;

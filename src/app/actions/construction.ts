@@ -16,6 +16,7 @@ import {
 } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "../../../auth";
+import { canOperateFinanceActions } from "@/lib/user-access";
 import { prisma } from "@/lib/prisma";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Cashflow from "@/models/cashflow";
@@ -748,7 +749,7 @@ export async function reviewSubkonTermynFinance(id: string) {
   const session = await auth();
   if (!session?.user?.id) return failure("Silakan masuk untuk memproses termin.");
   if (
-    session.user.role !== UserRole.FINANCE &&
+    !canOperateFinanceActions(session.user.role) &&
     session.user.role !== UserRole.ADMINISTRATIONS
   ) {
     return failure("Role Anda tidak diizinkan memproses termin.");
@@ -878,8 +879,8 @@ export async function paySubkonTermyn(
 ): Promise<ConstructionActionResult> {
   const session = await auth();
   if (!session?.user?.id) return failure("Silakan masuk untuk memproses pembayaran termin.");
-  if (session.user.role !== UserRole.FINANCE) {
-    return failure("Hanya Keuangan yang dapat membayar termin.");
+  if (!canOperateFinanceActions(session.user.role)) {
+    return failure("Hanya Keuangan atau Wakil Direktur yang dapat membayar termin.");
   }
   if (!validId(id) || !validId(financeAccountId)) {
     return failure("Data termin atau buku kas/bank tidak valid.");
@@ -1425,8 +1426,8 @@ export async function releaseSubkonRetention(
 ): Promise<ConstructionActionResult> {
   const session = await auth();
   if (!session?.user?.id) return failure("Silakan masuk untuk mencairkan retensi.");
-  if (session.user.role !== UserRole.FINANCE) {
-    return failure("Hanya Keuangan yang dapat mencairkan retensi.");
+  if (!canOperateFinanceActions(session.user.role)) {
+    return failure("Hanya Keuangan atau Wakil Direktur yang dapat mencairkan retensi.");
   }
   if (!validId(contractId) || !validId(financeAccountId)) {
     return failure("Data kontrak atau buku kas/bank tidak valid.");

@@ -48,7 +48,9 @@ export async function createVehicleTripLog(
     !session?.user?.id ||
     (session.user.role !== UserRole.MOVER &&
       session.user.role !== UserRole.LOGISTICS &&
-      session.user.role !== UserRole.ADMINISTRATIONS)
+      session.user.role !== UserRole.ADMINISTRATIONS &&
+      session.user.role !== UserRole.DIRECTOR &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
   ) {
     return fail("Anda tidak memiliki akses untuk mencatat perjalanan kendaraan.");
   }

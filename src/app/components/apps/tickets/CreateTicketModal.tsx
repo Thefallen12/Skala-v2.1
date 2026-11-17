@@ -779,6 +779,7 @@ const getRequestTypeOptions = (
 
   if (
     role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
     role === UserRole.KOORDINATOR ||
     role === UserRole.FIELD_TEAM
   ) {
@@ -789,7 +790,9 @@ const getRequestTypeOptions = (
   }
 
   if (
-    (role === UserRole.FIELD_TEAM || role === UserRole.KOORDINATOR) &&
+    (role === UserRole.FIELD_TEAM ||
+      role === UserRole.KOORDINATOR ||
+      role === UserRole.DEPUTY_DIRECTOR) &&
     selectedProjectId
   ) {
     options.push({
@@ -814,7 +817,8 @@ const getRequestTypeOptions = (
   if (
     role === UserRole.ADMINISTRATIONS ||
     role === UserRole.DRAFTER ||
-    role === UserRole.FINANCE
+    role === UserRole.FINANCE ||
+    role === UserRole.DEPUTY_DIRECTOR
   ) {
     options.push({
       label: requestCategoryLabels[TicketRequestCategory.OFFICE],
@@ -822,14 +826,22 @@ const getRequestTypeOptions = (
     });
   }
 
-  if (role === UserRole.LOGISTICS || role === UserRole.DIRECTOR) {
+  if (
+    role === UserRole.LOGISTICS ||
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR
+  ) {
     options.push({
       label: requestCategoryLabels[TicketRequestCategory.SHIPPING_COST],
       value: TicketRequestCategory.SHIPPING_COST,
     });
   }
 
-  if (role === UserRole.DIRECTOR || role === UserRole.FINANCE) {
+  if (
+    role === UserRole.DIRECTOR ||
+    role === UserRole.DEPUTY_DIRECTOR ||
+    role === UserRole.FINANCE
+  ) {
     options.push({
       label: requestCategoryLabels[TicketRequestCategory.APH],
       value: TicketRequestCategory.APH,

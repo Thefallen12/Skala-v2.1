@@ -39,7 +39,10 @@ export async function updateTransactionDocumentSignature(
         : kind === "DO"
           ? UserRole.KOORDINATOR
           : UserRole.FINANCE;
-  if (session.user.role !== requiredRole) {
+  if (
+    session.user.role !== requiredRole &&
+    session.user.role !== UserRole.DEPUTY_DIRECTOR
+  ) {
     return {
       success: false,
       message: `Aksi ini hanya dapat dilakukan oleh ${

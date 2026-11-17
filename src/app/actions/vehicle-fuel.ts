@@ -447,8 +447,12 @@ export async function processVehicleFuelRequest(
   },
 ): Promise<VehicleFuelActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
-    return fail("Hanya Keuangan yang dapat memproses request dana BBM.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.FINANCE &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return fail("Hanya Keuangan atau Wakil Direktur yang dapat memproses request dana BBM.");
   }
   if (
     typeof requestId !== "string" ||
@@ -643,8 +647,12 @@ export async function completeVehicleFuelRequestReview(
   financeNote: string,
 ): Promise<VehicleFuelActionResult> {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== UserRole.FINANCE) {
-    return fail("Hanya Keuangan yang dapat menutup rekonsiliasi request BBM.");
+  if (
+    !session?.user?.id ||
+    (session.user.role !== UserRole.FINANCE &&
+      session.user.role !== UserRole.DEPUTY_DIRECTOR)
+  ) {
+    return fail("Hanya Keuangan atau Wakil Direktur yang dapat menutup rekonsiliasi request BBM.");
   }
   if (
     typeof requestId !== "string" ||

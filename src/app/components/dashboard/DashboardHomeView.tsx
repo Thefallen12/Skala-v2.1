@@ -352,6 +352,7 @@ export async function DashboardHomeView({
           ? "/apps/logistics"
           : user.role === UserRole.LOGISTICS ||
               user.role === UserRole.DIRECTOR ||
+              user.role === UserRole.DEPUTY_DIRECTOR ||
               user.role === UserRole.ADMINISTRATIONS
             ? "/apps/logistics/stock"
             : user.role === UserRole.FINANCE

@@ -8,6 +8,8 @@ import type { TicketRow } from "../../types/ticket";
 import type { Prisma } from "@prisma/client";
 import {
   DODeliveryMethod,
+  OperationalDocumentKind,
+  OperationalDocumentStatus,
   PaymentStatus,
   POStatus,
   TicketFulfillmentStatus,
@@ -17,6 +19,10 @@ import {
   TicketType,
   UserRole,
 } from "@prisma/client";
+import {
+  canOperateLogisticsActions,
+  canViewAphRecords,
+} from "@/lib/user-access";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { projectSiteName } from "@/lib/documents/project-site-name";
@@ -479,6 +485,7 @@ export default async function LogisticsPage({
     deliveryOrders,
     unsignedOrderConfirmations,
     unsignedDeliveryOrders,
+    signedOperationalDocuments,
     equipmentLogs,
     equipmentMasters,
     vendors,
@@ -491,8 +498,7 @@ export default async function LogisticsPage({
       where: {
         AND: [
           where,
-          ...(session.user.role === UserRole.DIRECTOR ||
-          session.user.role === UserRole.FINANCE
+          ...(canViewAphRecords(session.user.role)
             ? []
             : [
                 {
@@ -786,7 +792,7 @@ export default async function LogisticsPage({
         vehiclePlateNumber: true,
       },
     }),
-    session.user.role === UserRole.LOGISTICS
+    canOperateLogisticsActions(session.user.role)
       ? prisma.orderConfirmation.findMany({
           where: { signedAt: null },
           orderBy: { createdAt: "asc" },
@@ -800,7 +806,7 @@ export default async function LogisticsPage({
           },
         })
       : Promise.resolve([]),
-    session.user.role === UserRole.LOGISTICS
+    canOperateLogisticsActions(session.user.role)
       ? prisma.deliveryOrder.findMany({
           where: { signedAt: null },
           orderBy: { createdAt: "asc" },
@@ -812,6 +818,34 @@ export default async function LogisticsPage({
             signedAt: true,
             acknowledgedBy: { select: { name: true } },
             acknowledgedAt: true,
+          },
+        })
+      : Promise.resolve([]),
+    canOperateLogisticsActions(session.user.role)
+      ? prisma.operationalDocument.findMany({
+          where: {
+            status: OperationalDocumentStatus.SIGNED,
+            kind: {
+              in: [
+                OperationalDocumentKind.PURCHASE_ORDER,
+                OperationalDocumentKind.DELIVERY_ORDER,
+              ],
+            },
+          },
+          orderBy: { signedAt: "asc" },
+          select: {
+            id: true,
+            documentNumber: true,
+            kind: true,
+            title: true,
+            signerName: true,
+            signedAt: true,
+            ticket: {
+              select: {
+                ticketNumber: true,
+                title: true,
+              },
+            },
           },
         })
       : Promise.resolve([]),
@@ -1158,7 +1192,7 @@ export default async function LogisticsPage({
     })),
   }));
 
-  if (mongo && session.user.role === UserRole.LOGISTICS) {
+  if (mongo && canOperateLogisticsActions(session.user.role)) {
     const equipmentTickets = await EquipmentTicket.find({
       ticketType: EQUIPMENT_REQUEST_TYPE,
       status: {
@@ -1422,6 +1456,16 @@ export default async function LogisticsPage({
             previewUrl: `/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(document.publicCode)}`,
           })),
         ]}
+        signedOperationalDocuments={signedOperationalDocuments.map((document) => ({
+          id: document.id,
+          documentNumber: document.documentNumber,
+          kind: document.kind,
+          title: document.title,
+          signerName: document.signerName,
+          signedAt: document.signedAt.toISOString(),
+          ticketNumber: document.ticket.ticketNumber,
+          ticketTitle: document.ticket.title,
+        }))}
         initialTab={tab}
         initialOpenSheet={openSheet}
         stockItems={stockItems.map((item) => ({
