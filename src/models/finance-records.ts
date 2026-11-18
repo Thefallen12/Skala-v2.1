@@ -440,6 +440,7 @@ export const MaterialContract =
 const materialDeliverySchema = new Schema(
   {
     _id: String,
+    publicCode: String,
     contractId: String,
     projectId: String,
     ticketId: String,
@@ -458,6 +459,7 @@ const materialDeliverySchema = new Schema(
   },
   { ...looseOptions, collection: "MaterialDelivery" },
 );
+materialDeliverySchema.index({ publicCode: 1 }, { unique: true, sparse: true });
 export const MaterialDelivery =
   models.MaterialDelivery ||
   model("MaterialDelivery", materialDeliverySchema, "MaterialDelivery");

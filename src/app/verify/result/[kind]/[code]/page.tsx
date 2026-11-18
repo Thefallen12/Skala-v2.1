@@ -153,6 +153,78 @@ async function loadDeliveryOrder(code: string) {
   });
 }
 
+async function loadMaterialDelivery(code: string) {
+  const delivery = await prisma.materialDelivery.findFirst({
+    where: {
+      OR: [{ publicCode: code }, { id: code }],
+    },
+    select: {
+      id: true,
+      publicCode: true,
+      doNumber: true,
+      deliveryDate: true,
+      vehiclePlate: true,
+      driverName: true,
+      quantityReceived: true,
+      createdAt: true,
+      contract: {
+        select: {
+          contractNumber: true,
+          vendorName: true,
+          materialType: true,
+          unit: true,
+        },
+      },
+      project: {
+        select: {
+          kelompokTani: true,
+          title: true,
+        },
+      },
+      ticket: {
+        select: { ticketNumber: true },
+      },
+      receivedBy: {
+        select: { name: true },
+      },
+    },
+  });
+  if (!delivery) return null;
+
+  const volumeText = `${delivery.quantityReceived.toLocaleString("id-ID", {
+    maximumFractionDigits: 2,
+  })} ${delivery.contract.unit}`;
+  const vendorFleetLabel =
+    [delivery.vehiclePlate, delivery.driverName].filter(Boolean).join(" · ") ||
+    "Armada & Mover Vendor Sendiri";
+
+  return createDocument("sj", code, {
+    type: "SURAT JALAN MATERIAL ALAM",
+    documentNumber: delivery.doNumber,
+    issueDate: formatDate(delivery.deliveryDate ?? delivery.createdAt),
+    partner: delivery.contract.vendorName,
+    createdBy: delivery.receivedBy?.name ?? "Logistik",
+    status: "Terverifikasi · Kontrak Payung Material Alam",
+    isValid: true,
+    previewUrl: delivery.publicCode
+      ? `/api/documents/transactions?kind=SJ&publicCode=${encodeURIComponent(delivery.publicCode)}`
+      : null,
+    details: [
+      { label: "No. Kontrak Payung", value: delivery.contract.contractNumber },
+      {
+        label: "Material & Volume",
+        value: `${delivery.contract.materialType} · ${volumeText}`,
+      },
+      {
+        label: "Proyek Tujuan",
+        value: delivery.project.kelompokTani || delivery.project.title || "—",
+      },
+      { label: "No. Tiket", value: delivery.ticket?.ticketNumber ?? "—" },
+      { label: "Armada Vendor", value: vendorFleetLabel },
+    ],
+  });
+}
+
 async function loadInvoice(code: string) {
   const invoice = await prisma.invoice.findUnique({
     where: { publicCode: code },
@@ -356,6 +428,7 @@ export default async function DocumentVerificationPage({
   const kinds: VerificationDocumentKind[] = [
     "po",
     "do",
+    "sj",
     "invoice",
     "ko",
     "spk",
@@ -375,13 +448,15 @@ export default async function DocumentVerificationPage({
       ? await loadPurchaseOrder(code)
       : kind === "do"
         ? await loadDeliveryOrder(code)
-        : kind === "invoice"
-          ? await loadInvoice(code)
-          : kind === "ko"
-            ? await loadOrderConfirmation(code)
-            : kind === "spk" || kind === "bast"
-              ? await loadConstructionDocument(kind, code)
-              : await loadIssuedDocument(code);
+        : kind === "sj"
+          ? await loadMaterialDelivery(code)
+          : kind === "invoice"
+            ? await loadInvoice(code)
+            : kind === "ko"
+              ? await loadOrderConfirmation(code)
+              : kind === "spk" || kind === "bast"
+                ? await loadConstructionDocument(kind, code)
+                : await loadIssuedDocument(code);
 
   if (!document) notFound();
   return <DocumentValidationViewer document={document} />;

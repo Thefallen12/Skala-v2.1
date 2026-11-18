@@ -569,6 +569,7 @@ export async function loadMaterialContractsBundle(options?: {
     const unitPrice = contract?.unitPrice ?? 0;
     return {
       id: String(delivery._id),
+      publicCode: delivery.publicCode ?? null,
       contractId: delivery.contractId,
       contractNumber: contract?.contractNumber ?? "Kontrak tidak ditemukan",
       vendorName: contract?.vendorName ?? "Vendor tidak ditemukan",
@@ -621,6 +622,7 @@ export async function loadMaterialContractsBundle(options?: {
         : null;
       return {
         id: String(delivery._id),
+        publicCode: delivery.publicCode ?? null,
         doNumber: delivery.doNumber,
         deliveryDate: safeIsoDateOnly(delivery.deliveryDate),
         projectId: delivery.projectId,

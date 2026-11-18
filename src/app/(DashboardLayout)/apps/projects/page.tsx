@@ -15,6 +15,7 @@ import {
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
+import { formatDailyEquipmentList } from "@/lib/project-reports";
 import {
   calculateWeightedProjectProgress,
   toJakartaDateKey,
@@ -99,6 +100,7 @@ export default async function ProjectsWorkstationPage({
           progress: true,
           workPointId: true,
           dailyVolume: true,
+          equipment: true,
           workSummary: true,
           notes: true,
           k3SafetyLog: true,
@@ -106,6 +108,21 @@ export default async function ProjectsWorkstationPage({
             orderBy: { createdAt: "asc" },
             select: { url: true, fileUrl: true },
           },
+        },
+      },
+      progressSubmissions: {
+        orderBy: { submittedAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          periodType: true,
+          periodLabel: true,
+          portalCode: true,
+          actualProgress: true,
+          plannedProgress: true,
+          deviation: true,
+          submittedAt: true,
+          submittedBy: { select: { name: true } },
         },
       },
       workPoints: {
@@ -365,12 +382,30 @@ export default async function ProjectsWorkstationPage({
       progress: report.progress,
       workPointId: report.workPointId,
       dailyVolume: report.dailyVolume,
+      equipment: report.equipment ?? null,
+      equipmentList: formatDailyEquipmentList(report.equipment),
       workSummary: report.workSummary,
       notes: report.notes,
       k3SafetyLog: report.k3SafetyLog ?? null,
       photoUrls: report.progressPhotos.map(
         (photo) => photo.fileUrl ?? photo.url,
       ),
+    }));
+
+    const serializedSubmissions = project.progressSubmissions.map((sub) => ({
+      id: sub.id,
+      periodType: sub.periodType,
+      periodLabel: sub.periodLabel,
+      portalCode: sub.portalCode,
+      actualProgress: sub.actualProgress,
+      plannedProgress: sub.plannedProgress,
+      deviation: sub.deviation,
+      submittedAt: sub.submittedAt
+        ? typeof sub.submittedAt === "string"
+          ? sub.submittedAt
+          : sub.submittedAt.toISOString()
+        : new Date().toISOString(),
+      submittedByName: sub.submittedBy?.name ?? "Tim Proyek",
     }));
 
     const serializedWorkPoints = project.workPoints.map((point) => {
@@ -495,6 +530,7 @@ export default async function ProjectsWorkstationPage({
       operationalRequested:
         realizedEntry?.requestedOperational.toString() ?? "0",
       reports: serializedReports,
+      progressSubmissions: serializedSubmissions,
       workPoints: serializedWorkPoints,
       blueprints: [
         ...project.blueprints

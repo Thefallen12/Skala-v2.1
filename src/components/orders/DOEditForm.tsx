@@ -1,15 +1,17 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { Plus, Printer, QrCode, Save, Trash2 } from "lucide-react";
+import { Info, Layers, Plus, Printer, QrCode, Save, Trash2 } from "lucide-react";
 import { DODeliveryMethod, DOStatus } from "@prisma/client";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import { createDeliveryOrder, updateDeliveryOrder } from "@/app/actions/orders";
 import type { DeliveryOrderItemInput } from "@/app/actions/orders";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,7 @@ type DeliveryTicketOption = {
   vendorName: string;
   requesterName: string;
   moverName: string;
+  hasContractItems?: boolean;
   items: Array<{
     itemName: string;
     quantity: number;
@@ -176,15 +179,17 @@ export default function DOEditForm({
       status: status ?? DOStatus.PENDING,
       items: items?.length
         ? items
-        : ticketOptions.find((ticket) => ticket.id === ticketId)?.items.map((item) => ({
-            itemName: item.itemName,
-            qtyOrdered: item.quantity,
-            qtyDelivered: 0,
-            unit: item.unit,
-            remarks: "",
-          })) ?? [
-            { itemName: "", qtyOrdered: 1, qtyDelivered: 0, unit: "pcs", remarks: "" },
-          ],
+        : initialTicket
+          ? initialTicket.items.map((item) => ({
+              itemName: item.itemName,
+              qtyOrdered: item.quantity,
+              qtyDelivered: 0,
+              unit: item.unit,
+              remarks: "",
+            }))
+          : [
+              { itemName: "", qtyOrdered: 1, qtyDelivered: 0, unit: "pcs", remarks: "" },
+            ],
     },
   });
   const { fields, append, remove, replace } = useFieldArray({
@@ -197,6 +202,12 @@ export default function DOEditForm({
   const selectedTicket = ticketOptions.find(
     (ticket) => ticket.id === watchedForm.ticketId,
   );
+  const isCreatingNew = !publicCode;
+  const hasNoDeliverableTickets = isCreatingNew && ticketOptions.length === 0;
+  const selectedTicketHasNoRegularItems =
+    isCreatingNew && Boolean(selectedTicket) && selectedTicket!.items.length === 0;
+  const suppressVehicleTrap =
+    hasNoDeliverableTickets || selectedTicketHasNoRegularItems;
   const effectiveProjectName = selectedTicket?.projectName ?? projectName;
   const effectiveProjectSite =
     selectedTicket?.projectLocation || projectSiteLocation;
@@ -213,6 +224,14 @@ export default function DOEditForm({
   const submit = form.handleSubmit(
     async (values) => {
       if (!canEdit) return;
+      if (suppressVehicleTrap) {
+        const msg =
+          "Tiket tidak memiliki item reguler untuk DO armada internal. Untuk Kontrak Payung Material Alam, terbitkan Surat Jalan Material Alam.";
+        setIsError(true);
+        setMessage(msg);
+        toast.error(msg);
+        return;
+      }
       if (
         values.deliveryMethod === DODeliveryMethod.EXPEDITION &&
         publicCode &&
@@ -335,6 +354,43 @@ export default function DOEditForm({
             {getStatusLabel(status ?? DOStatus.PENDING)}
           </Badge>
         </div>
+        {suppressVehicleTrap && (
+          <Alert
+            variant="lightinfo"
+            className="border border-sky-500/30 bg-sky-500/10 text-sky-900 dark:text-sky-100"
+          >
+            <Info className="size-4" aria-hidden="true" />
+            <AlertTitle>
+              {selectedTicketHasNoRegularItems
+                ? `Tiket ${selectedTicket?.ticketNumber} Tidak Memerlukan DO Armada Internal`
+                : "Belum Ada Tiket Material Reguler yang Siap DO"}
+            </AlertTitle>
+            <AlertDescription className="mt-1 space-y-2.5 text-sky-900/90 dark:text-sky-100/90">
+              <p>
+                {selectedTicketHasNoRegularItems
+                  ? "Tiket ini tidak memiliki item gudang atau PO reguler yang siap dibuatkan Delivery Order armada internal. Untuk item Kontrak Payung Material Alam (batu/pasir), vendor menyediakan armada & mover sendiri — tugas kita hanya menerbitkan Surat Jalan Material Alam."
+                  : "Delivery Order armada internal hanya untuk barang stok gudang atau PO reguler yang sudah lunas. Untuk pengiriman Batu/Pasir Kontrak Payung (armada & mover disediakan vendor), terbitkan Surat Jalan Material Alam."}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" asChild>
+                  <Link
+                    href={
+                      selectedTicketHasNoRegularItems && selectedTicket
+                        ? `/apps/logistics?tab=bulk-contracts&openSheet=${encodeURIComponent(selectedTicket.id)}`
+                        : "/apps/logistics?tab=bulk-contracts"
+                    }
+                  >
+                    <Layers className="mr-1.5 size-4" aria-hidden="true" />
+                    Terbitkan Surat Jalan Material Alam
+                  </Link>
+                </Button>
+                <Button type="button" size="sm" variant="outline" asChild>
+                  <Link href="/apps/tickets">Lihat Antrean Tiket</Link>
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="do-number">Nomor DO / Surat Jalan</Label>
@@ -400,6 +456,9 @@ export default function DOEditForm({
                         form.setValue("receiverName", selected.requesterName);
                         if (selected.moverName) {
                           form.setValue("driverName", selected.moverName);
+                        }
+                        if (selected.items.length === 0) {
+                          form.clearErrors("vehicleId");
                         }
                       }
                     }}
@@ -533,6 +592,9 @@ export default function DOEditForm({
                   name="vehicleId"
                   rules={{
                     validate: (selectedId) => {
+                      if (suppressVehicleTrap) {
+                        return true;
+                      }
                       if (
                         form.getValues("deliveryMethod") ===
                           DODeliveryMethod.INTERNAL_MOVER &&
@@ -564,7 +626,7 @@ export default function DOEditForm({
                   )}
                 />
               )}
-              {availableVehicles.length === 0 && !publicCode && (
+              {availableVehicles.length === 0 && !publicCode && !suppressVehicleTrap && (
                 <p className="text-sm text-destructive">
                   Belum ada kendaraan tersedia dengan KM awal yang sudah diinisialisasi.
                 </p>
@@ -991,7 +1053,7 @@ export default function DOEditForm({
       )}
       <div className="order-editor-actions sticky bottom-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur xl:bottom-4">
         {canEdit && (
-          <Button type="submit" disabled={isSaving}>
+          <Button type="submit" disabled={isSaving || suppressVehicleTrap}>
             <Save className="mr-2 h-4 w-4" />
             {isSaving
               ? "Menyimpan..."

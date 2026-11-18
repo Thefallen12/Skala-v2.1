@@ -32,10 +32,12 @@ import {
   Ellipsis,
   ExternalLink,
   FileSpreadsheet,
+  FileText,
   Filter,
   HardHat,
   ImageIcon,
   LayoutTemplate,
+  Loader2,
   MapPin,
   MapPinned,
   Pencil,
@@ -43,13 +45,16 @@ import {
   Printer,
   RefreshCw,
   Search,
+  Send,
   ShieldCheck,
+  Sparkles,
   Ticket,
   Trash2,
   Upload,
   UserPlus,
   Users,
   WifiOff,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ProjectPriority, ProjectStatus, UserRole } from "@prisma/client";
@@ -61,6 +66,7 @@ import {
   verifySubkonTermynField,
 } from "@/app/actions/construction";
 import {
+  applyWorkTypeTemplate,
   approveProjectWorkPointWage,
   assignProjectFieldPic,
   createProjectWorkPoint,
@@ -102,6 +108,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -114,7 +121,9 @@ import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -141,13 +150,22 @@ import {
   calculatePlannedSCurveProgress,
   calculateWeightedProjectProgress,
 } from "@/lib/project-progress";
+import {
+  PROJECT_WORK_TYPE_GROUPS,
+  formatWorkTypeBadge,
+  isConsultancyWorkType,
+  resolveProjectWorkType,
+} from "@/lib/project-work-types";
 import { cn } from "@/lib/utils";
 import DailyProgressModal, {
+  formatEquipmentText,
   isRunningProjectStatus,
   submitOfflineDailyReportAction,
 } from "./DailyProgressModal";
+import DailyReportsHubPanel from "./DailyReportsHubPanel";
 import { DinasProjectReportPage } from "./DinasProjectReportPage";
 import ImportProjectModal from "./ImportProjectModal";
+import SendProgressModal from "./SendProgressModal";
 import {
   classifyTicketFundCategory,
   type FundCategoryKey,
@@ -303,10 +321,23 @@ export type ProjectWorkstationMasterData = {
     progress: number | null;
     workPointId: string | null;
     dailyVolume: number | null;
+    equipment?: unknown;
+    equipmentList?: string[];
     workSummary: string | null;
     notes: string | null;
     k3SafetyLog?: string | null;
     photoUrls: string[];
+  }[];
+  progressSubmissions?: {
+    id: string;
+    periodType: string;
+    periodLabel: string;
+    portalCode: string;
+    actualProgress: number;
+    plannedProgress: number;
+    deviation: number;
+    submittedAt: string;
+    submittedByName?: string | null;
   }[];
   workPoints: {
     id: string;
@@ -649,6 +680,43 @@ function getPlannedProgress(
  * TOP-LEVEL ROW & CARD COMPONENTS (Zero inline components/selects in rows)
  * ============================================================================ */
 
+async function downloadUrlWithToast(url: string, fallbackFilename: string) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      let message = "Gagal membuat laporan otomatis.";
+      try {
+        const payload = (await res.json()) as { message?: string };
+        if (payload?.message) message = payload.message;
+      } catch {
+        // ignore non-JSON body
+      }
+      toast.error(message);
+      return;
+    }
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    try {
+      const disposition = res.headers.get("content-disposition");
+      const utf8Match = disposition?.match(/filename\*=UTF-8''([^;]+)/i);
+      const plainMatch = disposition?.match(/filename="?([^";]+)"?/i);
+      const resolvedName = utf8Match?.[1]
+        ? decodeURIComponent(utf8Match[1])
+        : plainMatch?.[1] || fallbackFilename;
+      const link = document.createElement("a");
+      link.href = objUrl;
+      link.download = resolvedName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      URL.revokeObjectURL(objUrl);
+    }
+  } catch {
+    toast.error("Gagal mengunduh berkas laporan. Periksa koneksi Anda.");
+  }
+}
+
 interface ProjectItemActionsProps {
   project: ProjectWorkstationMasterData;
   isSelected: boolean;
@@ -660,6 +728,7 @@ interface ProjectItemActionsProps {
   canSubmitProgress: boolean;
   hasFieldTeamUsers: boolean;
   onOpenDailyProgress: (project: ProjectWorkstationMasterData) => void;
+  onOpenSendProgress: (project: ProjectWorkstationMasterData) => void;
   onOpenWorkstation: (
     project: ProjectWorkstationMasterData,
     tab?: string,
@@ -672,11 +741,13 @@ interface ProjectItemActionsProps {
 
 function ProjectActionMenu({
   project,
+  canViewFinancials,
   isProjectManager,
   canDelete,
   canSubmitProgress,
   hasFieldTeamUsers,
   onOpenDailyProgress,
+  onOpenSendProgress,
   onOpenWorkstation,
   onOpenAssignPic,
   onOpenTicket,
@@ -685,11 +756,13 @@ function ProjectActionMenu({
 }: Pick<
   ProjectItemActionsProps,
   | "project"
+  | "canViewFinancials"
   | "isProjectManager"
   | "canDelete"
   | "canSubmitProgress"
   | "hasFieldTeamUsers"
   | "onOpenDailyProgress"
+  | "onOpenSendProgress"
   | "onOpenWorkstation"
   | "onOpenAssignPic"
   | "onOpenTicket"
@@ -697,6 +770,11 @@ function ProjectActionMenu({
   | "onRequestDelete"
 >) {
   const isRunning = isRunningProjectStatus(project.status);
+  const reportUrl = (
+    type: "daily" | "progress" | "financial",
+    format: "pdf" | "xlsx",
+  ) =>
+    `/api/projects/${encodeURIComponent(project.id)}/reports?type=${type}&format=${format}`;
 
   return (
     <DropdownMenu>
@@ -711,13 +789,17 @@ function ProjectActionMenu({
           <Ellipsis className="size-4" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-48">
+      <DropdownMenuContent align="end" className="min-w-56">
         {isRunning && canSubmitProgress && (
           <DropdownMenuItem onSelect={() => onOpenDailyProgress(project)}>
             <Camera aria-hidden="true" />
-            Isi Progres
+            Input Daily Report
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem onSelect={() => onOpenSendProgress(project)}>
+          <Send aria-hidden="true" />
+          Kirim Progres
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/apps/projects/${project.id}`}>
             <ExternalLink aria-hidden="true" />
@@ -736,6 +818,70 @@ function ProjectActionMenu({
           <Ticket aria-hidden="true" />
           Ajukan Tiket
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="type-p3 text-[11px] font-semibold text-muted-foreground">
+          Laporan Otomatis
+        </DropdownMenuLabel>
+        <DropdownMenuItem
+          onSelect={() =>
+            void downloadUrlWithToast(
+              reportUrl("daily", "pdf"),
+              `Laporan-Harian-${project.code}.pdf`,
+            )
+          }
+        >
+          <FileText aria-hidden="true" />
+          PDF Harian
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() =>
+            void downloadUrlWithToast(
+              reportUrl("progress", "pdf"),
+              `Progres-KurvaS-${project.code}.pdf`,
+            )
+          }
+        >
+          <FileText aria-hidden="true" />
+          PDF Progres &amp; Kurva-S
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() =>
+            void downloadUrlWithToast(
+              reportUrl("progress", "xlsx"),
+              `Progres-KurvaS-${project.code}.xlsx`,
+            )
+          }
+        >
+          <FileSpreadsheet aria-hidden="true" />
+          Excel Progres (.xlsx)
+        </DropdownMenuItem>
+        {canViewFinancials && (
+          <>
+            <DropdownMenuItem
+              onSelect={() =>
+                void downloadUrlWithToast(
+                  reportUrl("financial", "pdf"),
+                  `Keuangan-RAB-RAP-${project.code}.pdf`,
+                )
+              }
+            >
+              <FileText aria-hidden="true" />
+              PDF Keuangan RAB/RAP
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                void downloadUrlWithToast(
+                  reportUrl("financial", "xlsx"),
+                  `Keuangan-RAB-RAP-${project.code}.xlsx`,
+                )
+              }
+            >
+              <FileSpreadsheet aria-hidden="true" />
+              Excel Keuangan RAB/RAP
+            </DropdownMenuItem>
+          </>
+        )}
+        {isProjectManager && <DropdownMenuSeparator />}
         {isProjectManager && hasFieldTeamUsers && (
           <DropdownMenuItem onSelect={() => onOpenAssignPic(project)}>
             <UserPlus aria-hidden="true" />
@@ -792,6 +938,7 @@ function ProjectMobileCard(props: ProjectItemActionsProps) {
   const realizedNum = Number(project.realized) || 0;
   const requestedNum = Number(project.requestedTotal ?? 0) || 0;
   const laborRealizedNum = Number(project.laborRealized ?? 0) || 0;
+  const workTypeBadge = formatWorkTypeBadge(project.jenisPekerjaan);
 
   return (
     <div
@@ -826,6 +973,18 @@ function ProjectMobileCard(props: ProjectItemActionsProps) {
                   project.title.toLowerCase() &&
                 ` · ${project.kelompokTani}`}
             </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <Badge
+                variant={
+                  workTypeBadge.group === "CONSULTANCY"
+                    ? "secondary"
+                    : "outline"
+                }
+                className="text-[10px]"
+              >
+                {workTypeBadge.shortLabel}
+              </Badge>
+            </div>
           </div>
         </div>
 
@@ -974,6 +1133,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
   const laborRequestedNum = Number(project.laborRequested ?? 0) || 0;
   const absorptionPercent =
     paguNum > 0 ? Math.min(100, (realizedNum / paguNum) * 100) : 0;
+  const workTypeBadge = formatWorkTypeBadge(project.jenisPekerjaan);
 
   return (
     <TableRow className="group">
@@ -1001,6 +1161,21 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
               project.title.toLowerCase() &&
             ` · ${project.kelompokTani}`}
         </p>
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          <Badge
+            variant={
+              workTypeBadge.group === "CONSULTANCY" ? "secondary" : "outline"
+            }
+            className="text-[10px]"
+          >
+            {workTypeBadge.shortLabel}
+          </Badge>
+          {workTypeBadge.group === "CONSULTANCY" && (
+            <span className="type-p3 text-[10px] font-medium text-muted-foreground">
+              Konsultansi
+            </span>
+          )}
+        </div>
         {(project.location || project.address) && (
           <p className="type-p3 mt-0.5 line-clamp-1 flex items-center gap-1 text-muted-foreground">
             <MapPin className="size-3.5 shrink-0 text-primary/70" aria-hidden="true" />
@@ -1227,12 +1402,25 @@ export default function ProjectWorkstationMaster({
     lockedProject: ProjectWorkstationMasterData | null;
     initialProjectId: string | null;
     initialWorkPointId: string | null;
+    initialDate: string | null;
   }>(() => ({
     open: actionParam === "daily-report",
     lockedProject: null,
     initialProjectId: projectParam,
     initialWorkPointId: null,
+    initialDate: null,
   }));
+
+  // Send Progress Modal state
+  const [sendProgressState, setSendProgressState] = useState<{
+    open: boolean;
+    lockedProject: ProjectWorkstationMasterData | null;
+    initialProjectId: string | null;
+  }>({
+    open: false,
+    lockedProject: null,
+    initialProjectId: null,
+  });
 
   // Hoisted Assign PIC Modal state
   const [picModalProject, setPicModalProject] =
@@ -1271,6 +1459,7 @@ export default function ProjectWorkstationMaster({
     string | null
   >(null);
   const [search, setSearch] = useState("");
+  const [workTypeFilter, setWorkTypeFilter] = useState("ALL");
   const [projectPage, setProjectPage] = useState(1);
   const [sortField, setSortField] = useState<ProjectSortField>("default");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -1280,7 +1469,7 @@ export default function ProjectWorkstationMaster({
   const [targetDateInput, setTargetDateInput] = useState("");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectViewMode, setProjectViewMode] = useState<
-    "tabel" | "papan" | "dinas"
+    "tabel" | "papan" | "harian" | "dinas"
   >("tabel");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
@@ -1314,6 +1503,7 @@ export default function ProjectWorkstationMaster({
         lockedProject: null,
         initialProjectId: projectParam,
         initialWorkPointId: null,
+        initialDate: null,
       });
     }
   }
@@ -1623,8 +1813,26 @@ export default function ProjectWorkstationMaster({
       (projectStatusFilter === "DONE" &&
         ["DONE", "COMPLETED"].includes(project.status));
 
+    let matchesWorkType = true;
+    if (workTypeFilter !== "ALL") {
+      if (workTypeFilter === "CONSULTANCY") {
+        matchesWorkType = isConsultancyWorkType(project.jenisPekerjaan);
+      } else if (workTypeFilter === "PHYSICAL") {
+        matchesWorkType = !isConsultancyWorkType(project.jenisPekerjaan);
+      } else {
+        const resolved = resolveProjectWorkType(project.jenisPekerjaan);
+        matchesWorkType =
+          resolved.id === workTypeFilter ||
+          (project.jenisPekerjaan?.trim().toLowerCase() ?? "") ===
+            workTypeFilter.toLowerCase();
+      }
+    }
+
+    const workTypeLabel = formatWorkTypeBadge(project.jenisPekerjaan).label;
+
     return (
       matchesStatus &&
+      matchesWorkType &&
       (!query ||
         [
           project.title,
@@ -1633,6 +1841,8 @@ export default function ProjectWorkstationMaster({
           project.location ?? "",
           project.fieldPicName ?? "",
           project.kelompokTani ?? "",
+          project.jenisPekerjaan ?? "",
+          workTypeLabel,
         ].some((value) => value.toLocaleLowerCase("id-ID").includes(query)))
     );
   });
@@ -1781,12 +1991,24 @@ export default function ProjectWorkstationMaster({
   const openDailyProgressForProject = (
     project?: ProjectWorkstationMasterData | null,
     workPointId?: string | null,
+    initialDate?: string | null,
   ) => {
     setDailyProgressState({
       open: true,
       lockedProject: project ?? null,
       initialProjectId: project?.id ?? null,
       initialWorkPointId: workPointId ?? null,
+      initialDate: initialDate ?? null,
+    });
+  };
+
+  const openSendProgressForProject = (
+    project?: ProjectWorkstationMasterData | null,
+  ) => {
+    setSendProgressState({
+      open: true,
+      lockedProject: project ?? null,
+      initialProjectId: project?.id ?? null,
     });
   };
 
@@ -1804,9 +2026,11 @@ export default function ProjectWorkstationMaster({
     setPicModalSelectedUserId(project.fieldPicId ?? "");
   };
 
-  const getExportHref = (format: "csv" | "xlsx") => {
+  const getExportHref = (format: "csv" | "xlsx" | "pdf") => {
     const params = new URLSearchParams({ format });
     if (search.trim()) params.set("search", search.trim());
+    if (workTypeFilter !== "ALL") params.set("jenisPekerjaan", workTypeFilter);
+    if (projectStatusFilter !== "ALL") params.set("status", projectStatusFilter);
     return `/api/projects/export?${params.toString()}`;
   };
 
@@ -2023,9 +2247,141 @@ export default function ProjectWorkstationMaster({
                     className="gap-1.5"
                   >
                     <Camera className="size-4" aria-hidden="true" />
-                    <span>Isi Progres</span>
+                    <span>Input Daily Report</span>
                   </Button>
                 )}
+                {(canSubmitDailyProgressRole || isProjectManager) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openSendProgressForProject(null)}
+                    className="gap-1.5"
+                  >
+                    <Send className="size-3.5" aria-hidden="true" />
+                    <span>Kirim Progres</span>
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      <FileText className="size-3.5" aria-hidden="true" />
+                      <span>Laporan Otomatis</span>
+                      <ChevronDown className="size-3.5" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-60">
+                    <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                      Portofolio Proyek (Sesuai Filter)
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void downloadUrlWithToast(
+                          getExportHref("xlsx"),
+                          "portofolio-proyek.xlsx",
+                        )
+                      }
+                    >
+                      <FileSpreadsheet aria-hidden="true" />
+                      Portofolio Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void downloadUrlWithToast(
+                          getExportHref("pdf"),
+                          "portofolio-proyek.pdf",
+                        )
+                      }
+                    >
+                      <FileText aria-hidden="true" />
+                      Portofolio PDF Resmi
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => setProjectViewMode("dinas")}
+                    >
+                      <LayoutTemplate aria-hidden="true" />
+                      Buka Rekap Portofolio &amp; Dinas
+                    </DropdownMenuItem>
+                    {selectedProjectIds.length === 1 && (() => {
+                      const chosen = projects.find(
+                        (p) => p.id === selectedProjectIds[0],
+                      );
+                      if (!chosen) return null;
+                      return (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                            Proyek Terpilih: {chosen.code}
+                          </DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              void downloadUrlWithToast(
+                                `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=daily&format=pdf`,
+                                `Laporan-Harian-${chosen.code}.pdf`,
+                              )
+                            }
+                          >
+                            <FileText aria-hidden="true" />
+                            PDF Harian
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              void downloadUrlWithToast(
+                                `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=progress&format=pdf`,
+                                `Progres-KurvaS-${chosen.code}.pdf`,
+                              )
+                            }
+                          >
+                            <FileText aria-hidden="true" />
+                            PDF Progres &amp; Kurva-S
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              void downloadUrlWithToast(
+                                `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=progress&format=xlsx`,
+                                `Progres-KurvaS-${chosen.code}.xlsx`,
+                              )
+                            }
+                          >
+                            <FileSpreadsheet aria-hidden="true" />
+                            Excel Progres &amp; Kurva-S
+                          </DropdownMenuItem>
+                          {canViewFinancials && (
+                            <>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  void downloadUrlWithToast(
+                                    `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=financial&format=pdf`,
+                                    `Keuangan-RAB-RAP-${chosen.code}.pdf`,
+                                  )
+                                }
+                              >
+                                <FileText aria-hidden="true" />
+                                PDF Keuangan RAB/RAP
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  void downloadUrlWithToast(
+                                    `/api/projects/${encodeURIComponent(chosen.id)}/reports?type=financial&format=xlsx`,
+                                    `Keuangan-RAB-RAP-${chosen.code}.xlsx`,
+                                  )
+                                }
+                              >
+                                <FileSpreadsheet aria-hidden="true" />
+                                Excel Keuangan RAB/RAP
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   type="button"
                   variant="outline"
@@ -2593,8 +2949,8 @@ export default function ProjectWorkstationMaster({
 
           {/* Views Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex flex-wrap rounded-lg border border-border bg-muted/30 p-0.5">
                 <Button
                   type="button"
                   size="sm"
@@ -2614,6 +2970,14 @@ export default function ProjectWorkstationMaster({
                 <Button
                   type="button"
                   size="sm"
+                  variant={projectViewMode === "harian" ? "secondary" : "ghost"}
+                  onClick={() => setProjectViewMode("harian")}
+                >
+                  Laporan Harian
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   variant={projectViewMode === "dinas" ? "default" : "ghost"}
                   onClick={() => setProjectViewMode("dinas")}
                 >
@@ -2621,9 +2985,9 @@ export default function ProjectWorkstationMaster({
                 </Button>
               </div>
 
-              {projectViewMode !== "dinas" && (
+              {(projectViewMode === "tabel" || projectViewMode === "papan") && (
                 <>
-                  <div className="relative w-full sm:w-56">
+                  <div className="relative w-full sm:w-52">
                     <Search
                       className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
                       aria-hidden="true"
@@ -2634,7 +2998,7 @@ export default function ProjectWorkstationMaster({
                         setSearch(e.target.value);
                         setProjectPage(1);
                       }}
-                      placeholder="Cari proyek..."
+                      placeholder="Cari proyek atau jenis..."
                       className="pl-8"
                     />
                   </div>
@@ -2663,43 +3027,93 @@ export default function ProjectWorkstationMaster({
                       <SelectItem value="DONE">Selesai</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  <Select
+                    value={workTypeFilter}
+                    onValueChange={(value) => {
+                      setWorkTypeFilter(value);
+                      setProjectPage(1);
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label="Filter jenis pekerjaan"
+                      className="w-52"
+                    >
+                      <SelectValue placeholder="Semua Jenis Pekerjaan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Jenis Pekerjaan</SelectItem>
+                      <SelectItem value="CONSULTANCY">
+                        Semua Jasa Konsultansi
+                      </SelectItem>
+                      <SelectItem value="PHYSICAL">
+                        Semua Konstruksi Fisik
+                      </SelectItem>
+                      {PROJECT_WORK_TYPE_GROUPS.map((group) => (
+                        <SelectGroup key={group.group}>
+                          <SelectLabel>{group.label}</SelectLabel>
+                          {group.items.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </>
               )}
             </div>
 
-            {projectViewMode !== "dinas" && (
+            {(projectViewMode === "tabel" || projectViewMode === "papan") && (
               <div className="flex items-center gap-2">
                 <span className="type-p3 text-muted-foreground tabular-nums">
                   {filteredProjects.length} proyek
                 </span>
-                {canViewFinancials && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                      >
-                        <Download className="size-3.5" aria-hidden="true" />
-                        <span>Ekspor</span>
-                        <ChevronDown className="size-3.5" aria-hidden="true" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={getExportHref("xlsx")}>
-                          Ekspor ke Excel (.xlsx)
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={getExportHref("csv")}>
-                          Ekspor ke CSV (.csv)
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                    >
+                      <Download className="size-3.5" aria-hidden="true" />
+                      <span>Ekspor</span>
+                      <ChevronDown className="size-3.5" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void downloadUrlWithToast(
+                          getExportHref("xlsx"),
+                          "projects-export.xlsx",
+                        )
+                      }
+                    >
+                      <FileSpreadsheet aria-hidden="true" />
+                      Ekspor ke Excel (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void downloadUrlWithToast(
+                          getExportHref("pdf"),
+                          "projects-portfolio.pdf",
+                        )
+                      }
+                    >
+                      <FileText aria-hidden="true" />
+                      Ekspor Portofolio PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href={getExportHref("csv")}>
+                        <Download aria-hidden="true" />
+                        Ekspor ke CSV (.csv)
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <Button
                   type="button"
@@ -2764,6 +3178,9 @@ export default function ProjectWorkstationMaster({
                     hasFieldTeamUsers={fieldTeamUsers.length > 0}
                     onOpenDailyProgress={(p) =>
                       openDailyProgressForProject(p)
+                    }
+                    onOpenSendProgress={(p) =>
+                      openSendProgressForProject(p)
                     }
                     onOpenWorkstation={openProjectModal}
                     onOpenAssignPic={openAssignPicModal}
@@ -2969,6 +3386,9 @@ export default function ProjectWorkstationMaster({
                         onOpenDailyProgress={(p) =>
                           openDailyProgressForProject(p)
                         }
+                        onOpenSendProgress={(p) =>
+                          openSendProgressForProject(p)
+                        }
                         onOpenWorkstation={openProjectModal}
                         onOpenAssignPic={openAssignPicModal}
                         onOpenTicket={(p) =>
@@ -3073,6 +3493,18 @@ export default function ProjectWorkstationMaster({
                               <p className="type-p2 line-clamp-1 font-bold text-foreground">
                                 {p.title}
                               </p>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <Badge
+                                  variant={
+                                    isConsultancyWorkType(p.jenisPekerjaan)
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                  className="px-1.5 py-0 text-[10px]"
+                                >
+                                  {formatWorkTypeBadge(p.jenisPekerjaan).shortLabel}
+                                </Badge>
+                              </div>
                               <p className="type-p3 line-clamp-1 text-muted-foreground">
                                 {p.code}
                                 {p.clientName
@@ -3172,10 +3604,41 @@ export default function ProjectWorkstationMaster({
             </div>
           )}
 
+          {/* PUSAT LAPORAN HARIAN VIEW */}
+          {projectViewMode === "harian" && (
+            <div className="pt-2">
+              <DailyReportsHubPanel
+                projects={projectList}
+                currentUserId={currentUserId}
+                isFieldTeam={isFieldTeam}
+                canSubmitProgress={canSubmitDailyProgressRole}
+                onOpenDailyProgress={(proj, opts) =>
+                  openDailyProgressForProject(
+                    proj
+                      ? (projectList.find((item) => item.id === proj.id) ?? null)
+                      : null,
+                    null,
+                    opts?.date ?? null,
+                  )
+                }
+                onOpenSendProgress={(proj) =>
+                  openSendProgressForProject(
+                    proj
+                      ? (projectList.find((item) => item.id === proj.id) ?? null)
+                      : null,
+                  )
+                }
+              />
+            </div>
+          )}
+
           {/* LAPORAN RESMI DINAS VIEW */}
           {projectViewMode === "dinas" && (
             <div className="pt-2">
-              <DinasProjectReportPage projects={projectList} />
+              <DinasProjectReportPage
+                projects={projectList}
+                canViewFinancials={canViewFinancials}
+              />
             </div>
           )}
         </div>
@@ -3261,8 +3724,28 @@ export default function ProjectWorkstationMaster({
         lockedProject={dailyProgressState.lockedProject}
         initialProjectId={dailyProgressState.initialProjectId}
         initialWorkPointId={dailyProgressState.initialWorkPointId}
+        initialDate={dailyProgressState.initialDate}
+        canIncludeFinancials={canViewFinancials}
         onSuccess={() => router.refresh()}
         onQueueChange={setOfflineQueueCount}
+        onOpenSendProgress={(proj) => {
+          const matched =
+            projectList.find((item) => item.id === proj.id) ?? null;
+          openSendProgressForProject(matched);
+        }}
+      />
+
+      {/* Send Progress Modal */}
+      <SendProgressModal
+        open={sendProgressState.open}
+        onOpenChange={(open) =>
+          setSendProgressState((prev) => ({ ...prev, open }))
+        }
+        projects={projectList}
+        lockedProject={sendProgressState.lockedProject}
+        initialProjectId={sendProgressState.initialProjectId}
+        canIncludeFinancials={canViewFinancials}
+        onSuccess={() => router.refresh()}
       />
 
       {/* Hoisted Assign PIC Modal */}
@@ -3508,8 +3991,14 @@ export default function ProjectWorkstationMaster({
                       )}
                     >
                       <div className="type-p2 flex items-center justify-between gap-1 font-bold">
-                        <span>2. Titik Kerja &amp; Upah</span>
-                        {approvedPoints > 0 ? (
+                        <span>
+                          {isConsultancyWorkType(activeProject.jenisPekerjaan)
+                            ? "2. Deliverable / Jadwal"
+                            : "2. Titik Kerja & Upah"}
+                        </span>
+                        {(isConsultancyWorkType(activeProject.jenisPekerjaan)
+                          ? totalPoints > 0
+                          : approvedPoints > 0) ? (
                           <CheckCircle2
                             className="size-4 text-success"
                             aria-hidden="true"
@@ -3523,8 +4012,12 @@ export default function ProjectWorkstationMaster({
                       </div>
                       <p className="type-p3 mt-1 text-muted-foreground">
                         {totalPoints === 0
-                          ? "Belum ada titik kerja"
-                          : `${approvedPoints}/${totalPoints} titik disetujui`}
+                          ? isConsultancyWorkType(activeProject.jenisPekerjaan)
+                            ? "Belum ada deliverable"
+                            : "Belum ada titik kerja"
+                          : isConsultancyWorkType(activeProject.jenisPekerjaan)
+                            ? `${totalPoints} deliverable siap`
+                            : `${approvedPoints}/${totalPoints} titik disetujui`}
                       </p>
                     </button>
 
@@ -4280,7 +4773,25 @@ export default function ProjectWorkstationMaster({
                     {activeProject.workPoints.length === 0 && (
                       <EmptyState
                         title="Belum ada titik pekerjaan"
-                        description="Tambahkan titik kerja dan usulan upah pada formulir di atas."
+                        description="Tambahkan titik kerja / deliverable pada formulir di atas atau terapkan template standar."
+                        action={
+                          isProjectManager ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={isPending}
+                              onClick={() =>
+                                runProjectAction(() =>
+                                  applyWorkTypeTemplate(activeProject.id),
+                                )
+                              }
+                              className="gap-1.5"
+                            >
+                              <Sparkles className="size-3.5" aria-hidden="true" />
+                              <span>Terapkan Template Pekerjaan</span>
+                            </Button>
+                          ) : undefined
+                        }
                       />
                     )}
                   </CardContent>
@@ -4366,6 +4877,21 @@ export default function ProjectWorkstationMaster({
                           {report.workersCount} pekerja ·{" "}
                           {report.photoUrls.length} foto
                         </p>
+                        {(report.equipmentList?.length ||
+                          formatEquipmentText(report.equipment)) && (
+                          <p className="type-p3 flex items-center gap-1.5 text-muted-foreground">
+                            <Wrench
+                              className="size-3.5 shrink-0 text-primary"
+                              aria-hidden="true"
+                            />
+                            <span>
+                              Peralatan:{" "}
+                              {report.equipmentList?.length
+                                ? report.equipmentList.join(", ")
+                                : formatEquipmentText(report.equipment)}
+                            </span>
+                          </p>
+                        )}
 
                         {report.dailyVolume !== null &&
                           report.workPointId &&
@@ -4488,6 +5014,13 @@ export default function ProjectWorkstationMaster({
                               <SelectValue placeholder="Pilih kategori" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="DED">DED (Detail Engineering Design)</SelectItem>
+                              <SelectItem value="SURVEY_GEOTEKNIK">
+                                Survey &amp; Uji Tanah (Geoteknik)
+                              </SelectItem>
+                              <SelectItem value="SUPERVISION_REPORT">
+                                Laporan Pengawasan / Supervisi
+                              </SelectItem>
                               <SelectItem value="SHOP_DRAWING">
                                 Shop Drawing
                               </SelectItem>
@@ -4564,6 +5097,13 @@ export default function ProjectWorkstationMaster({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ALL">Semua kategori</SelectItem>
+                          <SelectItem value="DED">DED</SelectItem>
+                          <SelectItem value="SURVEY_GEOTEKNIK">
+                            Survey &amp; Geoteknik
+                          </SelectItem>
+                          <SelectItem value="SUPERVISION_REPORT">
+                            Laporan Supervisi
+                          </SelectItem>
                           <SelectItem value="SHOP_DRAWING">
                             Shop Drawing
                           </SelectItem>

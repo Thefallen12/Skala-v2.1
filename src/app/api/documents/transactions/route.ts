@@ -19,11 +19,19 @@ import {
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import { renderPdf } from "@/lib/documents/render-pdf";
 import { isValidPublicCode } from "@/lib/documents/random-code";
-import { documentVerificationPath } from "@/lib/documents/verification-url";
+import {
+  documentVerificationPath,
+  type VerificationDocumentKind,
+} from "@/lib/documents/verification-url";
+import {
+  canBillAndPayVendorContracts,
+  canRecordMaterialDeliveries,
+} from "@/lib/material-contracts";
 
 export const runtime = "nodejs";
 
 type DocumentKind = UniversalDocumentData["kind"];
+type RouteDocumentKind = DocumentKind | "SJ";
 
 const allowedPrivateRoles: UserRole[] = [
   UserRole.LOGISTICS,
@@ -51,7 +59,7 @@ const summary = (subtotal: number, tax: number, deduction = 0) => [
   { label: "TOTAL", amount: subtotal + tax - deduction, emphasis: true },
 ];
 
-function sampleDocument(kind: DocumentKind): UniversalDocumentData {
+function sampleDocument(kind: RouteDocumentKind): UniversalDocumentData {
   const examples = {
     PO: {
       title: "PURCHASE ORDER",
@@ -169,14 +177,43 @@ function sampleDocument(kind: DocumentKind): UniversalDocumentData {
         { heading: "Diterima Oleh / Received By", name: "Penerima Proyek", role: "Penerima / Recipient" },
       ],
     },
+    SJ: {
+      title: "SURAT JALAN MATERIAL ALAM",
+      subtitle: "KONTRAK PAYUNG CURAH",
+      number: "SPE-001/SJ/2026",
+      leftDetails: [
+        { label: "No. Kontrak Payung", value: "KONTRAK/PASIR/2026/001" },
+        { label: "Supplier / Vendor", value: "CV Alam Mandiri" },
+        { label: "Armada Pengiriman", value: "Armada & Mover Vendor Sendiri" },
+        { label: "Proyek Tujuan", value: "Rehabilitasi Saluran Irigasi" },
+        { label: "No. Tiket Referensi", value: "TKT-202611-101" },
+      ],
+      rightDetails: [
+        { label: "Plat Kendaraan Vendor", value: "BL 8890 AB" },
+        { label: "Nama Supir Vendor", value: "Budi Santoso" },
+        { label: "PIC Proyek / Penerima", value: "Koordinator Lapangan" },
+        { label: "Penerbit Dokumen", value: "Fachri Maulana Hattami" },
+      ],
+      items: [
+        { itemCode: "KONTRAK/PASIR/2026/001", description: "PASIR — Pengadaan Pasir Pasang", quantity: 4, unit: "M3", remarks: "Pengiriman material alam (armada & mover disediakan vendor)" },
+      ],
+      summary: undefined,
+      terms: undefined,
+      notes: "Material alam dikirim langsung ke lokasi proyek menggunakan armada & mover vendor.",
+      signatures: [
+        { heading: "Logistik Pengirim / Issued By", name: "Fachri Maulana Hattami", role: "Logistik / Pengirim" },
+        { heading: "Supir / Vendor / Carrier", name: "Budi Santoso", role: "Armada & Mover Vendor" },
+        { heading: "Penerima Lapangan / Received By", role: "Penerima Lapangan / Proyek" },
+      ],
+    },
   } satisfies Record<
-    DocumentKind,
+    RouteDocumentKind,
     Omit<UniversalDocumentData, "kind" | "date" | "logoDataUrl">
   >;
 
   return {
     ...examples[kind],
-    kind,
+    kind: kind === "SJ" ? "DO" : kind,
     date: "2 November 2026",
     logoDataUrl: "",
   };
@@ -209,7 +246,7 @@ function stockItemKey(name: string, unit: string): string {
 }
 
 async function loadDocument(
-  kind: DocumentKind,
+  kind: RouteDocumentKind,
   recordId: string,
   publicCode: string,
 ): Promise<UniversalDocumentData | null> {
@@ -628,6 +665,128 @@ async function loadDocument(
     };
   }
 
+  if (kind === "SJ") {
+    const delivery = await prisma.materialDelivery.findFirst({
+      where: recordId
+        ? { OR: [{ id: recordId }, { publicCode: recordId }] }
+        : { publicCode },
+      select: {
+        id: true,
+        publicCode: true,
+        doNumber: true,
+        deliveryDate: true,
+        vehiclePlate: true,
+        driverName: true,
+        quantityReceived: true,
+        notes: true,
+        createdAt: true,
+        contract: {
+          select: {
+            contractNumber: true,
+            vendorName: true,
+            materialType: true,
+            unit: true,
+          },
+        },
+        project: {
+          select: {
+            code: true,
+            title: true,
+            kelompokTani: true,
+            location: true,
+            address: true,
+            fieldPic: { select: { name: true } },
+          },
+        },
+        ticket: {
+          select: {
+            ticketNumber: true,
+            title: true,
+          },
+        },
+        receivedBy: {
+          select: { name: true },
+        },
+      },
+    });
+    if (!delivery) return null;
+
+    const projectLabel = projectSiteName(
+      delivery.project.kelompokTani ?? delivery.project.title,
+      delivery.project.location ?? delivery.project.address,
+    );
+    const driverLabel = delivery.driverName?.trim() || null;
+    const plateLabel = delivery.vehiclePlate?.trim() || null;
+
+    return {
+      kind: "DO",
+      title: "SURAT JALAN MATERIAL ALAM",
+      subtitle: "KONTRAK PAYUNG CURAH",
+      number: delivery.doNumber,
+      date: formatDate(delivery.deliveryDate ?? delivery.createdAt),
+      verificationPublicCode: delivery.publicCode ?? delivery.id,
+      leftDetails: [
+        { label: "No. Kontrak Payung", value: delivery.contract.contractNumber },
+        { label: "Supplier / Vendor", value: delivery.contract.vendorName },
+        { label: "Armada Pengiriman", value: "Armada & Mover Vendor Sendiri" },
+        { label: "Proyek Tujuan", value: projectLabel },
+        { label: "No. Tiket Referensi", value: delivery.ticket?.ticketNumber ?? "-" },
+      ],
+      rightDetails: [
+        {
+          label: "Plat Kendaraan Vendor",
+          value: plateLabel ?? "Opsional (Armada Vendor)",
+        },
+        {
+          label: "Nama Supir Vendor",
+          value: driverLabel ?? "Opsional (Mover Vendor)",
+        },
+        {
+          label: "PIC Proyek / Penerima",
+          value: delivery.project.fieldPic?.name ?? delivery.receivedBy?.name ?? "-",
+        },
+        {
+          label: "Penerbit Dokumen",
+          value: delivery.receivedBy?.name ?? "Logistik",
+        },
+      ],
+      items: documentItems([
+        {
+          itemCode: delivery.contract.contractNumber,
+          description: `${delivery.contract.materialType}${
+            delivery.ticket?.title ? ` — ${delivery.ticket.title}` : ""
+          }`,
+          quantity: delivery.quantityReceived,
+          unit: delivery.contract.unit,
+          remarks: "Pengiriman material alam (armada & mover disediakan vendor)",
+        },
+      ]),
+      notes: [
+        delivery.notes?.trim() ||
+          "Material alam dikirim langsung ke lokasi proyek menggunakan armada & mover vendor.",
+        "Dokumen resmi pengeluaran/pengiriman material alam Kontrak Payung (tanpa armada internal).",
+      ].join("\n"),
+      signatures: [
+        {
+          heading: "Logistik Pengirim / Issued By",
+          name: delivery.receivedBy?.name ?? undefined,
+          role: "Logistik / Pengirim",
+        },
+        {
+          heading: "Supir / Vendor / Carrier",
+          name: driverLabel ?? undefined,
+          role: "Armada & Mover Vendor",
+        },
+        {
+          heading: "Penerima Lapangan / Received By",
+          name: delivery.project.fieldPic?.name ?? undefined,
+          role: "Penerima Lapangan / Proyek",
+        },
+      ],
+      logoDataUrl: "",
+    };
+  }
+
   if (kind === "INVOICE") {
     const invoice = await prisma.invoice.findUnique({
       where: publicCode ? { publicCode } : { id: recordId },
@@ -932,8 +1091,8 @@ async function loadDocument(
 
 export async function GET(request: NextRequest) {
   const kindParam = request.nextUrl.searchParams.get("kind") ?? "";
-  const kind = ["PO", "INVOICE", "KO", "DO"].includes(kindParam)
-    ? (kindParam as DocumentKind)
+  const kind = ["PO", "INVOICE", "KO", "DO", "SJ"].includes(kindParam)
+    ? (kindParam as RouteDocumentKind)
     : null;
   const recordId = request.nextUrl.searchParams.get("id") ?? "";
   const publicCode = request.nextUrl.searchParams.get("publicCode") ?? "";
@@ -944,10 +1103,12 @@ export async function GET(request: NextRequest) {
     (!previewOnly &&
       (kind === "PO" || kind === "DO"
         ? !publicCode
-        : !recordId &&
-          (!publicCode ||
-            !["INVOICE", "KO"].includes(kind) ||
-            !isValidPublicCode(publicCode))))
+        : kind === "SJ"
+          ? !recordId && (!publicCode || !isValidPublicCode(publicCode))
+          : !recordId &&
+            (!publicCode ||
+              !["INVOICE", "KO"].includes(kind) ||
+              !isValidPublicCode(publicCode))))
   ) {
     return NextResponse.json({ message: "Jenis atau nomor dokumen tidak valid." }, { status: 400 });
   }
@@ -980,17 +1141,20 @@ export async function GET(request: NextRequest) {
 
   if (
     previewOnly ||
+    (kind === "SJ" && Boolean(recordId)) ||
     ((kind === "INVOICE" || kind === "KO") && !publicSignedDocument)
   ) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Silakan masuk untuk mencetak dokumen." }, { status: 401 });
     }
-    if (
-      previewOnly
-        ? !allowedPreviewRoles.includes(session.user.role)
-        : !allowedPrivateRoles.includes(session.user.role)
-    ) {
+    const isAuthorized = previewOnly
+      ? allowedPreviewRoles.includes(session.user.role)
+      : kind === "SJ"
+        ? canRecordMaterialDeliveries(session.user.role) ||
+          canBillAndPayVendorContracts(session.user.role)
+        : allowedPrivateRoles.includes(session.user.role);
+    if (!isAuthorized) {
       return NextResponse.json({ message: "Anda tidak memiliki akses mencetak dokumen ini." }, { status: 403 });
     }
   }
@@ -1006,7 +1170,7 @@ export async function GET(request: NextRequest) {
       kind === "PO" ? null : document.verificationPublicCode;
     const verificationPath = verificationCode
       ? documentVerificationPath(
-          kind.toLowerCase() as "po" | "do" | "invoice" | "ko",
+          kind.toLowerCase() as VerificationDocumentKind,
           verificationCode,
         )
       : null;
@@ -1057,7 +1221,11 @@ export async function GET(request: NextRequest) {
     document.approvalQrDataUrl =
       approvalQrResult.status === "fulfilled" ? approvalQrResult.value : null;
     delete document.approvalPublicCode;
-    const documentHtml = renderUniversalTransactionDocument(document);
+    const renderedHtml = renderUniversalTransactionDocument(document);
+    const documentHtml =
+      kind === "SJ"
+        ? renderedHtml.replace("<strong>NO. DO:", "<strong>NO. SJ:")
+        : renderedHtml;
     if (previewOnly || htmlPreview) {
       return new NextResponse(documentHtml, {
         headers: {

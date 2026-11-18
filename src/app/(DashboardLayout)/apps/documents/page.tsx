@@ -4,7 +4,12 @@ import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
 import { decimalStringFromScaledInteger } from "@/lib/scaled-decimal";
 import { canManageUsers } from "@/lib/user-access";
-import { TicketStatus, TicketType, UserRole } from "@prisma/client";
+import {
+  TicketCategoryHint,
+  TicketStatus,
+  TicketType,
+  UserRole,
+} from "@prisma/client";
 import { PageHeader } from "@/components/ui/page-header";
 import DocumentWorkspace from "@/app/components/apps/documents/DocumentWorkspace";
 
@@ -67,6 +72,7 @@ export default async function DocumentsPage() {
             quantity: true,
             unit: true,
             estimatedCost: true,
+            categoryHint: true,
           },
         },
       },
@@ -97,11 +103,38 @@ export default async function DocumentsPage() {
     }),
   ]);
 
+  const regularMaterialTickets = tickets.flatMap((ticket) => {
+    const nonContractItems = ticket.items.filter(
+      (item) => item.categoryHint !== TicketCategoryHint.CONTRACT,
+    );
+    if (ticket.items.length > 0 && nonContractItems.length === 0) {
+      return [];
+    }
+    return [
+      {
+        ...ticket,
+        totalAmount:
+          ticket.totalAmount !== null
+            ? decimalStringFromScaledInteger(ticket.totalAmount)
+            : null,
+        items: nonContractItems.map((item) => ({
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unit: item.unit,
+          estimatedCost:
+            item.estimatedCost !== null
+              ? decimalStringFromScaledInteger(item.estimatedCost)
+              : null,
+        })),
+      },
+    ];
+  });
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Dokumen PO & DO"
-        description="Buat, bubuhkan tanda tangan, dan pantau penerbitan dokumen operasional secara searah."
+        description="Buat, bubuhkan tanda tangan, dan pantau penerbitan dokumen PO & DO reguler secara searah (Surat Jalan Material Alam Kontrak Payung diterbitkan dari menu Logistik)."
         breadcrumbs={[
           { label: "Beranda", href: "/" },
           { label: "Dokumen PO & DO" },
@@ -112,20 +145,7 @@ export default async function DocumentsPage() {
           ...template,
           updatedAt: template.updatedAt.toISOString(),
         }))}
-        tickets={tickets.map((ticket) => ({
-          ...ticket,
-          totalAmount:
-            ticket.totalAmount !== null
-              ? decimalStringFromScaledInteger(ticket.totalAmount)
-              : null,
-          items: ticket.items.map((item) => ({
-            ...item,
-            estimatedCost:
-              item.estimatedCost !== null
-                ? decimalStringFromScaledInteger(item.estimatedCost)
-                : null,
-          })),
-        }))}
+        tickets={regularMaterialTickets}
         documents={documents.map((document) => ({
           ...document,
           signedAt: document.signedAt.toISOString(),

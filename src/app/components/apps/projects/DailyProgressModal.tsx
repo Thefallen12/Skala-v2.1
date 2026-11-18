@@ -13,10 +13,13 @@ import {
   Minus,
   Plus,
   RefreshCw,
+  Send,
   ShieldCheck,
+  Sparkles,
   Sun,
   Trash2,
   WifiOff,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { addProjectProgress } from "@/app/actions/project";
@@ -44,7 +47,13 @@ import {
   type OfflineDailyReportInput,
   type OfflineDailyReportSubmitFn,
 } from "@/lib/offline-daily-report-queue";
+import {
+  formatWorkTypeBadge,
+  getDailyReportFocusHints,
+  isConsultancyWorkType,
+} from "@/lib/project-work-types";
 import { cn } from "@/lib/utils";
+import SendProgressModal from "./SendProgressModal";
 
 export type DailyProgressWorkPoint = {
   id: string;
@@ -71,6 +80,7 @@ export type DailyProgressExistingReport = {
   workSummary?: string | null;
   notes?: string | null;
   k3SafetyLog?: string | null;
+  equipment?: unknown;
   photoUrls?: string[];
 };
 
@@ -80,6 +90,9 @@ export type DailyProgressProjectOption = {
   title: string;
   status: string;
   progress: number;
+  jenisPekerjaan?: string | null;
+  clientName?: string | null;
+  fieldPicName?: string | null;
   location?: string | null;
   address?: string | null;
   kelompokTani?: string | null;
@@ -95,8 +108,11 @@ export interface DailyProgressModalProps {
   lockedProject?: DailyProgressProjectOption | null;
   initialProjectId?: string | null;
   initialWorkPointId?: string | null;
+  initialDate?: string | null;
+  canIncludeFinancials?: boolean;
   onSuccess?: () => void;
   onQueueChange?: (count: number) => void;
+  onOpenSendProgress?: (project: DailyProgressProjectOption) => void;
 }
 
 const STEPS = [
@@ -128,10 +144,50 @@ const K3_PRESETS = [
   "Briefing K3 pagi selesai · Nihil insiden",
 ] as const;
 
+const PHYSICAL_EQUIPMENT_PRESETS = [
+  "Excavator",
+  "Molen Beton",
+  "Dump Truck",
+  "Stamper / Vibro",
+  "Genset",
+] as const;
+
+const CONSULTANCY_EQUIPMENT_PRESETS = [
+  "Total Station",
+  "GPS RTK / Drone",
+  "Alat Sondir / Bor",
+  "Laptop CAD & Survey",
+  "Kamera Dokumentasi",
+] as const;
+
 const MAX_PHOTOS = 5;
 
 export function isRunningProjectStatus(status: string): boolean {
   return ["RUNNING", "ON_PROGRESS", "ACTIVE"].includes(status);
+}
+
+export function formatEquipmentText(equipment: unknown): string {
+  if (!equipment) return "";
+  if (typeof equipment === "string") return equipment.trim();
+  if (Array.isArray(equipment)) {
+    return equipment
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object" && "name" in item) {
+          const obj = item as { name?: unknown; qty?: unknown };
+          const name = typeof obj.name === "string" ? obj.name.trim() : "";
+          const qty =
+            obj.qty !== undefined && obj.qty !== null
+              ? String(obj.qty).trim()
+              : "";
+          return name ? (qty ? `${name} (${qty})` : name) : "";
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
 }
 
 function formatVolumeNumber(value: number): string {
@@ -157,8 +213,10 @@ function extractSameDayLoggedVolume(
 function computeWorkPointCapacity(
   workPoint: DailyProgressWorkPoint,
   reportDate: string,
+  isConsultancy = false,
 ) {
-  const target = Number(workPoint.proposedVolume ?? 0);
+  const rawTarget = Number(workPoint.proposedVolume ?? 0);
+  const target = rawTarget > 0 ? rawTarget : isConsultancy ? 100 : 0;
   const completed =
     workPoint.completedVolume ?? (target * (workPoint.progress ?? 0)) / 100;
   const sameDayLogged = extractSameDayLoggedVolume(workPoint, reportDate);
@@ -172,7 +230,7 @@ function computeWorkPointCapacity(
     target,
     completed: Math.max(0, Math.round(completed * 1000) / 1000),
     maxAllowed,
-    unit: workPoint.proposedUnit || "unit",
+    unit: workPoint.proposedUnit || (isConsultancy ? "%" : "unit"),
   };
 }
 
@@ -248,8 +306,36 @@ function PhotoThumbnailItem({
 }
 
 export default function DailyProgressModal(props: DailyProgressModalProps) {
-  if (!props.open) return null;
-  return <DailyProgressModalInner {...props} />;
+  const [fallbackSendProject, setFallbackSendProject] =
+    React.useState<DailyProgressProjectOption | null>(null);
+
+  return (
+    <>
+      {props.open && (
+        <DailyProgressModalInner
+          {...props}
+          onRequestSendProgress={(project) => {
+            if (props.onOpenSendProgress) {
+              props.onOpenSendProgress(project);
+            } else {
+              setFallbackSendProject(project);
+            }
+          }}
+        />
+      )}
+      {!props.onOpenSendProgress && (
+        <SendProgressModal
+          open={fallbackSendProject !== null}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setFallbackSendProject(null);
+          }}
+          lockedProject={fallbackSendProject}
+          canIncludeFinancials={props.canIncludeFinancials}
+          onSuccess={() => props.onSuccess?.()}
+        />
+      )}
+    </>
+  );
 }
 
 function DailyProgressModalInner({
@@ -259,9 +345,13 @@ function DailyProgressModalInner({
   lockedProject = null,
   initialProjectId = null,
   initialWorkPointId = null,
+  initialDate = null,
   onSuccess,
   onQueueChange,
-}: DailyProgressModalProps) {
+  onRequestSendProgress,
+}: DailyProgressModalProps & {
+  onRequestSendProgress: (project: DailyProgressProjectOption) => void;
+}) {
   const [todayKey] = React.useState(() => getJakartaDateKey());
   const runningProjects = React.useMemo(() => {
     const source = lockedProject ? [lockedProject] : projects;
@@ -287,10 +377,20 @@ function DailyProgressModalInner({
     [lockedProject, runningProjects, initialProjId],
   );
 
+  const defaultReportDate = initialDate && initialDate <= todayKey ? initialDate : todayKey;
+  const initialSameDayReport = React.useMemo(() => {
+    if (!initialTargetProject?.reports || !defaultReportDate) return null;
+    return (
+      initialTargetProject.reports.find(
+        (report) => report.reportDate === defaultReportDate,
+      ) ?? null
+    );
+  }, [initialTargetProject, defaultReportDate]);
+
   const [step, setStep] = React.useState(0);
   const [selectedProjectId, setSelectedProjectId] =
     React.useState<string>(initialProjId);
-  const [reportDate, setReportDate] = React.useState<string>(todayKey);
+  const [reportDate, setReportDate] = React.useState<string>(defaultReportDate);
 
   // Step 2 states
   const [isNonWork, setIsNonWork] = React.useState(false);
@@ -305,7 +405,10 @@ function DailyProgressModalInner({
       const wp = initialTargetProject.workPoints.find(
         (item) => item.id === initialWorkPointId,
       );
-      const cap = wp ? computeWorkPointCapacity(wp, todayKey) : null;
+      const isCons = isConsultancyWorkType(initialTargetProject.jenisPekerjaan);
+      const cap = wp
+        ? computeWorkPointCapacity(wp, defaultReportDate, isCons)
+        : null;
       const defaultVol =
         cap && cap.maxAllowed > 0 ? String(Math.min(1, cap.maxAllowed)) : "";
       return defaultVol ? { [initialWorkPointId]: defaultVol } : {};
@@ -316,24 +419,100 @@ function DailyProgressModalInner({
     () => (initialTargetProject ? String(initialTargetProject.progress ?? 0) : "0"),
   );
 
-  // Step 3 states
-  const [weather, setWeather] = React.useState<string>("Cerah");
-  const [workersCount, setWorkersCount] = React.useState<string>("1");
-  const [workSummary, setWorkSummary] = React.useState<string>("");
+  // Step 3 states (auto-prefilled from existingSameDayReport)
+  const [weather, setWeather] = React.useState<string>(
+    () => initialSameDayReport?.weather || "Cerah",
+  );
+  const [workersCount, setWorkersCount] = React.useState<string>(() =>
+    initialSameDayReport?.workersCount !== undefined
+      ? String(initialSameDayReport.workersCount)
+      : "1",
+  );
+  const [equipment, setEquipment] = React.useState<string>(() =>
+    formatEquipmentText(initialSameDayReport?.equipment),
+  );
+  const [workSummary, setWorkSummary] = React.useState<string>(
+    () => initialSameDayReport?.workSummary ?? "",
+  );
   const [issueNotes, setIssueNotes] = React.useState<string>("");
-  const [k3SafetyLog, setK3SafetyLog] = React.useState<string>("");
+  const [k3SafetyLog, setK3SafetyLog] = React.useState<string>(
+    () => initialSameDayReport?.k3SafetyLog ?? "",
+  );
   const [photos, setPhotos] = React.useState<AttachedPhotoItem[]>([]);
   const photosRef = React.useRef<AttachedPhotoItem[]>([]);
   const [isCompressingPhotos, setIsCompressingPhotos] = React.useState(false);
 
   // Submission & offline queue states
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submittingMode, setSubmittingMode] = React.useState<
+    "save" | "save-and-send" | null
+  >(null);
+  const isSubmitting = submittingMode !== null;
   const [isFlushingQueue, setIsFlushingQueue] = React.useState(false);
   const [queuedCount, setQueuedCount] = React.useState(0);
   const [isOnline, setIsOnline] = React.useState<boolean>(() =>
     typeof navigator === "undefined" ? true : navigator.onLine !== false,
   );
   const [stepError, setStepError] = React.useState("");
+
+  const activeProject = React.useMemo(() => {
+    if (lockedProject) return lockedProject;
+    return (
+      runningProjects.find((project) => project.id === selectedProjectId) ?? null
+    );
+  }, [lockedProject, runningProjects, selectedProjectId]);
+
+  const isConsultancyProject = React.useMemo(
+    () => isConsultancyWorkType(activeProject?.jenisPekerjaan),
+    [activeProject?.jenisPekerjaan],
+  );
+  const workTypeBadge = React.useMemo(
+    () =>
+      activeProject
+        ? formatWorkTypeBadge(activeProject.jenisPekerjaan)
+        : null,
+    [activeProject],
+  );
+  const focusHints = React.useMemo(
+    () =>
+      activeProject
+        ? getDailyReportFocusHints(activeProject.jenisPekerjaan)
+        : null,
+    [activeProject],
+  );
+
+  const existingSameDayReport = React.useMemo(() => {
+    if (!activeProject?.reports || !reportDate) return null;
+    return (
+      activeProject.reports.find((report) => report.reportDate === reportDate) ??
+      null
+    );
+  }, [activeProject, reportDate]);
+
+  // Auto-prefill Step 3 fields whenever activeProject or reportDate changes
+  const prefillKey = `${activeProject?.id ?? ""}|${reportDate}|${existingSameDayReport?.id ?? ""}`;
+  const [prevPrefillKey, setPrevPrefillKey] = React.useState(prefillKey);
+  if (prefillKey !== prevPrefillKey) {
+    setPrevPrefillKey(prefillKey);
+    if (existingSameDayReport) {
+      setWeather(existingSameDayReport.weather || "Cerah");
+      setWorkersCount(
+        String(
+          existingSameDayReport.workersCount ??
+            (isConsultancyProject ? 0 : 1),
+        ),
+      );
+      setEquipment(formatEquipmentText(existingSameDayReport.equipment));
+      setWorkSummary(existingSameDayReport.workSummary ?? "");
+      setK3SafetyLog(existingSameDayReport.k3SafetyLog ?? "");
+    } else {
+      setWeather("Cerah");
+      setWorkersCount(isConsultancyProject ? "1" : "1");
+      setEquipment("");
+      setWorkSummary("");
+      setK3SafetyLog("");
+    }
+    setIssueNotes("");
+  }
 
   const refreshQueueCount = React.useCallback(async () => {
     const count = await countOfflineDailyReports();
@@ -400,35 +579,24 @@ function DailyProgressModalInner({
     };
   }, [onQueueChange, onSuccess, refreshQueueCount]);
 
-  const activeProject = React.useMemo(() => {
-    if (lockedProject) return lockedProject;
-    return (
-      runningProjects.find((project) => project.id === selectedProjectId) ?? null
-    );
-  }, [lockedProject, runningProjects, selectedProjectId]);
-
   const projectOptions = React.useMemo<ComboboxOption[]>(
     () =>
-      runningProjects.map((project) => ({
-        value: project.id,
-        label: project.title,
-        description: `${project.code}${project.location || project.address ? ` · ${project.location || project.address}` : ""} · ${project.progress.toFixed(0)}%`,
-        keywords: [
-          project.code,
-          project.kelompokTani ?? "",
-          project.location ?? "",
-        ],
-      })),
+      runningProjects.map((project) => {
+        const wt = formatWorkTypeBadge(project.jenisPekerjaan);
+        return {
+          value: project.id,
+          label: project.title,
+          description: `${project.code} · ${wt.shortLabel}${project.location || project.address ? ` · ${project.location || project.address}` : ""} · ${project.progress.toFixed(0)}%`,
+          keywords: [
+            project.code,
+            wt.label,
+            project.kelompokTani ?? "",
+            project.location ?? "",
+          ],
+        };
+      }),
     [runningProjects],
   );
-
-  const existingSameDayReport = React.useMemo(() => {
-    if (!activeProject?.reports || !reportDate) return null;
-    return (
-      activeProject.reports.find((report) => report.reportDate === reportDate) ??
-      null
-    );
-  }, [activeProject, reportDate]);
 
   const existingPhotosTodayCount = existingSameDayReport?.photoUrls?.length ?? 0;
   const maxAddablePhotos = Math.max(0, MAX_PHOTOS - existingPhotosTodayCount);
@@ -464,7 +632,11 @@ function DailyProgressModalInner({
       if (!checked) {
         delete next[workPoint.id];
       } else {
-        const cap = computeWorkPointCapacity(workPoint, reportDate);
+        const cap = computeWorkPointCapacity(
+          workPoint,
+          reportDate,
+          isConsultancyProject,
+        );
         const suggested =
           cap.maxAllowed > 0 ? Math.min(1, cap.maxAllowed) : 0;
         next[workPoint.id] = suggested > 0 ? String(suggested) : "";
@@ -477,7 +649,11 @@ function DailyProgressModalInner({
     workPoint: DailyProgressWorkPoint,
     delta: number,
   ) => {
-    const cap = computeWorkPointCapacity(workPoint, reportDate);
+    const cap = computeWorkPointCapacity(
+      workPoint,
+      reportDate,
+      isConsultancyProject,
+    );
     if (cap.maxAllowed <= 0) return;
 
     const currentRaw = selectedVolumes[workPoint.id] ?? "";
@@ -581,7 +757,12 @@ function DailyProgressModalInner({
 
       if (activeProject.workPoints.length > 0) {
         const selectedIds = Object.keys(selectedVolumes);
+        // For CONSULTANCY projects (DED, Pengawas, MK, Survey), allow proceeding with
+        // 0 checked items so they can still submit a daily supervision/design log.
         if (selectedIds.length === 0) {
+          if (isConsultancyProject) {
+            return true;
+          }
           setStepError(
             "Centang minimal 1 item pekerjaan atau aktifkan mode Libur / Hujan.",
           );
@@ -592,7 +773,11 @@ function DailyProgressModalInner({
           const wp = activeProject.workPoints.find((item) => item.id === wpId);
           if (!wp) continue;
           const vol = Number.parseFloat(selectedVolumes[wpId] ?? "");
-          const cap = computeWorkPointCapacity(wp, reportDate);
+          const cap = computeWorkPointCapacity(
+            wp,
+            reportDate,
+            isConsultancyProject,
+          );
           if (!Number.isFinite(vol) || vol <= 0) {
             setStepError(
               `Isi volume harian lebih dari 0 untuk "${wp.title}".`,
@@ -615,7 +800,10 @@ function DailyProgressModalInner({
         return true;
       }
 
-      // Project without work points: validate cumulative progress
+      // Project without work points: validate cumulative progress (optional for consultancy)
+      if (isConsultancyProject && cumulativeProgress.trim() === "") {
+        return true;
+      }
       const parsedProg = Number.parseFloat(cumulativeProgress);
       if (
         !Number.isFinite(parsedProg) ||
@@ -675,13 +863,26 @@ function DailyProgressModalInner({
     }
   };
 
-  const handleSubmit = async () => {
+  const appendEquipmentPreset = (preset: string) => {
+    setEquipment((prev) => {
+      const parts = prev
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.some((p) => p.toLowerCase() === preset.toLowerCase())) {
+        return prev;
+      }
+      return [...parts, preset].join(", ");
+    });
+  };
+
+  const handleSubmit = async (sendAfterSave = false) => {
     if (!activeProject) return;
     if (!validateStep(0) || !validateStep(1)) return;
 
     const parsedWorkers = Number.parseInt(workersCount, 10);
     if (!Number.isFinite(parsedWorkers) || parsedWorkers < 0) {
-      setStepError("Jumlah pekerja tidak valid.");
+      setStepError("Jumlah pekerja / personel tidak valid.");
       return;
     }
 
@@ -690,18 +891,27 @@ function DailyProgressModalInner({
       activeProject.workPoints.length > 0 &&
       Object.keys(selectedVolumes).length > 0;
 
-    if (!isNonWork && (hasWorkEntries || Number(cumulativeProgress) > 0) && parsedWorkers < 1) {
+    if (
+      !isConsultancyProject &&
+      !isNonWork &&
+      (hasWorkEntries || Number(cumulativeProgress) > 0) &&
+      parsedWorkers < 1
+    ) {
       setStepError("Minimal 1 pekerja hadir pada hari kerja.");
       return;
     }
 
-    if (!isNonWork && activeProject.workPoints.length === 0 && !workSummary.trim()) {
-      setStepError("Ringkasan pekerjaan harian wajib diisi.");
+    if (
+      !isNonWork &&
+      !hasWorkEntries &&
+      !workSummary.trim()
+    ) {
+      setStepError("Ringkasan pekerjaan / aktivitas harian wajib diisi.");
       return;
     }
 
     setStepError("");
-    setIsSubmitting(true);
+    setSubmittingMode(sendAfterSave ? "save-and-send" : "save");
 
     const entries = hasWorkEntries
       ? Object.entries(selectedVolumes).map(([workPointId, raw]) => ({
@@ -710,17 +920,29 @@ function DailyProgressModalInner({
         }))
       : [];
 
+    const trimmedEquipment = equipment.trim();
+    const summaryWithEquipmentFallback =
+      trimmedEquipment && workSummary.trim()
+        ? `${workSummary.trim()} [Peralatan: ${trimmedEquipment}]`
+        : workSummary.trim() ||
+          (trimmedEquipment ? `Peralatan: ${trimmedEquipment}` : "");
+
+    const parsedCumulative = Number.parseFloat(cumulativeProgress);
+    const shouldIncludeCumulativeProgress =
+      !isNonWork &&
+      !hasWorkEntries &&
+      Number.isFinite(parsedCumulative) &&
+      (activeProject.workPoints.length === 0 ||
+        parsedCumulative > activeProject.progress);
+
     const offlineInput: OfflineDailyReportInput = {
       projectId: activeProject.id,
       reportDate,
       weather,
       workersCount: parsedWorkers,
-      workSummary: workSummary.trim(),
+      workSummary: summaryWithEquipmentFallback,
       entries: entries.length > 0 ? entries : undefined,
-      progress:
-        !isNonWork && activeProject.workPoints.length === 0
-          ? Number.parseFloat(cumulativeProgress)
-          : undefined,
+      progress: shouldIncludeCumulativeProgress ? parsedCumulative : undefined,
       issueNotes: issueNotes.trim() || undefined,
       k3SafetyLog: k3SafetyLog.trim() || undefined,
       noWorkReason: isNonWork ? noWorkReason.trim() : undefined,
@@ -732,11 +954,14 @@ function DailyProgressModalInner({
     formData.set("weather", weather);
     formData.set("workersCount", String(parsedWorkers));
     formData.set("workSummary", workSummary.trim());
+    if (trimmedEquipment) {
+      formData.set("equipment", trimmedEquipment);
+    }
 
     if (entries.length > 0) {
       formData.set("entries", JSON.stringify(entries));
-    } else if (!isNonWork && activeProject.workPoints.length === 0) {
-      formData.set("progress", cumulativeProgress);
+    } else if (shouldIncludeCumulativeProgress) {
+      formData.set("progress", String(parsedCumulative));
     }
 
     if (issueNotes.trim()) {
@@ -772,7 +997,11 @@ function DailyProgressModalInner({
         toast.success(result.message || "Laporan progres harian tersimpan.");
         requestNotificationFeedRefresh();
         onSuccess?.();
+        const projectSnapshot = activeProject;
         onOpenChange(false);
+        if (sendAfterSave) {
+          onRequestSendProgress(projectSnapshot);
+        }
         return;
       }
 
@@ -786,9 +1015,13 @@ function DailyProgressModalInner({
     } catch {
       await saveToOfflineQueue();
     } finally {
-      setIsSubmitting(false);
+      setSubmittingMode(null);
     }
   };
+
+  const equipmentPresets = isConsultancyProject
+    ? CONSULTANCY_EQUIPMENT_PRESETS
+    : PHYSICAL_EQUIPMENT_PRESETS;
 
   return (
     <GlobalModal
@@ -798,11 +1031,11 @@ function DailyProgressModalInner({
       mobileBehavior="sheet"
       icon={<Camera className="size-4" aria-hidden="true" />}
       title="Laporan Progres Harian"
-      description="Catat volume pekerjaan, cuaca, pekerja, kendala, K3, dan foto lapangan."
+      description="Catat volume pekerjaan, cuaca, pekerja, peralatan, kendala, K3, dan foto lapangan."
       className="max-w-2xl"
       footerNote="Data progres langsung memperbarui realisasi titik kerja dan Kurva S."
       footer={
-        <div className="flex w-full items-center justify-between gap-2">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <Button
             type="button"
             variant="outline"
@@ -830,21 +1063,43 @@ function DailyProgressModalInner({
               Lanjut
             </Button>
           ) : (
-            <Button
-              type="button"
-              size="sm"
-              disabled={isSubmitting || isCompressingPhotos || !activeProject}
-              onClick={() => void handleSubmit()}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  Menyimpan...
-                </>
-              ) : (
-                "Kirim Laporan"
-              )}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isSubmitting || isCompressingPhotos || !activeProject}
+                onClick={() => void handleSubmit(true)}
+                className="gap-1.5"
+              >
+                {submittingMode === "save-and-send" ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="size-3.5" aria-hidden="true" />
+                    <span>Simpan &amp; Kirim Progres</span>
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isSubmitting || isCompressingPhotos || !activeProject}
+                onClick={() => void handleSubmit(false)}
+              >
+                {submittingMode === "save" ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Laporan"
+                )}
+              </Button>
+            </div>
           )}
         </div>
       }
@@ -932,16 +1187,27 @@ function DailyProgressModalInner({
                           : ""}
                       </p>
                     </div>
-                    <Badge variant="outline" className="tabular-nums">
-                      Progres {lockedProject.progress.toFixed(1)}%
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {workTypeBadge && (
+                        <Badge variant="outline">
+                          {workTypeBadge.shortLabel}
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="tabular-nums">
+                        Progres {lockedProject.progress.toFixed(1)}%
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <EmptyState
                   icon={HardHat}
                   title="Proyek Belum Berjalan"
-                  description="Laporan harian aktif setelah PIC lapangan ditunjuk dan minimal 1 titik kerja disetujui Direktur."
+                  description={
+                    isConsultancyProject
+                      ? "Laporan harian aktif setelah PIC lapangan ditunjuk dan minimal 1 deliverable atau jadwal proyek tersedia."
+                      : "Laporan harian aktif setelah PIC lapangan ditunjuk dan minimal 1 titik kerja disetujui Direktur."
+                  }
                 />
               )
             ) : runningProjects.length === 0 ? (
@@ -964,6 +1230,27 @@ function DailyProgressModalInner({
                   searchPlaceholder="Cari nama atau kode proyek..."
                   emptyText="Tidak ada proyek berjalan yang cocok."
                 />
+              </div>
+            )}
+
+            {activeProject && focusHints && isRunningProjectStatus(activeProject.status) && (
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
+                  <span className="type-p3 font-semibold text-foreground">
+                    Panduan Laporan ({focusHints.categoryLabel})
+                  </span>
+                  {focusHints.isConsultancy && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      Mode Konsultansi
+                    </Badge>
+                  )}
+                </div>
+                <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                  {focusHints.focusHints.slice(0, 2).map((hint, idx) => (
+                    <li key={idx}>• {hint}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -993,8 +1280,9 @@ function DailyProgressModalInner({
                       <p className="type-p3 text-foreground">
                         Sudah ada laporan pada tanggal ini (
                         {existingSameDayReport.workersCount ?? 0} pekerja ·{" "}
-                        {existingPhotosTodayCount} foto). Kiriman baru akan
-                        digabungkan ke laporan hari tersebut.
+                        {existingPhotosTodayCount} foto). Cuaca, jumlah pekerja,
+                        peralatan, K3, dan ringkasan telah diisi otomatis untuk
+                        diperbarui.
                       </p>
                     </div>
                   )}
@@ -1014,7 +1302,7 @@ function DailyProgressModalInner({
                     htmlFor="non-work-toggle"
                     className="type-p2 font-semibold text-foreground"
                   >
-                    Tidak ada pekerjaan fisik
+                    Tidak ada aktivitas lapangan / libur
                   </Label>
                   <p className="type-p3 text-muted-foreground">
                     Aktifkan jika hari libur, hujan deras, atau kendala lapangan.
@@ -1064,13 +1352,16 @@ function DailyProgressModalInner({
               <>
                 {activeProject.workPoints.length > 0 ? (
                   <div className="space-y-2.5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="type-p2 font-semibold text-foreground">
-                        Checklist Titik Pekerjaan (
-                        {Object.keys(selectedVolumes).length} dipilih)
+                        {isConsultancyProject
+                          ? `Deliverable / Checklist (${Object.keys(selectedVolumes).length} dipilih)`
+                          : `Checklist Titik Pekerjaan (${Object.keys(selectedVolumes).length} dipilih)`}
                       </p>
                       <span className="type-p3 text-muted-foreground">
-                        Pilih item yang dikerjakan hari ini
+                        {isConsultancyProject
+                          ? "Opsional: pilih deliverable bila progres berubah hari ini"
+                          : "Pilih item yang dikerjakan hari ini"}
                       </span>
                     </div>
 
@@ -1080,7 +1371,11 @@ function DailyProgressModalInner({
                           selectedVolumes,
                           wp.id,
                         );
-                        const cap = computeWorkPointCapacity(wp, reportDate);
+                        const cap = computeWorkPointCapacity(
+                          wp,
+                          reportDate,
+                          isConsultancyProject,
+                        );
                         const rawVol = selectedVolumes[wp.id] ?? "";
                         const parsedVol = Number.parseFloat(rawVol);
                         const validVol =
@@ -1150,7 +1445,7 @@ function DailyProgressModalInner({
                             {isChecked && !isDisabledItem && (
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
                                 <span className="type-p3 font-medium text-muted-foreground">
-                                  Volume hari ini ({cap.unit})
+                                  Capaian hari ini ({cap.unit})
                                 </span>
                                 <div className="flex items-center gap-1.5">
                                   <Button
@@ -1289,58 +1584,99 @@ function DailyProgressModalInner({
               </div>
             </div>
 
-            {/* Workers Count */}
-            <div className="space-y-2">
-              <Label htmlFor="daily-workers-count" className="type-p2 font-semibold">
-                Jumlah Pekerja Hadir
-              </Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Kurangi pekerja"
-                  onClick={() => {
-                    const curr = Number.parseInt(workersCount, 10) || 0;
-                    const minVal = isNonWork ? 0 : 1;
-                    setWorkersCount(String(Math.max(minVal, curr - 1)));
-                  }}
+            {/* Workers Count & Equipment */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="daily-workers-count" className="type-p2 font-semibold">
+                  {isConsultancyProject
+                    ? "Personel / Tenaga Hadir"
+                    : "Jumlah Pekerja Hadir"}
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Kurangi pekerja"
+                    onClick={() => {
+                      const curr = Number.parseInt(workersCount, 10) || 0;
+                      const minVal = isNonWork || isConsultancyProject ? 0 : 1;
+                      setWorkersCount(String(Math.max(minVal, curr - 1)));
+                    }}
+                  >
+                    <Minus className="size-4" aria-hidden="true" />
+                  </Button>
+                  <Input
+                    id="daily-workers-count"
+                    type="number"
+                    min={isNonWork || isConsultancyProject ? 0 : 1}
+                    max={100000}
+                    value={workersCount}
+                    onChange={(event) => {
+                      setWorkersCount(event.target.value);
+                      setStepError("");
+                    }}
+                    className="w-24 text-center tabular-nums"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Tambah pekerja"
+                    onClick={() => {
+                      const curr = Number.parseInt(workersCount, 10) || 0;
+                      setWorkersCount(String(curr + 1));
+                    }}
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                  </Button>
+                  <span className="type-p3 text-muted-foreground">orang</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="daily-equipment"
+                  className="type-p2 flex items-center gap-1.5 font-semibold"
                 >
-                  <Minus className="size-4" aria-hidden="true" />
-                </Button>
+                  <Wrench className="size-3.5 text-primary" aria-hidden="true" />
+                  <span>Peralatan / Alat Berat / Perangkat Survei</span>
+                </Label>
                 <Input
-                  id="daily-workers-count"
-                  type="number"
-                  min={isNonWork ? 0 : 1}
-                  max={100000}
-                  value={workersCount}
-                  onChange={(event) => {
-                    setWorkersCount(event.target.value);
-                    setStepError("");
-                  }}
-                  className="w-28 text-center tabular-nums"
+                  id="daily-equipment"
+                  value={equipment}
+                  maxLength={500}
+                  onChange={(event) => setEquipment(event.target.value)}
+                  placeholder={
+                    isConsultancyProject
+                      ? "Total Station, GPS RTK, Alat Sondir..."
+                      : "Excavator, Molen, Dump Truck..."
+                  }
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Tambah pekerja"
-                  onClick={() => {
-                    const curr = Number.parseInt(workersCount, 10) || 0;
-                    setWorkersCount(String(curr + 1));
-                  }}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                </Button>
-                <span className="type-p3 text-muted-foreground">orang</span>
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {equipmentPresets.map((preset) => (
+                    <Button
+                      key={preset}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendEquipmentPreset(preset)}
+                      className="h-6 px-2 text-[11px]"
+                    >
+                      + {preset}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Work Summary */}
             <div className="space-y-1.5">
               <Label htmlFor="daily-work-summary" className="type-p2 font-semibold">
-                Uraian Pekerjaan{" "}
-                {!isNonWork && activeProject?.workPoints.length === 0 ? (
+                {isConsultancyProject
+                  ? "Uraian Aktivitas / Hasil Pengawasan / Desain"
+                  : "Uraian Pekerjaan"}{" "}
+                {!isNonWork && Object.keys(selectedVolumes).length === 0 ? (
                   <span className="text-destructive">*</span>
                 ) : (
                   <span className="font-normal text-muted-foreground">
@@ -1354,7 +1690,11 @@ function DailyProgressModalInner({
                 maxLength={2000}
                 value={workSummary}
                 onChange={(event) => setWorkSummary(event.target.value)}
-                placeholder="Contoh: Pemasangan batu kali saluran sekunder segmen 2."
+                placeholder={
+                  isConsultancyProject
+                    ? "Contoh: Asistensi gambar DED struktur pondasi, verifikasi mutu besi & slump cor lapangan."
+                    : "Contoh: Pemasangan batu kali saluran sekunder segmen 2."
+                }
               />
             </div>
 
@@ -1370,7 +1710,7 @@ function DailyProgressModalInner({
                   maxLength={2000}
                   value={issueNotes}
                   onChange={(event) => setIssueNotes(event.target.value)}
-                  placeholder="Material terlambat, akses jalan becek, dll."
+                  placeholder="Material terlambat, akses jalan becek, revisi desain, dll."
                 />
               </div>
               <div className="space-y-1.5">

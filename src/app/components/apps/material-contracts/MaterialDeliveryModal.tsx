@@ -2,18 +2,32 @@
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Ticket } from "lucide-react";
+import {
+  CheckCircle2,
+  Info,
+  Loader2,
+  Plus,
+  Printer,
+  Ticket,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
-import { recordMaterialDelivery } from "@/app/actions/material-contracts";
+import {
+  attachMaterialDeliveryProof,
+  recordMaterialDelivery,
+} from "@/app/actions/material-contracts";
 import { getJakartaDateKey } from "@/lib/habit-date";
 import { compressFieldImageFile } from "@/lib/image-compression-client";
 import {
   calculateContractDeliverySubtotal,
   formatMaterialVolume,
+  getMaterialDeliveryDocumentPreviewUrl,
   type ContractTicketDeliveryOption,
   type MaterialContractRow,
 } from "@/lib/material-contracts";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -37,6 +51,41 @@ export type DeliveryProjectOption = {
   title: string;
   kelompokTani: string;
 };
+
+export type PrintableMaterialDelivery = {
+  id: string;
+  publicCode?: string | null;
+  doNumber: string;
+  deliveryDate?: string;
+  materialType?: string;
+  vendorName?: string;
+  quantityReceived?: number;
+  unit?: string;
+};
+
+export type AttachableMaterialDelivery = {
+  id: string;
+  publicCode?: string | null;
+  doNumber: string;
+  vehiclePlate: string | null;
+  driverName: string | null;
+  proofUrl: string | null;
+  vendorName?: string;
+  materialType?: string;
+};
+
+async function prepareMaterialProofFile(file: File): Promise<File> {
+  try {
+    return await compressFieldImageFile(file, {
+      allowPdfPassthrough: true,
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1920,
+    });
+  } catch (error) {
+    console.error("Material delivery proof compression failed:", error);
+    return file;
+  }
+}
 
 function currency(amount: number): string {
   return new Intl.NumberFormat("id-ID", {
@@ -77,8 +126,8 @@ export default function MaterialDeliveryModal({
       isOpen={open}
       onClose={() => onOpenChange(false)}
       onOpenChange={onOpenChange}
-      title="Catat Surat Jalan Material"
-      description="Pencatatan penerimaan material alam berdasarkan tiket lapangan aktif & kontrak payung."
+      title="Terbitkan Surat Jalan Material Alam"
+      description="Penerbitan Surat Jalan resmi untuk material alam (batu, pasir, sirtu, tanah urug) berdasarkan Kontrak Payung."
       className="sm:max-w-xl"
     >
       <MaterialDeliveryFormBody
@@ -191,6 +240,18 @@ function MaterialDeliveryFormBody({
   const [notes, setNotes] = useState("");
   const [proofFiles, setProofFiles] = useState<File[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [issuedDelivery, setIssuedDelivery] = useState<{
+    id: string;
+    publicCode: string | null;
+    doNumber: string;
+    materialType: string;
+    vendorName: string;
+    quantityReceived: number;
+    unit: string;
+    deliveryDate: string;
+    projectLabel: string;
+  } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const selectedTicket =
     availableTickets.find((ticket) => ticket.id === ticketId) ?? null;
@@ -276,15 +337,8 @@ function MaterialDeliveryFormBody({
     }
     setIsCompressing(true);
     try {
-      const prepared = await compressFieldImageFile(file, {
-        allowPdfPassthrough: true,
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1920,
-      });
+      const prepared = await prepareMaterialProofFile(file);
       setProofFiles([prepared]);
-    } catch (error) {
-      console.error("DO proof photo compression failed:", error);
-      setProofFiles([file]);
     } finally {
       setIsCompressing(false);
     }
@@ -298,12 +352,16 @@ function MaterialDeliveryFormBody({
       toast.error("Pilih Tiket Material Alam aktif dari Tim Lapangan terlebih dahulu.");
       return;
     }
-    if (!contractId || !projectId || !deliveryDate || !doNumber.trim()) {
-      toast.error("Kontrak, proyek tujuan, tanggal, dan nomor Surat Jalan wajib diisi.");
+    if (!contractId || !projectId || !deliveryDate) {
+      toast.error("Kontrak, proyek tujuan, dan tanggal pengiriman wajib diisi.");
+      return;
+    }
+    if (doNumber.trim().length > 0 && doNumber.trim().length < 2) {
+      toast.error("Nomor Surat Jalan minimal 2 karakter jika diisi manual.");
       return;
     }
     if (!Number.isFinite(parsedQty) || parsedQty <= 0) {
-      toast.error("Volume / jumlah rit diterima harus lebih dari 0.");
+      toast.error("Volume / jumlah rit harus lebih dari 0.");
       return;
     }
 
@@ -312,7 +370,9 @@ function MaterialDeliveryFormBody({
     formData.set("projectId", projectId);
     formData.set("ticketId", ticketId);
     formData.set("deliveryDate", deliveryDate);
-    formData.set("doNumber", doNumber.trim());
+    if (doNumber.trim()) {
+      formData.set("doNumber", doNumber.trim());
+    }
     formData.set("vehiclePlate", vehiclePlate.trim());
     formData.set("driverName", driverName.trim());
     formData.set("quantityReceived", String(parsedQty));
@@ -329,13 +389,27 @@ function MaterialDeliveryFormBody({
           requestNotificationFeedRefresh();
           router.refresh();
           onSaved?.();
-          onClose();
+          if (result.id) {
+            setIssuedDelivery({
+              id: result.id,
+              publicCode: result.publicCode ?? null,
+              doNumber: result.doNumber ?? (doNumber.trim() || "Surat Jalan"),
+              materialType: selectedContract?.materialType ?? "Material Alam",
+              vendorName: selectedContract?.vendorName ?? "-",
+              quantityReceived: parsedQty,
+              unit: selectedContract?.unit ?? "RIT",
+              deliveryDate,
+              projectLabel: resolvedProjectLabel,
+            });
+          } else {
+            onClose();
+          }
         } else {
           toast.error(result.message);
         }
       } catch (error) {
         console.error("Record material delivery failed:", error);
-        toast.error("Gagal mencatat Surat Jalan material. Silakan coba lagi.");
+        toast.error("Gagal menerbitkan Surat Jalan material. Silakan coba lagi.");
       }
     });
   };
@@ -376,8 +450,106 @@ function MaterialDeliveryFormBody({
     return selectedTicket?.projectName ?? "Proyek Terkait Tiket";
   })();
 
+  if (issuedDelivery) {
+    return (
+      <>
+        <div className="space-y-4">
+          <Alert
+            variant="lightsuccess"
+            className="border border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100"
+          >
+            <CheckCircle2 className="size-4" aria-hidden="true" />
+            <AlertTitle>
+              Surat Jalan {issuedDelivery.doNumber} Berhasil Diterbitkan
+            </AlertTitle>
+            <AlertDescription className="text-emerald-900/90 dark:text-emerald-100/90">
+              Dokumen resmi siap dicetak atau dibagikan ke vendor / tim
+              lapangan. Lampiran foto dan info armada vendor dapat dilengkapi
+              menyusul jika belum tersedia saat ini.
+            </AlertDescription>
+          </Alert>
+
+          <dl className="type-p2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3.5">
+            <dt className="text-muted-foreground">No. Surat Jalan</dt>
+            <dd className="text-right font-mono font-bold text-primary">
+              {issuedDelivery.doNumber}
+            </dd>
+            <dt className="text-muted-foreground">Material &amp; Volume</dt>
+            <dd className="text-right font-semibold">
+              {issuedDelivery.materialType} ·{" "}
+              {formatMaterialVolume(
+                issuedDelivery.quantityReceived,
+                issuedDelivery.unit,
+              )}
+            </dd>
+            <dt className="text-muted-foreground">Vendor Kontrak</dt>
+            <dd className="text-right font-medium">
+              {issuedDelivery.vendorName}
+            </dd>
+            <dt className="text-muted-foreground">Armada &amp; Mover</dt>
+            <dd className="text-right font-medium">
+              Disediakan Vendor Sendiri
+            </dd>
+            <dt className="text-muted-foreground">Proyek Tujuan</dt>
+            <dd className="text-right font-medium">
+              {issuedDelivery.projectLabel}
+            </dd>
+            <dt className="text-muted-foreground">Tanggal</dt>
+            <dd className="text-right tabular-nums">
+              {issuedDelivery.deliveryDate}
+            </dd>
+          </dl>
+
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIssuedDelivery(null);
+                setDoNumber("");
+                setVehiclePlate("");
+                setDriverName("");
+                setNotes("");
+                setProofFiles([]);
+              }}
+            >
+              <Plus className="mr-1.5 size-4" aria-hidden="true" />
+              Terbitkan Lagi
+            </Button>
+            <Button type="button" onClick={() => setPreviewOpen(true)}>
+              <Printer className="mr-1.5 size-4" aria-hidden="true" />
+              Pratinjau / Cetak Surat Jalan
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Selesai
+            </Button>
+          </div>
+        </div>
+
+        <MaterialDeliveryPrintModal
+          deliveries={previewOpen ? [issuedDelivery] : []}
+          initialDeliveryId={issuedDelivery.id}
+          onClose={() => setPreviewOpen(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <Alert
+        variant="lightinfo"
+        className="border border-sky-500/30 bg-sky-500/10 text-sky-900 dark:text-sky-100"
+      >
+        <Info className="size-4" aria-hidden="true" />
+        <AlertTitle>Armada &amp; Mover Disediakan Vendor</AlertTitle>
+        <AlertDescription className="text-sky-900/90 dark:text-sky-100/90">
+          Armada &amp; mover disediakan langsung oleh vendor kontrak payung.
+          Tugas kita menerbitkan Surat Jalan resmi — plat nomor, supir, dan foto
+          bukti bersifat opsional.
+        </AlertDescription>
+      </Alert>
+
       <div className="space-y-1.5">
         <Label htmlFor="md-ticket" className="type-p2 font-medium">
           Tiket Material Alam <span className="text-destructive">*</span>
@@ -489,12 +661,14 @@ function MaterialDeliveryFormBody({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="md-do-number" className="type-p2 font-medium">
-            Nomor Surat Jalan <span className="text-destructive">*</span>
+            Nomor Surat Jalan{" "}
+            <span className="type-p3 font-normal text-muted-foreground">
+              (Opsional)
+            </span>
           </Label>
           <Input
             id="md-do-number"
-            required
-            placeholder="Contoh: SJ-PM-0891"
+            placeholder="Otomatis (SPE-.../SJ/...) jika dikosongkan"
             value={doNumber}
             onChange={(event) => setDoNumber(event.target.value)}
           />
@@ -521,7 +695,7 @@ function MaterialDeliveryFormBody({
       {estimatedSubtotal > 0 && selectedContract && (
         <div className="type-p3 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
           <span className="text-emerald-800 dark:text-emerald-200">
-            Nilai DO ({parsedQty} {selectedContract.unit} &times;{" "}
+            Nilai Surat Jalan ({parsedQty} {selectedContract.unit} &times;{" "}
             {currency(selectedContract.unitPrice)})
           </span>
           <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
@@ -533,11 +707,14 @@ function MaterialDeliveryFormBody({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="md-plate" className="type-p2 font-medium">
-            Plat Nomor Truk
+            Plat Nomor Truk Vendor{" "}
+            <span className="type-p3 font-normal text-muted-foreground">
+              (Opsional)
+            </span>
           </Label>
           <Input
             id="md-plate"
-            placeholder="Contoh: B 9123 KDA"
+            placeholder="Contoh: B 9123 KDA (opsional)"
             value={vehiclePlate}
             onChange={(event) => setVehiclePlate(event.target.value)}
           />
@@ -545,11 +722,14 @@ function MaterialDeliveryFormBody({
 
         <div className="space-y-1.5">
           <Label htmlFor="md-driver" className="type-p2 font-medium">
-            Nama Supir
+            Nama Supir Vendor{" "}
+            <span className="type-p3 font-normal text-muted-foreground">
+              (Opsional)
+            </span>
           </Label>
           <Input
             id="md-driver"
-            placeholder="Opsional"
+            placeholder="Nama supir / mover vendor (opsional)"
             value={driverName}
             onChange={(event) => setDriverName(event.target.value)}
           />
@@ -558,18 +738,21 @@ function MaterialDeliveryFormBody({
 
       <div className="space-y-1.5">
         <Label htmlFor="md-proof" className="type-p2 font-medium">
-          Foto Surat Jalan Fisik
+          Foto / PDF Bukti Surat Jalan{" "}
+          <span className="type-p3 font-normal text-muted-foreground">
+            (Opsional — bisa dilampirkan menyusul)
+          </span>
         </Label>
         <FileDropzone
           id="md-proof"
           accept="image/*,.heic,.heif,.pdf,application/pdf"
           capture="environment"
           maxFiles={1}
-          maxSizeMb={10}
+          maxSizeMb={5}
           files={proofFiles}
           disabled={isCompressing || isPending}
-          label={isCompressing ? "Mengompres foto..." : "Unggah Foto Surat Jalan"}
-          hint="JPG, PNG, WEBP, atau PDF. Foto kamera otomatis dikompres."
+          label={isCompressing ? "Mengompres foto..." : "Unggah Foto / PDF Bukti (Opsional)"}
+          hint="JPG, PNG, WEBP, atau PDF maks. 5 MB. Foto kamera otomatis dikompres."
           onFilesChange={(files) => void handleProofFilesChange(files)}
           onError={(err) => toast.error(err)}
         />
@@ -604,10 +787,329 @@ function MaterialDeliveryFormBody({
           {isPending ? (
             <>
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Menerbitkan...
+            </>
+          ) : (
+            "Terbitkan Surat Jalan"
+          )}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Reusable print/preview modal for official Material Alam Surat Jalan (kind=SJ).
+ */
+export function MaterialDeliveryPrintModal({
+  deliveries,
+  initialDeliveryId,
+  onClose,
+}: {
+  deliveries: PrintableMaterialDelivery[];
+  initialDeliveryId?: string;
+  onClose: () => void;
+}) {
+  const modalKey = `${deliveries.map((d) => d.id).join(",")}:${initialDeliveryId ?? ""}`;
+
+  return (
+    <GlobalModal
+      isOpen={deliveries.length > 0}
+      onClose={onClose}
+      title={
+        deliveries[0]
+          ? `Surat Jalan ${deliveries[0].doNumber}`
+          : "Pratinjau Surat Jalan"
+      }
+      description="Pratinjau & cetak dokumen resmi Surat Jalan Material Alam."
+      hideHeader
+      footerNote=""
+      bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden"
+      className="sm:max-w-3xl"
+    >
+      {deliveries.length > 0 && (
+        <MaterialDeliveryPrintModalBody
+          key={modalKey}
+          deliveries={deliveries}
+          initialDeliveryId={initialDeliveryId}
+          onClose={onClose}
+        />
+      )}
+    </GlobalModal>
+  );
+}
+
+function MaterialDeliveryPrintModalBody({
+  deliveries,
+  initialDeliveryId,
+  onClose,
+}: {
+  deliveries: PrintableMaterialDelivery[];
+  initialDeliveryId?: string;
+  onClose: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState(
+    () => initialDeliveryId || deliveries[0]?.id || "",
+  );
+  const activeDelivery =
+    deliveries.find((d) => d.id === selectedId) ?? deliveries[0];
+
+  if (!activeDelivery) return null;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {deliveries.length > 1 && (
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-muted/40 px-3 py-2">
+          <span className="type-p3 mr-1 font-medium text-muted-foreground">
+            Pilih Surat Jalan:
+          </span>
+          {deliveries.map((item) => {
+            const isActive = item.id === activeDelivery.id;
+            return (
+              <Button
+                key={item.id}
+                type="button"
+                size="sm"
+                variant={isActive ? "default" : "outline"}
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setSelectedId(item.id)}
+              >
+                {item.doNumber}
+                {item.quantityReceived !== undefined && item.unit
+                  ? ` (${formatMaterialVolume(item.quantityReceived, item.unit)})`
+                  : ""}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+      <UniversalDocumentPreview
+        title={`Surat Jalan ${activeDelivery.doNumber}`}
+        documentNumber={activeDelivery.doNumber}
+        toolbarLabel="Surat Jalan Material Alam · Armada Vendor"
+        minimalToolbar
+        src={getMaterialDeliveryDocumentPreviewUrl(activeDelivery)}
+        onClose={onClose}
+      />
+    </div>
+  );
+}
+
+/**
+ * Reusable modal to attach/replace signed Surat Jalan proof photo/PDF and vendor fleet info.
+ */
+export function MaterialDeliveryAttachModal({
+  delivery,
+  onClose,
+  onSaved,
+}: {
+  delivery: AttachableMaterialDelivery | null;
+  onClose: () => void;
+  onSaved?: () => void;
+}) {
+  return (
+    <GlobalModal
+      isOpen={delivery !== null}
+      onClose={onClose}
+      title={
+        delivery
+          ? `Lampirkan Foto / Plat / Supir · ${delivery.doNumber}`
+          : "Lampirkan Bukti Surat Jalan"
+      }
+      description="Lengkapi atau perbarui foto/PDF Surat Jalan bertanda tangan serta plat nomor & nama supir vendor (semuanya opsional)."
+      className="sm:max-w-lg"
+    >
+      {delivery && (
+        <MaterialDeliveryAttachModalBody
+          key={delivery.id}
+          delivery={delivery}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )}
+    </GlobalModal>
+  );
+}
+
+function MaterialDeliveryAttachModalBody({
+  delivery,
+  onClose,
+  onSaved,
+}: {
+  delivery: AttachableMaterialDelivery;
+  onClose: () => void;
+  onSaved?: () => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [vehiclePlate, setVehiclePlate] = useState(delivery.vehiclePlate ?? "");
+  const [driverName, setDriverName] = useState(delivery.driverName ?? "");
+  const [proofFiles, setProofFiles] = useState<File[]>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
+
+  const hasChanges =
+    Boolean(proofFiles[0]) ||
+    vehiclePlate.trim() !== (delivery.vehiclePlate ?? "") ||
+    driverName.trim() !== (delivery.driverName ?? "");
+
+  const handleFilesChange = async (files: File[]) => {
+    const file = files[0] ?? null;
+    if (!file) {
+      setProofFiles([]);
+      return;
+    }
+    setIsCompressing(true);
+    try {
+      const prepared = await prepareMaterialProofFile(file);
+      setProofFiles([prepared]);
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isPending || isCompressing) return;
+    if (!hasChanges) {
+      toast.error(
+        "Pilih foto/PDF baru atau ubah plat nomor / nama supir vendor terlebih dahulu.",
+      );
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("deliveryId", delivery.id);
+    formData.set("vehiclePlate", vehiclePlate.trim());
+    formData.set("driverName", driverName.trim());
+    if (proofFiles[0]) {
+      formData.set("proof", proofFiles[0]);
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await attachMaterialDeliveryProof(formData);
+        if (result.success) {
+          toast.success(result.message);
+          requestNotificationFeedRefresh();
+          router.refresh();
+          onSaved?.();
+          onClose();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error("Attach material delivery proof failed:", error);
+        toast.error("Gagal menyimpan bukti atau info armada Surat Jalan.");
+      }
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+        <div className="min-w-0">
+          <p className="type-p2 font-semibold text-foreground">
+            {delivery.doNumber}
+          </p>
+          {(delivery.materialType || delivery.vendorName) && (
+            <p className="type-p3 text-muted-foreground">
+              {[delivery.materialType, delivery.vendorName]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+        </div>
+        <Badge variant={delivery.proofUrl ? "lightSuccess" : "lightWarning"}>
+          {delivery.proofUrl ? "Bukti Terlampir" : "Belum Ada Bukti"}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="attach-plate" className="type-p2 font-medium">
+            Plat Nomor Truk Vendor{" "}
+            <span className="type-p3 font-normal text-muted-foreground">
+              (Opsional)
+            </span>
+          </Label>
+          <Input
+            id="attach-plate"
+            maxLength={40}
+            placeholder="Contoh: B 9123 KDA"
+            value={vehiclePlate}
+            onChange={(event) => setVehiclePlate(event.target.value)}
+            disabled={isPending}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="attach-driver" className="type-p2 font-medium">
+            Nama Supir Vendor{" "}
+            <span className="type-p3 font-normal text-muted-foreground">
+              (Opsional)
+            </span>
+          </Label>
+          <Input
+            id="attach-driver"
+            maxLength={80}
+            placeholder="Nama supir / mover vendor"
+            value={driverName}
+            onChange={(event) => setDriverName(event.target.value)}
+            disabled={isPending}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="attach-proof" className="type-p2 font-medium">
+          {delivery.proofUrl
+            ? "Ganti Foto / PDF Bukti Surat Jalan (Opsional)"
+            : "Unggah Foto / PDF Surat Jalan Bertanda Tangan"}
+        </Label>
+        <FileDropzone
+          id="attach-proof"
+          accept="image/*,.heic,.heif,.pdf,application/pdf"
+          capture="environment"
+          maxFiles={1}
+          maxSizeMb={5}
+          files={proofFiles}
+          disabled={isCompressing || isPending}
+          label={
+            isCompressing
+              ? "Mengompres foto..."
+              : delivery.proofUrl
+                ? "Pilih File Baru untuk Mengganti Bukti"
+                : "Unggah Foto / PDF Bukti Surat Jalan"
+          }
+          hint="JPG, PNG, WEBP, atau PDF maks. 5 MB. Kosongkan jika hanya memperbarui plat/supir."
+          onFilesChange={(files) => void handleFilesChange(files)}
+          onError={(err) => toast.error(err)}
+        />
+      </div>
+
+      <div className="flex justify-end gap-2 pt-1">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={isPending}
+        >
+          Batal
+        </Button>
+        <Button
+          type="submit"
+          disabled={isPending || isCompressing || !hasChanges}
+        >
+          {isPending ? (
+            <>
+              <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
               Menyimpan...
             </>
           ) : (
-            "Simpan Surat Jalan"
+            <>
+              <Upload className="mr-1.5 size-4" aria-hidden="true" />
+              Simpan Lampiran
+            </>
           )}
         </Button>
       </div>

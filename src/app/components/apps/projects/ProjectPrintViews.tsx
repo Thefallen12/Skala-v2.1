@@ -1,8 +1,15 @@
 "use client";
 
-import React from "react";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { ArrowLeft, Download, FileSpreadsheet, Loader2, Printer } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  buildProjectSCurveSeries,
+  calculateWeightedProjectProgress,
+  clampProjectProgress,
+  toJakartaDateKey,
+} from "@/lib/project-progress";
 
 function currency(val: number | string | null | undefined): string {
   const num = typeof val === "string" ? parseFloat(val) : Number(val || 0);
@@ -11,17 +18,91 @@ function currency(val: number | string | null | undefined): string {
 }
 
 function formatDateIndo(dateStr: string | null | undefined): string {
-  if (!dateStr) return "10 Nov 2026";
+  if (!dateStr) return "Belum ditentukan";
   try {
-    const d = new Date(dateStr);
+    const key = toJakartaDateKey(dateStr);
+    const d = key ? new Date(`${key}T00:00:00+07:00`) : new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("id-ID", {
       day: "numeric",
       month: "short",
       year: "numeric",
+      timeZone: "Asia/Jakarta",
     });
   } catch {
     return dateStr;
+  }
+}
+
+function formatMsIndo(ms: number): string {
+  return new Date(ms).toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  });
+}
+
+function resolveClientName(project: {
+  clientName?: string | null;
+  kelompokTani?: string | null;
+}): string {
+  const client = project.clientName?.trim();
+  if (client) return client;
+  const partner = project.kelompokTani?.trim();
+  if (partner) return partner;
+  return "—";
+}
+
+function filenameFromDisposition(
+  headerValue: string | null,
+  fallback: string,
+): string {
+  if (!headerValue) return fallback;
+  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallback;
+    }
+  }
+  const plainMatch = headerValue.match(/filename="?([^";]+)"?/i);
+  return plainMatch?.[1] || fallback;
+}
+
+async function triggerProjectReportDownload(
+  projectId: string,
+  type: "daily" | "progress" | "financial",
+  format: "pdf" | "xlsx",
+  fallbackFilename: string,
+) {
+  const url = `/api/projects/${encodeURIComponent(projectId)}/reports?type=${encodeURIComponent(type)}&format=${encodeURIComponent(format)}`;
+  const res = await fetch(url, { method: "GET" });
+  if (!res.ok) {
+    let errMsg = "Gagal mengunduh laporan otomatis.";
+    try {
+      const payload = (await res.json()) as { message?: string };
+      if (payload?.message) errMsg = payload.message;
+    } catch {
+      // Ignore non-JSON error body
+    }
+    throw new Error(errMsg);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filenameFromDisposition(
+      res.headers.get("content-disposition"),
+      fallbackFilename,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
   }
 }
 
@@ -43,15 +124,38 @@ export interface PrintViewGroup {
   items: PrintViewItem[];
 }
 
+export interface ProjectPrintReportEntry {
+  reportDate: string;
+  progress?: number | null;
+  workSummary?: string | null;
+}
+
+export interface ProjectPrintWorkPointEntry {
+  id: string;
+  plannedStartDate?: string | null;
+  targetDate?: string | null;
+  progress: number;
+  proposedTotalWage: string | number;
+  approvedTotalWage?: string | number | null;
+  progressReports?: Array<{
+    reportDate: string;
+    progress: number;
+  }>;
+}
+
 interface ProjectPrintProps {
   project: {
     id: string;
     title: string;
     code: string;
     clientName?: string | null;
+    kelompokTani?: string | null;
+    jenisPekerjaan?: string | null;
     startDate?: string | null;
     endDate?: string | null;
     progress: number;
+    reports?: ProjectPrintReportEntry[];
+    workPoints?: ProjectPrintWorkPointEntry[];
   };
   rabGroups: PrintViewGroup[];
   totalRabNumber: number;
@@ -61,7 +165,7 @@ interface ProjectPrintProps {
 }
 
 // =========================================================================
-// 1. CETAK RAB (Matching Image 2 media_1794323251325_57556b0f.png)
+// 1. CETAK RAB
 // =========================================================================
 export function ProjectPrintRabView({
   project,
@@ -69,57 +173,35 @@ export function ProjectPrintRabView({
   totalRabNumber,
   onBack,
 }: ProjectPrintProps) {
-  const currentDateFormatted = new Date().toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const [mountNowMs] = useState(() => Date.now());
+  const [downloadingFormat, setDownloadingFormat] = useState<"xlsx" | "pdf" | null>(
+    null,
+  );
+  const currentDateFormatted = formatMsIndo(mountNowMs);
+  const clientLabel = resolveClientName(project);
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleExportExcel = () => {
-    const rows = [
-      ["Rencana Anggaran Biaya (RAB)"],
-      ["Proyek", project.title],
-      ["Kode", project.code],
-      ["Klien", project.clientName || "Klien contoh"],
-      ["Tanggal cetak", currentDateFormatted],
-      [],
-      ["No", "Uraian pekerjaan", "Volume", "Satuan", "Harga satuan", "Jumlah"],
-    ];
-
-    for (const group of rabGroups) {
-      rows.push([group.sectionName, "", "", "", "", ""]);
-      for (const it of group.items) {
-        const parts = it.volumeText.trim().split(" ");
-        const vol = parts[0] || "1";
-        const unit = parts.slice(1).join(" ") || "paket";
-        rows.push([it.code, it.title, vol, unit, it.unitPrice.toString(), it.totalPrice.toString()]);
-      }
-      const subtotal = group.items.reduce((sum, it) => sum + it.totalPrice, 0);
-      rows.push(["", `Subtotal ${group.sectionName}`, "", "", "", subtotal.toString()]);
+  const handleDownloadReport = async (format: "xlsx" | "pdf") => {
+    setDownloadingFormat(format);
+    try {
+      await triggerProjectReportDownload(
+        project.id,
+        "financial",
+        format,
+        `RAB-Keuangan-${project.code || "proyek"}.${format}`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Gagal mengekspor file ${format.toUpperCase()}.`,
+      );
+    } finally {
+      setDownloadingFormat(null);
     }
-
-    rows.push(["", "Total RAB", "", "", "", totalRabNumber.toString()]);
-    rows.push([]);
-    rows.push(["Rekapitulasi"]);
-    rows.push(["No", "Uraian pekerjaan", "Jumlah", "Porsi"]);
-    for (const group of rabGroups) {
-      const subtotal = group.items.reduce((sum, it) => sum + it.totalPrice, 0);
-      const porsi = totalRabNumber > 0 ? ((subtotal / totalRabNumber) * 100).toFixed(1) + "%" : "0%";
-      rows.push([group.sectionName.split(" ")[0] || "", group.sectionName, subtotal.toString(), porsi]);
-    }
-    rows.push(["", "Total RAB", totalRabNumber.toString(), "100%"]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map((e) => e.map((c) => `"${c}"`).join(",")).join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `RAB-${project.code || "proyek"}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -142,16 +224,36 @@ export function ProjectPrintRabView({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleExportExcel}
+            disabled={downloadingFormat !== null}
+            onClick={() => void handleDownloadReport("xlsx")}
             className="h-8 gap-1.5 px-3 text-xs"
           >
-            <Download className="size-3.5 text-muted-foreground" />
-            <span>Ekspor Excel</span>
+            {downloadingFormat === "xlsx" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-3.5 text-muted-foreground" />
+            )}
+            <span>Ekspor Excel (.xlsx)</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={downloadingFormat !== null}
+            onClick={() => void handleDownloadReport("pdf")}
+            className="h-8 gap-1.5 px-3 text-xs"
+          >
+            {downloadingFormat === "pdf" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5 text-muted-foreground" />
+            )}
+            <span>Unduh PDF</span>
           </Button>
           <Button
             type="button"
@@ -160,7 +262,7 @@ export function ProjectPrintRabView({
             className="h-8 gap-1.5 px-3.5 text-xs font-semibold bg-foreground text-background hover:bg-foreground/90"
           >
             <Printer className="size-3.5" />
-            <span>Cetak / PDF</span>
+            <span>Cetak Halaman</span>
           </Button>
         </div>
       </header>
@@ -171,7 +273,9 @@ export function ProjectPrintRabView({
         <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-slate-950">Skala-prioritas</h1>
-            <p className="text-xs text-slate-600 font-mono">+628135887883</p>
+            <p className="text-xs text-slate-600 font-mono">
+              {project.jenisPekerjaan || "Manajemen Proyek Konstruksi"}
+            </p>
           </div>
           <div className="text-right">
             <span className="text-xl font-extrabold tracking-wider text-slate-950">RAB</span>
@@ -181,7 +285,7 @@ export function ProjectPrintRabView({
         {/* Metadata Details */}
         <div className="mt-5 space-y-2">
           <h2 className="text-sm font-bold text-slate-950">Rencana Anggaran Biaya</h2>
-          <div className="grid grid-cols-2 gap-x-6 text-xs text-slate-700 max-w-md">
+          <div className="grid grid-cols-2 gap-x-6 text-xs text-slate-700 max-w-lg">
             <div className="grid grid-cols-[100px_1fr] py-0.5">
               <span className="text-slate-500">Proyek</span>
               <span className="font-semibold text-slate-900">: {project.title}</span>
@@ -191,8 +295,8 @@ export function ProjectPrintRabView({
               <span className="font-mono font-semibold text-slate-900">: {project.code}</span>
             </div>
             <div className="grid grid-cols-[100px_1fr] py-0.5">
-              <span className="text-slate-500">Klien</span>
-              <span className="font-semibold text-slate-900">: {project.clientName || "Klien contoh"}</span>
+              <span className="text-slate-500">Klien / Mitra</span>
+              <span className="font-semibold text-slate-900">: {clientLabel}</span>
             </div>
             <div className="grid grid-cols-[100px_1fr] py-0.5">
               <span className="text-slate-500">Tanggal cetak</span>
@@ -302,7 +406,7 @@ export function ProjectPrintRabView({
                   {currency(totalRabNumber)}
                 </td>
                 <td className="py-2 px-2 text-right font-mono font-bold text-slate-950">
-                  100%
+                  {totalRabNumber > 0 ? "100%" : "0%"}
                 </td>
               </tr>
             </tbody>
@@ -322,7 +426,7 @@ export function ProjectPrintRabView({
             <p className="text-slate-600">Disetujui oleh</p>
             <div className="h-20" />
             <div className="border-t border-slate-900 pt-1 font-bold text-slate-950">
-              {project.clientName || "Klien contoh"}
+              {clientLabel}
             </div>
           </div>
         </div>
@@ -332,66 +436,230 @@ export function ProjectPrintRabView({
 }
 
 // =========================================================================
-// 2. CETAK LAPORAN PROGRES (Matching Image 1 media_1794323216371_7c844d7d.png)
+// 2. CETAK LAPORAN PROGRES (Dynamic DB S-Curve + Opname Dates)
 // =========================================================================
 export function ProjectPrintProgressView({
   project,
   rabGroups,
-  plannedToday = 32.3,
-  deviation = -32.3,
+  plannedToday,
+  deviation,
   onBack,
 }: ProjectPrintProps) {
-  const currentDateFormatted = new Date().toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const [mountNowMs] = useState(() => Date.now());
+  const [downloadingFormat, setDownloadingFormat] = useState<"xlsx" | "pdf" | null>(
+    null,
+  );
+  const currentDateFormatted = formatMsIndo(mountNowMs);
+  const clientLabel = resolveClientName(project);
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleExportExcel = () => {
-    const rows = [
-      ["Laporan Progres Pekerjaan"],
-      ["Proyek", project.title],
-      ["Kode", project.code],
-      ["Klien", project.clientName || "Klien contoh"],
-      ["Progres", `${project.progress}%`],
-      ["Rencana hari ini", `${plannedToday}%`],
-      ["Deviasi", `${deviation}%`],
-      ["Tanggal cetak", currentDateFormatted],
-      [],
-      ["No", "Uraian pekerjaan", "Volume", "Bobot", "Terpasang", "Progres", "Bobot tercapai"],
-    ];
-
-    for (const group of rabGroups) {
-      rows.push([group.sectionName, "", "", "", "", "", ""]);
-      for (const it of group.items) {
-        const achievedWeight = ((it.bobot * it.progress) / 100).toFixed(2) + "%";
-        rows.push([it.code, it.title, it.volumeText, it.bobot.toFixed(2) + "%", it.terpasangText, it.progress + "%", achievedWeight]);
-      }
-      const subBobot = group.items.reduce((s, it) => s + it.bobot, 0).toFixed(2) + "%";
-      const subAchieved = group.items.reduce((s, it) => s + (it.bobot * it.progress) / 100, 0).toFixed(2) + "%";
-      rows.push(["", `Subtotal ${group.sectionName}`, "", subBobot, "", "", subAchieved]);
+  const handleDownloadReport = async (format: "xlsx" | "pdf") => {
+    setDownloadingFormat(format);
+    try {
+      await triggerProjectReportDownload(
+        project.id,
+        "progress",
+        format,
+        `Laporan-Progres-${project.code || "proyek"}.${format}`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Gagal mengekspor laporan progres (${format.toUpperCase()}).`,
+      );
+    } finally {
+      setDownloadingFormat(null);
     }
-
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map((e) => e.map((c) => `"${c}"`).join(",")).join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `Progres-${project.code || "proyek"}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
+  const {
+    sCurve,
+    effectivePlannedToday,
+    effectiveDeviation,
+    lastOpnameLabel,
+    estimatedCompletionLabel,
+    startDateStr,
+    midDateStr,
+    endDateStr,
+    plannedPath,
+    actualPath,
+    actualSvgPoints,
+  } = useMemo(() => {
+    const workPoints = project.workPoints ?? [];
+    const reports = project.reports ?? [];
+
+    const plannedStartDates = workPoints
+      .map((point) => point.plannedStartDate)
+      .filter((date): date is string => Boolean(date))
+      .sort();
+    const targetDates = workPoints
+      .map((point) => point.targetDate)
+      .filter((date): date is string => Boolean(date))
+      .sort();
+    const allReportDates = [
+      ...reports.map((report) => toJakartaDateKey(report.reportDate)),
+      ...workPoints.flatMap((point) =>
+        (point.progressReports ?? []).map((pr) => toJakartaDateKey(pr.reportDate)),
+      ),
+    ]
+      .filter((key): key is string => Boolean(key))
+      .sort();
+
+    const latestOpnameKey = allReportDates.at(-1) ?? null;
+
+    const effectiveStartDate =
+      project.startDate ??
+      plannedStartDates[0] ??
+      allReportDates[0] ??
+      null;
+    const effectiveEndDate =
+      project.endDate ?? targetDates.at(-1) ?? null;
+
+    const progressByDate = new Map<string, Map<string, number>>();
+    for (const point of workPoints) {
+      for (const report of point.progressReports ?? []) {
+        const dateKey = toJakartaDateKey(report.reportDate);
+        if (!dateKey) continue;
+        const progressAtDate = progressByDate.get(dateKey) ?? new Map();
+        progressAtDate.set(point.id, report.progress);
+        progressByDate.set(dateKey, progressAtDate);
+      }
+    }
+    const latestPointProgress = new Map<string, number>();
+    for (const point of workPoints) latestPointProgress.set(point.id, 0);
+
+    const weightedFromPoints = [...progressByDate.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, progressAtDate]) => {
+        for (const [pointId, progress] of progressAtDate) {
+          latestPointProgress.set(pointId, progress);
+        }
+        return {
+          reportDate: date,
+          progress: calculateWeightedProjectProgress(
+            workPoints.map((pt) => ({
+              progress: latestPointProgress.get(pt.id) ?? 0,
+              proposedTotalWage: pt.proposedTotalWage,
+              approvedTotalWage: pt.approvedTotalWage,
+            })),
+          ),
+        };
+      });
+
+    const directReports = reports
+      .filter(
+        (report): report is ProjectPrintReportEntry & { progress: number } =>
+          report.progress !== null && report.progress !== undefined,
+      )
+      .map((report) => ({
+        reportDate: report.reportDate,
+        progress: Number(report.progress),
+      }));
+
+    const series = buildProjectSCurveSeries({
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      currentProgress: project.progress,
+      dailyReports: [...weightedFromPoints, ...directReports],
+      nowMs: mountNowMs,
+    });
+
+    const computedPlanned = series.plannedToday ?? 0;
+    const planTodayVal =
+      typeof plannedToday === "number" && Number.isFinite(plannedToday)
+        ? plannedToday
+        : computedPlanned;
+    const devVal =
+      typeof deviation === "number" && Number.isFinite(deviation)
+        ? deviation
+        : Number((project.progress - planTodayVal).toFixed(1));
+
+    const firstPlannedMs = series.planned[0]?.x ?? mountNowMs;
+    const lastPlannedMs =
+      series.planned.at(-1)?.x ?? firstPlannedMs + 30 * 86400000;
+    const lastActualMs = series.actual.at(-1)?.x ?? firstPlannedMs;
+
+    const xMin = Math.min(firstPlannedMs, series.actual[0]?.x ?? firstPlannedMs);
+    const xMax = Math.max(lastPlannedMs, lastActualMs, xMin + 86400000);
+    const midMs = Math.round((xMin + xMax) / 2);
+
+    const mapX = (x: number) =>
+      Math.round((50 + ((x - xMin) / (xMax - xMin)) * 620) * 10) / 10;
+    const mapY = (y: number) =>
+      Math.round((180 - (clampProjectProgress(y) / 100) * 160) * 10) / 10;
+
+    const plannedD =
+      series.planned.length > 0
+        ? series.planned
+            .map(
+              (pt, idx) =>
+                `${idx === 0 ? "M" : "L"} ${mapX(pt.x)} ${mapY(pt.y)}`,
+            )
+            .join(" ")
+        : "";
+
+    const mappedActualPoints = series.actual.map((pt) => ({
+      cx: mapX(pt.x),
+      cy: mapY(pt.y),
+      progress: pt.y,
+    }));
+    const actualD =
+      mappedActualPoints.length > 0
+        ? mappedActualPoints
+            .map((pt, idx) => `${idx === 0 ? "M" : "L"} ${pt.cx} ${pt.cy}`)
+            .join(" ")
+        : "";
+
+    let etaLabel = "Menunggu progres awal";
+    if (project.progress >= 100) {
+      etaLabel = latestOpnameKey
+        ? `Selesai (${formatDateIndo(latestOpnameKey)})`
+        : "Selesai (100%)";
+    } else if (project.progress > 0 && allReportDates.length > 0) {
+      const refMs = Math.max(mountNowMs, lastActualMs);
+      const elapsedDays = Math.max(1, (refMs - firstPlannedMs) / 86400000);
+      const dailyRate = project.progress / elapsedDays;
+      if (dailyRate > 0.01) {
+        const remainingDays = Math.min(
+          3650,
+          Math.ceil((100 - project.progress) / dailyRate),
+        );
+        const projectedEndMs = refMs + remainingDays * 86400000;
+        etaLabel = `${formatMsIndo(projectedEndMs)}${effectiveEndDate ? ` (Target: ${formatDateIndo(effectiveEndDate)})` : ""}`;
+      } else if (effectiveEndDate) {
+        etaLabel = `Target: ${formatDateIndo(effectiveEndDate)}`;
+      }
+    } else if (effectiveEndDate) {
+      etaLabel = `Target: ${formatDateIndo(effectiveEndDate)}`;
+    }
+
+    return {
+      sCurve: series,
+      effectivePlannedToday: planTodayVal,
+      effectiveDeviation: devVal,
+      lastOpnameLabel: latestOpnameKey
+        ? formatDateIndo(latestOpnameKey)
+        : "Belum tercatat",
+      estimatedCompletionLabel: etaLabel,
+      startDateStr: formatMsIndo(xMin),
+      midDateStr: formatMsIndo(midMs),
+      endDateStr: formatMsIndo(xMax),
+      plannedPath: plannedD,
+      actualPath: actualD,
+      actualSvgPoints: mappedActualPoints,
+    };
+  }, [project, plannedToday, deviation, mountNowMs]);
+
+  const totalBobot = rabGroups
+    .flatMap((g) => g.items)
+    .reduce((sum, it) => sum + it.bobot, 0);
   const totalAchievedBobot = rabGroups
     .flatMap((g) => g.items)
     .reduce((sum, it) => sum + (it.bobot * it.progress) / 100, 0);
-
-  const startDateStr = formatDateIndo(project.startDate || "2026-10-27");
-  const endDateStr = formatDateIndo(project.endDate || "2026-12-22");
-  const midDateStr = formatDateIndo("2026-11-24");
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 pb-16 print:bg-white print:p-0 print:pb-0">
@@ -409,20 +677,40 @@ export function ProjectPrintProgressView({
             <span>Kembali ke proyek</span>
           </Button>
           <span className="text-xs text-muted-foreground hidden md:inline">
-            Pratinjau A4 Laporan Progres Pekerjaan &amp; Kurva S.
+            Pratinjau A4 Laporan Progres Pekerjaan &amp; Kurva S (Live Database).
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleExportExcel}
+            disabled={downloadingFormat !== null}
+            onClick={() => void handleDownloadReport("xlsx")}
             className="h-8 gap-1.5 px-3 text-xs"
           >
-            <Download className="size-3.5 text-muted-foreground" />
-            <span>Ekspor Excel</span>
+            {downloadingFormat === "xlsx" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-3.5 text-muted-foreground" />
+            )}
+            <span>Ekspor Excel (.xlsx)</span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={downloadingFormat !== null}
+            onClick={() => void handleDownloadReport("pdf")}
+            className="h-8 gap-1.5 px-3 text-xs"
+          >
+            {downloadingFormat === "pdf" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5 text-muted-foreground" />
+            )}
+            <span>Unduh PDF</span>
           </Button>
           <Button
             type="button"
@@ -431,7 +719,7 @@ export function ProjectPrintProgressView({
             className="h-8 gap-1.5 px-3.5 text-xs font-semibold bg-foreground text-background hover:bg-foreground/90"
           >
             <Printer className="size-3.5" />
-            <span>Cetak / PDF</span>
+            <span>Cetak Halaman</span>
           </Button>
         </div>
       </header>
@@ -442,7 +730,9 @@ export function ProjectPrintProgressView({
         <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-slate-950">Skala-prioritas</h1>
-            <p className="text-xs text-slate-600 font-mono">+628135887883</p>
+            <p className="text-xs text-slate-600 font-mono">
+              {project.jenisPekerjaan || "Manajemen Proyek Konstruksi"}
+            </p>
           </div>
           <div className="text-right">
             <span className="text-xl font-extrabold tracking-wider text-slate-950">PROGRES</span>
@@ -452,7 +742,7 @@ export function ProjectPrintProgressView({
         {/* Metadata Details */}
         <div className="mt-5 space-y-2">
           <h2 className="text-sm font-bold text-slate-950">Laporan progres pekerjaan</h2>
-          <div className="grid grid-cols-2 gap-x-6 text-xs text-slate-700 max-w-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 text-xs text-slate-700">
             <div className="grid grid-cols-[120px_1fr] py-0.5">
               <span className="text-slate-500">Proyek</span>
               <span className="font-semibold text-slate-900">: {project.title}</span>
@@ -462,28 +752,36 @@ export function ProjectPrintProgressView({
               <span className="font-mono font-semibold text-slate-900">: {project.code}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
-              <span className="text-slate-500">Klien</span>
-              <span className="font-semibold text-slate-900">: {project.clientName || "Klien contoh"}</span>
+              <span className="text-slate-500">Klien / Mitra</span>
+              <span className="font-semibold text-slate-900">: {clientLabel}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
               <span className="text-slate-500">Opname terakhir</span>
-              <span className="text-slate-900">: Belum ada opname</span>
+              <span className="text-slate-900">: {lastOpnameLabel}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
-              <span className="text-slate-500">Progres</span>
-              <span className="font-bold text-slate-950">: {project.progress}%</span>
+              <span className="text-slate-500">Progres aktual</span>
+              <span className="font-bold text-slate-950">: {project.progress.toFixed(1)}%</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
               <span className="text-slate-500">Rencana hari ini</span>
-              <span className="font-bold text-slate-950">: {plannedToday.toFixed(1)}%</span>
+              <span className="font-bold text-slate-950">: {effectivePlannedToday.toFixed(1)}%</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
               <span className="text-slate-500">Deviasi</span>
-              <span className="font-bold text-rose-600">: {deviation.toFixed(1)}%</span>
+              <span
+                className={
+                  effectiveDeviation < 0
+                    ? "font-bold text-rose-600"
+                    : "font-bold text-emerald-700"
+                }
+              >
+                : {effectiveDeviation > 0 ? `+${effectiveDeviation.toFixed(1)}%` : `${effectiveDeviation.toFixed(1)}%`}
+              </span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
               <span className="text-slate-500">Perkiraan selesai</span>
-              <span className="text-slate-900">: Perlu 7 hari opname</span>
+              <span className="text-slate-900">: {estimatedCompletionLabel}</span>
             </div>
             <div className="grid grid-cols-[120px_1fr] py-0.5">
               <span className="text-slate-500">Tanggal cetak</span>
@@ -559,24 +857,31 @@ export function ProjectPrintProgressView({
                   Total
                 </td>
                 <td className="py-2.5 px-2 text-right font-mono font-extrabold text-slate-950">
-                  100%
+                  {totalBobot > 0 ? `${totalBobot.toFixed(1)}%` : "0%"}
                 </td>
                 <td colSpan={2} />
                 <td className="py-2.5 px-2 text-right font-mono font-extrabold text-slate-950">
-                  {totalAchievedBobot.toFixed(2)}%
+                  {totalBobot > 0
+                    ? `${totalAchievedBobot.toFixed(2)}%`
+                    : `${project.progress.toFixed(1)}%`}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Kurva S Graphical Canvas */}
+        {/* Kurva S Graphical Canvas (Dynamic from buildProjectSCurveSeries) */}
         <div className="mt-8 pt-2">
-          <div className="mb-2">
-            <h3 className="text-xs font-bold text-slate-950">Kurva S</h3>
-            <p className="text-[11px] text-slate-500">
-              Garis penuh: progres aktual · garis putus-putus: rencana
-            </p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-bold text-slate-950">Kurva S</h3>
+              <p className="text-[11px] text-slate-500">
+                Garis penuh: progres aktual ({project.progress.toFixed(1)}%) · garis putus-putus: rencana ({effectivePlannedToday.toFixed(1)}%)
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500">
+              {sCurve.actual.length} titik histori
+            </span>
           </div>
 
           <div className="rounded-lg border border-slate-200 p-4 bg-white">
@@ -609,23 +914,34 @@ export function ProjectPrintProgressView({
               </text>
 
               {/* Planned S-Curve (Dashed gray line) */}
-              <path
-                d="M 50 180 C 200 170, 320 80, 670 20"
-                fill="none"
-                stroke="#64748b"
-                strokeWidth="2"
-                strokeDasharray="5,5"
-              />
+              {plannedPath && (
+                <path
+                  d={plannedPath}
+                  fill="none"
+                  stroke="#64748b"
+                  strokeWidth="2"
+                  strokeDasharray="5,5"
+                />
+              )}
 
               {/* Actual Curve (Solid thick black line) */}
-              <path
-                d={`M 50 180 L 150 180 L 220 ${180 - (project.progress * 1.6)}`}
-                fill="none"
-                stroke="#0f172a"
-                strokeWidth="2.5"
-              />
-              <circle cx="50" cy="180" r="3" fill="#0f172a" />
-              <circle cx="220" cy={180 - (project.progress * 1.6)} r="3" fill="#0f172a" />
+              {actualPath && (
+                <path
+                  d={actualPath}
+                  fill="none"
+                  stroke="#0f172a"
+                  strokeWidth="2.5"
+                />
+              )}
+              {actualSvgPoints.map((pt, idx) => (
+                <circle
+                  key={`${pt.cx}-${pt.cy}-${idx}`}
+                  cx={pt.cx}
+                  cy={pt.cy}
+                  r="3"
+                  fill="#0f172a"
+                />
+              ))}
             </svg>
           </div>
         </div>
@@ -650,7 +966,7 @@ export function ProjectPrintProgressView({
             <p className="text-slate-600">Disetujui oleh</p>
             <div className="h-20" />
             <div className="border-t border-slate-900 pt-1 font-bold text-slate-950">
-              {project.clientName || "Klien contoh"}
+              {clientLabel}
             </div>
           </div>
         </div>
@@ -692,11 +1008,8 @@ export function ProjectPrintScheduleView({
   totalWeeks = 8,
   onBack,
 }: ProjectPrintScheduleProps) {
-  const currentDateFormatted = new Date().toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const [mountNowMs] = useState(() => Date.now());
+  const currentDateFormatted = formatMsIndo(mountNowMs);
 
   const weeksCount = Math.max(4, Math.min(24, totalWeeks));
   const weekNumbers = Array.from({ length: weeksCount }, (_, i) => i + 1);

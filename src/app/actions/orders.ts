@@ -2581,6 +2581,8 @@ export async function createDeliveryOrder(
         ));
     const vehicleError =
       error instanceof Error && error.message.startsWith("Kendaraan");
+    const contractError =
+      error instanceof Error && error.message.includes("Kontrak Material Alam");
     const approvalError =
       error instanceof Error &&
       [
@@ -2591,7 +2593,7 @@ export async function createDeliveryOrder(
         "Item DO harus sesuai dengan item pada tiket referensi.",
       ].includes(error.message);
     return fail(
-      inventoryError || approvalError || vehicleError
+      inventoryError || approvalError || vehicleError || contractError
         ? error.message
         : "Delivery Order gagal dibuat. Periksa nomor DO dan PO terkait.",
     );

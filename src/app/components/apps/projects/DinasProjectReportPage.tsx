@@ -2,17 +2,22 @@
 
 import { useMemo, useState } from "react";
 import {
+  Briefcase,
+  Building2,
   CheckCircle2,
   Download,
+  FileSpreadsheet,
   FileText,
   Filter,
   Image as ImageIcon,
   Landmark,
   Layers,
+  Loader2,
   Printer,
   Search,
   UserCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,7 +25,9 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -37,16 +44,109 @@ import {
   DINAS_PROJECTS_DATA,
   DINAS_REPORT_METADATA,
 } from "@/lib/dinas-report-data";
+import {
+  calculatePlannedSCurveProgress,
+  toJakartaDateKey,
+} from "@/lib/project-progress";
+import {
+  formatWorkTypeBadge,
+  PROJECT_WORK_TYPE_GROUPS,
+  resolveProjectWorkType,
+  type WorkTypeBadgeTone,
+} from "@/lib/project-work-types";
 import { cn } from "@/lib/utils";
 
+type ReportViewMode = "portfolio_live" | "dinas_preset";
 type DinasTabType = "rekapitulasi" | "rincian_sid" | "database_spk";
 
-type DinasProjectProgressSource = {
+export type DinasProjectProgressSource = {
+  id?: string;
+  code?: string;
   kelompokTani: string;
   name: string;
   title: string;
   progress: number;
+  jenisPekerjaan?: string | null;
+  status?: string | null;
+  pagu?: string | number | null;
+  realized?: string | number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  fieldPicName?: string | null;
+  location?: string | null;
+  address?: string | null;
+  clientName?: string | null;
+  vendor?: string | null;
+  reports?: Array<{
+    id?: string;
+    reportDate: string;
+    progress?: number | null;
+    workSummary?: string | null;
+  }>;
+  workPoints?: Array<{
+    id?: string;
+    title?: string;
+    progress?: number;
+  }>;
+  progressSubmissions?: Array<{
+    id: string;
+    periodType: string;
+    periodLabel: string;
+    actualProgress: number;
+    plannedProgress: number;
+    deviation: number;
+    submittedAt: string;
+  }>;
 };
+
+const WORK_TYPE_TONE_CLASSES: Record<WorkTypeBadgeTone, string> = {
+  indigo:
+    "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
+  sky: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+  emerald:
+    "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  amber:
+    "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  teal: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+  slate: "border-border bg-muted/60 text-foreground",
+};
+
+const STATUS_LABEL_MAP: Record<string, string> = {
+  RUNNING: "Berjalan",
+  PENDING_SETUP: "Persiapan",
+  HOLD: "Tertahan",
+  DONE: "Selesai",
+};
+
+function parseAmountSafe(value: string | number | null | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function formatCompactRupiah(value: number): string {
+  return `Rp ${Math.round(value).toLocaleString("id-ID")}`;
+}
+
+function parseDownloadFilename(
+  disposition: string | null,
+  fallback: string,
+): string {
+  if (!disposition) return fallback;
+  const utfMatch = /filename\*=UTF-8''([^;\s]+)/i.exec(disposition);
+  if (utfMatch?.[1]) {
+    try {
+      return decodeURIComponent(utfMatch[1]);
+    } catch {
+      return utfMatch[1];
+    }
+  }
+  const quotedMatch = /filename="?([^";]+)"?/i.exec(disposition);
+  return quotedMatch?.[1] || fallback;
+}
 
 function normalizeGroupName(value: string): string {
   return value
@@ -65,13 +165,318 @@ function calculateRealizedArea(
 
 export function DinasProjectReportPage({
   projects,
+  canViewFinancials = true,
 }: {
   projects: DinasProjectProgressSource[];
+  canViewFinancials?: boolean;
 }) {
+  const hasLiveDbMetadata = useMemo(
+    () => projects.some((project) => Boolean(project.id)),
+    [projects],
+  );
+  const [reportMode, setReportMode] = useState<ReportViewMode>(() =>
+    projects.some((project) => Boolean(project.id))
+      ? "portfolio_live"
+      : "dinas_preset",
+  );
+  const [referenceNowMs] = useState<number>(() => Date.now());
+  const [portfolioSearch, setPortfolioSearch] = useState<string>("");
+  const [portfolioWorkTypeFilter, setPortfolioWorkTypeFilter] =
+    useState<string>("ALL");
+  const [portfolioStatusFilter, setPortfolioStatusFilter] =
+    useState<string>("ALL");
+  const [exportingKey, setExportingKey] = useState<string | null>(null);
+
   const [activeTab, setActiveTab] = useState<DinasTabType>("rekapitulasi");
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedPoktanIndex, setSelectedPoktanIndex] = useState<number>(0);
+
+  const portfolioRows = useMemo(() => {
+    return projects.map((project, index) => {
+      const workTypeDef = resolveProjectWorkType(project.jenisPekerjaan);
+      const badge = formatWorkTypeBadge(project.jenisPekerjaan);
+      const actualProgress = Math.min(
+        100,
+        Math.max(0, Number.isFinite(project.progress) ? project.progress : 0),
+      );
+      const plannedProgress = calculatePlannedSCurveProgress(
+        project.startDate,
+        project.endDate,
+        referenceNowMs,
+      );
+      const deviation =
+        plannedProgress !== null
+          ? Math.round((actualProgress - plannedProgress) * 10) / 10
+          : null;
+      const paguValue = parseAmountSafe(project.pagu);
+      const realizedValue = parseAmountSafe(project.realized);
+      const reports = project.reports ?? [];
+      const sortedReportDates = reports
+        .map((report) => toJakartaDateKey(report.reportDate))
+        .filter((dateKey): dateKey is string => Boolean(dateKey))
+        .sort()
+        .reverse();
+      const latestReportDate = sortedReportDates[0] ?? null;
+      const clientLabel =
+        project.clientName?.trim() ||
+        project.kelompokTani?.trim() ||
+        project.vendor?.trim() ||
+        "-";
+      const locationLabel =
+        project.location?.trim() || project.address?.trim() || "-";
+      const statusKey = (project.status || "RUNNING").toUpperCase();
+
+      return {
+        key: project.id || `${project.code || project.name}-${index}`,
+        id: project.id,
+        code: project.code || `PRJ-${index + 1}`,
+        title: project.title || project.name,
+        name: project.name,
+        rawJenisPekerjaan: project.jenisPekerjaan || "",
+        workTypeId: workTypeDef.id,
+        workTypeBadge: badge,
+        statusKey,
+        statusLabel: STATUS_LABEL_MAP[statusKey] || statusKey,
+        actualProgress,
+        plannedProgress,
+        deviation,
+        paguValue,
+        realizedValue,
+        reportsCount: reports.length,
+        latestReportDate,
+        workPointsCount: project.workPoints?.length ?? 0,
+        submissionsCount: project.progressSubmissions?.length ?? 0,
+        fieldPicName: project.fieldPicName?.trim() || "-",
+        clientLabel,
+        locationLabel,
+      };
+    });
+  }, [projects, referenceNowMs]);
+
+  const filteredPortfolioRows = useMemo(() => {
+    const query = portfolioSearch.trim().toLowerCase();
+    return portfolioRows.filter((row) => {
+      const matchWorkType =
+        portfolioWorkTypeFilter === "ALL" ||
+        (portfolioWorkTypeFilter === "CONSULTANCY" &&
+          row.workTypeBadge.group === "CONSULTANCY") ||
+        (portfolioWorkTypeFilter === "PHYSICAL" &&
+          row.workTypeBadge.group === "PHYSICAL") ||
+        row.workTypeId === portfolioWorkTypeFilter ||
+        row.rawJenisPekerjaan.toLowerCase() ===
+          portfolioWorkTypeFilter.toLowerCase();
+      const matchStatus =
+        portfolioStatusFilter === "ALL" ||
+        row.statusKey === portfolioStatusFilter;
+      const matchSearch =
+        !query ||
+        row.code.toLowerCase().includes(query) ||
+        row.title.toLowerCase().includes(query) ||
+        row.name.toLowerCase().includes(query) ||
+        row.workTypeBadge.label.toLowerCase().includes(query) ||
+        row.clientLabel.toLowerCase().includes(query) ||
+        row.fieldPicName.toLowerCase().includes(query) ||
+        row.locationLabel.toLowerCase().includes(query);
+
+      return matchWorkType && matchStatus && matchSearch;
+    });
+  }, [
+    portfolioRows,
+    portfolioSearch,
+    portfolioWorkTypeFilter,
+    portfolioStatusFilter,
+  ]);
+
+  const portfolioSummary = useMemo(() => {
+    const count = filteredPortfolioRows.length;
+    const totalProgress = filteredPortfolioRows.reduce(
+      (sum, row) => sum + row.actualProgress,
+      0,
+    );
+    const plannedList = filteredPortfolioRows.filter(
+      (row) => row.plannedProgress !== null,
+    );
+    const totalPlanned = plannedList.reduce(
+      (sum, row) => sum + (row.plannedProgress ?? 0),
+      0,
+    );
+    const consultancyCount = filteredPortfolioRows.filter(
+      (row) => row.workTypeBadge.group === "CONSULTANCY",
+    ).length;
+    const physicalCount = count - consultancyCount;
+    const totalPagu = filteredPortfolioRows.reduce(
+      (sum, row) => sum + row.paguValue,
+      0,
+    );
+    const totalRealized = filteredPortfolioRows.reduce(
+      (sum, row) => sum + row.realizedValue,
+      0,
+    );
+    const totalReports = filteredPortfolioRows.reduce(
+      (sum, row) => sum + row.reportsCount,
+      0,
+    );
+    const behindScheduleCount = filteredPortfolioRows.filter(
+      (row) => row.deviation !== null && row.deviation < -5,
+    ).length;
+
+    const breakdownMap = new Map<
+      string,
+      {
+        workTypeId: string;
+        label: string;
+        group: "CONSULTANCY" | "PHYSICAL";
+        tone: WorkTypeBadgeTone;
+        count: number;
+        totalProgress: number;
+        totalPagu: number;
+      }
+    >();
+
+    for (const row of portfolioRows) {
+      const existing = breakdownMap.get(row.workTypeId);
+      if (existing) {
+        existing.count += 1;
+        existing.totalProgress += row.actualProgress;
+        existing.totalPagu += row.paguValue;
+      } else {
+        breakdownMap.set(row.workTypeId, {
+          workTypeId: row.workTypeId,
+          label: row.workTypeBadge.shortLabel,
+          group: row.workTypeBadge.group,
+          tone: row.workTypeBadge.tone,
+          count: 1,
+          totalProgress: row.actualProgress,
+          totalPagu: row.paguValue,
+        });
+      }
+    }
+
+    const workTypeBreakdown = Array.from(breakdownMap.values())
+      .map((item) => ({
+        ...item,
+        avgProgress:
+          item.count > 0
+            ? Math.round((item.totalProgress / item.count) * 10) / 10
+            : 0,
+      }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
+    return {
+      count,
+      avgProgress:
+        count > 0 ? Math.round((totalProgress / count) * 10) / 10 : 0,
+      avgPlanned:
+        plannedList.length > 0
+          ? Math.round((totalPlanned / plannedList.length) * 10) / 10
+          : null,
+      consultancyCount,
+      physicalCount,
+      totalPagu,
+      totalRealized,
+      realizationPercent:
+        totalPagu > 0 ? Math.round((totalRealized / totalPagu) * 1000) / 10 : 0,
+      totalReports,
+      behindScheduleCount,
+      workTypeBreakdown,
+    };
+  }, [filteredPortfolioRows, portfolioRows]);
+
+  const handleDownloadPortfolio = async (format: "xlsx" | "pdf") => {
+    const key = `portfolio-${format}`;
+    if (exportingKey) return;
+    setExportingKey(key);
+    try {
+      const params = new URLSearchParams({ format });
+      if (portfolioSearch.trim()) {
+        params.set("search", portfolioSearch.trim());
+      }
+      if (portfolioWorkTypeFilter !== "ALL") {
+        params.set("jenisPekerjaan", portfolioWorkTypeFilter);
+      }
+      if (portfolioStatusFilter !== "ALL") {
+        params.set("status", portfolioStatusFilter);
+      }
+      const res = await fetch(`/api/projects/export?${params.toString()}`);
+      if (!res.ok) {
+        let message = `Gagal mengekspor portofolio (${res.status})`;
+        try {
+          const payload = (await res.json()) as { error?: string };
+          if (payload?.error) message = payload.error;
+        } catch {
+          // ignore non-json error body
+        }
+        toast.error(message);
+        return;
+      }
+      const blob = await res.blob();
+      const fallbackName = `Rekap_Portofolio_Proyek_${new Date().toISOString().slice(0, 10)}.${format}`;
+      const filename = parseDownloadFilename(
+        res.headers.get("Content-Disposition"),
+        fallbackName,
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      toast.success(`Unduhan ${filename} dimulai`);
+    } catch {
+      toast.error("Gagal mengunduh rekap portofolio.");
+    } finally {
+      setExportingKey(null);
+    }
+  };
+
+  const handleDownloadProjectReport = async (
+    projectId: string,
+    projectCode: string,
+    type: "progress" | "financial",
+    format: "pdf" | "xlsx",
+  ) => {
+    const key = `${projectId}-${type}-${format}`;
+    if (exportingKey) return;
+    setExportingKey(key);
+    try {
+      const res = await fetch(
+        `/api/projects/${encodeURIComponent(projectId)}/reports?type=${type}&format=${format}`,
+      );
+      if (!res.ok) {
+        let message = `Gagal membuat laporan ${type} (${res.status})`;
+        try {
+          const payload = (await res.json()) as { error?: string };
+          if (payload?.error) message = payload.error;
+        } catch {
+          // ignore non-json error body
+        }
+        toast.error(message);
+        return;
+      }
+      const blob = await res.blob();
+      const fallbackName = `Laporan_${type}_${projectCode}_${new Date().toISOString().slice(0, 10)}.${format}`;
+      const filename = parseDownloadFilename(
+        res.headers.get("Content-Disposition"),
+        fallbackName,
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      toast.success(`Unduhan ${filename} dimulai`);
+    } catch {
+      toast.error("Gagal mengunduh laporan proyek.");
+    } finally {
+      setExportingKey(null);
+    }
+  };
 
   const linkedProjectsByGroup = useMemo(() => {
     const projectByGroup = new Map<string, DinasProjectProgressSource>();
@@ -282,8 +687,590 @@ export function DinasProjectReportPage({
 
   return (
     <div className="space-y-6">
-      {/* Official Dinas Report Header */}
-      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-5 shadow-xs">
+      {/* Mode Switcher Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs print:hidden">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={reportMode === "portfolio_live" ? "default" : "outline"}
+            onClick={() => setReportMode("portfolio_live")}
+            className="gap-1.5"
+          >
+            <Building2 className="size-3.5" aria-hidden="true" />
+            <span>Rekap Portofolio Live DB</span>
+            <Badge
+              variant={
+                reportMode === "portfolio_live" ? "secondary" : "outline"
+              }
+              className="ml-0.5 tabular-nums"
+            >
+              {portfolioRows.length}
+            </Badge>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={reportMode === "dinas_preset" ? "default" : "outline"}
+            onClick={() => setReportMode("dinas_preset")}
+            className="gap-1.5"
+          >
+            <Landmark className="size-3.5" aria-hidden="true" />
+            <span>Preset Dinas Aceh Tengah</span>
+          </Button>
+        </div>
+        <span className="type-p3 text-muted-foreground">
+          {reportMode === "portfolio_live"
+            ? hasLiveDbMetadata
+              ? "Tersinkron langsung dengan progres Kurva-S & proyek aktif di database"
+              : "Data ringkas dari database proyek (akses Master Proyek untuk kolom lengkap)"
+            : "Template resmi Dinas Aceh Tengah (38 Poktan / 754 Ha) terintegrasi progres live"}
+        </span>
+      </div>
+
+      {reportMode === "portfolio_live" ? (
+        <div className="space-y-6">
+          {/* Portfolio Live DB Header */}
+          <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-5 shadow-xs">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div className="flex items-start gap-3.5">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                  <Briefcase className="size-6" aria-hidden="true" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Rekap Otomatis Live DB</Badge>
+                    <span className="type-p3 text-muted-foreground">
+                      Konsultansi &amp; Konstruksi Fisik
+                    </span>
+                  </div>
+                  <h2 className="type-h2 mt-1 text-foreground">
+                    Rekapitulasi Portofolio Proyek &amp; Jenis Pekerjaan
+                  </h2>
+                  <p className="type-p2 text-muted-foreground">
+                    Rekap otomatis seluruh proyek aktif di database (DED,
+                    Konsultan Pengawas, Gedung, Jalan &amp; Jembatan, Irigasi,
+                    MEP, dan spesialisasi lainnya) beserta Kurva-S rencana.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingKey !== null}
+                  onClick={() => void handleDownloadPortfolio("xlsx")}
+                  className="gap-1.5"
+                >
+                  {exportingKey === "portfolio-xlsx" ? (
+                    <Loader2
+                      className="size-3.5 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <FileSpreadsheet
+                      className="size-3.5 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>Ekspor Excel (.xlsx)</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingKey !== null}
+                  onClick={() => void handleDownloadPortfolio("pdf")}
+                  className="gap-1.5"
+                >
+                  {exportingKey === "portfolio-pdf" ? (
+                    <Loader2
+                      className="size-3.5 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <FileText
+                      className="size-3.5 text-rose-600"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>Ekspor PDF</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="gap-1.5"
+                >
+                  <Printer className="size-3.5" aria-hidden="true" />
+                  <span>Cetak</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Portfolio KPI Summary */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+              <p className="type-p3 text-muted-foreground">
+                Total Proyek Ditampilkan
+              </p>
+              <p className="type-kpi mt-1 text-foreground tabular-nums">
+                {portfolioSummary.count}{" "}
+                <span className="type-p3 font-normal text-muted-foreground">
+                  dari {portfolioRows.length} proyek
+                </span>
+              </p>
+              <p className="type-p3 mt-1 text-muted-foreground tabular-nums">
+                Deviasi tertinggal (&lt;-5%):{" "}
+                {portfolioSummary.behindScheduleCount} proyek
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+              <p className="type-p3 text-muted-foreground">
+                Rata-rata Progres Aktual
+              </p>
+              <p className="type-kpi mt-1 text-foreground tabular-nums">
+                {portfolioSummary.avgProgress.toFixed(1)}%
+              </p>
+              <p className="type-p3 mt-1 text-muted-foreground tabular-nums">
+                {portfolioSummary.avgPlanned !== null
+                  ? `Rata-rata Rencana Kurva-S: ${portfolioSummary.avgPlanned.toFixed(1)}%`
+                  : "Jadwal Kurva-S belum lengkap"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+              <p className="type-p3 text-muted-foreground">
+                Komposisi Jenis Pekerjaan
+              </p>
+              <p className="type-kpi mt-1 text-foreground tabular-nums">
+                {portfolioSummary.consultancyCount}{" "}
+                <span className="type-p3 font-normal text-muted-foreground">
+                  Konsultansi · {portfolioSummary.physicalCount} Fisik
+                </span>
+              </p>
+              <p className="type-p3 mt-1 text-muted-foreground">
+                {portfolioSummary.workTypeBreakdown.length} kategori aktif
+              </p>
+            </div>
+
+            {canViewFinancials ? (
+              <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+                <p className="type-p3 text-muted-foreground">
+                  Total Pagu &amp; Realisasi Biaya
+                </p>
+                <p className="type-kpi mt-1 text-foreground tabular-nums">
+                  {formatCompactRupiah(portfolioSummary.totalPagu)}
+                </p>
+                <p className="type-p3 mt-1 font-medium text-emerald-600 tabular-nums dark:text-emerald-400">
+                  Realisasi:{" "}
+                  {formatCompactRupiah(portfolioSummary.totalRealized)} (
+                  {portfolioSummary.realizationPercent.toFixed(1)}%)
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+                <p className="type-p3 text-muted-foreground">
+                  Total Laporan Harian
+                </p>
+                <p className="type-kpi mt-1 text-foreground tabular-nums">
+                  {portfolioSummary.totalReports}
+                </p>
+                <p className="type-p3 mt-1 text-muted-foreground">
+                  Dokumentasi lapangan terekam
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Interactive Work Type Breakdown Pills */}
+          {portfolioSummary.workTypeBreakdown.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="type-p3 font-semibold text-foreground">
+                  Ringkasan per Jenis Pekerjaan (Klik untuk filter)
+                </p>
+                {portfolioWorkTypeFilter !== "ALL" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPortfolioWorkTypeFilter("ALL")}
+                    className="h-7 px-2 text-xs"
+                  >
+                    Reset Filter
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {portfolioSummary.workTypeBreakdown.map((item) => {
+                  const isActive = portfolioWorkTypeFilter === item.workTypeId;
+                  return (
+                    <button
+                      key={item.workTypeId}
+                      type="button"
+                      onClick={() =>
+                        setPortfolioWorkTypeFilter(
+                          isActive ? "ALL" : item.workTypeId,
+                        )
+                      }
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-left transition-colors",
+                        isActive
+                          ? "border-primary bg-primary/10 ring-1 ring-primary"
+                          : "border-border bg-background hover:bg-muted/50",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium",
+                          WORK_TYPE_TONE_CLASSES[item.tone],
+                        )}
+                      >
+                        {item.label}
+                      </span>
+                      <span className="type-p3 font-semibold text-foreground tabular-nums">
+                        {item.count} proyek
+                      </span>
+                      <span className="type-p3 text-muted-foreground tabular-nums">
+                        · {item.avgProgress.toFixed(1)}%
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Portfolio Filters Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs print:hidden">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-full sm:w-64">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  value={portfolioSearch}
+                  onChange={(event) => setPortfolioSearch(event.target.value)}
+                  placeholder="Cari kode, nama proyek, klien, PIC..."
+                  className="pl-8"
+                />
+              </div>
+
+              <Select
+                value={portfolioWorkTypeFilter}
+                onValueChange={setPortfolioWorkTypeFilter}
+              >
+                <SelectTrigger className="w-60">
+                  <Filter
+                    className="mr-1.5 size-3.5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <SelectValue placeholder="Semua Jenis Pekerjaan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">
+                    Semua Jenis Pekerjaan ({portfolioRows.length})
+                  </SelectItem>
+                  <SelectItem value="CONSULTANCY">
+                    Semua Jasa Konsultansi
+                  </SelectItem>
+                  <SelectItem value="PHYSICAL">
+                    Semua Konstruksi Fisik
+                  </SelectItem>
+                  {PROJECT_WORK_TYPE_GROUPS.map((group) => (
+                    <SelectGroup key={group.group}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.items.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={portfolioStatusFilter}
+                onValueChange={setPortfolioStatusFilter}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Semua Status</SelectItem>
+                  <SelectItem value="RUNNING">Berjalan</SelectItem>
+                  <SelectItem value="PENDING_SETUP">Persiapan</SelectItem>
+                  <SelectItem value="HOLD">Tertahan</SelectItem>
+                  <SelectItem value="DONE">Selesai</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="type-p3 text-muted-foreground tabular-nums">
+              Menampilkan{" "}
+              <strong className="font-semibold text-foreground">
+                {filteredPortfolioRows.length}
+              </strong>{" "}
+              proyek
+            </p>
+          </div>
+
+          {filteredPortfolioRows.length === 0 ? (
+            <EmptyState
+              title="Tidak ada proyek yang sesuai filter"
+              description="Ubah kata kunci pencarian, kategori jenis pekerjaan, atau status proyek."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-2xs">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="w-12 text-center">No</TableHead>
+                    <TableHead className="min-w-[230px]">
+                      Kode &amp; Nama Proyek
+                    </TableHead>
+                    <TableHead className="min-w-[170px]">
+                      Jenis Pekerjaan
+                    </TableHead>
+                    <TableHead className="min-w-[160px]">
+                      Mitra / Klien &amp; PIC
+                    </TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Aktual</TableHead>
+                    <TableHead className="text-right">Rencana</TableHead>
+                    <TableHead className="text-right">Deviasi</TableHead>
+                    <TableHead className="text-center">
+                      Laporan Harian
+                    </TableHead>
+                    {canViewFinancials && (
+                      <>
+                        <TableHead className="text-right">
+                          Pagu Anggaran
+                        </TableHead>
+                        <TableHead className="text-right">Realisasi</TableHead>
+                      </>
+                    )}
+                    <TableHead className="text-right print:hidden">
+                      Laporan Proyek
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPortfolioRows.map((row, idx) => (
+                    <TableRow key={row.key}>
+                      <TableCell className="text-center text-muted-foreground tabular-nums">
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {row.code}
+                            </span>
+                          </div>
+                          <p className="font-medium text-foreground">
+                            {row.title}
+                          </p>
+                          {row.locationLabel !== "-" && (
+                            <p className="type-p3 text-muted-foreground">
+                              {row.locationLabel}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
+                              WORK_TYPE_TONE_CLASSES[row.workTypeBadge.tone],
+                            )}
+                          >
+                            {row.workTypeBadge.shortLabel}
+                          </span>
+                          <p className="type-p3 text-muted-foreground">
+                            {row.workTypeBadge.groupShortLabel}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-0.5 text-xs">
+                          <p className="font-medium text-foreground">
+                            {row.clientLabel}
+                          </p>
+                          <p className="text-muted-foreground">
+                            PIC: {row.fieldPicName}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline">{row.statusLabel}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {row.actualProgress.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground tabular-nums">
+                        {row.plannedProgress !== null
+                          ? `${row.plannedProgress.toFixed(1)}%`
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.deviation !== null ? (
+                          <span
+                            className={cn(
+                              "font-semibold",
+                              row.deviation >= 0
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : row.deviation < -10
+                                  ? "text-rose-600 dark:text-rose-400"
+                                  : "text-amber-600 dark:text-amber-400",
+                            )}
+                          >
+                            {row.deviation >= 0 ? "+" : ""}
+                            {row.deviation.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center text-xs tabular-nums">
+                        <span className="font-medium text-foreground">
+                          {row.reportsCount}x
+                        </span>
+                        {row.latestReportDate && (
+                          <p className="text-muted-foreground">
+                            {row.latestReportDate}
+                          </p>
+                        )}
+                      </TableCell>
+                      {canViewFinancials && (
+                        <>
+                          <TableCell className="text-right text-xs tabular-nums">
+                            {formatCompactRupiah(row.paguValue)}
+                          </TableCell>
+                          <TableCell className="text-right text-xs font-medium text-emerald-600 tabular-nums dark:text-emerald-400">
+                            {formatCompactRupiah(row.realizedValue)}
+                          </TableCell>
+                        </>
+                      )}
+                      <TableCell className="text-right print:hidden">
+                        {row.id ? (
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={exportingKey !== null}
+                              onClick={() =>
+                                void handleDownloadProjectReport(
+                                  row.id!,
+                                  row.code,
+                                  "progress",
+                                  "pdf",
+                                )
+                              }
+                              className="h-7 px-2 text-xs"
+                              title="Unduh PDF Progres & Kurva-S"
+                            >
+                              PDF
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={exportingKey !== null}
+                              onClick={() =>
+                                void handleDownloadProjectReport(
+                                  row.id!,
+                                  row.code,
+                                  "progress",
+                                  "xlsx",
+                                )
+                              }
+                              className="h-7 px-2 text-xs"
+                              title="Unduh Excel Progres"
+                            >
+                              XLSX
+                            </Button>
+                            {canViewFinancials && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={exportingKey !== null}
+                                onClick={() =>
+                                  void handleDownloadProjectReport(
+                                    row.id!,
+                                    row.code,
+                                    "financial",
+                                    "xlsx",
+                                  )
+                                }
+                                className="h-7 px-2 text-xs"
+                                title="Unduh Excel Keuangan RAB/RAP"
+                              >
+                                RAB
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            -
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="font-semibold">
+                    <TableCell colSpan={5}>
+                      Total / Rata-rata ({filteredPortfolioRows.length} proyek)
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {portfolioSummary.avgProgress.toFixed(1)}%
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {portfolioSummary.avgPlanned !== null
+                        ? `${portfolioSummary.avgPlanned.toFixed(1)}%`
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {portfolioSummary.avgPlanned !== null
+                        ? `${(portfolioSummary.avgProgress - portfolioSummary.avgPlanned) >= 0 ? "+" : ""}${(portfolioSummary.avgProgress - portfolioSummary.avgPlanned).toFixed(1)}%`
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums">
+                      {portfolioSummary.totalReports}x
+                    </TableCell>
+                    {canViewFinancials && (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCompactRupiah(portfolioSummary.totalPagu)}
+                        </TableCell>
+                        <TableCell className="text-right text-emerald-600 tabular-nums dark:text-emerald-400">
+                          {formatCompactRupiah(portfolioSummary.totalRealized)}
+                        </TableCell>
+                      </>
+                    )}
+                    <TableCell className="print:hidden" />
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Official Dinas Report Header */}
+          <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-5 shadow-xs">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div className="flex items-start gap-3.5">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -1081,6 +2068,8 @@ export function DinasProjectReportPage({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

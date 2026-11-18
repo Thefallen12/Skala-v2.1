@@ -247,6 +247,9 @@ enum BlueprintCategory {
   ARCHITECTURAL
   STRUCTURAL
   MEP
+  DED
+  SURVEY_GEOTEKNIK
+  SUPERVISION_REPORT
 }
 
 enum BlueprintStatus {
@@ -417,6 +420,7 @@ model User {
   receivedMaterialDeliveries                        MaterialDelivery[]            @relation("MaterialDeliveryReceiver")
   processedVendorInvoices                           VendorInvoice[]               @relation("VendorInvoiceProcessor")
   processedVendorInvoicePayments                    VendorInvoicePayment[]        @relation("VendorInvoicePaymentProcessor")
+  submittedProjectProgress                          ProjectProgressSubmission[]   @relation("ProjectProgressSubmitter")
 }
 
 model UserNote {
@@ -676,6 +680,7 @@ model Project {
   rabMaterials        ProjectRabMaterial[]
   laborPlans          ProjectLaborPlan[]
   materialDeliveries  MaterialDelivery[]
+  progressSubmissions ProjectProgressSubmission[]
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @updatedAt
 
@@ -802,6 +807,28 @@ model ProjectProgressPhoto {
   createdAt     DateTime    @default(now())
 
   @@index([dailyReportId, createdAt])
+}
+
+model ProjectProgressSubmission {
+  id                String   @id @default(cuid()) @map("_id")
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  periodType        String
+  periodLabel       String
+  summary           String
+  actualProgress    Float
+  plannedProgress   Float
+  deviation         Float
+  includeFinancials Boolean  @default(false)
+  portalCode        String   @unique
+  recipientRoles    String[] @default([])
+  notes             String?
+  submittedById     String
+  submittedBy       User     @relation("ProjectProgressSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedAt       DateTime @default(now())
+
+  @@index([projectId, submittedAt])
+  @@index([submittedById, submittedAt])
 }
 
 model ProjectWorkPoint {
@@ -1996,6 +2023,7 @@ model MaterialContract {
 
 model MaterialDelivery {
   id               String                        @id @default(cuid()) @map("_id")
+  publicCode       String?
   contractId       String
   contract         MaterialContract              @relation(fields: [contractId], references: [id], onDelete: Restrict)
   projectId        String
@@ -2017,6 +2045,7 @@ model MaterialDelivery {
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
 
+  @@index([publicCode])
   @@index([contractId, billingStatus, deliveryDate])
   @@index([contractId, doNumber])
   @@index([projectId, deliveryDate])

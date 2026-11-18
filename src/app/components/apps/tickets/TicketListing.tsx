@@ -27,6 +27,7 @@ import {
   ShoppingCart,
   Trash2,
   Truck,
+  Upload,
   UploadCloud,
 } from "lucide-react";
 import {
@@ -48,6 +49,8 @@ import {
   canOperateLogisticsActions,
 } from "@/lib/user-access";
 import {
+  canBillAndPayVendorContracts,
+  canManageMaterialContracts,
   canRecordMaterialDeliveries,
   formatMaterialVolume,
   type ContractTicketDeliveryOption,
@@ -80,7 +83,12 @@ import type {
 import type { VendorBankAccountOption } from "@/lib/vendor-bank-accounts";
 import CreatePOForm from "@/app/components/forms/CreatePOForm";
 import DirectStockPurchaseForm from "@/app/components/forms/DirectStockPurchaseForm";
-import MaterialDeliveryModal from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
+import MaterialDeliveryModal, {
+  MaterialDeliveryAttachModal,
+  MaterialDeliveryPrintModal,
+  type AttachableMaterialDelivery,
+  type PrintableMaterialDelivery,
+} from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
 import ExpeditionArrivalModal from "@/app/components/apps/tickets/ExpeditionArrivalModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -539,6 +547,7 @@ function TicketRowActionControls({
   onOpenWorkflow,
   onOpenLogisticsDo,
   onOpenContractDo,
+  onPrintContractSj,
   onOpenManage,
 }: {
   ticket: TicketRow;
@@ -552,6 +561,7 @@ function TicketRowActionControls({
   onOpenWorkflow: (ticket: TicketRow) => void;
   onOpenLogisticsDo: (ticketId: string) => void;
   onOpenContractDo: (ticket: TicketRow) => void;
+  onPrintContractSj: (ticket: TicketRow, initialDeliveryId?: string) => void;
   onOpenManage: (ticket: TicketRow, mode: TicketManageMode) => void;
 }) {
   const isMobile = variant === "mobile";
@@ -581,6 +591,12 @@ function TicketRowActionControls({
       item.categoryHint !== TicketCategoryHint.CONTRACT &&
       item.status === FulfillmentStatus.PENDING,
   );
+  const materialDeliveries = ticket.materialDeliveries ?? [];
+  const hasMaterialDeliveries = materialDeliveries.length > 0;
+  const isContractTicket =
+    ticket.items.some(
+      (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+    ) || hasMaterialDeliveries;
   const hasOpenContract =
     canRecordContractDo && hasOpenContractDelivery(role, ticket);
   const canManageLogisticsItems =
@@ -634,12 +650,26 @@ function TicketRowActionControls({
           type="button"
           size={isMobile ? "sm" : "icon"}
           variant="success"
-          aria-label="DO Kontrak"
-          title="DO Kontrak"
+          aria-label="Terbitkan Surat Jalan Material Alam"
+          title="Terbitkan Surat Jalan"
           onClick={() => onOpenContractDo(ticket)}
         >
           <Truck className="size-3.5" aria-hidden="true" />
-          {isMobile && <span>DO Kontrak</span>}
+          {isMobile && <span>Terbitkan SJ</span>}
+        </Button>
+      )}
+
+      {isContractTicket && hasMaterialDeliveries && !hasOpenContract && (
+        <Button
+          type="button"
+          size={isMobile ? "sm" : "icon"}
+          variant="outline"
+          aria-label="Cetak Surat Jalan Material Alam"
+          title="Pratinjau / Cetak SJ"
+          onClick={() => onPrintContractSj(ticket)}
+        >
+          <Printer className="size-3.5" aria-hidden="true" />
+          {isMobile && <span>Cetak SJ</span>}
         </Button>
       )}
 
@@ -722,6 +752,18 @@ function TicketRowActionControls({
             <Eye className="size-4" aria-hidden="true" />
             Detail
           </DropdownMenuItem>
+          {hasOpenContract && (
+            <DropdownMenuItem onSelect={() => onOpenContractDo(ticket)}>
+              <Truck className="size-4" aria-hidden="true" />
+              Terbitkan Surat Jalan
+            </DropdownMenuItem>
+          )}
+          {hasMaterialDeliveries && (
+            <DropdownMenuItem onSelect={() => onPrintContractSj(ticket)}>
+              <Printer className="size-4" aria-hidden="true" />
+              Cetak SJ
+            </DropdownMenuItem>
+          )}
           {showDoPrint && primaryDo && (
             <DropdownMenuItem asChild>
               <Link href={`/d/${primaryDo.publicCode}`}>
@@ -763,6 +805,7 @@ function TicketMobileCard({
   onOpenWorkflow,
   onOpenLogisticsDo,
   onOpenContractDo,
+  onPrintContractSj,
   onOpenManage,
 }: {
   ticket: TicketRow;
@@ -775,6 +818,7 @@ function TicketMobileCard({
   onOpenWorkflow: (ticket: TicketRow) => void;
   onOpenLogisticsDo: (ticketId: string) => void;
   onOpenContractDo: (ticket: TicketRow) => void;
+  onPrintContractSj: (ticket: TicketRow, initialDeliveryId?: string) => void;
   onOpenManage: (ticket: TicketRow, mode: TicketManageMode) => void;
 }) {
   const stageNum = getTicketStageNumber(ticket.status);
@@ -882,6 +926,7 @@ function TicketMobileCard({
           onOpenWorkflow={onOpenWorkflow}
           onOpenLogisticsDo={onOpenLogisticsDo}
           onOpenContractDo={onOpenContractDo}
+          onPrintContractSj={onPrintContractSj}
           onOpenManage={onOpenManage}
         />
       </div>
@@ -900,6 +945,7 @@ function TicketDesktopRow({
   onOpenWorkflow,
   onOpenLogisticsDo,
   onOpenContractDo,
+  onPrintContractSj,
   onOpenManage,
 }: {
   ticket: TicketRow;
@@ -912,6 +958,7 @@ function TicketDesktopRow({
   onOpenWorkflow: (ticket: TicketRow) => void;
   onOpenLogisticsDo: (ticketId: string) => void;
   onOpenContractDo: (ticket: TicketRow) => void;
+  onPrintContractSj: (ticket: TicketRow, initialDeliveryId?: string) => void;
   onOpenManage: (ticket: TicketRow, mode: TicketManageMode) => void;
 }) {
   const stageNum = getTicketStageNumber(ticket.status);
@@ -1050,6 +1097,7 @@ function TicketDesktopRow({
           onOpenWorkflow={onOpenWorkflow}
           onOpenLogisticsDo={onOpenLogisticsDo}
           onOpenContractDo={onOpenContractDo}
+          onPrintContractSj={onPrintContractSj}
           onOpenManage={onOpenManage}
         />
       </TableCell>
@@ -1142,7 +1190,7 @@ function TicketDetailItemCard({
               ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
               : deliveredContractVolume > 0
                 ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
-                : "Menunggu DO Kontrak"
+                : "Menunggu Surat Jalan"
             : item.status === FulfillmentStatus.PENDING
               ? activeDirectPurchase
                 ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
@@ -1321,7 +1369,7 @@ function TicketDetailItemRow({
               ? `Dipenuhi (${formatMaterialVolume(deliveredContractVolume, item.unit)})`
               : deliveredContractVolume > 0
                 ? `Parsial (${formatMaterialVolume(deliveredContractVolume, item.unit)} / ${formatMaterialVolume(item.quantity, item.unit)})`
-                : "Menunggu DO Kontrak"
+                : "Menunggu Surat Jalan"
             : item.status === FulfillmentStatus.PENDING
               ? activeDirectPurchase
                 ? `Dipesan · ${activeDirectPurchase.purchaseNumber}`
@@ -1909,6 +1957,12 @@ export default function TicketListing({
   const [workflowTicket, setWorkflowTicket] = useState<TicketRow | null>(null);
   const [contractDoModalTicket, setContractDoModalTicket] =
     useState<TicketRow | null>(null);
+  const [contractSjPreview, setContractSjPreview] = useState<{
+    deliveries: PrintableMaterialDelivery[];
+    initialDeliveryId?: string;
+  } | null>(null);
+  const [contractSjAttachTarget, setContractSjAttachTarget] =
+    useState<AttachableMaterialDelivery | null>(null);
   const [deletingDeliveryId, setDeletingDeliveryId] = useState<string | null>(
     null,
   );
@@ -1920,6 +1974,31 @@ export default function TicketListing({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const canRecordContractDo = canRecordMaterialDeliveries(role);
+  const canAttachContractProof =
+    canManageMaterialContracts(role) ||
+    canOperateLogisticsActions(role) ||
+    canBillAndPayVendorContracts(role);
+
+  const openContractSjPreview = (
+    ticket: TicketRow,
+    initialDeliveryId?: string,
+  ) => {
+    const deliveries = ticket.materialDeliveries ?? [];
+    if (deliveries.length === 0) return;
+    setContractSjPreview({
+      deliveries: deliveries.map((d) => ({
+        id: d.id,
+        publicCode: (d as { publicCode?: string | null }).publicCode ?? null,
+        doNumber: d.doNumber,
+        deliveryDate: d.deliveryDate,
+        materialType: d.materialType,
+        vendorName: d.vendorName,
+        quantityReceived: d.quantityReceived,
+        unit: d.unit,
+      })),
+      initialDeliveryId: initialDeliveryId ?? deliveries[0]?.id,
+    });
+  };
 
   const openReceiptPreview = (receipt: { label: string; url: string }) => {
     setReceiptPreviewError(false);
@@ -2367,6 +2446,7 @@ export default function TicketListing({
               )
             }
             onOpenContractDo={setContractDoModalTicket}
+            onPrintContractSj={openContractSjPreview}
             onOpenManage={(target, mode) =>
               setActiveManageModal({ ticket: target, mode })
             }
@@ -2439,6 +2519,7 @@ export default function TicketListing({
                     )
                   }
                   onOpenContractDo={setContractDoModalTicket}
+                  onPrintContractSj={openContractSjPreview}
                   onOpenManage={(target, mode) =>
                     setActiveManageModal({ ticket: target, mode })
                   }
@@ -2484,6 +2565,13 @@ export default function TicketListing({
             <div className="flex w-full flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 {selectedTicket.type === TicketType.MATERIAL &&
+                  !(
+                    selectedTicket.items.length > 0 &&
+                    selectedTicket.items.every(
+                      (item) => item.categoryHint === TicketCategoryHint.CONTRACT,
+                    ) &&
+                    (selectedTicket.purchaseOrders?.length ?? 0) === 0
+                  ) &&
                   (role === UserRole.LOGISTICS ||
                     role === UserRole.DIRECTOR ||
                     role === UserRole.DEPUTY_DIRECTOR ||
@@ -2502,6 +2590,29 @@ export default function TicketListing({
                       Cetak PO
                     </Button>
                   )}
+
+                {canRecordContractDo &&
+                  hasOpenContractDelivery(role, selectedTicket) && (
+                    <Button
+                      type="button"
+                      variant="success"
+                      onClick={() => setContractDoModalTicket(selectedTicket)}
+                    >
+                      <Truck className="size-4" aria-hidden="true" />
+                      Terbitkan Surat Jalan
+                    </Button>
+                  )}
+
+                {(selectedTicket.materialDeliveries?.length ?? 0) > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => openContractSjPreview(selectedTicket)}
+                  >
+                    <Printer className="size-4" aria-hidden="true" />
+                    Cetak SJ ({selectedTicket.materialDeliveries!.length})
+                  </Button>
+                )}
 
                 {selectedTicketPermissions?.processedByFinance && isExecutive ? (
                   <Badge variant="outline" className="gap-1.5">
@@ -3272,11 +3383,11 @@ export default function TicketListing({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h3 className="type-h3 text-foreground">
-                          Kontrak Material Alam &amp; DO
+                          Surat Jalan Material Alam (Kontrak Payung)
                         </h3>
                         <p className="type-p3 text-muted-foreground">
-                          Pengiriman langsung dari vendor Kontrak Payung tanpa
-                          PO baru.
+                          Armada &amp; mover disediakan langsung oleh vendor kontrak payung.
+                          Tugas kita menerbitkan Surat Jalan resmi tanpa PO/DO armada internal.
                         </p>
                       </div>
                       {canRecordContractDo &&
@@ -3289,7 +3400,7 @@ export default function TicketListing({
                             }
                           >
                             <Truck className="size-3.5" aria-hidden="true" />
-                            DO Kontrak
+                            Terbitkan Surat Jalan
                           </Button>
                         )}
                     </div>
@@ -3372,7 +3483,7 @@ export default function TicketListing({
                         <TableHeader>
                           <TableRow className="bg-muted/40">
                             <TableHead className="type-p3">Tanggal</TableHead>
-                            <TableHead className="type-p3">No. DO &amp; Truk</TableHead>
+                            <TableHead className="type-p3">No. SJ &amp; Armada Vendor</TableHead>
                             <TableHead className="type-p3">Kontrak</TableHead>
                             <TableHead className="type-p3 text-right">
                               Volume
@@ -3433,15 +3544,65 @@ export default function TicketListing({
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    title="Pratinjau / Cetak Surat Jalan"
+                                    onClick={() =>
+                                      openContractSjPreview(
+                                        selectedTicket,
+                                        delivery.id,
+                                      )
+                                    }
+                                  >
+                                    <Printer
+                                      className="size-3.5"
+                                      aria-hidden="true"
+                                    />
+                                    Pratinjau / Cetak SJ
+                                  </Button>
+                                  {canAttachContractProof && (
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="outline"
+                                      aria-label={`Lampirkan Foto / Plat / Supir ${delivery.doNumber}`}
+                                      title="Lampirkan Foto / Plat / Supir"
+                                      onClick={() =>
+                                        setContractSjAttachTarget({
+                                          id: delivery.id,
+                                          publicCode:
+                                            (
+                                              delivery as {
+                                                publicCode?: string | null;
+                                              }
+                                            ).publicCode ?? null,
+                                          doNumber: delivery.doNumber,
+                                          vehiclePlate: delivery.vehiclePlate,
+                                          driverName: delivery.driverName,
+                                          proofUrl: delivery.proofUrl,
+                                          vendorName: delivery.vendorName,
+                                          materialType: delivery.materialType,
+                                        })
+                                      }
+                                    >
+                                      <Upload
+                                        className="size-3.5"
+                                        aria-hidden="true"
+                                      />
+                                    </Button>
+                                  )}
                                   {delivery.proofUrl && (
                                     <Button
                                       type="button"
                                       size="icon"
                                       variant="outline"
                                       aria-label={`Lihat bukti ${delivery.doNumber}`}
+                                      title="Lihat Foto Bukti"
                                       onClick={() =>
                                         openReceiptPreview({
-                                          label: `Surat Jalan ${delivery.doNumber}`,
+                                          label: `Bukti Surat Jalan ${delivery.doNumber}`,
                                           url: delivery.proofUrl!,
                                         })
                                       }
@@ -3459,7 +3620,8 @@ export default function TicketListing({
                                           isPending ||
                                           deletingDeliveryId === delivery.id
                                         }
-                                        aria-label={`Hapus DO ${delivery.doNumber}`}
+                                        aria-label={`Hapus Surat Jalan ${delivery.doNumber}`}
+                                        title="Hapus Surat Jalan belum ditagih"
                                         onClick={() =>
                                           handleDeleteContractDelivery(
                                             delivery.id,
@@ -3483,7 +3645,7 @@ export default function TicketListing({
                       <EmptyState
                         variant="inline"
                         title="Belum ada Surat Jalan"
-                        description="Belum ada DO material alam tercatat untuk tiket ini."
+                        description="Belum ada Surat Jalan material alam diterbitkan untuk tiket ini."
                       />
                     )}
                   </section>
@@ -4603,15 +4765,23 @@ export default function TicketListing({
               lockedProjectId={contractDoModalTicket.projectId ?? undefined}
               lockedTicketId={contractDoModalTicket.id}
               onSaved={() => {
-                toast.success(
-                  `Surat Jalan untuk tiket ${contractDoModalTicket.ticketNumber} dicatat.`,
-                );
-                setContractDoModalTicket(null);
                 router.refresh();
               }}
             />
           );
         })()}
+
+      <MaterialDeliveryPrintModal
+        deliveries={contractSjPreview?.deliveries ?? []}
+        initialDeliveryId={contractSjPreview?.initialDeliveryId}
+        onClose={() => setContractSjPreview(null)}
+      />
+
+      <MaterialDeliveryAttachModal
+        delivery={contractSjAttachTarget}
+        onClose={() => setContractSjAttachTarget(null)}
+        onSaved={() => router.refresh()}
+      />
     </div>
   );
 }

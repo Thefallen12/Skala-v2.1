@@ -13,17 +13,21 @@ import {
   CalendarDays,
   Camera,
   CheckCircle2,
+  ChevronDown,
   Sparkles,
   ClipboardList,
   Coins,
   Copy,
   Download,
   Ellipsis,
+  ExternalLink,
+  FileSpreadsheet,
   FileText,
   Globe,
   HardHat,
   ImageIcon,
   LayoutTemplate,
+  Loader2,
   MapPin,
   MapPinned,
   Package,
@@ -39,6 +43,7 @@ import {
   User,
   WalletCards,
   WifiOff,
+  Wrench,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,6 +52,7 @@ import {
   buildProjectSCurveSeries,
   calculateWeightedProjectProgress,
 } from "@/lib/project-progress";
+import { formatWorkTypeBadge } from "@/lib/project-work-types";
 import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
 import {
   countOfflineDailyReports,
@@ -70,6 +76,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -106,14 +114,17 @@ import type { ProjectWorkstationMasterData } from "./ProjectWorkstationMaster";
 import ProjectActionButton from "./ProjectActionButton";
 import type { FieldTeamOption } from "@/app/(DashboardLayout)/types/project";
 import {
+  applyWorkTypeTemplate,
   deleteProject,
   duplicateProject,
   updateProjectKanbanStatus,
 } from "@/app/actions/project";
 import DailyProgressModal, {
+  formatEquipmentText,
   isRunningProjectStatus,
   submitOfflineDailyReportAction,
 } from "./DailyProgressModal";
+import SendProgressModal from "./SendProgressModal";
 import EditRabModal from "./EditRabModal";
 import RapManagementModal from "./RapManagementModal";
 import ProjectScheduleGantt, { type ScheduleMilestoneItem } from "./ProjectScheduleGantt";
@@ -220,6 +231,8 @@ export default function ProjectDetailView({
   const [isDailyProgressOpen, setIsDailyProgressOpen] = useState(
     () => actionParam === "daily-report",
   );
+  const [isSendProgressOpen, setIsSendProgressOpen] = useState(false);
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [isFlushingQueue, setIsFlushingQueue] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{
@@ -755,39 +768,48 @@ export default function ProjectDetailView({
     });
   };
 
-  const handlePrintRab = () => {
-    window.print();
-  };
-
-  const handleExportRab = () => {
-    const rows = [
-      ["Bagian", "Kode", "Uraian Pekerjaan", "Volume", "Harga Satuan", "Jumlah", "Bobot %", "Terpasang", "Progres %"],
-    ];
-
-    for (const group of rabGroups) {
-      for (const it of group.items) {
-        rows.push([
-          group.sectionName,
-          it.code,
-          it.title,
-          it.volumeText,
-          it.unitPrice.toString(),
-          it.totalPrice.toString(),
-          it.bobot.toFixed(2) + "%",
-          it.terpasangText,
-          it.progress + "%",
-        ]);
+  const handleDownloadAutomatedReport = async (
+    type: "daily" | "progress" | "financial",
+    format: "pdf" | "xlsx",
+  ) => {
+    setIsDownloadingReport(true);
+    try {
+      const url = `/api/projects/${encodeURIComponent(project.id)}/reports?type=${type}&format=${format}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        let message = "Gagal membuat laporan otomatis.";
+        try {
+          const payload = (await res.json()) as { message?: string };
+          if (payload?.message) message = payload.message;
+        } catch {
+          // ignore non-JSON body
+        }
+        toast.error(message);
+        return;
       }
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      try {
+        const disposition = res.headers.get("content-disposition");
+        const utf8Match = disposition?.match(/filename\*=UTF-8''([^;]+)/i);
+        const plainMatch = disposition?.match(/filename="?([^";]+)"?/i);
+        const resolvedName = utf8Match?.[1]
+          ? decodeURIComponent(utf8Match[1])
+          : plainMatch?.[1] || `${type}-${project.code}.${format}`;
+        const link = document.createElement("a");
+        link.href = objUrl;
+        link.download = resolvedName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        URL.revokeObjectURL(objUrl);
+      }
+    } catch {
+      toast.error("Gagal mengunduh laporan otomatis. Periksa koneksi Anda.");
+    } finally {
+      setIsDownloadingReport(false);
     }
-
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map((e) => e.map((c) => '"' + c + '"').join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "RAB-" + (project.code || "proyek") + ".csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const handlePrintMaterials = () => {
@@ -921,6 +943,10 @@ export default function ProjectDetailView({
               {healthStatus}
             </Badge>
 
+            <Badge variant="secondary" className="font-medium">
+              {formatWorkTypeBadge(project.jenisPekerjaan).shortLabel}
+            </Badge>
+
             <span className="type-p3 font-mono font-semibold text-muted-foreground">
               {project.code}
             </span>
@@ -937,9 +963,101 @@ export default function ProjectDetailView({
                   className="gap-1.5 font-semibold"
                 >
                   <Camera className="size-4" aria-hidden="true" />
-                  <span>Isi Progres</span>
+                  <span>Input Daily Report</span>
                 </Button>
               )}
+
+            {(canSubmitDailyProgress || canManageProject) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSendProgressOpen(true)}
+                className="gap-1.5"
+              >
+                <Send className="size-3.5" aria-hidden="true" />
+                <span>Kirim Progres</span>
+              </Button>
+            )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isDownloadingReport}
+                  className="gap-1.5"
+                >
+                  {isDownloadingReport ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <FileText className="size-3.5" aria-hidden="true" />
+                  )}
+                  <span>Laporan Otomatis</span>
+                  <ChevronDown className="size-3.5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-60">
+                <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                  Unduh Dokumen Live DB
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onSelect={() => void handleDownloadAutomatedReport("daily", "pdf")}
+                >
+                  <FileText aria-hidden="true" />
+                  PDF Laporan Harian
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void handleDownloadAutomatedReport("progress", "pdf")
+                  }
+                >
+                  <FileText aria-hidden="true" />
+                  PDF Progres &amp; Kurva-S
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void handleDownloadAutomatedReport("progress", "xlsx")
+                  }
+                >
+                  <FileSpreadsheet aria-hidden="true" />
+                  Excel Progres &amp; Kurva-S (.xlsx)
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setPrintDocView("progres")}>
+                  <Printer aria-hidden="true" />
+                  Pratinjau Cetak Progres (A4)
+                </DropdownMenuItem>
+                {canViewFinancials && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                      Keuangan RAB &amp; RAP
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void handleDownloadAutomatedReport("financial", "pdf")
+                      }
+                    >
+                      <FileText aria-hidden="true" />
+                      PDF Keuangan RAB/RAP
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void handleDownloadAutomatedReport("financial", "xlsx")
+                      }
+                    >
+                      <FileSpreadsheet aria-hidden="true" />
+                      Excel Keuangan RAB/RAP (.xlsx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
+                      <Printer aria-hidden="true" />
+                      Pratinjau Cetak RAB (A4)
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {canManageProject && (
               <>
@@ -1608,9 +1726,16 @@ export default function ProjectDetailView({
                         Cetak progres
                       </DropdownMenuItem>
                       {canViewFinancials && (
-                        <DropdownMenuItem onSelect={handleExportRab}>
-                          <Download />
-                          Ekspor CSV
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void handleDownloadAutomatedReport(
+                              "financial",
+                              "xlsx",
+                            )
+                          }
+                        >
+                          <FileSpreadsheet />
+                          Ekspor Excel RAB/RAP (.xlsx)
                         </DropdownMenuItem>
                       )}
                       {canEditProjectRab && (
@@ -1644,15 +1769,38 @@ export default function ProjectDetailView({
                     }
                     action={
                       canEditProjectRab ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => setIsEditRabModalOpen(true)}
-                          className="gap-1.5"
-                        >
-                          <ClipboardList className="size-4" aria-hidden="true" />
-                          <span>Isi RAB</span>
-                        </Button>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setIsEditRabModalOpen(true)}
+                            className="gap-1.5"
+                          >
+                            <ClipboardList className="size-4" aria-hidden="true" />
+                            <span>Isi RAB</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isPending}
+                            onClick={() =>
+                              startTransition(async () => {
+                                const res = await applyWorkTypeTemplate(project.id);
+                                if (res.success) {
+                                  toast.success(res.message);
+                                  router.refresh();
+                                } else {
+                                  toast.error(res.message);
+                                }
+                              })
+                            }
+                            className="gap-1.5"
+                          >
+                            <Sparkles className="size-4" aria-hidden="true" />
+                            <span>Terapkan Template Pekerjaan</span>
+                          </Button>
+                        </div>
                       ) : undefined
                     }
                   />
@@ -2478,6 +2626,18 @@ export default function ProjectDetailView({
                               <span>K3: {report.k3SafetyLog}</span>
                             </p>
                           )}
+                          {(report.equipmentList?.length ||
+                            formatEquipmentText(report.equipment)) && (
+                            <p className="type-p3 flex items-start gap-1.5 text-muted-foreground">
+                              <Wrench className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                              <span>
+                                Peralatan:{" "}
+                                {report.equipmentList?.length
+                                  ? report.equipmentList.join(", ")
+                                  : formatEquipmentText(report.equipment)}
+                              </span>
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -2770,19 +2930,21 @@ export default function ProjectDetailView({
           onClose={() => setIsClientPortalOpen(false)}
           mobileBehavior="sheet"
           title="Portal Klien"
-          description="Bagikan tautan ini kepada klien untuk memantau progres dan dokumentasi foto proyek secara langsung."
+          description="Bagikan tautan ini kepada klien untuk memantau progres Kurva-S dan dokumentasi foto proyek secara langsung."
         >
           <div className="space-y-4">
             <div className="rounded-xl border border-border bg-muted/30 p-3.5">
               <span className="type-p3 font-semibold text-muted-foreground">
-                Tautan Publik Klien:
+                Tautan Publik Klien (Tanpa Detail Keuangan):
               </span>
               <div className="mt-1.5 flex items-center gap-2">
                 <Input
                   readOnly
                   value={
                     typeof window !== "undefined"
-                      ? window.location.origin + "/verify/" + project.code
+                      ? window.location.origin +
+                        "/portal/projects/" +
+                        encodeURIComponent(project.code)
                       : ""
                   }
                   className="font-mono"
@@ -2792,7 +2954,9 @@ export default function ProjectDetailView({
                   size="sm"
                   onClick={() => {
                     void navigator.clipboard.writeText(
-                      window.location.origin + "/verify/" + project.code,
+                      window.location.origin +
+                        "/portal/projects/" +
+                        encodeURIComponent(project.code),
                     );
                     toast.success("Tautan portal klien berhasil disalin.");
                   }}
@@ -2800,6 +2964,30 @@ export default function ProjectDetailView({
                 >
                   <Copy className="size-3.5" aria-hidden="true" />
                   <span>Salin Tautan</span>
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsClientPortalOpen(false);
+                    setIsSendProgressOpen(true);
+                  }}
+                  className="gap-1.5"
+                >
+                  <Send className="size-3.5" aria-hidden="true" />
+                  <span>Buat Paket &amp; Kirim Progres</span>
+                </Button>
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link
+                    href={`/portal/projects/${encodeURIComponent(project.code)}`}
+                    target="_blank"
+                  >
+                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                    <span>Buka Portal</span>
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -2881,8 +3069,21 @@ export default function ProjectDetailView({
             }
           }}
           lockedProject={project}
+          canIncludeFinancials={canViewFinancials}
           onSuccess={() => router.refresh()}
           onQueueChange={setOfflineQueueCount}
+          onOpenSendProgress={() => setIsSendProgressOpen(true)}
+        />
+      )}
+
+      {/* Send Progress Modal */}
+      {(canSubmitDailyProgress || canManageProject) && (
+        <SendProgressModal
+          open={isSendProgressOpen}
+          onOpenChange={setIsSendProgressOpen}
+          lockedProject={project}
+          canIncludeFinancials={canViewFinancials}
+          onSuccess={() => router.refresh()}
         />
       )}
 

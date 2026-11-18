@@ -76,6 +76,7 @@ import {
   OperationalDocumentKind,
   POPaymentMethod,
   POStatus,
+  TicketCategoryHint,
   TicketStatus,
   TicketType,
   UserRole,
@@ -926,6 +927,7 @@ export default function LogisticsHub({
           const eligibleItems = items
             .filter((item) => {
               if (
+                item.categoryHint === TicketCategoryHint.CONTRACT ||
                 item.status !== "PENDING" ||
                 item.poItemId ||
                 item.doItemId
@@ -1026,7 +1028,9 @@ export default function LogisticsHub({
           materialContracts={materialContractOptions}
           materialDeliveryContracts={materialContracts}
           contractTickets={contractTickets}
-          initialOpenSheet={initialOpenSheet}
+          initialOpenSheet={
+            resolvedTab === "tickets" ? initialOpenSheet : undefined
+          }
         />
       </TabsContent>
 
@@ -1051,7 +1055,7 @@ export default function LogisticsHub({
               <div>
                 <CardTitle className="type-h3">Penerbitan PO, KO &amp; DO</CardTitle>
                 <p className="type-p3 mt-0.5 text-muted-foreground">
-                  Penerbitan PO, tanda tangan KO &amp; DO, serta pengiriman resmi berada di Logistik.
+                  Penerbitan PO, tanda tangan KO &amp; DO armada/gudang berada di Logistik. Untuk Batu/Pasir Kontrak Payung (armada &amp; mover dari vendor), terbitkan melalui Surat Jalan Material Alam.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1066,8 +1070,17 @@ export default function LogisticsHub({
                     <Button size="sm" variant="outline" asChild>
                       <Link href="/apps/orders/new?type=do">
                         <Truck className="mr-1.5 size-4" aria-hidden="true" />
-                        Terbitkan DO
+                        Terbitkan DO Reguler
                       </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setActiveTab("bulk-contracts")}
+                    >
+                      <Layers className="mr-1.5 size-4" aria-hidden="true" />
+                      Surat Jalan Material Alam
                     </Button>
                   </>
                 )}
@@ -1177,8 +1190,24 @@ export default function LogisticsHub({
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="type-h3">Delivery Order</CardTitle>
+              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="type-h3">Delivery Order (Armada / Gudang)</CardTitle>
+                  <p className="type-p3 text-muted-foreground">
+                    Untuk pengiriman Kontrak Payung Batu/Pasir, lihat Surat Jalan Material Alam.
+                  </p>
+                </div>
+                {(materialDeliveries.length > 0 || contractTickets.length > 0) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setActiveTab("bulk-contracts")}
+                  >
+                    <Layers className="mr-1.5 size-3.5" aria-hidden="true" />
+                    Surat Jalan Alam ({materialDeliveries.length})
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
                 {deliveryOrders.length === 0 ? (
@@ -1327,6 +1356,9 @@ export default function LogisticsHub({
           deliveries={materialDeliveries}
           contractTickets={contractTickets}
           vendorInvoices={vendorInvoices}
+          initialOpenTicketId={
+            resolvedTab === "bulk-contracts" ? initialOpenSheet : undefined
+          }
           vendors={vendors.map((v) => ({
             id: v.id,
             name: v.name,

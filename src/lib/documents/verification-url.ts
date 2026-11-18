@@ -1,6 +1,7 @@
 export type VerificationDocumentKind =
   | "po"
   | "do"
+  | "sj"
   | "invoice"
   | "ko"
   | "spk"

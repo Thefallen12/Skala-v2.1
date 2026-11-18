@@ -1,9 +1,15 @@
 import ExcelJS from "exceljs";
-import { UserRole } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
-import { prisma } from "@/lib/prisma";
-import { getPaidProjectTicketRealization } from "@/lib/project-realization";
-import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
+import { renderPdf } from "@/lib/documents/render-pdf";
+import {
+  buildLivePortfolioSummary,
+  canViewProjectFinancialReports,
+  generatePortfolioRecapHtml,
+  PROJECT_NON_FINANCIAL_REPORT_ROLES,
+} from "@/lib/project-reports";
+
+export const runtime = "nodejs";
 
 const exportHeaders = [
   "Kode Proyek",
@@ -11,34 +17,16 @@ const exportHeaders = [
   "Pagu Anggaran",
   "Realisasi",
   "Jenis Pekerjaan",
+  "Kategori (Konsultansi/Fisik)",
+  "Progres Aktual (%)",
+  "Rencana Kurva-S (%)",
+  "Deviasi (%)",
+  "Jumlah Laporan Harian",
   "Desa",
   "Kecamatan",
   "Kabupaten",
   "Status",
 ] as const;
-
-const projectRoles: UserRole[] = [
-  UserRole.ADMINISTRATIONS,
-  UserRole.DIRECTOR,
-  UserRole.DEPUTY_DIRECTOR,
-  UserRole.KOORDINATOR,
-  UserRole.FIELD_TEAM,
-  UserRole.DRAFTER,
-];
-
-function splitAddress(address: string) {
-  const kecamatan =
-    address.match(
-      /\bKec(?:amatan)?\.?\s+(.+?)(?=,\s*Kab(?:upaten)?\.?\s+|$)/i,
-    )?.[1] ?? "";
-  const kabupaten =
-    address.match(/\bKab(?:upaten)?\.?\s+(.+)$/i)?.[1] ?? "";
-  const desa = address
-    .replace(/\s*,?\s*Kec(?:amatan)?\.?\s+.+?(?=,\s*Kab(?:upaten)?\.?\s+|$)/i, "")
-    .replace(/\s*,?\s*Kab(?:upaten)?\.?\s+.+$/i, "")
-    .trim();
-  return { desa, kecamatan, kabupaten };
-}
 
 function csvCell(value: string | number) {
   const safeValue =
@@ -48,88 +36,116 @@ function csvCell(value: string | number) {
   return `"${safeValue.replace(/"/g, '""')}"`;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return Response.json({ message: "Silakan masuk untuk mengekspor proyek." }, { status: 401 });
+    return NextResponse.json(
+      { message: "Silakan masuk untuk mengekspor proyek." },
+      { status: 401 },
+    );
   }
-  if (!projectRoles.includes(session.user.role)) {
-    return Response.json({ message: "Anda tidak berhak mengekspor proyek." }, { status: 403 });
+  if (!PROJECT_NON_FINANCIAL_REPORT_ROLES.includes(session.user.role)) {
+    return NextResponse.json(
+      { message: "Anda tidak berhak mengekspor proyek." },
+      { status: 403 },
+    );
   }
 
-  const requestUrl = new URL(request.url);
+  const requestUrl = request.nextUrl;
   const format = requestUrl.searchParams.get("format");
-  if (format !== "csv" && format !== "xlsx") {
-    return Response.json({ message: "Format ekspor tidak valid." }, { status: 400 });
+  if (
+    format !== "csv" &&
+    format !== "xlsx" &&
+    format !== "pdf" &&
+    format !== "html"
+  ) {
+    return NextResponse.json(
+      { message: "Format ekspor tidak valid." },
+      { status: 400 },
+    );
   }
+
   const search = requestUrl.searchParams.get("search")?.trim().slice(0, 120) ?? "";
-  const where = {
-    isDeleted: false,
-    ...(session.user.role === UserRole.FIELD_TEAM ||
-    session.user.role === UserRole.KOORDINATOR
-      ? { fieldPicId: session.user.id }
-      : {}),
-    ...(search
-      ? {
-          OR: [
-            { title: { contains: search, mode: "insensitive" as const } },
-            { code: { contains: search, mode: "insensitive" as const } },
-            { address: { contains: search, mode: "insensitive" as const } },
-            { location: { contains: search, mode: "insensitive" as const } },
-            {
-              fieldPic: {
-                is: { name: { contains: search, mode: "insensitive" as const } },
-              },
-            },
-          ],
-        }
-      : {}),
-  };
+  const jenisPekerjaan =
+    requestUrl.searchParams.get("jenisPekerjaan")?.trim().slice(0, 180) ?? "";
+  const status =
+    requestUrl.searchParams.get("status")?.trim().slice(0, 40) ?? "";
 
   try {
-    const isDirector =
-      session.user.role === UserRole.DIRECTOR ||
-      session.user.role === UserRole.DEPUTY_DIRECTOR;
-    const visibleHeaders = isDirector
+    const canViewFinancials = canViewProjectFinancialReports(session.user.role);
+    const summary = await buildLivePortfolioSummary({
+      userRole: session.user.role,
+      userId: session.user.id,
+      search,
+      jenisPekerjaan,
+      status,
+    });
+
+    if (format === "html" || format === "pdf") {
+      const html = await generatePortfolioRecapHtml({
+        summary,
+        includeFinancials: canViewFinancials,
+        portalOrigin: requestUrl.origin,
+      });
+
+      if (format === "html") {
+        return new NextResponse(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      }
+
+      try {
+        const pdf = await renderPdf(html);
+        return new NextResponse(pdf, {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": 'attachment; filename="projects-portfolio.pdf"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      } catch (pdfError) {
+        const detail =
+          pdfError instanceof Error ? pdfError.message : "PDF rendering unavailable";
+        console.error("Exporting portfolio PDF failed:", pdfError);
+        return NextResponse.json(
+          {
+            message:
+              "Browser PDF (Chromium/Chrome/Edge) tidak tersedia untuk membuat PDF portofolio. Gunakan format Excel (.xlsx) atau ?format=html.",
+            detail,
+          },
+          { status: 503 },
+        );
+      }
+    }
+
+    const visibleHeaders = canViewFinancials
       ? exportHeaders
       : exportHeaders.filter(
-          (header) =>
-            header !== "Pagu Anggaran" && header !== "Realisasi",
+          (header) => header !== "Pagu Anggaran" && header !== "Realisasi",
         );
-    const projects = await prisma.project.findMany({
-      where,
-      orderBy: [{ status: "asc" }, { name: "asc" }],
-      select: {
-        id: true,
-        code: true,
-        title: true,
-        pagu: true,
-        jenisPekerjaan: true,
-        kelompokTani: true,
-        address: true,
-        status: true,
-      },
-    });
-    const projectIds = projects.map((project) => project.id);
-    const realizedMap = isDirector
-      ? await getPaidProjectTicketRealization(projectIds)
-      : null;
-    const rows = projects.map((project) => {
-      const address = splitAddress(project.address);
-      return {
-        "Kode Proyek": project.code,
-        "Nama Proyek": project.title,
-        "Pagu Anggaran": isDirector
-          ? decimalNumberFromScaledInteger(project.pagu)
-          : "",
-        Realisasi: realizedMap?.get(project.id)?.total.toNumber() ?? "",
-        "Jenis Pekerjaan": project.jenisPekerjaan ?? "",
-        Desa: address.desa || project.kelompokTani,
-        Kecamatan: address.kecamatan,
-        Kabupaten: address.kabupaten,
-        Status: project.status,
-      };
-    });
+
+    const rows = summary.rows.map((row) => ({
+      "Kode Proyek": row.code,
+      "Nama Proyek": row.title,
+      "Pagu Anggaran": canViewFinancials ? (row.pagu ?? 0) : "",
+      Realisasi: canViewFinancials ? (row.realized ?? 0) : "",
+      "Jenis Pekerjaan": row.jenisPekerjaan,
+      "Kategori (Konsultansi/Fisik)":
+        row.workTypeCategory === "KONSULTANSI" ? "Konsultansi" : "Fisik",
+      "Progres Aktual (%)": row.actualProgress,
+      "Rencana Kurva-S (%)": row.plannedProgress ?? "-",
+      "Deviasi (%)": row.deviation ?? "-",
+      "Jumlah Laporan Harian": row.dailyReportCount,
+      Desa: row.desa,
+      Kecamatan: row.kecamatan,
+      Kabupaten: row.kabupaten,
+      Status: row.status,
+    }));
 
     if (format === "csv") {
       const csv = [
@@ -160,6 +176,24 @@ export async function GET(request: Request) {
       from: { row: 1, column: 1 },
       to: { row: 1, column: visibleHeaders.length },
     };
+
+    const recapSheet = workbook.addWorksheet("Rekap Jenis Pekerjaan");
+    recapSheet.columns = [
+      { header: "Jenis Pekerjaan", key: "workType", width: 36 },
+      { header: "Kategori", key: "category", width: 16 },
+      { header: "Jumlah Proyek", key: "count", width: 16 },
+      { header: "Rata-rata Progres (%)", key: "avgProgress", width: 22 },
+    ];
+    recapSheet.addRows(
+      summary.byWorkType.map((entry) => ({
+        workType: entry.workType,
+        category: entry.category === "KONSULTANSI" ? "Konsultansi" : "Fisik",
+        count: entry.count,
+        avgProgress: entry.avgProgress,
+      })),
+    );
+    recapSheet.getRow(1).font = { bold: true };
+
     const buffer = await workbook.xlsx.writeBuffer();
     return new Response(new Uint8Array(buffer), {
       headers: {
@@ -171,7 +205,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Exporting projects failed:", error);
-    return Response.json(
+    return NextResponse.json(
       { message: "Ekspor proyek gagal dibuat. Silakan coba kembali." },
       { status: 500 },
     );

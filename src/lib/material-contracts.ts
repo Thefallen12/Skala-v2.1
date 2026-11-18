@@ -151,6 +151,7 @@ export function getJakartaDateOnlyUtc(): Date {
 
 export type MaterialDeliveryRow = {
   id: string;
+  publicCode: string | null;
   contractId: string;
   contractNumber: string;
   vendorName: string;
@@ -179,6 +180,7 @@ export type MaterialDeliveryRow = {
 
 export type VendorInvoiceDeliverySummary = {
   id: string;
+  publicCode: string | null;
   doNumber: string;
   deliveryDate: string;
   projectId: string;
@@ -260,9 +262,29 @@ export function formatMaterialVolume(volume: number, unit: string): string {
   return `${formatted} ${unit}`;
 }
 
+export function getMaterialDeliveryDocumentPreviewUrl(
+  delivery: { id: string; publicCode?: string | null },
+  options?: { format?: "html"; download?: boolean },
+): string {
+  const params = new URLSearchParams({ kind: "SJ" });
+  if (delivery.publicCode?.trim()) {
+    params.set("publicCode", delivery.publicCode.trim());
+  } else {
+    params.set("id", delivery.id);
+  }
+  if (options?.format === "html") {
+    params.set("format", "html");
+  }
+  if (options?.download) {
+    params.set("download", "1");
+  }
+  return `/api/documents/transactions?${params.toString()}`;
+}
+
 export function mapTicketMaterialDeliveries(
   deliveries: Array<{
     id: string;
+    publicCode?: string | null;
     contractId: string;
     deliveryDate: Date;
     doNumber: string;
@@ -283,6 +305,7 @@ export function mapTicketMaterialDeliveries(
 ) {
   return deliveries.map((delivery) => ({
     id: delivery.id,
+    publicCode: delivery.publicCode ?? null,
     contractId: delivery.contractId,
     contractNumber: delivery.contract.contractNumber,
     vendorName: delivery.contract.vendorName,
@@ -356,8 +379,13 @@ export const recordMaterialDeliverySchema = z.object({
   doNumber: z
     .string()
     .trim()
-    .min(2, "Nomor Surat Jalan (DO) wajib diisi.")
-    .max(80, "Nomor Surat Jalan maksimal 80 karakter."),
+    .max(80, "Nomor Surat Jalan maksimal 80 karakter.")
+    .optional()
+    .nullable()
+    .refine(
+      (value) => !value || value.length >= 2,
+      "Nomor Surat Jalan minimal 2 karakter jika diisi manual.",
+    ),
   vehiclePlate: z
     .string()
     .trim()
@@ -374,6 +402,26 @@ export const recordMaterialDeliverySchema = z.object({
     .number()
     .positive("Volume / jumlah rit diterima harus lebih dari 0."),
   notes: z.string().trim().max(500, "Catatan maksimal 500 karakter.").optional().nullable(),
+});
+
+export const attachMaterialDeliveryProofMetadataSchema = z.object({
+  deliveryId: z
+    .string()
+    .trim()
+    .min(1, "Referensi Surat Jalan wajib diisi.")
+    .max(191, "Referensi Surat Jalan tidak valid."),
+  vehiclePlate: z
+    .string()
+    .trim()
+    .max(40, "Plat kendaraan maksimal 40 karakter.")
+    .optional()
+    .nullable(),
+  driverName: z
+    .string()
+    .trim()
+    .max(80, "Nama supir maksimal 80 karakter.")
+    .optional()
+    .nullable(),
 });
 
 export const createVendorInvoiceSchema = z.object({

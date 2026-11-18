@@ -14,11 +14,13 @@ import {
   Layers,
   Loader2,
   Plus,
+  Printer,
   Receipt,
   Search,
   Send,
   Trash2,
   Truck,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import type {
@@ -36,6 +38,7 @@ import { getJakartaDateKey } from "@/lib/habit-date";
 import {
   BULK_MATERIAL_TYPE_OPTIONS,
   BULK_MATERIAL_UNIT_OPTIONS,
+  canBillAndPayVendorContracts,
   canManageMaterialContracts,
   canPrepareVendorInvoices,
   canRecordMaterialDeliveries,
@@ -46,6 +49,7 @@ import {
   type MaterialDeliveryRow,
   type VendorInvoiceRow,
 } from "@/lib/material-contracts";
+import { canOperateLogisticsActions } from "@/lib/user-access";
 import { parseRupiahInput } from "@/lib/indonesian-currency";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +87,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import RupiahAmountInput from "@/app/components/apps/finance/RupiahAmountInput";
-import MaterialDeliveryModal from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
+import MaterialDeliveryModal, {
+  MaterialDeliveryAttachModal,
+  MaterialDeliveryPrintModal,
+} from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
 import MaterialDeliveryProofModal from "@/app/components/apps/material-contracts/MaterialDeliveryProofModal";
 
 export type ContractVendorCatalogOption = {
@@ -205,13 +212,19 @@ function ContractMobileCard({
 function DeliveryMobileCard({
   delivery,
   canRecordDelivery,
+  canAttachProof,
   isPending,
+  onPrintSj,
+  onAttachProof,
   onPreviewProof,
   onDelete,
 }: {
   delivery: MaterialDeliveryRow;
   canRecordDelivery: boolean;
+  canAttachProof: boolean;
   isPending: boolean;
+  onPrintSj: (delivery: MaterialDeliveryRow) => void;
+  onAttachProof: (delivery: MaterialDeliveryRow) => void;
   onPreviewProof: (delivery: MaterialDeliveryRow) => void;
   onDelete: (delivery: MaterialDeliveryRow) => void;
 }) {
@@ -256,12 +269,32 @@ function DeliveryMobileCard({
         </span>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="type-p3 text-muted-foreground">
           {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
           {delivery.driverName ? ` (${delivery.driverName})` : ""}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onPrintSj(delivery)}
+          >
+            <Printer className="size-3.5" aria-hidden="true" />
+            Pratinjau / Cetak SJ
+          </Button>
+          {canAttachProof && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onAttachProof(delivery)}
+            >
+              <Upload className="size-3.5" aria-hidden="true" />
+              {delivery.proofUrl ? "Update Lampiran" : "Lampirkan Foto / Plat / Supir"}
+            </Button>
+          )}
           {delivery.proofUrl && (
             <Button
               type="button"
@@ -296,11 +329,13 @@ function BillingDeliveryMobileCard({
   delivery,
   checked,
   onToggle,
+  onPrintSj,
   onPreviewProof,
 }: {
   delivery: MaterialDeliveryRow;
   checked: boolean;
   onToggle: (checked: boolean) => void;
+  onPrintSj: (delivery: MaterialDeliveryRow) => void;
   onPreviewProof: (delivery: MaterialDeliveryRow) => void;
 }) {
   return (
@@ -333,17 +368,28 @@ function BillingDeliveryMobileCard({
             </p>
           </div>
         </label>
-        {delivery.proofUrl && (
+        <div className="flex shrink-0 items-center gap-1.5">
           <Button
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => onPreviewProof(delivery)}
+            onClick={() => onPrintSj(delivery)}
           >
-            <Eye className="size-3.5" aria-hidden="true" />
-            Foto
+            <Printer className="size-3.5" aria-hidden="true" />
+            SJ
           </Button>
-        )}
+          {delivery.proofUrl && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onPreviewProof(delivery)}
+            >
+              <Eye className="size-3.5" aria-hidden="true" />
+              Foto
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
@@ -367,6 +413,7 @@ export default function MaterialContractsPanel({
   projects,
   contractTickets = [],
   vendorInvoices = [],
+  initialOpenTicketId,
 }: {
   role: TicketPageRole;
   contracts: MaterialContractRow[];
@@ -375,21 +422,43 @@ export default function MaterialContractsPanel({
   projects: TicketProjectOption[];
   contractTickets?: ContractTicketDeliveryOption[];
   vendorInvoices?: VendorInvoiceRow[];
+  initialOpenTicketId?: string;
 }) {
   const router = useRouter();
   const canCreateContract = canManageMaterialContracts(role);
   const canRecordDelivery = canRecordMaterialDeliveries(role);
   const canPrepareInvoices = canPrepareVendorInvoices(role);
+  const canAttachProof =
+    canCreateContract ||
+    canOperateLogisticsActions(role) ||
+    canBillAndPayVendorContracts(role);
+
+  const matchingInitialTicket = initialOpenTicketId
+    ? contractTickets.find((t) => t.id === initialOpenTicketId)
+    : undefined;
 
   const [activeSubTab, setActiveSubTab] = useState<
     "contracts" | "deliveries" | "billing"
   >("contracts");
   const [contractModalOpen, setContractModalOpen] = useState(false);
-  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(() =>
+    Boolean(
+      canRecordDelivery &&
+        initialOpenTicketId &&
+        (matchingInitialTicket || initialOpenTicketId === "new"),
+    ),
+  );
   const [selectedContractForDo, setSelectedContractForDo] = useState<
     string | undefined
-  >(undefined);
+  >(() => matchingInitialTicket?.items[0]?.materialContractId);
+  const [selectedTicketForDo, setSelectedTicketForDo] = useState<
+    string | undefined
+  >(() => matchingInitialTicket?.id);
   const [deleteDeliveryTarget, setDeleteDeliveryTarget] =
+    useState<MaterialDeliveryRow | null>(null);
+  const [printDeliveryTarget, setPrintDeliveryTarget] =
+    useState<MaterialDeliveryRow | null>(null);
+  const [attachDeliveryTarget, setAttachDeliveryTarget] =
     useState<MaterialDeliveryRow | null>(null);
   const [proofPreview, setProofPreview] = useState<{
     title: string;
@@ -631,7 +700,7 @@ export default function MaterialContractsPanel({
             Kontrak Material Alam
           </h2>
           <p className="type-p2 mt-1 text-muted-foreground">
-            Ikat harga kontrak vendor, catat Surat Jalan per tiket proyek, dan kirim tagihan ke Keuangan.
+            Ikat harga kontrak vendor (armada &amp; mover dari vendor), terbitkan Surat Jalan per tiket proyek, dan kirim tagihan ke Keuangan.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -641,11 +710,12 @@ export default function MaterialContractsPanel({
               variant="outline"
               onClick={() => {
                 setSelectedContractForDo(undefined);
+                setSelectedTicketForDo(undefined);
                 setDeliveryModalOpen(true);
               }}
             >
               <Truck className="size-4" aria-hidden="true" />
-              Catat Surat Jalan
+              Terbitkan Surat Jalan
             </Button>
           )}
           {canPrepareInvoices && (
@@ -767,6 +837,7 @@ export default function MaterialContractsPanel({
                         onToggleActive={handleToggleActive}
                         onRecordDo={(contractId) => {
                           setSelectedContractForDo(contractId);
+                          setSelectedTicketForDo(undefined);
                           setDeliveryModalOpen(true);
                         }}
                         onSendBilling={(contractId) =>
@@ -886,11 +957,12 @@ export default function MaterialContractsPanel({
                                     variant="outline"
                                     onClick={() => {
                                       setSelectedContractForDo(contract.id);
+                                      setSelectedTicketForDo(undefined);
                                       setDeliveryModalOpen(true);
                                     }}
                                   >
                                     <Plus className="size-3.5" aria-hidden="true" />
-                                    Catat DO
+                                    Terbitkan SJ
                                   </Button>
                                 )}
                               </div>
@@ -915,7 +987,7 @@ export default function MaterialContractsPanel({
                     Log Surat Jalan Material Alam
                   </CardTitle>
                   <CardDescription className="type-p2">
-                    Setiap kiriman UNBILLED siap disusun menjadi tagihan ke Keuangan.
+                    Armada &amp; mover disediakan vendor. Cetak Surat Jalan resmi, lengkapi bukti menyusul, atau susun tagihan UNBILLED ke Keuangan.
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -946,7 +1018,7 @@ export default function MaterialContractsPanel({
                   <Input
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Cari No. DO, tiket, proyek, vendor..."
+                    placeholder="Cari No. Surat Jalan, tiket, proyek, vendor..."
                     className="pl-9"
                   />
                 </div>
@@ -981,7 +1053,10 @@ export default function MaterialContractsPanel({
                         key={delivery.id}
                         delivery={delivery}
                         canRecordDelivery={canRecordDelivery}
+                        canAttachProof={canAttachProof}
                         isPending={isPending}
+                        onPrintSj={setPrintDeliveryTarget}
+                        onAttachProof={setAttachDeliveryTarget}
                         onPreviewProof={(d) =>
                           setProofPreview({
                             title: `Surat Jalan ${d.doNumber}`,
@@ -998,10 +1073,10 @@ export default function MaterialContractsPanel({
                       <TableHeader>
                         <TableRow>
                           <TableHead>Tanggal</TableHead>
-                          <TableHead>No. DO &amp; Tiket</TableHead>
+                          <TableHead>No. SJ &amp; Tiket</TableHead>
                           <TableHead>Kontrak &amp; Vendor</TableHead>
                           <TableHead>Proyek Tujuan</TableHead>
-                          <TableHead>Truk / Supir</TableHead>
+                          <TableHead>Armada / Supir Vendor</TableHead>
                           <TableHead className="text-right">Volume</TableHead>
                           <TableHead className="text-right">Nilai</TableHead>
                           <TableHead>Status</TableHead>
@@ -1072,12 +1147,35 @@ export default function MaterialContractsPanel({
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  title="Pratinjau / Cetak Surat Jalan"
+                                  onClick={() => setPrintDeliveryTarget(delivery)}
+                                >
+                                  <Printer className="size-3.5" aria-hidden="true" />
+                                  Pratinjau / Cetak SJ
+                                </Button>
+                                {canAttachProof && (
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    aria-label="Lampirkan Foto / Plat / Supir"
+                                    title="Lampirkan Foto / Plat / Supir"
+                                    onClick={() => setAttachDeliveryTarget(delivery)}
+                                  >
+                                    <Upload className="size-4" aria-hidden="true" />
+                                  </Button>
+                                )}
                                 {delivery.proofUrl && (
                                   <Button
                                     type="button"
                                     size="icon"
                                     variant="outline"
-                                    title="Lihat Foto Surat Jalan"
+                                    aria-label="Lihat Foto Bukti Surat Jalan"
+                                    title="Lihat Foto Bukti Surat Jalan"
                                     onClick={() =>
                                       setProofPreview({
                                         title: `Surat Jalan ${delivery.doNumber}`,
@@ -1095,7 +1193,8 @@ export default function MaterialContractsPanel({
                                       size="icon"
                                       variant="outline"
                                       disabled={isPending}
-                                      title="Hapus DO belum ditagih"
+                                      aria-label="Hapus Surat Jalan belum ditagih"
+                                      title="Hapus Surat Jalan belum ditagih"
                                       onClick={() =>
                                         setDeleteDeliveryTarget(delivery)
                                       }
@@ -1222,6 +1321,7 @@ export default function MaterialContractsPanel({
                                 : prev.filter((id) => id !== delivery.id),
                             );
                           }}
+                          onPrintSj={setPrintDeliveryTarget}
                           onPreviewProof={(d) =>
                             setProofPreview({
                               title: `Surat Jalan ${d.doNumber}`,
@@ -1321,29 +1421,41 @@ export default function MaterialContractsPanel({
                                   {currency(delivery.estimatedAmount)}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {delivery.proofUrl ? (
+                                  <div className="flex items-center justify-end gap-1.5">
                                     <Button
                                       type="button"
                                       size="sm"
                                       variant="outline"
                                       onClick={() =>
-                                        setProofPreview({
-                                          title: `Surat Jalan ${delivery.doNumber}`,
-                                          url: delivery.proofUrl!,
-                                        })
+                                        setPrintDeliveryTarget(delivery)
                                       }
                                     >
-                                      <Eye
+                                      <Printer
                                         className="size-3.5"
                                         aria-hidden="true"
                                       />
-                                      Foto
+                                      SJ
                                     </Button>
-                                  ) : (
-                                    <span className="type-p3 text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
+                                    {delivery.proofUrl && (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          setProofPreview({
+                                            title: `Surat Jalan ${delivery.doNumber}`,
+                                            url: delivery.proofUrl!,
+                                          })
+                                        }
+                                      >
+                                        <Eye
+                                          className="size-3.5"
+                                          aria-hidden="true"
+                                        />
+                                        Foto
+                                      </Button>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );
@@ -1500,11 +1612,15 @@ export default function MaterialContractsPanel({
 
       <MaterialDeliveryModal
         open={deliveryModalOpen}
-        onOpenChange={setDeliveryModalOpen}
+        onOpenChange={(open) => {
+          setDeliveryModalOpen(open);
+          if (!open) setSelectedTicketForDo(undefined);
+        }}
         contracts={contracts}
         projects={projects}
         contractTickets={contractTickets}
         defaultContractId={selectedContractForDo}
+        defaultTicketId={selectedTicketForDo}
         onSaved={() => {
           if (activeSubTab === "billing" && billingContractId) {
             void loadContractUnbilled(billingContractId);
@@ -1515,6 +1631,22 @@ export default function MaterialContractsPanel({
       <MaterialDeliveryProofModal
         preview={proofPreview}
         onClose={() => setProofPreview(null)}
+      />
+
+      <MaterialDeliveryPrintModal
+        deliveries={printDeliveryTarget ? [printDeliveryTarget] : []}
+        initialDeliveryId={printDeliveryTarget?.id}
+        onClose={() => setPrintDeliveryTarget(null)}
+      />
+
+      <MaterialDeliveryAttachModal
+        delivery={attachDeliveryTarget}
+        onClose={() => setAttachDeliveryTarget(null)}
+        onSaved={() => {
+          if (activeSubTab === "billing" && billingContractId) {
+            void loadContractUnbilled(billingContractId);
+          }
+        }}
       />
 
       {/* Delete DO Confirmation */}

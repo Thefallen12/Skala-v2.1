@@ -17,11 +17,19 @@ import {
   isValidDateKey,
 } from "@/lib/habit-date";
 import {
+  buildProjectSCurveSeries,
+  calculatePlannedSCurveProgress,
   calculateWeightedProjectProgress,
   clampProjectProgress,
   toJakartaDateKey,
   toJakartaDayStartDate,
 } from "@/lib/project-progress";
+import {
+  formatWorkTypeLabel,
+  getWorkTypeChecklistTemplates,
+  isConsultancyWorkType,
+} from "@/lib/project-work-types";
+import { generateRandomCode } from "@/lib/documents/random-code";
 import { getFinancePaymentProofMimeType } from "@/lib/finance-payment-proof-file";
 import { sendNotification } from "@/lib/notifications";
 import { PrivatePhotoValidationError } from "@/lib/private-photos";
@@ -202,9 +210,13 @@ async function activateProjectIfReady(projectId: string) {
         id: true,
         name: true,
         status: true,
+        jenisPekerjaan: true,
         fieldPicId: true,
         workPoints: {
-          where: { approvedTotalWage: { gt: 0 } },
+          select: { id: true, approvedTotalWage: true },
+        },
+        calendarEvents: {
+          where: { description: "MILESTONE" },
           take: 1,
           select: { id: true },
         },
@@ -213,9 +225,19 @@ async function activateProjectIfReady(projectId: string) {
     if (
       !project ||
       !setupProjectStatuses.includes(project.status) ||
-      !project.fieldPicId ||
-      project.workPoints.length === 0
+      !project.fieldPicId
     ) {
+      return false;
+    }
+
+    const isConsultancy = isConsultancyWorkType(project.jenisPekerjaan);
+    const hasApprovedWagePoint = project.workPoints.some(
+      (wp) => wp.approvedTotalWage !== null && wp.approvedTotalWage > BigInt(0),
+    );
+    const hasConsultancyPlan =
+      project.workPoints.length > 0 || project.calendarEvents.length > 0;
+
+    if (isConsultancy ? !hasConsultancyPlan : !hasApprovedWagePoint) {
       return false;
     }
 
@@ -258,10 +280,21 @@ export async function checkProjectActivation(
 
   try {
     const activated = await activateProjectIfReady(projectId);
+    if (activated) {
+      return {
+        success: true,
+        message: "Prasyarat terpenuhi. Status proyek berubah menjadi RUNNING dan PIC telah diberi notifikasi.",
+      };
+    }
+    const proj = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: { jenisPekerjaan: true },
+    });
+    const isConsultancy = isConsultancyWorkType(proj?.jenisPekerjaan);
     return {
       success: true,
-      message: activated
-        ? "Prasyarat terpenuhi. Status proyek berubah menjadi RUNNING dan PIC telah diberi notifikasi."
+      message: isConsultancy
+        ? "Proyek konsultansi masih menunggu PIC lapangan dan minimal satu item deliverable atau milestone."
         : "Proyek masih menunggu PIC lapangan dan persetujuan minimal satu upah titik.",
     };
   } catch (error) {
@@ -273,7 +306,7 @@ export async function checkProjectActivation(
 export async function saveProject(
   projectId: string | null,
   input: ProjectFormInput,
-): Promise<ProjectMutationResult> {
+): Promise<ProjectMutationResult & { projectId?: string }> {
   const session = await auth();
   if (!session?.user?.id) {
     return { success: false, message: "Silakan masuk untuk mengelola proyek." };
@@ -396,6 +429,7 @@ export async function saveProject(
     revalidatePath("/apps/habits");
     return {
       success: true,
+      projectId: savedProjectId,
       message: activated
         ? "Proyek berhasil disimpan dan otomatis berubah menjadi RUNNING."
         : projectId
@@ -984,6 +1018,7 @@ export async function addProjectWorkPointProgress(
     where: { id: workPointId },
     select: {
       id: true,
+      title: true,
       projectId: true,
       project: { select: { isDeleted: true, status: true, fieldPicId: true } },
     },
@@ -1086,10 +1121,63 @@ export async function addProjectWorkPointProgress(
           approvedTotalWage: true,
         },
       });
+      const nextOverallProgress = calculateWeightedProjectProgress(allPoints);
       await transaction.project.update({
         where: { id: workPoint.projectId },
-        data: { progress: calculateWeightedProjectProgress(allPoints) },
+        data: { progress: nextOverallProgress },
       });
+
+      const existingDailyReport = await transaction.dailyReport.findFirst({
+        where: {
+          projectId: workPoint.projectId,
+          reportDate: { gte: reportDateStart, lt: reportDateEndExclusive },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          workPointId: true,
+          workSummary: true,
+          _count: { select: { progressPhotos: true } },
+        },
+      });
+      const pointLine = `• ${workPoint.title}: progres ${parsed.data.progress}%${
+        parsed.data.workSummary ? ` — ${parsed.data.workSummary}` : ""
+      }`;
+      const syncedDailyReport = existingDailyReport
+        ? await transaction.dailyReport.update({
+            where: { id: existingDailyReport.id },
+            data: {
+              progress: nextOverallProgress,
+              workSummary:
+                mergeDailyWorkSummary(existingDailyReport.workSummary, [
+                  { itemTitle: workPoint.title, line: pointLine },
+                ]) || null,
+            },
+            select: { id: true },
+          })
+        : await transaction.dailyReport.create({
+            data: {
+              projectId: workPoint.projectId,
+              workPointId,
+              reportDate: reportDateStart,
+              progress: nextOverallProgress,
+              workSummary: pointLine,
+            },
+            select: { id: true },
+          });
+      if (
+        storedPhotos.length > 0 &&
+        (existingDailyReport?._count.progressPhotos ?? 0) + storedPhotos.length <= 5
+      ) {
+        await transaction.projectProgressPhoto.createMany({
+          data: storedPhotos.map((photo) => ({
+            dailyReportId: syncedDailyReport.id,
+            url: photo.url,
+            fileUrl: photo.fileUrl,
+            publicId: photo.publicId,
+          })),
+        });
+      }
     });
     transactionCommitted = true;
     revalidateProjectReportPaths(workPoint.projectId);
@@ -1348,7 +1436,8 @@ const projectProgressSchema = z
       !value.noWorkReason &&
       !hasEntries &&
       !value.workPointId &&
-      value.progress === undefined
+      value.progress === undefined &&
+      value.workSummary.length < 1
     ) {
       context.addIssue({
         code: "custom",
@@ -1364,6 +1453,68 @@ const projectProgressSchema = z
       });
     }
   });
+
+function parseDailyEquipmentFromFormData(input: FormData): {
+  provided: boolean;
+  items: string[];
+} {
+  if (!input.has("equipment")) {
+    return { provided: false, items: [] };
+  }
+  const rawValues = input
+    .getAll("equipment")
+    .filter((entry): entry is string => typeof entry === "string");
+  if (rawValues.length === 0) {
+    return { provided: true, items: [] };
+  }
+
+  const collected: string[] = [];
+  for (const raw of rawValues) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (typeof item === "string" && item.trim()) {
+              collected.push(item.trim().slice(0, 120));
+            } else if (
+              item &&
+              typeof item === "object" &&
+              "name" in item &&
+              typeof (item as { name?: unknown }).name === "string"
+            ) {
+              const name = (item as { name: string }).name.trim();
+              const qty = (item as { qty?: unknown }).qty;
+              if (name) {
+                collected.push(
+                  (qty !== undefined && qty !== null && String(qty).trim()
+                    ? `${name} (${String(qty).trim()})`
+                    : name
+                  ).slice(0, 120),
+                );
+              }
+            }
+          }
+          continue;
+        }
+      } catch {
+        // Fallback to delimiter splitting if string is not valid JSON.
+      }
+    }
+
+    for (const part of trimmed.split(/[\n,;]+/)) {
+      const cleaned = part.trim();
+      if (cleaned) collected.push(cleaned.slice(0, 120));
+    }
+  }
+
+  return {
+    provided: true,
+    items: [...new Set(collected)].slice(0, 30),
+  };
+}
 
 const progressUpdateRoles: UserRole[] = [
   UserRole.ADMINISTRATIONS,
@@ -1595,6 +1746,7 @@ export async function addProjectProgress(
   const { start: reportDate, endExclusive: reportDateEndExclusive } =
     getJakartaDayRange(dateKey);
 
+  const parsedEquipment = parseDailyEquipmentFromFormData(input);
   const workEntries: Array<{ workPointId: string; dailyVolume: number }> =
     values.entries.length > 0
       ? values.entries
@@ -1605,12 +1757,6 @@ export async function addProjectProgress(
   const hasPositiveWork =
     workEntries.length > 0 ||
     (values.progress !== undefined && values.progress > 0);
-  if (!values.noWorkReason && hasPositiveWork && values.workersCount < 1) {
-    return {
-      success: false,
-      message: "Jumlah pekerja hadir minimal 1 orang pada hari kerja dengan progres.",
-    };
-  }
 
   if (photos.length > 5) {
     return {
@@ -1633,6 +1779,7 @@ export async function addProjectProgress(
       select: {
         id: true,
         title: true,
+        jenisPekerjaan: true,
         fieldPicId: true,
         progress: true,
       },
@@ -1641,6 +1788,30 @@ export async function addProjectProgress(
       return {
         success: false,
         message: "Laporan harian hanya dapat dibuat setelah proyek berstatus RUNNING.",
+      };
+    }
+    const isConsultancy = isConsultancyWorkType(project.jenisPekerjaan);
+    if (
+      !isConsultancy &&
+      !values.noWorkReason &&
+      hasPositiveWork &&
+      values.workersCount < 1
+    ) {
+      return {
+        success: false,
+        message: "Jumlah pekerja hadir minimal 1 orang pada hari kerja dengan progres.",
+      };
+    }
+    if (
+      !isConsultancy &&
+      !values.noWorkReason &&
+      workEntries.length === 0 &&
+      values.progress === undefined
+    ) {
+      return {
+        success: false,
+        message:
+          "Pilih item pekerjaan, isi progres kumulatif proyek, atau cantumkan alasan non-kerja.",
       };
     }
     if (
@@ -1676,6 +1847,7 @@ export async function addProjectProgress(
           id: true,
           workPointId: true,
           dailyVolume: true,
+          equipment: true,
           workSummary: true,
           notes: true,
           k3SafetyLog: true,
@@ -1734,14 +1906,15 @@ export async function addProjectProgress(
 
         for (const entry of workEntries) {
           const workPoint = workPointMap.get(entry.workPointId)!;
-          if (!workPoint.proposedVolume) {
-            throw new Error("TARGET_VOLUME_TIDAK_VALID");
-          }
-          const targetVolume = decimalNumberFromScaledInteger(
-            workPoint.proposedVolume,
-          );
+          let targetVolume = workPoint.proposedVolume
+            ? decimalNumberFromScaledInteger(workPoint.proposedVolume)
+            : 0;
           if (targetVolume <= 0) {
-            throw new Error("TARGET_VOLUME_TIDAK_VALID");
+            if (isConsultancy) {
+              targetVolume = 100;
+            } else {
+              throw new Error("TARGET_VOLUME_TIDAK_VALID");
+            }
           }
 
           const existingSameDay = sameDayByWorkPoint.get(workPoint.id);
@@ -1869,10 +2042,13 @@ export async function addProjectProgress(
           }`,
         });
       } else {
-        if (values.progress === undefined) {
+        if (values.progress === undefined && !isConsultancy) {
           throw new Error("PROGRES_KUMULATIF_TIDAK_VALID");
         }
-        const newProjectProgress = clampProjectProgress(values.progress);
+        const newProjectProgress =
+          values.progress !== undefined
+            ? clampProjectProgress(values.progress)
+            : clampProjectProgress(project.progress);
         const updatedProject = await transaction.project.updateMany({
           where: { id: projectId, progress: { lte: newProjectProgress } },
           data: { progress: newProjectProgress },
@@ -1897,6 +2073,11 @@ export async function addProjectProgress(
       });
       const nextK3SafetyLog =
         values.k3SafetyLog ?? existingReport?.k3SafetyLog ?? null;
+      const nextEquipment = parsedEquipment.provided
+        ? parsedEquipment.items.length > 0
+          ? parsedEquipment.items
+          : null
+        : (existingReport?.equipment ?? null);
 
       const report = existingReport
         ? await transaction.dailyReport.update({
@@ -1905,6 +2086,7 @@ export async function addProjectProgress(
               workPointId: dailyWorkPointId,
               dailyVolume: dailyVolumeHeader,
               progress: cumulativeProjectProgress,
+              equipment: nextEquipment,
               workSummary: mergedWorkSummary || null,
               notes: mergedNotes,
               k3SafetyLog: nextK3SafetyLog,
@@ -1919,6 +2101,7 @@ export async function addProjectProgress(
               workPointId: dailyWorkPointId,
               dailyVolume: dailyVolumeHeader,
               progress: cumulativeProjectProgress,
+              equipment: nextEquipment,
               workSummary: mergedWorkSummary || null,
               notes: mergedNotes,
               k3SafetyLog: nextK3SafetyLog,
@@ -2813,6 +2996,7 @@ export async function saveProjectScheduleTask(
       return { targetWpId, progressReportId };
     });
 
+    await activateProjectIfReady(projectId);
     revalidateProjectReportPaths(projectId);
     if (!txResult.targetWpId || !txResult.progressReportId) {
       return {
@@ -3076,7 +3260,8 @@ export async function saveProjectMilestone(
       },
     });
 
-    revalidatePath("/apps/projects/schedule");
+    await activateProjectIfReady(projectId);
+    revalidateProjectReportPaths(projectId);
     return { success: true, message: "Milestone berhasil ditambahkan." };
   } catch (error) {
     console.error("Save milestone error:", error);
@@ -3990,5 +4175,439 @@ export async function updateProjectKanbanStatus(
   } catch (err: any) {
     console.error("updateProjectKanbanStatus error:", err);
     return { success: false, message: err?.message || "Gagal memperbarui status proyek." };
+  }
+}
+
+export async function applyWorkTypeTemplate(
+  projectId: string,
+  overrideJenisPekerjaan?: string,
+): Promise<ProjectMutationResult & { addedCount?: number; skippedCount?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk menerapkan template pekerjaan." };
+  }
+  if (
+    typeof projectId !== "string" ||
+    projectId.length < 1 ||
+    projectId.length > 100
+  ) {
+    return { success: false, message: "ID Proyek tidak valid." };
+  }
+
+  try {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, isDeleted: false },
+      select: {
+        id: true,
+        jenisPekerjaan: true,
+        fieldPicId: true,
+        startDate: true,
+        endDate: true,
+        workPoints: {
+          select: { title: true },
+        },
+      },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan atau sudah diarsipkan." };
+    }
+
+    const canManage = projectManagerRoles.includes(session.user.role);
+    const isAssignedPic =
+      isFieldPicRole(session.user.role) && project.fieldPicId === session.user.id;
+    if (!canManage && !isAssignedPic) {
+      return {
+        success: false,
+        message: "Role Anda tidak diizinkan menerapkan template item pekerjaan.",
+      };
+    }
+
+    const targetWorkType =
+      overrideJenisPekerjaan?.trim() || project.jenisPekerjaan;
+    const templates = getWorkTypeChecklistTemplates(targetWorkType);
+    const existingTitleKeys = new Set(
+      project.workPoints.map((wp) => wp.title.trim().toLowerCase()),
+    );
+    const toCreate = templates.filter(
+      (item) => !existingTitleKeys.has(item.title.trim().toLowerCase()),
+    );
+    const skippedCount = templates.length - toCreate.length;
+
+    if (toCreate.length === 0) {
+      return {
+        success: true,
+        message: "Seluruh item template pekerjaan sudah tersedia di proyek ini.",
+        addedCount: 0,
+        skippedCount,
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of toCreate) {
+        await tx.projectWorkPoint.create({
+          data: {
+            projectId: project.id,
+            title: item.title,
+            location: item.section,
+            plannedStartDate: project.startDate ?? null,
+            targetDate: project.endDate ?? null,
+            proposedVolume: scaledIntegerFromDecimal(item.defaultVolume),
+            proposedUnit: item.unit,
+            proposedUnitPrice: BigInt(0),
+            proposedTotalWage: BigInt(0),
+            proposedById: session.user.id,
+            progress: 0,
+            completedVolume: 0,
+          },
+        });
+      }
+    });
+
+    const activated = await activateProjectIfReady(project.id);
+    revalidateProjectReportPaths(project.id);
+
+    const workTypeLabel = formatWorkTypeLabel(targetWorkType);
+    return {
+      success: true,
+      message: activated
+        ? `${toCreate.length} item template "${workTypeLabel}" ditambahkan dan proyek aktif menjadi RUNNING.`
+        : `${toCreate.length} item template "${workTypeLabel}" berhasil ditambahkan${skippedCount > 0 ? ` (${skippedCount} item yang sudah ada dilewati)` : ""}.`,
+      addedCount: toCreate.length,
+      skippedCount,
+    };
+  } catch (error) {
+    console.error("Applying work type template failed:", error);
+    return {
+      success: false,
+      message: "Gagal menerapkan template item pekerjaan. Silakan coba kembali.",
+    };
+  }
+}
+
+export type ProgressSubmissionPeriodType =
+  | "DAILY"
+  | "WEEKLY"
+  | "MONTHLY"
+  | "CUMULATIVE";
+
+export type SubmitProjectProgressReportInput = {
+  projectId: string;
+  periodType:
+    | ProgressSubmissionPeriodType
+    | "Harian"
+    | "Mingguan"
+    | "Bulanan"
+    | "Kumulatif";
+  periodLabel?: string;
+  recipientRoles?: Array<UserRole | string>;
+  notes?: string;
+  includeFinancials?: boolean;
+  summaryOverride?: string;
+};
+
+export type SubmitProjectProgressReportResult =
+  | {
+      success: true;
+      message: string;
+      submissionId: string;
+      portalCode: string;
+      portalUrl: string;
+      actualProgress: number;
+      plannedProgress: number;
+      deviation: number;
+    }
+  | { success: false; message: string };
+
+const financialReportRoles: UserRole[] = [
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.ADMINISTRATIONS,
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+];
+
+const progressSubmissionSchema = z.object({
+  projectId: z.string().trim().min(1, "Proyek wajib dipilih.").max(100),
+  periodType: z.string().trim().min(1).max(32),
+  periodLabel: z.string().trim().max(120).optional(),
+  recipientRoles: z.array(z.string().trim()).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  includeFinancials: z.boolean().optional().default(false),
+  summaryOverride: z.string().trim().max(2000).optional(),
+});
+
+function normalizeSubmissionPeriodType(
+  raw: string,
+): ProgressSubmissionPeriodType | null {
+  switch (raw.trim().toUpperCase()) {
+    case "DAILY":
+    case "HARIAN":
+      return "DAILY";
+    case "WEEKLY":
+    case "MINGGUAN":
+      return "WEEKLY";
+    case "MONTHLY":
+    case "BULANAN":
+      return "MONTHLY";
+    case "CUMULATIVE":
+    case "KUMULATIF":
+      return "CUMULATIVE";
+    default:
+      return null;
+  }
+}
+
+function defaultPeriodLabelForType(
+  periodType: ProgressSubmissionPeriodType,
+  dateKey: string,
+): string {
+  const dateObj = toJakartaDayStartDate(dateKey);
+  const shortDate = new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(dateObj);
+  const monthYear = new Intl.DateTimeFormat("id-ID", {
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(dateObj);
+
+  switch (periodType) {
+    case "DAILY":
+      return `Harian · ${shortDate}`;
+    case "WEEKLY":
+      return `Mingguan · s/d ${shortDate}`;
+    case "MONTHLY":
+      return `Bulanan · ${monthYear}`;
+    case "CUMULATIVE":
+      return `Kumulatif · s/d ${shortDate}`;
+  }
+}
+
+async function generateUniqueProgressPortalCode(): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = generateRandomCode();
+    const existing = await prisma.projectProgressSubmission.findUnique({
+      where: { portalCode: candidate },
+      select: { id: true },
+    });
+    if (!existing) return candidate;
+  }
+  throw new Error("Kode portal progres unik gagal dibuat.");
+}
+
+export async function submitProjectProgressReport(
+  input: SubmitProjectProgressReportInput,
+): Promise<SubmitProjectProgressReportResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan masuk untuk mengirim progres proyek." };
+  }
+  if (!projectAccessRoles.includes(session.user.role)) {
+    return {
+      success: false,
+      message: "Role Anda tidak diizinkan mengirim paket laporan progres.",
+    };
+  }
+
+  const parsed = progressSubmissionSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      success: false,
+      message:
+        parsed.error.issues[0]?.message ?? "Data pengiriman progres tidak valid.",
+    };
+  }
+
+  const periodType = normalizeSubmissionPeriodType(parsed.data.periodType);
+  if (!periodType) {
+    return {
+      success: false,
+      message: "Jenis periode pengiriman progres tidak dikenali.",
+    };
+  }
+
+  try {
+    const project = await prisma.project.findFirst({
+      where: { id: parsed.data.projectId, isDeleted: false },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        name: true,
+        status: true,
+        progress: true,
+        startDate: true,
+        endDate: true,
+        fieldPicId: true,
+        jenisPekerjaan: true,
+        workPoints: {
+          select: {
+            progress: true,
+            proposedTotalWage: true,
+            approvedTotalWage: true,
+          },
+        },
+        dailyReports: {
+          orderBy: [{ reportDate: "desc" }, { createdAt: "desc" }],
+          take: 90,
+          select: {
+            reportDate: true,
+            progress: true,
+            weather: true,
+            workersCount: true,
+            workSummary: true,
+            notes: true,
+          },
+        },
+      },
+    });
+    if (!project) {
+      return { success: false, message: "Proyek tidak ditemukan atau sudah dihapus." };
+    }
+    if (
+      isFieldPicRole(session.user.role) &&
+      project.fieldPicId !== session.user.id
+    ) {
+      return {
+        success: false,
+        message: "Hanya PIC proyek yang ditunjuk atau manajemen yang dapat mengirim progres.",
+      };
+    }
+
+    const actualProgress = clampProjectProgress(
+      project.progress > 0 || project.workPoints.length === 0
+        ? project.progress
+        : calculateWeightedProjectProgress(project.workPoints),
+    );
+    const sCurve = buildProjectSCurveSeries({
+      startDate: project.startDate,
+      endDate: project.endDate,
+      currentProgress: actualProgress,
+      dailyReports: project.dailyReports.flatMap((r) =>
+        typeof r.progress === "number"
+          ? [{ reportDate: r.reportDate, progress: r.progress }]
+          : [],
+      ),
+    });
+    const plannedProgress =
+      sCurve.plannedToday ??
+      calculatePlannedSCurveProgress(project.startDate, project.endDate) ??
+      0;
+    const deviation = Math.round((actualProgress - plannedProgress) * 10) / 10;
+
+    const todayKey = getJakartaDateKey();
+    const periodLabel =
+      parsed.data.periodLabel?.trim() ||
+      defaultPeriodLabelForType(periodType, todayKey);
+
+    const latestReport = project.dailyReports[0];
+    const latestSummary = latestReport?.workSummary?.trim();
+    const latestReportDateText = latestReport
+      ? new Intl.DateTimeFormat("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          timeZone: "Asia/Jakarta",
+        }).format(latestReport.reportDate)
+      : null;
+
+    const autoSummary = [
+      `Progres aktual ${actualProgress}% vs rencana Kurva-S ${plannedProgress}% (deviasi ${deviation >= 0 ? "+" : ""}${deviation}%).`,
+      latestReportDateText
+        ? `Laporan terakhir (${latestReportDateText}, ${latestReport?.weather || "Cuaca -"}, ${latestReport?.workersCount ?? 0} pekerja): ${latestSummary || "Tanpa ringkasan tertulis."}`
+        : "Belum ada laporan harian tercatat.",
+      parsed.data.notes ? `Catatan pengirim: ${parsed.data.notes}` : null,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 2000);
+
+    const summary = parsed.data.summaryOverride?.trim() || autoSummary;
+
+    const validRoleSet = new Set<string>(Object.values(UserRole));
+    const requestedRoles = (parsed.data.recipientRoles ?? []).filter(
+      (role): role is UserRole => validRoleSet.has(role),
+    );
+    const targetRoles: UserRole[] =
+      requestedRoles.length > 0
+        ? [...new Set(requestedRoles)]
+        : [
+            UserRole.DIRECTOR,
+            UserRole.DEPUTY_DIRECTOR,
+            UserRole.KOORDINATOR,
+          ];
+
+    const effectiveIncludeFinancials =
+      Boolean(parsed.data.includeFinancials) &&
+      financialReportRoles.includes(session.user.role);
+
+    const portalCode = await generateUniqueProgressPortalCode();
+
+    const submission = await prisma.$transaction(async (tx) => {
+      const created = await tx.projectProgressSubmission.create({
+        data: {
+          projectId: project.id,
+          periodType,
+          periodLabel,
+          summary,
+          actualProgress,
+          plannedProgress,
+          deviation,
+          includeFinancials: effectiveIncludeFinancials,
+          portalCode,
+          recipientRoles: targetRoles,
+          notes: parsed.data.notes || null,
+          submittedById: session.user.id,
+        },
+        select: { id: true, portalCode: true },
+      });
+
+      const notifTitle = `Paket Progres (${periodLabel}): ${project.title}`.slice(
+        0,
+        180,
+      );
+      const notifMessage = [
+        `${session.user.name ?? "Tim Proyek"} mengirim progres ${formatWorkTypeLabel(project.jenisPekerjaan)} — Aktual ${actualProgress}% vs Rencana ${plannedProgress}% (Deviasi ${deviation >= 0 ? "+" : ""}${deviation}%).`,
+        parsed.data.notes ? `Catatan: ${parsed.data.notes}` : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 2000);
+
+      await sendNotification({
+        roleTarget: targetRoles,
+        title: notifTitle,
+        message: notifMessage,
+        actionUrl: `/apps/projects/${encodeURIComponent(project.id)}`,
+        type: deviation < -10 ? NotificationType.WARNING : NotificationType.INFO,
+        database: tx,
+      });
+
+      return created;
+    });
+
+    revalidateProjectReportPaths(project.id);
+    revalidatePath(`/portal/projects/${submission.portalCode}`);
+    revalidatePath(`/portal/projects/${project.code}`);
+
+    return {
+      success: true,
+      message: "Paket laporan progres berhasil dikirim dan tautan portal klien siap dibagikan.",
+      submissionId: submission.id,
+      portalCode: submission.portalCode,
+      portalUrl: `/portal/projects/${submission.portalCode}`,
+      actualProgress,
+      plannedProgress,
+      deviation,
+    };
+  } catch (error) {
+    console.error("Submitting project progress report failed:", error);
+    return {
+      success: false,
+      message: "Gagal mengirim paket laporan progres. Silakan coba kembali.",
+    };
   }
 }

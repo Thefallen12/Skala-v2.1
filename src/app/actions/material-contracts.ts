@@ -1,6 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import type { ClientSession } from "mongoose";
 import {
@@ -64,6 +64,7 @@ import {
 } from "@/app/actions/finance-cashflow";
 import {
   MATERIAL_DELIVERY_PROOF_CLOUDINARY_FOLDER,
+  attachMaterialDeliveryProofMetadataSchema,
   calculateContractDeliverySubtotal,
   canBillAndPayVendorContracts,
   canManageMaterialContracts,
@@ -77,11 +78,14 @@ import {
   type CreateVendorInvoiceInput,
   type MaterialDeliveryRow,
 } from "@/lib/material-contracts";
+import { canOperateLogisticsActions } from "@/lib/user-access";
 
 export type MaterialContractActionResult = {
   success: boolean;
   message: string;
   id?: string;
+  publicCode?: string;
+  doNumber?: string;
 };
 
 function parseDateOnlyInput(value: string): Date | null {
@@ -128,6 +132,60 @@ async function generateNextContractNumber(
     .select({ value: 1 })
     .lean();
   return `KONTRAK/${slug}/${year}/${String(sequence?.value ?? 1).padStart(3, "0")}`;
+}
+
+async function generateNextMaterialSuratJalanNumber(
+  mongoSession: ClientSession,
+  contractId: string,
+): Promise<string> {
+  const year = new Date().getFullYear();
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const sequence = await DocumentNumberSequence.findOneAndUpdate(
+      { kind: "SJ_MATERIAL", year },
+      {
+        $inc: { value: 1 },
+        $setOnInsert: { _id: randomUUID() },
+      },
+      {
+        upsert: true,
+        returnDocument: "after",
+        setDefaultsOnInsert: true,
+        session: mongoSession,
+      },
+    )
+      .select({ value: 1 })
+      .lean();
+    const candidate = `SPE-${String(sequence?.value ?? 1).padStart(3, "0")}/SJ/${year}`;
+    const existing = await MaterialDelivery.findOne({
+      contractId,
+      doNumber: {
+        $regex: new RegExp(`^${escapeRegExp(candidate)}$`, "i"),
+      },
+    })
+      .session(mongoSession)
+      .select({ _id: 1 })
+      .lean();
+    if (!existing) {
+      return candidate;
+    }
+  }
+  throw new Error("Nomor Surat Jalan Material Alam tidak dapat dibuat.");
+}
+
+async function generateAvailableMaterialDeliveryPublicCode(
+  mongoSession: ClientSession,
+): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = randomBytes(16).toString("hex");
+    const existing = await MaterialDelivery.findOne({ publicCode: candidate })
+      .session(mongoSession)
+      .select({ _id: 1 })
+      .lean();
+    if (!existing) {
+      return candidate;
+    }
+  }
+  throw new Error("Kode verifikasi Surat Jalan tidak dapat dibuat.");
 }
 
 const LOGISTICS_DB_ROLES = [UserRole.LOGISTICS, "KOORDINATOR_LOGISTIK"];
@@ -687,7 +745,7 @@ export async function recordMaterialDelivery(
     }
   }
 
-  const normalizedDoNumber = data.doNumber.trim();
+  const manualDoNumber = data.doNumber?.trim() || "";
   const normalizedQty = roundMaterialNumber(data.quantityReceived, 2);
 
   try {
@@ -721,18 +779,26 @@ export async function recordMaterialDelivery(
         throw new Error("Proyek tujuan pengiriman tidak ditemukan.");
       }
 
-      const duplicateDo = await MaterialDelivery.findOne({
-        contractId: String(contract._id),
-        doNumber: {
-          $regex: new RegExp(`^${escapeRegExp(normalizedDoNumber)}$`, "i"),
-        },
-      })
-        .session(mongoSession)
-        .select({ _id: 1 })
-        .lean();
-      if (duplicateDo) {
-        throw new Error(
-          `Nomor Surat Jalan "${normalizedDoNumber}" sudah pernah dicatat pada kontrak ${contract.contractNumber}.`,
+      let resolvedDoNumber = manualDoNumber;
+      if (resolvedDoNumber) {
+        const duplicateDo = await MaterialDelivery.findOne({
+          contractId: String(contract._id),
+          doNumber: {
+            $regex: new RegExp(`^${escapeRegExp(resolvedDoNumber)}$`, "i"),
+          },
+        })
+          .session(mongoSession)
+          .select({ _id: 1 })
+          .lean();
+        if (duplicateDo) {
+          throw new Error(
+            `Nomor Surat Jalan "${resolvedDoNumber}" sudah pernah dicatat pada kontrak ${contract.contractNumber}.`,
+          );
+        }
+      } else {
+        resolvedDoNumber = await generateNextMaterialSuratJalanNumber(
+          mongoSession,
+          String(contract._id),
         );
       }
 
@@ -804,17 +870,21 @@ export async function recordMaterialDelivery(
       }
       const linkedTicketId = String(ticket._id);
 
-      const newDeliveryId = randomUUID();
+      const [newDeliveryId, publicCode] = await Promise.all([
+        Promise.resolve(randomUUID()),
+        generateAvailableMaterialDeliveryPublicCode(mongoSession),
+      ]);
       const now = new Date();
       await MaterialDelivery.create(
         [
           {
             _id: newDeliveryId,
+            publicCode,
             contractId: String(contract._id),
             projectId: String(project._id),
             ticketId: linkedTicketId,
             deliveryDate,
-            doNumber: normalizedDoNumber,
+            doNumber: resolvedDoNumber,
             vehiclePlate: data.vehiclePlate?.trim().toUpperCase() || null,
             driverName: data.driverName?.trim() || null,
             quantityReceived: normalizedQty,
@@ -835,7 +905,7 @@ export async function recordMaterialDelivery(
         linkedTicketId,
         String(contract.contractNumber),
         session.user.id,
-        normalizedDoNumber,
+        resolvedDoNumber,
         "RECORDED",
       );
 
@@ -858,7 +928,7 @@ export async function recordMaterialDelivery(
 
       const notificationRows: Array<Record<string, unknown>> = [];
       const unitLabel = String(contract.unit ?? "");
-      const deliverySummary = `${synced?.ticketNumber ?? ticket.ticketNumber} · ${synced?.title ?? ticket.title} — Surat Jalan ${normalizedDoNumber} (${normalizedQty} ${unitLabel}) pada kontrak ${contract.contractNumber}`;
+      const deliverySummary = `${synced?.ticketNumber ?? ticket.ticketNumber} · ${synced?.title ?? ticket.title} — Surat Jalan ${resolvedDoNumber} (${normalizedQty} ${unitLabel}) pada kontrak ${contract.contractNumber}`;
 
       if (synced?.requesterId && synced.requesterId !== session.user.id) {
         notificationRows.push({
@@ -868,10 +938,10 @@ export async function recordMaterialDelivery(
             ? "Pengiriman Material Alam Selesai"
             : synced.isWaitingFinancePayment
               ? "Material Alam Tiba - Menunggu Pembayaran Keuangan"
-              : "Surat Jalan Material Alam Dicatat",
+              : "Surat Jalan Material Alam Diterbitkan",
           message: synced.isWaitingFinancePayment
-            ? `${deliverySummary} telah tiba seluruhnya dan diteruskan untuk proses tagihan/pembayaran Keuangan.`
-            : `${deliverySummary} telah dicatat.`,
+            ? `${deliverySummary} telah diterbitkan seluruhnya dan diteruskan untuk proses tagihan/pembayaran Keuangan.`
+            : `${deliverySummary} telah diterbitkan.`,
           actionUrl: `/apps/tickets?openSheet=${encodeURIComponent(linkedTicketId)}`,
           type: synced.isCompleted
             ? NotificationType.SUCCESS
@@ -888,7 +958,7 @@ export async function recordMaterialDelivery(
           _id: randomUUID(),
           userId: financeUserId,
           title: "Surat Jalan Material Alam Siap Ditagihkan",
-          message: `${deliverySummary} telah dicatat dan siap ditagihkan/dibayar.`,
+          message: `${deliverySummary} telah diterbitkan dan siap ditagihkan/dibayar.`,
           actionUrl: "/apps/finance?tab=vendor-contracts",
           type: NotificationType.INFO,
           isRead: false,
@@ -907,8 +977,8 @@ export async function recordMaterialDelivery(
         notificationRows.push({
           _id: randomUUID(),
           userId: logisticsUserId,
-          title: "Surat Jalan Material Alam Dicatat",
-          message: `${deliverySummary} siap disusun ke tagihan vendor.`,
+          title: "Surat Jalan Material Alam Diterbitkan",
+          message: `${deliverySummary} siap dicetak dan disusun ke tagihan vendor.`,
           actionUrl: "/apps/logistics?tab=bulk-contracts",
           type: NotificationType.INFO,
           isRead: false,
@@ -920,17 +990,26 @@ export async function recordMaterialDelivery(
         await Notification.insertMany(notificationRows, { session: mongoSession });
       }
 
-      return { id: newDeliveryId, projectId: String(project._id) };
+      return {
+        id: newDeliveryId,
+        publicCode,
+        doNumber: resolvedDoNumber,
+        projectId: String(project._id),
+      };
     });
 
     revalidatePath("/apps/logistics");
     revalidatePath("/apps/tickets");
     revalidatePath("/apps/finance");
+    revalidatePath("/apps/orders");
+    revalidatePath("/apps/documents/issued");
     revalidatePath(`/apps/projects/${created.projectId}`);
     return {
       success: true,
       id: created.id,
-      message: `Surat Jalan ${normalizedDoNumber} berhasil dicatat (UNBILLED).`,
+      publicCode: created.publicCode,
+      doNumber: created.doNumber,
+      message: `Surat Jalan ${created.doNumber} berhasil diterbitkan (UNBILLED).`,
     };
   } catch (error) {
     await removeDeliveryProofFile(uploadedProofUrl);
@@ -1160,6 +1239,7 @@ export async function getUnbilledDeliveriesForContract(
           : null;
         return {
           id: String(delivery._id),
+          publicCode: delivery.publicCode ?? null,
           contractId: delivery.contractId,
           contractNumber: contract.contractNumber,
           vendorName: contract.vendorName,
@@ -2059,6 +2139,258 @@ export async function replaceVendorInvoicePaymentProof(
         error instanceof Error
           ? error.message
           : "Gagal memperbarui bukti pembayaran tagihan vendor.",
+    };
+  }
+}
+
+export async function attachMaterialDeliveryProof(
+  formData: FormData,
+): Promise<MaterialContractActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, message: "Silakan login terlebih dahulu." };
+  }
+  if (
+    !canManageMaterialContracts(session.user.role) &&
+    !canOperateLogisticsActions(session.user.role) &&
+    !canBillAndPayVendorContracts(session.user.role)
+  ) {
+    return {
+      success: false,
+      message:
+        "Hanya Logistik, Keuangan, Administrasi, atau Direksi yang dapat melampirkan bukti atau memperbarui armada Surat Jalan.",
+    };
+  }
+
+  if (!(formData instanceof FormData)) {
+    return { success: false, message: "Data unggahan tidak valid." };
+  }
+
+  const rawDeliveryId = formData.get("deliveryId");
+  const hasVehiclePlate = formData.has("vehiclePlate");
+  const hasDriverName = formData.has("driverName");
+
+  const parsed = attachMaterialDeliveryProofMetadataSchema.safeParse({
+    deliveryId: typeof rawDeliveryId === "string" ? rawDeliveryId : "",
+    vehiclePlate: hasVehiclePlate
+      ? String(formData.get("vehiclePlate") ?? "") || null
+      : undefined,
+    driverName: hasDriverName
+      ? String(formData.get("driverName") ?? "") || null
+      : undefined,
+  });
+  if (!parsed.success) {
+    return {
+      success: false,
+      message:
+        parsed.error.issues[0]?.message ??
+        "Data pembaruan Surat Jalan tidak valid.",
+    };
+  }
+
+  const { deliveryId } = parsed.data;
+  const proofCandidate = formData.get("proof") ?? formData.get("file");
+  const hasProofInput =
+    proofCandidate !== null &&
+    proofCandidate !== undefined &&
+    !(
+      proofCandidate instanceof File &&
+      proofCandidate.size === 0 &&
+      !proofCandidate.name
+    );
+
+  if (hasProofInput) {
+    if (
+      !(proofCandidate instanceof File) ||
+      proofCandidate.size < 1 ||
+      proofCandidate.size > 5 * 1024 * 1024
+    ) {
+      return {
+        success: false,
+        message: "Pilih file bukti (PDF/JPG/PNG/WEBP) maksimal 5 MB.",
+      };
+    }
+    if (!normalizeFinancePaymentProofFile(proofCandidate)) {
+      return {
+        success: false,
+        message: "Format file bukti harus PDF, JPG, PNG, atau WEBP.",
+      };
+    }
+  }
+
+  const proofFile =
+    proofCandidate instanceof File && proofCandidate.size > 0
+      ? proofCandidate
+      : null;
+
+  if (!proofFile && !hasVehiclePlate && !hasDriverName) {
+    return {
+      success: false,
+      message:
+        "Pilih file bukti Surat Jalan atau isi plat kendaraan / nama supir vendor.",
+    };
+  }
+
+  let uploadedProofUrl: string | null = null;
+  try {
+    const mongoose = await connectToMongoDB();
+    const existingDelivery = await MaterialDelivery.findOne({
+      $or: [{ _id: deliveryId }, { publicCode: deliveryId }],
+    })
+      .select({ _id: 1 })
+      .lean();
+    if (!existingDelivery) {
+      return {
+        success: false,
+        message: "Surat Jalan material tidak ditemukan.",
+      };
+    }
+
+    if (proofFile) {
+      uploadedProofUrl = await uploadDeliveryProofFile(proofFile);
+    }
+
+    const result = await mongoose.connection.transaction(
+      async (mongoSession) => {
+        const delivery = await MaterialDelivery.findById(existingDelivery._id)
+          .session(mongoSession)
+          .select({
+            _id: 1,
+            publicCode: 1,
+            doNumber: 1,
+            projectId: 1,
+            ticketId: 1,
+            proofUrl: 1,
+          })
+          .lean();
+        if (!delivery) {
+          throw new Error("Surat Jalan material tidak ditemukan.");
+        }
+
+        const oldProofUrl =
+          typeof delivery.proofUrl === "string" && delivery.proofUrl.trim()
+            ? delivery.proofUrl.trim()
+            : null;
+        const nextVehiclePlate = hasVehiclePlate
+          ? parsed.data.vehiclePlate?.trim().toUpperCase() || null
+          : undefined;
+        const nextDriverName = hasDriverName
+          ? parsed.data.driverName?.trim() || null
+          : undefined;
+
+        const updateFields: Record<string, unknown> = {
+          updatedAt: new Date(),
+        };
+        if (uploadedProofUrl) {
+          updateFields.proofUrl = uploadedProofUrl;
+        }
+        if (hasVehiclePlate) {
+          updateFields.vehiclePlate = nextVehiclePlate ?? null;
+        }
+        if (hasDriverName) {
+          updateFields.driverName = nextDriverName ?? null;
+        }
+
+        const updated = await MaterialDelivery.updateOne(
+          { _id: delivery._id },
+          { $set: updateFields },
+          { session: mongoSession },
+        );
+        if (updated.matchedCount !== 1) {
+          throw new Error("Gagal memperbarui bukti Surat Jalan.");
+        }
+
+        if (delivery.ticketId) {
+          const auditParts: string[] = [];
+          if (uploadedProofUrl) {
+            auditParts.push(
+              oldProofUrl
+                ? "mengganti lampiran bukti Surat Jalan"
+                : "melampirkan bukti Surat Jalan",
+            );
+          }
+          if (hasVehiclePlate || hasDriverName) {
+            auditParts.push("memperbarui info armada vendor");
+          }
+          await TicketAuditLog.create(
+            [
+              {
+                _id: randomUUID(),
+                ticketId: String(delivery.ticketId),
+                userId: session.user.id,
+                action: "MATERIAL_CONTRACT_DELIVERY_PROOF_UPDATED",
+                notes: `Surat Jalan ${delivery.doNumber}: ${auditParts.join(" dan ")}.`,
+                createdAt: new Date(),
+              },
+            ],
+            { session: mongoSession },
+          );
+        }
+
+        return {
+          id: String(delivery._id),
+          publicCode:
+            typeof delivery.publicCode === "string" && delivery.publicCode.trim()
+              ? delivery.publicCode.trim()
+              : undefined,
+          doNumber: String(delivery.doNumber ?? ""),
+          projectId: String(delivery.projectId ?? ""),
+          oldProofUrl,
+        };
+      },
+    );
+
+    if (
+      uploadedProofUrl &&
+      result.oldProofUrl &&
+      result.oldProofUrl !== uploadedProofUrl &&
+      !isLegacySharedProofUrl(result.oldProofUrl)
+    ) {
+      const stillReferenced = await isProofUrlReferencedInDb(
+        result.oldProofUrl,
+      ).catch(() => true);
+      if (!stillReferenced) {
+        await removeDeliveryProofFile(result.oldProofUrl);
+      }
+    }
+
+    revalidatePath("/apps/logistics");
+    revalidatePath("/apps/finance");
+    revalidatePath("/apps/tickets");
+    revalidatePath("/apps/projects");
+    revalidatePath("/apps/orders");
+    revalidatePath("/apps/documents/issued");
+    if (result.projectId) {
+      revalidatePath(`/apps/projects/${result.projectId}`);
+    }
+
+    return {
+      success: true,
+      id: result.id,
+      ...(result.publicCode ? { publicCode: result.publicCode } : {}),
+      doNumber: result.doNumber,
+      message: uploadedProofUrl
+        ? `Bukti Surat Jalan ${result.doNumber} berhasil disimpan.`
+        : `Info armada vendor pada Surat Jalan ${result.doNumber} berhasil diperbarui.`,
+    };
+  } catch (error) {
+    if (uploadedProofUrl) {
+      await removeDeliveryProofFile(uploadedProofUrl);
+    }
+    console.error("Attach material delivery proof error:", error);
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryConfigurationError ||
+      error instanceof CloudinaryPrivatePdfValidationError
+    ) {
+      return { success: false, message: error.message };
+    }
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan bukti Surat Jalan.",
     };
   }
 }

@@ -2,11 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Layers, Plus, Trash2, Truck } from "lucide-react";
+import { Eye, Layers, Plus, Printer, Trash2, Truck, Upload } from "lucide-react";
 import { UserRole } from "@prisma/client";
 import { toast } from "sonner";
 import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts";
 import MaterialDeliveryModal, {
+  MaterialDeliveryAttachModal,
+  MaterialDeliveryPrintModal,
   type DeliveryProjectOption,
 } from "@/app/components/apps/material-contracts/MaterialDeliveryModal";
 import MaterialDeliveryProofModal from "@/app/components/apps/material-contracts/MaterialDeliveryProofModal";
@@ -39,12 +41,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  canBillAndPayVendorContracts,
+  canManageMaterialContracts,
   canRecordMaterialDeliveries,
   formatMaterialVolume,
   type ContractTicketDeliveryOption,
   type MaterialContractRow,
   type MaterialDeliveryRow,
 } from "@/lib/material-contracts";
+import { canOperateLogisticsActions } from "@/lib/user-access";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 
 function currency(amount: number): string {
@@ -73,11 +78,19 @@ export default function ProjectMaterialDeliveriesCard({
   const [preview, setPreview] = useState<{ title: string; url: string } | null>(
     null,
   );
+  const [printDeliveryTarget, setPrintDeliveryTarget] =
+    useState<MaterialDeliveryRow | null>(null);
+  const [attachDeliveryTarget, setAttachDeliveryTarget] =
+    useState<MaterialDeliveryRow | null>(null);
   const [pendingDeleteDelivery, setPendingDeleteDelivery] =
     useState<MaterialDeliveryRow | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const canRecord = canRecordMaterialDeliveries(currentUserRole);
+  const canAttachProof =
+    canManageMaterialContracts(currentUserRole) ||
+    canOperateLogisticsActions(currentUserRole) ||
+    canBillAndPayVendorContracts(currentUserRole);
   const unbilledCount = deliveries.filter(
     (delivery) => delivery.billingStatus === "UNBILLED",
   ).length;
@@ -109,11 +122,11 @@ export default function ProjectMaterialDeliveriesCard({
         <div>
           <CardTitle className="type-h2 flex items-center gap-2">
             <Layers className="size-4 text-primary" aria-hidden="true" />
-            Penerimaan Material Curah (Surat Jalan DO)
+            Surat Jalan Material Alam (Kontrak Payung)
           </CardTitle>
           <CardDescription className="type-p3">
-            Catat kedatangan truk pasir, batu, sirtu, atau tanah urug berdasarkan
-            Kontrak Payung vendor.
+            Armada &amp; mover disediakan langsung oleh vendor kontrak payung.
+            Terbitkan Surat Jalan batu, pasir, sirtu, atau tanah urug dari tiket lapangan aktif.
           </CardDescription>
         </div>
         {canRecord && (
@@ -124,7 +137,7 @@ export default function ProjectMaterialDeliveriesCard({
             className="shrink-0 gap-1.5"
           >
             <Plus className="size-4" aria-hidden="true" />
-            Catat Surat Jalan
+            Terbitkan Surat Jalan
           </Button>
         )}
       </CardHeader>
@@ -133,10 +146,10 @@ export default function ProjectMaterialDeliveriesCard({
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
             <p className="type-p3 font-medium text-muted-foreground">
-              Total DO Masuk
+              Total Surat Jalan
             </p>
             <p className="type-kpi mt-0.5 text-foreground">
-              {deliveries.length} DO
+              {deliveries.length} SJ
             </p>
           </div>
           <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
@@ -160,8 +173,8 @@ export default function ProjectMaterialDeliveriesCard({
         {deliveries.length === 0 ? (
           <EmptyState
             icon={Truck}
-            title="Belum ada pengiriman material curah"
-            description="Tim lapangan atau Logistik dapat mencatat setiap kedatangan truk pasir/batu beserta foto Surat Jalan fisik."
+            title="Belum ada Surat Jalan Material Alam"
+            description="Tim lapangan atau Logistik dapat menerbitkan Surat Jalan batu/pasir beserta lampiran foto/plat/supir (opsional)."
           />
         ) : (
           <>
@@ -214,7 +227,29 @@ export default function ProjectMaterialDeliveriesCard({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 pt-0.5">
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setPrintDeliveryTarget(delivery)}
+                    >
+                      <Printer className="size-3.5" aria-hidden="true" />
+                      Pratinjau / Cetak SJ
+                    </Button>
+                    {canAttachProof && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setAttachDeliveryTarget(delivery)}
+                      >
+                        <Upload className="size-3.5" aria-hidden="true" />
+                        {delivery.proofUrl ? "Update Lampiran" : "Lampirkan Foto / Plat / Supir"}
+                      </Button>
+                    )}
                     {delivery.proofUrl && (
                       <Button
                         type="button"
@@ -223,13 +258,13 @@ export default function ProjectMaterialDeliveriesCard({
                         className="gap-1.5"
                         onClick={() =>
                           setPreview({
-                            title: `Surat Jalan ${delivery.doNumber}`,
+                            title: `Bukti Surat Jalan ${delivery.doNumber}`,
                             url: delivery.proofUrl!,
                           })
                         }
                       >
                         <Eye className="size-3.5" aria-hidden="true" />
-                        Surat Jalan
+                        Foto
                       </Button>
                     )}
                     {canRecord && delivery.billingStatus === "UNBILLED" && (
@@ -256,7 +291,7 @@ export default function ProjectMaterialDeliveriesCard({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tanggal</TableHead>
-                    <TableHead>No. DO &amp; Truk</TableHead>
+                    <TableHead>No. SJ &amp; Armada Vendor</TableHead>
                     <TableHead>Kontrak &amp; Vendor</TableHead>
                     <TableHead className="text-right">Volume</TableHead>
                     <TableHead className="text-right">Nilai Kontrak</TableHead>
@@ -320,16 +355,38 @@ export default function ProjectMaterialDeliveriesCard({
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            title="Pratinjau / Cetak Surat Jalan"
+                            onClick={() => setPrintDeliveryTarget(delivery)}
+                          >
+                            <Printer className="size-3.5" aria-hidden="true" />
+                            Pratinjau / Cetak SJ
+                          </Button>
+                          {canAttachProof && (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              aria-label="Lampirkan Foto / Plat / Supir"
+                              title="Lampirkan Foto / Plat / Supir"
+                              onClick={() => setAttachDeliveryTarget(delivery)}
+                            >
+                              <Upload className="size-4" aria-hidden="true" />
+                            </Button>
+                          )}
                           {delivery.proofUrl && (
                             <Button
                               type="button"
                               size="icon"
                               variant="outline"
-                              aria-label="Lihat bukti surat jalan"
-                              title="Lihat Bukti Surat Jalan"
+                              aria-label="Lihat foto bukti surat jalan"
+                              title="Lihat Foto Bukti Surat Jalan"
                               onClick={() =>
                                 setPreview({
-                                  title: `Surat Jalan ${delivery.doNumber}`,
+                                  title: `Bukti Surat Jalan ${delivery.doNumber}`,
                                   url: delivery.proofUrl!,
                                 })
                               }
@@ -344,8 +401,8 @@ export default function ProjectMaterialDeliveriesCard({
                                 size="icon"
                                 variant="outline"
                                 disabled={isPending}
-                                aria-label="Hapus DO belum ditagih"
-                                title="Hapus DO belum ditagih"
+                                aria-label="Hapus Surat Jalan belum ditagih"
+                                title="Hapus Surat Jalan belum ditagih"
                                 onClick={() =>
                                   setPendingDeleteDelivery(delivery)
                                 }
@@ -381,6 +438,17 @@ export default function ProjectMaterialDeliveriesCard({
         onClose={() => setPreview(null)}
       />
 
+      <MaterialDeliveryPrintModal
+        deliveries={printDeliveryTarget ? [printDeliveryTarget] : []}
+        initialDeliveryId={printDeliveryTarget?.id}
+        onClose={() => setPrintDeliveryTarget(null)}
+      />
+
+      <MaterialDeliveryAttachModal
+        delivery={attachDeliveryTarget}
+        onClose={() => setAttachDeliveryTarget(null)}
+      />
+
       <AlertDialog
         open={pendingDeleteDelivery !== null}
         onOpenChange={(open) => {
@@ -389,7 +457,7 @@ export default function ProjectMaterialDeliveriesCard({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Surat Jalan (DO)?</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Surat Jalan?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDeleteDelivery
                 ? `Hapus Surat Jalan ${pendingDeleteDelivery.doNumber} (${formatMaterialVolume(pendingDeleteDelivery.quantityReceived, pendingDeleteDelivery.unit)})? Tindakan ini tidak dapat dibatalkan.`
