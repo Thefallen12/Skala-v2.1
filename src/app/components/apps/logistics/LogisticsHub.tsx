@@ -7,14 +7,15 @@ import {
   Boxes,
   Building2,
   CheckCircle2,
+  ChevronDown,
   Clock,
-  Clock3,
   ExternalLink,
   Eye,
   FilePenLine,
   FileText,
   Fuel,
   Layers,
+  MoreHorizontal,
   PackageCheck,
   Pencil,
   Plus,
@@ -87,6 +88,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -108,11 +115,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   getVendorBankAccounts,
   type VendorBankAccountOption,
@@ -264,9 +266,55 @@ function PurchaseOrderRowCard({
   const canOperateLogistics = canOperateLogisticsActions(role);
   const canManageInvoice =
     canOperateLogistics || canOperateFinanceActions(role);
+
+  const canReceive =
+    canOperateLogistics &&
+    !order.ticketId &&
+    Boolean(order.paidAt) &&
+    !order.receivedAt;
+  const canSendVendor =
+    order.status === POStatus.APPROVED &&
+    !order.vendorInvoiceUrl &&
+    canOperateLogistics &&
+    !order.vendorPoSentAt;
+  const canUploadNota =
+    order.status === POStatus.APPROVED &&
+    !order.vendorInvoiceUrl &&
+    canOperateLogistics &&
+    Boolean(order.vendorPoSentAt) &&
+    !order.paidAt;
+  const canManageExistingNota =
+    order.status === POStatus.APPROVED &&
+    Boolean(order.vendorInvoiceUrl) &&
+    canManageInvoice;
+
+  const approvedPrimaryMode: "receive" | "send" | "upload" | "preview" =
+    canReceive
+      ? "receive"
+      : canSendVendor
+        ? "send"
+        : canUploadNota
+          ? "upload"
+          : "preview";
+
+  const canReviewPending =
+    order.status === POStatus.PENDING_FINANCE_REVIEW &&
+    (role === UserRole.FINANCE ||
+      role === UserRole.ADMINISTRATIONS ||
+      role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR);
+  const canApprovePending =
+    order.status === POStatus.PENDING_APPROVAL &&
+    (role === UserRole.DIRECTOR ||
+      role === UserRole.DEPUTY_DIRECTOR ||
+      role === UserRole.ADMINISTRATIONS);
+
+  const hasApprovedMenuItems =
+    approvedPrimaryMode !== "preview" || canManageExistingNota;
+
   return (
-    <article className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3.5 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 flex-1 flex-col items-start space-y-1">
+    <article className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-border bg-card p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:p-3.5">
+      <div className="flex min-w-0 flex-1 flex-col items-start space-y-1.5">
         <p
           className="type-p1 break-words font-semibold text-primary"
           title={`${order.poNumber} · ${order.vendorName}`}
@@ -277,36 +325,44 @@ function PurchaseOrderRowCard({
           {new Date(order.createdAt).toLocaleDateString("id-ID")}
         </p>
 
-        {order.status === POStatus.PENDING_FINANCE_REVIEW && (
-          <Badge variant="lightWarning">Menunggu Keuangan</Badge>
-        )}
-        {order.status === POStatus.PENDING_APPROVAL && (
-          <Badge variant="lightInfo">Menunggu Direktur</Badge>
-        )}
-        {order.status === POStatus.DRAFT && (
-          <Badge variant="gray">Draft PO</Badge>
-        )}
-        {order.status === POStatus.REJECTED && (
-          <Badge variant="lightError">Ditolak</Badge>
-        )}
-        {order.status === POStatus.CANCELLED && (
-          <Badge variant="gray">Dibatalkan</Badge>
-        )}
-
-        {order.ticketId && order.paidAt && (
-          <Badge variant="lightSuccess">PO Lunas · Siap DO</Badge>
-        )}
-        {!order.ticketId && order.paidAt && (
-          <div className="space-y-1 pt-0.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {order.status === POStatus.APPROVED && (
+            <Badge variant="lightSuccess">Disetujui</Badge>
+          )}
+          {order.status === POStatus.APPROVED && !order.vendorPoSentAt && (
+            <Badge variant="lightWarning">Menunggu Dikirim</Badge>
+          )}
+          {order.status === POStatus.PENDING_FINANCE_REVIEW && (
+            <Badge variant="lightWarning">Menunggu Keuangan</Badge>
+          )}
+          {order.status === POStatus.PENDING_APPROVAL && (
+            <Badge variant="lightInfo">Menunggu Direktur</Badge>
+          )}
+          {order.status === POStatus.DRAFT && (
+            <Badge variant="gray">Draft PO</Badge>
+          )}
+          {order.status === POStatus.REJECTED && (
+            <Badge variant="lightError">Ditolak</Badge>
+          )}
+          {order.status === POStatus.CANCELLED && (
+            <Badge variant="gray">Dibatalkan</Badge>
+          )}
+          {order.ticketId && order.paidAt && (
+            <Badge variant="lightSuccess">PO Lunas · Siap DO</Badge>
+          )}
+          {!order.ticketId && order.paidAt && (
             <Badge variant={order.receivedAt ? "lightSuccess" : "lightWarning"}>
               {order.receivedAt ? "Barang Diterima" : "Menunggu Pengiriman"}
             </Badge>
-            <p className="type-p3 text-muted-foreground">
-              {order.receivedAt
-                ? `Diterima ${new Date(order.receivedAt).toLocaleString("id-ID")}`
-                : "PO lunas; konfirmasi setelah barang tiba."}
-            </p>
-          </div>
+          )}
+        </div>
+
+        {!order.ticketId && order.paidAt && (
+          <p className="type-p3 text-muted-foreground">
+            {order.receivedAt
+              ? `Diterima ${new Date(order.receivedAt).toLocaleString("id-ID")}`
+              : "PO lunas; konfirmasi setelah barang tiba."}
+          </p>
         )}
         {order.vendorPoSentAt && (
           <p className="type-p3 text-muted-foreground">
@@ -324,93 +380,216 @@ function PurchaseOrderRowCard({
           )}
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+      <div className="flex w-full shrink-0 items-center justify-end gap-1.5 sm:w-auto">
         {order.status === POStatus.DRAFT ? (
-          <>
-            <ActionIconButton
-              label={
-                canOperateLogisticsActions(role)
-                  ? "Lanjutkan Draft"
-                  : "Lihat Draft"
-              }
-              tooltip={
-                canOperateLogisticsActions(role)
-                  ? "Lanjutkan Draft"
-                  : "Lihat Draft"
-              }
-              icon={FilePenLine}
-              href={`/d/${encodeURIComponent(order.publicCode)}`}
-            />
-            {canOperateLogisticsActions(role) && (
+          canOperateLogisticsActions(role) ? (
+            <>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
+                className="flex-1 sm:flex-initial"
                 disabled={isPending}
                 onClick={() => onSubmitDraft(order.publicCode)}
               >
                 <Send className="size-3.5" aria-hidden="true" />
                 Ajukan
               </Button>
-            )}
-          </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label={`Menu aksi ${order.poNumber}`}
+                  >
+                    <MoreHorizontal className="size-4" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                      <FilePenLine className="size-4" aria-hidden="true" />
+                      Lanjutkan Draft
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 sm:flex-initial"
+              asChild
+            >
+              <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                <FilePenLine className="size-3.5" aria-hidden="true" />
+                Lihat Draft
+              </Link>
+            </Button>
+          )
         ) : order.status !== POStatus.APPROVED ? (
-          <>
-            <ActionIconButton
-              label="Lihat PO"
-              tooltip="Lihat PO"
-              icon={Eye}
-              href={`/d/${encodeURIComponent(order.publicCode)}`}
-            />
-            {order.status === POStatus.PENDING_FINANCE_REVIEW &&
-              (role === UserRole.FINANCE ||
-                role === UserRole.ADMINISTRATIONS ||
-                role === UserRole.DIRECTOR ||
-                role === UserRole.DEPUTY_DIRECTOR) && (
+          canReviewPending || canApprovePending ? (
+            <>
+              {canReviewPending ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="flex-1 sm:flex-initial"
                   disabled={isPending}
                   onClick={() => onReviewPo(order.publicCode)}
                 >
                   Verifikasi
                 </Button>
-              )}
-            {order.status === POStatus.PENDING_APPROVAL &&
-              (role === UserRole.DIRECTOR ||
-                role === UserRole.DEPUTY_DIRECTOR ||
-                role === UserRole.ADMINISTRATIONS) && (
+              ) : (
                 <Button
                   type="button"
                   size="sm"
                   variant="outlinesuccess"
+                  className="flex-1 sm:flex-initial"
                   disabled={isPending}
                   onClick={() => onApprovePo(order.publicCode)}
                 >
                   Setujui
                 </Button>
               )}
-          </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label={`Menu aksi ${order.poNumber}`}
+                  >
+                    <MoreHorizontal className="size-4" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                      <Eye className="size-4" aria-hidden="true" />
+                      Lihat PO
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 sm:flex-initial"
+              asChild
+            >
+              <Link href={`/d/${encodeURIComponent(order.publicCode)}`}>
+                <Eye className="size-3.5" aria-hidden="true" />
+                Lihat PO
+              </Link>
+            </Button>
+          )
         ) : (
           <>
-            {order.vendorInvoiceUrl ? (
-              canManageInvoice && (
-                <>
-                  <ActionIconButton
-                    label="Lihat invoice vendor"
-                    tooltip="Lihat Nota"
-                    icon={ExternalLink}
-                    href={order.vendorInvoiceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  />
-                  {order.invoiceId && (
-                    <ActionIconButton
-                      label="Pratinjau invoice"
-                      tooltip="Pratinjau Invoice"
-                      icon={FileText}
-                      onClick={() =>
+            {approvedPrimaryMode === "receive" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outlinesuccess"
+                className="flex-1 sm:flex-initial"
+                disabled={isPending}
+                onClick={() => onOpenReceiptModal(order)}
+              >
+                <PackageCheck className="size-3.5" aria-hidden="true" />
+                Terima Barang
+              </Button>
+            ) : approvedPrimaryMode === "send" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1 sm:flex-initial"
+                disabled={isPending}
+                onClick={() => onMarkPoSent(order.publicCode)}
+              >
+                <Send className="size-3.5" aria-hidden="true" />
+                Kirim Vendor
+              </Button>
+            ) : approvedPrimaryMode === "upload" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1 sm:flex-initial"
+                disabled={isPending}
+                onClick={() => onOpenInvoiceModal(order)}
+              >
+                <Upload className="size-3.5" aria-hidden="true" />
+                Unggah Nota
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="flex-1 sm:flex-initial"
+                onClick={() =>
+                  onPreviewDocument({
+                    kind: "po",
+                    code: order.publicCode,
+                    number: order.poNumber,
+                    executiveApproval: "PO disetujui oleh Direksi",
+                  })
+                }
+              >
+                <Eye className="size-3.5" aria-hidden="true" />
+                Preview PO
+              </Button>
+            )}
+
+            {hasApprovedMenuItems && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label={`Menu aksi ${order.poNumber}`}
+                  >
+                    <MoreHorizontal className="size-4" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {approvedPrimaryMode !== "preview" && (
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        onPreviewDocument({
+                          kind: "po",
+                          code: order.publicCode,
+                          number: order.poNumber,
+                          executiveApproval: "PO disetujui oleh Direksi",
+                        })
+                      }
+                    >
+                      <Eye className="size-4" aria-hidden="true" />
+                      Preview PO
+                    </DropdownMenuItem>
+                  )}
+                  {canManageExistingNota && order.vendorInvoiceUrl && (
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={order.vendorInvoiceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink className="size-4" aria-hidden="true" />
+                        Lihat Nota
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  {canManageExistingNota && order.invoiceId && (
+                    <DropdownMenuItem
+                      onSelect={() =>
                         onPreviewDocument({
                           kind: "invoice",
                           code: order.invoiceId!,
@@ -418,99 +597,22 @@ function PurchaseOrderRowCard({
                           executiveApproval: `Invoice Vendor · PO ${order.poNumber}`,
                         })
                       }
-                    />
+                    >
+                      <FileText className="size-4" aria-hidden="true" />
+                      Pratinjau Invoice
+                    </DropdownMenuItem>
                   )}
-                  <ActionIconButton
-                    label="Ganti Foto/PDF Nota"
-                    tooltip="Ganti Nota"
-                    icon={FilePenLine}
-                    disabled={isPending}
-                    onClick={() => onOpenReplaceInvoiceModal(order)}
-                  />
-                </>
-              )
-            ) : canOperateLogistics ? (
-              !order.vendorPoSentAt ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={isPending}
-                  onClick={() => onMarkPoSent(order.publicCode)}
-                >
-                  <Send className="size-3.5" aria-hidden="true" />
-                  Kirim Vendor
-                </Button>
-              ) : !order.paidAt ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={isPending}
-                  onClick={() => onOpenInvoiceModal(order)}
-                >
-                  <Upload className="size-3.5" aria-hidden="true" />
-                  Unggah Nota
-                </Button>
-              ) : null
-            ) : null}
-
-            {canOperateLogistics &&
-              !order.ticketId &&
-              order.paidAt &&
-              !order.receivedAt && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outlinesuccess"
-                  disabled={isPending}
-                  onClick={() => onOpenReceiptModal(order)}
-                >
-                  <PackageCheck className="size-3.5" aria-hidden="true" />
-                  Terima Barang
-                </Button>
-              )}
-
-            <ActionIconButton
-              label="Preview PO Terbit"
-              tooltip="Preview PO"
-              icon={Eye}
-              onClick={() =>
-                onPreviewDocument({
-                  kind: "po",
-                  code: order.publicCode,
-                  number: order.poNumber,
-                  executiveApproval: "PO disetujui oleh Direksi",
-                })
-              }
-            />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  aria-label="Disetujui"
-                  className="flex size-9 items-center justify-center rounded-md border border-success text-success"
-                  role="img"
-                  tabIndex={0}
-                >
-                  <CheckCircle2 className="size-4" aria-hidden="true" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Disetujui</TooltipContent>
-            </Tooltip>
-            {!order.vendorPoSentAt && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    aria-label="Menunggu dikirim"
-                    className="flex size-9 items-center justify-center rounded-md border border-amber-500 text-amber-500"
-                    role="img"
-                    tabIndex={0}
-                  >
-                    <Clock3 className="size-4" aria-hidden="true" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>Menunggu dikirim</TooltipContent>
-              </Tooltip>
+                  {canManageExistingNota && (
+                    <DropdownMenuItem
+                      disabled={isPending}
+                      onSelect={() => onOpenReplaceInvoiceModal(order)}
+                    >
+                      <FilePenLine className="size-4" aria-hidden="true" />
+                      Ganti Foto/PDF Nota
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </>
         )}
@@ -527,20 +629,22 @@ function DeliveryOrderRowCard({
   onPreview: (selection: NonNullable<DocumentSelection>) => void;
 }) {
   return (
-    <article className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5">
-      <div>
-        <p className="type-p1 font-semibold text-primary">{order.doNumber}</p>
+    <article className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-border bg-card p-3 sm:p-3.5">
+      <div className="min-w-0 flex-1">
+        <p className="type-p1 truncate font-semibold text-primary">
+          {order.doNumber}
+        </p>
         <p className="type-p3 mt-0.5 text-muted-foreground">
           {new Date(order.createdAt).toLocaleDateString("id-ID")}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
         <Badge variant="outline">{order.status}</Badge>
         {order.executiveApproved ? (
-          <ActionIconButton
-            label="Preview Surat Jalan"
-            tooltip="Preview DO"
-            icon={Eye}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
             onClick={() =>
               onPreview({
                 kind: "do",
@@ -550,11 +654,12 @@ function DeliveryOrderRowCard({
                   "DO terhubung ke PO/tiket yang disetujui Direksi",
               })
             }
-          />
-        ) : (
-          <Button variant="outline" size="sm" disabled>
-            Menunggu Direksi
+          >
+            <Eye className="size-3.5" aria-hidden="true" />
+            Preview DO
           </Button>
+        ) : (
+          <Badge variant="lightWarning">Menunggu Direksi</Badge>
         )}
       </div>
     </article>
@@ -711,6 +816,7 @@ export default function LogisticsHub({
   const [equipmentMasterSheetOpen, setEquipmentMasterSheetOpen] =
     useState(false);
   const [vendorSheetOpen, setVendorSheetOpen] = useState(false);
+  const [masterAlatOpen, setMasterAlatOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<LogisticsVendor | null>(
     null,
   );
@@ -965,55 +1071,55 @@ export default function LogisticsHub({
       onValueChange={setActiveTab}
       className="space-y-5"
     >
-      <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 md:grid-cols-4 lg:grid-cols-7">
+      <TabsList className="flex h-auto w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-muted/60 p-1 scrollbar-none sm:p-1.5 lg:grid lg:grid-cols-7 lg:gap-1.5">
         <TabsTrigger
           value="tickets"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <TicketCheck className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Tiket Masuk</span>
+          <span>Tiket Masuk</span>
         </TabsTrigger>
         <TabsTrigger
           value="stock"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <Boxes className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Stok Gudang</span>
+          <span>Stok Gudang</span>
         </TabsTrigger>
         <TabsTrigger
           value="documents"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <FileText className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">PO, KO &amp; DO</span>
+          <span>PO, KO &amp; DO</span>
         </TabsTrigger>
         <TabsTrigger
           value="equipment"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <Fuel className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Sewa &amp; Alat</span>
+          <span>Sewa &amp; Alat</span>
         </TabsTrigger>
         <TabsTrigger
           value="vehicles"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <Truck className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Armada</span>
+          <span>Armada</span>
         </TabsTrigger>
         <TabsTrigger
           value="vendors"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <Store className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Vendor</span>
+          <span>Vendor</span>
         </TabsTrigger>
         <TabsTrigger
           value="bulk-contracts"
-          className="type-p3 h-auto justify-start gap-2 rounded-lg px-3 py-2 font-semibold"
+          className="type-p3 h-auto shrink-0 justify-start gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 font-semibold sm:gap-2 sm:px-3 sm:py-2 lg:justify-center"
         >
           <Layers className="size-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">Kontrak Material</span>
+          <span>Kontrak Material</span>
         </TabsTrigger>
       </TabsList>
 
@@ -1058,7 +1164,59 @@ export default function LogisticsHub({
                   Penerbitan PO, tanda tangan KO &amp; DO armada/gudang berada di Logistik. Untuk Batu/Pasir Kontrak Payung (armada &amp; mover dari vendor), terbitkan melalui Surat Jalan Material Alam.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full items-center gap-2 sm:hidden">
+                {canOperateLogistics ? (
+                  <>
+                    <Button size="sm" className="flex-1" asChild>
+                      <Link href="/apps/orders/new?type=po">
+                        <Plus className="size-4" aria-hidden="true" />
+                        Terbitkan PO
+                      </Link>
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          aria-label="Menu penerbitan dokumen"
+                        >
+                          <MoreHorizontal className="size-4" aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href="/apps/orders/new?type=do">
+                            <Truck className="size-4" aria-hidden="true" />
+                            Terbitkan DO Reguler
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => setActiveTab("bulk-contracts")}
+                        >
+                          <Layers className="size-4" aria-hidden="true" />
+                          Surat Jalan Material Alam
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/apps/orders">
+                            <FileText className="size-4" aria-hidden="true" />
+                            Daftar Order
+                          </Link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                ) : (
+                  <Button size="sm" variant="outline" className="w-full" asChild>
+                    <Link href="/apps/orders">
+                      <FileText className="size-4" aria-hidden="true" />
+                      Daftar Order
+                    </Link>
+                  </Button>
+                )}
+              </div>
+
+              <div className="hidden flex-wrap gap-2 sm:flex">
                 {canOperateLogistics && (
                   <>
                     <Button size="sm" asChild>
@@ -1247,13 +1405,15 @@ export default function LogisticsHub({
             <CardTitle className="type-h2">Katalog Vendor</CardTitle>
             <Button
               type="button"
+              size="sm"
+              className="w-full sm:w-auto"
               onClick={() => {
                 setEditingVendor(null);
                 setVendorSheetOpen(true);
               }}
             >
               <Plus className="size-4" aria-hidden="true" />
-              + Vendor
+              Vendor
             </Button>
           </CardHeader>
           <CardContent>
@@ -1380,23 +1540,26 @@ export default function LogisticsHub({
                   Sewa alat, kendaraan &amp; rumah tukang, log HM alat berat, serta operasional armada.
                 </p>
               </div>
-              <TabsList className="h-auto flex-wrap gap-1 rounded-lg border bg-muted/70 p-1">
-                <TabsTrigger value="rentals" className="gap-1.5 px-3 py-1.5">
-                  <Building2 className="size-4" aria-hidden="true" />
+              <TabsList className="flex h-auto w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-lg border bg-muted/70 p-1 scrollbar-none sm:w-auto">
+                <TabsTrigger
+                  value="rentals"
+                  className="shrink-0 gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm"
+                >
+                  <Building2 className="size-3.5 shrink-0 sm:size-4" aria-hidden="true" />
                   <span>Sewa Alat &amp; Rumah</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="equipment-logs"
-                  className="gap-1.5 px-3 py-1.5"
+                  className="shrink-0 gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm"
                 >
-                  <Clock className="size-4" aria-hidden="true" />
+                  <Clock className="size-3.5 shrink-0 sm:size-4" aria-hidden="true" />
                   <span>Log Alat &amp; BBM</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="vehicle-operations"
-                  className="gap-1.5 px-3 py-1.5"
+                  className="shrink-0 gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm"
                 >
-                  <Truck className="size-4" aria-hidden="true" />
+                  <Truck className="size-3.5 shrink-0 sm:size-4" aria-hidden="true" />
                   <span>Operasional Armada</span>
                 </TabsTrigger>
               </TabsList>
@@ -1422,7 +1585,7 @@ export default function LogisticsHub({
                   <CardTitle className="type-h3">
                     Log Alat Berat &amp; BBM
                   </CardTitle>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
                     <Button
                       type="button"
                       size="sm"
@@ -1434,7 +1597,7 @@ export default function LogisticsHub({
                       }}
                     >
                       <Plus className="size-4" aria-hidden="true" />
-                      + Log Alat
+                      Log Alat
                     </Button>
                     <Button
                       type="button"
@@ -1443,37 +1606,55 @@ export default function LogisticsHub({
                       onClick={() => setEquipmentMasterSheetOpen(true)}
                     >
                       <Plus className="size-4" aria-hidden="true" />
-                      + Master Alat
+                      Master Alat
                     </Button>
                   </div>
                 </CardHeader>
 
-                <CardContent className="space-y-6">
-                  <div className="rounded-xl border border-border p-4">
-                    <h3 className="type-h3 text-foreground">
-                      Master Alat Terdaftar
-                    </h3>
-                    {equipmentMasters.length === 0 ? (
-                      <p className="type-p2 mt-2 text-muted-foreground">
-                        Belum ada master alat.
-                      </p>
-                    ) : (
-                      <ul className="mt-2 divide-y">
-                        {equipmentMasters.map((equipment) => (
-                          <li
-                            className="type-p2 flex flex-wrap justify-between gap-2 py-2"
-                            key={equipment.id}
-                          >
-                            <span className="font-medium">
-                              {equipment.code} · {equipment.name}
-                            </span>
-                            <span className="type-p3 text-muted-foreground tabular-nums">
-                              HM {equipment.currentHM} · {equipment.status}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                <CardContent className="space-y-4 sm:space-y-6">
+                  <div className="rounded-xl border border-border p-3 sm:p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="type-h3 text-foreground">
+                        Master Alat Terdaftar ({equipmentMasters.length})
+                      </h3>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs md:hidden"
+                        aria-expanded={masterAlatOpen}
+                        onClick={() => setMasterAlatOpen((prev) => !prev)}
+                      >
+                        <span>{masterAlatOpen ? "Tutup" : "Lihat"}</span>
+                        <ChevronDown
+                          className={`size-3.5 transition-transform ${masterAlatOpen ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
+                      </Button>
+                    </div>
+                    <div className={masterAlatOpen ? "block" : "hidden md:block"}>
+                      {equipmentMasters.length === 0 ? (
+                        <p className="type-p2 mt-2 text-muted-foreground">
+                          Belum ada master alat.
+                        </p>
+                      ) : (
+                        <ul className="mt-2 divide-y">
+                          {equipmentMasters.map((equipment) => (
+                            <li
+                              className="type-p2 flex flex-wrap justify-between gap-2 py-2"
+                              key={equipment.id}
+                            >
+                              <span className="font-medium">
+                                {equipment.code} · {equipment.name}
+                              </span>
+                              <span className="type-p3 text-muted-foreground tabular-nums">
+                                HM {equipment.currentHM} · {equipment.status}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
 
                   {equipmentLogs.length === 0 ? (
@@ -1721,8 +1902,8 @@ export default function LogisticsHub({
             </Select>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <Label htmlFor="hl-name" className="type-p2 font-medium">
                 Nama Alat <span className="text-destructive">*</span>
               </Label>
@@ -1734,7 +1915,7 @@ export default function LogisticsHub({
                 onChange={(e) => setEqLogName(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <Label htmlFor="hl-operator" className="type-p2 font-medium">
                 Operator
               </Label>
@@ -1745,7 +1926,7 @@ export default function LogisticsHub({
                 onChange={(e) => setEqLogOperator(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="col-span-2 space-y-1.5 sm:col-span-1">
               <Label htmlFor="hl-date" className="type-p2 font-medium">
                 Tanggal <span className="text-destructive">*</span>
               </Label>
@@ -1798,7 +1979,7 @@ export default function LogisticsHub({
                 onChange={(e) => setEqLogHours(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
+            <div className="space-y-1.5">
               <Label htmlFor="hl-fuel" className="type-p2 font-medium">
                 BBM (Liter) <span className="text-destructive">*</span>
               </Label>
@@ -1868,7 +2049,7 @@ export default function LogisticsHub({
             </Label>
             <Input id="hm-name" name="name" maxLength={160} required />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="hm-brand" className="type-p2 font-medium">
                 Merek

@@ -1035,7 +1035,7 @@ function DailyProgressModalInner({
       className="max-w-2xl"
       footerNote="Data progres langsung memperbarui realisasi titik kerja dan Kurva S."
       footer={
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
+        <>
           <Button
             type="button"
             variant="outline"
@@ -1063,7 +1063,7 @@ function DailyProgressModalInner({
               Lanjut
             </Button>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <>
               <Button
                 type="button"
                 variant="outline"
@@ -1080,7 +1080,7 @@ function DailyProgressModalInner({
                 ) : (
                   <>
                     <Send className="size-3.5" aria-hidden="true" />
-                    <span>Simpan &amp; Kirim Progres</span>
+                    <span>Simpan &amp; Kirim</span>
                   </>
                 )}
               </Button>
@@ -1099,9 +1099,9 @@ function DailyProgressModalInner({
                   "Simpan Laporan"
                 )}
               </Button>
-            </div>
+            </>
           )}
-        </div>
+        </>
       }
     >
       <div className="space-y-4">

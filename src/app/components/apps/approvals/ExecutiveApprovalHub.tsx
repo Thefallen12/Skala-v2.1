@@ -1247,81 +1247,84 @@ export default function ExecutiveApprovalHub({
       />
 
       {/* 4 Executive KPI Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="type-p3 font-medium text-muted-foreground">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+        <Card className="p-3 sm:p-5">
+          <CardContent className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="type-p3 truncate font-medium text-muted-foreground">
                 Total Antrean
               </span>
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Clock className="size-4" />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-8">
+                <Clock className="size-3.5 sm:size-4" />
               </span>
             </div>
-            <p className="mt-1.5 type-kpi text-foreground">
+            <p className="mt-1.5 type-kpi truncate text-foreground">
               {totalPendingCount} Pengajuan
             </p>
-            <p className="mt-0.5 type-p3 text-muted-foreground">
+            <p className="mt-0.5 hidden type-p3 text-muted-foreground sm:block">
               Menunggu keputusan Direksi
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="type-p3 font-medium text-muted-foreground">
+        <Card className="p-3 sm:p-5">
+          <CardContent className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="type-p3 truncate font-medium text-muted-foreground">
                 Nilai Otorisasi
               </span>
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Landmark className="size-4" />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-8">
+                <Landmark className="size-3.5 sm:size-4" />
               </span>
             </div>
-            <p className="mt-1.5 type-kpi text-primary">
+            <p
+              className="mt-1.5 type-kpi truncate text-primary"
+              title={currency(totalExposureAmount)}
+            >
               {currency(totalExposureAmount)}
             </p>
-            <p className="mt-0.5 type-p3 text-muted-foreground">
+            <p className="mt-0.5 hidden type-p3 text-muted-foreground sm:block">
               Akumulasi PO, tiket, upah &amp; subkon
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="type-p3 font-medium text-muted-foreground">
+        <Card className="p-3 sm:p-5">
+          <CardContent className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="type-p3 truncate font-medium text-muted-foreground">
                 PO &amp; Pengadaan
               </span>
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <QrCode className="size-4" />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-8">
+                <QrCode className="size-3.5 sm:size-4" />
               </span>
             </div>
-            <p className="mt-1.5 type-kpi text-foreground">
+            <p className="mt-1.5 type-kpi truncate text-foreground">
               {purchaseOrders.length} PO · {directPurchases.length} Belanja
             </p>
-            <p className="mt-0.5 type-p3 text-muted-foreground">
+            <p className="mt-0.5 hidden type-p3 text-muted-foreground sm:block">
               Siap tanda tangan QR Direksi
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="type-p3 font-medium text-muted-foreground">
+        <Card className="p-3 sm:p-5">
+          <CardContent className="min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="type-p3 truncate font-medium text-muted-foreground">
                 Tiket &amp; Konstruksi
               </span>
-              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <ShieldCheck className="size-4" />
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-8">
+                <ShieldCheck className="size-3.5 sm:size-4" />
               </span>
             </div>
-            <p className="mt-1.5 type-kpi text-foreground">
+            <p className="mt-1.5 type-kpi truncate text-foreground">
               {tickets.length} Tiket · {wageRows.length} Proyek
               {pendingDrawings.length > 0
                 ? ` · ${pendingDrawings.length} DED`
                 : ""}
             </p>
-            <p className="mt-0.5 type-p3 text-muted-foreground">
+            <p className="mt-0.5 hidden type-p3 text-muted-foreground sm:block">
               Upah, termin, SPK, CCO, BAST &amp; DED
             </p>
           </CardContent>

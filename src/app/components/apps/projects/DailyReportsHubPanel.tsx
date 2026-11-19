@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  Ellipsis,
   ExternalLink,
   FileText,
   Filter,
@@ -24,6 +25,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -387,8 +394,8 @@ export default function DailyReportsHubPanel({
     <div className="space-y-5">
       {/* Top Action & Summary Strip */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="border-primary/30 bg-primary/5 lg:col-span-1">
-          <CardContent className="flex h-full flex-col justify-between gap-4 p-4">
+        <Card className="border-primary/30 bg-primary/5 p-0 lg:col-span-1">
+          <CardContent className="flex h-full flex-col justify-between gap-3 p-3.5 sm:gap-4 sm:p-5">
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <Badge variant="outline" className="bg-background/80">
@@ -406,7 +413,7 @@ export default function DailyReportsHubPanel({
                 aktif sudah mengirim laporan hari ini.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex">
               {canSubmitProgress && (
                 <Button
                   type="button"
@@ -624,8 +631,8 @@ export default function DailyReportsHubPanel({
 
       {/* Filter Bar */}
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-2.5 p-3.5">
-          <div className="relative w-full sm:w-56">
+        <CardContent className="grid grid-cols-2 gap-2 p-3 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5 sm:p-3.5">
+          <div className="relative col-span-2 w-full sm:col-span-1 sm:w-56">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
@@ -641,7 +648,7 @@ export default function DailyReportsHubPanel({
             />
           </div>
 
-          <div className="w-40">
+          <div className="w-full sm:w-40">
             <DatePicker
               clearable
               value={selectedDate}
@@ -661,7 +668,7 @@ export default function DailyReportsHubPanel({
               setPage(1);
             }}
           >
-            <SelectTrigger className="w-44" aria-label="Filter proyek">
+            <SelectTrigger className="w-full sm:w-44" aria-label="Filter proyek">
               <SelectValue placeholder="Semua Proyek" />
             </SelectTrigger>
             <SelectContent>
@@ -681,7 +688,7 @@ export default function DailyReportsHubPanel({
               setPage(1);
             }}
           >
-            <SelectTrigger className="w-48" aria-label="Filter jenis pekerjaan">
+            <SelectTrigger className="w-full sm:w-48" aria-label="Filter jenis pekerjaan">
               <Filter className="mr-1 size-3.5 text-muted-foreground" />
               <SelectValue placeholder="Semua Jenis Pekerjaan" />
             </SelectTrigger>
@@ -711,7 +718,7 @@ export default function DailyReportsHubPanel({
               setPage(1);
             }}
           >
-            <SelectTrigger className="w-40" aria-label="Filter PIC lapangan">
+            <SelectTrigger className="w-full sm:w-40" aria-label="Filter PIC lapangan">
               <SelectValue placeholder="Semua PIC" />
             </SelectTrigger>
             <SelectContent>
@@ -724,7 +731,7 @@ export default function DailyReportsHubPanel({
             </SelectContent>
           </Select>
 
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground">
+          <label className="col-span-2 flex cursor-pointer items-center gap-2 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground sm:col-span-1">
             <Checkbox
               checked={onlyConstraints}
               onCheckedChange={(checked) => {
@@ -735,7 +742,7 @@ export default function DailyReportsHubPanel({
             <span>Ada Kendala</span>
           </label>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:ml-auto">
             {(selectedDate ||
               selectedProjectId !== "ALL" ||
               selectedWorkType !== "ALL" ||
@@ -779,7 +786,148 @@ export default function DailyReportsHubPanel({
             </div>
           ) : (
             <div className="space-y-4">
-              <Table pagination={false}>
+              {/* Mobile Card List (< md) */}
+              <div className="space-y-3 p-3 md:hidden">
+                {visibleReports.map((item) => {
+                  const pdfKey = `${item.project.id}-${item.reportDate}-pdf`;
+                  const wt = formatWorkTypeBadge(item.project.jenisPekerjaan);
+                  return (
+                    <div
+                      key={`${item.project.id}-${item.id}`}
+                      className="rounded-xl border border-border bg-card p-3 shadow-2xs space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="type-p2 font-bold text-foreground">
+                            {formatIndoDate(item.reportDate)}
+                          </p>
+                          <p className="type-p3 text-muted-foreground">
+                            Cuaca: {item.weather || "Cerah"}
+                          </p>
+                        </div>
+                        {item.progress !== null && (
+                          <Badge variant="outline" className="text-primary font-bold">
+                            +{item.progress.toFixed(1)}%
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg bg-muted/40 p-2 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <Link
+                            href={`/apps/projects?view=detail&code=${encodeURIComponent(item.project.code)}`}
+                            className="font-semibold text-primary hover:underline line-clamp-1"
+                          >
+                            {item.project.title}
+                          </Link>
+                          <Badge variant="secondary" className="shrink-0 text-[10px]">
+                            {wt.shortLabel}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          PIC: {item.project.fieldPicName || "Tim Lapangan"} · {item.workersCount || 0} pekerja
+                        </p>
+                      </div>
+
+                      {item.workSummary && (
+                        <p className="text-xs text-foreground line-clamp-2">
+                          {item.workSummary}
+                        </p>
+                      )}
+
+                      {/* Photo preview */}
+                      {item.photoUrls.length > 0 && (
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                          {item.photoUrls.map((url, idx) => (
+                            <button
+                              key={url}
+                              type="button"
+                              onClick={() =>
+                                setLightboxMedia({
+                                  url: withLocalPhotoPreview(url),
+                                  title: `${item.project.title} · ${formatIndoDate(item.reportDate)} (#${idx + 1})`,
+                                  allPhotos: item.photoUrls,
+                                  index: idx,
+                                })
+                              }
+                              className="relative size-12 shrink-0 overflow-hidden rounded-md border border-border"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={`Foto ${idx + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-border/60">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={downloadingKey === pdfKey}
+                          onClick={() =>
+                            void handleDownloadDailyPdf(
+                              item.project.id,
+                              item.project.code,
+                              item.reportDate,
+                              "pdf",
+                            )
+                          }
+                          className="h-8 gap-1 px-2 text-xs truncate"
+                        >
+                          {downloadingKey === pdfKey ? (
+                            <Loader2 className="size-3.5 animate-spin shrink-0" />
+                          ) : (
+                            <FileText className="size-3.5 shrink-0" aria-hidden="true" />
+                          )}
+                          <span className="truncate">PDF Harian</span>
+                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1 px-2 text-xs truncate"
+                            >
+                              <Ellipsis className="size-3.5 shrink-0" aria-hidden="true" />
+                              <span className="truncate">Aksi Lain</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-44">
+                            <DropdownMenuItem onSelect={() => onOpenSendProgress(item.project)}>
+                              <Send className="size-3.5" aria-hidden="true" />
+                              Kirim Progres
+                            </DropdownMenuItem>
+                            {canReportForProject(item.project) && (
+                              <DropdownMenuItem
+                                onSelect={() =>
+                                  onOpenDailyProgress(item.project, {
+                                    date: item.reportDate,
+                                  })
+                                }
+                              >
+                                <Camera className="size-3.5" aria-hidden="true" />
+                                Perbarui Laporan
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table (md+) */}
+              <div className="hidden md:block">
+                <Table pagination={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-32">Tanggal</TableHead>
@@ -981,6 +1129,7 @@ export default function DailyReportsHubPanel({
                   })}
                 </TableBody>
               </Table>
+              </div>
 
               <TablePaginationControls
                 count={filteredReports.length}

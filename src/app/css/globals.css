@@ -1024,54 +1024,75 @@ main {
 }
 
 @utility type-h1 {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: -0.02em;
+  @media (min-width: 640px) {
+    font-size: 1.25rem;
+  }
   @media (min-width: 768px) {
     font-size: 1.5rem;
   }
 }
 
 @utility type-h2 {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: -0.01em;
+  @media (min-width: 640px) {
+    font-size: 1rem;
+  }
   @media (min-width: 768px) {
     font-size: 1.125rem;
   }
 }
 
 @utility type-h3 {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.4;
+  @media (min-width: 640px) {
+    font-size: 0.875rem;
+  }
   @media (min-width: 768px) {
     font-size: 0.9375rem;
   }
 }
 
 @utility type-p1 {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   line-height: 1.5;
+  @media (min-width: 640px) {
+    font-size: 0.875rem;
+  }
 }
 
 @utility type-p2 {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: 1.45;
+  @media (min-width: 640px) {
+    font-size: 0.8125rem;
+  }
 }
 
 @utility type-p3 {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
+  @media (min-width: 640px) {
+    font-size: 0.75rem;
+  }
 }
 
 @utility type-kpi {
-  font-size: 1.25rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  @media (min-width: 640px) {
+    font-size: 1.25rem;
+  }
   @media (min-width: 768px) {
     font-size: 1.375rem;
   }
@@ -1273,8 +1294,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 @media (pointer: coarse) {
-  [data-slot="button"]:not([data-compact="true"]) {
-    min-height: 2.75rem;
+  [data-slot="button"]:not([data-compact="true"]):not([data-size="sm"]):not([data-size="xs"]):not([data-size="icon"]) {
+    min-height: 2.5rem;
   }
 }
 

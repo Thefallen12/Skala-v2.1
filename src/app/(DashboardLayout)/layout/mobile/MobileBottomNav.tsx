@@ -216,7 +216,7 @@ export function MobileBottomNav({
     <nav
       aria-label="Navigasi Bawah Mobile"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      className="fixed inset-x-0 bottom-0 z-30 flex min-h-16 items-center justify-around border-t border-border bg-background/95 px-1 backdrop-blur-lg md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex min-h-14 sm:min-h-16 items-center justify-around border-t border-border bg-background/95 px-1 backdrop-blur-lg md:hidden"
     >
       {items.map((item) => {
         const Icon = item.icon;
@@ -228,14 +228,14 @@ export function MobileBottomNav({
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`type-p3 flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            className={`flex h-14 sm:h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[10.5px] sm:text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
               active
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <span
-              className={`relative flex h-7 w-11 items-center justify-center rounded-full transition-colors ${
+              className={`relative flex h-6 w-10 sm:h-7 sm:w-11 items-center justify-center rounded-full transition-colors ${
                 active ? "bg-primary/15 text-primary" : ""
               }`}
             >

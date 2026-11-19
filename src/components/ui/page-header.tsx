@@ -40,8 +40,8 @@ export function PageHeader({
     <header
       className={cn(
         variant === "card"
-          ? "mb-4 rounded-xl border border-border bg-card px-4 py-3.5 text-card-foreground shadow-2xs sm:mb-5 sm:px-5 sm:py-4"
-          : "mb-4 border-b border-border pb-4 sm:mb-5",
+          ? "mb-3 rounded-xl border border-border bg-card px-3 py-2.5 text-card-foreground shadow-2xs sm:mb-5 sm:px-5 sm:py-4"
+          : "mb-3 border-b border-border pb-3 sm:mb-5 sm:pb-4",
         className,
       )}
     >
@@ -92,7 +92,7 @@ export function PageHeader({
         </div>
 
         {actions ? (
-          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end [&>*]:flex-1 sm:[&>*]:flex-initial">
+          <div className="grid w-full shrink-0 grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2 sm:justify-end [&>*:only-child]:col-span-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*]:flex-initial">
             {actions}
           </div>
         ) : null}

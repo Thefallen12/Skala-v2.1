@@ -81,9 +81,9 @@ export default function NotificationBell({
             type="button"
             suppressHydrationWarning
             aria-label={`Notifikasi${unreadCount ? `, ${unreadCount} belum dibaca` : ""}`}
-            className="relative flex size-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="relative flex size-8 sm:size-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <Bell className="size-5" aria-hidden="true" />
+            <Bell className="size-4 sm:size-5" aria-hidden="true" />
             {unreadCount > 0 && (
               <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
                 {unreadCount > 99 ? "99+" : unreadCount}

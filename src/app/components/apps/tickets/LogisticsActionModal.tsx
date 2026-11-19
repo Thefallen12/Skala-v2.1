@@ -2,7 +2,14 @@
 
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ExternalLink, FileText, Plus, Send, Truck } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  MoreHorizontal,
+  Plus,
+  Send,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   FulfillmentStatus,
@@ -23,6 +30,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DialogClose } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -134,58 +147,60 @@ function PurchaseOrderRowCard({
 }) {
   const isApproved = po.status === POStatus.APPROVED;
   const isPaid = Boolean(po.paidAt);
+  const canMarkSent = isApproved && !po.vendorPoSentAt && !isPaid;
 
   return (
     <div
       className={cn(
-        "space-y-2 rounded-xl border p-3 transition-colors",
+        "space-y-2 rounded-xl border p-2.5 transition-colors sm:p-3",
         isSelected ? "border-primary bg-primary/5" : "border-border bg-card",
       )}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <button
           type="button"
           onClick={() => onSelect(po.publicCode)}
-          className="text-left"
+          className="min-w-0 flex-1 text-left"
         >
-          <p className="type-p2 font-semibold text-foreground">
+          <p className="type-p2 truncate font-semibold text-foreground">
             PO {po.poNumber}
           </p>
-          <p className="type-p3 text-muted-foreground">{po.vendorName}</p>
+          <p className="type-p3 truncate text-muted-foreground">
+            {po.vendorName}
+          </p>
         </button>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge
-            variant={
-              isPaid || (isApproved && po.vendorInvoiceUrl)
-                ? "lightSuccess"
-                : "lightWarning"
-            }
-          >
-            {isPaid
-              ? "Lunas"
-              : isApproved && po.vendorInvoiceUrl
-                ? "Menunggu Finance"
-                : isApproved
-                  ? "Siap Upload Invoice"
-                  : po.status === POStatus.PENDING_APPROVAL
-                    ? "Menunggu Direktur"
-                    : po.status === POStatus.REJECTED
-                      ? "Ditolak"
-                      : po.status === POStatus.CANCELLED
-                        ? "Dibatalkan"
-                        : "Menunggu Finance"}
-          </Badge>
-          <Button asChild size="icon" variant="outline" aria-label={`Cetak PO ${po.poNumber}`}>
-            <a href={`/d/${po.publicCode}`}>
-              <FileText className="size-4" aria-hidden="true" />
-            </a>
-          </Button>
-          {isApproved && !po.vendorPoSentAt && !isPaid && (
+        <Badge
+          className="shrink-0"
+          variant={
+            isPaid || (isApproved && po.vendorInvoiceUrl)
+              ? "lightSuccess"
+              : "lightWarning"
+          }
+        >
+          {isPaid
+            ? "Lunas"
+            : isApproved && po.vendorInvoiceUrl
+              ? "Menunggu Finance"
+              : isApproved
+                ? "Siap Upload Invoice"
+                : po.status === POStatus.PENDING_APPROVAL
+                  ? "Menunggu Direktur"
+                  : po.status === POStatus.REJECTED
+                    ? "Ditolak"
+                    : po.status === POStatus.CANCELLED
+                      ? "Dibatalkan"
+                      : "Menunggu Finance"}
+        </Badge>
+      </div>
+
+      <div className="flex items-center justify-end gap-1.5">
+        {canMarkSent ? (
+          <>
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              className="flex-1 sm:flex-initial"
               disabled={isPending}
               onClick={() => onMarkSent(po.publicCode)}
             >
@@ -194,24 +209,72 @@ function PurchaseOrderRowCard({
                 ? "Mengirim..."
                 : "Kirim Vendor"}
             </Button>
-          )}
-        </div>
-      </div>
-
-      {po.invoiceId && (
-        <div>
-          <Button asChild size="sm" variant="outline">
-            <a
-              href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(po.invoiceId)}`}
-              target="_blank"
-              rel="noreferrer"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label={`Menu aksi PO ${po.poNumber}`}
+                >
+                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <a href={`/d/${po.publicCode}`}>
+                    <FileText className="size-4" aria-hidden="true" />
+                    Cetak PO
+                  </a>
+                </DropdownMenuItem>
+                {po.invoiceId && (
+                  <DropdownMenuItem asChild>
+                    <a
+                      href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(po.invoiceId)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink className="size-4" aria-hidden="true" />
+                      Cetak Invoice
+                    </a>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        ) : (
+          <>
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="flex-1 sm:flex-initial"
             >
-              <ExternalLink className="size-3.5" aria-hidden="true" />
-              Cetak Invoice
-            </a>
-          </Button>
-        </div>
-      )}
+              <a href={`/d/${po.publicCode}`}>
+                <FileText className="size-3.5" aria-hidden="true" />
+                Cetak PO
+              </a>
+            </Button>
+            {po.invoiceId && (
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="flex-1 sm:flex-initial"
+              >
+                <a
+                  href={`/api/documents/transactions?kind=INVOICE&id=${encodeURIComponent(po.invoiceId)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                  Cetak Invoice
+                </a>
+              </Button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -221,13 +284,11 @@ function DirectVendorPurchasePanel({
   pendingItems,
   vendors,
   onCreated,
-  onCancel,
 }: {
   ticket: TicketRow;
   pendingItems: TicketRow["items"];
   vendors: LogisticsVendorOption[];
   onCreated: (publicCode: string, message: string) => void;
-  onCancel?: () => void;
 }) {
   const [vendorId, setVendorId] = useState("");
   const [bankAccountId, setBankAccountId] = useState("");
@@ -366,7 +427,7 @@ function DirectVendorPurchasePanel({
   };
 
   return (
-    <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+    <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3 sm:space-y-4 sm:p-4">
       <div>
         <h3 className="type-h3 text-foreground">
           Pembelian Vendor Langsung (Tanpa Mapping Gudang)
@@ -403,7 +464,7 @@ function DirectVendorPurchasePanel({
               value={selectedBank?.id ?? ""}
               onValueChange={setBankAccountId}
             >
-              <SelectTrigger className="h-10 w-full">
+              <SelectTrigger className="h-9 w-full sm:h-10 [&>span]:truncate">
                 <SelectValue placeholder="Pilih rekening" />
               </SelectTrigger>
               <SelectContent>
@@ -415,7 +476,7 @@ function DirectVendorPurchasePanel({
               </SelectContent>
             </Select>
           ) : (
-            <p className="type-p3 flex h-10 items-center rounded-md border border-border bg-card px-3 text-muted-foreground">
+            <p className="type-p3 flex h-9 items-center rounded-md border border-border bg-card px-3 text-muted-foreground sm:h-10">
               {selectedVendor ? "Tunai (Cash)" : "Pilih vendor terlebih dahulu"}
             </p>
           )}
@@ -432,7 +493,7 @@ function DirectVendorPurchasePanel({
             return (
               <div
                 key={item.id}
-                className="grid gap-2 rounded-lg border border-border bg-card p-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-center"
+                className="grid gap-2 rounded-lg border border-border bg-card p-2.5 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-center sm:p-3"
               >
                 <div className="min-w-0">
                   <p className="type-p2 truncate font-semibold text-foreground">
@@ -533,34 +594,21 @@ function DirectVendorPurchasePanel({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-border pt-3">
         <div>
           <span className="type-p3 text-muted-foreground">Total PO: </span>
           <span className="type-p1 font-bold text-primary tabular-nums">
             {formatCurrency(grandTotal)}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {onCancel && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isPending}
-              onClick={onCancel}
-            >
-              Batal
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="default"
-            disabled={isPending || grandTotal <= 0 || !selectedVendor}
-            onClick={handleSubmit}
-          >
-            {isPending ? "Menyimpan..." : "Buat PO"}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          disabled={isPending || grandTotal <= 0 || !selectedVendor}
+          onClick={handleSubmit}
+        >
+          {isPending ? "Menyimpan..." : "Buat PO"}
+        </Button>
       </div>
 
       {errorMessage && (
@@ -885,13 +933,13 @@ export default function LogisticsActionModal({
     >
       <form
         id="logistics-action-form"
-        className="space-y-4"
+        className="space-y-3 sm:space-y-4"
         onSubmit={submit}
       >
         {pendingContractItems.length > 0 && (
-          <section className="space-y-2 rounded-xl border border-teal-500/30 bg-teal-500/10 p-3.5">
+          <section className="space-y-2 rounded-xl border border-teal-500/30 bg-teal-500/10 p-3 sm:p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
+              <div className="min-w-0">
                 <h3 className="type-h3 text-foreground">
                   Material Alam ({pendingContractItems.length} item kontrak)
                 </h3>
@@ -918,7 +966,7 @@ export default function LogisticsActionModal({
         )}
 
         {allDeliveryOrders.length > 0 && (
-          <section className="space-y-2.5 rounded-xl border border-border bg-muted/20 p-3.5">
+          <section className="space-y-2.5 rounded-xl border border-border bg-muted/20 p-3 sm:p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="type-h3 text-foreground">
                 Surat Jalan ({allDeliveryOrders.length})
@@ -946,12 +994,12 @@ export default function LogisticsActionModal({
                 setActionType(value);
               }
             }}
-            className="grid gap-3 sm:grid-cols-2"
+            className="grid gap-2.5 sm:grid-cols-2 sm:gap-3"
           >
             <Label
               htmlFor="logistics-mode-warehouse"
               className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors",
+                "flex cursor-pointer items-center gap-2.5 rounded-xl border p-2.5 transition-colors sm:gap-3 sm:p-3",
                 actionType === "READY_WAREHOUSE"
                   ? "border-primary bg-primary/10"
                   : "border-border bg-card",
@@ -978,7 +1026,7 @@ export default function LogisticsActionModal({
             <Label
               htmlFor="logistics-mode-buy"
               className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors",
+                "flex cursor-pointer items-center gap-2.5 rounded-xl border p-2.5 transition-colors sm:gap-3 sm:p-3",
                 actionType === "BUY_STORE"
                   ? "border-primary bg-primary/10"
                   : "border-border bg-card",
@@ -1002,7 +1050,7 @@ export default function LogisticsActionModal({
         {actionType === "READY_WAREHOUSE" &&
           hasItemsNeedingNewDo &&
           hasPaidPurchaseOrder && (
-            <section className="grid gap-3 rounded-xl border border-border p-3.5 sm:grid-cols-2">
+            <section className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-2 sm:p-3.5">
               <div className="space-y-1.5">
                 <Label htmlFor="external-vehicle-document" className="type-p2">
                   No. STNK / STK (opsional)
@@ -1099,7 +1147,7 @@ export default function LogisticsActionModal({
         {actionType === "READY_WAREHOUSE" &&
           hasItemsNeedingNewDo &&
           !hasPaidPurchaseOrder && (
-            <section className="space-y-2 rounded-xl border border-border p-3.5">
+            <section className="space-y-2 rounded-xl border border-border p-3 sm:p-3.5">
               <Label htmlFor="internal-vehicle" className="type-p2 font-medium">
                 Kendaraan Master <span className="text-destructive">*</span>
               </Label>
@@ -1108,7 +1156,10 @@ export default function LogisticsActionModal({
                 onValueChange={setSelectedVehicleId}
                 disabled={isPending || availableVehicles.length === 0}
               >
-                <SelectTrigger id="internal-vehicle" className="h-10 w-full">
+                <SelectTrigger
+                  id="internal-vehicle"
+                  className="h-9 w-full sm:h-10 [&>span]:truncate"
+                >
                   <SelectValue placeholder="Pilih kendaraan tersedia" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1130,7 +1181,7 @@ export default function LogisticsActionModal({
           )}
 
         {actionType === "BUY_STORE" && allPurchaseOrders.length > 0 && (
-          <section className="space-y-3 rounded-xl border border-border p-3.5">
+          <section className="space-y-3 rounded-xl border border-border p-3 sm:p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="type-h3 text-foreground">
                 Daftar PO ({allPurchaseOrders.length})
@@ -1258,7 +1309,7 @@ export default function LogisticsActionModal({
               <Label
                 htmlFor="po-mode-direct-vendor"
                 className={cn(
-                  "flex cursor-pointer items-center gap-2.5 rounded-xl border p-3",
+                  "flex cursor-pointer items-center gap-2.5 rounded-xl border p-2.5 sm:p-3",
                   poCreateMode === "DIRECT_VENDOR"
                     ? "border-primary bg-primary/10"
                     : "border-border bg-card",
@@ -1281,7 +1332,7 @@ export default function LogisticsActionModal({
               <Label
                 htmlFor="po-mode-catalog"
                 className={cn(
-                  "flex cursor-pointer items-center gap-2.5 rounded-xl border p-3",
+                  "flex cursor-pointer items-center gap-2.5 rounded-xl border p-2.5 sm:p-3",
                   poCreateMode === "CATALOG_PO"
                     ? "border-primary bg-primary/10"
                     : "border-border bg-card",
@@ -1309,13 +1360,6 @@ export default function LogisticsActionModal({
                   onOpenChange(false);
                   onSuccess();
                   router.push(`/d/${publicCode}`);
-                }}
-                onCancel={() => {
-                  if (allPurchaseOrders.length > 0) {
-                    setCreatingNewPo(false);
-                  } else {
-                    setActionType("READY_WAREHOUSE");
-                  }
                 }}
               />
             ) : (

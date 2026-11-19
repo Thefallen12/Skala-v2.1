@@ -132,37 +132,31 @@ export default function PurchaseOrderInvoiceUpload({
     if (invoiceUrl) {
       return (
         <>
-          <div className="flex items-start gap-1.5">
-            <div className="flex w-10 flex-col items-center">
-              <ActionIconButton
-                label="Lihat invoice vendor"
-                tooltip="Lihat Nota"
-                icon={ExternalLink}
-                href={invoiceUrl}
-                target="_blank"
-                rel="noreferrer"
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <ActionIconButton
+              label="Lihat invoice vendor"
+              tooltip="Lihat Nota"
+              icon={ExternalLink}
+              href={invoiceUrl}
+              target="_blank"
+              rel="noreferrer"
+            />
             {invoiceId && (
-              <div className="flex w-10 flex-col items-center">
-                <ActionIconButton
-                  label="Pratinjau invoice"
-                  tooltip="Pratinjau Invoice"
-                  icon={FileText}
-                  onClick={() => setInvoicePreviewOpen(true)}
-                />
-              </div>
+              <ActionIconButton
+                label="Pratinjau invoice"
+                tooltip="Pratinjau Invoice"
+                icon={FileText}
+                onClick={() => setInvoicePreviewOpen(true)}
+              />
             )}
             {canReplace && (
-              <div className="flex w-10 flex-col items-center">
-                <ActionIconButton
-                  label="Ganti Foto/PDF Nota"
-                  tooltip="Ganti Nota"
-                  icon={FilePenLine}
-                  disabled={isPending}
-                  onClick={() => setResolvedOpen(true)}
-                />
-              </div>
+              <ActionIconButton
+                label="Ganti Foto/PDF Nota"
+                tooltip="Ganti Nota"
+                icon={FilePenLine}
+                disabled={isPending}
+                onClick={() => setResolvedOpen(true)}
+              />
             )}
           </div>
           {invoiceId && (
@@ -363,7 +357,7 @@ function PurchaseOrderInvoiceFormBody({
   return (
     <form
       id={`purchase-order-invoice-form-${publicCode}`}
-      className="max-h-[70vh] space-y-5 overflow-y-auto px-1"
+      className="space-y-4 sm:space-y-5"
       onSubmit={submitInvoice}
     >
       <InvoiceDetailsFields
@@ -376,8 +370,8 @@ function PurchaseOrderInvoiceFormBody({
         bankAccount={paymentAccountNumber}
         bankHolder={paymentAccountName}
       />
-      <div className="space-y-2 rounded-lg border border-border p-3.5">
-        <div className="flex items-center justify-between gap-2">
+      <div className="space-y-2 rounded-lg border border-border p-3 sm:p-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="type-p2 font-semibold text-foreground">
             Dokumen Invoice / Bon
           </p>
@@ -537,11 +531,17 @@ function ReplacePurchaseOrderInvoiceFormBody({
       onSubmit={submitReplacement}
     >
       {currentInvoiceUrl && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3.5 py-2.5">
-          <p className="type-p3 text-muted-foreground">
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <p className="type-p3 min-w-0 text-muted-foreground">
             Berkas nota saat ini akan diganti dengan berkas baru.
           </p>
-          <Button type="button" size="sm" variant="outline" asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full shrink-0 sm:w-auto"
+            asChild
+          >
             <a href={currentInvoiceUrl} target="_blank" rel="noreferrer">
               <ExternalLink className="size-3.5" aria-hidden="true" />
               Lihat Nota Lama
@@ -549,8 +549,8 @@ function ReplacePurchaseOrderInvoiceFormBody({
           </Button>
         </div>
       )}
-      <div className="space-y-2 rounded-lg border border-border p-3.5">
-        <div className="flex items-center justify-between gap-2">
+      <div className="space-y-2 rounded-lg border border-border p-3 sm:p-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="type-p2 font-semibold text-foreground">
             Berkas Invoice / Bon Pengganti
           </p>

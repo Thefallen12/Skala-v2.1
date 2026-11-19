@@ -17,10 +17,62 @@ export default async function DinasReportRoute() {
   const projects = await prisma.project.findMany({
     where: { isDeleted: false },
     select: {
-      kelompokTani: true,
+      id: true,
+      code: true,
       name: true,
       title: true,
+      kelompokTani: true,
+      jenisPekerjaan: true,
+      status: true,
       progress: true,
+      pagu: true,
+      startDate: true,
+      endDate: true,
+      fieldPic: {
+        select: { name: true },
+      },
+      location: true,
+      address: true,
+      clientName: true,
+      vendor: true,
+      dailyReports: {
+        orderBy: [{ reportDate: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          reportDate: true,
+          progress: true,
+          workSummary: true,
+          weather: true,
+          workersCount: true,
+          notes: true,
+          progressPhotos: {
+            select: { url: true, fileUrl: true },
+          },
+        },
+      },
+      progressSubmissions: {
+        orderBy: { submittedAt: "desc" },
+        select: {
+          id: true,
+          periodType: true,
+          periodLabel: true,
+          actualProgress: true,
+          plannedProgress: true,
+          deviation: true,
+          submittedAt: true,
+        },
+      },
+      workPoints: {
+        select: {
+          id: true,
+          title: true,
+          proposedVolume: true,
+          completedVolume: true,
+          proposedUnit: true,
+          proposedUnitPrice: true,
+          progress: true,
+        },
+      },
     },
   });
 

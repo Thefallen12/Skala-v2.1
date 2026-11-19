@@ -122,31 +122,26 @@ export default function MaterialDeliveryModal({
   const modalKey = `${open ? "open" : "closed"}:${defaultContractId ?? ""}:${defaultTicketId ?? ""}:${lockedProjectId ?? ""}:${lockedTicketId ?? ""}`;
 
   return (
-    <GlobalModal
-      isOpen={open}
-      onClose={() => onOpenChange(false)}
+    <MaterialDeliveryFormBody
+      key={modalKey}
+      open={open}
       onOpenChange={onOpenChange}
-      title="Terbitkan Surat Jalan Material Alam"
-      description="Penerbitan Surat Jalan resmi untuk material alam (batu, pasir, sirtu, tanah urug) berdasarkan Kontrak Payung."
-      className="sm:max-w-xl"
-    >
-      <MaterialDeliveryFormBody
-        key={modalKey}
-        activeContracts={activeContracts}
-        projects={projects}
-        contractTickets={contractTickets}
-        defaultContractId={defaultContractId}
-        defaultTicketId={defaultTicketId}
-        lockedProjectId={lockedProjectId}
-        lockedTicketId={lockedTicketId}
-        onClose={() => onOpenChange(false)}
-        onSaved={onSaved}
-      />
-    </GlobalModal>
+      activeContracts={activeContracts}
+      projects={projects}
+      contractTickets={contractTickets}
+      defaultContractId={defaultContractId}
+      defaultTicketId={defaultTicketId}
+      lockedProjectId={lockedProjectId}
+      lockedTicketId={lockedTicketId}
+      onClose={() => onOpenChange(false)}
+      onSaved={onSaved}
+    />
   );
 }
 
 function MaterialDeliveryFormBody({
+  open,
+  onOpenChange,
   activeContracts,
   projects,
   contractTickets,
@@ -157,6 +152,8 @@ function MaterialDeliveryFormBody({
   onClose,
   onSaved,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   activeContracts: MaterialContractRow[];
   projects: DeliveryProjectOption[];
   contractTickets: ContractTicketDeliveryOption[];
@@ -414,34 +411,7 @@ function MaterialDeliveryFormBody({
     });
   };
 
-  if (activeContracts.length === 0) {
-    return (
-      <EmptyState
-        title="Belum Ada Kontrak Aktif"
-        description="Logistik atau Administrasi perlu membuat Kontrak Payung Material Alam yang aktif sebelum mencatat Surat Jalan."
-        action={
-          <Button type="button" variant="outline" onClick={onClose}>
-            Tutup
-          </Button>
-        }
-      />
-    );
-  }
-
-  if (availableTickets.length === 0) {
-    return (
-      <EmptyState
-        icon={Ticket}
-        title="Belum Ada Tiket Material Alam Aktif"
-        description="Surat Jalan Material Alam wajib ditautkan ke tiket permintaan aktif dari Tim Lapangan."
-        action={
-          <Button type="button" variant="outline" onClick={onClose}>
-            Tutup
-          </Button>
-        }
-      />
-    );
-  }
+  const formId = "material-delivery-create-form";
 
   const resolvedProjectLabel = (() => {
     const targetId = selectedTicket?.projectId || projectId;
@@ -450,351 +420,390 @@ function MaterialDeliveryFormBody({
     return selectedTicket?.projectName ?? "Proyek Terkait Tiket";
   })();
 
-  if (issuedDelivery) {
-    return (
-      <>
-        <div className="space-y-4">
-          <Alert
-            variant="lightsuccess"
-            className="border border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100"
-          >
-            <CheckCircle2 className="size-4" aria-hidden="true" />
-            <AlertTitle>
-              Surat Jalan {issuedDelivery.doNumber} Berhasil Diterbitkan
-            </AlertTitle>
-            <AlertDescription className="text-emerald-900/90 dark:text-emerald-100/90">
-              Dokumen resmi siap dicetak atau dibagikan ke vendor / tim
-              lapangan. Lampiran foto dan info armada vendor dapat dilengkapi
-              menyusul jika belum tersedia saat ini.
-            </AlertDescription>
-          </Alert>
+  const isEmptyState =
+    activeContracts.length === 0 || availableTickets.length === 0;
 
-          <dl className="type-p2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3.5">
-            <dt className="text-muted-foreground">No. Surat Jalan</dt>
-            <dd className="text-right font-mono font-bold text-primary">
-              {issuedDelivery.doNumber}
-            </dd>
-            <dt className="text-muted-foreground">Material &amp; Volume</dt>
-            <dd className="text-right font-semibold">
-              {issuedDelivery.materialType} ·{" "}
-              {formatMaterialVolume(
-                issuedDelivery.quantityReceived,
-                issuedDelivery.unit,
-              )}
-            </dd>
-            <dt className="text-muted-foreground">Vendor Kontrak</dt>
-            <dd className="text-right font-medium">
-              {issuedDelivery.vendorName}
-            </dd>
-            <dt className="text-muted-foreground">Armada &amp; Mover</dt>
-            <dd className="text-right font-medium">
-              Disediakan Vendor Sendiri
-            </dd>
-            <dt className="text-muted-foreground">Proyek Tujuan</dt>
-            <dd className="text-right font-medium">
-              {issuedDelivery.projectLabel}
-            </dd>
-            <dt className="text-muted-foreground">Tanggal</dt>
-            <dd className="text-right tabular-nums">
-              {issuedDelivery.deliveryDate}
-            </dd>
-          </dl>
+  const modalFooter = isEmptyState ? (
+    <Button type="button" variant="outline" onClick={onClose}>
+      Tutup
+    </Button>
+  ) : issuedDelivery ? (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => {
+          setIssuedDelivery(null);
+          setDoNumber("");
+          setVehiclePlate("");
+          setDriverName("");
+          setNotes("");
+          setProofFiles([]);
+        }}
+      >
+        <Plus className="size-4" aria-hidden="true" />
+        Terbitkan Lagi
+      </Button>
+      <Button type="button" variant="outline" onClick={onClose}>
+        Selesai
+      </Button>
+      <Button type="button" onClick={() => setPreviewOpen(true)}>
+        <Printer className="size-4" aria-hidden="true" />
+        Pratinjau / Cetak SJ
+      </Button>
+    </>
+  ) : (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onClose}
+        disabled={isPending}
+      >
+        Batal
+      </Button>
+      <Button
+        type="submit"
+        form={formId}
+        disabled={isPending || isCompressing || !ticketId.trim()}
+      >
+        {isPending ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            Menerbitkan...
+          </>
+        ) : (
+          "Terbitkan Surat Jalan"
+        )}
+      </Button>
+    </>
+  );
 
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIssuedDelivery(null);
-                setDoNumber("");
-                setVehiclePlate("");
-                setDriverName("");
-                setNotes("");
-                setProofFiles([]);
-              }}
+  return (
+    <>
+      <GlobalModal
+        isOpen={open}
+        onClose={onClose}
+        onOpenChange={onOpenChange}
+        title="Terbitkan Surat Jalan Material Alam"
+        description="Penerbitan Surat Jalan resmi untuk material alam (batu, pasir, sirtu, tanah urug) berdasarkan Kontrak Payung."
+        className="sm:max-w-xl"
+        footer={modalFooter}
+      >
+        {activeContracts.length === 0 ? (
+          <EmptyState
+            title="Belum Ada Kontrak Aktif"
+            description="Logistik atau Administrasi perlu membuat Kontrak Payung Material Alam yang aktif sebelum mencatat Surat Jalan."
+          />
+        ) : availableTickets.length === 0 ? (
+          <EmptyState
+            icon={Ticket}
+            title="Belum Ada Tiket Material Alam Aktif"
+            description="Surat Jalan Material Alam wajib ditautkan ke tiket permintaan aktif dari Tim Lapangan."
+          />
+        ) : issuedDelivery ? (
+          <div className="space-y-4">
+            <Alert
+              variant="lightsuccess"
+              className="border border-emerald-500/30 bg-emerald-500/10 py-2.5 text-emerald-900 sm:py-3.5 dark:text-emerald-100"
             >
-              <Plus className="mr-1.5 size-4" aria-hidden="true" />
-              Terbitkan Lagi
-            </Button>
-            <Button type="button" onClick={() => setPreviewOpen(true)}>
-              <Printer className="mr-1.5 size-4" aria-hidden="true" />
-              Pratinjau / Cetak Surat Jalan
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Selesai
-            </Button>
-          </div>
-        </div>
+              <CheckCircle2 className="size-4" aria-hidden="true" />
+              <AlertTitle>
+                Surat Jalan {issuedDelivery.doNumber} Berhasil Diterbitkan
+              </AlertTitle>
+              <AlertDescription className="text-emerald-900/90 dark:text-emerald-100/90">
+                Dokumen resmi siap dicetak atau dibagikan ke vendor / tim
+                lapangan. Lampiran foto dan info armada vendor dapat dilengkapi
+                menyusul jika belum tersedia saat ini.
+              </AlertDescription>
+            </Alert>
 
+            <dl className="type-p2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-border bg-muted/30 p-3 sm:p-3.5">
+              <dt className="text-muted-foreground">No. Surat Jalan</dt>
+              <dd className="text-right font-mono font-bold text-primary">
+                {issuedDelivery.doNumber}
+              </dd>
+              <dt className="text-muted-foreground">Material &amp; Volume</dt>
+              <dd className="text-right font-semibold">
+                {issuedDelivery.materialType} ·{" "}
+                {formatMaterialVolume(
+                  issuedDelivery.quantityReceived,
+                  issuedDelivery.unit,
+                )}
+              </dd>
+              <dt className="text-muted-foreground">Vendor Kontrak</dt>
+              <dd className="text-right font-medium">
+                {issuedDelivery.vendorName}
+              </dd>
+              <dt className="text-muted-foreground">Armada &amp; Mover</dt>
+              <dd className="text-right font-medium">
+                Disediakan Vendor Sendiri
+              </dd>
+              <dt className="text-muted-foreground">Proyek Tujuan</dt>
+              <dd className="text-right font-medium">
+                {issuedDelivery.projectLabel}
+              </dd>
+              <dt className="text-muted-foreground">Tanggal</dt>
+              <dd className="text-right tabular-nums">
+                {issuedDelivery.deliveryDate}
+              </dd>
+            </dl>
+          </div>
+        ) : (
+          <form id={formId} onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
+            <Alert
+              variant="lightinfo"
+              className="border border-sky-500/30 bg-sky-500/10 px-3 py-2.5 text-sky-900 sm:px-4 sm:py-3.5 dark:text-sky-100"
+            >
+              <Info className="size-4" aria-hidden="true" />
+              <AlertTitle>Armada &amp; Mover Disediakan Vendor</AlertTitle>
+              <AlertDescription className="text-xs leading-snug text-sky-900/90 sm:text-sm dark:text-sky-100/90">
+                Armada &amp; mover disediakan vendor kontrak payung. Plat nomor,
+                supir, dan foto bukti bersifat opsional.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="md-ticket" className="type-p2 font-medium">
+                Tiket Material Alam <span className="text-destructive">*</span>
+              </Label>
+              {lockedTicketId && selectedTicket ? (
+                <Input
+                  id="md-ticket"
+                  readOnly
+                  value={`${selectedTicket.ticketNumber} · ${selectedTicket.title}`}
+                  className="bg-muted/50"
+                />
+              ) : (
+                <Combobox
+                  id="md-ticket"
+                  options={ticketComboboxOptions}
+                  value={ticketId}
+                  onValueChange={handleTicketChange}
+                  placeholder="Pilih tiket material alam aktif..."
+                  searchPlaceholder="Cari nomor tiket, proyek, atau material..."
+                  emptyText="Tiket material alam aktif tidak ditemukan."
+                />
+              )}
+
+              {selectedTicket ? (
+                <div className="space-y-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sky-900 dark:text-sky-200">
+                  {selectedTicket.items.map((item) => (
+                    <div
+                      key={item.ticketItemId}
+                      className="type-p3 flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <span className="font-medium">
+                        {item.materialType} ({item.contractNumber})
+                      </span>
+                      <span className="tabular-nums">
+                        Diminta {formatMaterialVolume(item.requestedQuantity, item.unit)} ·
+                        Terkirim {formatMaterialVolume(item.deliveredQuantity, item.unit)} ·
+                        Sisa{" "}
+                        <strong>
+                          {formatMaterialVolume(item.remainingQuantity, item.unit)}
+                        </strong>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="type-p3 text-muted-foreground">
+                  Setiap Surat Jalan wajib ditautkan ke tiket permintaan dari Tim Lapangan.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="md-contract" className="type-p2 font-medium">
+                Kontrak Payung Material <span className="text-destructive">*</span>
+              </Label>
+              <Select value={contractId} onValueChange={setContractId}>
+                <SelectTrigger id="md-contract" className="w-full [&>span]:truncate">
+                  <SelectValue placeholder="Pilih kontrak vendor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectableContracts.map((contract) => (
+                    <SelectItem key={contract.id} value={contract.id}>
+                      {contract.vendorName} · {contract.materialType} (
+                      {contract.contractNumber}) — {currency(contract.unitPrice)}/
+                      {contract.unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedContract && (
+                <div className="type-p3 flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
+                  <Badge variant="outline">{selectedContract.materialType}</Badge>
+                  <span className="font-medium text-foreground">
+                    {selectedContract.vendorName}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {currency(selectedContract.unitPrice)} / {selectedContract.unit}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="md-project" className="type-p2 font-medium">
+                  Proyek Tujuan <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="md-project"
+                  readOnly
+                  value={resolvedProjectLabel}
+                  className="bg-muted/50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="md-date" className="type-p2 font-medium">
+                  Tanggal Pengiriman <span className="text-destructive">*</span>
+                </Label>
+                <DatePicker
+                  id="md-date"
+                  value={deliveryDate}
+                  onValueChange={setDeliveryDate}
+                  placeholder="Pilih tanggal"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="md-do-number" className="type-p2 font-medium">
+                  <span className="sm:hidden">No. SJ (Opsional)</span>
+                  <span className="hidden sm:inline">
+                    Nomor Surat Jalan{" "}
+                    <span className="type-p3 font-normal text-muted-foreground">
+                      (Opsional)
+                    </span>
+                  </span>
+                </Label>
+                <Input
+                  id="md-do-number"
+                  placeholder="Otomatis jika kosong"
+                  value={doNumber}
+                  onChange={(event) => setDoNumber(event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="md-qty" className="type-p2 font-medium">
+                  Volume ({selectedContract?.unit ?? "RIT"}){" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="md-qty"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  placeholder="Mis. 2 atau 6.5"
+                  value={quantityReceived}
+                  onChange={(event) => setQuantityReceived(event.target.value)}
+                />
+              </div>
+            </div>
+
+            {estimatedSubtotal > 0 && selectedContract && (
+              <div className="type-p3 flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                <span className="min-w-0 truncate text-emerald-800 dark:text-emerald-200">
+                  Nilai SJ ({parsedQty} {selectedContract.unit} &times;{" "}
+                  {currency(selectedContract.unitPrice)})
+                </span>
+                <span className="shrink-0 font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                  {currency(estimatedSubtotal)}
+                </span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="md-plate" className="type-p2 font-medium">
+                  <span className="sm:hidden">Plat Truk (Opsional)</span>
+                  <span className="hidden sm:inline">
+                    Plat Nomor Truk Vendor{" "}
+                    <span className="type-p3 font-normal text-muted-foreground">
+                      (Opsional)
+                    </span>
+                  </span>
+                </Label>
+                <Input
+                  id="md-plate"
+                  placeholder="Mis. B 9123 KDA"
+                  value={vehiclePlate}
+                  onChange={(event) => setVehiclePlate(event.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="md-driver" className="type-p2 font-medium">
+                  <span className="sm:hidden">Nama Supir (Opsional)</span>
+                  <span className="hidden sm:inline">
+                    Nama Supir Vendor{" "}
+                    <span className="type-p3 font-normal text-muted-foreground">
+                      (Opsional)
+                    </span>
+                  </span>
+                </Label>
+                <Input
+                  id="md-driver"
+                  placeholder="Nama supir / mover"
+                  value={driverName}
+                  onChange={(event) => setDriverName(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="md-proof" className="type-p2 font-medium">
+                Foto / PDF Bukti Surat Jalan{" "}
+                <span className="type-p3 font-normal text-muted-foreground">
+                  (Opsional — bisa menyusul)
+                </span>
+              </Label>
+              <FileDropzone
+                id="md-proof"
+                accept="image/*,.heic,.heif,.pdf,application/pdf"
+                capture="environment"
+                maxFiles={1}
+                maxSizeMb={5}
+                files={proofFiles}
+                disabled={isCompressing || isPending}
+                label={isCompressing ? "Mengompres foto..." : "Unggah Foto / PDF Bukti (Opsional)"}
+                hint="JPG, PNG, WEBP, atau PDF maks. 5 MB. Foto kamera otomatis dikompres."
+                onFilesChange={(files) => void handleProofFilesChange(files)}
+                onError={(err) => toast.error(err)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="md-notes" className="type-p2 font-medium">
+                Catatan Lokasi
+              </Label>
+              <Textarea
+                id="md-notes"
+                rows={2}
+                placeholder="Mis. Turun di area Pintu Air Sekunder 2"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
+          </form>
+        )}
+      </GlobalModal>
+
+      {issuedDelivery && (
         <MaterialDeliveryPrintModal
           deliveries={previewOpen ? [issuedDelivery] : []}
           initialDeliveryId={issuedDelivery.id}
           onClose={() => setPreviewOpen(false)}
         />
-      </>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Alert
-        variant="lightinfo"
-        className="border border-sky-500/30 bg-sky-500/10 text-sky-900 dark:text-sky-100"
-      >
-        <Info className="size-4" aria-hidden="true" />
-        <AlertTitle>Armada &amp; Mover Disediakan Vendor</AlertTitle>
-        <AlertDescription className="text-sky-900/90 dark:text-sky-100/90">
-          Armada &amp; mover disediakan langsung oleh vendor kontrak payung.
-          Tugas kita menerbitkan Surat Jalan resmi — plat nomor, supir, dan foto
-          bukti bersifat opsional.
-        </AlertDescription>
-      </Alert>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="md-ticket" className="type-p2 font-medium">
-          Tiket Material Alam <span className="text-destructive">*</span>
-        </Label>
-        {lockedTicketId && selectedTicket ? (
-          <Input
-            id="md-ticket"
-            readOnly
-            value={`${selectedTicket.ticketNumber} · ${selectedTicket.title}`}
-            className="bg-muted/50"
-          />
-        ) : (
-          <Combobox
-            id="md-ticket"
-            options={ticketComboboxOptions}
-            value={ticketId}
-            onValueChange={handleTicketChange}
-            placeholder="Pilih tiket material alam aktif..."
-            searchPlaceholder="Cari nomor tiket, proyek, atau material..."
-            emptyText="Tiket material alam aktif tidak ditemukan."
-          />
-        )}
-
-        {selectedTicket ? (
-          <div className="space-y-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-sky-900 dark:text-sky-200">
-            {selectedTicket.items.map((item) => (
-              <div
-                key={item.ticketItemId}
-                className="type-p3 flex flex-wrap items-center justify-between gap-2"
-              >
-                <span className="font-medium">
-                  {item.materialType} ({item.contractNumber})
-                </span>
-                <span className="tabular-nums">
-                  Diminta {formatMaterialVolume(item.requestedQuantity, item.unit)} ·
-                  Terkirim {formatMaterialVolume(item.deliveredQuantity, item.unit)} ·
-                  Sisa{" "}
-                  <strong>
-                    {formatMaterialVolume(item.remainingQuantity, item.unit)}
-                  </strong>
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="type-p3 text-muted-foreground">
-            Setiap Surat Jalan wajib ditautkan ke tiket permintaan dari Tim Lapangan.
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="md-contract" className="type-p2 font-medium">
-          Kontrak Payung Material <span className="text-destructive">*</span>
-        </Label>
-        <Select value={contractId} onValueChange={setContractId}>
-          <SelectTrigger id="md-contract" className="w-full">
-            <SelectValue placeholder="Pilih kontrak vendor..." />
-          </SelectTrigger>
-          <SelectContent>
-            {selectableContracts.map((contract) => (
-              <SelectItem key={contract.id} value={contract.id}>
-                {contract.vendorName} · {contract.materialType} (
-                {contract.contractNumber}) — {currency(contract.unitPrice)}/
-                {contract.unit}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {selectedContract && (
-          <div className="type-p3 flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
-            <Badge variant="outline">{selectedContract.materialType}</Badge>
-            <span className="font-medium text-foreground">
-              {selectedContract.vendorName}
-            </span>
-            <span className="text-muted-foreground tabular-nums">
-              {currency(selectedContract.unitPrice)} / {selectedContract.unit}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="md-project" className="type-p2 font-medium">
-            Proyek Tujuan <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="md-project"
-            readOnly
-            value={resolvedProjectLabel}
-            className="bg-muted/50"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="md-date" className="type-p2 font-medium">
-            Tanggal Pengiriman <span className="text-destructive">*</span>
-          </Label>
-          <DatePicker
-            id="md-date"
-            value={deliveryDate}
-            onValueChange={setDeliveryDate}
-            placeholder="Pilih tanggal"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="md-do-number" className="type-p2 font-medium">
-            Nomor Surat Jalan{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              (Opsional)
-            </span>
-          </Label>
-          <Input
-            id="md-do-number"
-            placeholder="Otomatis (SPE-.../SJ/...) jika dikosongkan"
-            value={doNumber}
-            onChange={(event) => setDoNumber(event.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="md-qty" className="type-p2 font-medium">
-            Volume ({selectedContract?.unit ?? "RIT"}){" "}
-            <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="md-qty"
-            type="number"
-            min="0.01"
-            step="0.01"
-            required
-            placeholder="Contoh: 2 atau 6.5"
-            value={quantityReceived}
-            onChange={(event) => setQuantityReceived(event.target.value)}
-          />
-        </div>
-      </div>
-
-      {estimatedSubtotal > 0 && selectedContract && (
-        <div className="type-p3 flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-          <span className="text-emerald-800 dark:text-emerald-200">
-            Nilai Surat Jalan ({parsedQty} {selectedContract.unit} &times;{" "}
-            {currency(selectedContract.unitPrice)})
-          </span>
-          <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-            {currency(estimatedSubtotal)}
-          </span>
-        </div>
       )}
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="md-plate" className="type-p2 font-medium">
-            Plat Nomor Truk Vendor{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              (Opsional)
-            </span>
-          </Label>
-          <Input
-            id="md-plate"
-            placeholder="Contoh: B 9123 KDA (opsional)"
-            value={vehiclePlate}
-            onChange={(event) => setVehiclePlate(event.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="md-driver" className="type-p2 font-medium">
-            Nama Supir Vendor{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              (Opsional)
-            </span>
-          </Label>
-          <Input
-            id="md-driver"
-            placeholder="Nama supir / mover vendor (opsional)"
-            value={driverName}
-            onChange={(event) => setDriverName(event.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="md-proof" className="type-p2 font-medium">
-          Foto / PDF Bukti Surat Jalan{" "}
-          <span className="type-p3 font-normal text-muted-foreground">
-            (Opsional — bisa dilampirkan menyusul)
-          </span>
-        </Label>
-        <FileDropzone
-          id="md-proof"
-          accept="image/*,.heic,.heif,.pdf,application/pdf"
-          capture="environment"
-          maxFiles={1}
-          maxSizeMb={5}
-          files={proofFiles}
-          disabled={isCompressing || isPending}
-          label={isCompressing ? "Mengompres foto..." : "Unggah Foto / PDF Bukti (Opsional)"}
-          hint="JPG, PNG, WEBP, atau PDF maks. 5 MB. Foto kamera otomatis dikompres."
-          onFilesChange={(files) => void handleProofFilesChange(files)}
-          onError={(err) => toast.error(err)}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="md-notes" className="type-p2 font-medium">
-          Catatan Lokasi
-        </Label>
-        <Textarea
-          id="md-notes"
-          rows={2}
-          placeholder="Mis. Turun di area Pintu Air Sekunder 2"
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isPending}
-        >
-          Batal
-        </Button>
-        <Button
-          type="submit"
-          disabled={isPending || isCompressing || !ticketId.trim()}
-        >
-          {isPending ? (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Menerbitkan...
-            </>
-          ) : (
-            "Terbitkan Surat Jalan"
-          )}
-        </Button>
-      </div>
-    </form>
+    </>
   );
 }
 
@@ -859,8 +868,8 @@ function MaterialDeliveryPrintModalBody({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {deliveries.length > 1 && (
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-muted/40 px-3 py-2">
-          <span className="type-p3 mr-1 font-medium text-muted-foreground">
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-border bg-muted/40 px-3 py-2 scrollbar-none">
+          <span className="type-p3 mr-1 shrink-0 whitespace-nowrap font-medium text-muted-foreground">
             Pilih Surat Jalan:
           </span>
           {deliveries.map((item) => {
@@ -871,7 +880,7 @@ function MaterialDeliveryPrintModalBody({
                 type="button"
                 size="sm"
                 variant={isActive ? "default" : "outline"}
-                className="h-7 px-2.5 text-xs"
+                className="h-7 shrink-0 whitespace-nowrap px-2.5 text-xs"
                 onClick={() => setSelectedId(item.id)}
               >
                 {item.doNumber}
@@ -907,27 +916,27 @@ export function MaterialDeliveryAttachModal({
   onClose: () => void;
   onSaved?: () => void;
 }) {
+  if (!delivery) {
+    return (
+      <GlobalModal
+        isOpen={false}
+        onClose={onClose}
+        title="Lampirkan Bukti Surat Jalan"
+        description="Lengkapi atau perbarui foto/PDF Surat Jalan bertanda tangan serta plat nomor & nama supir vendor (semuanya opsional)."
+        className="sm:max-w-lg"
+      >
+        {null}
+      </GlobalModal>
+    );
+  }
+
   return (
-    <GlobalModal
-      isOpen={delivery !== null}
+    <MaterialDeliveryAttachModalBody
+      key={delivery.id}
+      delivery={delivery}
       onClose={onClose}
-      title={
-        delivery
-          ? `Lampirkan Foto / Plat / Supir · ${delivery.doNumber}`
-          : "Lampirkan Bukti Surat Jalan"
-      }
-      description="Lengkapi atau perbarui foto/PDF Surat Jalan bertanda tangan serta plat nomor & nama supir vendor (semuanya opsional)."
-      className="sm:max-w-lg"
-    >
-      {delivery && (
-        <MaterialDeliveryAttachModalBody
-          key={delivery.id}
-          delivery={delivery}
-          onClose={onClose}
-          onSaved={onSaved}
-        />
-      )}
-    </GlobalModal>
+      onSaved={onSaved}
+    />
   );
 }
 
@@ -1004,115 +1013,135 @@ function MaterialDeliveryAttachModalBody({
     });
   };
 
+  const attachFormId = `material-delivery-attach-form-${delivery.id}`;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-        <div className="min-w-0">
-          <p className="type-p2 font-semibold text-foreground">
-            {delivery.doNumber}
-          </p>
-          {(delivery.materialType || delivery.vendorName) && (
-            <p className="type-p3 text-muted-foreground">
-              {[delivery.materialType, delivery.vendorName]
-                .filter(Boolean)
-                .join(" · ")}
+    <GlobalModal
+      isOpen
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+      title={`Lampiran SJ · ${delivery.doNumber}`}
+      description="Lengkapi atau perbarui foto/PDF Surat Jalan bertanda tangan serta plat nomor & nama supir vendor (opsional)."
+      className="sm:max-w-lg"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isPending}
+          >
+            Batal
+          </Button>
+          <Button
+            type="submit"
+            form={attachFormId}
+            disabled={isPending || isCompressing || !hasChanges}
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                Menyimpan...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-1.5 size-4" aria-hidden="true" />
+                Simpan Lampiran
+              </>
+            )}
+          </Button>
+        </>
+      }
+    >
+      <form id={attachFormId} onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="min-w-0">
+            <p className="type-p2 font-semibold text-foreground">
+              {delivery.doNumber}
             </p>
-          )}
+            {(delivery.materialType || delivery.vendorName) && (
+              <p className="type-p3 text-muted-foreground">
+                {[delivery.materialType, delivery.vendorName]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
+          <Badge variant={delivery.proofUrl ? "lightSuccess" : "lightWarning"}>
+            {delivery.proofUrl ? "Bukti Terlampir" : "Belum Ada Bukti"}
+          </Badge>
         </div>
-        <Badge variant={delivery.proofUrl ? "lightSuccess" : "lightWarning"}>
-          {delivery.proofUrl ? "Bukti Terlampir" : "Belum Ada Bukti"}
-        </Badge>
-      </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="attach-plate" className="type-p2 font-medium">
+              <span className="sm:hidden">Plat Truk</span>
+              <span className="hidden sm:inline">
+                Plat Nomor Truk Vendor{" "}
+                <span className="type-p3 font-normal text-muted-foreground">
+                  (Opsional)
+                </span>
+              </span>
+            </Label>
+            <Input
+              id="attach-plate"
+              maxLength={40}
+              placeholder="Contoh: B 9123 KDA"
+              value={vehiclePlate}
+              onChange={(event) => setVehiclePlate(event.target.value)}
+              disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="attach-driver" className="type-p2 font-medium">
+              <span className="sm:hidden">Nama Supir</span>
+              <span className="hidden sm:inline">
+                Nama Supir Vendor{" "}
+                <span className="type-p3 font-normal text-muted-foreground">
+                  (Opsional)
+                </span>
+              </span>
+            </Label>
+            <Input
+              id="attach-driver"
+              maxLength={80}
+              placeholder="Nama supir / mover"
+              value={driverName}
+              onChange={(event) => setDriverName(event.target.value)}
+              disabled={isPending}
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="attach-plate" className="type-p2 font-medium">
-            Plat Nomor Truk Vendor{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              (Opsional)
-            </span>
+          <Label htmlFor="attach-proof" className="type-p2 font-medium">
+            {delivery.proofUrl
+              ? "Ganti Foto / PDF Bukti Surat Jalan (Opsional)"
+              : "Unggah Foto / PDF Surat Jalan Bertanda Tangan"}
           </Label>
-          <Input
-            id="attach-plate"
-            maxLength={40}
-            placeholder="Contoh: B 9123 KDA"
-            value={vehiclePlate}
-            onChange={(event) => setVehiclePlate(event.target.value)}
-            disabled={isPending}
+          <FileDropzone
+            id="attach-proof"
+            accept="image/*,.heic,.heif,.pdf,application/pdf"
+            capture="environment"
+            maxFiles={1}
+            maxSizeMb={5}
+            files={proofFiles}
+            disabled={isCompressing || isPending}
+            label={
+              isCompressing
+                ? "Mengompres foto..."
+                : delivery.proofUrl
+                  ? "Pilih File Baru untuk Mengganti Bukti"
+                  : "Unggah Foto / PDF Bukti Surat Jalan"
+            }
+            hint="JPG, PNG, WEBP, atau PDF maks. 5 MB. Kosongkan jika hanya memperbarui plat/supir."
+            onFilesChange={(files) => void handleFilesChange(files)}
+            onError={(err) => toast.error(err)}
           />
         </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="attach-driver" className="type-p2 font-medium">
-            Nama Supir Vendor{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              (Opsional)
-            </span>
-          </Label>
-          <Input
-            id="attach-driver"
-            maxLength={80}
-            placeholder="Nama supir / mover vendor"
-            value={driverName}
-            onChange={(event) => setDriverName(event.target.value)}
-            disabled={isPending}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="attach-proof" className="type-p2 font-medium">
-          {delivery.proofUrl
-            ? "Ganti Foto / PDF Bukti Surat Jalan (Opsional)"
-            : "Unggah Foto / PDF Surat Jalan Bertanda Tangan"}
-        </Label>
-        <FileDropzone
-          id="attach-proof"
-          accept="image/*,.heic,.heif,.pdf,application/pdf"
-          capture="environment"
-          maxFiles={1}
-          maxSizeMb={5}
-          files={proofFiles}
-          disabled={isCompressing || isPending}
-          label={
-            isCompressing
-              ? "Mengompres foto..."
-              : delivery.proofUrl
-                ? "Pilih File Baru untuk Mengganti Bukti"
-                : "Unggah Foto / PDF Bukti Surat Jalan"
-          }
-          hint="JPG, PNG, WEBP, atau PDF maks. 5 MB. Kosongkan jika hanya memperbarui plat/supir."
-          onFilesChange={(files) => void handleFilesChange(files)}
-          onError={(err) => toast.error(err)}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-1">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isPending}
-        >
-          Batal
-        </Button>
-        <Button
-          type="submit"
-          disabled={isPending || isCompressing || !hasChanges}
-        >
-          {isPending ? (
-            <>
-              <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
-              Menyimpan...
-            </>
-          ) : (
-            <>
-              <Upload className="mr-1.5 size-4" aria-hidden="true" />
-              Simpan Lampiran
-            </>
-          )}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </GlobalModal>
   );
 }

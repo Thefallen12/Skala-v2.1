@@ -13,6 +13,7 @@ import {
   FilePlus2,
   Layers,
   Loader2,
+  MoreHorizontal,
   Plus,
   Printer,
   Receipt,
@@ -64,6 +65,13 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
@@ -200,7 +208,7 @@ function ContractMobileCard({
               onClick={() => onRecordDo(contract.id)}
             >
               <Plus className="size-3.5" aria-hidden="true" />
-              Catat DO
+              Terbitkan SJ
             </Button>
           )}
         </div>
@@ -228,8 +236,13 @@ function DeliveryMobileCard({
   onPreviewProof: (delivery: MaterialDeliveryRow) => void;
   onDelete: (delivery: MaterialDeliveryRow) => void;
 }) {
+  const hasSecondaryActions =
+    canAttachProof ||
+    Boolean(delivery.proofUrl) ||
+    (canRecordDelivery && delivery.billingStatus === "UNBILLED");
+
   return (
-    <div className="space-y-2 rounded-xl border border-border/80 bg-card p-3.5">
+    <div className="space-y-2 rounded-xl border border-border/80 bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -240,7 +253,7 @@ function DeliveryMobileCard({
               <Badge variant="outline">{delivery.ticketNumber}</Badge>
             )}
           </div>
-          <p className="type-p1 mt-0.5 font-semibold text-foreground">
+          <p className="type-p2 mt-0.5 font-semibold text-foreground">
             {delivery.projectName}
           </p>
           <p className="type-p3 text-muted-foreground">
@@ -260,7 +273,7 @@ function DeliveryMobileCard({
         )}
       </div>
 
-      <div className="flex items-center justify-between rounded-lg bg-muted/40 p-2.5">
+      <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-2">
         <span className="type-p2 font-semibold text-foreground">
           {formatMaterialVolume(delivery.quantityReceived, delivery.unit)}
         </span>
@@ -269,57 +282,65 @@ function DeliveryMobileCard({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="type-p3 text-muted-foreground">
-          {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
-          {delivery.driverName ? ` (${delivery.driverName})` : ""}
-        </span>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onPrintSj(delivery)}
-          >
-            <Printer className="size-3.5" aria-hidden="true" />
-            Pratinjau / Cetak SJ
-          </Button>
-          {canAttachProof && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onAttachProof(delivery)}
-            >
-              <Upload className="size-3.5" aria-hidden="true" />
-              {delivery.proofUrl ? "Update Lampiran" : "Lampirkan Foto / Plat / Supir"}
-            </Button>
-          )}
-          {delivery.proofUrl && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onPreviewProof(delivery)}
-            >
-              <Eye className="size-3.5" aria-hidden="true" />
-              Foto
-            </Button>
-          )}
-          {canRecordDelivery && delivery.billingStatus === "UNBILLED" && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={isPending}
-              className="text-destructive"
-              onClick={() => onDelete(delivery)}
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-              Hapus
-            </Button>
-          )}
-        </div>
+      <p className="type-p3 text-muted-foreground">
+        {delivery.deliveryDate} · {delivery.vehiclePlate || "-"}
+        {delivery.driverName ? ` (${delivery.driverName})` : ""}
+      </p>
+
+      <div className="flex items-center gap-1.5 pt-0.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="flex-1"
+          onClick={() => onPrintSj(delivery)}
+        >
+          <Printer className="size-3.5" aria-hidden="true" />
+          Pratinjau SJ
+        </Button>
+        {hasSecondaryActions && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={`Menu aksi ${delivery.doNumber}`}
+              >
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {canAttachProof && (
+                <DropdownMenuItem onSelect={() => onAttachProof(delivery)}>
+                  <Upload className="size-4" aria-hidden="true" />
+                  {delivery.proofUrl ? "Update Lampiran" : "Lampirkan Foto/Plat"}
+                </DropdownMenuItem>
+              )}
+              {delivery.proofUrl && (
+                <DropdownMenuItem onSelect={() => onPreviewProof(delivery)}>
+                  <Eye className="size-4" aria-hidden="true" />
+                  Lihat Foto
+                </DropdownMenuItem>
+              )}
+              {canRecordDelivery && delivery.billingStatus === "UNBILLED" && (
+                <>
+                  {(canAttachProof || Boolean(delivery.proofUrl)) && (
+                    <DropdownMenuSeparator />
+                  )}
+                  <DropdownMenuItem
+                    disabled={isPending}
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => onDelete(delivery)}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    Hapus
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );
@@ -340,66 +361,65 @@ function BillingDeliveryMobileCard({
 }) {
   return (
     <div
-      className={`space-y-2 rounded-xl border p-3.5 transition-colors ${
+      className={`space-y-2 rounded-xl border p-3 transition-colors ${
         checked
           ? "border-primary/50 bg-primary/5"
           : "border-border/80 bg-card"
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <label className="flex min-w-0 cursor-pointer items-start gap-2.5">
-          <Checkbox
-            checked={checked}
-            onCheckedChange={(val) => onToggle(val === true)}
-            aria-label={`Pilih DO ${delivery.doNumber}`}
-            className="mt-0.5"
-          />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="type-p2 font-mono font-bold text-primary">
-                {delivery.doNumber}
-              </span>
-              {delivery.ticketNumber && (
-                <Badge variant="outline">{delivery.ticketNumber}</Badge>
-              )}
-            </div>
-            <p className="type-p3 text-muted-foreground">
-              {delivery.deliveryDate} · {delivery.projectName}
-            </p>
+      <label className="flex min-w-0 cursor-pointer items-start gap-2.5">
+        <Checkbox
+          checked={checked}
+          onCheckedChange={(val) => onToggle(val === true)}
+          aria-label={`Pilih DO ${delivery.doNumber}`}
+          className="mt-0.5"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="type-p2 font-mono font-bold text-primary">
+              {delivery.doNumber}
+            </span>
+            {delivery.ticketNumber && (
+              <Badge variant="outline">{delivery.ticketNumber}</Badge>
+            )}
           </div>
-        </label>
-        <div className="flex shrink-0 items-center gap-1.5">
+          <p className="type-p3 text-muted-foreground">
+            {delivery.deliveryDate} · {delivery.projectName}
+          </p>
+        </div>
+      </label>
+
+      <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5">
+        <span className="type-p3 min-w-0 truncate text-muted-foreground">
+          {formatMaterialVolume(delivery.quantityReceived, delivery.unit)} ·{" "}
+          {delivery.vehiclePlate || "-"}
+        </span>
+        <span className="type-p2 shrink-0 font-mono font-bold tabular-nums text-foreground">
+          {currency(delivery.estimatedAmount)}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-end gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onPrintSj(delivery)}
+        >
+          <Printer className="size-3.5" aria-hidden="true" />
+          Pratinjau SJ
+        </Button>
+        {delivery.proofUrl && (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => onPrintSj(delivery)}
+            onClick={() => onPreviewProof(delivery)}
           >
-            <Printer className="size-3.5" aria-hidden="true" />
-            SJ
+            <Eye className="size-3.5" aria-hidden="true" />
+            Lihat Foto
           </Button>
-          {delivery.proofUrl && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onPreviewProof(delivery)}
-            >
-              <Eye className="size-3.5" aria-hidden="true" />
-              Foto
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
-        <span className="type-p3 text-muted-foreground">
-          {formatMaterialVolume(delivery.quantityReceived, delivery.unit)} ·{" "}
-          {delivery.vehiclePlate || "-"}
-        </span>
-        <span className="type-p2 font-mono font-bold tabular-nums text-foreground">
-          {currency(delivery.estimatedAmount)}
-        </span>
+        )}
       </div>
     </div>
   );
@@ -692,54 +712,135 @@ export default function MaterialContractsPanel({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <div className="min-w-0">
           <h2 className="type-h2 flex items-center gap-2 text-foreground">
-            <Layers className="size-5 text-primary" aria-hidden="true" />
+            <Layers className="size-4 shrink-0 text-primary sm:size-5" aria-hidden="true" />
             Kontrak Material Alam
           </h2>
-          <p className="type-p2 mt-1 text-muted-foreground">
+          <p className="type-p3 mt-1 text-muted-foreground sm:type-p2">
             Ikat harga kontrak vendor (armada &amp; mover dari vendor), terbitkan Surat Jalan per tiket proyek, dan kirim tagihan ke Keuangan.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canRecordDelivery && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setSelectedContractForDo(undefined);
-                setSelectedTicketForDo(undefined);
-                setDeliveryModalOpen(true);
-              }}
-            >
-              <Truck className="size-4" aria-hidden="true" />
-              Terbitkan Surat Jalan
-            </Button>
-          )}
-          {canPrepareInvoices && (
-            <Button
-              type="button"
-              variant="outlinesuccess"
-              onClick={() => handleOpenBillingForContract()}
-            >
-              <Send className="size-4" aria-hidden="true" />
-              Kirim Tagihan
-            </Button>
-          )}
-          {canCreateContract && (
-            <Button type="button" onClick={() => setContractModalOpen(true)}>
-              <FilePlus2 className="size-4" aria-hidden="true" />
-              Buat Kontrak
-            </Button>
-          )}
-        </div>
+
+        {(canRecordDelivery || canPrepareInvoices || canCreateContract) && (
+          <>
+            <div className="flex w-full items-center gap-2 sm:hidden">
+              {canCreateContract ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setContractModalOpen(true)}
+                >
+                  <FilePlus2 className="size-4" aria-hidden="true" />
+                  Buat Kontrak
+                </Button>
+              ) : canRecordDelivery ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setSelectedContractForDo(undefined);
+                    setSelectedTicketForDo(undefined);
+                    setDeliveryModalOpen(true);
+                  }}
+                >
+                  <Truck className="size-4" aria-hidden="true" />
+                  Terbitkan SJ
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outlinesuccess"
+                  className="flex-1"
+                  onClick={() => handleOpenBillingForContract()}
+                >
+                  <Send className="size-4" aria-hidden="true" />
+                  Kirim Tagihan
+                </Button>
+              )}
+              {((canCreateContract && (canRecordDelivery || canPrepareInvoices)) ||
+                (!canCreateContract && canRecordDelivery && canPrepareInvoices)) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      aria-label="Menu aksi kontrak material"
+                    >
+                      <MoreHorizontal className="size-4" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canCreateContract && canRecordDelivery && (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setSelectedContractForDo(undefined);
+                          setSelectedTicketForDo(undefined);
+                          setDeliveryModalOpen(true);
+                        }}
+                      >
+                        <Truck className="size-4" aria-hidden="true" />
+                        Terbitkan Surat Jalan
+                      </DropdownMenuItem>
+                    )}
+                    {canPrepareInvoices && (
+                      <DropdownMenuItem
+                        onSelect={() => handleOpenBillingForContract()}
+                      >
+                        <Send className="size-4" aria-hidden="true" />
+                        Kirim Tagihan
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+
+            <div className="hidden flex-wrap items-center gap-2 sm:flex">
+              {canRecordDelivery && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedContractForDo(undefined);
+                    setSelectedTicketForDo(undefined);
+                    setDeliveryModalOpen(true);
+                  }}
+                >
+                  <Truck className="size-4" aria-hidden="true" />
+                  Terbitkan Surat Jalan
+                </Button>
+              )}
+              {canPrepareInvoices && (
+                <Button
+                  type="button"
+                  variant="outlinesuccess"
+                  onClick={() => handleOpenBillingForContract()}
+                >
+                  <Send className="size-4" aria-hidden="true" />
+                  Kirim Tagihan
+                </Button>
+              )}
+              {canCreateContract && (
+                <Button type="button" onClick={() => setContractModalOpen(true)}>
+                  <FilePlus2 className="size-4" aria-hidden="true" />
+                  Buat Kontrak
+                </Button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card className="border-border/80 shadow-2xs">
-          <CardHeader className="pb-2">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+        <Card className="border-border/80 p-3 shadow-2xs sm:p-5">
+          <CardHeader className="space-y-1">
             <CardDescription className="type-p3">
               Kontrak Aktif
             </CardDescription>
@@ -751,8 +852,8 @@ export default function MaterialContractsPanel({
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-amber-500/30 bg-amber-500/5 shadow-2xs">
-          <CardHeader className="pb-2">
+        <Card className="border-amber-500/30 bg-amber-500/5 p-3 shadow-2xs sm:p-5">
+          <CardHeader className="space-y-1">
             <CardDescription className="type-p3 text-amber-700 dark:text-amber-300">
               Surat Jalan UNBILLED
             </CardDescription>
@@ -761,8 +862,8 @@ export default function MaterialContractsPanel({
             </CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-emerald-500/30 bg-emerald-500/5 shadow-2xs">
-          <CardHeader className="pb-2">
+        <Card className="col-span-2 border-emerald-500/30 bg-emerald-500/5 p-3 shadow-2xs sm:col-span-1 sm:p-5">
+          <CardHeader className="space-y-1">
             <CardDescription className="type-p3 text-emerald-700 dark:text-emerald-300">
               Estimasi Nilai UNBILLED
             </CardDescription>
@@ -778,18 +879,27 @@ export default function MaterialContractsPanel({
         onValueChange={handleTabChange}
         className="space-y-4"
       >
-        <TabsList className="grid h-auto w-full grid-cols-3 gap-1.5 rounded-xl border border-border bg-muted/60 p-1.5 sm:w-auto sm:inline-grid">
-          <TabsTrigger value="contracts" className="gap-1.5">
-            <Layers className="size-4" aria-hidden="true" />
+        <TabsList className="flex h-auto w-full flex-nowrap items-center justify-start gap-1 overflow-x-auto rounded-xl border border-border bg-muted/60 p-1 scrollbar-none sm:inline-flex sm:w-auto sm:p-1.5">
+          <TabsTrigger
+            value="contracts"
+            className="shrink-0 gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm"
+          >
+            <Layers className="size-3.5 shrink-0 sm:size-4" aria-hidden="true" />
             <span>Kontrak Material</span>
           </TabsTrigger>
-          <TabsTrigger value="deliveries" className="gap-1.5">
-            <Truck className="size-4" aria-hidden="true" />
+          <TabsTrigger
+            value="deliveries"
+            className="shrink-0 gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm"
+          >
+            <Truck className="size-3.5 shrink-0 sm:size-4" aria-hidden="true" />
             <span>Surat Jalan</span>
           </TabsTrigger>
           {canPrepareInvoices && (
-            <TabsTrigger value="billing" className="gap-1.5">
-              <Send className="size-4" aria-hidden="true" />
+            <TabsTrigger
+              value="billing"
+              className="shrink-0 gap-1.5 whitespace-nowrap px-2.5 py-1.5 text-xs sm:px-3 sm:text-sm"
+            >
+              <Send className="size-3.5 shrink-0 sm:size-4" aria-hidden="true" />
               <span>Kirim Tagihan</span>
             </TabsTrigger>
           )}
@@ -980,17 +1090,17 @@ export default function MaterialContractsPanel({
 
         <TabsContent value="deliveries">
           <Card className="border-border/80 shadow-2xs">
-            <CardHeader className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardHeader className="space-y-2.5">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="type-h3">
                     Log Surat Jalan Material Alam
                   </CardTitle>
-                  <CardDescription className="type-p2">
+                  <CardDescription className="type-p3 line-clamp-2 sm:type-p2 sm:line-clamp-none">
                     Armada &amp; mover disediakan vendor. Cetak Surat Jalan resmi, lengkapi bukti menyusul, atau susun tagihan UNBILLED ke Keuangan.
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="grid w-full grid-cols-3 gap-1.5 sm:flex sm:w-auto sm:items-center">
                   {(["ALL", "UNBILLED", "BILLED"] as const).map((status) => (
                     <Button
                       key={status}
@@ -1545,54 +1655,100 @@ export default function MaterialContractsPanel({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Table itemLabel="tagihan vendor">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>No. Tagihan</TableHead>
-                        <TableHead>Kontrak &amp; Vendor</TableHead>
-                        <TableHead>Jumlah DO</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {vendorInvoices.map((inv) => (
-                        <TableRow key={inv.id}>
-                          <TableCell className="type-p2 font-mono font-semibold">
-                            {inv.invoiceNumber}
-                          </TableCell>
-                          <TableCell className="whitespace-normal">
-                            <p className="type-p2 font-medium">
+                  <div className="space-y-2.5 md:hidden">
+                    {vendorInvoices.map((inv) => (
+                      <div
+                        key={inv.id}
+                        className="space-y-2 rounded-xl border border-border/80 bg-card p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="type-p2 font-mono font-bold text-primary">
+                              {inv.invoiceNumber}
+                            </p>
+                            <p className="type-p2 font-medium text-foreground">
                               {inv.vendorName}
                             </p>
                             <p className="type-p3 text-muted-foreground">
                               {inv.contractNumber} · {inv.materialType}
                             </p>
-                          </TableCell>
-                          <TableCell className="type-p2">
+                          </div>
+                          <Badge
+                            variant={
+                              inv.status === "PAID"
+                                ? "lightSuccess"
+                                : inv.status === "PARTIAL"
+                                  ? "lightInfo"
+                                  : "lightWarning"
+                            }
+                            className="shrink-0"
+                          >
+                            {inv.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
+                          <span className="type-p3 text-muted-foreground">
                             {inv.deliveryCount} DO (
                             {formatMaterialVolume(inv.totalQuantity, inv.unit)})
-                          </TableCell>
-                          <TableCell className="type-p2 text-right font-bold tabular-nums">
+                          </span>
+                          <span className="type-p2 font-mono font-bold tabular-nums text-foreground">
                             {currency(inv.grandTotal)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                inv.status === "PAID"
-                                  ? "lightSuccess"
-                                  : inv.status === "PARTIAL"
-                                    ? "lightInfo"
-                                    : "lightWarning"
-                              }
-                            >
-                              {inv.status}
-                            </Badge>
-                          </TableCell>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="hidden md:block">
+                    <Table itemLabel="tagihan vendor">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>No. Tagihan</TableHead>
+                          <TableHead>Kontrak &amp; Vendor</TableHead>
+                          <TableHead>Jumlah DO</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead>Status</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {vendorInvoices.map((inv) => (
+                          <TableRow key={inv.id}>
+                            <TableCell className="type-p2 font-mono font-semibold">
+                              {inv.invoiceNumber}
+                            </TableCell>
+                            <TableCell className="whitespace-normal">
+                              <p className="type-p2 font-medium">
+                                {inv.vendorName}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {inv.contractNumber} · {inv.materialType}
+                              </p>
+                            </TableCell>
+                            <TableCell className="type-p2">
+                              {inv.deliveryCount} DO (
+                              {formatMaterialVolume(inv.totalQuantity, inv.unit)})
+                            </TableCell>
+                            <TableCell className="type-p2 text-right font-bold tabular-nums">
+                              {currency(inv.grandTotal)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  inv.status === "PAID"
+                                    ? "lightSuccess"
+                                    : inv.status === "PARTIAL"
+                                      ? "lightInfo"
+                                      : "lightWarning"
+                                }
+                              >
+                                {inv.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -1762,29 +1918,26 @@ function CreateMaterialContractModal({
   onCreated: () => void;
 }) {
   return (
-    <GlobalModal
-      isOpen={open}
-      onClose={() => onOpenChange(false)}
+    <CreateMaterialContractFormBody
+      key={open ? "open" : "closed"}
+      open={open}
       onOpenChange={onOpenChange}
-      title="Buat Kontrak Material"
-      description="Ikat harga per rit atau m3 dengan vendor untuk pengiriman bertahap."
-      className="sm:max-w-xl"
-    >
-      <CreateMaterialContractFormBody
-        key={open ? "open" : "closed"}
-        vendors={vendors}
-        onClose={() => onOpenChange(false)}
-        onCreated={onCreated}
-      />
-    </GlobalModal>
+      vendors={vendors}
+      onClose={() => onOpenChange(false)}
+      onCreated={onCreated}
+    />
   );
 }
 
 function CreateMaterialContractFormBody({
+  open,
+  onOpenChange,
   vendors,
   onClose,
   onCreated,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   vendors: ContractVendorCatalogOption[];
   onClose: () => void;
   onCreated: () => void;
@@ -1872,200 +2025,216 @@ function CreateMaterialContractFormBody({
     });
   };
 
+  const contractFormId = "create-material-contract-form";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-catalog-vendor" className="type-p2 font-medium">
-            Katalog Vendor
-          </Label>
-          <Combobox
-            id="mc-catalog-vendor"
-            options={vendorOptions}
-            value={vendorSelection}
-            onValueChange={handleVendorChange}
-            placeholder="Pilih vendor..."
-            searchPlaceholder="Cari nama vendor..."
-          />
-        </div>
+    <GlobalModal
+      isOpen={open}
+      onClose={() => {
+        if (!isPending) onClose();
+      }}
+      onOpenChange={(next) => {
+        if (!isPending) onOpenChange(next);
+      }}
+      title="Buat Kontrak Material"
+      description="Ikat harga per rit atau m3 dengan vendor untuk pengiriman bertahap."
+      className="sm:max-w-xl"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isPending}
+          >
+            Batal
+          </Button>
+          <Button type="submit" form={contractFormId} disabled={isPending}>
+            {isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Menyimpan...
+              </>
+            ) : (
+              "Simpan Kontrak"
+            )}
+          </Button>
+        </>
+      }
+    >
+      <form id={contractFormId} onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-catalog-vendor" className="type-p2 font-medium">
+              Katalog Vendor
+            </Label>
+            <Combobox
+              id="mc-catalog-vendor"
+              options={vendorOptions}
+              value={vendorSelection}
+              onValueChange={handleVendorChange}
+              placeholder="Pilih vendor..."
+              searchPlaceholder="Cari nama vendor..."
+            />
+          </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-vendor-name" className="type-p2 font-medium">
-            Nama Vendor <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="mc-vendor-name"
-            required
-            placeholder="Contoh: PT Pasir Maju"
-            value={vendorName}
-            onChange={(event) => {
-              setVendorName(event.target.value);
-              if (vendorSelection !== "CUSTOM") {
-                const chosen = vendors.find((v) => v.id === vendorSelection);
-                if (chosen && chosen.name !== event.target.value) {
-                  setVendorSelection("CUSTOM");
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-vendor-name" className="type-p2 font-medium">
+              Nama Vendor <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="mc-vendor-name"
+              required
+              placeholder="Contoh: PT Pasir Maju"
+              value={vendorName}
+              onChange={(event) => {
+                setVendorName(event.target.value);
+                if (vendorSelection !== "CUSTOM") {
+                  const chosen = vendors.find((v) => v.id === vendorSelection);
+                  if (chosen && chosen.name !== event.target.value) {
+                    setVendorSelection("CUSTOM");
+                  }
                 }
-              }
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-number" className="type-p2 font-medium">
-            Nomor Kontrak (Opsional)
-          </Label>
-          <Input
-            id="mc-number"
-            placeholder="Auto jika dikosongkan"
-            value={contractNumber}
-            onChange={(event) => setContractNumber(event.target.value)}
-          />
+              }}
+            />
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-material" className="type-p2 font-medium">
-            Jenis Material <span className="text-destructive">*</span>
-          </Label>
-          <Select value={materialType} onValueChange={setMaterialType}>
-            <SelectTrigger id="mc-material" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {BULK_MATERIAL_TYPE_OPTIONS.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-              <SelectItem value="CUSTOM">Lainnya (Ketik Sendiri)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-number" className="type-p2 font-medium">
+              Nomor Kontrak (Opsional)
+            </Label>
+            <Input
+              id="mc-number"
+              placeholder="Auto jika dikosongkan"
+              value={contractNumber}
+              onChange={(event) => setContractNumber(event.target.value)}
+            />
+          </div>
 
-      {materialType === "CUSTOM" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-material" className="type-p2 font-medium">
+              Jenis Material <span className="text-destructive">*</span>
+            </Label>
+            <Select value={materialType} onValueChange={setMaterialType}>
+              <SelectTrigger id="mc-material" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BULK_MATERIAL_TYPE_OPTIONS.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+                <SelectItem value="CUSTOM">Lainnya (Ketik Sendiri)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {materialType === "CUSTOM" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-custom-material" className="type-p2 font-medium">
+              Nama Jenis Material <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="mc-custom-material"
+              required
+              placeholder="Mis. ABU BATU atau PASIR COR"
+              value={customMaterial}
+              onChange={(event) => setCustomMaterial(event.target.value)}
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-unit" className="type-p2 font-medium">
+              Satuan Hitung <span className="text-destructive">*</span>
+            </Label>
+            <Select value={unit} onValueChange={setUnit}>
+              <SelectTrigger id="mc-unit" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BULK_MATERIAL_UNIT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-est-volume" className="type-p2 font-medium">
+              Target Volume
+            </Label>
+            <Input
+              id="mc-est-volume"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder={`Mis. 500 (${unit})`}
+              value={estimatedVolume}
+              onChange={(event) => setEstimatedVolume(event.target.value)}
+            />
+          </div>
+        </div>
+
         <div className="space-y-1.5">
-          <Label htmlFor="mc-custom-material" className="type-p2 font-medium">
-            Nama Jenis Material <span className="text-destructive">*</span>
+          <Label htmlFor="mc-unit-price" className="type-p2 font-medium">
+            Harga Kesepakatan per {unit}{" "}
+            <span className="text-destructive">*</span>
           </Label>
-          <Input
-            id="mc-custom-material"
+          <RupiahAmountInput
+            id="mc-unit-price"
+            value={unitPriceFormatted}
+            onChange={setUnitPriceFormatted}
             required
-            placeholder="Mis. ABU BATU atau PASIR COR"
-            value={customMaterial}
-            onChange={(event) => setCustomMaterial(event.target.value)}
           />
         </div>
-      )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-unit" className="type-p2 font-medium">
-            Satuan Hitung <span className="text-destructive">*</span>
-          </Label>
-          <Select value={unit} onValueChange={setUnit}>
-            <SelectTrigger id="mc-unit" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {BULK_MATERIAL_UNIT_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-start-date" className="type-p2 font-medium">
+              Tanggal Mulai <span className="text-destructive">*</span>
+            </Label>
+            <DatePicker
+              id="mc-start-date"
+              value={startDate}
+              onValueChange={setStartDate}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="mc-end-date" className="type-p2 font-medium">
+              Berakhir (Opsional)
+            </Label>
+            <DatePicker
+              id="mc-end-date"
+              value={endDate}
+              minDate={startDate}
+              clearable
+              onValueChange={setEndDate}
+              placeholder="Tanpa batas"
+            />
+          </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="mc-est-volume" className="type-p2 font-medium">
-            Target Volume (Opsional)
+          <Label htmlFor="mc-notes" className="type-p2 font-medium">
+            Catatan Syarat
           </Label>
-          <Input
-            id="mc-est-volume"
-            type="number"
-            min="0.01"
-            step="0.01"
-            placeholder={`Mis. 500 (${unit})`}
-            value={estimatedVolume}
-            onChange={(event) => setEstimatedVolume(event.target.value)}
+          <Textarea
+            id="mc-notes"
+            rows={2}
+            placeholder="Mis. Harga sudah termasuk ongkos kirim..."
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
           />
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="mc-unit-price" className="type-p2 font-medium">
-          Harga Kesepakatan per {unit}{" "}
-          <span className="text-destructive">*</span>
-        </Label>
-        <RupiahAmountInput
-          id="mc-unit-price"
-          value={unitPriceFormatted}
-          onChange={setUnitPriceFormatted}
-          required
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-start-date" className="type-p2 font-medium">
-            Tanggal Mulai <span className="text-destructive">*</span>
-          </Label>
-          <DatePicker
-            id="mc-start-date"
-            value={startDate}
-            onValueChange={setStartDate}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="mc-end-date" className="type-p2 font-medium">
-            Tanggal Berakhir (Opsional)
-          </Label>
-          <DatePicker
-            id="mc-end-date"
-            value={endDate}
-            minDate={startDate}
-            clearable
-            onValueChange={setEndDate}
-            placeholder="Tanpa batas"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <Label htmlFor="mc-notes" className="type-p2 font-medium">
-          Catatan Syarat
-        </Label>
-        <Textarea
-          id="mc-notes"
-          rows={2}
-          placeholder="Mis. Harga sudah termasuk ongkos kirim..."
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isPending}
-        >
-          Batal
-        </Button>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? (
-            <>
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              Menyimpan...
-            </>
-          ) : (
-            "Simpan Kontrak"
-          )}
-        </Button>
-      </div>
-    </form>
+      </form>
+    </GlobalModal>
   );
 }

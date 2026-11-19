@@ -315,10 +315,13 @@ export default function FinanceDashboard({
               type="button"
               variant="outline"
               size="sm"
+              className="min-w-0"
               onClick={() => setShowCharts((prev) => !prev)}
             >
               <BarChart3 className="size-4 text-primary" aria-hidden="true" />
-              {showCharts ? "Tutup Grafik" : "Lihat Grafik"}
+              <span className="truncate">
+                {showCharts ? "Tutup Grafik" : "Lihat Grafik"}
+              </span>
               {showCharts ? (
                 <ChevronUp className="size-4" aria-hidden="true" />
               ) : (
@@ -328,10 +331,14 @@ export default function FinanceDashboard({
             <Button
               type="button"
               size="sm"
+              className="min-w-0"
               onClick={() => setReportModalOpen(true)}
             >
               <Printer className="size-4" aria-hidden="true" />
-              Cetak Laporan
+              <span className="truncate">
+                <span className="sm:hidden">Cetak</span>
+                <span className="hidden sm:inline">Cetak Laporan</span>
+              </span>
             </Button>
           </>
         }

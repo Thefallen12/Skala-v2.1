@@ -6,7 +6,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
-import { Info, Layers, Plus, Printer, QrCode, Save, Trash2 } from "lucide-react";
+import {
+  Info,
+  Layers,
+  MoreHorizontal,
+  Plus,
+  Printer,
+  QrCode,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { DODeliveryMethod, DOStatus } from "@prisma/client";
 import type { VehicleSummary } from "@/app/actions/vehicles";
 import { createDeliveryOrder, updateDeliveryOrder } from "@/app/actions/orders";
@@ -17,6 +26,12 @@ import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -336,9 +351,9 @@ export default function DOEditForm({
   return (
     <form onSubmit={submit} className="order-editor-print-area space-y-6">
       <fieldset disabled={!canEdit} className="space-y-6">
-      <Card className="space-y-5 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
-          <div>
+      <Card className="space-y-4 p-3.5 sm:space-y-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border pb-3 sm:gap-4 sm:pb-4">
+          <div className="min-w-0">
             <h2 className="type-h2 text-foreground">
               {publicCode ? `Delivery Order · ${doNumber}` : "1. Informasi Pengiriman & Kendaraan"}
             </h2>
@@ -380,8 +395,11 @@ export default function DOEditForm({
                         : "/apps/logistics?tab=bulk-contracts"
                     }
                   >
-                    <Layers className="mr-1.5 size-4" aria-hidden="true" />
-                    Terbitkan Surat Jalan Material Alam
+                    <Layers className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="sm:hidden">Terbitkan SJ Alam</span>
+                    <span className="hidden sm:inline">
+                      Terbitkan Surat Jalan Material Alam
+                    </span>
                   </Link>
                 </Button>
                 <Button type="button" size="sm" variant="outline" asChild>
@@ -722,7 +740,7 @@ export default function DOEditForm({
           </div>
           {watchedForm.deliveryMethod === DODeliveryMethod.EXPEDITION &&
             publicCode && (
-              <div className="space-y-3 rounded-md border p-4 md:col-span-2">
+              <div className="space-y-3 rounded-md border p-3 sm:p-4 md:col-span-2">
                 <div>
                   <Label htmlFor="do-arrival-photo">
                     Foto material tiba di gudang
@@ -747,8 +765,11 @@ export default function DOEditForm({
                   />
                 )}
                 {arrivalPhotoFile && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm text-muted-foreground">
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <p
+                      className="min-w-0 flex-1 truncate text-sm text-muted-foreground"
+                      title={arrivalPhotoFile.name}
+                    >
                       Foto dipilih: {arrivalPhotoFile.name}
                     </p>
                     <InvoiceFilePreview
@@ -794,9 +815,9 @@ export default function DOEditForm({
         )}
       </Card>
 
-      <Card className="space-y-4 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-          <div>
+      <Card className="space-y-4 p-3.5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border pb-3 sm:gap-3 sm:pb-4">
+          <div className="min-w-0">
             <h2 className="type-h2 text-foreground">2. Item Pengiriman</h2>
             <p className="type-p3 mt-0.5 text-muted-foreground">
               Jumlah terkirim tidak dapat melebihi jumlah yang dipesan.
@@ -821,7 +842,7 @@ export default function DOEditForm({
           {fields.map((field, index) => (
             <div
               key={field.fieldId}
-              className="space-y-3 rounded-xl border border-border bg-muted/20 p-3.5"
+              className="space-y-2.5 rounded-xl border border-border bg-muted/20 p-3"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="type-p3 font-semibold text-muted-foreground">
@@ -850,7 +871,7 @@ export default function DOEditForm({
                   })}
                 />
               </div>
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
                 <div className="space-y-1.5">
                   <Label htmlFor={`do-m-ord-${index}`}>Dipesan</Label>
                   <Input
@@ -884,7 +905,7 @@ export default function DOEditForm({
                     })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="col-span-2 space-y-1.5">
                   <Label htmlFor={`do-m-unit-${index}`}>Satuan</Label>
                   <Input
                     id={`do-m-unit-${index}`}
@@ -1010,7 +1031,7 @@ export default function DOEditForm({
       </fieldset>
 
       {showQr && (
-        <Card className="flex flex-col items-center gap-3 p-5 text-center">
+        <Card className="flex flex-col items-center gap-3 p-3.5 text-center sm:p-6">
           <h2 className="type-h3 text-foreground">QR Dokumen Delivery Order</h2>
           {qrDataUrl ? (
             <Image
@@ -1051,35 +1072,100 @@ export default function DOEditForm({
           {message}
         </p>
       )}
-      <div className="order-editor-actions sticky bottom-16 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur xl:bottom-4">
-        {canEdit && (
-          <Button type="submit" disabled={isSaving || suppressVehicleTrap}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSaving
-              ? "Menyimpan..."
-              : publicCode
-                ? "Simpan Perubahan"
-                : "Buat Delivery Order"}
-          </Button>
-        )}
-        {publicCode && (
+      <div className="order-editor-actions sticky bottom-16 z-10 flex items-center gap-2 rounded-xl border border-border bg-card/95 p-2.5 shadow-sm backdrop-blur sm:flex-wrap sm:p-3 xl:bottom-4">
+        {canEdit ? (
           <>
             <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsPdfPreviewOpen(true)}
+              type="submit"
+              className="flex-1 sm:flex-initial"
+              disabled={isSaving || suppressVehicleTrap}
             >
-              <Printer className="mr-2 h-4 w-4" /> Pratinjau / Cetak PDF
+              <Save className="size-4" aria-hidden="true" />
+              {isSaving
+                ? "Menyimpan..."
+                : publicCode
+                  ? "Simpan Perubahan"
+                  : "Buat Delivery Order"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowQr((visible) => !visible)}
-            >
-              <QrCode className="mr-2 h-4 w-4" />
-              {showQr ? "Sembunyikan QR" : "Tampilkan QR verifikasi"}
-            </Button>
+            {publicCode && (
+              <>
+                <div className="sm:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        aria-label="Menu dokumen Delivery Order"
+                      >
+                        <MoreHorizontal className="size-4" aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={() => setIsPdfPreviewOpen(true)}
+                      >
+                        <Printer className="size-4" aria-hidden="true" />
+                        Cetak PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setShowQr((visible) => !visible)}
+                      >
+                        <QrCode className="size-4" aria-hidden="true" />
+                        {showQr ? "Sembunyikan QR" : "QR Verifikasi"}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="hidden sm:inline-flex"
+                  onClick={() => setIsPdfPreviewOpen(true)}
+                >
+                  <Printer className="size-4" aria-hidden="true" /> Pratinjau / Cetak PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="hidden sm:inline-flex"
+                  onClick={() => setShowQr((visible) => !visible)}
+                >
+                  <QrCode className="size-4" aria-hidden="true" />
+                  {showQr ? "Sembunyikan QR" : "Tampilkan QR verifikasi"}
+                </Button>
+              </>
+            )}
           </>
+        ) : (
+          publicCode && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 sm:flex-initial"
+                onClick={() => setIsPdfPreviewOpen(true)}
+              >
+                <Printer className="size-4" aria-hidden="true" />
+                <span className="sm:hidden">Cetak PDF</span>
+                <span className="hidden sm:inline">Pratinjau / Cetak PDF</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => setShowQr((visible) => !visible)}
+              >
+                <QrCode className="size-4" aria-hidden="true" />
+                <span className="sm:hidden">
+                  {showQr ? "Tutup QR" : "QR Verifikasi"}
+                </span>
+                <span className="hidden sm:inline">
+                  {showQr ? "Sembunyikan QR" : "Tampilkan QR verifikasi"}
+                </span>
+              </Button>
+            </>
+          )
         )}
       </div>
       {publicCode && (

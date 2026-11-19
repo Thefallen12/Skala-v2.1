@@ -131,7 +131,7 @@ const Header = ({
           isSticky ? "shadow-sm" : ""
         }`}
       >
-        <nav className="flex min-h-16 min-w-0 items-center justify-between gap-1.5 px-2.5 py-2 sm:gap-4 sm:px-6 sm:py-2.5">
+        <nav className="flex min-h-13 sm:min-h-16 min-w-0 items-center justify-between gap-1.5 px-2 py-1.5 sm:gap-4 sm:px-6 sm:py-2.5">
           {/* Left: Mobile/Tablet Menu + Back Button + Brand + Module Title + Search */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
             <Button

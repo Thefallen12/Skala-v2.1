@@ -953,143 +953,146 @@ export default function ProjectDetailView({
           </div>
         }
         actions={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {canSubmitDailyProgress &&
-              isRunningProjectStatus(project.status) && (
+          <>
+            {/* Mobile View: 1 Primary CTA + 1 Consolidated DropdownMenu */}
+            <div className="grid w-full grid-cols-2 gap-1.5 sm:hidden">
+              {canSubmitDailyProgress &&
+              isRunningProjectStatus(project.status) ? (
                 <Button
                   type="button"
                   size="sm"
                   onClick={() => setIsDailyProgressOpen(true)}
-                  className="gap-1.5 font-semibold"
+                  className="gap-1.5 truncate font-semibold"
                 >
-                  <Camera className="size-4" aria-hidden="true" />
-                  <span>Input Daily Report</span>
+                  <Camera className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Daily Report</span>
+                </Button>
+              ) : canManageProject ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="gap-1.5 truncate"
+                >
+                  <Pencil className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Ubah Proyek</span>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setIsSendProgressOpen(true)}
+                  className="gap-1.5 truncate"
+                >
+                  <Send className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">Kirim Progres</span>
                 </Button>
               )}
 
-            {(canSubmitDailyProgress || canManageProject) && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsSendProgressOpen(true)}
-                className="gap-1.5"
-              >
-                <Send className="size-3.5" aria-hidden="true" />
-                <span>Kirim Progres</span>
-              </Button>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isDownloadingReport}
-                  className="gap-1.5"
-                >
-                  {isDownloadingReport ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <FileText className="size-3.5" aria-hidden="true" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 truncate"
+                  >
+                    <Ellipsis className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">Menu &amp; Aksi</span>
+                    <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-56">
+                  <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                    Aksi Progres Lapangan
+                  </DropdownMenuLabel>
+                  {canSubmitDailyProgress &&
+                    isRunningProjectStatus(project.status) && (
+                      <DropdownMenuItem onSelect={() => setIsDailyProgressOpen(true)}>
+                        <Camera className="size-4" aria-hidden="true" />
+                        Input Daily Report
+                      </DropdownMenuItem>
+                    )}
+                  {(canSubmitDailyProgress || canManageProject) && (
+                    <DropdownMenuItem onSelect={() => setIsSendProgressOpen(true)}>
+                      <Send className="size-3.5" aria-hidden="true" />
+                      Kirim Progres Lapangan
+                    </DropdownMenuItem>
                   )}
-                  <span>Laporan Otomatis</span>
-                  <ChevronDown className="size-3.5" aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-60">
-                <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
-                  Unduh Dokumen Live DB
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onSelect={() => void handleDownloadAutomatedReport("daily", "pdf")}
-                >
-                  <FileText aria-hidden="true" />
-                  PDF Laporan Harian
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    void handleDownloadAutomatedReport("progress", "pdf")
-                  }
-                >
-                  <FileText aria-hidden="true" />
-                  PDF Progres &amp; Kurva-S
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    void handleDownloadAutomatedReport("progress", "xlsx")
-                  }
-                >
-                  <FileSpreadsheet aria-hidden="true" />
-                  Excel Progres &amp; Kurva-S (.xlsx)
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setPrintDocView("progres")}>
-                  <Printer aria-hidden="true" />
-                  Pratinjau Cetak Progres (A4)
-                </DropdownMenuItem>
-                {canViewFinancials && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
-                      Keuangan RAB &amp; RAP
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void handleDownloadAutomatedReport("financial", "pdf")
-                      }
-                    >
-                      <FileText aria-hidden="true" />
-                      PDF Keuangan RAB/RAP
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void handleDownloadAutomatedReport("financial", "xlsx")
-                      }
-                    >
-                      <FileSpreadsheet aria-hidden="true" />
-                      Excel Keuangan RAB/RAP (.xlsx)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
-                      <Printer aria-hidden="true" />
-                      Pratinjau Cetak RAB (A4)
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {canManageProject && (
-              <>
-                <div className="sm:hidden">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        aria-label="Aksi proyek"
-                        title="Aksi proyek"
-                        className="size-11"
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                    Dokumen &amp; Laporan
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onSelect={() => void handleDownloadAutomatedReport("daily", "pdf")}
+                  >
+                    <FileText aria-hidden="true" />
+                    PDF Laporan Harian
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void handleDownloadAutomatedReport("progress", "pdf")
+                    }
+                  >
+                    <FileText aria-hidden="true" />
+                    PDF Progres &amp; Kurva-S
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void handleDownloadAutomatedReport("progress", "xlsx")
+                    }
+                  >
+                    <FileSpreadsheet aria-hidden="true" />
+                    Excel Progres &amp; Kurva-S
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setPrintDocView("progres")}>
+                    <Printer aria-hidden="true" />
+                    Pratinjau Cetak Progres
+                  </DropdownMenuItem>
+                  {canViewFinancials && (
+                    <>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void handleDownloadAutomatedReport("financial", "pdf")
+                        }
                       >
-                        <Ellipsis className="size-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-52">
+                        <FileText aria-hidden="true" />
+                        PDF Keuangan RAB/RAP
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void handleDownloadAutomatedReport("financial", "xlsx")
+                        }
+                      >
+                        <FileSpreadsheet aria-hidden="true" />
+                        Excel Keuangan RAB/RAP
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
+                        <Printer aria-hidden="true" />
+                        Pratinjau Cetak RAB
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {canManageProject && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                        Kelola Proyek
+                      </DropdownMenuLabel>
                       <DropdownMenuItem onSelect={() => setIsEditModalOpen(true)}>
-                        <Pencil />
-                        Ubah Proyek
+                        <Pencil aria-hidden="true" />
+                        Ubah Informasi Proyek
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setIsClientPortalOpen(true)}>
-                        <Globe />
-                        Portal Klien
+                        <Globe aria-hidden="true" />
+                        Akses Portal Klien
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setIsTemplateModalOpen(true)}>
-                        <LayoutTemplate />
-                        Simpan Template
+                        <LayoutTemplate aria-hidden="true" />
+                        Simpan Sebagai Template
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={handleDuplicate} disabled={isPending}>
-                        <Copy />
+                        <Copy aria-hidden="true" />
                         Duplikat Proyek
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -1097,14 +1100,124 @@ export default function ProjectDetailView({
                         disabled={isPending}
                         className="text-rose-600 focus:bg-rose-50 focus:text-rose-700 dark:focus:bg-rose-950/30"
                       >
-                        <Trash2 />
+                        <Trash2 aria-hidden="true" />
                         Hapus Proyek
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
-                <div className="hidden flex-wrap justify-end gap-2 sm:flex">
+            {/* Desktop View: Full horizontal button bar intact */}
+            <div className="hidden flex-wrap items-center justify-end gap-2 sm:flex">
+              {canSubmitDailyProgress &&
+                isRunningProjectStatus(project.status) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsDailyProgressOpen(true)}
+                    className="gap-1.5 font-semibold"
+                  >
+                    <Camera className="size-4" aria-hidden="true" />
+                    <span>Input Daily Report</span>
+                  </Button>
+                )}
+
+              {(canSubmitDailyProgress || canManageProject) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsSendProgressOpen(true)}
+                  className="gap-1.5"
+                >
+                  <Send className="size-3.5" aria-hidden="true" />
+                  <span>Kirim Progres</span>
+                </Button>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isDownloadingReport}
+                    className="gap-1.5"
+                  >
+                    {isDownloadingReport ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <FileText className="size-3.5" aria-hidden="true" />
+                    )}
+                    <span>Laporan Otomatis</span>
+                    <ChevronDown className="size-3.5" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-60">
+                  <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                    Unduh Dokumen Live DB
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onSelect={() => void handleDownloadAutomatedReport("daily", "pdf")}
+                  >
+                    <FileText aria-hidden="true" />
+                    PDF Laporan Harian
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void handleDownloadAutomatedReport("progress", "pdf")
+                    }
+                  >
+                    <FileText aria-hidden="true" />
+                    PDF Progres &amp; Kurva-S
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void handleDownloadAutomatedReport("progress", "xlsx")
+                    }
+                  >
+                    <FileSpreadsheet aria-hidden="true" />
+                    Excel Progres &amp; Kurva-S (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setPrintDocView("progres")}>
+                    <Printer aria-hidden="true" />
+                    Pratinjau Cetak Progres (A4)
+                  </DropdownMenuItem>
+                  {canViewFinancials && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
+                        Keuangan RAB &amp; RAP
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void handleDownloadAutomatedReport("financial", "pdf")
+                        }
+                      >
+                        <FileText aria-hidden="true" />
+                        PDF Keuangan RAB/RAP
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void handleDownloadAutomatedReport("financial", "xlsx")
+                        }
+                      >
+                        <FileSpreadsheet aria-hidden="true" />
+                        Excel Keuangan RAB/RAP (.xlsx)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPrintDocView("rab")}>
+                        <Printer aria-hidden="true" />
+                        Pratinjau Cetak RAB (A4)
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {canManageProject && (
+                <div className="flex flex-wrap justify-end gap-2">
                   <ProjectActionButton
                     type="button"
                     label="Ubah Proyek"
@@ -1149,9 +1262,9 @@ export default function ProjectDetailView({
                     className="border-rose-500/30 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/30"
                   />
                 </div>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          </>
         }
       />
 
@@ -1293,8 +1406,8 @@ export default function ProjectDetailView({
           <div
             className={
               canViewFinancials
-                ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
-                : "grid grid-cols-1 gap-3 sm:grid-cols-3"
+                ? "grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                : "grid grid-cols-2 gap-2.5 sm:grid-cols-3"
             }
           >
             <div className="rounded-xl border border-border/70 bg-card p-3.5 shadow-2xs">

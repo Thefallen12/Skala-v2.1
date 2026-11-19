@@ -50,10 +50,11 @@ const buttonVariants = cva(
         lighterror: 'bg-lighterror text-error hover:bg-error hover:text-white',
       },
       size: {
-        default: 'h-10 px-4 py-2 text-[13px]',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-11 rounded-md px-6 text-sm',
-        icon: 'size-9 p-0',
+        default: 'h-9 px-3 text-xs sm:h-10 sm:px-4 sm:text-[13px]',
+        xs: 'h-7 rounded px-2 text-[11px] [&_svg]:size-3.5',
+        sm: 'h-8 rounded-md px-2.5 text-xs',
+        lg: 'h-10 rounded-md px-5 text-xs sm:h-11 sm:px-6 sm:text-sm',
+        icon: 'size-8 p-0 sm:size-9',
       },
       shape: {
         pill: 'rounded-full',
@@ -78,6 +79,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         data-slot="button"
+        data-size={size || 'default'}
         className={cn(buttonVariants({ variant, size, shape, className }))}
         ref={ref}
         // Ekstensi browser (autofill/password manager) menyisipkan atribut

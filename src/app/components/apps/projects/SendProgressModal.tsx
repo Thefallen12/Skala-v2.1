@@ -246,7 +246,7 @@ function SendProgressModalInner({
       className="max-w-2xl"
       footer={
         submittedResult ? (
-          <div className="flex w-full items-center justify-end gap-2">
+          <>
             <Button
               type="button"
               variant="outline"
@@ -262,9 +262,9 @@ function SendProgressModalInner({
             >
               Selesai
             </Button>
-          </div>
+          </>
         ) : (
-          <div className="flex w-full items-center justify-between gap-2">
+          <>
             <Button
               type="button"
               variant="outline"
@@ -293,7 +293,7 @@ function SendProgressModalInner({
                 </>
               )}
             </Button>
-          </div>
+          </>
         )
       }
     >

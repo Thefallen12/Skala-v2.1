@@ -638,103 +638,209 @@ function TicketRowActionControls({
 
   const WorkflowIcon = workflow ? workflowIcons[workflow] : null;
 
+  const mobilePrimaryMode:
+    | "contractDo"
+    | "workflow"
+    | "finance"
+    | "action"
+    | "manageItems"
+    | "printSj"
+    | "detail" = hasOpenContract
+    ? "contractDo"
+    : workflow && WorkflowIcon
+      ? "workflow"
+      : financeTarget
+        ? "finance"
+        : visibleAction
+          ? "action"
+          : canManageLogisticsItems
+            ? "manageItems"
+            : isContractTicket && hasMaterialDeliveries && !hasOpenContract
+              ? "printSj"
+              : "detail";
+
   return (
     <div
       className={cn(
         "flex items-center gap-1.5",
-        isMobile ? "flex-wrap justify-end" : "flex-nowrap justify-end",
+        isMobile ? "w-full justify-between" : "flex-nowrap justify-end",
       )}
     >
-      {hasOpenContract && (
-        <Button
-          type="button"
-          size={isMobile ? "sm" : "icon"}
-          variant="success"
-          aria-label="Terbitkan Surat Jalan Material Alam"
-          title="Terbitkan Surat Jalan"
-          onClick={() => onOpenContractDo(ticket)}
-        >
-          <Truck className="size-3.5" aria-hidden="true" />
-          {isMobile && <span>Terbitkan SJ</span>}
-        </Button>
-      )}
-
-      {isContractTicket && hasMaterialDeliveries && !hasOpenContract && (
-        <Button
-          type="button"
-          size={isMobile ? "sm" : "icon"}
-          variant="outline"
-          aria-label="Cetak Surat Jalan Material Alam"
-          title="Pratinjau / Cetak SJ"
-          onClick={() => onPrintContractSj(ticket)}
-        >
-          <Printer className="size-3.5" aria-hidden="true" />
-          {isMobile && <span>Cetak SJ</span>}
-        </Button>
-      )}
-
-      {canManageLogisticsItems && (
-        <Button
-          type="button"
-          size={isMobile ? "sm" : "icon"}
-          variant="warning"
-          aria-label={hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
-          title={hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
-          onClick={() => onOpenDetail(ticket)}
-        >
-          <ClipboardList className="size-3.5" aria-hidden="true" />
-          {isMobile && (
-            <span>{hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}</span>
-          )}
-        </Button>
-      )}
-
-      {workflow && WorkflowIcon ? (
-        <Button
-          type="button"
-          size={isMobile ? "sm" : "icon"}
-          variant={workflow === "EXPEDITION_RECEIPT" ? "outlinesuccess" : "default"}
-          aria-label={workflowShortLabels[workflow]}
-          title={workflowShortLabels[workflow]}
-          onClick={() => {
-            if (workflow === "LOGISTICS_DO") {
-              onOpenLogisticsDo(ticket.id);
-              return;
+      {isMobile ? (
+        mobilePrimaryMode === "contractDo" ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="success"
+            className="flex-1"
+            onClick={() => onOpenContractDo(ticket)}
+          >
+            <Truck className="size-3.5" aria-hidden="true" />
+            <span>Terbitkan SJ</span>
+          </Button>
+        ) : mobilePrimaryMode === "workflow" && workflow && WorkflowIcon ? (
+          <Button
+            type="button"
+            size="sm"
+            variant={
+              workflow === "EXPEDITION_RECEIPT" ? "outlinesuccess" : "default"
             }
-            onOpenWorkflow(ticket);
-          }}
-        >
-          <WorkflowIcon className="size-3.5" aria-hidden="true" />
-          {isMobile && <span>{workflowShortLabels[workflow]}</span>}
-        </Button>
-      ) : financeTarget ? (
-        <Button
-          asChild
-          size={isMobile ? "sm" : "icon"}
-          aria-label={financeTarget.label}
-        >
-          <Link href={financeTarget.href}>
-            <CircleDollarSign className="size-3.5" aria-hidden="true" />
-            {isMobile && <span>{financeTarget.label}</span>}
-          </Link>
-        </Button>
-      ) : visibleAction ? (
-        <Button
-          type="button"
-          size={isMobile ? "sm" : "icon"}
-          aria-label={visibleAction.label}
-          title={visibleAction.label}
-          disabled={isPending && busyId === ticket.id}
-          onClick={() => onRunAction(ticket, visibleAction)}
-        >
-          {visibleAction.label === "Setujui" ? (
-            <Check className="size-3.5" aria-hidden="true" />
-          ) : (
-            <Send className="size-3.5" aria-hidden="true" />
+            className="flex-1"
+            onClick={() => {
+              if (workflow === "LOGISTICS_DO") {
+                onOpenLogisticsDo(ticket.id);
+                return;
+              }
+              onOpenWorkflow(ticket);
+            }}
+          >
+            <WorkflowIcon className="size-3.5" aria-hidden="true" />
+            <span>{workflowShortLabels[workflow]}</span>
+          </Button>
+        ) : mobilePrimaryMode === "finance" && financeTarget ? (
+          <Button asChild size="sm" className="flex-1">
+            <Link href={financeTarget.href}>
+              <CircleDollarSign className="size-3.5" aria-hidden="true" />
+              <span>{financeTarget.label}</span>
+            </Link>
+          </Button>
+        ) : mobilePrimaryMode === "action" && visibleAction ? (
+          <Button
+            type="button"
+            size="sm"
+            className="flex-1"
+            disabled={isPending && busyId === ticket.id}
+            onClick={() => onRunAction(ticket, visibleAction)}
+          >
+            {visibleAction.label === "Setujui" ? (
+              <Check className="size-3.5" aria-hidden="true" />
+            ) : (
+              <Send className="size-3.5" aria-hidden="true" />
+            )}
+            <span>{visibleAction.label}</span>
+          </Button>
+        ) : mobilePrimaryMode === "manageItems" ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="warning"
+            className="flex-1"
+            onClick={() => onOpenDetail(ticket)}
+          >
+            <ClipboardList className="size-3.5" aria-hidden="true" />
+            <span>
+              {hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
+            </span>
+          </Button>
+        ) : mobilePrimaryMode === "printSj" ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => onPrintContractSj(ticket)}
+          >
+            <Printer className="size-3.5" aria-hidden="true" />
+            <span>Cetak SJ</span>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => onOpenDetail(ticket)}
+          >
+            <Eye className="size-3.5" aria-hidden="true" />
+            <span>Detail</span>
+          </Button>
+        )
+      ) : (
+        <>
+          {hasOpenContract && (
+            <Button
+              type="button"
+              size="icon"
+              variant="success"
+              aria-label="Terbitkan Surat Jalan Material Alam"
+              title="Terbitkan Surat Jalan"
+              onClick={() => onOpenContractDo(ticket)}
+            >
+              <Truck className="size-3.5" aria-hidden="true" />
+            </Button>
           )}
-          {isMobile && <span>{visibleAction.label}</span>}
-        </Button>
-      ) : null}
+
+          {isContractTicket && hasMaterialDeliveries && !hasOpenContract && (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Cetak Surat Jalan Material Alam"
+              title="Pratinjau / Cetak SJ"
+              onClick={() => onPrintContractSj(ticket)}
+            >
+              <Printer className="size-3.5" aria-hidden="true" />
+            </Button>
+          )}
+
+          {canManageLogisticsItems && (
+            <Button
+              type="button"
+              size="icon"
+              variant="warning"
+              aria-label={hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
+              title={hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
+              onClick={() => onOpenDetail(ticket)}
+            >
+              <ClipboardList className="size-3.5" aria-hidden="true" />
+            </Button>
+          )}
+
+          {workflow && WorkflowIcon ? (
+            <Button
+              type="button"
+              size="icon"
+              variant={workflow === "EXPEDITION_RECEIPT" ? "outlinesuccess" : "default"}
+              aria-label={workflowShortLabels[workflow]}
+              title={workflowShortLabels[workflow]}
+              onClick={() => {
+                if (workflow === "LOGISTICS_DO") {
+                  onOpenLogisticsDo(ticket.id);
+                  return;
+                }
+                onOpenWorkflow(ticket);
+              }}
+            >
+              <WorkflowIcon className="size-3.5" aria-hidden="true" />
+            </Button>
+          ) : financeTarget ? (
+            <Button
+              asChild
+              size="icon"
+              aria-label={financeTarget.label}
+            >
+              <Link href={financeTarget.href}>
+                <CircleDollarSign className="size-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : visibleAction ? (
+            <Button
+              type="button"
+              size="icon"
+              aria-label={visibleAction.label}
+              title={visibleAction.label}
+              disabled={isPending && busyId === ticket.id}
+              onClick={() => onRunAction(ticket, visibleAction)}
+            >
+              {visibleAction.label === "Setujui" ? (
+                <Check className="size-3.5" aria-hidden="true" />
+              ) : (
+                <Send className="size-3.5" aria-hidden="true" />
+              )}
+            </Button>
+          ) : null}
+        </>
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -748,22 +854,71 @@ function TicketRowActionControls({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => onOpenDetail(ticket)}>
-            <Eye className="size-4" aria-hidden="true" />
-            Detail
-          </DropdownMenuItem>
-          {hasOpenContract && (
+          {(!isMobile || mobilePrimaryMode !== "detail") && (
+            <DropdownMenuItem onSelect={() => onOpenDetail(ticket)}>
+              <Eye className="size-4" aria-hidden="true" />
+              Detail
+            </DropdownMenuItem>
+          )}
+          {isMobile &&
+            canManageLogisticsItems &&
+            mobilePrimaryMode !== "manageItems" && (
+              <DropdownMenuItem onSelect={() => onOpenDetail(ticket)}>
+                <ClipboardList className="size-4" aria-hidden="true" />
+                {hasPendingNonContractItems ? "Alokasi Item" : "Kelola Item"}
+              </DropdownMenuItem>
+            )}
+          {isMobile &&
+            workflow &&
+            WorkflowIcon &&
+            mobilePrimaryMode !== "workflow" && (
+              <DropdownMenuItem
+                onSelect={() => {
+                  if (workflow === "LOGISTICS_DO") {
+                    onOpenLogisticsDo(ticket.id);
+                    return;
+                  }
+                  onOpenWorkflow(ticket);
+                }}
+              >
+                <WorkflowIcon className="size-4" aria-hidden="true" />
+                {workflowShortLabels[workflow]}
+              </DropdownMenuItem>
+            )}
+          {isMobile && financeTarget && mobilePrimaryMode !== "finance" && (
+            <DropdownMenuItem asChild>
+              <Link href={financeTarget.href}>
+                <CircleDollarSign className="size-4" aria-hidden="true" />
+                {financeTarget.label}
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isMobile && visibleAction && mobilePrimaryMode !== "action" && (
+            <DropdownMenuItem
+              disabled={isPending && busyId === ticket.id}
+              onSelect={() => onRunAction(ticket, visibleAction)}
+            >
+              {visibleAction.label === "Setujui" ? (
+                <Check className="size-4" aria-hidden="true" />
+              ) : (
+                <Send className="size-4" aria-hidden="true" />
+              )}
+              {visibleAction.label}
+            </DropdownMenuItem>
+          )}
+          {hasOpenContract && (!isMobile || mobilePrimaryMode !== "contractDo") && (
             <DropdownMenuItem onSelect={() => onOpenContractDo(ticket)}>
               <Truck className="size-4" aria-hidden="true" />
               Terbitkan Surat Jalan
             </DropdownMenuItem>
           )}
-          {hasMaterialDeliveries && (
-            <DropdownMenuItem onSelect={() => onPrintContractSj(ticket)}>
-              <Printer className="size-4" aria-hidden="true" />
-              Cetak SJ
-            </DropdownMenuItem>
-          )}
+          {hasMaterialDeliveries &&
+            (!isMobile || mobilePrimaryMode !== "printSj") && (
+              <DropdownMenuItem onSelect={() => onPrintContractSj(ticket)}>
+                <Printer className="size-4" aria-hidden="true" />
+                Cetak SJ
+              </DropdownMenuItem>
+            )}
           {showDoPrint && primaryDo && (
             <DropdownMenuItem asChild>
               <Link href={`/d/${primaryDo.publicCode}`}>
@@ -835,7 +990,7 @@ function TicketMobileCard({
   return (
     <article
       onClick={() => onOpenDetail(ticket)}
-      className="cursor-pointer rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs transition-colors hover:border-primary/40 active:bg-muted/30"
+      className="cursor-pointer rounded-xl border border-border/80 bg-card p-3 shadow-2xs transition-colors hover:border-primary/40 active:bg-muted/30 sm:p-3.5"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
@@ -908,12 +1063,9 @@ function TicketMobileCard({
       </div>
 
       <div
-        className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5"
+        className="mt-2.5 border-t border-border/60 pt-2"
         onClick={(event) => event.stopPropagation()}
       >
-        <span className="type-p3 text-muted-foreground">
-          Ketuk kartu untuk detail
-        </span>
         <TicketRowActionControls
           ticket={ticket}
           role={role}
@@ -2561,10 +2713,10 @@ export default function TicketListing({
         }
         className="sm:max-w-4xl lg:max-w-5xl"
         footer={
-          selectedTicket ? (
-            <div className="flex w-full flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                {selectedTicket.type === TicketType.MATERIAL &&
+          selectedTicket
+            ? (() => {
+                const canPrintPo =
+                  selectedTicket.type === TicketType.MATERIAL &&
                   !(
                     selectedTicket.items.length > 0 &&
                     selectedTicket.items.every(
@@ -2575,24 +2727,105 @@ export default function TicketListing({
                   (role === UserRole.LOGISTICS ||
                     role === UserRole.DIRECTOR ||
                     role === UserRole.DEPUTY_DIRECTOR ||
-                    role === UserRole.ADMINISTRATIONS) && (
+                    role === UserRole.ADMINISTRATIONS);
+                const canIssueContractDo =
+                  canRecordContractDo &&
+                  hasOpenContractDelivery(role, selectedTicket);
+                const sjCount = selectedTicket.materialDeliveries?.length ?? 0;
+                const isLockedFinance = Boolean(
+                  selectedTicketPermissions?.processedByFinance && isExecutive,
+                );
+                const canEditTicket =
+                  !isLockedFinance && Boolean(selectedTicketPermissions?.canEdit);
+                const canDeleteTicket =
+                  !isLockedFinance &&
+                  Boolean(selectedTicketPermissions?.canDelete);
+
+                const action =
+                  actionFor(role, selectedTicket) ??
+                  (selectedTicket.status === TicketStatus.DRAFT &&
+                  selectedTicket.canSubmit
+                    ? {
+                        label: "Ajukan",
+                        run: submitTicketRequest,
+                      }
+                    : null);
+                const workflow = workflowFor(role, selectedTicket);
+                const isEquipmentLogistics =
+                  canOperateLogisticsActions(role) &&
+                  selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE &&
+                  (selectedTicket.status === "PENDING_LOGISTIK" ||
+                    selectedTicket.status === TicketStatus.APPROVED_DIR ||
+                    selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC);
+                const financeTarget = canOperateFinanceActions(role)
+                  ? getFinanceActionTarget(selectedTicket)
+                  : null;
+
+                let primaryCta: React.ReactNode = null;
+                let contractDoUsedAsPrimary = false;
+
+                if (isEquipmentLogistics) {
+                  primaryCta = (
                     <Button
                       type="button"
-                      variant="outline"
-                      onClick={() =>
-                        printPurchaseOrder(
-                          selectedTicket.id,
-                          selectedTicket.purchaseOrders?.[0]?.publicCode,
-                        )
-                      }
+                      onClick={() => {
+                        setEquipmentSource("INTERNAL");
+                        setEquipmentVendorName("");
+                        setEquipmentQuotedCost("");
+                        setEquipmentDecisionError("");
+                        setEquipmentDecisionOpen(true);
+                      }}
                     >
-                      <Printer className="size-4" aria-hidden="true" />
-                      Cetak PO
+                      Proses Alat
                     </Button>
-                  )}
-
-                {canRecordContractDo &&
-                  hasOpenContractDelivery(role, selectedTicket) && (
+                  );
+                } else if (workflow) {
+                  const labels = {
+                    LOGISTICS: "Proses Logistik",
+                    LOGISTICS_DO: "Buat DO",
+                    EXPEDITION_RECEIPT: "Terima Barang",
+                    FINANCE: "Bayar",
+                    MOVER: "Konfirmasi Tiba",
+                  };
+                  primaryCta = (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTicket(null);
+                        setItemSelection(null);
+                        if (workflow === "LOGISTICS_DO") {
+                          router.push(
+                            `/apps/orders/new?type=do&ticketId=${encodeURIComponent(selectedTicket.id)}`,
+                          );
+                          return;
+                        }
+                        setWorkflowTicket(selectedTicket);
+                      }}
+                    >
+                      {labels[workflow]}
+                    </Button>
+                  );
+                } else if (financeTarget) {
+                  primaryCta = (
+                    <Button asChild>
+                      <Link href={financeTarget.href}>
+                        {financeTarget.label}
+                      </Link>
+                    </Button>
+                  );
+                } else if (action) {
+                  primaryCta = (
+                    <Button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => runAction(selectedTicket, action)}
+                    >
+                      {isPending ? "Memproses..." : action.label}
+                    </Button>
+                  );
+                } else if (canIssueContractDo) {
+                  contractDoUsedAsPrimary = true;
+                  primaryCta = (
                     <Button
                       type="button"
                       variant="success"
@@ -2601,154 +2834,106 @@ export default function TicketListing({
                       <Truck className="size-4" aria-hidden="true" />
                       Terbitkan Surat Jalan
                     </Button>
-                  )}
+                  );
+                }
 
-                {(selectedTicket.materialDeliveries?.length ?? 0) > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => openContractSjPreview(selectedTicket)}
-                  >
-                    <Printer className="size-4" aria-hidden="true" />
-                    Cetak SJ ({selectedTicket.materialDeliveries!.length})
-                  </Button>
-                )}
+                const hasSecondaryMenu =
+                  canPrintPo ||
+                  (canIssueContractDo && !contractDoUsedAsPrimary) ||
+                  sjCount > 0 ||
+                  canEditTicket ||
+                  canDeleteTicket;
 
-                {selectedTicketPermissions?.processedByFinance && isExecutive ? (
-                  <Badge variant="outline" className="gap-1.5">
-                    <Lock className="size-3.5 text-amber-500" aria-hidden="true" />
-                    Terkunci Finance
-                  </Badge>
-                ) : (
+                return (
                   <>
-                    {selectedTicketPermissions?.canEdit && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          setActiveManageModal({
-                            ticket: selectedTicket,
-                            mode: "edit",
-                          })
-                        }
-                      >
-                        <Pencil className="size-4" aria-hidden="true" />
-                        Edit
-                      </Button>
-                    )}
-                    {selectedTicketPermissions?.canDelete && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() =>
-                          setActiveManageModal({
-                            ticket: selectedTicket,
-                            mode: "delete",
-                          })
-                        }
-                      >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                        Hapus
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeTicketSheet}
-                >
-                  Tutup
-                </Button>
-                {(() => {
-                  const action =
-                    actionFor(role, selectedTicket) ??
-                    (selectedTicket.status === TicketStatus.DRAFT &&
-                    selectedTicket.canSubmit
-                      ? {
-                          label: "Ajukan",
-                          run: submitTicketRequest,
-                        }
-                      : null);
-                  const workflow = workflowFor(role, selectedTicket);
-                  if (
-                    canOperateLogisticsActions(role) &&
-                    selectedTicket.ticketType === EQUIPMENT_REQUEST_TYPE &&
-                    (selectedTicket.status === "PENDING_LOGISTIK" ||
-                      selectedTicket.status === TicketStatus.APPROVED_DIR ||
-                      selectedTicket.status === TicketStatus.PROCESSED_LOGISTIC)
-                  ) {
-                    return (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setEquipmentSource("INTERNAL");
-                          setEquipmentVendorName("");
-                          setEquipmentQuotedCost("");
-                          setEquipmentDecisionError("");
-                          setEquipmentDecisionOpen(true);
-                        }}
-                      >
-                        Proses Alat
-                      </Button>
-                    );
-                  }
-                  if (workflow) {
-                    const labels = {
-                      LOGISTICS: "Proses Logistik",
-                      LOGISTICS_DO: "Buat DO",
-                      EXPEDITION_RECEIPT: "Terima Barang",
-                      FINANCE: "Bayar",
-                      MOVER: "Konfirmasi Tiba",
-                    };
-                    return (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTicket(null);
-                          setItemSelection(null);
-                          if (workflow === "LOGISTICS_DO") {
-                            router.push(
-                              `/apps/orders/new?type=do&ticketId=${encodeURIComponent(selectedTicket.id)}`,
-                            );
-                            return;
-                          }
-                          setWorkflowTicket(selectedTicket);
-                        }}
-                      >
-                        {labels[workflow]}
-                      </Button>
-                    );
-                  }
-                  if (canOperateFinanceActions(role)) {
-                    const financeTarget = getFinanceActionTarget(selectedTicket);
-                    if (financeTarget) {
-                      return (
-                        <Button asChild>
-                          <Link href={financeTarget.href}>
-                            {financeTarget.label}
-                          </Link>
-                        </Button>
-                      );
-                    }
-                  }
-                  return action ? (
                     <Button
                       type="button"
-                      disabled={isPending}
-                      onClick={() => runAction(selectedTicket, action)}
+                      variant="outline"
+                      onClick={closeTicketSheet}
                     >
-                      {isPending ? "Memproses..." : action.label}
+                      Tutup
                     </Button>
-                  ) : null;
-                })()}
-              </div>
-            </div>
-          ) : undefined
+                    {hasSecondaryMenu && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" variant="outline">
+                            <MoreHorizontal className="size-4" aria-hidden="true" />
+                            Opsi
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canIssueContractDo && !contractDoUsedAsPrimary && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                setContractDoModalTicket(selectedTicket)
+                              }
+                            >
+                              <Truck className="size-4" aria-hidden="true" />
+                              Terbitkan Surat Jalan
+                            </DropdownMenuItem>
+                          )}
+                          {canPrintPo && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                printPurchaseOrder(
+                                  selectedTicket.id,
+                                  selectedTicket.purchaseOrders?.[0]?.publicCode,
+                                )
+                              }
+                            >
+                              <Printer className="size-4" aria-hidden="true" />
+                              Cetak PO
+                            </DropdownMenuItem>
+                          )}
+                          {sjCount > 0 && (
+                            <DropdownMenuItem
+                              onSelect={() => openContractSjPreview(selectedTicket)}
+                            >
+                              <Printer className="size-4" aria-hidden="true" />
+                              Cetak SJ ({sjCount})
+                            </DropdownMenuItem>
+                          )}
+                          {(canEditTicket || canDeleteTicket) &&
+                            (canPrintPo ||
+                              sjCount > 0 ||
+                              (canIssueContractDo && !contractDoUsedAsPrimary)) && (
+                              <DropdownMenuSeparator />
+                            )}
+                          {canEditTicket && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                setActiveManageModal({
+                                  ticket: selectedTicket,
+                                  mode: "edit",
+                                })
+                              }
+                            >
+                              <Pencil className="size-4" aria-hidden="true" />
+                              Edit
+                            </DropdownMenuItem>
+                          )}
+                          {canDeleteTicket && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onSelect={() =>
+                                setActiveManageModal({
+                                  ticket: selectedTicket,
+                                  mode: "delete",
+                                })
+                              }
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                              Hapus
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    {primaryCta}
+                  </>
+                );
+              })()
+            : undefined
         }
       >
         {selectedTicket &&
@@ -2838,8 +3023,8 @@ export default function TicketListing({
                   </div>
                 )}
 
-                <div className="rounded-xl border border-border bg-muted/20 p-3.5">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-xl border border-border bg-muted/20 p-2.5 sm:p-3.5">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
                     {[
                       { step: 1, title: "01. Pengajuan", sub: "Draft & Submit" },
                       { step: 2, title: "02. Otorisasi", sub: "Direktur" },
@@ -2865,7 +3050,7 @@ export default function TicketListing({
                       return (
                         <div
                           key={s.step}
-                          className={`rounded-lg border px-3 py-2 ${
+                          className={`rounded-lg border px-2.5 py-1.5 sm:px-3 sm:py-2 ${
                             isDone
                               ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-500"
                               : isActive
@@ -2879,7 +3064,7 @@ export default function TicketListing({
                       );
                     })}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 sm:mt-3 sm:px-3 sm:py-2">
                     <span className="type-p3 font-semibold text-foreground">
                       Status: {statusLabels[selectedTicket.status]}
                     </span>
@@ -2889,20 +3074,20 @@ export default function TicketListing({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                  <div className="rounded-xl border border-border bg-card p-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5">
+                  <div className="rounded-xl border border-border bg-card p-2.5 sm:p-3">
                     <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
                       Pemohon
                     </p>
-                    <p className="type-p2 mt-1 font-bold text-foreground">
+                    <p className="type-p2 mt-0.5 truncate font-bold text-foreground sm:mt-1">
                       {selectedTicket.requester.name}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-border bg-card p-3">
+                  <div className="rounded-xl border border-border bg-card p-2.5 sm:p-3">
                     <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
                       Tanggal Pengajuan
                     </p>
-                    <p className="type-p2 mt-1 font-bold text-foreground">
+                    <p className="type-p2 mt-0.5 font-bold text-foreground sm:mt-1">
                       {format(
                         new Date(selectedTicket.createdAt),
                         "d MMM yyyy, HH:mm",
@@ -2910,33 +3095,33 @@ export default function TicketListing({
                       )}
                     </p>
                   </div>
-                  <div className="col-span-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:col-span-1">
+                  <div className="col-span-2 rounded-xl border border-primary/30 bg-primary/5 p-2.5 sm:col-span-1 sm:p-3">
                     <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
                       {selectedTicket.type === TicketType.MATERIAL
                         ? "Total Estimasi"
                         : "Nominal Pengajuan"}
                     </p>
-                    <p className="type-kpi mt-1 text-primary">
+                    <p className="type-kpi mt-0.5 text-primary sm:mt-1">
                       {formatCurrency(selectedTicket.totalAmount)}
                     </p>
                   </div>
-                  <div className="col-span-2 rounded-xl border border-border bg-card p-3">
+                  <div className="col-span-2 rounded-xl border border-border bg-card p-2.5 sm:p-3">
                     <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
                       Proyek &amp; Lokasi Kerja
                     </p>
-                    <p className="type-p2 mt-1 font-bold text-foreground">
+                    <p className="type-p2 mt-0.5 font-bold text-foreground sm:mt-1">
                       {selectedTicket.project
                         ? `${selectedTicket.project.kelompokTani} — ${selectedTicket.project.title}`
                         : "Non-Proyek / Operasional"}
                     </p>
                   </div>
-                  <div className="col-span-2 rounded-xl border border-border bg-card p-3 sm:col-span-1">
+                  <div className="col-span-2 rounded-xl border border-border bg-card p-2.5 sm:col-span-1 sm:p-3">
                     <p className="type-p3 font-semibold uppercase tracking-wider text-muted-foreground">
                       {selectedTicket.items.length > 0
                         ? "Pemenuhan Barang"
                         : "Kategori"}
                     </p>
-                    <p className="type-p2 mt-1 font-bold text-foreground">
+                    <p className="type-p2 mt-0.5 font-bold text-foreground sm:mt-1">
                       {selectedTicket.items.length > 0
                         ? selectedTicket.fulfillmentStatus === "COMPLETED"
                           ? "Selesai (100%)"
@@ -3479,76 +3664,67 @@ export default function TicketListing({
                     </div>
 
                     {(selectedTicket.materialDeliveries?.length ?? 0) > 0 ? (
-                      <Table pagination={false}>
-                        <TableHeader>
-                          <TableRow className="bg-muted/40">
-                            <TableHead className="type-p3">Tanggal</TableHead>
-                            <TableHead className="type-p3">No. SJ &amp; Armada Vendor</TableHead>
-                            <TableHead className="type-p3">Kontrak</TableHead>
-                            <TableHead className="type-p3 text-right">
-                              Volume
-                            </TableHead>
-                            <TableHead className="type-p3 text-right">
-                              Nilai
-                            </TableHead>
-                            <TableHead className="type-p3">Tagihan</TableHead>
-                            <TableHead className="type-p3 text-right">
-                              Aksi
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedTicket.materialDeliveries!.map((delivery) => (
-                            <TableRow key={delivery.id}>
-                              <TableCell className="type-p3 whitespace-nowrap">
-                                {delivery.deliveryDate}
-                              </TableCell>
-                              <TableCell>
-                                <div className="type-p2 font-semibold">
-                                  {delivery.doNumber}
+                      <>
+                        <div className="space-y-2.5 md:hidden">
+                          {selectedTicket.materialDeliveries!.map((delivery) => {
+                            const hasSjMenu =
+                              canAttachContractProof ||
+                              Boolean(delivery.proofUrl) ||
+                              (canRecordContractDo &&
+                                delivery.billingStatus === "UNBILLED");
+                            return (
+                              <div
+                                key={delivery.id}
+                                className="space-y-2 rounded-xl border border-border/80 bg-muted/15 p-3"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="type-p2 font-mono font-bold text-primary">
+                                      {delivery.doNumber}
+                                    </p>
+                                    <p className="type-p3 text-muted-foreground">
+                                      {delivery.deliveryDate} ·{" "}
+                                      {delivery.vehiclePlate || "-"}
+                                      {delivery.driverName
+                                        ? ` (${delivery.driverName})`
+                                        : ""}
+                                    </p>
+                                    <p className="type-p3 text-muted-foreground">
+                                      {delivery.materialType} ·{" "}
+                                      {delivery.vendorName} (
+                                      {delivery.contractNumber})
+                                    </p>
+                                  </div>
+                                  <Badge
+                                    className="shrink-0"
+                                    variant={
+                                      delivery.billingStatus === "BILLED"
+                                        ? "lightSuccess"
+                                        : "lightWarning"
+                                    }
+                                  >
+                                    {delivery.billingStatus}
+                                  </Badge>
                                 </div>
-                                <div className="type-p3 text-muted-foreground">
-                                  {delivery.vehiclePlate || "-"}
-                                  {delivery.driverName
-                                    ? ` · ${delivery.driverName}`
-                                    : ""}
+                                <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
+                                  <span className="type-p2 font-semibold tabular-nums">
+                                    {formatMaterialVolume(
+                                      delivery.quantityReceived,
+                                      delivery.unit,
+                                    )}
+                                  </span>
+                                  <span className="type-p2 font-mono font-bold tabular-nums">
+                                    {formatCurrency(
+                                      String(delivery.estimatedAmount),
+                                    )}
+                                  </span>
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="type-p2 font-medium">
-                                  {delivery.materialType} · {delivery.vendorName}
-                                </div>
-                                <div className="type-p3 text-muted-foreground">
-                                  {delivery.contractNumber}
-                                </div>
-                              </TableCell>
-                              <TableCell className="type-p2 whitespace-nowrap text-right font-semibold">
-                                {formatMaterialVolume(
-                                  delivery.quantityReceived,
-                                  delivery.unit,
-                                )}
-                              </TableCell>
-                              <TableCell className="type-p2 whitespace-nowrap text-right font-medium">
-                                {formatCurrency(String(delivery.estimatedAmount))}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    delivery.billingStatus === "BILLED"
-                                      ? "lightSuccess"
-                                      : "lightWarning"
-                                  }
-                                >
-                                  {delivery.billingStatus}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
+                                <div className="flex items-center gap-1.5 pt-0.5">
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    title="Pratinjau / Cetak Surat Jalan"
+                                    className="flex-1"
                                     onClick={() =>
                                       openContractSjPreview(
                                         selectedTicket,
@@ -3560,87 +3736,275 @@ export default function TicketListing({
                                       className="size-3.5"
                                       aria-hidden="true"
                                     />
-                                    Pratinjau / Cetak SJ
+                                    Pratinjau SJ
                                   </Button>
-                                  {canAttachContractProof && (
-                                    <Button
-                                      type="button"
-                                      size="icon"
-                                      variant="outline"
-                                      aria-label={`Lampirkan Foto / Plat / Supir ${delivery.doNumber}`}
-                                      title="Lampirkan Foto / Plat / Supir"
-                                      onClick={() =>
-                                        setContractSjAttachTarget({
-                                          id: delivery.id,
-                                          publicCode:
-                                            (
-                                              delivery as {
-                                                publicCode?: string | null;
-                                              }
-                                            ).publicCode ?? null,
-                                          doNumber: delivery.doNumber,
-                                          vehiclePlate: delivery.vehiclePlate,
-                                          driverName: delivery.driverName,
-                                          proofUrl: delivery.proofUrl,
-                                          vendorName: delivery.vendorName,
-                                          materialType: delivery.materialType,
-                                        })
+                                  {hasSjMenu && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="outline"
+                                          aria-label={`Menu aksi ${delivery.doNumber}`}
+                                        >
+                                          <MoreHorizontal
+                                            className="size-4"
+                                            aria-hidden="true"
+                                          />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        {canAttachContractProof && (
+                                          <DropdownMenuItem
+                                            onSelect={() =>
+                                              setContractSjAttachTarget({
+                                                id: delivery.id,
+                                                publicCode:
+                                                  (
+                                                    delivery as {
+                                                      publicCode?: string | null;
+                                                    }
+                                                  ).publicCode ?? null,
+                                                doNumber: delivery.doNumber,
+                                                vehiclePlate:
+                                                  delivery.vehiclePlate,
+                                                driverName: delivery.driverName,
+                                                proofUrl: delivery.proofUrl,
+                                                vendorName: delivery.vendorName,
+                                                materialType:
+                                                  delivery.materialType,
+                                              })
+                                            }
+                                          >
+                                            <Upload
+                                              className="size-4"
+                                              aria-hidden="true"
+                                            />
+                                            {delivery.proofUrl
+                                              ? "Update Lampiran"
+                                              : "Lampirkan Foto/Plat"}
+                                          </DropdownMenuItem>
+                                        )}
+                                        {delivery.proofUrl && (
+                                          <DropdownMenuItem
+                                            onSelect={() =>
+                                              openReceiptPreview({
+                                                label: `Bukti Surat Jalan ${delivery.doNumber}`,
+                                                url: delivery.proofUrl!,
+                                              })
+                                            }
+                                          >
+                                            <Eye
+                                              className="size-4"
+                                              aria-hidden="true"
+                                            />
+                                            Lihat Foto
+                                          </DropdownMenuItem>
+                                        )}
+                                        {canRecordContractDo &&
+                                          delivery.billingStatus ===
+                                            "UNBILLED" && (
+                                            <>
+                                              {(canAttachContractProof ||
+                                                Boolean(delivery.proofUrl)) && (
+                                                <DropdownMenuSeparator />
+                                              )}
+                                              <DropdownMenuItem
+                                                disabled={
+                                                  isPending ||
+                                                  deletingDeliveryId ===
+                                                    delivery.id
+                                                }
+                                                className="text-destructive focus:text-destructive"
+                                                onSelect={() =>
+                                                  handleDeleteContractDelivery(
+                                                    delivery.id,
+                                                    delivery.doNumber,
+                                                  )
+                                                }
+                                              >
+                                                <Trash2
+                                                  className="size-4"
+                                                  aria-hidden="true"
+                                                />
+                                                Hapus
+                                              </DropdownMenuItem>
+                                            </>
+                                          )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="hidden md:block">
+                          <Table pagination={false}>
+                            <TableHeader>
+                              <TableRow className="bg-muted/40">
+                                <TableHead className="type-p3">Tanggal</TableHead>
+                                <TableHead className="type-p3">No. SJ &amp; Armada Vendor</TableHead>
+                                <TableHead className="type-p3">Kontrak</TableHead>
+                                <TableHead className="type-p3 text-right">
+                                  Volume
+                                </TableHead>
+                                <TableHead className="type-p3 text-right">
+                                  Nilai
+                                </TableHead>
+                                <TableHead className="type-p3">Tagihan</TableHead>
+                                <TableHead className="type-p3 text-right">
+                                  Aksi
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedTicket.materialDeliveries!.map((delivery) => (
+                                <TableRow key={delivery.id}>
+                                  <TableCell className="type-p3 whitespace-nowrap">
+                                    {delivery.deliveryDate}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="type-p2 font-semibold">
+                                      {delivery.doNumber}
+                                    </div>
+                                    <div className="type-p3 text-muted-foreground">
+                                      {delivery.vehiclePlate || "-"}
+                                      {delivery.driverName
+                                        ? ` · ${delivery.driverName}`
+                                        : ""}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="type-p2 font-medium">
+                                      {delivery.materialType} · {delivery.vendorName}
+                                    </div>
+                                    <div className="type-p3 text-muted-foreground">
+                                      {delivery.contractNumber}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="type-p2 whitespace-nowrap text-right font-semibold">
+                                    {formatMaterialVolume(
+                                      delivery.quantityReceived,
+                                      delivery.unit,
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="type-p2 whitespace-nowrap text-right font-medium">
+                                    {formatCurrency(String(delivery.estimatedAmount))}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant={
+                                        delivery.billingStatus === "BILLED"
+                                          ? "lightSuccess"
+                                          : "lightWarning"
                                       }
                                     >
-                                      <Upload
-                                        className="size-3.5"
-                                        aria-hidden="true"
-                                      />
-                                    </Button>
-                                  )}
-                                  {delivery.proofUrl && (
-                                    <Button
-                                      type="button"
-                                      size="icon"
-                                      variant="outline"
-                                      aria-label={`Lihat bukti ${delivery.doNumber}`}
-                                      title="Lihat Foto Bukti"
-                                      onClick={() =>
-                                        openReceiptPreview({
-                                          label: `Bukti Surat Jalan ${delivery.doNumber}`,
-                                          url: delivery.proofUrl!,
-                                        })
-                                      }
-                                    >
-                                      <Eye className="size-3.5" aria-hidden="true" />
-                                    </Button>
-                                  )}
-                                  {canRecordContractDo &&
-                                    delivery.billingStatus === "UNBILLED" && (
+                                      {delivery.billingStatus}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1">
                                       <Button
                                         type="button"
-                                        size="icon"
+                                        size="sm"
                                         variant="outline"
-                                        disabled={
-                                          isPending ||
-                                          deletingDeliveryId === delivery.id
-                                        }
-                                        aria-label={`Hapus Surat Jalan ${delivery.doNumber}`}
-                                        title="Hapus Surat Jalan belum ditagih"
+                                        title="Pratinjau / Cetak Surat Jalan"
                                         onClick={() =>
-                                          handleDeleteContractDelivery(
+                                          openContractSjPreview(
+                                            selectedTicket,
                                             delivery.id,
-                                            delivery.doNumber,
                                           )
                                         }
                                       >
-                                        <Trash2
-                                          className="size-3.5 text-destructive"
+                                        <Printer
+                                          className="size-3.5"
                                           aria-hidden="true"
                                         />
+                                        Pratinjau / Cetak SJ
                                       </Button>
-                                    )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                                      {canAttachContractProof && (
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="outline"
+                                          aria-label={`Lampirkan Foto / Plat / Supir ${delivery.doNumber}`}
+                                          title="Lampirkan Foto / Plat / Supir"
+                                          onClick={() =>
+                                            setContractSjAttachTarget({
+                                              id: delivery.id,
+                                              publicCode:
+                                                (
+                                                  delivery as {
+                                                    publicCode?: string | null;
+                                                  }
+                                                ).publicCode ?? null,
+                                              doNumber: delivery.doNumber,
+                                              vehiclePlate: delivery.vehiclePlate,
+                                              driverName: delivery.driverName,
+                                              proofUrl: delivery.proofUrl,
+                                              vendorName: delivery.vendorName,
+                                              materialType: delivery.materialType,
+                                            })
+                                          }
+                                        >
+                                          <Upload
+                                            className="size-3.5"
+                                            aria-hidden="true"
+                                          />
+                                        </Button>
+                                      )}
+                                      {delivery.proofUrl && (
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="outline"
+                                          aria-label={`Lihat bukti ${delivery.doNumber}`}
+                                          title="Lihat Foto Bukti"
+                                          onClick={() =>
+                                            openReceiptPreview({
+                                              label: `Bukti Surat Jalan ${delivery.doNumber}`,
+                                              url: delivery.proofUrl!,
+                                            })
+                                          }
+                                        >
+                                          <Eye className="size-3.5" aria-hidden="true" />
+                                        </Button>
+                                      )}
+                                      {canRecordContractDo &&
+                                        delivery.billingStatus === "UNBILLED" && (
+                                          <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="outline"
+                                            disabled={
+                                              isPending ||
+                                              deletingDeliveryId === delivery.id
+                                            }
+                                            aria-label={`Hapus Surat Jalan ${delivery.doNumber}`}
+                                            title="Hapus Surat Jalan belum ditagih"
+                                            onClick={() =>
+                                              handleDeleteContractDelivery(
+                                                delivery.id,
+                                                delivery.doNumber,
+                                              )
+                                            }
+                                          >
+                                            <Trash2
+                                              className="size-3.5 text-destructive"
+                                              aria-hidden="true"
+                                            />
+                                          </Button>
+                                        )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </>
                     ) : (
                       <EmptyState
                         variant="inline"
@@ -3654,8 +4018,8 @@ export default function TicketListing({
                 {(selectedTicket.items.length > 0 ||
                   (canExecutiveManageTicket &&
                     selectedTicket.type === TicketType.MATERIAL)) && (
-                  <section className="space-y-3 rounded-xl border border-border bg-card p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <section className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="type-h3 text-foreground">
@@ -3676,69 +4040,76 @@ export default function TicketListing({
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {canExecutiveManageTicket && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={fulfillmentPending}
-                            onClick={() => setItemEditorModal({ mode: "add" })}
-                          >
-                            <Plus className="size-3.5" aria-hidden="true" />
-                            Tambah Item
-                          </Button>
-                        )}
-                        {canSplitFulfillment && (
-                          <>
+                      {(canExecutiveManageTicket || canSplitFulfillment) && (
+                        <div className="grid w-full grid-cols-2 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center [&>*:only-child]:col-span-2 [&>*:last-child:nth-child(odd)]:col-span-2">
+                          {canExecutiveManageTicket && (
                             <Button
                               type="button"
                               size="sm"
-                              disabled={
-                                selectedStockItems.length === 0 ||
-                                fulfillmentPending
-                              }
-                              onClick={prepareWarehouseFulfillment}
+                              variant="outline"
+                              disabled={fulfillmentPending}
+                              onClick={() => setItemEditorModal({ mode: "add" })}
                             >
-                              <PackageOpen
-                                className="size-3.5"
-                                aria-hidden="true"
-                              />
-                              Cek Stok ({selectedStockItems.length})
+                              <Plus className="size-3.5" aria-hidden="true" />
+                              Tambah Item
                             </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              disabled={
-                                selectedStockItems.length === 0 ||
-                                fulfillmentPending
-                              }
-                              onClick={() => {
-                                if (
-                                  !selectedTicket ||
-                                  selectedStockItems.length === 0
-                                )
-                                  return;
-                                setFulfillmentMessage("");
-                                setStockAvailability([]);
-                                setItemSelection({
-                                  ticketId: selectedTicket.id,
-                                  itemIds: selectedStockItems.map((i) => i.id),
-                                });
-                                setPurchaseMode("DIRECT_PURCHASE");
-                                setPoDialogOpen(true);
-                              }}
-                            >
-                              <ShoppingCart
-                                className="size-3.5"
-                                aria-hidden="true"
-                              />
-                              Buat PO / Belanja ({selectedStockItems.length})
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                          )}
+                          {canSplitFulfillment && (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={
+                                  selectedStockItems.length === 0 ||
+                                  fulfillmentPending
+                                }
+                                onClick={prepareWarehouseFulfillment}
+                              >
+                                <PackageOpen
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                                Cek Stok ({selectedStockItems.length})
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={
+                                  selectedStockItems.length === 0 ||
+                                  fulfillmentPending
+                                }
+                                onClick={() => {
+                                  if (
+                                    !selectedTicket ||
+                                    selectedStockItems.length === 0
+                                  )
+                                    return;
+                                  setFulfillmentMessage("");
+                                  setStockAvailability([]);
+                                  setItemSelection({
+                                    ticketId: selectedTicket.id,
+                                    itemIds: selectedStockItems.map((i) => i.id),
+                                  });
+                                  setPurchaseMode("DIRECT_PURCHASE");
+                                  setPoDialogOpen(true);
+                                }}
+                              >
+                                <ShoppingCart
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                                <span className="sm:hidden">
+                                  PO / Belanja ({selectedStockItems.length})
+                                </span>
+                                <span className="hidden sm:inline">
+                                  Buat PO / Belanja ({selectedStockItems.length})
+                                </span>
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2.5 md:hidden">
@@ -3876,7 +4247,7 @@ export default function TicketListing({
                 )}
 
                 {(selectedTicket.paymentTransactions?.length ?? 0) > 0 && (
-                  <div className="space-y-2.5 rounded-xl border border-border bg-card p-4">
+                  <div className="space-y-2.5 rounded-xl border border-border bg-card p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h3 className="type-h3 text-foreground">
                         Riwayat Pembayaran
@@ -3894,74 +4265,131 @@ export default function TicketListing({
                         );
                       })()}
                     </div>
-                    <Table pagination={false}>
-                      <TableHeader>
-                        <TableRow className="bg-muted/40">
-                          <TableHead className="type-p3">Tanggal</TableHead>
-                          <TableHead className="type-p3">Referensi</TableHead>
-                          <TableHead className="type-p3">Tipe</TableHead>
-                          <TableHead className="type-p3 text-right">
-                            Jumlah
-                          </TableHead>
-                          <TableHead className="type-p3">
-                            Tujuan Transfer
-                          </TableHead>
-                          <TableHead className="type-p3 text-right">
-                            Bukti
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedTicket.paymentTransactions!.map((payment) => (
-                          <TableRow key={payment.id}>
-                            <TableCell className="type-p3 whitespace-nowrap">
-                              {payment.paidAt
-                                ? new Date(payment.paidAt).toLocaleDateString(
-                                    "id-ID",
-                                  )
-                                : "—"}
-                            </TableCell>
-                            <TableCell className="type-p2 font-medium">
-                              {payment.reference}
-                            </TableCell>
-                            <TableCell className="type-p3">
+
+                    <div className="space-y-2 md:hidden">
+                      {selectedTicket.paymentTransactions!.map((payment) => (
+                        <div
+                          key={payment.id}
+                          className="space-y-1.5 rounded-xl border border-border/80 bg-muted/15 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="type-p2 truncate font-semibold text-foreground">
+                                {payment.reference}
+                              </p>
+                              <p className="type-p3 text-muted-foreground">
+                                {payment.paidAt
+                                  ? new Date(payment.paidAt).toLocaleDateString(
+                                      "id-ID",
+                                    )
+                                  : "—"}{" "}
+                                · {payment.transferDestination}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="shrink-0">
                               {payment.paymentType === PaymentType.DOWN_PAYMENT
                                 ? "DP"
                                 : payment.paymentType ===
                                     PaymentType.PROGRESS_PAYMENT
                                   ? "Termin"
                                   : "Pelunasan"}
-                            </TableCell>
-                            <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <span className="type-p2 font-mono font-bold tabular-nums text-foreground">
                               {formatCurrency(String(payment.amount))}
-                            </TableCell>
-                            <TableCell className="type-p3">
-                              {payment.transferDestination}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {payment.proofOfTransferUrl ? (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openReceiptPreview({
-                                      label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
-                                      url: payment.proofOfTransferUrl!,
-                                    })
-                                  }
-                                >
-                                  <Eye className="size-3.5" aria-hidden="true" />
-                                  Bukti
-                                </Button>
-                              ) : (
-                                "—"
-                              )}
-                            </TableCell>
+                            </span>
+                            {payment.proofOfTransferUrl && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  openReceiptPreview({
+                                    label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
+                                    url: payment.proofOfTransferUrl!,
+                                  })
+                                }
+                              >
+                                <Eye className="size-3.5" aria-hidden="true" />
+                                Lihat Bukti
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="hidden md:block">
+                      <Table pagination={false}>
+                        <TableHeader>
+                          <TableRow className="bg-muted/40">
+                            <TableHead className="type-p3">Tanggal</TableHead>
+                            <TableHead className="type-p3">Referensi</TableHead>
+                            <TableHead className="type-p3">Tipe</TableHead>
+                            <TableHead className="type-p3 text-right">
+                              Jumlah
+                            </TableHead>
+                            <TableHead className="type-p3">
+                              Tujuan Transfer
+                            </TableHead>
+                            <TableHead className="type-p3 text-right">
+                              Bukti
+                            </TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedTicket.paymentTransactions!.map((payment) => (
+                            <TableRow key={payment.id}>
+                              <TableCell className="type-p3 whitespace-nowrap">
+                                {payment.paidAt
+                                  ? new Date(payment.paidAt).toLocaleDateString(
+                                      "id-ID",
+                                    )
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="type-p2 font-medium">
+                                {payment.reference}
+                              </TableCell>
+                              <TableCell className="type-p3">
+                                {payment.paymentType === PaymentType.DOWN_PAYMENT
+                                  ? "DP"
+                                  : payment.paymentType ===
+                                      PaymentType.PROGRESS_PAYMENT
+                                    ? "Termin"
+                                    : "Pelunasan"}
+                              </TableCell>
+                              <TableCell className="type-p2 text-right font-semibold tabular-nums">
+                                {formatCurrency(String(payment.amount))}
+                              </TableCell>
+                              <TableCell className="type-p3">
+                                {payment.transferDestination}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {payment.proofOfTransferUrl ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      openReceiptPreview({
+                                        label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
+                                        url: payment.proofOfTransferUrl!,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Bukti
+                                  </Button>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
                 )}
 
@@ -4167,122 +4595,260 @@ export default function TicketListing({
         title="Pemenuhan Stok Gudang"
         description="Periksa stok barang, tautkan SKU bila perlu, lalu terbitkan DO atau alihkan ke PO."
         className="sm:max-w-4xl"
-        footer={
-          <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        footer={(() => {
+          const hasPendingPurchaseLink = stockAvailability.some((a) =>
+            Boolean(a.pendingPurchaseNumber),
+          );
+          const hasReady = readyStockItems.length > 0;
+          const hasNeedsOrder = needsOrderTicketItemIds.length > 0;
+          const isUnchecked = stockAvailability.length === 0;
+
+          const openDirectBuy = () => {
+            if (!selectedTicket || selectedStockItems.length === 0) return;
+            setFulfillmentMessage("");
+            setDoDialogOpen(false);
+            setStockAvailability([]);
+            setItemSelection({
+              ticketId: selectedTicket.id,
+              itemIds: selectedStockItems.map((i) => i.id),
+            });
+            setPurchaseMode("DIRECT_PURCHASE");
+            setPoDialogOpen(true);
+          };
+
+          const primaryCta = hasReady ? (
             <Button
               type="button"
-              variant="outline"
-              onClick={() => setDoDialogOpen(false)}
+              onClick={fulfillSelectedItemsFromStock}
+              disabled={
+                fulfillmentPending ||
+                readyStockItems.length === 0 ||
+                !selectedMoverId ||
+                !selectedVehicleId
+              }
+            >
+              {fulfillmentPending
+                ? "Memproses..."
+                : `Terbitkan DO (${readyStockItems.length})`}
+            </Button>
+          ) : hasNeedsOrder ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={openPurchaseOrderForUnavailableItems}
               disabled={fulfillmentPending}
             >
-              Batal
+              Buat PO ({needsOrderTicketItemIds.length})
             </Button>
-            {stockAvailability.length === 0 && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={prepareWarehouseFulfillment}
-                  disabled={fulfillmentPending}
-                >
-                  <RefreshCw
-                    className={`size-4 ${fulfillmentPending ? "animate-spin" : ""}`}
-                    aria-hidden="true"
-                  />
-                  Periksa Ulang
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    if (!selectedTicket || selectedStockItems.length === 0)
-                      return;
-                    setFulfillmentMessage("");
-                    setDoDialogOpen(false);
-                    setStockAvailability([]);
-                    setItemSelection({
-                      ticketId: selectedTicket.id,
-                      itemIds: selectedStockItems.map((i) => i.id),
-                    });
-                    setPurchaseMode("DIRECT_PURCHASE");
-                    setPoDialogOpen(true);
-                  }}
-                  disabled={
-                    fulfillmentPending || selectedStockItems.length === 0
-                  }
-                >
-                  <ShoppingCart className="size-4" aria-hidden="true" />
-                  Beli Langsung ({selectedStockItems.length})
-                </Button>
-              </>
-            )}
-            {stockAvailability.some((a) => Boolean(a.pendingPurchaseNumber)) && (
-              <Button asChild type="button" variant="outline">
-                <Link href="/apps/logistics?tab=stock">Kelola Stok</Link>
-              </Button>
-            )}
-            {needsOrderTicketItemIds.length > 0 && (
+          ) : isUnchecked ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={openDirectBuy}
+              disabled={fulfillmentPending || selectedStockItems.length === 0}
+            >
+              <ShoppingCart className="size-4" aria-hidden="true" />
+              Beli Langsung ({selectedStockItems.length})
+            </Button>
+          ) : hasPendingPurchaseLink ? (
+            <Button asChild type="button" variant="outline">
+              <Link href="/apps/logistics?tab=stock">Kelola Stok</Link>
+            </Button>
+          ) : null;
+
+          const hasSecondaryMenu =
+            isUnchecked ||
+            (hasReady && hasNeedsOrder) ||
+            (hasPendingPurchaseLink && (hasReady || hasNeedsOrder || isUnchecked));
+
+          return (
+            <>
               <Button
                 type="button"
-                variant="secondary"
-                onClick={openPurchaseOrderForUnavailableItems}
+                variant="outline"
+                onClick={() => setDoDialogOpen(false)}
                 disabled={fulfillmentPending}
               >
-                Buat PO ({needsOrderTicketItemIds.length})
+                Batal
               </Button>
-            )}
-            {readyStockItems.length > 0 && (
-              <Button
-                type="button"
-                onClick={fulfillSelectedItemsFromStock}
-                disabled={
-                  fulfillmentPending ||
-                  readyStockItems.length === 0 ||
-                  !selectedMoverId ||
-                  !selectedVehicleId
-                }
-              >
-                {fulfillmentPending
-                  ? "Memproses..."
-                  : `Terbitkan DO (${readyStockItems.length})`}
-              </Button>
-            )}
-          </div>
-        }
+              {hasSecondaryMenu && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={fulfillmentPending}
+                    >
+                      <MoreHorizontal className="size-4" aria-hidden="true" />
+                      Opsi
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {isUnchecked && (
+                      <DropdownMenuItem
+                        disabled={fulfillmentPending}
+                        onSelect={prepareWarehouseFulfillment}
+                      >
+                        <RefreshCw className="size-4" aria-hidden="true" />
+                        Periksa Ulang
+                      </DropdownMenuItem>
+                    )}
+                    {hasReady && hasNeedsOrder && (
+                      <DropdownMenuItem
+                        disabled={fulfillmentPending}
+                        onSelect={openPurchaseOrderForUnavailableItems}
+                      >
+                        <ShoppingCart className="size-4" aria-hidden="true" />
+                        Buat PO ({needsOrderTicketItemIds.length})
+                      </DropdownMenuItem>
+                    )}
+                    {hasPendingPurchaseLink && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/apps/logistics?tab=stock">Kelola Stok</Link>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {primaryCta}
+            </>
+          );
+        })()}
       >
         <div className="space-y-4">
-          <Table pagination={false}>
-            <TableHeader>
-              <TableRow className="bg-muted/40">
-                <TableHead className="type-p3">Barang</TableHead>
-                <TableHead className="type-p3">Jumlah</TableHead>
-                <TableHead className="type-p3">Tersedia</TableHead>
-                <TableHead className="type-p3">Status &amp; SKU</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(stockAvailability.length > 0
+          {(() => {
+            const stockCheckItems =
+              stockAvailability.length > 0
                 ? (selectedTicket?.items.filter((item) =>
                     stockAvailability.some(
                       (availability) => availability.ticketItemId === item.id,
                     ),
                   ) ?? [])
-                : selectedStockItems
-              ).map((item) => (
-                <StockAvailabilityRow
-                  key={item.id}
-                  item={item}
-                  availability={stockAvailability.find(
-                    (entry) => entry.ticketItemId === item.id,
-                  )}
-                  disabled={fulfillmentPending || stockItems.length === 0}
-                  onOpenSkuMapper={(targetItem, currentStockId) =>
-                    setSkuMapTarget({ item: targetItem, currentStockId })
-                  }
-                />
-              ))}
-            </TableBody>
-          </Table>
+                : selectedStockItems;
+
+            return (
+              <>
+                <div className="space-y-2 md:hidden">
+                  {stockCheckItems.map((item) => {
+                    const availability = stockAvailability.find(
+                      (entry) => entry.ticketItemId === item.id,
+                    );
+                    return (
+                      <div
+                        key={item.id}
+                        className="space-y-2 rounded-xl border border-border/80 bg-muted/15 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="type-p2 font-semibold text-foreground">
+                              {item.itemName}
+                            </p>
+                            {availability?.stockItemSku && (
+                              <p className="type-p3 text-muted-foreground">
+                                SKU: {availability.stockItemSku}
+                              </p>
+                            )}
+                          </div>
+                          <Badge
+                            className="shrink-0"
+                            variant={
+                              availability?.ready
+                                ? "lightSuccess"
+                                : "lightWarning"
+                            }
+                          >
+                            {availability
+                              ? availability.pendingPurchaseNumber
+                                ? "Sedang Dipesan"
+                                : availability.ready
+                                  ? "Stok Ready"
+                                  : "Perlu Pesan"
+                              : "Menunggu"}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5">
+                          <div>
+                            <span className="type-p3 text-muted-foreground">
+                              Diminta
+                            </span>
+                            <p className="type-p2 font-semibold tabular-nums">
+                              {item.quantity} {item.unit}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="type-p3 text-muted-foreground">
+                              Tersedia
+                            </span>
+                            <p className="type-p2 font-semibold tabular-nums">
+                              {availability
+                                ? `${availability.availableQuantity} ${item.unit}`
+                                : "Belum diperiksa"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {availability?.message && (
+                          <p className="type-p3 text-muted-foreground">
+                            {availability.message}
+                          </p>
+                        )}
+
+                        {availability && !availability.pendingPurchaseNumber && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                            disabled={fulfillmentPending || stockItems.length === 0}
+                            onClick={() =>
+                              setSkuMapTarget({
+                                item,
+                                currentStockId: availability.stockItemId,
+                              })
+                            }
+                          >
+                            Tautkan SKU
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="hidden md:block">
+                  <Table pagination={false}>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead className="type-p3">Barang</TableHead>
+                        <TableHead className="type-p3">Jumlah</TableHead>
+                        <TableHead className="type-p3">Tersedia</TableHead>
+                        <TableHead className="type-p3">Status &amp; SKU</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockCheckItems.map((item) => (
+                        <StockAvailabilityRow
+                          key={item.id}
+                          item={item}
+                          availability={stockAvailability.find(
+                            (entry) => entry.ticketItemId === item.id,
+                          )}
+                          disabled={fulfillmentPending || stockItems.length === 0}
+                          onOpenSkuMapper={(targetItem, currentStockId) =>
+                            setSkuMapTarget({
+                              item: targetItem,
+                              currentStockId,
+                            })
+                          }
+                        />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            );
+          })()}
 
           {readyStockItems.length > 0 && (
             <div className="grid gap-3 rounded-xl border border-border bg-muted/20 p-3.5 sm:grid-cols-2">

@@ -53,14 +53,14 @@ const Profile = ({
   const canOpenNotes = !allowedMenuKeys || allowedMenuKeys.includes('notes')
 
   return (
-    <div className='relative group/menu shrink-0 border-l border-border pl-2 sm:pl-4'>
+    <div className='relative group/menu shrink-0 border-l border-border pl-1.5 sm:pl-4'>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type='button'
             suppressHydrationWarning
-            className='flex cursor-pointer items-center gap-2 rounded-xl px-1.5 py-1 text-left text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-3 sm:px-2'>
-            <Avatar className='size-[35px] border border-border'>
+            className='flex cursor-pointer items-center gap-1.5 rounded-xl px-1 py-1 text-left text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-3 sm:px-2'>
+            <Avatar className='size-[28px] sm:size-[35px] border border-border'>
               <AvatarImage src={profilePhotoUrl ?? undefined} alt='' className='object-cover' />
               <AvatarFallback className='text-xs font-semibold'>
                 {userName

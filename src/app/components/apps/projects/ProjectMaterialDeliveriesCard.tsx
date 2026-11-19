@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Layers, Plus, Printer, Trash2, Truck, Upload } from "lucide-react";
+import {
+  Eye,
+  Layers,
+  MoreHorizontal,
+  Plus,
+  Printer,
+  Trash2,
+  Truck,
+  Upload,
+} from "lucide-react";
 import { UserRole } from "@prisma/client";
 import { toast } from "sonner";
 import { deleteUnbilledMaterialDelivery } from "@/app/actions/material-contracts";
@@ -31,6 +40,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
@@ -134,7 +150,7 @@ export default function ProjectMaterialDeliveriesCard({
             type="button"
             size="sm"
             onClick={() => setModalOpen(true)}
-            className="shrink-0 gap-1.5"
+            className="w-full shrink-0 gap-1.5 sm:w-auto"
           >
             <Plus className="size-4" aria-hidden="true" />
             Terbitkan Surat Jalan
@@ -142,9 +158,9 @@ export default function ProjectMaterialDeliveriesCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+      <CardContent className="space-y-3 sm:space-y-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div className="rounded-lg border border-border bg-muted/20 p-2.5 sm:px-3 sm:py-2.5">
             <p className="type-p3 font-medium text-muted-foreground">
               Total Surat Jalan
             </p>
@@ -152,15 +168,15 @@ export default function ProjectMaterialDeliveriesCard({
               {deliveries.length} SJ
             </p>
           </div>
-          <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5">
+          <div className="rounded-lg border border-warning/30 bg-warning/5 p-2.5 sm:px-3 sm:py-2.5">
             <p className="type-p3 font-medium text-warning">
-              Status Penagihan Vendor
+              Penagihan Vendor
             </p>
-            <p className="type-p1 mt-1 font-bold text-foreground tabular-nums">
+            <p className="type-p2 mt-1 font-bold text-foreground tabular-nums sm:type-p1">
               {unbilledCount} Unbilled · {billedCount} Billed
             </p>
           </div>
-          <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
+          <div className="col-span-2 rounded-lg border border-success/30 bg-success/5 p-2.5 sm:col-span-1 sm:px-3 sm:py-2.5">
             <p className="type-p3 font-medium text-success">
               Akumulasi Nilai Kontrak
             </p>
@@ -227,58 +243,72 @@ export default function ProjectMaterialDeliveriesCard({
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
+                  <div className="flex items-center gap-1.5 pt-0.5">
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="gap-1.5"
+                      className="flex-1 gap-1.5"
                       onClick={() => setPrintDeliveryTarget(delivery)}
                     >
                       <Printer className="size-3.5" aria-hidden="true" />
-                      Pratinjau / Cetak SJ
+                      Pratinjau SJ
                     </Button>
-                    {canAttachProof && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        onClick={() => setAttachDeliveryTarget(delivery)}
-                      >
-                        <Upload className="size-3.5" aria-hidden="true" />
-                        {delivery.proofUrl ? "Update Lampiran" : "Lampirkan Foto / Plat / Supir"}
-                      </Button>
-                    )}
-                    {delivery.proofUrl && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        onClick={() =>
-                          setPreview({
-                            title: `Bukti Surat Jalan ${delivery.doNumber}`,
-                            url: delivery.proofUrl!,
-                          })
-                        }
-                      >
-                        <Eye className="size-3.5" aria-hidden="true" />
-                        Foto
-                      </Button>
-                    )}
-                    {canRecord && delivery.billingStatus === "UNBILLED" && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={isPending}
-                        className="gap-1.5 text-destructive hover:text-destructive"
-                        onClick={() => setPendingDeleteDelivery(delivery)}
-                      >
-                        <Trash2 className="size-3.5" aria-hidden="true" />
-                        Hapus
-                      </Button>
+                    {(canAttachProof ||
+                      Boolean(delivery.proofUrl) ||
+                      (canRecord && delivery.billingStatus === "UNBILLED")) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label={`Menu aksi ${delivery.doNumber}`}
+                          >
+                            <MoreHorizontal className="size-4" aria-hidden="true" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canAttachProof && (
+                            <DropdownMenuItem
+                              onSelect={() => setAttachDeliveryTarget(delivery)}
+                            >
+                              <Upload className="size-4" aria-hidden="true" />
+                              {delivery.proofUrl
+                                ? "Update Lampiran"
+                                : "Lampirkan Foto/Plat"}
+                            </DropdownMenuItem>
+                          )}
+                          {delivery.proofUrl && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                setPreview({
+                                  title: `Bukti Surat Jalan ${delivery.doNumber}`,
+                                  url: delivery.proofUrl!,
+                                })
+                              }
+                            >
+                              <Eye className="size-4" aria-hidden="true" />
+                              Lihat Foto
+                            </DropdownMenuItem>
+                          )}
+                          {canRecord && delivery.billingStatus === "UNBILLED" && (
+                            <>
+                              {(canAttachProof || Boolean(delivery.proofUrl)) && (
+                                <DropdownMenuSeparator />
+                              )}
+                              <DropdownMenuItem
+                                disabled={isPending}
+                                className="text-destructive focus:text-destructive"
+                                onSelect={() => setPendingDeleteDelivery(delivery)}
+                              >
+                                <Trash2 className="size-4" aria-hidden="true" />
+                                Hapus
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </div>

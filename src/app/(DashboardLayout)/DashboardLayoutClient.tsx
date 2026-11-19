@@ -519,7 +519,7 @@ export default function DashboardLayoutClient({
                 androidDownloadUrl={androidDownloadUrl}
               />
             </div>
-            <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-[calc(4.25rem+env(safe-area-inset-top,0px))] md:pt-0'>
+            <div className='body-wrapper flex min-w-0 flex-1 flex-col pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:pt-[calc(4.25rem+env(safe-area-inset-top,0px))] md:pt-0'>
               <Header
                 canManageUsers={canManageUsers}
                 canAccessLogistics={canAccessLogistics}
@@ -542,7 +542,7 @@ export default function DashboardLayoutClient({
               <main
                 id='main-content'
                 tabIndex={-1}
-                className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3.5 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] pt-4 outline-none sm:px-6 sm:pt-6 md:pb-8'
+                className='mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] pt-3 outline-none sm:px-6 sm:pt-6 sm:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-8'
               >
                 {pageUnderMaintenance ? (
                   <UnderProductionState

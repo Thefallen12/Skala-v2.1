@@ -387,13 +387,13 @@ export default async function ProjectPortalPage({
 
         {/* Project Identity & KPI Summary */}
         <section className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs lg:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
                   {workTypeBadge.groupShortLabel} · {formatWorkTypeLabel(project.jenisPekerjaan)}
                 </span>
-                <h2 className="mt-1.5 text-lg font-bold text-slate-900">
+                <h2 className="mt-1.5 text-base sm:text-lg font-bold text-slate-900">
                   {project.title}
                 </h2>
               </div>
@@ -439,7 +439,7 @@ export default async function ProjectPortalPage({
             </dl>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="grid grid-cols-2 gap-2.5 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs">
             <div className="col-span-2 rounded-xl bg-teal-50/70 p-3.5 border border-teal-100">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-teal-800">
@@ -505,7 +505,7 @@ export default async function ProjectPortalPage({
         </section>
 
         {/* Live S-Curve Visualization */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <section className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-bold text-slate-900">
@@ -597,8 +597,8 @@ export default async function ProjectPortalPage({
         </section>
 
         {/* Physical WBS / Deliverable Progress + Milestones */}
-        <section className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs lg:col-span-2">
+        <section className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs lg:col-span-2">
             <div className="mb-3 flex items-center gap-2">
               <ClipboardCheck className="size-4 text-teal-700" aria-hidden="true" />
               <h2 className="text-base font-bold text-slate-900">
@@ -656,7 +656,7 @@ export default async function ProjectPortalPage({
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs">
             <div className="mb-3 flex items-center gap-2">
               <Clock className="size-4 text-amber-600" aria-hidden="true" />
               <h2 className="text-base font-bold text-slate-900">
@@ -687,7 +687,7 @@ export default async function ProjectPortalPage({
         </section>
 
         {/* Recent Daily Reports */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <section className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs">
           <h2 className="mb-3 text-base font-bold text-slate-900">
             Riwayat Laporan Harian Terbaru
           </h2>
@@ -702,7 +702,7 @@ export default async function ProjectPortalPage({
                 return (
                   <article
                     key={rep.id}
-                    className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4"
+                    className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 sm:p-4"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -750,11 +750,11 @@ export default async function ProjectPortalPage({
 
         {/* Field Photo Gallery */}
         {resolvedPhotos.length > 0 && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs">
             <h2 className="mb-3 text-base font-bold text-slate-900">
               Dokumentasi Foto Lapangan ({resolvedPhotos.length})
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
               {resolvedPhotos.map((photo) => (
                 <figure
                   key={photo.key}

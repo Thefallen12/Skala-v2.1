@@ -52,7 +52,7 @@ export function ActionIconButton({
       variant={variant}
       disabled={disabled}
       className={cn(
-        "h-10 w-10 rounded-md border border-primary/75 bg-transparent text-primary transition-colors hover:bg-primary hover:text-primary-foreground",
+        "size-8 sm:size-9 rounded-md border border-primary/75 bg-transparent text-primary transition-colors hover:bg-primary hover:text-primary-foreground",
         className,
       )}
     >
@@ -77,7 +77,7 @@ export function ActionIconButton({
       aria-label={label}
       aria-pressed={ariaPressed}
       className={cn(
-        "h-10 w-10 rounded-md border border-primary/75 bg-transparent text-primary transition-colors hover:bg-primary hover:text-primary-foreground",
+        "size-8 sm:size-9 rounded-md border border-primary/75 bg-transparent text-primary transition-colors hover:bg-primary hover:text-primary-foreground",
         className,
       )}
     >

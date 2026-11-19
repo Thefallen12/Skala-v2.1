@@ -1,26 +1,37 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   Briefcase,
   Building2,
+  Calendar,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
+  Eye,
   FileSpreadsheet,
   FileText,
   Filter,
   Image as ImageIcon,
+  Info,
   Landmark,
   Layers,
   Loader2,
+  Maximize2,
   Printer,
   Search,
+  Sparkles,
   UserCheck,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { GlobalModal } from "@/components/ui/global-modal";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -68,11 +79,12 @@ export type DinasProjectProgressSource = {
   progress: number;
   jenisPekerjaan?: string | null;
   status?: string | null;
-  pagu?: string | number | null;
-  realized?: string | number | null;
-  startDate?: string | null;
-  endDate?: string | null;
+  pagu?: string | number | bigint | null;
+  realized?: string | number | bigint | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
   fieldPicName?: string | null;
+  fieldPic?: { name: string } | null;
   location?: string | null;
   address?: string | null;
   clientName?: string | null;
@@ -83,9 +95,26 @@ export type DinasProjectProgressSource = {
     progress?: number | null;
     workSummary?: string | null;
   }>;
+  dailyReports?: Array<{
+    id?: string;
+    reportDate: string | Date;
+    progress?: number | null;
+    workSummary?: string | null;
+    weather?: string | null;
+    workersCount?: number | null;
+    notes?: string | null;
+    progressPhotos?: Array<{
+      url?: string | null;
+      fileUrl?: string | null;
+    }>;
+  }>;
   workPoints?: Array<{
     id?: string;
     title?: string;
+    proposedVolume?: string | number | bigint | null;
+    completedVolume?: string | number | bigint | null;
+    proposedUnit?: string | null;
+    proposedUnitPrice?: string | number | bigint | null;
     progress?: number;
   }>;
   progressSubmissions?: Array<{
@@ -95,8 +124,47 @@ export type DinasProjectProgressSource = {
     actualProgress: number;
     plannedProgress: number;
     deviation: number;
-    submittedAt: string;
+    submittedAt: string | Date;
   }>;
+};
+
+export type ClassifiedPhotoItem = {
+  url: string;
+  reportDate: string;
+  reportDateRaw?: string | Date;
+  progress: number;
+  workSummary?: string;
+  weather?: string;
+  workersCount?: number;
+  notes?: string;
+  stage: "0%" | "50%" | "100%" | "Prasasti";
+  stageLabel: string;
+  poktan: string;
+  desa: string;
+  kecamatan: string;
+};
+
+export type PoktanPhotoClassification = {
+  photos0: ClassifiedPhotoItem[];
+  photos50: ClassifiedPhotoItem[];
+  photos100: ClassifiedPhotoItem[];
+  photosPrasasti: ClassifiedPhotoItem[];
+  allPhotos: ClassifiedPhotoItem[];
+  totalPhotosCount: number;
+  dailyReportsCount: number;
+  latestReportDate: string | null;
+  latestProgress: number;
+  latestWeeklySubmission: {
+    periodLabel: string;
+    actualProgress: number;
+    submittedAt: string;
+  } | null;
+};
+
+export type LightboxState = {
+  photo: ClassifiedPhotoItem;
+  photoList: ClassifiedPhotoItem[];
+  currentIndex: number;
 };
 
 const WORK_TYPE_TONE_CLASSES: Record<WorkTypeBadgeTone, string> = {
@@ -118,7 +186,10 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   DONE: "Selesai",
 };
 
-function parseAmountSafe(value: string | number | null | undefined): number {
+function parseAmountSafe(
+  value: string | number | bigint | null | undefined,
+): number {
+  if (typeof value === "bigint") return Number(value);
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (typeof value === "string") {
     const parsed = Number(value);
@@ -163,6 +234,181 @@ function calculateRealizedArea(
   return (areaHa * progressPercent) / 100;
 }
 
+function formatDateIndo(value?: string | Date | null): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function classifyProjectPhotos(
+  poktan: string,
+  desa: string,
+  kecamatan: string,
+  linkedProject?: DinasProjectProgressSource,
+): PoktanPhotoClassification {
+  const photos0: ClassifiedPhotoItem[] = [];
+  const photos50: ClassifiedPhotoItem[] = [];
+  const photos100: ClassifiedPhotoItem[] = [];
+  const photosPrasasti: ClassifiedPhotoItem[] = [];
+  const allPhotos: ClassifiedPhotoItem[] = [];
+
+  const dailyReports = linkedProject?.dailyReports || [];
+  let latestReportDate: string | null = null;
+  let latestProgress = linkedProject?.progress ?? 0;
+
+  for (const dr of dailyReports) {
+    const reportDateStr = formatDateIndo(dr.reportDate);
+    if (
+      !latestReportDate ||
+      new Date(dr.reportDate) > new Date(latestReportDate)
+    ) {
+      latestReportDate = reportDateStr;
+    }
+    const reportProg =
+      typeof dr.progress === "number" && !isNaN(dr.progress)
+        ? dr.progress
+        : latestProgress;
+
+    const photos = dr.progressPhotos || [];
+    for (const p of photos) {
+      const url = p.url || p.fileUrl;
+      if (!url) continue;
+
+      const summary = dr.workSummary || "";
+      const notes = dr.notes || "";
+      const isPrasasti =
+        /prasasti|batu\s*prasasti|serah\s*terima|bast/i.test(summary) ||
+        /prasasti|batu\s*prasasti|serah\s*terima|bast/i.test(notes) ||
+        reportProg >= 95;
+
+      let stage: ClassifiedPhotoItem["stage"] = "50%";
+      let stageLabel = "Kondisi Pelaksanaan (50%)";
+
+      if (isPrasasti) {
+        stage = "Prasasti";
+        stageLabel = "Batu Prasasti / BAST Fisik";
+      } else if (reportProg <= 15) {
+        stage = "0%";
+        stageLabel = "Kondisi Titik Nol (0%)";
+      } else if (reportProg > 75) {
+        stage = "100%";
+        stageLabel = "Kondisi Akhir Selesai (100%)";
+      } else {
+        stage = "50%";
+        stageLabel = `Kondisi Pelaksanaan (${reportProg.toFixed(1)}%)`;
+      }
+
+      const item: ClassifiedPhotoItem = {
+        url,
+        reportDate: reportDateStr,
+        reportDateRaw: dr.reportDate,
+        progress: reportProg,
+        workSummary: summary,
+        weather: dr.weather || undefined,
+        workersCount: dr.workersCount || undefined,
+        notes: notes,
+        stage,
+        stageLabel,
+        poktan,
+        desa,
+        kecamatan,
+      };
+
+      allPhotos.push(item);
+      if (stage === "Prasasti") photosPrasasti.push(item);
+      else if (stage === "0%") photos0.push(item);
+      else if (stage === "100%") photos100.push(item);
+      else photos50.push(item);
+    }
+  }
+
+  const submissions = linkedProject?.progressSubmissions || [];
+  const latestSub = submissions.length > 0 ? submissions[0] : null;
+  const latestWeeklySubmission = latestSub
+    ? {
+        periodLabel: latestSub.periodLabel,
+        actualProgress: latestSub.actualProgress,
+        submittedAt: formatDateIndo(latestSub.submittedAt),
+      }
+    : null;
+
+  return {
+    photos0,
+    photos50,
+    photos100,
+    photosPrasasti,
+    allPhotos,
+    totalPhotosCount: allPhotos.length,
+    dailyReportsCount: dailyReports.length,
+    latestReportDate,
+    latestProgress,
+    latestWeeklySubmission,
+  };
+}
+
+function PhotoThumbnailSlot({
+  photos,
+  stageName,
+  stageTitle,
+  onOpenLightbox,
+}: {
+  photos: ClassifiedPhotoItem[];
+  stageName: string;
+  stageTitle: string;
+  onOpenLightbox: (
+    photo: ClassifiedPhotoItem,
+    photoList: ClassifiedPhotoItem[],
+    currentIndex: number,
+  ) => void;
+}) {
+  if (photos.length === 0) {
+    return (
+      <div className="mx-auto flex h-14 w-full min-w-[62px] max-w-[80px] flex-col items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/10 p-1 text-center text-muted-foreground">
+        <ImageIcon className="size-3.5 opacity-30 mb-0.5" aria-hidden="true" />
+        <span className="text-[10px] font-medium leading-tight">Nihil</span>
+        <span className="text-[9px] text-muted-foreground/60">{stageName}</span>
+      </div>
+    );
+  }
+
+  const firstPhoto = photos[0];
+  const count = photos.length;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenLightbox(firstPhoto, photos, 0)}
+      className="group relative mx-auto flex h-14 w-full min-w-[62px] max-w-[80px] overflow-hidden rounded-md border border-border/80 bg-muted/30 shadow-2xs transition hover:border-primary hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary"
+      title={`${stageTitle} - Klik untuk pratinjau (${count} foto)`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={firstPhoto.url}
+        alt={`${stageTitle} - ${firstPhoto.poktan}`}
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent opacity-85 group-hover:opacity-95 transition-opacity" />
+      <span className="absolute bottom-1 left-1 text-[9px] font-bold text-white tracking-tight drop-shadow-xs">
+        {stageName}
+      </span>
+      {count > 1 && (
+        <span className="absolute top-1 right-1 rounded-full bg-primary/95 px-1 py-0.2 text-[8px] font-extrabold text-white shadow-xs">
+          +{count - 1}
+        </span>
+      )}
+      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+        <Maximize2 className="size-3.5 text-white drop-shadow-md" />
+      </div>
+    </button>
+  );
+}
+
 export function DinasProjectReportPage({
   projects,
   canViewFinancials = true,
@@ -191,6 +437,43 @@ export function DinasProjectReportPage({
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedPoktanIndex, setSelectedPoktanIndex] = useState<number>(0);
+
+  // Controls for Tab 2: Hasil SID & Foto Master
+  const [photoFilter, setPhotoFilter] = useState<
+    "ALL" | "WITH_PHOTOS" | "FULL_4_STAGES" | "NO_PHOTOS"
+  >("ALL");
+  const [reportFilter, setReportFilter] = useState<
+    "ALL" | "HAS_DAILY" | "HAS_WEEKLY"
+  >("ALL");
+  const [showAllItems, setShowAllItems] = useState<boolean>(true);
+  const [expandedPoktanNos, setExpandedPoktanNos] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [sidViewMode, setSidViewMode] = useState<"excel_table" | "mobile_cards">(
+    "excel_table",
+  );
+  const [lightboxData, setLightboxData] = useState<LightboxState | null>(null);
+
+  const togglePoktan = (no: number) => {
+    setExpandedPoktanNos((prev) => {
+      const next = new Set(prev);
+      if (next.has(no)) next.delete(no);
+      else next.add(no);
+      return next;
+    });
+  };
+
+  const handleOpenLightbox = (
+    photo: ClassifiedPhotoItem,
+    photoList: ClassifiedPhotoItem[],
+    currentIndex: number,
+  ) => {
+    setLightboxData({
+      photo,
+      photoList,
+      currentIndex,
+    });
+  };
 
   const portfolioRows = useMemo(() => {
     return projects.map((project, index) => {
@@ -247,7 +530,8 @@ export function DinasProjectReportPage({
         latestReportDate,
         workPointsCount: project.workPoints?.length ?? 0,
         submissionsCount: project.progressSubmissions?.length ?? 0,
-        fieldPicName: project.fieldPicName?.trim() || "-",
+        fieldPicName:
+          project.fieldPic?.name?.trim() || project.fieldPicName?.trim() || "-",
         clientLabel,
         locationLabel,
       };
@@ -480,19 +764,16 @@ export function DinasProjectReportPage({
 
   const linkedProjectsByGroup = useMemo(() => {
     const projectByGroup = new Map<string, DinasProjectProgressSource>();
-    const ambiguousGroups = new Set<string>();
     for (const project of projects) {
-      const keys = new Set(
-        [project.kelompokTani, project.name, project.title]
-          .map(normalizeGroupName)
-          .filter(Boolean),
-      );
+      const keys = [
+        normalizeGroupName(project.name),
+        normalizeGroupName(project.kelompokTani),
+        normalizeGroupName(project.title),
+        normalizeGroupName(project.code || ""),
+      ].filter(Boolean);
+
       for (const key of keys) {
-        if (ambiguousGroups.has(key)) continue;
-        if (projectByGroup.has(key)) {
-          projectByGroup.delete(key);
-          ambiguousGroups.add(key);
-        } else {
+        if (!projectByGroup.has(key)) {
           projectByGroup.set(key, project);
         }
       }
@@ -503,9 +784,11 @@ export function DinasProjectReportPage({
   const projectReportData = useMemo(
     () =>
       DINAS_PROJECTS_DATA.map((record) => {
-        const linkedProject = linkedProjectsByGroup.get(
-          normalizeGroupName(record.poktan),
-        );
+        const linkedProject =
+          linkedProjectsByGroup.get(normalizeGroupName(record.poktan)) ||
+          linkedProjectsByGroup.get(normalizeGroupName(record.desa)) ||
+          linkedProjectsByGroup.get(normalizeGroupName(record.nomorSpk));
+
         const sourceProgress =
           linkedProject && Number.isFinite(linkedProject.progress)
             ? linkedProject.progress
@@ -515,17 +798,46 @@ export function DinasProjectReportPage({
           record.luasLahanHa,
           progress,
         );
+
+        const photoClassification = classifyProjectPhotos(
+          record.poktan,
+          record.desa,
+          record.kecamatan,
+          linkedProject,
+        );
+
+        const totalBiayaKonstruksi = record.totalBiayaKonstruksi;
+        const pekerjaanListWithBobot = record.pekerjaanList.map((item) => {
+          const bobotPercent =
+            totalBiayaKonstruksi > 0
+              ? (item.biaya / totalBiayaKonstruksi) * 100
+              : 0;
+          const realisasiBiaya = Math.round((progress / 100) * item.biaya);
+          const realisasiVolumeCalc =
+            typeof item.volume === "number" && item.volume > 0
+              ? Math.round(((progress / 100) * item.volume) * 100) / 100
+              : item.realisasiVolume ?? "-";
+
+          return {
+            ...item,
+            bobotPercent,
+            realisasiBiaya,
+            realisasiVolumeCalc,
+          };
+        });
+
+        const totalRealisasiBiaya = Math.round(
+          (progress / 100) * totalBiayaKonstruksi,
+        );
+
         return {
           ...record,
           progresFisikKonstruksiPercent: progress,
           realisasiHaKonstruksi: realizedArea,
-          biayaDigunakanKonstruksi:
-            record.luasLahanHa > 0
-              ? Math.round(
-                  (record.totalBiayaKonstruksi / record.luasLahanHa) *
-                    realizedArea,
-                )
-              : 0,
+          biayaDigunakanKonstruksi: totalRealisasiBiaya,
+          pekerjaanListWithBobot,
+          photoClassification,
+          linkedProject,
         };
       }),
     [linkedProjectsByGroup],
@@ -552,9 +864,53 @@ export function DinasProjectReportPage({
         item.ketuaPoktan.toLowerCase().includes(query) ||
         item.ketuaUpkk.toLowerCase().includes(query);
 
+      if (activeTab === "rincian_sid") {
+        if (
+          photoFilter === "WITH_PHOTOS" &&
+          item.photoClassification.totalPhotosCount === 0
+        ) {
+          return false;
+        }
+        if (
+          photoFilter === "FULL_4_STAGES" &&
+          (item.photoClassification.photos0.length === 0 ||
+            item.photoClassification.photos50.length === 0 ||
+            item.photoClassification.photos100.length === 0 ||
+            item.photoClassification.photosPrasasti.length === 0)
+        ) {
+          return false;
+        }
+        if (
+          photoFilter === "NO_PHOTOS" &&
+          item.photoClassification.totalPhotosCount > 0
+        ) {
+          return false;
+        }
+
+        if (
+          reportFilter === "HAS_DAILY" &&
+          item.photoClassification.dailyReportsCount === 0
+        ) {
+          return false;
+        }
+        if (
+          reportFilter === "HAS_WEEKLY" &&
+          !item.photoClassification.latestWeeklySubmission
+        ) {
+          return false;
+        }
+      }
+
       return matchKecamatan && matchSearch;
     });
-  }, [projectReportData, selectedKecamatan, searchQuery]);
+  }, [
+    projectReportData,
+    selectedKecamatan,
+    searchQuery,
+    activeTab,
+    photoFilter,
+    reportFilter,
+  ]);
 
   const aggregates = useMemo(() => {
     let totalLuas = 0;
@@ -565,6 +921,9 @@ export function DinasProjectReportPage({
     let totalBiayaDigunakanOlahLahan = 0;
     let totalSp2d1 = 0;
     let totalSp2d2 = 0;
+    let totalPhotosCount = 0;
+    let poktanWithPhotosCount = 0;
+    let totalDailyReportsCount = 0;
 
     filteredData.forEach((d) => {
       totalLuas += d.luasLahanHa;
@@ -575,6 +934,11 @@ export function DinasProjectReportPage({
       totalBiayaDigunakanOlahLahan += d.biayaDigunakanOlahLahan;
       totalSp2d1 += d.sp2d1Jumlah;
       totalSp2d2 += d.sp2d2Jumlah;
+      totalPhotosCount += d.photoClassification.totalPhotosCount;
+      if (d.photoClassification.totalPhotosCount > 0) {
+        poktanWithPhotosCount += 1;
+      }
+      totalDailyReportsCount += d.photoClassification.dailyReportsCount;
     });
 
     return {
@@ -587,6 +951,15 @@ export function DinasProjectReportPage({
       totalSp2d1,
       totalSp2d2,
       totalPenyaluran: totalSp2d1 + totalSp2d2,
+      totalPhotosCount,
+      poktanWithPhotosCount,
+      totalDailyReportsCount,
+      avgProgressPercent:
+        totalBiayaKonstruksi > 0
+          ? Math.round(
+              (totalBiayaDigunakanKonstruksi / totalBiayaKonstruksi) * 1000,
+            ) / 10
+          : 0,
     };
   }, [filteredData]);
 
@@ -648,11 +1021,28 @@ export function DinasProjectReportPage({
       );
     } else {
       csvHeader =
-        "No,Kecamatan,Desa,Nama Poktan,Luas (Ha),Nama Pekerjaan,Volume SID,Satuan,Biaya Rencana,Realisasi Volume,Realisasi Satuan";
-      csvRows = filteredData.flatMap((d) =>
-        d.pekerjaanList.map((p) =>
+        "No,Kabupaten,Kecamatan,Desa,Nama Poktan,Luas Desain (Ha),Item Pekerjaan,Volume SID,Satuan,Biaya Rencana (Rp),Bobot Pekerjaan (%),Realisasi Volume,Satuan Realisasi,Realisasi Biaya (Rp),Progres Fisik (%),Jumlah Lap. Harian,Progres Mingguan Terkini,Tanggal Update Terakhir,URL Foto 0%,URL Foto 50%,URL Foto 100%,URL Foto Prasasti";
+      csvRows = filteredData.flatMap((d) => {
+        const photo0Url = d.photoClassification.photos0
+          .map((x) => x.url)
+          .join(" | ");
+        const photo50Url = d.photoClassification.photos50
+          .map((x) => x.url)
+          .join(" | ");
+        const photo100Url = d.photoClassification.photos100
+          .map((x) => x.url)
+          .join(" | ");
+        const prasastiUrl = d.photoClassification.photosPrasasti
+          .map((x) => x.url)
+          .join(" | ");
+        const weeklyText = d.photoClassification.latestWeeklySubmission
+          ? `${d.photoClassification.latestWeeklySubmission.periodLabel} (${d.photoClassification.latestWeeklySubmission.actualProgress}%)`
+          : "-";
+
+        return d.pekerjaanListWithBobot.map((p) =>
           [
             d.no,
+            `"${d.kabupaten}"`,
             `"${d.kecamatan}"`,
             `"${d.desa}"`,
             `"${d.poktan}"`,
@@ -661,11 +1051,21 @@ export function DinasProjectReportPage({
             `"${p.volume || ""}"`,
             `"${p.satuan || ""}"`,
             p.biaya,
-            `"${p.realisasiVolume || ""}"`,
-            `"${p.realisasiSatuan || ""}"`,
+            `"${p.bobotPercent.toFixed(2)}%"`,
+            `"${p.realisasiVolumeCalc || ""}"`,
+            `"${p.realisasiSatuan || p.satuan || ""}"`,
+            p.realisasiBiaya,
+            `"${d.progresFisikKonstruksiPercent.toFixed(1)}%"`,
+            d.photoClassification.dailyReportsCount,
+            `"${weeklyText}"`,
+            `"${d.photoClassification.latestReportDate || "-"}"`,
+            `"${photo0Url}"`,
+            `"${photo50Url}"`,
+            `"${photo100Url}"`,
+            `"${prasastiUrl}"`,
           ].join(","),
-        ),
-      );
+        );
+      });
     }
 
     const csvContent =
@@ -1351,69 +1751,145 @@ export function DinasProjectReportPage({
         </div>
       </div>
 
-      {/* Metric Summaries */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
-          <p className="type-p3 text-muted-foreground">Total Poktan Terdaftar</p>
-          <p className="type-kpi mt-1 text-foreground">
-            {filteredData.length}{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              dari 38 Poktan
-            </span>
-          </p>
-          <p className="type-p3 mt-1 text-muted-foreground">
-            9 Kecamatan se-Aceh Tengah
-          </p>
-        </div>
+            {/* Metric Summaries */}
+      {activeTab === "rincian_sid" ? (
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Total Poktan</p>
+            <p className="type-kpi mt-1 text-foreground">
+              {filteredData.length}{" "}
+              <span className="type-p3 font-normal text-muted-foreground">
+                / {projectReportData.length}
+              </span>
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              {aggregates.totalLuas.toFixed(2)} Ha Desain
+            </p>
+          </div>
 
-        <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
-          <p className="type-p3 text-muted-foreground">
-            Total Luas Lahan (CPCL)
-          </p>
-          <p className="type-kpi mt-1 text-foreground">
-            {aggregates.totalLuas.toLocaleString("id-ID")}{" "}
-            <span className="type-p3 font-normal text-muted-foreground">
-              Hektar
-            </span>
-          </p>
-          <p className="type-p3 mt-1 font-medium text-success tabular-nums">
-            Realisasi:{" "}
-            {aggregates.totalRealisasiHaKonstruksi.toLocaleString("id-ID")} Ha
-          </p>
-        </div>
+          <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Pagu Konstruksi</p>
+            <p className="type-p2 mt-1 font-mono font-bold text-primary tabular-nums">
+              Rp {(aggregates.totalBiayaKonstruksi / 1000000).toLocaleString("id-ID")} Jt
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              Pagu Fisik 38 Poktan
+            </p>
+          </div>
 
-        <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
-          <p className="type-p3 text-muted-foreground">
-            Pagu Konstruksi &amp; Olah Lahan
-          </p>
-          <p className="type-kpi mt-1 text-foreground">
-            Rp{" "}
-            {(
-              aggregates.totalBiayaKonstruksi + aggregates.totalBiayaOlahLahan
-            ).toLocaleString("id-ID")}
-          </p>
-          <p className="type-p3 mt-1 text-muted-foreground tabular-nums">
-            Digunakan: Rp{" "}
-            {(
-              aggregates.totalBiayaDigunakanKonstruksi +
-              aggregates.totalBiayaDigunakanOlahLahan
-            ).toLocaleString("id-ID")}
-          </p>
-        </div>
+          <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Realisasi Biaya</p>
+            <p className="type-p2 mt-1 font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+              Rp {(aggregates.totalBiayaDigunakanKonstruksi / 1000000).toLocaleString("id-ID")} Jt
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              {aggregates.avgProgressPercent}% dari Pagu
+            </p>
+          </div>
 
-        <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
-          <p className="type-p3 text-muted-foreground">
-            Tersalurkan SP2D (Bank)
-          </p>
-          <p className="type-kpi mt-1 text-success">
-            Rp {aggregates.totalPenyaluran.toLocaleString("id-ID")}
-          </p>
-          <p className="type-p3 mt-1 text-muted-foreground tabular-nums">
-            T1: Rp {aggregates.totalSp2d1.toLocaleString("id-ID")} · T2: Rp{" "}
-            {aggregates.totalSp2d2.toLocaleString("id-ID")}
-          </p>
+          <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Rata-rata Progres</p>
+            <p className="type-kpi mt-1 text-emerald-600 dark:text-emerald-400">
+              {aggregates.avgProgressPercent}%
+            </p>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all"
+                style={{ width: `${Math.min(100, aggregates.avgProgressPercent)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Foto Lapangan</p>
+            <p className="type-kpi mt-1 text-foreground">
+              {aggregates.totalPhotosCount}{" "}
+              <span className="type-p3 font-normal text-muted-foreground">
+                Foto
+              </span>
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              {aggregates.poktanWithPhotosCount} Poktan Terdata
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Laporan Masuk</p>
+            <p className="type-kpi mt-1 text-foreground">
+              {aggregates.totalDailyReportsCount}{" "}
+              <span className="type-p3 font-normal text-muted-foreground">
+                Lap. Harian
+              </span>
+            </p>
+            <p className="type-p3 mt-0.5 text-muted-foreground">
+              Sinkronisasi Live DB
+            </p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">Total Poktan Terdaftar</p>
+            <p className="type-kpi mt-1 text-foreground">
+              {filteredData.length}{" "}
+              <span className="type-p3 font-normal text-muted-foreground">
+                dari 38 Poktan
+              </span>
+            </p>
+            <p className="type-p3 mt-1 text-muted-foreground">
+              9 Kecamatan se-Aceh Tengah
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">
+              Total Luas Lahan (CPCL)
+            </p>
+            <p className="type-kpi mt-1 text-foreground">
+              {aggregates.totalLuas.toLocaleString("id-ID")}{" "}
+              <span className="type-p3 font-normal text-muted-foreground">
+                Hektar
+              </span>
+            </p>
+            <p className="type-p3 mt-1 font-medium text-success tabular-nums">
+              Realisasi:{" "}
+              {aggregates.totalRealisasiHaKonstruksi.toLocaleString("id-ID")} Ha
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">
+              Pagu Konstruksi &amp; Olah Lahan
+            </p>
+            <p className="type-kpi mt-1 text-foreground">
+              Rp{" "}
+              {(
+                aggregates.totalBiayaKonstruksi + aggregates.totalBiayaOlahLahan
+              ).toLocaleString("id-ID")}
+            </p>
+            <p className="type-p3 mt-1 text-muted-foreground tabular-nums">
+              Digunakan: Rp{" "}
+              {(
+                aggregates.totalBiayaDigunakanKonstruksi +
+                aggregates.totalBiayaDigunakanOlahLahan
+              ).toLocaleString("id-ID")}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-3.5 shadow-2xs">
+            <p className="type-p3 text-muted-foreground">
+              Tersalurkan SP2D (Bank)
+            </p>
+            <p className="type-kpi mt-1 text-success">
+              Rp {aggregates.totalPenyaluran.toLocaleString("id-ID")}
+            </p>
+            <p className="type-p3 mt-1 text-muted-foreground tabular-nums">
+              T1: Rp {aggregates.totalSp2d1.toLocaleString("id-ID")} · T2: Rp{" "}
+              {aggregates.totalSp2d2.toLocaleString("id-ID")}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs">
@@ -1634,261 +2110,681 @@ export function DinasProjectReportPage({
             </div>
           )}
 
-          {/* TAB 2: Hasil SID & Dokumentasi Foto */}
+                    {/* TAB 2: Hasil SID & Dokumentasi Foto (Master Table 38 Poktan & Lightbox) */}
           {activeTab === "rincian_sid" && (
-            <div className="space-y-6">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-2xs">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="type-h3 text-foreground">
-                      Pilih Kelompok Tani untuk Rincian Fisik &amp; Dokumentasi
-                    </h3>
-                    <p className="type-p3 text-muted-foreground">
-                      Laporan Realisasi Fisik Hasil SID vs Fisik Konstruksi
-                    </p>
+            <div className="space-y-4">
+              {/* Toolbar & Filters for Hasil SID & Foto */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Mode Toggle */}
+                  <div className="inline-flex items-center rounded-lg border border-border bg-muted/40 p-1">
+                    <Button
+                      type="button"
+                      variant={
+                        sidViewMode === "excel_table" ? "secondary" : "ghost"
+                      }
+                      size="xs"
+                      onClick={() => setSidViewMode("excel_table")}
+                      className="gap-1.5 font-medium"
+                    >
+                      <FileSpreadsheet className="size-3.5 text-primary" />
+                      <span className="hidden sm:inline">
+                        Tabel Master (Excel)
+                      </span>
+                      <span className="sm:hidden">Tabel Excel</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        sidViewMode === "mobile_cards" ? "secondary" : "ghost"
+                      }
+                      size="xs"
+                      onClick={() => setSidViewMode("mobile_cards")}
+                      className="gap-1.5 font-medium"
+                    >
+                      <Layers className="size-3.5 text-primary" />
+                      <span className="hidden sm:inline">Tampilan Kartu</span>
+                      <span className="sm:hidden">Kartu</span>
+                    </Button>
                   </div>
-                  <Badge variant="outline">
-                    {selectedPoktan.kecamatan} · {selectedPoktan.desa}
+
+                  {sidViewMode === "excel_table" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setShowAllItems((v) => !v)}
+                      className="gap-1.5 text-xs"
+                    >
+                      {showAllItems ? (
+                        <ChevronDown className="size-3.5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="size-3.5 text-muted-foreground" />
+                      )}
+                      <span>
+                        {showAllItems
+                          ? "Ringkas (Sembunyikan Sub-Item)"
+                          : "Buka Semua Rincian Item SID"}
+                      </span>
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Photo Filter Dropdown */}
+                  <Select
+                    value={photoFilter}
+                    onValueChange={(val) =>
+                      setPhotoFilter(
+                        val as
+                          | "ALL"
+                          | "WITH_PHOTOS"
+                          | "FULL_4_STAGES"
+                          | "NO_PHOTOS",
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[170px] text-xs">
+                      <ImageIcon className="mr-1 size-3.5 text-muted-foreground" />
+                      <SelectValue placeholder="Status Foto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Foto (38 Poktan)</SelectItem>
+                      <SelectItem value="WITH_PHOTOS">Ada Foto Terunggah</SelectItem>
+                      <SelectItem value="FULL_4_STAGES">Lengkap 4 Tahap</SelectItem>
+                      <SelectItem value="NO_PHOTOS">Belum Ada Foto</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Report Filter Dropdown */}
+                  <Select
+                    value={reportFilter}
+                    onValueChange={(val) =>
+                      setReportFilter(val as "ALL" | "HAS_DAILY" | "HAS_WEEKLY")
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[165px] text-xs">
+                      <FileText className="mr-1 size-3.5 text-muted-foreground" />
+                      <SelectValue placeholder="Status Laporan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Laporan</SelectItem>
+                      <SelectItem value="HAS_DAILY">Ada Lap. Harian</SelectItem>
+                      <SelectItem value="HAS_WEEKLY">Ada SP Mingguan</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Badge variant="outline" className="hidden text-xs sm:inline-flex">
+                    {filteredData.length} Poktan · {aggregates.totalPhotosCount} Foto
                   </Badge>
                 </div>
-
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {filteredData.map((p, idx) => (
-                    <button
-                      key={p.no}
-                      type="button"
-                      onClick={() => setSelectedPoktanIndex(idx)}
-                      className={cn(
-                        "flex min-w-[160px] shrink-0 flex-col rounded-lg border p-3 text-left transition",
-                        selectedPoktan.no === p.no
-                          ? "border-primary bg-primary/10 font-semibold text-primary shadow-xs"
-                          : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-                      )}
-                    >
-                      <span className="type-p3 uppercase tracking-wider text-muted-foreground">
-                        #{p.no} · {p.kecamatan}
-                      </span>
-                      <span className="type-p2 truncate font-bold text-foreground">
-                        {p.poktan}
-                      </span>
-                      <span className="type-p3 mt-0.5 tabular-nums">
-                        Luas: {p.luasLahanHa} Ha
-                      </span>
-                    </button>
-                  ))}
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <div className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-2xs lg:col-span-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h4 className="type-h3 text-foreground">
-                        Rincian Item Pekerjaan Konstruksi
-                      </h4>
-                      <p className="type-p3 text-muted-foreground">
-                        {selectedPoktan.poktan} · Kec.{" "}
-                        {selectedPoktan.kecamatan}, Desa {selectedPoktan.desa}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="type-p3 text-muted-foreground">
-                        Total Anggaran Konstruksi
-                      </span>
-                      <p className="type-h3 font-bold text-primary tabular-nums">
-                        Rp{" "}
-                        {selectedPoktan.totalBiayaKonstruksi.toLocaleString(
-                          "id-ID",
-                        )}
-                      </p>
-                    </div>
-                  </div>
+              {/* TABLE VIEW (EXCEL FORMAT) */}
+              {sidViewMode === "excel_table" && (
+                <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xs">
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-[1550px]">
+                      <TableHeader className="sticky top-0 z-10 bg-muted/70 text-xs">
+                        {/* Tier 1 Header */}
+                        <TableRow className="border-b border-border/80">
+                          <TableHead
+                            rowSpan={2}
+                            className="w-12 border-r border-border/60 text-center font-bold text-foreground"
+                          >
+                            No
+                          </TableHead>
+                          <TableHead
+                            rowSpan={2}
+                            className="min-w-[130px] border-r border-border/60 font-bold text-foreground"
+                          >
+                            Kecamatan &amp; Desa
+                          </TableHead>
+                          <TableHead
+                            rowSpan={2}
+                            className="min-w-[170px] border-r border-border/60 font-bold text-foreground"
+                          >
+                            Kelompok Tani (Poktan)
+                          </TableHead>
+                          <TableHead
+                            rowSpan={2}
+                            className="w-24 border-r border-border/60 text-right font-bold text-foreground"
+                          >
+                            Luas Desain (Ha)
+                          </TableHead>
+                          <TableHead
+                            colSpan={5}
+                            className="border-r border-border/60 bg-primary/10 py-2 text-center font-bold text-primary"
+                          >
+                            HASIL SID (RENCANA DESAIN)
+                          </TableHead>
+                          <TableHead
+                            colSpan={5}
+                            className="border-r border-border/60 bg-emerald-500/10 py-2 text-center font-bold text-emerald-600 dark:text-emerald-400"
+                          >
+                            HASIL FISIK KONSTRUKSI &amp; LAPORAN
+                          </TableHead>
+                          <TableHead
+                            colSpan={4}
+                            className="bg-amber-500/10 py-2 text-center font-bold text-amber-600 dark:text-amber-400"
+                          >
+                            DOKUMENTASI FOTO LAPANGAN (4 TAHAP)
+                          </TableHead>
+                        </TableRow>
 
-                  <Table pagination={false}>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-10 text-center">No</TableHead>
-                        <TableHead>Rincian Pekerjaan</TableHead>
-                        <TableHead className="text-right">Vol SID</TableHead>
-                        <TableHead className="text-center">Satuan</TableHead>
-                        <TableHead className="text-right">Biaya (Rp)</TableHead>
-                        <TableHead className="text-right">Realisasi</TableHead>
-                        <TableHead className="text-center">Satuan</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedPoktan.pekerjaanList.map((item, i) => (
-                        <TableRow key={`${item.namaPekerjaan}-${i}`}>
-                          <TableCell className="type-p3 text-center font-mono text-muted-foreground tabular-nums">
-                            {i + 1}
+                        {/* Tier 2 Header */}
+                        <TableRow className="border-b border-border/80 text-[11px] uppercase tracking-wider text-muted-foreground">
+                          {/* HASIL SID */}
+                          <TableHead className="min-w-[160px] bg-primary/5">
+                            Pekerjaan
+                          </TableHead>
+                          <TableHead className="w-20 bg-primary/5 text-right">
+                            Vol SID
+                          </TableHead>
+                          <TableHead className="w-14 bg-primary/5 text-center">
+                            Sat
+                          </TableHead>
+                          <TableHead className="w-28 bg-primary/5 text-right">
+                            Biaya (Rp)
+                          </TableHead>
+                          <TableHead className="w-20 border-r border-border/60 bg-primary/5 text-right font-semibold text-primary">
+                            Bobot (%)
+                          </TableHead>
+
+                          {/* HASIL FISIK KONSTRUKSI */}
+                          <TableHead className="w-24 bg-emerald-500/5 text-right">
+                            Realisasi Vol
+                          </TableHead>
+                          <TableHead className="w-14 bg-emerald-500/5 text-center">
+                            Sat
+                          </TableHead>
+                          <TableHead className="w-28 bg-emerald-500/5 text-right">
+                            Realisasi (Rp)
+                          </TableHead>
+                          <TableHead className="w-24 bg-emerald-500/5 text-center font-semibold text-emerald-600 dark:text-emerald-400">
+                            Progres Fisik
+                          </TableHead>
+                          <TableHead className="min-w-[140px] border-r border-border/60 bg-emerald-500/5">
+                            Laporan Lapangan
+                          </TableHead>
+
+                          {/* FOTO DOKUMENTASI */}
+                          <TableHead className="w-24 bg-amber-500/5 text-center">
+                            Foto 0%
+                          </TableHead>
+                          <TableHead className="w-24 bg-amber-500/5 text-center">
+                            Foto 50%
+                          </TableHead>
+                          <TableHead className="w-24 bg-amber-500/5 text-center">
+                            Foto 100%
+                          </TableHead>
+                          <TableHead className="w-24 bg-amber-500/5 text-center">
+                            Prasasti
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+
+                      <TableBody>
+                        {filteredData.map((p) => {
+                          const isExpanded =
+                            showAllItems || expandedPoktanNos.has(p.no);
+                          const photos = p.photoClassification;
+
+                          return (
+                            <Fragment key={`poktan-row-${p.no}`}>
+                              {/* Main Poktan Summary Row */}
+                              <TableRow className="border-t-2 border-border/80 bg-muted/20 font-medium transition hover:bg-muted/30">
+                                <TableCell className="border-r border-border/60 text-center font-mono text-xs font-bold text-foreground">
+                                  {p.no}
+                                </TableCell>
+                                <TableCell className="border-r border-border/60">
+                                  <span className="block text-xs font-bold text-foreground">
+                                    {p.kecamatan}
+                                  </span>
+                                  <span className="block text-[11px] text-muted-foreground">
+                                    Desa {p.desa}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="border-r border-border/60">
+                                  <div className="flex items-center gap-1.5">
+                                    {!showAllItems && (
+                                      <button
+                                        type="button"
+                                        onClick={() => togglePoktan(p.no)}
+                                        className="rounded-sm p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                        aria-label={
+                                          isExpanded
+                                            ? "Tutup rincian item"
+                                            : "Buka rincian item"
+                                        }
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronDown className="size-3.5" />
+                                        ) : (
+                                          <ChevronRight className="size-3.5" />
+                                        )}
+                                      </button>
+                                    )}
+                                    <div>
+                                      <span className="block text-xs font-bold text-foreground">
+                                        {p.poktan}
+                                      </span>
+                                      <span className="font-mono text-[10px] text-muted-foreground">
+                                        SPK: {p.nomorSpk || "-"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="border-r border-border/60 text-right font-mono text-xs font-semibold tabular-nums text-foreground">
+                                  {p.luasLahanHa.toFixed(2)} Ha
+                                </TableCell>
+
+                                {/* HASIL SID Summary */}
+                                <TableCell className="bg-primary/5 text-xs font-semibold text-primary">
+                                  Total Konstruksi ({p.pekerjaanListWithBobot.length} Item)
+                                </TableCell>
+                                <TableCell className="bg-primary/5 text-right font-mono text-xs text-muted-foreground">
+                                  —
+                                </TableCell>
+                                <TableCell className="bg-primary/5 text-center text-xs text-muted-foreground">
+                                  —
+                                </TableCell>
+                                <TableCell className="bg-primary/5 text-right font-mono text-xs font-bold tabular-nums text-primary">
+                                  Rp {p.totalBiayaKonstruksi.toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="border-r border-border/60 bg-primary/5 text-right font-mono text-xs font-bold tabular-nums text-primary">
+                                  100.0%
+                                </TableCell>
+
+                                {/* HASIL FISIK KONSTRUKSI Summary */}
+                                <TableCell className="bg-emerald-500/5 text-right font-mono text-xs text-muted-foreground">
+                                  —
+                                </TableCell>
+                                <TableCell className="bg-emerald-500/5 text-center text-xs text-muted-foreground">
+                                  —
+                                </TableCell>
+                                <TableCell className="bg-emerald-500/5 text-right font-mono text-xs font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                  Rp {p.biayaDigunakanKonstruksi.toLocaleString("id-ID")}
+                                </TableCell>
+                                <TableCell className="bg-emerald-500/5 text-center">
+                                  <Badge
+                                    variant={
+                                      p.progresFisikKonstruksiPercent >= 100
+                                        ? "success"
+                                        : p.progresFisikKonstruksiPercent > 0
+                                          ? "default"
+                                          : "secondary"
+                                    }
+                                    className="font-mono text-[11px] font-bold"
+                                  >
+                                    {p.progresFisikKonstruksiPercent.toFixed(1)}%
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="border-r border-border/60 bg-emerald-500/5 text-xs">
+                                  <div className="space-y-0.5">
+                                    <Badge
+                                      variant={
+                                        photos.dailyReportsCount > 0
+                                          ? "outline"
+                                          : "secondary"
+                                      }
+                                      className="text-[10px]"
+                                    >
+                                      {photos.dailyReportsCount > 0
+                                        ? `${photos.dailyReportsCount} Lap. Harian`
+                                        : "Belum Ada Lap."}
+                                    </Badge>
+                                    {photos.latestWeeklySubmission && (
+                                      <div className="text-[10px] font-medium text-muted-foreground">
+                                        {photos.latestWeeklySubmission.periodLabel}:{" "}
+                                        <span className="font-mono font-bold text-foreground">
+                                          {photos.latestWeeklySubmission.actualProgress}%
+                                        </span>
+                                      </div>
+                                    )}
+                                    {photos.latestReportDate && (
+                                      <div className="text-[9px] text-muted-foreground">
+                                        Update: {photos.latestReportDate}
+                                      </div>
+                                    )}
+                                  </div>
+                                </TableCell>
+
+                                {/* 4 FOTO CELLS */}
+                                <TableCell className="bg-amber-500/5 p-1 text-center">
+                                  <PhotoThumbnailSlot
+                                    photos={photos.photos0}
+                                    stageName="0%"
+                                    stageTitle="Foto Kondisi 0%"
+                                    onOpenLightbox={handleOpenLightbox}
+                                  />
+                                </TableCell>
+                                <TableCell className="bg-amber-500/5 p-1 text-center">
+                                  <PhotoThumbnailSlot
+                                    photos={photos.photos50}
+                                    stageName="50%"
+                                    stageTitle="Foto Kondisi 50%"
+                                    onOpenLightbox={handleOpenLightbox}
+                                  />
+                                </TableCell>
+                                <TableCell className="bg-amber-500/5 p-1 text-center">
+                                  <PhotoThumbnailSlot
+                                    photos={photos.photos100}
+                                    stageName="100%"
+                                    stageTitle="Foto Kondisi 100%"
+                                    onOpenLightbox={handleOpenLightbox}
+                                  />
+                                </TableCell>
+                                <TableCell className="bg-amber-500/5 p-1 text-center">
+                                  <PhotoThumbnailSlot
+                                    photos={photos.photosPrasasti}
+                                    stageName="Prasasti"
+                                    stageTitle="Foto Batu Prasasti"
+                                    onOpenLightbox={handleOpenLightbox}
+                                  />
+                                </TableCell>
+                              </TableRow>
+
+                              {/* Sub-Rows for each Pekerjaan Item */}
+                              {isExpanded &&
+                                p.pekerjaanListWithBobot.map((item, idx) => (
+                                  <TableRow
+                                    key={`item-${p.no}-${item.namaPekerjaan}-${idx}`}
+                                    className="border-b border-border/40 text-xs transition hover:bg-muted/10"
+                                  >
+                                    <TableCell className="border-r border-border/60 text-center font-mono text-[10px] text-muted-foreground/60">
+                                      {p.no}.{idx + 1}
+                                    </TableCell>
+                                    <TableCell
+                                      colSpan={2}
+                                      className="border-r border-border/60 pl-6"
+                                    >
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-mono text-muted-foreground/60">
+                                          ↳
+                                        </span>
+                                        <span className="font-medium text-foreground">
+                                          {item.namaPekerjaan}
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="border-r border-border/60 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                                      —
+                                    </TableCell>
+
+                                    {/* HASIL SID Item Columns */}
+                                    <TableCell className="bg-primary/2 text-xs text-muted-foreground">
+                                      {item.namaPekerjaan}
+                                    </TableCell>
+                                    <TableCell className="bg-primary/2 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                                      {item.volume !== null &&
+                                      item.volume !== undefined
+                                        ? String(item.volume)
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="bg-primary/2 text-center text-xs text-muted-foreground">
+                                      {item.satuan || "—"}
+                                    </TableCell>
+                                    <TableCell className="bg-primary/2 text-right font-mono text-xs font-semibold tabular-nums text-foreground">
+                                      {item.biaya > 0
+                                        ? item.biaya.toLocaleString("id-ID")
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="border-r border-border/60 bg-primary/2 text-right font-mono text-xs font-bold tabular-nums text-primary">
+                                      {item.bobotPercent.toFixed(2)}%
+                                    </TableCell>
+
+                                    {/* HASIL FISIK KONSTRUKSI Item Columns */}
+                                    <TableCell className="bg-emerald-500/2 text-right font-mono text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                      {item.realisasiVolumeCalc !== null &&
+                                      item.realisasiVolumeCalc !== undefined
+                                        ? String(item.realisasiVolumeCalc)
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="bg-emerald-500/2 text-center text-xs text-muted-foreground">
+                                      {item.realisasiSatuan || item.satuan || "—"}
+                                    </TableCell>
+                                    <TableCell className="bg-emerald-500/2 text-right font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                      {item.realisasiBiaya > 0
+                                        ? item.realisasiBiaya.toLocaleString("id-ID")
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="bg-emerald-500/2 text-center text-xs font-medium text-emerald-600">
+                                      {p.progresFisikKonstruksiPercent.toFixed(1)}%
+                                    </TableCell>
+                                    <TableCell className="border-r border-border/60 bg-emerald-500/2 text-[11px] text-muted-foreground">
+                                      {item.biaya > 0
+                                        ? p.progresFisikKonstruksiPercent >= 100
+                                          ? "100% Selesai"
+                                          : p.progresFisikKonstruksiPercent > 0
+                                            ? "Pelaksanaan"
+                                            : "Belum Mulai"
+                                        : "Opsional"}
+                                    </TableCell>
+
+                                    {/* Empty Foto Slots for sub-row */}
+                                    <TableCell
+                                      colSpan={4}
+                                      className="bg-muted/5 py-1 text-center text-[10px] italic text-muted-foreground/40"
+                                    >
+                                      ↳ Foto di baris Kelompok Tani
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </Fragment>
+                          );
+                        })}
+                      </TableBody>
+
+                      <TableFooter className="bg-muted/80 text-xs font-bold">
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center font-bold">
+                            TOTAL KESELURUHAN ({filteredData.length} KELOMPOK TANI)
                           </TableCell>
-                          <TableCell className="type-p2 whitespace-normal font-medium text-foreground">
-                            {item.namaPekerjaan}
+                          <TableCell className="text-right font-mono tabular-nums text-foreground">
+                            {aggregates.totalLuas.toFixed(2)} Ha
                           </TableCell>
-                          <TableCell className="type-p3 text-right font-mono text-muted-foreground tabular-nums">
-                            {item.volume !== null && item.volume !== undefined
-                              ? String(item.volume)
-                              : "—"}
+                          <TableCell colSpan={3} className="text-right text-primary">
+                            Total Anggaran SID:
                           </TableCell>
-                          <TableCell className="type-p3 text-center text-muted-foreground">
-                            {item.satuan || "—"}
+                          <TableCell className="text-right font-mono font-bold tabular-nums text-primary">
+                            Rp {aggregates.totalBiayaKonstruksi.toLocaleString("id-ID")}
                           </TableCell>
-                          <TableCell className="type-p3 text-right font-mono font-semibold text-foreground tabular-nums">
-                            {item.biaya > 0
-                              ? item.biaya.toLocaleString("id-ID")
-                              : "—"}
+                          <TableCell className="border-r border-border/60 text-right font-mono font-bold tabular-nums text-primary">
+                            100.0%
                           </TableCell>
-                          <TableCell className="type-p3 text-right font-mono font-medium text-success tabular-nums">
-                            {item.realisasiVolume !== null &&
-                            item.realisasiVolume !== undefined
-                              ? String(item.realisasiVolume)
-                              : "—"}
+                          <TableCell colSpan={2} className="text-right text-emerald-600">
+                            Total Realisasi Fisik:
                           </TableCell>
-                          <TableCell className="type-p3 text-center text-muted-foreground">
-                            {item.realisasiSatuan || item.satuan || "—"}
+                          <TableCell className="text-right font-mono font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                            Rp{" "}
+                            {aggregates.totalBiayaDigunakanKonstruksi.toLocaleString(
+                              "id-ID",
+                            )}
                           </TableCell>
-                          <TableCell className="text-center">
-                            <span className="type-p3 inline-flex items-center gap-1 font-semibold text-success">
-                              <CheckCircle2
-                                className="size-3.5"
-                                aria-hidden="true"
-                              />
-                              100%
-                            </span>
+                          <TableCell className="text-center font-mono font-bold text-emerald-600">
+                            {aggregates.avgProgressPercent}%
+                          </TableCell>
+                          <TableCell className="border-r border-border/60 text-xs text-muted-foreground">
+                            {aggregates.totalDailyReportsCount} Lap. Harian
+                          </TableCell>
+                          <TableCell
+                            colSpan={4}
+                            className="text-center font-bold text-amber-600"
+                          >
+                            {aggregates.totalPhotosCount} Foto ({aggregates.poktanWithPhotosCount} Poktan)
                           </TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow>
-                        <TableCell colSpan={4} className="type-p2 text-center font-bold">
-                          Total Biaya Konstruksi
-                        </TableCell>
-                        <TableCell className="type-p2 text-right font-mono font-bold text-primary tabular-nums">
-                          Rp{" "}
-                          {selectedPoktan.totalBiayaKonstruksi.toLocaleString(
-                            "id-ID",
-                          )}
-                        </TableCell>
-                        <TableCell
-                          colSpan={3}
-                          className="type-p3 text-center font-semibold text-success"
-                        >
-                          Progres Fisik 100% Selesai
-                        </TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-
-                {/* 4 Photo Stages */}
-                <div className="space-y-3">
-                  <div className="rounded-xl border border-border bg-card p-4 shadow-2xs">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <h4 className="type-h3 flex items-center gap-2 text-foreground">
-                        <ImageIcon
-                          className="size-4 text-primary"
-                          aria-hidden="true"
-                        />
-                        Dokumentasi Resmi
-                      </h4>
-                      <Badge variant="outline">4 Tahap</Badge>
-                    </div>
-                    <p className="type-p3 mb-4 text-muted-foreground">
-                      Dokumentasi visual fisik wajib untuk lampiran BAST dan
-                      pertanggungjawaban dinas.
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-lg border border-border bg-muted/15 p-3 text-center">
-                        <div className="mb-1.5 flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                          <ImageIcon className="size-4" aria-hidden="true" />
-                        </div>
-                        <span className="type-p2 font-bold text-foreground">
-                          Kondisi 0%
-                        </span>
-                        <span className="type-p3 text-muted-foreground">
-                          Sebelum Kerja
-                        </span>
-                        <Badge variant="secondary" className="mt-1.5">
-                          Terverifikasi
-                        </Badge>
-                      </div>
-
-                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-lg border border-border bg-muted/15 p-3 text-center">
-                        <div className="mb-1.5 flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                          <ImageIcon className="size-4" aria-hidden="true" />
-                        </div>
-                        <span className="type-p2 font-bold text-foreground">
-                          Kondisi 50%
-                        </span>
-                        <span className="type-p3 text-muted-foreground">
-                          Sedang Jalan
-                        </span>
-                        <Badge variant="secondary" className="mt-1.5">
-                          Terverifikasi
-                        </Badge>
-                      </div>
-
-                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-lg border border-success/40 bg-success/5 p-3 text-center">
-                        <div className="mb-1.5 flex size-8 items-center justify-center rounded-full bg-success/15 text-success">
-                          <CheckCircle2 className="size-4" aria-hidden="true" />
-                        </div>
-                        <span className="type-p2 font-bold text-success">
-                          Kondisi 100%
-                        </span>
-                        <span className="type-p3 text-muted-foreground">
-                          Selesai
-                        </span>
-                        <Badge variant="outline" className="mt-1.5">
-                          Lengkap
-                        </Badge>
-                      </div>
-
-                      <div className="flex min-h-[112px] flex-col items-center justify-center rounded-lg border border-warning/40 bg-warning/5 p-3 text-center">
-                        <div className="mb-1.5 flex size-8 items-center justify-center rounded-full bg-warning/15 text-warning">
-                          <Landmark className="size-4" aria-hidden="true" />
-                        </div>
-                        <span className="type-p2 font-bold text-warning">
-                          Prasasti
-                        </span>
-                        <span className="type-p3 text-muted-foreground">
-                          Batu Prasasti
-                        </span>
-                        <Badge variant="outline" className="mt-1.5">
-                          Terpasang
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="type-p3 mt-4 space-y-1.5 border-t border-border pt-3">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Ketua Poktan:
-                        </span>
-                        <span className="font-semibold text-foreground">
-                          {selectedPoktan.ketuaPoktan}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Ketua UPKK:
-                        </span>
-                        <span className="font-semibold text-foreground">
-                          {selectedPoktan.ketuaUpkk}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Nomor SPK:</span>
-                        <span className="font-mono text-foreground">
-                          {selectedPoktan.nomorSpk}
-                        </span>
-                      </div>
-                    </div>
+                      </TableFooter>
+                    </Table>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* MOBILE CARDS VIEW */}
+              {sidViewMode === "mobile_cards" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+                    {filteredData.map((p) => {
+                      const photos = p.photoClassification;
+                      const isExpanded = expandedPoktanNos.has(p.no);
+
+                      return (
+                        <div
+                          key={`card-poktan-${p.no}`}
+                          className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-2xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant="outline" className="text-[10px]">
+                                  #{p.no} · {p.kecamatan}
+                                </Badge>
+                                <span className="text-[11px] text-muted-foreground">
+                                  Desa {p.desa}
+                                </span>
+                              </div>
+                              <h4 className="type-h3 mt-1 font-bold text-foreground">
+                                {p.poktan}
+                              </h4>
+                              <p className="font-mono text-[11px] text-muted-foreground">
+                                SPK: {p.nomorSpk || "-"}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <Badge
+                                variant={
+                                  p.progresFisikKonstruksiPercent >= 100
+                                    ? "success"
+                                    : p.progresFisikKonstruksiPercent > 0
+                                      ? "default"
+                                      : "secondary"
+                                }
+                                className="font-mono text-xs font-bold"
+                              >
+                                {p.progresFisikKonstruksiPercent.toFixed(1)}% Fisik
+                              </Badge>
+                              <span className="mt-1 block text-xs font-medium text-foreground">
+                                {p.luasLahanHa.toFixed(2)} Ha Desain
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Financial & Progress Info */}
+                          <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5 text-xs">
+                            <div>
+                              <span className="block text-[10px] text-muted-foreground">
+                                Pagu Konstruksi
+                              </span>
+                              <span className="font-mono font-bold text-primary">
+                                Rp {p.totalBiayaKonstruksi.toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-muted-foreground">
+                                Realisasi Biaya
+                              </span>
+                              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                Rp {p.biayaDigunakanKonstruksi.toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Photo Documentation Grid (4 Stages) */}
+                          <div>
+                            <div className="mb-1.5 flex items-center justify-between text-xs">
+                              <span className="flex items-center gap-1 font-semibold text-foreground">
+                                <ImageIcon className="size-3.5 text-amber-500" />
+                                Dokumentasi Foto Lapangan (4 Tahap)
+                              </span>
+                              <span className="font-mono text-[11px] text-muted-foreground">
+                                {photos.totalPhotosCount} Foto
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              <PhotoThumbnailSlot
+                                photos={photos.photos0}
+                                stageName="0%"
+                                stageTitle="Foto 0%"
+                                onOpenLightbox={handleOpenLightbox}
+                              />
+                              <PhotoThumbnailSlot
+                                photos={photos.photos50}
+                                stageName="50%"
+                                stageTitle="Foto 50%"
+                                onOpenLightbox={handleOpenLightbox}
+                              />
+                              <PhotoThumbnailSlot
+                                photos={photos.photos100}
+                                stageName="100%"
+                                stageTitle="Foto 100%"
+                                onOpenLightbox={handleOpenLightbox}
+                              />
+                              <PhotoThumbnailSlot
+                                photos={photos.photosPrasasti}
+                                stageName="Prasasti"
+                                stageTitle="Prasasti"
+                                onOpenLightbox={handleOpenLightbox}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Collapsible Work Items Accordion */}
+                          <div className="border-t border-border/60 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => togglePoktan(p.no)}
+                              className="flex w-full items-center justify-between text-xs font-medium text-primary hover:underline"
+                            >
+                              <span>
+                                {isExpanded ? "Tutup" : "Lihat"} Rincian {p.pekerjaanListWithBobot.length} Item SID &amp; Bobot (%)
+                              </span>
+                              {isExpanded ? (
+                                <ChevronDown className="size-3.5" />
+                              ) : (
+                                <ChevronRight className="size-3.5" />
+                              )}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2 space-y-1.5 rounded-lg border border-border/60 bg-muted/10 p-2.5 text-xs">
+                                {p.pekerjaanListWithBobot.map((item, idx) => (
+                                  <div
+                                    key={`card-item-${p.no}-${idx}`}
+                                    className="flex items-center justify-between border-b border-border/40 pb-1.5 last:border-0 last:pb-0"
+                                  >
+                                    <div>
+                                      <span className="block font-medium text-foreground">
+                                        {item.namaPekerjaan}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        Vol: {item.volume ?? "-"} {item.satuan} · Real:{" "}
+                                        {item.realisasiVolumeCalc}{" "}
+                                        {item.realisasiSatuan || item.satuan}
+                                      </span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="block font-mono font-bold text-primary">
+                                        {item.bobotPercent.toFixed(2)}%
+                                      </span>
+                                      <span className="font-mono text-[10px] text-muted-foreground">
+                                        Rp{" "}
+                                        {item.biaya > 0
+                                          ? item.biaya.toLocaleString("id-ID")
+                                          : "-"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2069,6 +2965,178 @@ export function DinasProjectReportPage({
         </div>
       </div>
         </>
+      )}
+
+      {/* In-App Interactive Lightbox Modal */}
+      {lightboxData && (
+        <GlobalModal
+          isOpen={Boolean(lightboxData)}
+          onClose={() => setLightboxData(null)}
+          title={
+            <div className="flex items-center gap-2">
+              <ImageIcon className="size-4 text-primary" />
+              <span className="type-h3">{lightboxData.photo.stageLabel}</span>
+            </div>
+          }
+          description={`${lightboxData.photo.poktan} · Desa ${lightboxData.photo.desa}, Kec. ${lightboxData.photo.kecamatan} · Progres ${lightboxData.photo.progress.toFixed(1)}%`}
+          className="max-w-3xl"
+          footer={
+            <div className="flex w-full items-center justify-between">
+              <a
+                href={lightboxData.photo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <Download className="size-3.5" />
+                Unduh Foto Asli
+              </a>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setLightboxData(null)}
+              >
+                Tutup
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {/* Main Photo Frame */}
+            <div className="relative flex max-h-[60vh] min-h-[260px] w-full items-center justify-center overflow-hidden rounded-xl bg-black/90 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxData.photo.url}
+                alt={`${lightboxData.photo.stageLabel} - ${lightboxData.photo.poktan}`}
+                className="max-h-[58vh] max-w-full rounded-lg object-contain shadow-2xl transition-all"
+              />
+              {lightboxData.photoList.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    disabled={lightboxData.currentIndex <= 0}
+                    onClick={() => {
+                      const newIdx = lightboxData.currentIndex - 1;
+                      if (newIdx >= 0) {
+                        setLightboxData({
+                          ...lightboxData,
+                          currentIndex: newIdx,
+                          photo: lightboxData.photoList[newIdx],
+                        });
+                      }
+                    }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black disabled:opacity-20 transition"
+                    aria-label="Foto Sebelumnya"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      lightboxData.currentIndex >=
+                      lightboxData.photoList.length - 1
+                    }
+                    onClick={() => {
+                      const newIdx = lightboxData.currentIndex + 1;
+                      if (newIdx < lightboxData.photoList.length) {
+                        setLightboxData({
+                          ...lightboxData,
+                          currentIndex: newIdx,
+                          photo: lightboxData.photoList[newIdx],
+                        });
+                      }
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black disabled:opacity-20 transition"
+                    aria-label="Foto Selanjutnya"
+                  >
+                    <ChevronRight className="size-5" />
+                  </button>
+                </>
+              )}
+              <div className="absolute top-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white">
+                {lightboxData.currentIndex + 1} / {lightboxData.photoList.length}
+              </div>
+            </div>
+
+            {/* Detailed Metadata Card */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-border bg-muted/20 p-3 text-xs">
+              <div>
+                <span className="block text-[10px] text-muted-foreground">
+                  Kelompok Tani &amp; Wilayah
+                </span>
+                <span className="text-sm font-bold text-foreground">
+                  {lightboxData.photo.poktan}
+                </span>
+                <p className="mt-0.5 text-muted-foreground">
+                  Kec. {lightboxData.photo.kecamatan}, Desa {lightboxData.photo.desa}
+                </p>
+              </div>
+              <div>
+                <span className="block text-[10px] text-muted-foreground">
+                  Tahapan Dokumentasi
+                </span>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <Badge variant="default" className="text-xs">
+                    {lightboxData.photo.stageLabel}
+                  </Badge>
+                  <span className="font-mono font-bold text-emerald-600">
+                    {lightboxData.photo.progress.toFixed(1)}% Fisik
+                  </span>
+                </div>
+                <p className="mt-1 text-muted-foreground">
+                  Laporan Tanggal: {lightboxData.photo.reportDate}
+                </p>
+              </div>
+              {(lightboxData.photo.workSummary || lightboxData.photo.notes) && (
+                <div className="sm:col-span-2 border-t border-border/60 pt-2">
+                  <span className="block text-[10px] font-medium text-muted-foreground">
+                    Uraian Pekerjaan / Catatan Lapangan:
+                  </span>
+                  <p className="mt-0.5 whitespace-pre-wrap font-medium text-foreground">
+                    {lightboxData.photo.workSummary || lightboxData.photo.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Thumbnail carousel strip */}
+            {lightboxData.photoList.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
+                {lightboxData.photoList.map((item, idx) => (
+                  <button
+                    key={`modal-thumb-${item.url}-${idx}`}
+                    type="button"
+                    onClick={() =>
+                      setLightboxData({
+                        ...lightboxData,
+                        currentIndex: idx,
+                        photo: item,
+                      })
+                    }
+                    className={cn(
+                      "relative size-14 shrink-0 overflow-hidden rounded-md border transition-all",
+                      idx === lightboxData.currentIndex
+                        ? "border-primary ring-2 ring-primary scale-105"
+                        : "border-border/60 opacity-60 hover:opacity-100",
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.url}
+                      alt={`Thumb ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] font-bold text-white text-center">
+                      {item.stage}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </GlobalModal>
       )}
     </div>
   );

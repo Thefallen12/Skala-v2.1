@@ -232,8 +232,8 @@ export function GlobalModal({
             {children}
           </div>
           {footer ? (
-            <DrawerFooter className="mt-0 shrink-0 border-t border-border bg-muted/60 px-4 pt-3 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]">
-              <div className="flex w-full flex-wrap items-center justify-end gap-2 [&>button]:flex-1">
+            <DrawerFooter className="mt-0 shrink-0 border-t border-border bg-muted/60 px-3.5 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end [&>*:only-child]:col-span-2 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*]:w-full sm:[&>*]:w-auto">
                 {footer}
               </div>
             </DrawerFooter>
@@ -264,12 +264,12 @@ export function GlobalModal({
       >
         <DialogHeader
           className={cn(
-            "sticky top-0 z-10 shrink-0 flex-row items-start justify-between gap-3 space-y-0 border-b border-border bg-muted/60 px-4 py-3.5 pr-12 backdrop-blur-sm sm:px-6 sm:py-4 sm:pr-14",
+            "sticky top-0 z-10 shrink-0 flex-row items-start justify-between gap-3 space-y-0 border-b border-border bg-muted/60 px-3.5 py-2.5 pr-12 backdrop-blur-sm sm:px-6 sm:py-4 sm:pr-14",
             hideHeader && "hidden",
           )}
         >
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:size-10">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:size-10">
               {icon ?? <FolderOpen aria-hidden="true" className="size-4 sm:size-5" />}
             </span>
             <div className="min-w-0 space-y-0.5">
@@ -286,7 +286,7 @@ export function GlobalModal({
         </DialogHeader>
         <div
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto overscroll-y-contain space-y-4 p-4 sm:space-y-5 sm:p-6",
+            "min-h-0 flex-1 overflow-y-auto overscroll-y-contain space-y-3.5 p-3.5 sm:space-y-5 sm:p-6",
             isMobileSheet &&
               !footer &&
               "pb-[calc(1rem+env(safe-area-inset-bottom,0px))]",
@@ -298,10 +298,10 @@ export function GlobalModal({
         {footer ? (
           <div
             className={cn(
-              "sticky bottom-0 z-10 shrink-0 flex flex-col-reverse items-stretch justify-between gap-2.5 border-t border-border bg-muted/60 px-4 pt-3.5 backdrop-blur-sm sm:flex-row sm:items-center sm:px-6 sm:py-4",
+              "sticky bottom-0 z-10 shrink-0 flex flex-col-reverse items-stretch justify-between gap-2 border-t border-border bg-muted/60 px-3.5 pt-2.5 backdrop-blur-sm sm:flex-row sm:items-center sm:px-6 sm:py-4 sm:gap-2.5",
               isMobileSheet
-                ? "pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]"
-                : "pb-3.5",
+                ? "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+                : "pb-2.5 sm:pb-4",
             )}
           >
             {footerNote ? (
@@ -309,7 +309,7 @@ export function GlobalModal({
                 {footerNote}
               </span>
             ) : null}
-            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-initial">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end [&>*:only-child]:col-span-2 [&>*:last-child:nth-child(odd)]:col-span-2 [&>*]:w-full sm:[&>*]:w-auto">
               {footer}
             </div>
           </div>

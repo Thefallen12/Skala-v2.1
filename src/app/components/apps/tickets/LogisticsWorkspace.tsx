@@ -13,7 +13,9 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  BarChart3,
   Boxes,
+  ChevronDown,
   CircleDollarSign,
   ClipboardList,
   Copy,
@@ -315,44 +317,47 @@ function StockItemMobileCard({
       </div>
 
       {canManage && (
-        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border/60 pt-2">
+        <div className="flex items-center gap-1.5 border-t border-border/60 pt-2">
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="flex-1"
             onClick={() => onDetail(item)}
           >
             <Eye className="size-3.5" aria-hidden="true" />
             Detail
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(item)}
-          >
-            <Pencil className="size-3.5" aria-hidden="true" />
-            Edit
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onDuplicate(item)}
-          >
-            <Copy className="size-3.5" aria-hidden="true" />
-            Duplikat
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="text-destructive"
-            onClick={() => onDelete(item)}
-          >
-            <Trash2 className="size-3.5" aria-hidden="true" />
-            Hapus
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                aria-label={`Menu aksi ${item.name}`}
+              >
+                <MoreHorizontal className="size-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onEdit(item)}>
+                <Pencil className="size-4" aria-hidden="true" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onDuplicate(item)}>
+                <Copy className="size-4" aria-hidden="true" />
+                Duplikat
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => onDelete(item)}
+              >
+                <Trash2 className="size-4" aria-hidden="true" />
+                Hapus
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
     </div>
@@ -387,9 +392,11 @@ function DirectPurchaseMobileCard({
   const canReplace =
     canReplaceInvoice && canReplaceDirectPurchaseInvoice(purchase);
   const readyToReceive = canReceiveDirectPurchase(purchase, canManage);
+  const primaryIsDetail = !needsInvoice && !readyToReceive;
+  const hasMenu = !primaryIsDetail || canReplace;
 
   return (
-    <div className="space-y-2.5 rounded-xl border border-border/80 bg-card p-3.5">
+    <div className="space-y-2 rounded-xl border border-border/80 bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="type-p2 font-mono font-bold text-primary">
@@ -422,11 +429,11 @@ function DirectPurchaseMobileCard({
         <p className="type-p3 text-muted-foreground">{itemQtySummary}</p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2">
-        <span className="type-p1 font-mono font-bold tabular-nums text-foreground">
+      <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2">
+        <span className="type-p1 shrink-0 font-mono font-bold tabular-nums text-foreground">
           {currency.format(Number(purchase.totalAmount))}
         </span>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <div className="flex items-center gap-1.5">
           {needsInvoice ? (
             <Button
               type="button"
@@ -446,26 +453,47 @@ function DirectPurchaseMobileCard({
               <PackageOpen className="size-3.5" aria-hidden="true" />
               Terima
             </Button>
-          ) : null}
-          {canReplace && (
+          ) : (
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onOpenReplaceInvoiceModal(purchase)}
+              onClick={() => onOpenDetailModal(purchase)}
             >
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Ganti Foto Invoice/Bon
+              <Eye className="size-3.5" aria-hidden="true" />
+              Detail
             </Button>
           )}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onOpenDetailModal(purchase)}
-          >
-            Detail
-          </Button>
+          {hasMenu && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  aria-label={`Menu aksi ${purchase.purchaseNumber}`}
+                >
+                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {!primaryIsDetail && (
+                  <DropdownMenuItem onSelect={() => onOpenDetailModal(purchase)}>
+                    <Eye className="size-4" aria-hidden="true" />
+                    Detail
+                  </DropdownMenuItem>
+                )}
+                {canReplace && (
+                  <DropdownMenuItem
+                    onSelect={() => onOpenReplaceInvoiceModal(purchase)}
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Ganti Foto/Bon
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
     </div>
@@ -507,6 +535,7 @@ export default function LogisticsWorkspace({
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [purchaseOpen, setPurchaseOpen] = useState(Boolean(initialAction));
+  const [mobileChartsOpen, setMobileChartsOpen] = useState(false);
 
   // Hoisted Single Action Controllers for Direct Purchases & Stock
   const [directPurchaseModal, setDirectPurchaseModal] = useState<{
@@ -1211,75 +1240,136 @@ export default function LogisticsWorkspace({
     };
 
     return (
-      <div className="my-4 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="my-2 space-y-4 sm:my-4 sm:space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="type-h2 text-foreground">Katalog &amp; Stok Gudang</h2>
-            <p className="type-p2 mt-1 text-muted-foreground">
+            <p className="type-p3 mt-0.5 text-muted-foreground sm:type-p2 sm:mt-1">
               {canCreatePurchaseOrder
                 ? "Kelola katalog material, pantau ketersediaan, dan catat pembelian langsung."
                 : "Pantau persediaan material dan status pemenuhannya."}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {canCreatePurchaseOrder && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setCsvFiles([]);
-                  setCsvModalOpen(true);
-                }}
-              >
-                <FileUp className="size-4" aria-hidden="true" />
-                Import CSV
+          <div>
+            <div className="flex w-full items-center gap-2 sm:hidden">
+              {canCreatePurchaseOrder ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setPurchaseOpen(true)}
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                    Pembelian
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        aria-label="Menu katalog stok"
+                      >
+                        <MoreHorizontal className="size-4" aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => openStockEditor()}>
+                        <Plus className="size-4" aria-hidden="true" />
+                        Tambah Barang
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setCsvFiles([]);
+                          setCsvModalOpen(true);
+                        }}
+                      >
+                        <FileUp className="size-4" aria-hidden="true" />
+                        Import CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={exportStockCsv}>
+                        <Download className="size-4" aria-hidden="true" />
+                        Export CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  onClick={exportStockCsv}
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  Export
+                </Button>
+              )}
+            </div>
+
+            <div className="hidden flex-wrap gap-2 sm:flex">
+              {canCreatePurchaseOrder && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCsvFiles([]);
+                    setCsvModalOpen(true);
+                  }}
+                >
+                  <FileUp className="size-4" aria-hidden="true" />
+                  Import CSV
+                </Button>
+              )}
+              {canCreatePurchaseOrder && (
+                <Button
+                  type="button"
+                  onClick={() => setPurchaseOpen(true)}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  Pembelian
+                </Button>
+              )}
+              <Button type="button" variant="outline" onClick={exportStockCsv}>
+                <Download className="size-4" aria-hidden="true" />
+                Export
               </Button>
-            )}
-            {canCreatePurchaseOrder && (
-              <Button
-                type="button"
-                onClick={() => setPurchaseOpen(true)}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                + Pembelian
-              </Button>
-            )}
-            <Button type="button" variant="outline" onClick={exportStockCsv}>
-              <Download className="size-4" aria-hidden="true" />
-              Export
-            </Button>
-            {canCreatePurchaseOrder && (
-              <>
+              {canCreatePurchaseOrder && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => openStockEditor()}
                 >
                   <Plus className="size-4" aria-hidden="true" />
-                  + Barang
+                  Barang
                 </Button>
-                <CreatePurchaseModal
-                  open={purchaseOpen}
-                  onOpenChange={setPurchaseOpen}
-                  initialType={
-                    initialAction === "ticket"
-                      ? "PURCHASE_ORDER"
-                      : "DIRECT_PURCHASE"
-                  }
-                  vendors={vendors}
-                  stockItems={stockItems}
-                  tickets={purchaseTickets}
-                  onCreated={(message) => {
-                    toast.success(message);
-                    setPurchaseOpen(false);
-                  }}
-                />
-              </>
+              )}
+            </div>
+
+            {canCreatePurchaseOrder && (
+              <CreatePurchaseModal
+                open={purchaseOpen}
+                onOpenChange={setPurchaseOpen}
+                initialType={
+                  initialAction === "ticket"
+                    ? "PURCHASE_ORDER"
+                    : "DIRECT_PURCHASE"
+                }
+                vendors={vendors}
+                stockItems={stockItems}
+                tickets={purchaseTickets}
+                onCreated={(message) => {
+                  toast.success(message);
+                  setPurchaseOpen(false);
+                }}
+              />
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
           {[
             {
               label: "Total Barang",
@@ -1314,24 +1404,59 @@ export default function LogisticsWorkspace({
               color: "text-info",
             },
           ].map(({ label, value, note, Icon, background, color }) => (
-            <CardBox key={label} className="p-3.5">
-              <div className="flex items-start justify-between gap-3">
+            <CardBox key={label} className="p-3 sm:p-3.5">
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="type-p3 font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="type-p3 truncate font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="type-kpi mt-1.5">{value}</p>
-                  <p className="type-p3 mt-1 text-muted-foreground">{note}</p>
+                  <p
+                    className="type-kpi mt-1 truncate"
+                    title={String(value)}
+                  >
+                    {value}
+                  </p>
+                  <p className="type-p3 mt-1 hidden text-muted-foreground sm:block">
+                    {note}
+                  </p>
                 </div>
-                <span className={`shrink-0 rounded-md p-2 ${background} ${color}`}>
-                  <Icon className="size-5" aria-hidden="true" />
+                <span className={`shrink-0 rounded-md p-1.5 sm:p-2 ${background} ${color}`}>
+                  <Icon className="size-4 sm:size-5" aria-hidden="true" />
                 </span>
               </div>
             </CardBox>
           ))}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="sm:hidden">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="w-full justify-between"
+            aria-expanded={mobileChartsOpen}
+            onClick={() => setMobileChartsOpen((prev) => !prev)}
+          >
+            <span className="flex items-center gap-2">
+              <BarChart3 className="size-4 text-primary" aria-hidden="true" />
+              {mobileChartsOpen
+                ? "Sembunyikan Grafik Ringkasan"
+                : "Tampilkan Grafik Ringkasan"}
+            </span>
+            <ChevronDown
+              className={`size-4 transition-transform ${mobileChartsOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+          </Button>
+        </div>
+
+        <div
+          className={
+            mobileChartsOpen
+              ? "grid gap-4 sm:gap-6 xl:grid-cols-3"
+              : "hidden sm:grid sm:gap-6 xl:grid-cols-3"
+          }
+        >
           <CardBox className="overflow-hidden p-0 xl:col-span-2">
             <div className="border-b border-border px-5 py-4">
               <h3 className="type-h3 font-semibold">Stok per Material</h3>
@@ -1418,17 +1543,17 @@ export default function LogisticsWorkspace({
         </div>
 
         <CardBox className="gap-0 overflow-hidden p-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border px-3.5 py-3 sm:gap-3 sm:px-5 sm:py-4">
             <div>
               <h3 className="type-h3 font-semibold">Katalog Material</h3>
-              <p className="type-p2 mt-1 text-muted-foreground">
+              <p className="type-p3 mt-0.5 text-muted-foreground sm:type-p2 sm:mt-1">
                 {canCreatePurchaseOrder
                   ? "Kelola katalog barang dan pantau kebutuhan restock."
                   : "Stok ditampilkan dalam mode baca saja untuk role Anda."}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="relative">
+            <div className="grid w-full grid-cols-[1fr_8.5rem] gap-2 sm:flex sm:w-auto">
+              <div className="relative min-w-0">
                 <Search
                   className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                   aria-hidden="true"
@@ -1441,7 +1566,7 @@ export default function LogisticsWorkspace({
                   }}
                   placeholder="Cari barang..."
                   aria-label="Cari barang persediaan"
-                  className="w-52 pl-9"
+                  className="w-full pl-9 sm:w-52"
                 />
               </div>
               <Select
@@ -1451,7 +1576,10 @@ export default function LogisticsWorkspace({
                   setStockPage(1);
                 }}
               >
-                <SelectTrigger aria-label="Filter kondisi stok" className="w-40">
+                <SelectTrigger
+                  aria-label="Filter kondisi stok"
+                  className="w-full sm:w-40"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1465,7 +1593,7 @@ export default function LogisticsWorkspace({
           </div>
 
           {stockItems.length ? (
-            <div className="space-y-4 p-4 sm:p-5">
+            <div className="space-y-4 p-3 sm:p-5">
               {!visibleStockItems.length ? (
                 <EmptyState
                   icon={Search}
@@ -1964,19 +2092,53 @@ export default function LogisticsWorkspace({
                         : "Kirim ke Keuangan"}
                   </Button>
                 </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDirectPurchaseModal(null)}
-                  >
-                    Tutup
-                  </Button>
-                  {canCreatePurchaseOrder &&
-                    canUploadDirectPurchaseInvoice(
-                      directPurchaseModal.purchase,
-                    ) && (
+              ) : (() => {
+                const canUpload =
+                  canCreatePurchaseOrder &&
+                  canUploadDirectPurchaseInvoice(directPurchaseModal.purchase);
+                const canReplace =
+                  canReplacePurchaseInvoice &&
+                  canReplaceDirectPurchaseInvoice(directPurchaseModal.purchase);
+                const canReceive = canReceiveDirectPurchase(
+                  directPurchaseModal.purchase,
+                  canCreatePurchaseOrder,
+                );
+                const hasPrimaryOtherThanReplace = canUpload || canReceive;
+
+                return (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setDirectPurchaseModal(null)}
+                    >
+                      Tutup
+                    </Button>
+                    {canReplace && hasPrimaryOtherThanReplace && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button type="button" variant="outline">
+                            <MoreHorizontal className="size-4" aria-hidden="true" />
+                            Opsi
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              setInvoiceFiles([]);
+                              setDirectPurchaseModal({
+                                purchase: directPurchaseModal.purchase,
+                                mode: "replace-invoice",
+                              });
+                            }}
+                          >
+                            <Pencil className="size-4" aria-hidden="true" />
+                            Ganti Foto/Bon
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    {canUpload ? (
                       <Button
                         type="button"
                         onClick={() => {
@@ -1990,11 +2152,20 @@ export default function LogisticsWorkspace({
                         <Upload className="size-4" aria-hidden="true" />
                         Unggah Nota
                       </Button>
-                    )}
-                  {canReplacePurchaseInvoice &&
-                    canReplaceDirectPurchaseInvoice(
-                      directPurchaseModal.purchase,
-                    ) && (
+                    ) : canReceive ? (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          const target = directPurchaseModal.purchase;
+                          setDirectPurchaseModal(null);
+                          setReceivingFiles([]);
+                          setReceivingPurchase(target);
+                        }}
+                      >
+                        <PackageOpen className="size-4" aria-hidden="true" />
+                        Terima Barang
+                      </Button>
+                    ) : canReplace ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -2007,28 +2178,12 @@ export default function LogisticsWorkspace({
                         }}
                       >
                         <Pencil className="size-4" aria-hidden="true" />
-                        Ganti Foto Invoice/Bon
+                        Ganti Foto/Bon
                       </Button>
-                    )}
-                  {canReceiveDirectPurchase(
-                    directPurchaseModal.purchase,
-                    canCreatePurchaseOrder,
-                  ) && (
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        const target = directPurchaseModal.purchase;
-                        setDirectPurchaseModal(null);
-                        setReceivingFiles([]);
-                        setReceivingPurchase(target);
-                      }}
-                    >
-                      <PackageOpen className="size-4" aria-hidden="true" />
-                      Terima Barang
-                    </Button>
-                  )}
-                </>
-              )
+                    ) : null}
+                  </>
+                );
+              })()
             ) : undefined
           }
         >
@@ -2700,16 +2855,16 @@ export default function LogisticsWorkspace({
 
   // MODE = "logistics" (Tiket Masuk & Overview)
   return (
-    <div className="my-4 space-y-5 pb-12">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="my-2 space-y-4 pb-12 sm:my-4 sm:space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="type-h2 text-foreground">Manajemen Tiket Logistik</h2>
-          <p className="type-p2 mt-1 text-muted-foreground">
+          <p className="type-p3 mt-0.5 text-muted-foreground sm:type-p2 sm:mt-1">
             Pantau permintaan material, status pemenuhan, dan pengiriman.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={exportCsv}>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Button type="button" size="sm" variant="outline" onClick={exportCsv}>
             <Download className="size-4" aria-hidden="true" />
             Export
           </Button>
@@ -2726,7 +2881,7 @@ export default function LogisticsWorkspace({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {stats.map(({ label, value, note, filter, Icon, color, background }) => (
           <button
             key={label}
@@ -2737,17 +2892,21 @@ export default function LogisticsWorkspace({
               setSearch("");
             }}
           >
-            <CardBox className="h-full p-3.5 transition-colors hover:bg-muted/40">
-              <div className="flex items-start justify-between gap-3">
+            <CardBox className="h-full p-3 transition-colors hover:bg-muted/40 sm:p-3.5">
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="type-p3 font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="type-p3 truncate font-medium uppercase tracking-wide text-muted-foreground">
                     {label}
                   </p>
-                  <p className="type-kpi mt-1.5">{value}</p>
-                  <p className="type-p3 mt-1 text-muted-foreground">{note}</p>
+                  <p className="type-kpi mt-1 truncate" title={String(value)}>
+                    {value}
+                  </p>
+                  <p className="type-p3 mt-1 hidden text-muted-foreground sm:block">
+                    {note}
+                  </p>
                 </div>
-                <span className={`shrink-0 rounded-md p-2 ${background} ${color}`}>
-                  <Icon className="size-5" aria-hidden="true" />
+                <span className={`shrink-0 rounded-md p-1.5 sm:p-2 ${background} ${color}`}>
+                  <Icon className="size-4 sm:size-5" aria-hidden="true" />
                 </span>
               </div>
             </CardBox>
@@ -2755,7 +2914,35 @@ export default function LogisticsWorkspace({
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="sm:hidden">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-full justify-between"
+          aria-expanded={mobileChartsOpen}
+          onClick={() => setMobileChartsOpen((prev) => !prev)}
+        >
+          <span className="flex items-center gap-2">
+            <BarChart3 className="size-4 text-primary" aria-hidden="true" />
+            {mobileChartsOpen
+              ? "Sembunyikan Grafik Ringkasan"
+              : "Tampilkan Grafik Ringkasan"}
+          </span>
+          <ChevronDown
+            className={`size-4 transition-transform ${mobileChartsOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </Button>
+      </div>
+
+      <div
+        className={
+          mobileChartsOpen
+            ? "grid gap-4 sm:gap-6 xl:grid-cols-3"
+            : "hidden sm:grid sm:gap-6 xl:grid-cols-3"
+        }
+      >
         <CardBox className="overflow-hidden p-0 xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div>
@@ -2852,10 +3039,10 @@ export default function LogisticsWorkspace({
       </div>
 
       <CardBox className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border px-3.5 py-3 sm:gap-3 sm:px-5 sm:py-4">
           <div>
             <h3 className="type-h3 font-semibold">Pesanan Material</h3>
-            <p className="type-p2 mt-1 text-muted-foreground">
+            <p className="type-p3 mt-0.5 text-muted-foreground sm:type-p2 sm:mt-1">
               Lihat rincian, lacak aktivitas, dan lanjutkan pemenuhan.
             </p>
           </div>
@@ -2887,7 +3074,7 @@ export default function LogisticsWorkspace({
             </Select>
           </div>
         </div>
-        <div className="px-5">
+        <div className="px-2.5 sm:px-5">
           <TicketListing
             tickets={visibleTickets}
             projects={projects}
