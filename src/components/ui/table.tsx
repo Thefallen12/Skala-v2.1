@@ -25,13 +25,34 @@ const TablePaginationContext = React.createContext<TablePaginationState | null>(
   null,
 );
 
-export function getTableRows(children: React.ReactNode): React.ReactNode[] {
-  return React.Children.toArray(children).flatMap((child) => {
+export function getTableRows(
+  children: React.ReactNode,
+  parentKeyPrefix = "",
+): React.ReactNode[] {
+  return React.Children.toArray(children).flatMap((child, index) => {
+    const fragmentKey =
+      React.isValidElement(child) && child.key != null
+        ? String(child.key)
+        : `frag-${index}`;
+    const nextPrefix = parentKeyPrefix
+      ? `${parentKeyPrefix}::${fragmentKey}`
+      : fragmentKey;
+
     if (React.isValidElement(child) && child.type === React.Fragment) {
       return getTableRows(
         (child as React.ReactElement<{ children?: React.ReactNode }>).props
           .children,
+        nextPrefix,
       );
+    }
+
+    if (parentKeyPrefix && React.isValidElement(child)) {
+      const innerKey = child.key != null ? String(child.key) : `row-${index}`;
+      return [
+        React.cloneElement(child, {
+          key: `${parentKeyPrefix}::${innerKey}`,
+        }),
+      ];
     }
 
     return [child];

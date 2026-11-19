@@ -779,32 +779,39 @@ export default function ProjectDetailView({
       if (!res.ok) {
         let message = "Gagal membuat laporan otomatis.";
         try {
-          const payload = (await res.json()) as { message?: string };
-          if (payload?.message) message = payload.message;
+          const payload = (await res.json()) as {
+            message?: string;
+            error?: string;
+          };
+          message = payload?.message || payload?.error || message;
         } catch {
           // ignore non-JSON body
+        }
+        if (res.status === 503 && format === "pdf") {
+          const htmlUrl = url.replace(/([?&])format=pdf\b/i, "$1format=html");
+          window.open(htmlUrl, "_blank", "noopener,noreferrer");
+          toast.error(`${message} Pratinjau cetak HTML dibuka di tab baru.`);
+          return;
         }
         toast.error(message);
         return;
       }
       const blob = await res.blob();
       const objUrl = URL.createObjectURL(blob);
-      try {
-        const disposition = res.headers.get("content-disposition");
-        const utf8Match = disposition?.match(/filename\*=UTF-8''([^;]+)/i);
-        const plainMatch = disposition?.match(/filename="?([^";]+)"?/i);
-        const resolvedName = utf8Match?.[1]
-          ? decodeURIComponent(utf8Match[1])
-          : plainMatch?.[1] || `${type}-${project.code}.${format}`;
-        const link = document.createElement("a");
-        link.href = objUrl;
-        link.download = resolvedName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } finally {
-        URL.revokeObjectURL(objUrl);
-      }
+      const disposition = res.headers.get("content-disposition");
+      const utf8Match = disposition?.match(/filename\*=UTF-8''([^;]+)/i);
+      const plainMatch = disposition?.match(/filename="?([^";]+)"?/i);
+      const resolvedName = utf8Match?.[1]
+        ? decodeURIComponent(utf8Match[1])
+        : plainMatch?.[1] || `${type}-${project.code}.${format}`;
+      const link = document.createElement("a");
+      link.href = objUrl;
+      link.download = resolvedName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
+      toast.success(`Unduhan ${resolvedName} dimulai.`);
     } catch {
       toast.error("Gagal mengunduh laporan otomatis. Periksa koneksi Anda.");
     } finally {

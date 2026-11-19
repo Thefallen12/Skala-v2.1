@@ -363,26 +363,34 @@ export default function DailyReportsHubPanel({
       if (!res.ok) {
         let message = "Gagal membuat dokumen laporan harian.";
         try {
-          const payload = (await res.json()) as { message?: string };
-          if (payload?.message) message = payload.message;
+          const payload = (await res.json()) as {
+            message?: string;
+            error?: string;
+          };
+          message = payload?.message || payload?.error || message;
         } catch {
           // ignore
+        }
+        if (res.status === 503 && format === "pdf") {
+          const htmlUrl = url.replace(/([?&])format=pdf\b/i, "$1format=html");
+          window.open(htmlUrl, "_blank", "noopener,noreferrer");
+          toast.error(`${message} Pratinjau cetak HTML dibuka di tab baru.`);
+          return;
         }
         toast.error(message);
         return;
       }
       const blob = await res.blob();
       const objUrl = URL.createObjectURL(blob);
-      try {
-        const link = document.createElement("a");
-        link.href = objUrl;
-        link.download = `Laporan-Harian-${projectCode}-${date}.${format}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } finally {
-        URL.revokeObjectURL(objUrl);
-      }
+      const filename = `Laporan-Harian-${projectCode}-${date}.${format}`;
+      const link = document.createElement("a");
+      link.href = objUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
+      toast.success(`Unduhan ${filename} dimulai.`);
     } catch {
       toast.error("Gagal mengunduh laporan harian. Periksa koneksi Anda.");
     } finally {

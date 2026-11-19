@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { DocType, SPKStatus } from "@prisma/client";
+import { SPKStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import DocumentValidationViewer, {
   type VerificationDocument,
@@ -62,8 +62,8 @@ function createDocument(
 }
 
 async function loadPurchaseOrder(code: string) {
-  const order = await prisma.purchaseOrder.findUnique({
-    where: { publicCode: code },
+  const order = await prisma.purchaseOrder.findFirst({
+    where: { OR: [{ publicCode: code }, { poNumber: code }, { id: code }] },
     select: {
       publicCode: true,
       poNumber: true,
@@ -78,7 +78,7 @@ async function loadPurchaseOrder(code: string) {
   if (!order) return null;
 
   const isValid = Boolean(order.approvedAt && order.approvedBy);
-  return createDocument("po", code, {
+  return createDocument("po", order.publicCode, {
     type: "PURCHASE ORDER (PO)",
     documentNumber: order.poNumber,
     issueDate: formatDate(order.approvedAt ?? order.createdAt),
@@ -88,7 +88,7 @@ async function loadPurchaseOrder(code: string) {
       ? "Disetujui Direktur/Wakil Direktur · QR tersedia"
       : "Menunggu persetujuan Direktur/Wakil Direktur",
     isValid,
-    previewUrl: `/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(code)}`,
+    previewUrl: `/api/documents/transactions?kind=PO&publicCode=${encodeURIComponent(order.publicCode)}`,
     details: [
       {
         label: "Disetujui Oleh",
@@ -103,8 +103,8 @@ async function loadPurchaseOrder(code: string) {
 }
 
 async function loadDeliveryOrder(code: string) {
-  const order = await prisma.deliveryOrder.findUnique({
-    where: { publicCode: code },
+  const order = await prisma.deliveryOrder.findFirst({
+    where: { OR: [{ publicCode: code }, { doNumber: code }, { id: code }] },
     select: {
       publicCode: true,
       doNumber: true,
@@ -128,7 +128,7 @@ async function loadDeliveryOrder(code: string) {
   if (!order) return null;
 
   const isValid = Boolean(order.publicCode);
-  return createDocument("do", code, {
+  return createDocument("do", order.publicCode, {
     type: "SURAT JALAN (DELIVERY ORDER)",
     documentNumber: order.doNumber,
     issueDate: formatDate(order.signedAt ?? order.createdAt),
@@ -141,7 +141,7 @@ async function loadDeliveryOrder(code: string) {
     createdBy: order.signedBy?.name ?? order.createdBy?.name ?? "Logistik",
     status: "Terverifikasi · QR tersedia",
     isValid,
-    previewUrl: `/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(code)}`,
+    previewUrl: `/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(order.publicCode)}`,
     details: [
       { label: "No. Tiket", value: order.ticket?.ticketNumber ?? "—" },
       {
@@ -156,7 +156,7 @@ async function loadDeliveryOrder(code: string) {
 async function loadMaterialDelivery(code: string) {
   const delivery = await prisma.materialDelivery.findFirst({
     where: {
-      OR: [{ publicCode: code }, { id: code }],
+      OR: [{ publicCode: code }, { id: code }, { doNumber: code }],
     },
     select: {
       id: true,
@@ -197,8 +197,9 @@ async function loadMaterialDelivery(code: string) {
   const vendorFleetLabel =
     [delivery.vehiclePlate, delivery.driverName].filter(Boolean).join(" · ") ||
     "Armada & Mover Vendor Sendiri";
+  const resolvedCode = delivery.publicCode ?? delivery.id;
 
-  return createDocument("sj", code, {
+  return createDocument("sj", resolvedCode, {
     type: "SURAT JALAN MATERIAL ALAM",
     documentNumber: delivery.doNumber,
     issueDate: formatDate(delivery.deliveryDate ?? delivery.createdAt),
@@ -206,9 +207,7 @@ async function loadMaterialDelivery(code: string) {
     createdBy: delivery.receivedBy?.name ?? "Logistik",
     status: "Terverifikasi · Kontrak Payung Material Alam",
     isValid: true,
-    previewUrl: delivery.publicCode
-      ? `/api/documents/transactions?kind=SJ&publicCode=${encodeURIComponent(delivery.publicCode)}`
-      : null,
+    previewUrl: `/api/documents/transactions?kind=SJ&publicCode=${encodeURIComponent(resolvedCode)}`,
     details: [
       { label: "No. Kontrak Payung", value: delivery.contract.contractNumber },
       {
@@ -226,10 +225,13 @@ async function loadMaterialDelivery(code: string) {
 }
 
 async function loadInvoice(code: string) {
-  const invoice = await prisma.invoice.findUnique({
-    where: { publicCode: code },
+  const invoice = await prisma.invoice.findFirst({
+    where: {
+      OR: [{ publicCode: code }, { invoiceNumber: code }, { id: code }],
+    },
     select: {
       id: true,
+      publicCode: true,
       invoiceNumber: true,
       vendorName: true,
       status: true,
@@ -244,7 +246,8 @@ async function loadInvoice(code: string) {
   if (!invoice) return null;
 
   const isValid = Boolean(invoice.signedAt);
-  return createDocument("invoice", code, {
+  const resolvedCode = invoice.publicCode ?? invoice.id;
+  return createDocument("invoice", resolvedCode, {
     type: "INVOICE",
     documentNumber: invoice.invoiceNumber ?? "Tanpa Nomor",
     issueDate: formatDate(invoice.signedAt ?? invoice.createdAt),
@@ -252,11 +255,9 @@ async function loadInvoice(code: string) {
     createdBy: invoice.signedBy?.name ?? "Keuangan",
     status: isValid
       ? "Terverifikasi · QR tersedia"
-      : "QR verifikasi belum tersedia",
+      : "Belum ditandatangani Keuangan",
     isValid,
-    previewUrl: isValid && invoice.acknowledgedAt
-      ? `/api/documents/transactions?kind=INVOICE&publicCode=${encodeURIComponent(code)}`
-      : null,
+    previewUrl: `/api/documents/transactions?kind=INVOICE&publicCode=${encodeURIComponent(resolvedCode)}`,
     details: [
       { label: "Status Pembayaran", value: invoice.status.replaceAll("_", " ") },
       { label: "Total Invoice", value: currency.format(invoice.grandTotal) },
@@ -269,9 +270,13 @@ async function loadInvoice(code: string) {
 }
 
 async function loadOrderConfirmation(code: string) {
-  const order = await prisma.orderConfirmation.findUnique({
-    where: { publicCode: code },
+  const order = await prisma.orderConfirmation.findFirst({
+    where: {
+      OR: [{ publicCode: code }, { koNumber: code }, { id: code }],
+    },
     select: {
+      id: true,
+      publicCode: true,
       koNumber: true,
       paymentType: true,
       paymentAmount: true,
@@ -287,7 +292,8 @@ async function loadOrderConfirmation(code: string) {
   if (!order) return null;
 
   const isValid = Boolean(order.signedAt);
-  return createDocument("ko", code, {
+  const resolvedCode = order.publicCode ?? order.id;
+  return createDocument("ko", resolvedCode, {
     type: "KONFIRMASI ORDER",
     documentNumber: order.koNumber,
     issueDate: formatDate(order.paidAt ?? order.createdAt),
@@ -295,11 +301,9 @@ async function loadOrderConfirmation(code: string) {
     createdBy: order.signedBy?.name ?? "Logistik",
     status: isValid
       ? "Terverifikasi · QR tersedia"
-      : "QR verifikasi belum tersedia",
+      : "Belum ditandatangani Logistik",
     isValid,
-    previewUrl: isValid && order.acknowledgedAt
-      ? `/api/documents/transactions?kind=KO&publicCode=${encodeURIComponent(code)}`
-      : null,
+    previewUrl: `/api/documents/transactions?kind=KO&publicCode=${encodeURIComponent(resolvedCode)}`,
     details: [
       { label: "No. PO", value: order.po.poNumber },
       {
@@ -326,9 +330,12 @@ async function loadConstructionDocument(
   code: string,
 ) {
   if (kind === "spk") {
-    const contract = await prisma.subkonContract.findUnique({
-      where: { publicCode: code },
+    const contract = await prisma.subkonContract.findFirst({
+      where: {
+        OR: [{ publicCode: code }, { contractNumber: code }, { id: code }],
+      },
       select: {
+        publicCode: true,
         contractNumber: true,
         subkonName: true,
         status: true,
@@ -340,7 +347,7 @@ async function loadConstructionDocument(
     });
     if (!contract) return null;
     const isValid = contract.status === SPKStatus.ACTIVE;
-    return createDocument("spk", code, {
+    return createDocument("spk", contract.publicCode, {
       type: "SURAT PERINTAH KERJA (SPK)",
       documentNumber: contract.contractNumber,
       issueDate: formatDate(contract.approvedAt ?? contract.createdAt),
@@ -348,9 +355,7 @@ async function loadConstructionDocument(
       createdBy: contract.approvedBy?.name ?? "—",
       status: isValid ? "Valid" : contract.status.replaceAll("_", " "),
       isValid,
-      previewUrl: isValid
-        ? `/api/documents/construction?publicCode=${encodeURIComponent(code)}`
-        : null,
+      previewUrl: `/api/documents/construction?publicCode=${encodeURIComponent(contract.publicCode)}`,
       details: [
         {
           label: "Proyek",
@@ -360,9 +365,12 @@ async function loadConstructionDocument(
     });
   }
 
-  const bast = await prisma.bASTDocument.findUnique({
-    where: { publicCode: code },
+  const bast = await prisma.bASTDocument.findFirst({
+    where: {
+      OR: [{ publicCode: code }, { bastNumber: code }, { id: code }],
+    },
     select: {
+      publicCode: true,
       bastNumber: true,
       type: true,
       date: true,
@@ -373,7 +381,7 @@ async function loadConstructionDocument(
     },
   });
   if (!bast) return null;
-  return createDocument("bast", code, {
+  return createDocument("bast", bast.publicCode, {
     type: `BERITA ACARA SERAH TERIMA (${bast.type})`,
     documentNumber: bast.bastNumber,
     issueDate: formatDate(bast.approvedAt ?? bast.date),
@@ -381,16 +389,15 @@ async function loadConstructionDocument(
     createdBy: bast.approvedBy?.name ?? "—",
     status: bast.isApproved ? "Valid" : "Belum disetujui",
     isValid: bast.isApproved,
-    previewUrl: bast.isApproved
-      ? `/api/documents/construction?publicCode=${encodeURIComponent(code)}`
-      : null,
+    previewUrl: `/api/documents/construction?publicCode=${encodeURIComponent(bast.publicCode)}`,
   });
 }
 
 async function loadIssuedDocument(code: string) {
-  const issued = await prisma.issuedDocument.findUnique({
-    where: { id: code },
+  const issued = await prisma.issuedDocument.findFirst({
+    where: { OR: [{ id: code }, { documentNumber: code }] },
     select: {
+      id: true,
       documentNumber: true,
       status: true,
       createdAt: true,
@@ -402,10 +409,7 @@ async function loadIssuedDocument(code: string) {
   if (!issued) return null;
 
   const isValid = issued.status === "VALID";
-  const isPdfAvailable =
-    issued.template.type === DocType.PURCHASE_ORDER &&
-    Boolean(issued.relatedRecordId);
-  return createDocument("issued", code, {
+  return createDocument("issued", issued.id, {
     type: issued.template.type.replaceAll("_", " "),
     documentNumber: issued.documentNumber,
     issueDate: formatDate(issued.createdAt),
@@ -413,8 +417,8 @@ async function loadIssuedDocument(code: string) {
     createdBy: issued.issuer.name,
     status: isValid ? "Valid" : "Dicabut",
     isValid,
-    previewUrl: isValid && isPdfAvailable
-      ? `/api/documents/issued/${encodeURIComponent(code)}/pdf`
+    previewUrl: Boolean(issued.relatedRecordId)
+      ? `/api/documents/issued/${encodeURIComponent(issued.id)}/pdf`
       : null,
   });
 }
@@ -435,9 +439,16 @@ export default async function DocumentVerificationPage({
     "bast",
     "issued",
   ];
+  let decodedCode: string;
+  try {
+    decodedCode = decodeURIComponent(code).trim();
+  } catch {
+    decodedCode = code.trim();
+  }
   if (
     !kinds.includes(rawKind as VerificationDocumentKind) ||
-    !/^[a-zA-Z0-9_-]{1,128}$/.test(code)
+    !decodedCode ||
+    decodedCode.length > 128
   ) {
     notFound();
   }
@@ -445,18 +456,18 @@ export default async function DocumentVerificationPage({
   const kind = rawKind as VerificationDocumentKind;
   const document =
     kind === "po"
-      ? await loadPurchaseOrder(code)
+      ? await loadPurchaseOrder(decodedCode)
       : kind === "do"
-        ? await loadDeliveryOrder(code)
+        ? await loadDeliveryOrder(decodedCode)
         : kind === "sj"
-          ? await loadMaterialDelivery(code)
+          ? await loadMaterialDelivery(decodedCode)
           : kind === "invoice"
-            ? await loadInvoice(code)
+            ? await loadInvoice(decodedCode)
             : kind === "ko"
-              ? await loadOrderConfirmation(code)
+              ? await loadOrderConfirmation(decodedCode)
               : kind === "spk" || kind === "bast"
-                ? await loadConstructionDocument(kind, code)
-                : await loadIssuedDocument(code);
+                ? await loadConstructionDocument(kind, decodedCode)
+                : await loadIssuedDocument(decodedCode);
 
   if (!document) notFound();
   return <DocumentValidationViewer document={document} />;

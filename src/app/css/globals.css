@@ -688,10 +688,78 @@ input[type="number"]::-webkit-outer-spin-button {
 @media print {
   @page {
     size: A4;
+    margin: 10mm;
+  }
+
+  @page orderSheet {
+    size: A4;
     margin: 0;
   }
 
-  body * {
+  @page dinasA4Sheet {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  body:has(.order-print-template) {
+    page: orderSheet;
+  }
+
+  body:has(.dinas-a4-print-sheet) {
+    page: dinasA4Sheet;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body:has(.dinas-a4-print-sheet)
+    *:not(.dinas-a4-print-sheet):not(.dinas-a4-print-sheet *):not(:has(.dinas-a4-print-sheet)) {
+    display: none !important;
+  }
+
+  body:has(.dinas-a4-print-sheet) *:has(.dinas-a4-print-sheet) {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .dinas-a4-print-sheet {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+  }
+
+  .dinas-a4-print-sheet table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .dinas-a4-print-sheet thead {
+    display: table-header-group !important;
+  }
+
+  .dinas-a4-print-sheet tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  body:has(.order-print-template) * {
     visibility: hidden;
   }
 
@@ -723,6 +791,37 @@ input[type="number"]::-webkit-outer-spin-button {
     break-inside: avoid;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  body:not(:has(.order-print-template)) {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body:not(:has(.order-print-template)) aside,
+  body:not(:has(.order-print-template)) .page-wrapper > div:has(aside),
+  body:not(:has(.order-print-template)) .body-wrapper > header,
+  body:not(:has(.order-print-template)) .body-wrapper > nav,
+  body:not(:has(.order-print-template)) header[data-slot="app-header"],
+  body:not(:has(.order-print-template)) [data-slot="sidebar"],
+  body:not(:has(.order-print-template)) .print\:hidden {
+    display: none !important;
+  }
+
+  body:not(:has(.order-print-template)) .page-wrapper,
+  body:not(:has(.order-print-template)) .body-wrapper,
+  body:not(:has(.order-print-template)) main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  body:not(:has(.order-print-template)) .overflow-x-auto,
+  body:not(:has(.order-print-template)) [data-slot="table-container"] {
+    overflow: visible !important;
   }
 }
 

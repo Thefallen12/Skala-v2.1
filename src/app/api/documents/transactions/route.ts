@@ -18,7 +18,6 @@ import {
 } from "@/lib/documents/public-app-url";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import { renderPdf } from "@/lib/documents/render-pdf";
-import { isValidPublicCode } from "@/lib/documents/random-code";
 import {
   documentVerificationPath,
   type VerificationDocumentKind,
@@ -669,7 +668,7 @@ async function loadDocument(
     const delivery = await prisma.materialDelivery.findFirst({
       where: recordId
         ? { OR: [{ id: recordId }, { publicCode: recordId }] }
-        : { publicCode },
+        : { OR: [{ publicCode }, { id: publicCode }] },
       select: {
         id: true,
         publicCode: true,
@@ -788,8 +787,10 @@ async function loadDocument(
   }
 
   if (kind === "INVOICE") {
-    const invoice = await prisma.invoice.findUnique({
-      where: publicCode ? { publicCode } : { id: recordId },
+    const invoice = await prisma.invoice.findFirst({
+      where: publicCode
+        ? { OR: [{ publicCode }, { id: publicCode }] }
+        : { id: recordId },
       select: {
         invoiceNumber: true,
         vendorName: true,
@@ -892,7 +893,7 @@ async function loadDocument(
         ...(recordId
           ? [{ id: recordId }, { paymentTransactionId: recordId }]
           : []),
-        ...(publicCode ? [{ publicCode }] : []),
+        ...(publicCode ? [{ publicCode }, { id: publicCode }] : []),
       ],
     },
     select: {
@@ -1098,17 +1099,13 @@ export async function GET(request: NextRequest) {
   const publicCode = request.nextUrl.searchParams.get("publicCode") ?? "";
   const previewOnly = request.nextUrl.searchParams.get("preview") === "1";
   const htmlPreview = request.nextUrl.searchParams.get("format") === "html";
+  const isValidCodeParam = (value: string) =>
+    value.length > 0 && value.length <= 128;
   if (
     !kind ||
     (!previewOnly &&
-      (kind === "PO" || kind === "DO"
-        ? !publicCode
-        : kind === "SJ"
-          ? !recordId && (!publicCode || !isValidPublicCode(publicCode))
-          : !recordId &&
-            (!publicCode ||
-              !["INVOICE", "KO"].includes(kind) ||
-              !isValidPublicCode(publicCode))))
+      !isValidCodeParam(recordId) &&
+      !isValidCodeParam(publicCode))
   ) {
     return NextResponse.json({ message: "Jenis atau nomor dokumen tidak valid." }, { status: 400 });
   }
@@ -1120,19 +1117,19 @@ export async function GET(request: NextRequest) {
     publicCode &&
     (kind === "INVOICE" || kind === "KO")
   ) {
-    const signedRecord =
+    const existingRecord =
       kind === "INVOICE"
-        ? await prisma.invoice.findUnique({
-            where: { publicCode },
-            select: { signedAt: true, acknowledgedAt: true },
+        ? await prisma.invoice.findFirst({
+            where: { OR: [{ publicCode }, { id: publicCode }] },
+            select: { id: true },
           })
-        : await prisma.orderConfirmation.findUnique({
-            where: { publicCode },
-            select: { signedAt: true, acknowledgedAt: true },
+        : await prisma.orderConfirmation.findFirst({
+            where: { OR: [{ publicCode }, { id: publicCode }] },
+            select: { id: true },
           });
-    if (!signedRecord?.signedAt || !signedRecord.acknowledgedAt) {
+    if (!existingRecord) {
       return NextResponse.json(
-        { message: "Dokumen belum ditandatangani lengkap atau tidak ditemukan." },
+        { message: "Dokumen tidak ditemukan." },
         { status: 404 },
       );
     }
@@ -1226,8 +1223,16 @@ export async function GET(request: NextRequest) {
       kind === "SJ"
         ? renderedHtml.replace("<strong>NO. DO:", "<strong>NO. SJ:")
         : renderedHtml;
+    const wantDownload = request.nextUrl.searchParams.get("download") === "1";
+    const printableHtml = wantDownload
+      ? documentHtml.replace(
+          /<\/body>/i,
+          `<script>window.addEventListener("load",function(){try{window.print();}catch(_e){}});</script></body>`,
+        )
+      : documentHtml;
+
     if (previewOnly || htmlPreview) {
-      return new NextResponse(documentHtml, {
+      return new NextResponse(printableHtml, {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "private, no-store",
@@ -1236,19 +1241,27 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const pdf = await renderPdf(documentHtml);
-    const disposition =
-      request.nextUrl.searchParams.get("download") === "1"
-        ? "attachment"
-        : "inline";
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `${disposition}; filename="${encodeURIComponent(document.number)}.pdf"`,
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    try {
+      const pdf = await renderPdf(documentHtml);
+      const disposition = wantDownload ? "attachment" : "inline";
+      return new NextResponse(pdf, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `${disposition}; filename="${encodeURIComponent(document.number)}.pdf"`,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    } catch (pdfError) {
+      console.error("Transaction PDF rendering failed, falling back to HTML:", pdfError);
+      return new NextResponse(printableHtml, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
   } catch (error) {
     console.error("Universal transaction document rendering failed:", error);
     return NextResponse.json(

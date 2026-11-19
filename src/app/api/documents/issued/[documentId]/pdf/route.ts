@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DocType, TicketType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   generateDocument,
+  type DocumentData,
   type DocumentLineItem,
 } from "@/lib/documents/generate-document";
+import {
+  getRequestOrigin,
+  resolvePublicAppUrl,
+} from "@/lib/documents/public-app-url";
 import { getDocumentHeaderLogoDataUrl } from "@/lib/documents/qr-code";
 import { renderPdf } from "@/lib/documents/render-pdf";
 import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
@@ -18,6 +22,14 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 export async function GET(
@@ -34,89 +46,226 @@ export async function GET(
       templateId: true,
       relatedRecordId: true,
       issuedById: true,
-      template: { select: { type: true } },
-    },
-  });
-  if (
-    !issued ||
-    issued.status !== "VALID" ||
-    issued.template.type !== DocType.PURCHASE_ORDER ||
-    !issued.relatedRecordId
-  ) {
-    return NextResponse.json(
-      { message: "Dokumen PDF tidak ditemukan atau sudah tidak valid." },
-      { status: 404 },
-    );
-  }
-
-  const ticket = await prisma.ticket.findFirst({
-    where: {
-      id: issued.relatedRecordId,
-      type: TicketType.MATERIAL,
-    },
-    select: {
-      ticketNumber: true,
-      title: true,
       createdAt: true,
-      totalAmount: true,
-      requester: { select: { name: true } },
-      project: {
-        select: { title: true, vendor: true, clientName: true, location: true },
-      },
-      items: {
-        select: {
-          itemName: true,
-          quantity: true,
-          unit: true,
-          estimatedCost: true,
-        },
-        orderBy: { id: "asc" },
-      },
+      template: { select: { id: true, name: true, type: true } },
     },
   });
-  const template = await prisma.documentTemplate.findUnique({
-    where: { id: issued.templateId },
-    select: { id: true, type: true },
-  });
-  if (!ticket || !template || template.type !== DocType.PURCHASE_ORDER) {
+  if (!issued || issued.status !== "VALID") {
     return NextResponse.json(
-      { message: "Data pembentuk Purchase Order tidak lagi tersedia." },
+      { message: "Dokumen tidak ditemukan atau sudah dicabut." },
       { status: 404 },
     );
   }
 
-  try {
-    const headerLogoDataUrl = await getDocumentHeaderLogoDataUrl();
-    const currency = (amount: number) =>
-      new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0,
-      }).format(amount);
-    const generated = await generateDocument(
-      template.id,
-      {
+  let documentData: DocumentData | null = null;
+  if (issued.relatedRecordId) {
+    const [purchaseOrder, deliveryOrder, ticket] = await Promise.all([
+      prisma.purchaseOrder.findUnique({
+        where: { id: issued.relatedRecordId },
+        select: {
+          poNumber: true,
+          vendorName: true,
+          paymentTerms: true,
+          createdAt: true,
+          vendor: { select: { name: true, address: true, phone: true, email: true } },
+          project: { select: { title: true, clientName: true, vendor: true, location: true } },
+          ticket: {
+            select: {
+              ticketNumber: true,
+              title: true,
+              createdAt: true,
+              requester: { select: { name: true } },
+              project: { select: { title: true, clientName: true, vendor: true, location: true } },
+            },
+          },
+          items: {
+            orderBy: { id: "asc" },
+            select: {
+              itemName: true,
+              quantity: true,
+              unit: true,
+              unitPrice: true,
+              totalPrice: true,
+            },
+          },
+        },
+      }),
+      prisma.deliveryOrder.findUnique({
+        where: { id: issued.relatedRecordId },
+        select: {
+          doNumber: true,
+          deliveryMethod: true,
+          vehicleDocumentNumber: true,
+          vehiclePlate: true,
+          vehiclePlateNumber: true,
+          driverName: true,
+          receiverName: true,
+          receivedAt: true,
+          createdAt: true,
+          createdBy: { select: { name: true } },
+          ticket: {
+            select: {
+              ticketNumber: true,
+              title: true,
+              requester: { select: { name: true } },
+              project: { select: { title: true, clientName: true, vendor: true, location: true } },
+            },
+          },
+          po: {
+            select: {
+              poNumber: true,
+              vendorName: true,
+              vendor: { select: { name: true, address: true, phone: true } },
+            },
+          },
+          items: {
+            orderBy: { id: "asc" },
+            select: {
+              itemCode: true,
+              itemName: true,
+              qtyOrdered: true,
+              qtyDelivered: true,
+              unit: true,
+              remarks: true,
+            },
+          },
+        },
+      }),
+      prisma.ticket.findUnique({
+        where: { id: issued.relatedRecordId },
+        select: {
+          ticketNumber: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          totalAmount: true,
+          requestedAmount: true,
+          recipientName: true,
+          requester: { select: { name: true } },
+          project: { select: { title: true, vendor: true, clientName: true, location: true } },
+          items: {
+            select: {
+              itemName: true,
+              quantity: true,
+              unit: true,
+              estimatedCost: true,
+            },
+            orderBy: { id: "asc" },
+          },
+        },
+      }),
+    ]);
+
+    if (purchaseOrder) {
+      const total = purchaseOrder.items.reduce(
+        (sum, item) => sum + item.totalPrice,
+        0,
+      );
+      const site = purchaseOrder.ticket?.project ?? purchaseOrder.project;
+      documentData = {
+        nomor_request: purchaseOrder.ticket?.ticketNumber ?? purchaseOrder.poNumber,
+        judul_request: purchaseOrder.ticket?.title ?? purchaseOrder.poNumber,
+        nama_requester: purchaseOrder.ticket?.requester.name ?? "—",
+        nama_proyek: site?.title ?? "—",
+        nama_klien: site?.clientName ?? "—",
+        total_biaya: formatCurrency(total),
+        diskon: "—",
+        pajak: "—",
+        tanggal: purchaseOrder.createdAt,
+        tanggal_spk: purchaseOrder.ticket?.createdAt ?? purchaseOrder.createdAt,
+        due_date: purchaseOrder.paymentTerms ?? "—",
+        nama_vendor:
+          purchaseOrder.vendor?.name ?? site?.vendor ?? purchaseOrder.vendorName,
+        alamat_vendor: purchaseOrder.vendor?.address ?? "—",
+        kontak_vendor:
+          purchaseOrder.vendor?.phone ?? purchaseOrder.vendor?.email ?? "—",
+        lokasi_pengiriman: site?.location ?? "—",
+        catatan: purchaseOrder.ticket?.title ?? purchaseOrder.poNumber,
+        items: purchaseOrder.items.map(
+          (item): DocumentLineItem => ({
+            description: item.itemName,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: formatCurrency(item.unitPrice),
+            amount: formatCurrency(item.totalPrice),
+          }),
+        ),
+      };
+    } else if (deliveryOrder) {
+      documentData = {
+        nomor_surat_jalan: deliveryOrder.doNumber,
+        nomor_request:
+          deliveryOrder.ticket?.ticketNumber ??
+          deliveryOrder.po?.poNumber ??
+          deliveryOrder.doNumber,
+        judul_request: deliveryOrder.ticket?.title ?? deliveryOrder.doNumber,
+        tanggal: deliveryOrder.createdAt,
+        tanggal_pengiriman: deliveryOrder.receivedAt ?? deliveryOrder.createdAt,
+        nama_pengirim: deliveryOrder.createdBy?.name ?? "Logistik",
+        nama_penerima:
+          deliveryOrder.receiverName ??
+          deliveryOrder.ticket?.requester.name ??
+          "—",
+        nama_vendor:
+          deliveryOrder.po?.vendor?.name ??
+          deliveryOrder.po?.vendorName ??
+          deliveryOrder.ticket?.project?.vendor ??
+          "—",
+        alamat_vendor: deliveryOrder.po?.vendor?.address ?? "—",
+        kontak_vendor: deliveryOrder.po?.vendor?.phone ?? "—",
+        nama_proyek: deliveryOrder.ticket?.project?.title ?? "—",
+        nama_klien: deliveryOrder.ticket?.project?.clientName ?? "—",
+        lokasi_pengiriman: deliveryOrder.ticket?.project?.location ?? "—",
+        catatan: [
+          deliveryOrder.deliveryMethod,
+          deliveryOrder.vehiclePlateNumber ?? deliveryOrder.vehiclePlate
+            ? `Kendaraan: ${deliveryOrder.vehiclePlateNumber ?? deliveryOrder.vehiclePlate}`
+            : "",
+          deliveryOrder.driverName ? `Pengemudi: ${deliveryOrder.driverName}` : "",
+          deliveryOrder.vehicleDocumentNumber
+            ? `No. dokumen kendaraan: ${deliveryOrder.vehicleDocumentNumber}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        items: deliveryOrder.items.map(
+          (item): DocumentLineItem => ({
+            itemCode: item.itemCode,
+            description: item.itemName,
+            quantity: item.qtyDelivered || item.qtyOrdered,
+            unit: item.unit,
+            notes: item.remarks ?? "",
+            unitPrice: "—",
+            amount: "—",
+          }),
+        ),
+      };
+    } else if (ticket) {
+      const total =
+        ticket.totalAmount !== null
+          ? decimalNumberFromScaledInteger(ticket.totalAmount)
+          : ticket.requestedAmount ?? 0;
+      documentData = {
         nomor_request: ticket.ticketNumber,
         judul_request: ticket.title,
         nama_requester: ticket.requester.name,
         nama_proyek: ticket.project?.title ?? "—",
         nama_klien: ticket.project?.clientName ?? "—",
-        total_biaya: ticket.totalAmount
-          ? currency(decimalNumberFromScaledInteger(ticket.totalAmount))
-          : "—",
+        total_biaya: total > 0 ? formatCurrency(total) : "—",
         diskon: "—",
         pajak: "—",
         tanggal: ticket.createdAt,
         tanggal_spk: ticket.createdAt,
         due_date: "—",
-        nama_vendor: ticket.project?.vendor ?? "Belum ditentukan",
+        nama_vendor: ticket.project?.vendor ?? ticket.recipientName ?? "—",
         alamat_vendor: "—",
         kontak_vendor: "—",
         lokasi_pengiriman:
           ticket.project?.location ??
           ticket.project?.title ??
           "Sesuai koordinasi proyek",
-        catatan: ticket.title,
+        catatan: ticket.description ?? ticket.title,
+        nama_penerima: ticket.recipientName ?? "—",
         items: ticket.items.map((item): DocumentLineItem => {
           const unitPrice =
             item.estimatedCost === null
@@ -126,17 +275,37 @@ export async function GET(
             description: item.itemName,
             quantity: item.quantity,
             unit: item.unit,
-            unitPrice: item.estimatedCost ? currency(unitPrice) : "—",
-            amount: item.estimatedCost
-              ? currency(unitPrice * item.quantity)
-              : "—",
+            unitPrice: item.estimatedCost !== null ? formatCurrency(unitPrice) : "—",
+            amount:
+              item.estimatedCost !== null
+                ? formatCurrency(unitPrice * item.quantity)
+                : "—",
           };
         }),
-      },
+      };
+    }
+  }
+
+  if (!documentData) {
+    return NextResponse.json(
+      { message: "Data pembentuk dokumen terbit tidak lagi tersedia." },
+      { status: 404 },
+    );
+  }
+
+  try {
+    const headerLogoDataUrl = await getDocumentHeaderLogoDataUrl();
+    const verificationBaseUrl = (
+      resolvePublicAppUrl(getRequestOrigin(request.headers)) ??
+      new URL(request.nextUrl.origin)
+    ).toString();
+    const generated = await generateDocument(
+      issued.template.id,
+      documentData,
       {
         issuedById: issued.issuedById,
-        relatedRecordId: issued.relatedRecordId,
-        verificationBaseUrl: request.nextUrl.origin,
+        relatedRecordId: issued.relatedRecordId ?? undefined,
+        verificationBaseUrl,
         existingIssuedDocumentId: issued.id,
       },
     );
@@ -161,18 +330,49 @@ export async function GET(
           ${generated.html}
         </body>
       </html>`;
-    const pdf = await renderPdf(html);
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `${request.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline"}; filename="${encodeURIComponent(issued.documentNumber)}.pdf"`,
-        "Cache-Control": "private, no-store",
-      },
-    });
+
+    const htmlPreview = request.nextUrl.searchParams.get("format") === "html";
+    const wantDownload = request.nextUrl.searchParams.get("download") === "1";
+    const printableHtml = wantDownload
+      ? html.replace(
+          /<\/body>/i,
+          `<script>window.addEventListener("load",function(){try{window.print();}catch(_e){}});</script></body>`,
+        )
+      : html;
+
+    if (htmlPreview) {
+      return new NextResponse(printableHtml, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    try {
+      const pdf = await renderPdf(html);
+      return new NextResponse(pdf, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `${wantDownload ? "attachment" : "inline"}; filename="${encodeURIComponent(issued.documentNumber)}.pdf"`,
+          "Cache-Control": "private, no-store",
+        },
+      });
+    } catch (pdfError) {
+      console.error("Issued document PDF rendering failed, falling back to HTML:", pdfError);
+      return new NextResponse(printableHtml, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
   } catch (error) {
-    console.error("Issued Purchase Order PDF preview failed:", error);
+    console.error("Issued document preview failed:", error);
     return NextResponse.json(
-      { message: "Pratinjau PDF PO gagal dibuat. Silakan coba kembali." },
+      { message: "Pratinjau dokumen gagal dibuat. Silakan coba kembali." },
       { status: 500 },
     );
   }

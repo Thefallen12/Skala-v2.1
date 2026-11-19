@@ -10,6 +10,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 
 export type VerificationDocument = {
   kind: string;
@@ -33,6 +34,9 @@ export default function DocumentValidationViewer({
 }) {
   const downloadUrl = document.previewUrl
     ? `${document.previewUrl}${document.previewUrl.includes("?") ? "&" : "?"}download=1`
+    : null;
+  const fullHtmlPreviewUrl = document.previewUrl
+    ? `${document.previewUrl}${document.previewUrl.includes("?") ? "&" : "?"}format=html`
     : null;
 
   return (
@@ -116,32 +120,39 @@ export default function DocumentValidationViewer({
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-5 sm:px-6 lg:grid-cols-[1fr_1fr] lg:gap-5 lg:px-8">
         <article className="flex min-h-[390px] flex-col rounded-lg border border-slate-200 bg-white p-3 shadow-md sm:min-h-[470px] sm:p-4">
-          <h2 className="!text-slate-950 text-sm font-bold sm:text-base">
-            PRATINJAU DOKUMEN
-          </h2>
-          <p className="text-[11px] leading-tight text-slate-500">
-            DOCUMENT PREVIEW
-          </p>
-          <div className="relative mt-2 flex min-h-[330px] flex-1 items-center justify-center overflow-hidden rounded-md bg-slate-100 sm:min-h-[405px]">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="!text-slate-950 text-sm font-bold sm:text-base">
+                PRATINJAU DOKUMEN
+              </h2>
+              <p className="text-[11px] leading-tight text-slate-500">
+                DOCUMENT PREVIEW
+              </p>
+            </div>
+            {fullHtmlPreviewUrl && (
+              <a
+                href={fullHtmlPreviewUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Buka pratinjau dokumen ukuran penuh"
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100"
+              >
+                <Maximize2 className="size-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">Layar Penuh</span>
+              </a>
+            )}
+          </div>
+          <div className="mt-2 flex min-h-[330px] flex-1 flex-col overflow-hidden rounded-md bg-slate-100 sm:min-h-[405px]">
             {document.previewUrl ? (
-              <>
-                <iframe
-                  src={document.previewUrl}
-                  title={`Pratinjau ${document.documentNumber}`}
-                  className="absolute inset-0 size-full border-0 bg-slate-200"
-                />
-                <a
-                  href={document.previewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Buka pratinjau dokumen ukuran penuh"
-                  className="absolute right-2 top-2 rounded-md bg-slate-900/70 p-2 text-white shadow hover:bg-slate-900"
-                >
-                  <Maximize2 className="size-4" aria-hidden="true" />
-                </a>
-              </>
+              <UniversalDocumentPreview
+                title={`Pratinjau ${document.documentNumber}`}
+                documentNumber={document.documentNumber}
+                toolbarLabel={document.type}
+                src={document.previewUrl}
+                minimalToolbar
+              />
             ) : (
-              <div className="max-w-sm px-6 text-center text-sm text-slate-500">
+              <div className="m-auto max-w-sm px-6 text-center text-sm text-slate-500">
                 Pratinjau dokumen belum tersedia. Informasi verifikasi tetap
                 ditampilkan pada halaman ini.
               </div>

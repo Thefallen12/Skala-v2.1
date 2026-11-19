@@ -749,6 +749,16 @@ export default function POEditForm({
             {currentApprovalTime ? `Disetujui pada ${currentApprovalTime}. ` : ""}
             Verifikasi publik tersedia melalui QR ini.
           </p>
+          {publicCode && (
+            <a
+              className="type-p3 font-medium text-primary underline underline-offset-4"
+              href={`/verify/result/po/${encodeURIComponent(publicCode)}`}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Buka halaman hasil verifikasi QR
+            </a>
+          )}
         </Card>
       )}
 

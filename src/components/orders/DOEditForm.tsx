@@ -1052,14 +1052,24 @@ export default function DOEditForm({
             Pindai QR untuk membuka tampilan dokumen Delivery Order.
           </p>
           {publicCode && (
-            <a
-              className="type-p3 font-medium text-primary underline underline-offset-4"
-              href={`/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(publicCode)}&format=html`}
-              rel="noreferrer"
-              target="_blank"
-            >
-              Buka tampilan dokumen DO
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <a
+                className="type-p3 font-medium text-primary underline underline-offset-4"
+                href={`/verify/result/do/${encodeURIComponent(publicCode)}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Buka hasil verifikasi QR
+              </a>
+              <a
+                className="type-p3 font-medium text-primary underline underline-offset-4"
+                href={`/api/documents/transactions?kind=DO&publicCode=${encodeURIComponent(publicCode)}&format=html`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Buka tampilan dokumen DO
+              </a>
+            </div>
           )}
         </Card>
       )}

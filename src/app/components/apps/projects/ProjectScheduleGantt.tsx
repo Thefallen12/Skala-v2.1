@@ -690,18 +690,18 @@ export default function ProjectScheduleGantt({
         ];
       }),
     ];
-    const csvContent =
-      "data:text/csv;charset=utf-8," + rows.map((e) => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvString = "\uFEFF" + rows.map((e) => e.join(",")).join("\r\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const objUrl = URL.createObjectURL(blob);
+    const filename = `jadwal_${selectedProject.code || "proyek"}.csv`;
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `jadwal_${selectedProject.code || "proyek"}.csv`,
-    );
+    link.href = objUrl;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
+    toast.success(`Unduhan ${filename} dimulai.`);
   };
 
   const handleUpdateBaseline = () => {

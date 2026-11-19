@@ -17,6 +17,7 @@ import {
   Search,
   Wrench,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -413,18 +414,18 @@ export default function ProjectFundRecapTab({
       ]);
     }
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," + rows.map((e) => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvString = "\uFEFF" + rows.map((e) => e.join(",")).join("\r\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const objUrl = URL.createObjectURL(blob);
+    const filename = `rekap_dana_${projectCode || "proyek"}.csv`;
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `rekap_dana_${projectCode || "proyek"}.csv`,
-    );
+    link.href = objUrl;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
+    toast.success(`Unduhan ${filename} dimulai.`);
   };
 
   const categoryCards: Array<{

@@ -1,28 +1,30 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
 import {
+  ArrowLeft,
   Briefcase,
   Building2,
-  Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
-  Eye,
   FileSpreadsheet,
   FileText,
   Filter,
   Image as ImageIcon,
-  Info,
   Landmark,
   Layers,
+  Link2,
   Loader2,
   Maximize2,
   Printer,
+  RotateCcw,
+  RotateCw,
   Search,
+  SlidersHorizontal,
   Sparkles,
   UserCheck,
   X,
@@ -55,6 +57,7 @@ import {
   DINAS_PROJECTS_DATA,
   DINAS_REPORT_METADATA,
 } from "@/lib/dinas-report-data";
+import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
 import {
   calculatePlannedSCurveProgress,
   toJakartaDateKey,
@@ -69,6 +72,165 @@ import { cn } from "@/lib/utils";
 
 type ReportViewMode = "portfolio_live" | "dinas_preset";
 type DinasTabType = "rekapitulasi" | "rincian_sid" | "database_spk";
+
+export type PhotoStageKey = "0%" | "50%" | "100%" | "Prasasti";
+export type PhotoAutoAdaptMode =
+  | "smart_chronological"
+  | "distribute_all_4"
+  | "strict_threshold";
+
+export const PHOTO_STAGE_META: ReadonlyArray<{
+  key: PhotoStageKey;
+  shortLabel: string;
+  fullLabel: string;
+  desc: string;
+}> = [
+  {
+    key: "0%",
+    shortLabel: "0%",
+    fullLabel: "Kondisi Titik Nol (0%)",
+    desc: "Kondisi awal / sebelum pekerjaan fisik",
+  },
+  {
+    key: "50%",
+    shortLabel: "50%",
+    fullLabel: "Kondisi Pelaksanaan (50%)",
+    desc: "Sedang dikerjakan di lapangan",
+  },
+  {
+    key: "100%",
+    shortLabel: "100%",
+    fullLabel: "Kondisi Akhir Selesai (100%)",
+    desc: "Fisik selesai penuh 100%",
+  },
+  {
+    key: "Prasasti",
+    shortLabel: "Prasasti",
+    fullLabel: "Batu Prasasti / BAST",
+    desc: "Foto batu prasasti & serah terima",
+  },
+];
+
+const PHOTO_ADJUSTMENTS_STORAGE_KEY =
+  "skala_dinas_sid_photo_adjustments_v1";
+const PHOTO_AUTO_MODE_STORAGE_KEY = "skala_dinas_sid_photo_auto_mode_v1";
+
+const EMPTY_ADJUSTMENTS_STORE: PhotoAdjustmentsStore = {};
+let adjustmentsCache: PhotoAdjustmentsStore | null = null;
+let autoModeCache: PhotoAutoAdaptMode | null = null;
+const photoSettingsListeners = new Set<() => void>();
+
+function notifyPhotoSettingsChanged() {
+  for (const listener of photoSettingsListeners) listener();
+}
+
+function subscribePhotoSettings(listener: () => void) {
+  photoSettingsListeners.add(listener);
+  const onStorage = (e: StorageEvent) => {
+    if (
+      e.key === PHOTO_ADJUSTMENTS_STORAGE_KEY ||
+      e.key === PHOTO_AUTO_MODE_STORAGE_KEY
+    ) {
+      adjustmentsCache = null;
+      autoModeCache = null;
+      listener();
+    }
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", onStorage);
+  }
+  return () => {
+    photoSettingsListeners.delete(listener);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("storage", onStorage);
+    }
+  };
+}
+
+function getAdjustmentsSnapshot(): PhotoAdjustmentsStore {
+  if (typeof window === "undefined") return EMPTY_ADJUSTMENTS_STORE;
+  if (adjustmentsCache) return adjustmentsCache;
+  try {
+    const raw = window.localStorage.getItem(PHOTO_ADJUSTMENTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as PhotoAdjustmentsStore;
+      if (parsed && typeof parsed === "object") {
+        adjustmentsCache = parsed;
+        return adjustmentsCache;
+      }
+    }
+  } catch {
+    // ignore malformed storage
+  }
+  adjustmentsCache = EMPTY_ADJUSTMENTS_STORE;
+  return adjustmentsCache;
+}
+
+function getAdjustmentsServerSnapshot(): PhotoAdjustmentsStore {
+  return EMPTY_ADJUSTMENTS_STORE;
+}
+
+function getAutoModeSnapshot(): PhotoAutoAdaptMode {
+  if (typeof window === "undefined") return "smart_chronological";
+  if (autoModeCache) return autoModeCache;
+  try {
+    const raw = window.localStorage.getItem(PHOTO_AUTO_MODE_STORAGE_KEY);
+    if (
+      raw === "smart_chronological" ||
+      raw === "distribute_all_4" ||
+      raw === "strict_threshold"
+    ) {
+      autoModeCache = raw;
+      return autoModeCache;
+    }
+  } catch {
+    // ignore malformed storage
+  }
+  autoModeCache = "smart_chronological";
+  return autoModeCache;
+}
+
+function getAutoModeServerSnapshot(): PhotoAutoAdaptMode {
+  return "smart_chronological";
+}
+
+function persistAutoMode(mode: PhotoAutoAdaptMode) {
+  autoModeCache = mode;
+  try {
+    window.localStorage.setItem(PHOTO_AUTO_MODE_STORAGE_KEY, mode);
+  } catch {
+    // ignore storage errors
+  }
+  notifyPhotoSettingsChanged();
+}
+
+function persistPhotoAdjustments(next: PhotoAdjustmentsStore) {
+  adjustmentsCache = next;
+  try {
+    window.localStorage.setItem(
+      PHOTO_ADJUSTMENTS_STORAGE_KEY,
+      JSON.stringify(next),
+    );
+  } catch {
+    // ignore storage errors
+  }
+  notifyPhotoSettingsChanged();
+}
+
+export type PhotoVisualSettings = {
+  rotation?: number;
+  fit?: "cover" | "contain";
+};
+
+export type PoktanPhotoAdjustment = {
+  linkedProjectId?: string;
+  stageOverrides?: Partial<Record<PhotoStageKey, string[]>>;
+  photoStageMap?: Record<string, PhotoStageKey[]>;
+  photoWorkItemMap?: Record<string, string>;
+  photoVisualMap?: Record<string, PhotoVisualSettings>;
+};
+
+export type PhotoAdjustmentsStore = Record<number, PoktanPhotoAdjustment>;
 
 export type DinasProjectProgressSource = {
   id?: string;
@@ -91,9 +253,18 @@ export type DinasProjectProgressSource = {
   vendor?: string | null;
   reports?: Array<{
     id?: string;
-    reportDate: string;
+    reportDate: string | Date;
     progress?: number | null;
     workSummary?: string | null;
+    weather?: string | null;
+    workersCount?: number | null;
+    notes?: string | null;
+    workPointId?: string | null;
+    photoUrls?: string[];
+    progressPhotos?: Array<{
+      url?: string | null;
+      fileUrl?: string | null;
+    }>;
   }>;
   dailyReports?: Array<{
     id?: string;
@@ -103,6 +274,8 @@ export type DinasProjectProgressSource = {
     weather?: string | null;
     workersCount?: number | null;
     notes?: string | null;
+    workPointId?: string | null;
+    k3SafetyLog?: string | null;
     progressPhotos?: Array<{
       url?: string | null;
       fileUrl?: string | null;
@@ -116,6 +289,17 @@ export type DinasProjectProgressSource = {
     proposedUnit?: string | null;
     proposedUnitPrice?: string | number | bigint | null;
     progress?: number;
+    progressReports?: Array<{
+      id?: string;
+      reportDate: string | Date;
+      progress?: number | null;
+      workSummary?: string | null;
+      photoUrls?: string[];
+      photos?: Array<{
+        url?: string | null;
+        fileUrl?: string | null;
+      }>;
+    }>;
   }>;
   progressSubmissions?: Array<{
     id: string;
@@ -130,14 +314,21 @@ export type DinasProjectProgressSource = {
 
 export type ClassifiedPhotoItem = {
   url: string;
+  rawUrl: string;
+  photoKey: string;
   reportDate: string;
   reportDateRaw?: string | Date;
+  reportTimestamp: number;
   progress: number;
   workSummary?: string;
   weather?: string;
   workersCount?: number;
   notes?: string;
-  stage: "0%" | "50%" | "100%" | "Prasasti";
+  sourceLabel?: string;
+  workItemName?: string;
+  rotation?: number;
+  fit?: "cover" | "contain";
+  stage: PhotoStageKey;
   stageLabel: string;
   poktan: string;
   desa: string;
@@ -150,6 +341,7 @@ export type PoktanPhotoClassification = {
   photos100: ClassifiedPhotoItem[];
   photosPrasasti: ClassifiedPhotoItem[];
   allPhotos: ClassifiedPhotoItem[];
+  rawPhotos: ClassifiedPhotoItem[];
   totalPhotosCount: number;
   dailyReportsCount: number;
   latestReportDate: string | null;
@@ -159,13 +351,21 @@ export type PoktanPhotoClassification = {
     actualProgress: number;
     submittedAt: string;
   } | null;
+  isManuallyAdjusted: boolean;
 };
 
 export type LightboxState = {
   photo: ClassifiedPhotoItem;
   photoList: ClassifiedPhotoItem[];
   currentIndex: number;
+  poktanNo?: number;
 };
+
+export type PhotoAssistantTarget = {
+  poktanNo: number;
+  focusStage?: PhotoStageKey;
+  focusPhotoKey?: string;
+} | null;
 
 const WORK_TYPE_TONE_CLASSES: Record<WorkTypeBadgeTone, string> = {
   indigo:
@@ -245,87 +445,487 @@ function formatDateIndo(value?: string | Date | null): string {
   });
 }
 
+function toTimestampMs(value?: string | Date | null): number {
+  if (!value) return 0;
+  const d = new Date(value);
+  const ms = d.getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+function normalizePhotoKey(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  try {
+    if (trimmed.startsWith("/api/")) {
+      const parsed = new URL(trimmed, "http://localhost");
+      parsed.searchParams.delete("preview");
+      return `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    // ignore malformed URL
+  }
+  return trimmed;
+}
+
+function stageLabelFromKey(stage: PhotoStageKey, progress: number): string {
+  if (stage === "Prasasti") return "Batu Prasasti / BAST Fisik";
+  if (stage === "0%") return "Kondisi Titik Nol (0%)";
+  if (stage === "100%") return "Kondisi Akhir Selesai (100%)";
+  return Number.isFinite(progress) && progress > 0 && progress < 100
+    ? `Kondisi Pelaksanaan (${progress.toFixed(1)}%)`
+    : "Kondisi Pelaksanaan (50%)";
+}
+
+function detectStrictStage(
+  progress: number,
+  workSummary?: string,
+  notes?: string,
+): PhotoStageKey {
+  const combined = `${workSummary || ""} ${notes || ""}`;
+  if (/prasasti|batu\s*prasasti|serah\s*terima|\bbast\b/i.test(combined)) {
+    return "Prasasti";
+  }
+  if (
+    /\b0\s*%|titik\s*nol|sebelum\s*kerja|awal\s*kegiatan|dokumentasi\s*awal/i.test(
+      combined,
+    )
+  ) {
+    return "0%";
+  }
+  if (
+    /\b100\s*%|selesai\s*fisik|finishing|kondisi\s*akhir/i.test(combined)
+  ) {
+    return "100%";
+  }
+  if (/\b50\s*%|sedang\s*berjalan|pelaksanaan/i.test(combined)) {
+    return "50%";
+  }
+  if (progress >= 95) return "Prasasti";
+  if (progress <= 15) return "0%";
+  if (progress > 75) return "100%";
+  return "50%";
+}
+
+function computeAutoStageMap(
+  rawPhotos: ClassifiedPhotoItem[],
+  overallProgress: number,
+  mode: PhotoAutoAdaptMode,
+): Record<string, PhotoStageKey[]> {
+  const stageMap: Record<string, PhotoStageKey[]> = {};
+  if (rawPhotos.length === 0) return stageMap;
+
+  const sorted = [...rawPhotos].sort(
+    (a, b) => a.reportTimestamp - b.reportTimestamp,
+  );
+
+  if (mode === "distribute_all_4") {
+    const n = sorted.length;
+    sorted.forEach((photo, idx) => {
+      let stage: PhotoStageKey = "50%";
+      if (n === 1) {
+        stage = detectStrictStage(
+          photo.progress,
+          photo.workSummary,
+          photo.notes,
+        );
+      } else if (n === 2) {
+        stage = idx === 0 ? "0%" : overallProgress >= 75 ? "100%" : "50%";
+      } else if (n === 3) {
+        stage = idx === 0 ? "0%" : idx === 1 ? "50%" : "100%";
+      } else {
+        const stages: PhotoStageKey[] = ["0%", "50%", "100%", "Prasasti"];
+        const bucket = Math.min(3, Math.floor((idx * 4) / n));
+        stage = stages[bucket];
+      }
+      stageMap[photo.photoKey] = [stage];
+    });
+    return stageMap;
+  }
+
+  // strict_threshold or smart_chronological
+  const initialStages = sorted.map((photo) =>
+    detectStrictStage(photo.progress, photo.workSummary, photo.notes),
+  );
+
+  if (mode === "smart_chronological" && sorted.length >= 2) {
+    const hasStage0 = initialStages.some((s) => s === "0%");
+    const hasStage50 = initialStages.some((s) => s === "50%");
+    const hasStage100 = initialStages.some((s) => s === "100%");
+    const hasPrasasti = initialStages.some((s) => s === "Prasasti");
+
+    // Promote earliest uploaded photo to 0% if none is tagged 0%
+    if (!hasStage0) {
+      initialStages[0] = "0%";
+    }
+    // Promote latest uploaded photos when overall project progress is already high
+    if (sorted.length >= 3 && overallProgress >= 75 && !hasStage100) {
+      initialStages[sorted.length - 1] = "100%";
+    }
+    if (sorted.length >= 4 && overallProgress >= 95 && !hasPrasasti) {
+      initialStages[sorted.length - 1] = "Prasasti";
+      if (!hasStage100 && sorted.length >= 3) {
+        initialStages[sorted.length - 2] = "100%";
+      }
+    }
+    // Ensure execution photos (50%) exist if progress > 15 and everything landed in 0%
+    if (
+      overallProgress > 15 &&
+      !hasStage50 &&
+      sorted.length >= 2 &&
+      initialStages[1] === "0%"
+    ) {
+      initialStages[1] = "50%";
+    }
+  }
+
+  sorted.forEach((photo, idx) => {
+    stageMap[photo.photoKey] = [initialStages[idx]];
+  });
+  return stageMap;
+}
+
+function extractRawDailyReportPhotos(
+  poktan: string,
+  desa: string,
+  kecamatan: string,
+  linkedProject?: DinasProjectProgressSource,
+): {
+  rawPhotos: ClassifiedPhotoItem[];
+  dailyReportsCount: number;
+  latestReportDate: string | null;
+  latestProgress: number;
+} {
+  const byKey = new Map<string, ClassifiedPhotoItem>();
+  const reportDateKeys = new Set<string>();
+  const latestProgress = linkedProject?.progress ?? 0;
+  let latestReportDate: string | null = null;
+  let latestTs = 0;
+
+  const workPointTitleById = new Map<string, string>();
+  for (const wp of linkedProject?.workPoints ?? []) {
+    if (wp.id && wp.title) {
+      workPointTitleById.set(wp.id, wp.title);
+    }
+  }
+
+  const pushPhoto = (
+    rawUrlInput: string | null | undefined,
+    meta: {
+      reportDate: string | Date;
+      progress?: number | null;
+      workSummary?: string | null;
+      weather?: string | null;
+      workersCount?: number | null;
+      notes?: string | null;
+      sourceLabel?: string;
+    },
+  ) => {
+    if (!rawUrlInput) return;
+    const rawUrl = rawUrlInput.trim();
+    const photoKey = normalizePhotoKey(rawUrl);
+    if (!photoKey) return;
+
+    const ts = toTimestampMs(meta.reportDate);
+    const reportDateStr = formatDateIndo(meta.reportDate);
+    const reportProg =
+      typeof meta.progress === "number" && !isNaN(meta.progress)
+        ? meta.progress
+        : latestProgress;
+    const summary = meta.workSummary || "";
+    const notes = meta.notes || "";
+    const strictStage = detectStrictStage(reportProg, summary, notes);
+
+    const existing = byKey.get(photoKey);
+    if (existing) {
+      if (!existing.weather && meta.weather) existing.weather = meta.weather;
+      if (!existing.workersCount && meta.workersCount) {
+        existing.workersCount = meta.workersCount;
+      }
+      if (!existing.notes && notes) existing.notes = notes;
+      if (!existing.workSummary && summary) existing.workSummary = summary;
+      return;
+    }
+
+    byKey.set(photoKey, {
+      url: withLocalPhotoPreview(rawUrl),
+      rawUrl,
+      photoKey,
+      reportDate: reportDateStr,
+      reportDateRaw: meta.reportDate,
+      reportTimestamp: ts,
+      progress: reportProg,
+      workSummary: summary,
+      weather: meta.weather || undefined,
+      workersCount: meta.workersCount || undefined,
+      notes: notes || undefined,
+      sourceLabel: meta.sourceLabel || "Lap. Harian",
+      stage: strictStage,
+      stageLabel: stageLabelFromKey(strictStage, reportProg),
+      poktan,
+      desa,
+      kecamatan,
+    });
+  };
+
+  const trackDate = (reportDate: string | Date, id?: string) => {
+    const ts = toTimestampMs(reportDate);
+    if (ts > latestTs) {
+      latestTs = ts;
+      latestReportDate = formatDateIndo(reportDate);
+    }
+    const key = toJakartaDateKey(reportDate) || id || String(reportDate);
+    if (key) reportDateKeys.add(`dr:${key}`);
+  };
+
+  // Source 1: Prisma dailyReports (from /apps/projects/reports/dinas)
+  for (const dr of linkedProject?.dailyReports ?? []) {
+    trackDate(dr.reportDate, dr.id);
+    const wpTitle = dr.workPointId
+      ? workPointTitleById.get(dr.workPointId)
+      : undefined;
+    const sourceLabel = wpTitle
+      ? `Lap. Harian (${wpTitle})`
+      : "Lap. Harian";
+    for (const p of dr.progressPhotos ?? []) {
+      pushPhoto(p.fileUrl || p.url, {
+        reportDate: dr.reportDate,
+        progress: dr.progress,
+        workSummary: dr.workSummary,
+        weather: dr.weather,
+        workersCount: dr.workersCount,
+        notes: dr.notes,
+        sourceLabel,
+      });
+    }
+  }
+
+  // Source 2: Serialized reports (from Master Proyek ProjectWorkstationMaster)
+  for (const rep of linkedProject?.reports ?? []) {
+    trackDate(rep.reportDate, rep.id);
+    const wpTitle = rep.workPointId
+      ? workPointTitleById.get(rep.workPointId)
+      : undefined;
+    const sourceLabel = wpTitle
+      ? `Lap. Harian (${wpTitle})`
+      : "Lap. Harian";
+    for (const url of rep.photoUrls ?? []) {
+      pushPhoto(url, {
+        reportDate: rep.reportDate,
+        progress: rep.progress,
+        workSummary: rep.workSummary,
+        weather: rep.weather,
+        workersCount: rep.workersCount,
+        notes: rep.notes,
+        sourceLabel,
+      });
+    }
+    for (const p of rep.progressPhotos ?? []) {
+      pushPhoto(p.fileUrl || p.url, {
+        reportDate: rep.reportDate,
+        progress: rep.progress,
+        workSummary: rep.workSummary,
+        weather: rep.weather,
+        workersCount: rep.workersCount,
+        notes: rep.notes,
+        sourceLabel,
+      });
+    }
+  }
+
+  // Source 3: WorkPoint progressReports (both Master & DB routes)
+  for (const wp of linkedProject?.workPoints ?? []) {
+    for (const pr of wp.progressReports ?? []) {
+      const ts = toTimestampMs(pr.reportDate);
+      if (ts > latestTs) {
+        latestTs = ts;
+        latestReportDate = formatDateIndo(pr.reportDate);
+      }
+      if (reportDateKeys.size === 0) {
+        const key = toJakartaDateKey(pr.reportDate) || pr.id;
+        if (key) reportDateKeys.add(`wp:${key}`);
+      }
+      const sourceLabel = wp.title
+        ? `Progres Item (${wp.title})`
+        : "Progres Item";
+      for (const url of pr.photoUrls ?? []) {
+        pushPhoto(url, {
+          reportDate: pr.reportDate,
+          progress: pr.progress,
+          workSummary: pr.workSummary,
+          sourceLabel,
+        });
+      }
+      for (const p of pr.photos ?? []) {
+        pushPhoto(p.fileUrl || p.url, {
+          reportDate: pr.reportDate,
+          progress: pr.progress,
+          workSummary: pr.workSummary,
+          sourceLabel,
+        });
+      }
+    }
+  }
+
+  const rawPhotos = Array.from(byKey.values()).sort(
+    (a, b) => a.reportTimestamp - b.reportTimestamp,
+  );
+
+  return {
+    rawPhotos,
+    dailyReportsCount: reportDateKeys.size,
+    latestReportDate,
+    latestProgress,
+  };
+}
+
 function classifyProjectPhotos(
   poktan: string,
   desa: string,
   kecamatan: string,
   linkedProject?: DinasProjectProgressSource,
+  adjustment?: PoktanPhotoAdjustment,
+  autoAdaptMode: PhotoAutoAdaptMode = "smart_chronological",
+  globalPhotoLookup?: Map<string, ClassifiedPhotoItem>,
 ): PoktanPhotoClassification {
+  const { rawPhotos, dailyReportsCount, latestReportDate, latestProgress } =
+    extractRawDailyReportPhotos(poktan, desa, kecamatan, linkedProject);
+
+  // Merge any extra cross-project photos explicitly selected by user into lookup
+  const photoByKey = new Map<string, ClassifiedPhotoItem>();
+  for (const photo of rawPhotos) {
+    photoByKey.set(photo.photoKey, photo);
+  }
+
+  const extraUrlsFromOverride = new Set<string>();
+  if (adjustment?.stageOverrides) {
+    for (const list of Object.values(adjustment.stageOverrides)) {
+      for (const rawUrl of list ?? []) {
+        extraUrlsFromOverride.add(normalizePhotoKey(rawUrl));
+      }
+    }
+  }
+  if (adjustment?.photoStageMap) {
+    for (const key of Object.keys(adjustment.photoStageMap)) {
+      extraUrlsFromOverride.add(normalizePhotoKey(key));
+    }
+  }
+
+  for (const key of extraUrlsFromOverride) {
+    if (!key || photoByKey.has(key)) continue;
+    const fromGlobal = globalPhotoLookup?.get(key);
+    if (fromGlobal) {
+      photoByKey.set(key, {
+        ...fromGlobal,
+        poktan,
+        desa,
+        kecamatan,
+      });
+    } else {
+      photoByKey.set(key, {
+        url: withLocalPhotoPreview(key),
+        rawUrl: key,
+        photoKey: key,
+        reportDate: latestReportDate || "-",
+        reportTimestamp: Date.now(),
+        progress: latestProgress,
+        workSummary: "Foto ditautkan dari Sistem Bantu Penyesuaian",
+        sourceLabel: "Penyesuaian Manual",
+        stage: "50%",
+        stageLabel: stageLabelFromKey("50%", latestProgress),
+        poktan,
+        desa,
+        kecamatan,
+      });
+    }
+  }
+
+  const allSourcePhotos = Array.from(photoByKey.values()).sort(
+    (a, b) => a.reportTimestamp - b.reportTimestamp,
+  );
+
+  const hasManualMap = Boolean(
+    adjustment?.photoStageMap &&
+      Object.keys(adjustment.photoStageMap).length > 0,
+  );
+  const hasStageOverrides = Boolean(
+    adjustment?.stageOverrides &&
+      Object.values(adjustment.stageOverrides).some(
+        (arr) => (arr?.length ?? 0) > 0,
+      ),
+  );
+  const isManuallyAdjusted = hasManualMap || hasStageOverrides;
+
+  const autoStageMap = computeAutoStageMap(
+    allSourcePhotos,
+    latestProgress,
+    autoAdaptMode,
+  );
+
   const photos0: ClassifiedPhotoItem[] = [];
   const photos50: ClassifiedPhotoItem[] = [];
   const photos100: ClassifiedPhotoItem[] = [];
   const photosPrasasti: ClassifiedPhotoItem[] = [];
-  const allPhotos: ClassifiedPhotoItem[] = [];
 
-  const dailyReports = linkedProject?.dailyReports || [];
-  let latestReportDate: string | null = null;
-  let latestProgress = linkedProject?.progress ?? 0;
+  const pushToStage = (photo: ClassifiedPhotoItem, stage: PhotoStageKey) => {
+    const visual = adjustment?.photoVisualMap?.[photo.photoKey];
+    const workItemName = adjustment?.photoWorkItemMap?.[photo.photoKey];
+    const resolved: ClassifiedPhotoItem = {
+      ...photo,
+      stage,
+      stageLabel: stageLabelFromKey(stage, photo.progress),
+      workItemName: workItemName || photo.workItemName,
+      rotation: visual?.rotation ?? 0,
+      fit: visual?.fit ?? "cover",
+    };
+    if (stage === "0%") photos0.push(resolved);
+    else if (stage === "50%") photos50.push(resolved);
+    else if (stage === "100%") photos100.push(resolved);
+    else photosPrasasti.push(resolved);
+  };
 
-  for (const dr of dailyReports) {
-    const reportDateStr = formatDateIndo(dr.reportDate);
-    if (
-      !latestReportDate ||
-      new Date(dr.reportDate) > new Date(latestReportDate)
-    ) {
-      latestReportDate = reportDateStr;
-    }
-    const reportProg =
-      typeof dr.progress === "number" && !isNaN(dr.progress)
-        ? dr.progress
-        : latestProgress;
-
-    const photos = dr.progressPhotos || [];
-    for (const p of photos) {
-      const url = p.url || p.fileUrl;
-      if (!url) continue;
-
-      const summary = dr.workSummary || "";
-      const notes = dr.notes || "";
-      const isPrasasti =
-        /prasasti|batu\s*prasasti|serah\s*terima|bast/i.test(summary) ||
-        /prasasti|batu\s*prasasti|serah\s*terima|bast/i.test(notes) ||
-        reportProg >= 95;
-
-      let stage: ClassifiedPhotoItem["stage"] = "50%";
-      let stageLabel = "Kondisi Pelaksanaan (50%)";
-
-      if (isPrasasti) {
-        stage = "Prasasti";
-        stageLabel = "Batu Prasasti / BAST Fisik";
-      } else if (reportProg <= 15) {
-        stage = "0%";
-        stageLabel = "Kondisi Titik Nol (0%)";
-      } else if (reportProg > 75) {
-        stage = "100%";
-        stageLabel = "Kondisi Akhir Selesai (100%)";
-      } else {
-        stage = "50%";
-        stageLabel = `Kondisi Pelaksanaan (${reportProg.toFixed(1)}%)`;
+  if (hasStageOverrides && adjustment?.stageOverrides) {
+    const stages: PhotoStageKey[] = ["0%", "50%", "100%", "Prasasti"];
+    for (const stage of stages) {
+      for (const rawUrl of adjustment.stageOverrides[stage] ?? []) {
+        const photo = photoByKey.get(normalizePhotoKey(rawUrl));
+        if (photo) pushToStage(photo, stage);
       }
-
-      const item: ClassifiedPhotoItem = {
-        url,
-        reportDate: reportDateStr,
-        reportDateRaw: dr.reportDate,
-        progress: reportProg,
-        workSummary: summary,
-        weather: dr.weather || undefined,
-        workersCount: dr.workersCount || undefined,
-        notes: notes,
-        stage,
-        stageLabel,
-        poktan,
-        desa,
-        kecamatan,
-      };
-
-      allPhotos.push(item);
-      if (stage === "Prasasti") photosPrasasti.push(item);
-      else if (stage === "0%") photos0.push(item);
-      else if (stage === "100%") photos100.push(item);
-      else photos50.push(item);
+    }
+  } else {
+    for (const photo of allSourcePhotos) {
+      const stages = hasManualMap
+        ? adjustment?.photoStageMap?.[photo.photoKey] ?? []
+        : autoStageMap[photo.photoKey] ?? [photo.stage];
+      for (const stage of stages) {
+        pushToStage(photo, stage);
+      }
     }
   }
+
+  const uniqueClassifiedByKey = new Map<string, ClassifiedPhotoItem>();
+  for (const item of [...photos0, ...photos50, ...photos100, ...photosPrasasti]) {
+    if (!uniqueClassifiedByKey.has(item.photoKey)) {
+      uniqueClassifiedByKey.set(item.photoKey, item);
+    }
+  }
+  const allPhotos = Array.from(uniqueClassifiedByKey.values());
+
+  const decoratedRawPhotos = allSourcePhotos.map((photo) => {
+    const visual = adjustment?.photoVisualMap?.[photo.photoKey];
+    const workItemName = adjustment?.photoWorkItemMap?.[photo.photoKey];
+    const assignedStages = hasManualMap
+      ? adjustment?.photoStageMap?.[photo.photoKey] ?? []
+      : autoStageMap[photo.photoKey] ?? [photo.stage];
+    const primaryStage = assignedStages[0] || photo.stage;
+    return {
+      ...photo,
+      stage: primaryStage,
+      stageLabel: stageLabelFromKey(primaryStage, photo.progress),
+      workItemName: workItemName || photo.workItemName,
+      rotation: visual?.rotation ?? 0,
+      fit: visual?.fit ?? "cover",
+    };
+  });
 
   const submissions = linkedProject?.progressSubmissions || [];
   const latestSub = submissions.length > 0 ? submissions[0] : null;
@@ -343,12 +943,36 @@ function classifyProjectPhotos(
     photos100,
     photosPrasasti,
     allPhotos,
+    rawPhotos: decoratedRawPhotos,
     totalPhotosCount: allPhotos.length,
-    dailyReportsCount: dailyReports.length,
+    dailyReportsCount,
     latestReportDate,
     latestProgress,
     latestWeeklySubmission,
+    isManuallyAdjusted,
   };
+}
+
+function getWorkItemStagePhotos(
+  stagePhotos: ClassifiedPhotoItem[],
+  itemName: string,
+): ClassifiedPhotoItem[] {
+  const normalizedItem = itemName.trim().toLowerCase();
+  const explicit = stagePhotos.filter(
+    (p) => p.workItemName?.trim().toLowerCase() === normalizedItem,
+  );
+  if (explicit.length > 0) return explicit;
+
+  const tokens = normalizedItem
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !["pekerjaan", "lainnya"].includes(w));
+  if (tokens.length === 0) return [];
+
+  return stagePhotos.filter((p) => {
+    const text = `${p.workSummary || ""} ${p.sourceLabel || ""}`.toLowerCase();
+    return tokens.some((tok) => text.includes(tok));
+  });
 }
 
 function PhotoThumbnailSlot({
@@ -356,6 +980,8 @@ function PhotoThumbnailSlot({
   stageName,
   stageTitle,
   onOpenLightbox,
+  onAdjustEmpty,
+  compact = false,
 }: {
   photos: ClassifiedPhotoItem[];
   stageName: string;
@@ -365,47 +991,1109 @@ function PhotoThumbnailSlot({
     photoList: ClassifiedPhotoItem[],
     currentIndex: number,
   ) => void;
+  onAdjustEmpty?: () => void;
+  compact?: boolean;
 }) {
+  const sizeClass = compact
+    ? "h-10 min-w-[54px] max-w-[72px]"
+    : "h-14 min-w-[62px] max-w-[82px]";
+
   if (photos.length === 0) {
+    if (onAdjustEmpty) {
+      return (
+        <button
+          type="button"
+          onClick={onAdjustEmpty}
+          title={`Klik untuk menyesuaikan foto ${stageTitle} dari Laporan Harian`}
+          className={cn(
+            "group mx-auto flex w-full flex-col items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/10 p-1 text-center text-muted-foreground transition hover:border-primary/60 hover:bg-primary/5 hover:text-primary",
+            sizeClass,
+          )}
+        >
+          <ImageIcon
+            className={cn(
+              "opacity-35 group-hover:opacity-80",
+              compact ? "size-3" : "mb-0.5 size-3.5",
+            )}
+            aria-hidden="true"
+          />
+          <span className="text-[9px] font-medium leading-tight group-hover:font-semibold">
+            {compact ? "—" : "+ Sesuaikan"}
+          </span>
+          {!compact && (
+            <span className="text-[8px] text-muted-foreground/60 group-hover:text-primary/80">
+              {stageName}
+            </span>
+          )}
+        </button>
+      );
+    }
+
     return (
-      <div className="mx-auto flex h-14 w-full min-w-[62px] max-w-[80px] flex-col items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/10 p-1 text-center text-muted-foreground">
-        <ImageIcon className="size-3.5 opacity-30 mb-0.5" aria-hidden="true" />
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/10 p-1 text-center text-muted-foreground",
+          sizeClass,
+        )}
+      >
+        <ImageIcon
+          className={cn("opacity-30", compact ? "size-3" : "mb-0.5 size-3.5")}
+          aria-hidden="true"
+        />
         <span className="text-[10px] font-medium leading-tight">Nihil</span>
-        <span className="text-[9px] text-muted-foreground/60">{stageName}</span>
+        {!compact && (
+          <span className="text-[9px] text-muted-foreground/60">
+            {stageName}
+          </span>
+        )}
       </div>
     );
   }
 
   const firstPhoto = photos[0];
   const count = photos.length;
+  const rotation = firstPhoto.rotation ?? 0;
+  const fitClass =
+    firstPhoto.fit === "contain"
+      ? "object-contain bg-black/80"
+      : "object-cover";
 
   return (
     <button
       type="button"
       onClick={() => onOpenLightbox(firstPhoto, photos, 0)}
-      className="group relative mx-auto flex h-14 w-full min-w-[62px] max-w-[80px] overflow-hidden rounded-md border border-border/80 bg-muted/30 shadow-2xs transition hover:border-primary hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary"
-      title={`${stageTitle} - Klik untuk pratinjau (${count} foto)`}
+      className={cn(
+        "group relative mx-auto flex w-full overflow-hidden rounded-md border border-border/80 bg-muted/30 shadow-2xs transition hover:border-primary hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary",
+        sizeClass,
+      )}
+      title={`${stageTitle} (${firstPhoto.reportDate}) - Klik untuk pratinjau (${count} foto)`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={firstPhoto.url}
         alt={`${stageTitle} - ${firstPhoto.poktan}`}
-        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+        style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
+        className={cn(
+          "h-full w-full transition-transform duration-300 group-hover:scale-105",
+          fitClass,
+        )}
         loading="lazy"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent opacity-85 group-hover:opacity-95 transition-opacity" />
-      <span className="absolute bottom-1 left-1 text-[9px] font-bold text-white tracking-tight drop-shadow-xs">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent opacity-85 transition-opacity group-hover:opacity-95" />
+      <span className="absolute bottom-0.5 left-1 text-[9px] font-bold tracking-tight text-white drop-shadow-xs">
         {stageName}
       </span>
       {count > 1 && (
-        <span className="absolute top-1 right-1 rounded-full bg-primary/95 px-1 py-0.2 text-[8px] font-extrabold text-white shadow-xs">
+        <span className="absolute right-1 top-1 rounded-full bg-primary/95 px-1 py-0.2 text-[8px] font-extrabold text-white shadow-xs">
           +{count - 1}
         </span>
       )}
-      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
         <Maximize2 className="size-3.5 text-white drop-shadow-md" />
       </div>
     </button>
+  );
+}
+
+function A4PhotoCell({
+  photos,
+  stageName,
+  compact = false,
+}: {
+  photos: ClassifiedPhotoItem[];
+  stageName: string;
+  compact?: boolean;
+}) {
+  if (photos.length === 0) {
+    return <span className="text-[7px] text-slate-400">—</span>;
+  }
+
+  const firstPhoto = photos[0];
+  const extraCount = photos.length - 1;
+  const rotation = firstPhoto.rotation ?? 0;
+  const fitClass =
+    firstPhoto.fit === "contain"
+      ? "object-contain bg-white"
+      : "object-cover";
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div
+        className={cn(
+          "relative mx-auto overflow-hidden border border-slate-400 bg-white",
+          compact ? "h-[22px] w-[32px]" : "h-[28px] w-[40px]",
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={firstPhoto.url}
+          alt={`${stageName} - ${firstPhoto.poktan}`}
+          style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
+          className={cn("h-full w-full", fitClass)}
+          loading="eager"
+        />
+        {extraCount > 0 && (
+          <span className="absolute bottom-0 right-0 bg-slate-900/85 px-0.5 text-[6px] font-bold leading-tight text-white">
+            +{extraCount}
+          </span>
+        )}
+      </div>
+      {!compact && firstPhoto.reportDate && firstPhoto.reportDate !== "-" && (
+        <span className="block max-w-full truncate text-[6px] leading-none text-slate-600 tabular-nums">
+          {firstPhoto.reportDate}
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface A4PortfolioRowData {
+  key: string;
+  code: string;
+  title: string;
+  workTypeBadge: {
+    shortLabel: string;
+    groupShortLabel: string;
+  };
+  clientLabel: string;
+  locationLabel: string;
+  fieldPicName: string;
+  statusLabel: string;
+  actualProgress: number;
+  plannedProgress: number | null;
+  deviation: number | null;
+  reportsCount: number;
+  latestReportDate: string | null;
+  paguValue: number;
+  realizedValue: number;
+}
+
+interface A4PortfolioSummaryData {
+  count: number;
+  avgProgress: number;
+  avgPlanned: number | null;
+  consultancyCount: number;
+  physicalCount: number;
+  totalPagu: number;
+  totalRealized: number;
+  realizationPercent: number;
+  totalReports: number;
+}
+
+interface A4PoktanRowData {
+  no: number;
+  kecamatan: string;
+  desa: string;
+  poktan: string;
+  luasLahanHa: number;
+  totalBiayaKonstruksi: number;
+  biayaDigunakanKonstruksi: number;
+  realisasiHaKonstruksi: number;
+  progresFisikKonstruksiPercent: number;
+  bastTeknisUpkk?: string;
+  bastUpkkPpk?: string;
+  bastPpkKpa?: string;
+  bastKpaPoktan?: string;
+  totalBiayaOlahLahan: number;
+  biayaDigunakanOlahLahan: number;
+  progresFisikOlahLahanPercent: number;
+  realisasiHaOlahLahan: number;
+  nomorSpk: string;
+  tglSpk: string;
+  tglMulai: string;
+  tglSelesai: string;
+  namaBank: string;
+  noRekening: string;
+  ketuaPoktan: string;
+  nikKetua: string;
+  jumlahAnggota: number;
+  ketuaUpkk: string;
+  sp2d1Jumlah: number;
+  sp2d1NoTgl: string;
+  sp2d2Jumlah: number;
+  sp2d2NoTgl?: string;
+  pekerjaanListWithBobot: Array<{
+    namaPekerjaan: string;
+    volume?: number | string | null;
+    satuan?: string | null;
+    biaya: number;
+    bobotPercent: number;
+    realisasiBiaya: number;
+    realisasiVolumeCalc: number | string | null;
+    realisasiSatuan?: string | null;
+  }>;
+  photoClassification: PoktanPhotoClassification;
+}
+
+interface A4DinasAggregatesData {
+  totalLuas: number;
+  totalBiayaKonstruksi: number;
+  totalBiayaDigunakanKonstruksi: number;
+  totalRealisasiHaKonstruksi: number;
+  totalBiayaOlahLahan: number;
+  totalBiayaDigunakanOlahLahan: number;
+  totalSp2d1: number;
+  totalSp2d2: number;
+  totalPenyaluran: number;
+  totalPhotosCount: number;
+  poktanWithPhotosCount: number;
+  totalDailyReportsCount: number;
+  avgProgressPercent: number;
+}
+
+function DinasA4CleanDocumentSheet({
+  isPreviewVisible,
+  reportMode,
+  activeTab,
+  filteredData,
+  aggregates,
+  filteredPortfolioRows,
+  portfolioSummary,
+  canViewFinancials,
+  printShowSubItems,
+  filterSummaryText,
+  printedDateLabel,
+}: {
+  isPreviewVisible: boolean;
+  reportMode: ReportViewMode;
+  activeTab: DinasTabType;
+  filteredData: A4PoktanRowData[];
+  aggregates: A4DinasAggregatesData;
+  filteredPortfolioRows: A4PortfolioRowData[];
+  portfolioSummary: A4PortfolioSummaryData;
+  canViewFinancials: boolean;
+  printShowSubItems: boolean;
+  filterSummaryText: string;
+  printedDateLabel: string;
+}) {
+  const isPortfolio = reportMode === "portfolio_live";
+  const docTitle = isPortfolio
+    ? "REKAPITULASI PORTOFOLIO PROYEK & KURVA-S (LIVE DATABASE)"
+    : activeTab === "rincian_sid"
+      ? "REKAPITULASI HASIL SID, REALISASI FISIK & DOKUMENTASI FOTO LAPANGAN"
+      : activeTab === "database_spk"
+        ? "DATABASE KONTRAK (SPK), PENGURUS POKTAN/UPKK & PENYALURAN SP2D"
+        : "REKAPITULASI REALISASI FISIK KEGIATAN KONSTRUKSI DAN OLAH LAHAN";
+
+  const docSubtitle = isPortfolio
+    ? "PT Skala Prioritas Engineering · Laporan Portofolio Lintas Jenis Pekerjaan"
+    : `${DINAS_REPORT_METADATA.kegiatan} · Kabupaten Aceh Tengah`;
+
+  return (
+    <div
+      className={cn(
+        "dinas-a4-print-sheet bg-white text-slate-900 antialiased",
+        isPreviewVisible
+          ? "mx-auto w-[210mm] max-w-full border border-slate-300 p-[8mm] shadow-xl print:w-full print:border-0 print:p-0 print:shadow-none"
+          : "hidden print:block",
+      )}
+    >
+      {/* Clean Formal A4 Letterhead / Document Title Block */}
+      <div className="mb-2.5 border-b-2 border-slate-900 pb-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[7.5px] font-bold uppercase tracking-wider text-slate-600">
+              {isPortfolio
+                ? "SISTEM MANAJEMEN PROYEK · SKALA PRIORITAS ENGINEERING"
+                : `${DINAS_REPORT_METADATA.satker} · TAHUN ANGGARAN 2026`}
+            </p>
+            <h1 className="mt-0.5 text-[11.5px] font-extrabold uppercase leading-snug tracking-tight text-slate-950">
+              {docTitle}
+            </h1>
+            <p className="mt-0.5 text-[8px] text-slate-700">
+              {docSubtitle}
+              {filterSummaryText ? ` · Filter: ${filterSummaryText}` : ""}
+            </p>
+          </div>
+          <div className="shrink-0 border border-slate-700 bg-slate-50 px-2 py-1 text-right">
+            <p className="text-[7px] font-bold uppercase tracking-wider text-slate-600">
+              Format Kertas A4
+            </p>
+            <p className="font-mono text-[8px] font-bold text-slate-900">
+              {printedDateLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Clean Summary Table */}
+      {isPortfolio ? (
+        <table
+          className="mb-2.5 w-full border-collapse border border-slate-600 text-[7.5px] text-slate-900"
+          style={{ tableLayout: "fixed" }}
+        >
+          <thead>
+            <tr className="bg-slate-100 text-left font-bold uppercase text-slate-700">
+              <th className="border border-slate-500 px-1.5 py-1">Total Proyek</th>
+              <th className="border border-slate-500 px-1.5 py-1">Komposisi</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Rata-rata Aktual</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Rata-rata Rencana</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Lap. Harian</th>
+              {canViewFinancials && (
+                <th className="border border-slate-500 px-1.5 py-1 text-right">Pagu &amp; Realisasi</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="bg-white font-semibold">
+              <td className="border border-slate-500 px-1.5 py-1 tabular-nums">
+                {portfolioSummary.count} Proyek
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1">
+                {portfolioSummary.consultancyCount} Konsultansi · {portfolioSummary.physicalCount} Fisik
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                {portfolioSummary.avgProgress.toFixed(1)}%
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                {portfolioSummary.avgPlanned !== null
+                  ? `${portfolioSummary.avgPlanned.toFixed(1)}%`
+                  : "—"}
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                {portfolioSummary.totalReports}x
+              </td>
+              {canViewFinancials && (
+                <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                  Rp {portfolioSummary.totalRealized.toLocaleString("id-ID")} / Rp{" "}
+                  {portfolioSummary.totalPagu.toLocaleString("id-ID")}
+                </td>
+              )}
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <table
+          className="mb-2.5 w-full border-collapse border border-slate-600 text-[7.5px] text-slate-900"
+          style={{ tableLayout: "fixed" }}
+        >
+          <thead>
+            <tr className="bg-slate-100 text-left font-bold uppercase text-slate-700">
+              <th className="border border-slate-500 px-1.5 py-1">Jumlah Poktan</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Luas SID (Ha)</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Pagu Konstruksi (Rp)</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Realisasi Fisik (Rp)</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Rata-rata Progres</th>
+              <th className="border border-slate-500 px-1.5 py-1 text-right">Foto &amp; Lap. Harian</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="bg-white font-semibold">
+              <td className="border border-slate-500 px-1.5 py-1 tabular-nums">
+                {filteredData.length} Poktan
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                {aggregates.totalLuas.toFixed(2)} Ha
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                Rp {aggregates.totalBiayaKonstruksi.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                Rp {aggregates.totalBiayaDigunakanKonstruksi.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                {aggregates.avgProgressPercent.toFixed(1)}%
+              </td>
+              <td className="border border-slate-500 px-1.5 py-1 text-right font-mono tabular-nums">
+                {aggregates.totalPhotosCount} Foto · {aggregates.totalDailyReportsCount} Lap.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* MAIN CLEAN A4 DATA TABLE */}
+      {isPortfolio ? (
+        <table
+          className="w-full border-collapse border border-slate-700 text-[7.5px] leading-[1.3] text-slate-900"
+          style={{ tableLayout: "fixed" }}
+        >
+          <thead>
+            <tr className="bg-slate-200 font-bold uppercase text-slate-900">
+              <th className="w-[4%] border border-slate-600 px-1 py-1.5 text-center">No</th>
+              <th className="w-[24%] border border-slate-600 px-1.5 py-1.5 text-left">
+                Kode &amp; Nama Proyek
+              </th>
+              <th className="w-[14%] border border-slate-600 px-1.5 py-1.5 text-left">
+                Jenis Pekerjaan
+              </th>
+              <th className="w-[15%] border border-slate-600 px-1.5 py-1.5 text-left">
+                Mitra / Klien &amp; PIC
+              </th>
+              <th className="w-[8%] border border-slate-600 px-1 py-1.5 text-center">
+                Status
+              </th>
+              <th className="w-[6%] border border-slate-600 px-1 py-1.5 text-right">
+                Aktual
+              </th>
+              <th className="w-[6%] border border-slate-600 px-1 py-1.5 text-right">
+                Rencana
+              </th>
+              <th className="w-[6%] border border-slate-600 px-1 py-1.5 text-right">
+                Deviasi
+              </th>
+              <th className="w-[5%] border border-slate-600 px-1 py-1.5 text-center">
+                Lap.
+              </th>
+              {canViewFinancials && (
+                <>
+                  <th className="w-[6%] border border-slate-600 px-1 py-1.5 text-right">
+                    Pagu (Rp)
+                  </th>
+                  <th className="w-[6%] border border-slate-600 px-1 py-1.5 text-right">
+                    Realisasi
+                  </th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredPortfolioRows.map((row, idx) => (
+              <tr key={row.key} className="bg-white">
+                <td className="border border-slate-500 px-1 py-1 text-center font-mono tabular-nums">
+                  {idx + 1}
+                </td>
+                <td className="border border-slate-500 px-1.5 py-1 align-top break-words">
+                  <span className="font-mono text-[6.5px] text-slate-600">
+                    {row.code}
+                  </span>
+                  <div className="font-bold text-slate-950">{row.title}</div>
+                  {row.locationLabel !== "-" && (
+                    <div className="text-[6.5px] text-slate-600">
+                      {row.locationLabel}
+                    </div>
+                  )}
+                </td>
+                <td className="border border-slate-500 px-1.5 py-1 align-top break-words">
+                  <div className="font-semibold">{row.workTypeBadge.shortLabel}</div>
+                  <div className="text-[6.5px] text-slate-600">
+                    {row.workTypeBadge.groupShortLabel}
+                  </div>
+                </td>
+                <td className="border border-slate-500 px-1.5 py-1 align-top break-words">
+                  <div className="font-medium">{row.clientLabel}</div>
+                  <div className="text-[6.5px] text-slate-600">
+                    PIC: {row.fieldPicName}
+                  </div>
+                </td>
+                <td className="border border-slate-500 px-1 py-1 text-center align-top">
+                  {row.statusLabel}
+                </td>
+                <td className="border border-slate-500 px-1 py-1 text-right font-mono font-bold tabular-nums">
+                  {row.actualProgress.toFixed(1)}%
+                </td>
+                <td className="border border-slate-500 px-1 py-1 text-right font-mono tabular-nums text-slate-700">
+                  {row.plannedProgress !== null
+                    ? `${row.plannedProgress.toFixed(1)}%`
+                    : "—"}
+                </td>
+                <td className="border border-slate-500 px-1 py-1 text-right font-mono tabular-nums">
+                  {row.deviation !== null
+                    ? `${row.deviation >= 0 ? "+" : ""}${row.deviation.toFixed(1)}%`
+                    : "—"}
+                </td>
+                <td className="border border-slate-500 px-1 py-1 text-center font-mono tabular-nums">
+                  {row.reportsCount}x
+                </td>
+                {canViewFinancials && (
+                  <>
+                    <td className="border border-slate-500 px-1 py-1 text-right font-mono tabular-nums">
+                      {row.paguValue.toLocaleString("id-ID")}
+                    </td>
+                    <td className="border border-slate-500 px-1 py-1 text-right font-mono tabular-nums">
+                      {row.realizedValue.toLocaleString("id-ID")}
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+            <tr className="bg-slate-200 font-bold text-slate-950">
+              <td colSpan={5} className="border border-slate-700 px-1.5 py-1.5 text-center">
+                TOTAL / RATA-RATA ({filteredPortfolioRows.length} PROYEK)
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {portfolioSummary.avgProgress.toFixed(1)}%
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {portfolioSummary.avgPlanned !== null
+                  ? `${portfolioSummary.avgPlanned.toFixed(1)}%`
+                  : "—"}
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {portfolioSummary.avgPlanned !== null
+                  ? `${portfolioSummary.avgProgress - portfolioSummary.avgPlanned >= 0 ? "+" : ""}${(portfolioSummary.avgProgress - portfolioSummary.avgPlanned).toFixed(1)}%`
+                  : "—"}
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-center font-mono tabular-nums">
+                {portfolioSummary.totalReports}x
+              </td>
+              {canViewFinancials && (
+                <>
+                  <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                    {portfolioSummary.totalPagu.toLocaleString("id-ID")}
+                  </td>
+                  <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                    {portfolioSummary.totalRealized.toLocaleString("id-ID")}
+                  </td>
+                </>
+              )}
+            </tr>
+          </tbody>
+        </table>
+      ) : activeTab === "rincian_sid" ? (
+        <table
+          className="w-full border-collapse border border-slate-700 text-[7px] leading-[1.22] text-slate-900"
+          style={{ tableLayout: "fixed" }}
+        >
+          <thead>
+            <tr className="bg-slate-200 font-bold uppercase text-slate-950">
+              <th
+                rowSpan={2}
+                className="w-[3.5%] border border-slate-600 px-0.5 py-1 text-center"
+              >
+                No
+              </th>
+              <th
+                rowSpan={2}
+                className="w-[13.5%] border border-slate-600 px-1 py-1 text-left"
+              >
+                Kelompok Tani, Lokasi &amp; SPK
+              </th>
+              <th
+                rowSpan={2}
+                className="w-[4.5%] border border-slate-600 px-0.5 py-1 text-right"
+              >
+                Luas (Ha)
+              </th>
+              <th
+                colSpan={4}
+                className="border border-slate-600 bg-slate-100 px-1 py-1 text-center"
+              >
+                HASIL SID (RENCANA DESAIN)
+              </th>
+              <th
+                colSpan={3}
+                className="border border-slate-600 bg-slate-100 px-1 py-1 text-center"
+              >
+                HASIL FISIK &amp; LAPORAN
+              </th>
+              <th
+                colSpan={4}
+                className="border border-slate-600 bg-slate-100 px-1 py-1 text-center"
+              >
+                DOKUMENTASI FOTO LAPANGAN
+              </th>
+            </tr>
+            <tr className="bg-slate-100 text-[6.5px] font-bold uppercase text-slate-800">
+              <th className="w-[13.5%] border border-slate-600 px-1 py-1 text-left">
+                Uraian Pekerjaan SID
+              </th>
+              <th className="w-[6%] border border-slate-600 px-0.5 py-1 text-right">
+                Vol / Sat
+              </th>
+              <th className="w-[8.5%] border border-slate-600 px-1 py-1 text-right">
+                Biaya SID (Rp)
+              </th>
+              <th className="w-[5%] border border-slate-600 px-0.5 py-1 text-right">
+                Bobot (%)
+              </th>
+              <th className="w-[6%] border border-slate-600 px-0.5 py-1 text-right">
+                Real. Vol
+              </th>
+              <th className="w-[8.5%] border border-slate-600 px-1 py-1 text-right">
+                Real. Biaya (Rp)
+              </th>
+              <th className="w-[7%] border border-slate-600 px-0.5 py-1 text-center">
+                Prog. / Lap.
+              </th>
+              <th className="w-[6%] border border-slate-600 px-0.5 py-1 text-center">
+                Foto 0%
+              </th>
+              <th className="w-[6%] border border-slate-600 px-0.5 py-1 text-center">
+                Foto 50%
+              </th>
+              <th className="w-[6%] border border-slate-600 px-0.5 py-1 text-center">
+                Foto 100%
+              </th>
+              <th className="w-[6%] border border-slate-600 px-0.5 py-1 text-center">
+                Prasasti
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((p) => {
+              const photos = p.photoClassification;
+              return (
+                <Fragment key={`a4-poktan-${p.no}`}>
+                  <tr className="bg-slate-100 font-semibold text-slate-950">
+                    <td className="border border-slate-600 px-0.5 py-1 text-center align-top font-mono">
+                      {p.no}
+                    </td>
+                    <td className="border border-slate-600 px-1 py-1 align-top break-words">
+                      <div className="font-bold">{p.poktan}</div>
+                      <div className="text-[6.5px] font-normal text-slate-700">
+                        Ds. {p.desa}, Kec. {p.kecamatan}
+                      </div>
+                      <div className="font-mono text-[6px] font-normal text-slate-600">
+                        SPK: {p.nomorSpk || "—"}
+                      </div>
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-right align-top font-mono tabular-nums">
+                      {p.luasLahanHa.toFixed(2)}
+                    </td>
+                    <td className="border border-slate-600 px-1 py-1 align-top">
+                      Total Konstruksi ({p.pekerjaanListWithBobot.length} Item)
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-right align-top text-slate-500">
+                      —
+                    </td>
+                    <td className="border border-slate-600 px-1 py-1 text-right align-top font-mono tabular-nums">
+                      {p.totalBiayaKonstruksi.toLocaleString("id-ID")}
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-right align-top font-mono tabular-nums">
+                      100,0%
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-right align-top text-slate-500">
+                      —
+                    </td>
+                    <td className="border border-slate-600 px-1 py-1 text-right align-top font-mono tabular-nums">
+                      {p.biayaDigunakanKonstruksi.toLocaleString("id-ID")}
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-center align-top font-mono tabular-nums">
+                      <div className="font-bold">
+                        {p.progresFisikKonstruksiPercent.toFixed(1)}%
+                      </div>
+                      <div className="text-[6px] font-normal text-slate-700">
+                        {photos.dailyReportsCount > 0
+                          ? `${photos.dailyReportsCount} Lap.`
+                          : "Belum ada"}
+                      </div>
+                      {photos.latestWeeklySubmission && (
+                        <div className="text-[5.8px] font-normal text-slate-600">
+                          {photos.latestWeeklySubmission.periodLabel}:{" "}
+                          {photos.latestWeeklySubmission.actualProgress}%
+                        </div>
+                      )}
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-center align-middle">
+                      <A4PhotoCell photos={photos.photos0} stageName="0%" />
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-center align-middle">
+                      <A4PhotoCell photos={photos.photos50} stageName="50%" />
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-center align-middle">
+                      <A4PhotoCell photos={photos.photos100} stageName="100%" />
+                    </td>
+                    <td className="border border-slate-600 px-0.5 py-1 text-center align-middle">
+                      <A4PhotoCell
+                        photos={photos.photosPrasasti}
+                        stageName="Prasasti"
+                      />
+                    </td>
+                  </tr>
+
+                  {printShowSubItems &&
+                    p.pekerjaanListWithBobot.map((item, idx) => {
+                      const item0 = getWorkItemStagePhotos(
+                        photos.photos0,
+                        item.namaPekerjaan,
+                      );
+                      const item50 = getWorkItemStagePhotos(
+                        photos.photos50,
+                        item.namaPekerjaan,
+                      );
+                      const item100 = getWorkItemStagePhotos(
+                        photos.photos100,
+                        item.namaPekerjaan,
+                      );
+                      const itemPrasasti = getWorkItemStagePhotos(
+                        photos.photosPrasasti,
+                        item.namaPekerjaan,
+                      );
+
+                      return (
+                        <tr
+                          key={`a4-item-${p.no}-${idx}`}
+                          className="bg-white text-[6.8px] text-slate-800"
+                        >
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-center font-mono text-slate-500">
+                            {p.no}.{idx + 1}
+                          </td>
+                          <td
+                            colSpan={2}
+                            className="border border-slate-400 px-1 py-0.5 pl-2.5 text-slate-700 break-words"
+                          >
+                            ↳ {item.namaPekerjaan}
+                          </td>
+                          <td className="border border-slate-400 px-1 py-0.5 break-words">
+                            {item.namaPekerjaan}
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-right font-mono tabular-nums">
+                            {item.volume !== null && item.volume !== undefined
+                              ? `${item.volume} ${item.satuan ?? ""}`.trim()
+                              : "—"}
+                          </td>
+                          <td className="border border-slate-400 px-1 py-0.5 text-right font-mono tabular-nums">
+                            {item.biaya > 0
+                              ? item.biaya.toLocaleString("id-ID")
+                              : "—"}
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-right font-mono tabular-nums">
+                            {item.bobotPercent.toFixed(2)}%
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-right font-mono tabular-nums">
+                            {item.realisasiVolumeCalc !== null &&
+                            item.realisasiVolumeCalc !== undefined &&
+                            item.realisasiVolumeCalc !== "-"
+                              ? `${item.realisasiVolumeCalc} ${item.realisasiSatuan || item.satuan || ""}`.trim()
+                              : "—"}
+                          </td>
+                          <td className="border border-slate-400 px-1 py-0.5 text-right font-mono tabular-nums">
+                            {item.realisasiBiaya > 0
+                              ? item.realisasiBiaya.toLocaleString("id-ID")
+                              : "—"}
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-center font-mono tabular-nums text-slate-600">
+                            {item.biaya > 0
+                              ? `${p.progresFisikKonstruksiPercent.toFixed(1)}%`
+                              : "Opsional"}
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-center align-middle">
+                            <A4PhotoCell photos={item0} stageName="0%" compact />
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-center align-middle">
+                            <A4PhotoCell photos={item50} stageName="50%" compact />
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-center align-middle">
+                            <A4PhotoCell
+                              photos={item100}
+                              stageName="100%"
+                              compact
+                            />
+                          </td>
+                          <td className="border border-slate-400 px-0.5 py-0.5 text-center align-middle">
+                            <A4PhotoCell
+                              photos={itemPrasasti}
+                              stageName="Prasasti"
+                              compact
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </Fragment>
+              );
+            })}
+
+            {/* Final Grand Total Row */}
+            <tr className="bg-slate-200 font-bold text-slate-950">
+              <td
+                colSpan={2}
+                className="border border-slate-700 px-1.5 py-1.5 text-center"
+              >
+                TOTAL KESELURUHAN ({filteredData.length} POKTAN)
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalLuas.toFixed(2)}
+              </td>
+              <td
+                colSpan={2}
+                className="border border-slate-700 px-1 py-1.5 text-right"
+              >
+                Total Anggaran SID:
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalBiayaKonstruksi.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                100,0%
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right">
+                Real:
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalBiayaDigunakanKonstruksi.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-center font-mono tabular-nums">
+                <div>{aggregates.avgProgressPercent.toFixed(1)}%</div>
+                <div className="text-[6px] font-normal">
+                  {aggregates.totalDailyReportsCount} Lap.
+                </div>
+              </td>
+              <td
+                colSpan={4}
+                className="border border-slate-700 px-1 py-1.5 text-center"
+              >
+                Total: {aggregates.totalPhotosCount} Foto (
+                {aggregates.poktanWithPhotosCount} Poktan)
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      ) : activeTab === "database_spk" ? (
+        <table
+          className="w-full border-collapse border border-slate-700 text-[7px] leading-[1.25] text-slate-900"
+          style={{ tableLayout: "fixed" }}
+        >
+          <thead>
+            <tr className="bg-slate-200 font-bold uppercase text-slate-950">
+              <th className="w-[3.5%] border border-slate-600 px-0.5 py-1 text-center">No</th>
+              <th className="w-[11%] border border-slate-600 px-1 py-1 text-left">Kec. / Desa</th>
+              <th className="w-[14%] border border-slate-600 px-1 py-1 text-left">Poktan &amp; Luas</th>
+              <th className="w-[13%] border border-slate-600 px-1 py-1 text-left">Nomor &amp; Tgl SPK</th>
+              <th className="w-[10%] border border-slate-600 px-1 py-1 text-left">Jangka Waktu</th>
+              <th className="w-[11.5%] border border-slate-600 px-1 py-1 text-left">Bank &amp; Rekening</th>
+              <th className="w-[13%] border border-slate-600 px-1 py-1 text-left">Pengurus</th>
+              <th className="w-[8%] border border-slate-600 px-1 py-1 text-right">SP2D 1 (Rp)</th>
+              <th className="w-[8%] border border-slate-600 px-1 py-1 text-right">SP2D 2 (Rp)</th>
+              <th className="w-[8%] border border-slate-600 px-1 py-1 text-right">Total Tersalur</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((d) => {
+              const totalTersalur = d.sp2d1Jumlah + d.sp2d2Jumlah;
+              return (
+                <tr key={`a4-spk-${d.no}`} className="bg-white">
+                  <td className="border border-slate-500 px-0.5 py-1 text-center font-mono">
+                    {d.no}
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 align-top break-words">
+                    <div className="font-semibold">Kec. {d.kecamatan}</div>
+                    <div className="text-[6.5px] text-slate-600">Desa {d.desa}</div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 align-top break-words">
+                    <div className="font-bold">{d.poktan}</div>
+                    <div className="text-[6.5px] text-slate-600">
+                      {d.luasLahanHa} Ha ({d.jumlahAnggota} Angg.)
+                    </div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 align-top font-mono break-words">
+                    <div>{d.nomorSpk}</div>
+                    <div className="text-[6px] text-slate-600">Tgl: {d.tglSpk}</div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 align-top tabular-nums">
+                    <div>{d.tglMulai} s/d</div>
+                    <div className="text-slate-600">{d.tglSelesai}</div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 align-top break-words">
+                    <div className="font-medium">{d.namaBank}</div>
+                    <div className="font-mono text-[6.5px] text-slate-600">
+                      {d.noRekening}
+                    </div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 align-top break-words">
+                    <div>
+                      Ketua: <span className="font-semibold">{d.ketuaPoktan}</span>
+                    </div>
+                    <div className="font-mono text-[6px] text-slate-600">
+                      NIK: {d.nikKetua}
+                    </div>
+                    <div>
+                      UPKK: <span className="font-semibold">{d.ketuaUpkk}</span>
+                    </div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 text-right align-top font-mono tabular-nums">
+                    <div>{d.sp2d1Jumlah.toLocaleString("id-ID")}</div>
+                    <div className="text-[5.8px] text-slate-600">{d.sp2d1NoTgl}</div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 text-right align-top font-mono tabular-nums">
+                    <div>{d.sp2d2Jumlah.toLocaleString("id-ID")}</div>
+                    <div className="text-[5.8px] text-slate-600">
+                      {d.sp2d2NoTgl || "—"}
+                    </div>
+                  </td>
+                  <td className="border border-slate-500 px-1 py-1 text-right align-top font-mono font-bold tabular-nums">
+                    {totalTersalur.toLocaleString("id-ID")}
+                  </td>
+                </tr>
+              );
+            })}
+            <tr className="bg-slate-200 font-bold text-slate-950">
+              <td colSpan={7} className="border border-slate-700 px-1.5 py-1.5 text-center">
+                TOTAL PENYALURAN SP2D ({filteredData.length} POKTAN)
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalSp2d1.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalSp2d2.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-1 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalPenyaluran.toLocaleString("id-ID")}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        <table
+          className="w-full border-collapse border border-slate-700 text-[6.8px] leading-[1.2] text-slate-900"
+          style={{ tableLayout: "fixed" }}
+        >
+          <thead>
+            <tr className="bg-slate-200 font-bold uppercase text-slate-950">
+              <th rowSpan={2} className="w-[3%] border border-slate-600 px-0.5 py-1 text-center">
+                No
+              </th>
+              <th rowSpan={2} className="w-[10%] border border-slate-600 px-1 py-1 text-left">
+                Kecamatan &amp; Desa
+              </th>
+              <th rowSpan={2} className="w-[12%] border border-slate-600 px-1 py-1 text-left">
+                Nama Poktan
+              </th>
+              <th rowSpan={2} className="w-[4.5%] border border-slate-600 px-0.5 py-1 text-right">
+                Luas (Ha)
+              </th>
+              <th colSpan={4} className="border border-slate-600 bg-slate-100 px-1 py-1 text-center">
+                Konstruksi
+              </th>
+              <th colSpan={4} className="border border-slate-600 bg-slate-100 px-1 py-1 text-center">
+                BAST Fisik
+              </th>
+              <th colSpan={4} className="border border-slate-600 bg-slate-100 px-1 py-1 text-center">
+                Olah Lahan
+              </th>
+            </tr>
+            <tr className="bg-slate-100 text-[6px] font-bold uppercase text-slate-800">
+              <th className="w-[7%] border border-slate-600 px-0.5 py-1 text-right">Biaya</th>
+              <th className="w-[7%] border border-slate-600 px-0.5 py-1 text-right">Digunakan</th>
+              <th className="w-[5.5%] border border-slate-600 px-0.5 py-1 text-right">Real Ha</th>
+              <th className="w-[4.5%] border border-slate-600 px-0.5 py-1 text-center">%</th>
+              <th className="w-[5.5%] border border-slate-600 px-0.5 py-1 text-center">UPKK</th>
+              <th className="w-[5.5%] border border-slate-600 px-0.5 py-1 text-center">UPKK-PPK</th>
+              <th className="w-[5.5%] border border-slate-600 px-0.5 py-1 text-center">PPK-KPA</th>
+              <th className="w-[5.5%] border border-slate-600 px-0.5 py-1 text-center">KPA-Pkt</th>
+              <th className="w-[7%] border border-slate-600 px-0.5 py-1 text-right">Biaya</th>
+              <th className="w-[7%] border border-slate-600 px-0.5 py-1 text-right">Digunakan</th>
+              <th className="w-[4.5%] border border-slate-600 px-0.5 py-1 text-center">%</th>
+              <th className="w-[5.5%] border border-slate-600 px-0.5 py-1 text-right">Real Ha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((d) => (
+              <tr key={`a4-rekap-${d.no}`} className="bg-white">
+                <td className="border border-slate-500 px-0.5 py-1 text-center font-mono">
+                  {d.no}
+                </td>
+                <td className="border border-slate-500 px-1 py-1 break-words">
+                  <div className="font-semibold">{d.kecamatan}</div>
+                  <div className="text-[6px] text-slate-600">Ds. {d.desa}</div>
+                </td>
+                <td className="border border-slate-500 px-1 py-1 font-bold break-words">
+                  {d.poktan}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.luasLahanHa}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.totalBiayaKonstruksi.toLocaleString("id-ID")}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.biayaDigunakanKonstruksi.toLocaleString("id-ID")}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.realisasiHaKonstruksi.toLocaleString("id-ID", {
+                    maximumFractionDigits: 3,
+                  })}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-center font-mono tabular-nums">
+                  {d.progresFisikKonstruksiPercent}%
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-center break-words">
+                  {d.bastTeknisUpkk || "—"}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-center break-words">
+                  {d.bastUpkkPpk || "—"}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-center break-words">
+                  {d.bastPpkKpa || "—"}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-center break-words">
+                  {d.bastKpaPoktan || "—"}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.totalBiayaOlahLahan.toLocaleString("id-ID")}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.biayaDigunakanOlahLahan.toLocaleString("id-ID")}
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-center font-mono tabular-nums">
+                  {d.progresFisikOlahLahanPercent}%
+                </td>
+                <td className="border border-slate-500 px-0.5 py-1 text-right font-mono tabular-nums">
+                  {d.realisasiHaOlahLahan}
+                </td>
+              </tr>
+            ))}
+            <tr className="bg-slate-200 font-bold text-slate-950">
+              <td colSpan={3} className="border border-slate-700 px-1 py-1.5 text-center">
+                TOTAL ({filteredData.length} POKTAN)
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalLuas.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalBiayaKonstruksi.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalBiayaDigunakanKonstruksi.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalRealisasiHaKonstruksi.toLocaleString("id-ID", {
+                  maximumFractionDigits: 2,
+                })}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-center font-mono">
+                {aggregates.avgProgressPercent}%
+              </td>
+              <td colSpan={4} className="border border-slate-700 px-0.5 py-1.5 text-center">
+                BAST Lengkap
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalBiayaOlahLahan.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalBiayaDigunakanOlahLahan.toLocaleString("id-ID")}
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-center">
+                100%
+              </td>
+              <td className="border border-slate-700 px-0.5 py-1.5 text-right font-mono tabular-nums">
+                {aggregates.totalLuas.toLocaleString("id-ID")}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* Formal Sign-Off Block on A4 Sheet */}
+      <div className="mt-5 break-inside-avoid border-t border-slate-400 pt-3">
+        <div className="grid grid-cols-3 gap-6 text-center text-[8px] leading-snug text-slate-900">
+          <div>
+            <p>Mengetahui,</p>
+            <p className="font-bold">Kuasa Pengguna Anggaran (KPA)</p>
+            <div className="h-14" />
+            <p className="font-bold underline">NAMA KPA LENGKAP, M.Si</p>
+            <p className="text-slate-600">NIP. 19780101 200501 1 001</p>
+          </div>
+          <div>
+            <p>Disetujui Oleh,</p>
+            <p className="font-bold">Pejabat Pembuat Komitmen (PPK)</p>
+            <div className="h-14" />
+            <p className="font-bold underline">NAMA PPK LENGKAP, ST</p>
+            <p className="text-slate-600">NIP. 19820315 200801 1 002</p>
+          </div>
+          <div>
+            <p>Takengon, {printedDateLabel}</p>
+            <p className="font-bold">
+              Pejabat Pelaksana Teknis Kegiatan (PPTK)
+            </p>
+            <div className="h-14" />
+            <p className="font-bold underline">NAMA PPTK LENGKAP, SP</p>
+            <p className="text-slate-600">NIP. 19850720 201001 1 003</p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -436,7 +2124,6 @@ export function DinasProjectReportPage({
   const [activeTab, setActiveTab] = useState<DinasTabType>("rekapitulasi");
   const [selectedKecamatan, setSelectedKecamatan] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedPoktanIndex, setSelectedPoktanIndex] = useState<number>(0);
 
   // Controls for Tab 2: Hasil SID & Foto Master
   const [photoFilter, setPhotoFilter] = useState<
@@ -453,6 +2140,70 @@ export function DinasProjectReportPage({
     "excel_table",
   );
   const [lightboxData, setLightboxData] = useState<LightboxState | null>(null);
+  const [photoAssistantTarget, setPhotoAssistantTarget] =
+    useState<PhotoAssistantTarget>(null);
+  const [assistantShowAllProjects, setAssistantShowAllProjects] =
+    useState<boolean>(false);
+  const [isA4PrintViewOpen, setIsA4PrintViewOpen] = useState<boolean>(false);
+  const [printShowSubItems, setPrintShowSubItems] = useState<boolean>(true);
+
+  const printedDateLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Asia/Jakarta",
+      }).format(new Date(referenceNowMs)),
+    [referenceNowMs],
+  );
+
+  const handleOpenA4PrintView = () => {
+    setPrintShowSubItems(showAllItems);
+    setIsA4PrintViewOpen(true);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  // Synced persistence for Auto Adaptation Mode & Per-Poktan Manual Adjustments
+  const autoAdaptMode = useSyncExternalStore(
+    subscribePhotoSettings,
+    getAutoModeSnapshot,
+    getAutoModeServerSnapshot,
+  );
+  const photoAdjustments = useSyncExternalStore(
+    subscribePhotoSettings,
+    getAdjustmentsSnapshot,
+    getAdjustmentsServerSnapshot,
+  );
+
+  const handleChangeAutoAdaptMode = (mode: PhotoAutoAdaptMode) => {
+    persistAutoMode(mode);
+    const labelMap: Record<PhotoAutoAdaptMode, string> = {
+      smart_chronological: "Otomatis Cerdas Kronologis (0% → 50% → 100%)",
+      distribute_all_4: "Sebar Merata ke 4 Tahap (0%, 50%, 100%, Prasasti)",
+      strict_threshold: "Ketat Berdasarkan % Progres Laporan Harian",
+    };
+    toast.success(`Mode penyesuaian foto: ${labelMap[mode]}`);
+  };
+
+  const updatePoktanAdjustment = (
+    poktanNo: number,
+    updater: (prev: PoktanPhotoAdjustment) => PoktanPhotoAdjustment,
+  ) => {
+    const prevAll = getAdjustmentsSnapshot();
+    const current = prevAll[poktanNo] ?? {};
+    const updated = updater(current);
+    persistPhotoAdjustments({ ...prevAll, [poktanNo]: updated });
+  };
+
+  const resetPoktanAdjustment = (poktanNo: number) => {
+    const next = { ...getAdjustmentsSnapshot() };
+    delete next[poktanNo];
+    persistPhotoAdjustments(next);
+    toast.success("Penyesuaian foto Poktan dikembalikan ke otomatis.");
+  };
 
   const togglePoktan = (no: number) => {
     setExpandedPoktanNos((prev) => {
@@ -467,11 +2218,13 @@ export function DinasProjectReportPage({
     photo: ClassifiedPhotoItem,
     photoList: ClassifiedPhotoItem[],
     currentIndex: number,
+    poktanNo?: number,
   ) => {
     setLightboxData({
       photo,
       photoList,
       currentIndex,
+      poktanNo,
     });
   };
 
@@ -494,7 +2247,7 @@ export function DinasProjectReportPage({
           : null;
       const paguValue = parseAmountSafe(project.pagu);
       const realizedValue = parseAmountSafe(project.realized);
-      const reports = project.reports ?? [];
+      const reports = project.reports ?? project.dailyReports ?? [];
       const sortedReportDates = reports
         .map((report) => toJakartaDateKey(report.reportDate))
         .filter((dateKey): dateKey is string => Boolean(dateKey))
@@ -682,14 +2435,24 @@ export function DinasProjectReportPage({
       if (portfolioStatusFilter !== "ALL") {
         params.set("status", portfolioStatusFilter);
       }
-      const res = await fetch(`/api/projects/export?${params.toString()}`);
+      const url = `/api/projects/export?${params.toString()}`;
+      const res = await fetch(url);
       if (!res.ok) {
         let message = `Gagal mengekspor portofolio (${res.status})`;
         try {
-          const payload = (await res.json()) as { error?: string };
-          if (payload?.error) message = payload.error;
+          const payload = (await res.json()) as {
+            message?: string;
+            error?: string;
+          };
+          message = payload?.message || payload?.error || message;
         } catch {
           // ignore non-json error body
+        }
+        if (res.status === 503 && format === "pdf") {
+          const htmlUrl = url.replace(/([?&])format=pdf\b/i, "$1format=html");
+          window.open(htmlUrl, "_blank", "noopener,noreferrer");
+          toast.error(`${message} Pratinjau cetak HTML dibuka di tab baru.`);
+          return;
         }
         toast.error(message);
         return;
@@ -700,14 +2463,14 @@ export function DinasProjectReportPage({
         res.headers.get("Content-Disposition"),
         fallbackName,
       );
-      const url = URL.createObjectURL(blob);
+      const objUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = url;
+      anchor.href = objUrl;
       anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
       toast.success(`Unduhan ${filename} dimulai`);
     } catch {
       toast.error("Gagal mengunduh rekap portofolio.");
@@ -726,16 +2489,24 @@ export function DinasProjectReportPage({
     if (exportingKey) return;
     setExportingKey(key);
     try {
-      const res = await fetch(
-        `/api/projects/${encodeURIComponent(projectId)}/reports?type=${type}&format=${format}`,
-      );
+      const url = `/api/projects/${encodeURIComponent(projectId)}/reports?type=${type}&format=${format}`;
+      const res = await fetch(url);
       if (!res.ok) {
         let message = `Gagal membuat laporan ${type} (${res.status})`;
         try {
-          const payload = (await res.json()) as { error?: string };
-          if (payload?.error) message = payload.error;
+          const payload = (await res.json()) as {
+            message?: string;
+            error?: string;
+          };
+          message = payload?.message || payload?.error || message;
         } catch {
           // ignore non-json error body
+        }
+        if (res.status === 503 && format === "pdf") {
+          const htmlUrl = url.replace(/([?&])format=pdf\b/i, "$1format=html");
+          window.open(htmlUrl, "_blank", "noopener,noreferrer");
+          toast.error(`${message} Pratinjau cetak HTML dibuka di tab baru.`);
+          return;
         }
         toast.error(message);
         return;
@@ -746,14 +2517,14 @@ export function DinasProjectReportPage({
         res.headers.get("Content-Disposition"),
         fallbackName,
       );
-      const url = URL.createObjectURL(blob);
+      const objUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = url;
+      anchor.href = objUrl;
       anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
       toast.success(`Unduhan ${filename} dimulai`);
     } catch {
       toast.error("Gagal mengunduh laporan proyek.");
@@ -761,6 +2532,14 @@ export function DinasProjectReportPage({
       setExportingKey(null);
     }
   };
+
+  const projectByIdMap = useMemo(() => {
+    const byId = new Map<string, DinasProjectProgressSource>();
+    for (const project of projects) {
+      if (project.id) byId.set(project.id, project);
+    }
+    return byId;
+  }, [projects]);
 
   const linkedProjectsByGroup = useMemo(() => {
     const projectByGroup = new Map<string, DinasProjectProgressSource>();
@@ -781,13 +2560,50 @@ export function DinasProjectReportPage({
     return projectByGroup;
   }, [projects]);
 
+  const globalPhotoPool = useMemo(() => {
+    const lookup = new Map<string, ClassifiedPhotoItem>();
+    const list: Array<
+      ClassifiedPhotoItem & { projectId?: string; projectTitle: string }
+    > = [];
+    const seenListKeys = new Set<string>();
+
+    for (const project of projects) {
+      const { rawPhotos } = extractRawDailyReportPhotos(
+        project.kelompokTani || project.name,
+        project.location || project.address || "-",
+        "-",
+        project,
+      );
+      const projLabel = project.name || project.title || project.code || "Proyek";
+      for (const photo of rawPhotos) {
+        if (!lookup.has(photo.photoKey)) {
+          lookup.set(photo.photoKey, photo);
+        }
+        if (!seenListKeys.has(photo.photoKey)) {
+          seenListKeys.add(photo.photoKey);
+          list.push({
+            ...photo,
+            projectId: project.id,
+            projectTitle: projLabel,
+          });
+        }
+      }
+    }
+    return { lookup, list };
+  }, [projects]);
+
   const projectReportData = useMemo(
     () =>
       DINAS_PROJECTS_DATA.map((record) => {
-        const linkedProject =
+        const adjustment = photoAdjustments[record.no];
+        const autoLinkedProject =
           linkedProjectsByGroup.get(normalizeGroupName(record.poktan)) ||
           linkedProjectsByGroup.get(normalizeGroupName(record.desa)) ||
           linkedProjectsByGroup.get(normalizeGroupName(record.nomorSpk));
+        const linkedProject =
+          (adjustment?.linkedProjectId
+            ? projectByIdMap.get(adjustment.linkedProjectId)
+            : undefined) ?? autoLinkedProject;
 
         const sourceProgress =
           linkedProject && Number.isFinite(linkedProject.progress)
@@ -804,6 +2620,9 @@ export function DinasProjectReportPage({
           record.desa,
           record.kecamatan,
           linkedProject,
+          adjustment,
+          autoAdaptMode,
+          globalPhotoPool.lookup,
         );
 
         const totalBiayaKonstruksi = record.totalBiayaKonstruksi;
@@ -838,9 +2657,17 @@ export function DinasProjectReportPage({
           pekerjaanListWithBobot,
           photoClassification,
           linkedProject,
+          autoLinkedProjectId: autoLinkedProject?.id,
+          adjustment,
         };
       }),
-    [linkedProjectsByGroup],
+    [
+      linkedProjectsByGroup,
+      projectByIdMap,
+      photoAdjustments,
+      autoAdaptMode,
+      globalPhotoPool,
+    ],
   );
 
   const kecamatanList = useMemo(() => {
@@ -1068,26 +2895,280 @@ export function DinasProjectReportPage({
       });
     }
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," + [csvHeader, ...csvRows].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvString = "\uFEFF" + [csvHeader, ...csvRows].join("\r\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const filename = `Laporan_Dinas_${activeTab}_Aceh_Tengah_${new Date().toISOString().slice(0, 10)}.csv`;
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `Laporan_Dinas_${activeTab}_Aceh_Tengah_${new Date().toISOString().slice(0, 10)}.csv`,
-    );
+    link.href = url;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    toast.success(`Unduhan ${filename} dimulai`);
   };
 
-  const selectedPoktan =
-    filteredData[selectedPoktanIndex] || filteredData[0] || projectReportData[0];
+  const getBaselineStageMap = (
+    poktanItem: (typeof projectReportData)[number],
+  ): Record<string, PhotoStageKey[]> => {
+    const existing = poktanItem.adjustment?.photoStageMap;
+    if (existing && Object.keys(existing).length > 0) {
+      return { ...existing };
+    }
+    const map: Record<string, PhotoStageKey[]> = {};
+    const addStage = (
+      list: ClassifiedPhotoItem[],
+      stage: PhotoStageKey,
+    ) => {
+      for (const item of list) {
+        const cur = map[item.photoKey] ?? [];
+        if (!cur.includes(stage)) {
+          map[item.photoKey] = [...cur, stage];
+        }
+      }
+    };
+    addStage(poktanItem.photoClassification.photos0, "0%");
+    addStage(poktanItem.photoClassification.photos50, "50%");
+    addStage(poktanItem.photoClassification.photos100, "100%");
+    addStage(poktanItem.photoClassification.photosPrasasti, "Prasasti");
+    return map;
+  };
+
+  const handleTogglePhotoStage = (
+    poktanNo: number,
+    photoKey: string,
+    stage: PhotoStageKey,
+  ) => {
+    const poktanItem = projectReportData.find((p) => p.no === poktanNo);
+    if (!poktanItem) return;
+    const baseMap = getBaselineStageMap(poktanItem);
+    const currentStages = baseMap[photoKey] ?? [];
+    const nextStages = currentStages.includes(stage)
+      ? currentStages.filter((s) => s !== stage)
+      : [...currentStages, stage];
+    baseMap[photoKey] = nextStages;
+
+    updatePoktanAdjustment(poktanNo, (prev) => ({
+      ...prev,
+      stageOverrides: undefined,
+      photoStageMap: baseMap,
+    }));
+  };
+
+  const handleSetPhotoWorkItem = (
+    poktanNo: number,
+    photoKey: string,
+    itemName: string,
+  ) => {
+    updatePoktanAdjustment(poktanNo, (prev) => {
+      const nextWorkMap = { ...(prev.photoWorkItemMap ?? {}) };
+      if (!itemName || itemName === "__ALL__") {
+        delete nextWorkMap[photoKey];
+      } else {
+        nextWorkMap[photoKey] = itemName;
+      }
+      return { ...prev, photoWorkItemMap: nextWorkMap };
+    });
+  };
+
+  const handleRotatePhoto = (poktanNo: number, photoKey: string) => {
+    updatePoktanAdjustment(poktanNo, (prev) => {
+      const nextVisual = { ...(prev.photoVisualMap ?? {}) };
+      const cur = nextVisual[photoKey] ?? {};
+      nextVisual[photoKey] = {
+        ...cur,
+        rotation: ((cur.rotation ?? 0) + 90) % 360,
+      };
+      return { ...prev, photoVisualMap: nextVisual };
+    });
+  };
+
+  const handleTogglePhotoFit = (poktanNo: number, photoKey: string) => {
+    updatePoktanAdjustment(poktanNo, (prev) => {
+      const nextVisual = { ...(prev.photoVisualMap ?? {}) };
+      const cur = nextVisual[photoKey] ?? {};
+      nextVisual[photoKey] = {
+        ...cur,
+        fit: cur.fit === "contain" ? "cover" : "contain",
+      };
+      return { ...prev, photoVisualMap: nextVisual };
+    });
+  };
+
+  const handleApplyPresetToPoktan = (
+    poktanNo: number,
+    mode: PhotoAutoAdaptMode,
+  ) => {
+    const poktanItem = projectReportData.find((p) => p.no === poktanNo);
+    if (!poktanItem) return;
+    const computedMap = computeAutoStageMap(
+      poktanItem.photoClassification.rawPhotos,
+      poktanItem.progresFisikKonstruksiPercent,
+      mode,
+    );
+    updatePoktanAdjustment(poktanNo, (prev) => ({
+      ...prev,
+      stageOverrides: undefined,
+      photoStageMap: computedMap,
+    }));
+    toast.success(
+      mode === "distribute_all_4"
+        ? `Foto Poktan ${poktanItem.poktan} disebar merata ke 4 tahap.`
+        : `Foto Poktan ${poktanItem.poktan} disesuaikan otomatis secara kronologis.`,
+    );
+  };
+
+  const handleLinkProjectToPoktan = (poktanNo: number, projectId: string) => {
+    updatePoktanAdjustment(poktanNo, (prev) => ({
+      ...prev,
+      linkedProjectId: projectId === "__AUTO__" ? undefined : projectId,
+    }));
+    toast.success("Sumber proyek Laporan Harian diperbarui.");
+  };
+
+  const activeAssistantPoktan = useMemo(() => {
+    if (!photoAssistantTarget) return null;
+    return (
+      projectReportData.find((p) => p.no === photoAssistantTarget.poktanNo) ??
+      projectReportData[0] ??
+      null
+    );
+  }, [photoAssistantTarget, projectReportData]);
+
+  const filterSummaryText = useMemo(() => {
+    if (reportMode === "portfolio_live") {
+      return [
+        portfolioSearch.trim() ? `Cari "${portfolioSearch.trim()}"` : "",
+        portfolioWorkTypeFilter !== "ALL"
+          ? `Jenis: ${portfolioWorkTypeFilter}`
+          : "",
+        portfolioStatusFilter !== "ALL"
+          ? `Status: ${portfolioStatusFilter}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    }
+    return [
+      selectedKecamatan !== "ALL" ? `Kec. ${selectedKecamatan}` : "",
+      searchQuery.trim() ? `Cari "${searchQuery.trim()}"` : "",
+      activeTab === "rincian_sid" && photoFilter !== "ALL"
+        ? `Foto: ${photoFilter}`
+        : "",
+      activeTab === "rincian_sid" && reportFilter !== "ALL"
+        ? `Laporan: ${reportFilter}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }, [
+    reportMode,
+    portfolioSearch,
+    portfolioWorkTypeFilter,
+    portfolioStatusFilter,
+    selectedKecamatan,
+    searchQuery,
+    activeTab,
+    photoFilter,
+    reportFilter,
+  ]);
 
   return (
     <div className="space-y-6">
-      {/* Mode Switcher Bar */}
+      {isA4PrintViewOpen ? (
+        <div className="space-y-4">
+          {/* Clean A4 Preview Top Control Bar (hidden on print) */}
+          <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/95 p-3 shadow-md backdrop-blur print:hidden">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsA4PrintViewOpen(false)}
+                className="gap-1.5"
+              >
+                <ArrowLeft className="size-3.5" aria-hidden="true" />
+                <span>Kembali ke Dashboard</span>
+              </Button>
+              {reportMode === "dinas_preset" && activeTab === "rincian_sid" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrintShowSubItems((v) => !v)}
+                  className="gap-1.5"
+                >
+                  <Layers className="size-3.5 text-primary" aria-hidden="true" />
+                  <span>
+                    {printShowSubItems
+                      ? "Rincian Sub-Item SID: Ditampilkan"
+                      : "Rincian Sub-Item SID: Dirangkum"}
+                  </span>
+                </Button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {reportMode === "dinas_preset" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  className="gap-1.5"
+                >
+                  <Download className="size-3.5" aria-hidden="true" />
+                  <span>Ekspor CSV</span>
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => window.print()}
+                className="gap-1.5 font-semibold"
+              >
+                <Printer className="size-3.5" aria-hidden="true" />
+                <span>Cetak Dokumen A4</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Centered A4 Paper Sheet Backdrop */}
+          <div className="overflow-x-auto rounded-xl border border-border bg-slate-200/80 p-3 sm:p-6 dark:bg-slate-900/70 print:overflow-visible print:border-0 print:bg-white print:p-0">
+            <DinasA4CleanDocumentSheet
+              isPreviewVisible
+              reportMode={reportMode}
+              activeTab={activeTab}
+              filteredData={filteredData}
+              aggregates={aggregates}
+              filteredPortfolioRows={filteredPortfolioRows}
+              portfolioSummary={portfolioSummary}
+              canViewFinancials={canViewFinancials}
+              printShowSubItems={printShowSubItems}
+              filterSummaryText={filterSummaryText}
+              printedDateLabel={printedDateLabel}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Hidden clean A4 document for direct Ctrl+P printing */}
+          <DinasA4CleanDocumentSheet
+            isPreviewVisible={false}
+            reportMode={reportMode}
+            activeTab={activeTab}
+            filteredData={filteredData}
+            aggregates={aggregates}
+            filteredPortfolioRows={filteredPortfolioRows}
+            portfolioSummary={portfolioSummary}
+            canViewFinancials={canViewFinancials}
+            printShowSubItems={showAllItems}
+            filterSummaryText={filterSummaryText}
+            printedDateLabel={printedDateLabel}
+          />
+
+          {/* Mode Switcher Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -1111,12 +3192,33 @@ export function DinasProjectReportPage({
           <Button
             type="button"
             size="sm"
-            variant={reportMode === "dinas_preset" ? "default" : "outline"}
+            variant={
+              reportMode === "dinas_preset" && activeTab !== "rincian_sid"
+                ? "default"
+                : "outline"
+            }
             onClick={() => setReportMode("dinas_preset")}
             className="gap-1.5"
           >
             <Landmark className="size-3.5" aria-hidden="true" />
             <span>Preset Dinas Aceh Tengah</span>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={
+              reportMode === "dinas_preset" && activeTab === "rincian_sid"
+                ? "default"
+                : "outline"
+            }
+            onClick={() => {
+              setReportMode("dinas_preset");
+              setActiveTab("rincian_sid");
+            }}
+            className="gap-1.5"
+          >
+            <ImageIcon className="size-3.5" aria-hidden="true" />
+            <span>Hasil SID &amp; Foto</span>
           </Button>
         </div>
         <span className="type-p3 text-muted-foreground">
@@ -1201,7 +3303,7 @@ export function DinasProjectReportPage({
                 <Button
                   type="button"
                   size="sm"
-                  onClick={() => window.print()}
+                  onClick={handleOpenA4PrintView}
                   className="gap-1.5"
                 >
                   <Printer className="size-3.5" aria-hidden="true" />
@@ -1429,7 +3531,7 @@ export function DinasProjectReportPage({
             />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-2xs">
-              <Table>
+              <Table pagination={false}>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="w-12 text-center">No</TableHead>
@@ -1707,7 +3809,7 @@ export function DinasProjectReportPage({
             <Button
               type="button"
               size="sm"
-              onClick={() => window.print()}
+              onClick={handleOpenA4PrintView}
               className="gap-1.5"
             >
               <Printer className="size-3.5" aria-hidden="true" />
@@ -2114,7 +4216,7 @@ export function DinasProjectReportPage({
           {activeTab === "rincian_sid" && (
             <div className="space-y-4">
               {/* Toolbar & Filters for Hasil SID & Foto */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs print:hidden">
                 <div className="flex flex-wrap items-center gap-2">
                   {/* View Mode Toggle */}
                   <div className="inline-flex items-center rounded-lg border border-border bg-muted/40 p-1">
@@ -2168,9 +4270,58 @@ export function DinasProjectReportPage({
                       </span>
                     </Button>
                   )}
+
+                  {/* System Bantu Sesuaikan Foto Button */}
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="xs"
+                    onClick={() => {
+                      const preferred =
+                        filteredData.find(
+                          (item) => item.photoClassification.totalPhotosCount > 0,
+                        ) ??
+                        filteredData[0] ??
+                        projectReportData[0];
+                      if (preferred) {
+                        setPhotoAssistantTarget({ poktanNo: preferred.no });
+                      }
+                    }}
+                    className="gap-1.5 text-xs font-semibold shadow-2xs"
+                  >
+                    <Sparkles className="size-3.5" aria-hidden="true" />
+                    <span>Sistem Bantu Sesuaikan Foto</span>
+                  </Button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Auto Adapt Mode Dropdown */}
+                  <Select
+                    value={autoAdaptMode}
+                    onValueChange={(val) =>
+                      handleChangeAutoAdaptMode(val as PhotoAutoAdaptMode)
+                    }
+                  >
+                    <SelectTrigger
+                      className="h-8 w-[205px] text-xs"
+                      title="Mode Otomatis Penyesuaian Foto Laporan Harian"
+                    >
+                      <Sparkles className="mr-1 size-3.5 text-primary" />
+                      <SelectValue placeholder="Mode Otomatis Foto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="smart_chronological">
+                        Otomatis Cerdas (Lap. Harian)
+                      </SelectItem>
+                      <SelectItem value="distribute_all_4">
+                        Sebar Merata 4 Tahap (0-100%)
+                      </SelectItem>
+                      <SelectItem value="strict_threshold">
+                        Ketat Sesuai % Laporan Harian
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   {/* Photo Filter Dropdown */}
                   <Select
                     value={photoFilter}
@@ -2184,7 +4335,7 @@ export function DinasProjectReportPage({
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-[170px] text-xs">
+                    <SelectTrigger className="h-8 w-[165px] text-xs">
                       <ImageIcon className="mr-1 size-3.5 text-muted-foreground" />
                       <SelectValue placeholder="Status Foto" />
                     </SelectTrigger>
@@ -2203,7 +4354,7 @@ export function DinasProjectReportPage({
                       setReportFilter(val as "ALL" | "HAS_DAILY" | "HAS_WEEKLY")
                     }
                   >
-                    <SelectTrigger className="h-8 w-[165px] text-xs">
+                    <SelectTrigger className="h-8 w-[160px] text-xs">
                       <FileText className="mr-1 size-3.5 text-muted-foreground" />
                       <SelectValue placeholder="Status Laporan" />
                     </SelectTrigger>
@@ -2224,7 +4375,7 @@ export function DinasProjectReportPage({
               {sidViewMode === "excel_table" && (
                 <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xs">
                   <div className="overflow-x-auto">
-                    <Table className="min-w-[1550px]">
+                    <Table pagination={false} className="min-w-[1550px]">
                       <TableHeader className="sticky top-0 z-10 bg-muted/70 text-xs">
                         {/* Tier 1 Header */}
                         <TableRow className="border-b border-border/80">
@@ -2333,7 +4484,10 @@ export function DinasProjectReportPage({
                           return (
                             <Fragment key={`poktan-row-${p.no}`}>
                               {/* Main Poktan Summary Row */}
-                              <TableRow className="border-t-2 border-border/80 bg-muted/20 font-medium transition hover:bg-muted/30">
+                              <TableRow
+                                key={`poktan-summary-${p.no}`}
+                                className="border-t-2 border-border/80 bg-muted/20 font-medium transition hover:bg-muted/30"
+                              >
                                 <TableCell className="border-r border-border/60 text-center font-mono text-xs font-bold text-foreground">
                                   {p.no}
                                 </TableCell>
@@ -2346,12 +4500,12 @@ export function DinasProjectReportPage({
                                   </span>
                                 </TableCell>
                                 <TableCell className="border-r border-border/60">
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-start gap-1.5">
                                     {!showAllItems && (
                                       <button
                                         type="button"
                                         onClick={() => togglePoktan(p.no)}
-                                        className="rounded-sm p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                        className="mt-0.5 rounded-sm p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                                         aria-label={
                                           isExpanded
                                             ? "Tutup rincian item"
@@ -2365,13 +4519,35 @@ export function DinasProjectReportPage({
                                         )}
                                       </button>
                                     )}
-                                    <div>
-                                      <span className="block text-xs font-bold text-foreground">
-                                        {p.poktan}
-                                      </span>
-                                      <span className="font-mono text-[10px] text-muted-foreground">
+                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                      <div className="flex flex-wrap items-center gap-1">
+                                        <span className="text-xs font-bold text-foreground">
+                                          {p.poktan}
+                                        </span>
+                                        {photos.isManuallyAdjusted && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="px-1 py-0 text-[9px]"
+                                          >
+                                            Disesuaikan
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <span className="block font-mono text-[10px] text-muted-foreground">
                                         SPK: {p.nomorSpk || "-"}
                                       </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setPhotoAssistantTarget({
+                                            poktanNo: p.no,
+                                          })
+                                        }
+                                        className="mt-0.5 inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-semibold text-primary transition hover:bg-primary/15 print:hidden"
+                                      >
+                                        <SlidersHorizontal className="size-2.5" />
+                                        <span>Sesuaikan Foto</span>
+                                      </button>
                                     </div>
                                   </div>
                                 </TableCell>
@@ -2456,7 +4632,15 @@ export function DinasProjectReportPage({
                                     photos={photos.photos0}
                                     stageName="0%"
                                     stageTitle="Foto Kondisi 0%"
-                                    onOpenLightbox={handleOpenLightbox}
+                                    onOpenLightbox={(photo, list, idx) =>
+                                      handleOpenLightbox(photo, list, idx, p.no)
+                                    }
+                                    onAdjustEmpty={() =>
+                                      setPhotoAssistantTarget({
+                                        poktanNo: p.no,
+                                        focusStage: "0%",
+                                      })
+                                    }
                                   />
                                 </TableCell>
                                 <TableCell className="bg-amber-500/5 p-1 text-center">
@@ -2464,7 +4648,15 @@ export function DinasProjectReportPage({
                                     photos={photos.photos50}
                                     stageName="50%"
                                     stageTitle="Foto Kondisi 50%"
-                                    onOpenLightbox={handleOpenLightbox}
+                                    onOpenLightbox={(photo, list, idx) =>
+                                      handleOpenLightbox(photo, list, idx, p.no)
+                                    }
+                                    onAdjustEmpty={() =>
+                                      setPhotoAssistantTarget({
+                                        poktanNo: p.no,
+                                        focusStage: "50%",
+                                      })
+                                    }
                                   />
                                 </TableCell>
                                 <TableCell className="bg-amber-500/5 p-1 text-center">
@@ -2472,7 +4664,15 @@ export function DinasProjectReportPage({
                                     photos={photos.photos100}
                                     stageName="100%"
                                     stageTitle="Foto Kondisi 100%"
-                                    onOpenLightbox={handleOpenLightbox}
+                                    onOpenLightbox={(photo, list, idx) =>
+                                      handleOpenLightbox(photo, list, idx, p.no)
+                                    }
+                                    onAdjustEmpty={() =>
+                                      setPhotoAssistantTarget({
+                                        poktanNo: p.no,
+                                        focusStage: "100%",
+                                      })
+                                    }
                                   />
                                 </TableCell>
                                 <TableCell className="bg-amber-500/5 p-1 text-center">
@@ -2480,97 +4680,243 @@ export function DinasProjectReportPage({
                                     photos={photos.photosPrasasti}
                                     stageName="Prasasti"
                                     stageTitle="Foto Batu Prasasti"
-                                    onOpenLightbox={handleOpenLightbox}
+                                    onOpenLightbox={(photo, list, idx) =>
+                                      handleOpenLightbox(photo, list, idx, p.no)
+                                    }
+                                    onAdjustEmpty={() =>
+                                      setPhotoAssistantTarget({
+                                        poktanNo: p.no,
+                                        focusStage: "Prasasti",
+                                      })
+                                    }
                                   />
                                 </TableCell>
                               </TableRow>
 
                               {/* Sub-Rows for each Pekerjaan Item */}
                               {isExpanded &&
-                                p.pekerjaanListWithBobot.map((item, idx) => (
-                                  <TableRow
-                                    key={`item-${p.no}-${item.namaPekerjaan}-${idx}`}
-                                    className="border-b border-border/40 text-xs transition hover:bg-muted/10"
-                                  >
-                                    <TableCell className="border-r border-border/60 text-center font-mono text-[10px] text-muted-foreground/60">
-                                      {p.no}.{idx + 1}
-                                    </TableCell>
-                                    <TableCell
-                                      colSpan={2}
-                                      className="border-r border-border/60 pl-6"
+                                p.pekerjaanListWithBobot.map((item, idx) => {
+                                  const item0 = getWorkItemStagePhotos(
+                                    photos.photos0,
+                                    item.namaPekerjaan,
+                                  );
+                                  const item50 = getWorkItemStagePhotos(
+                                    photos.photos50,
+                                    item.namaPekerjaan,
+                                  );
+                                  const item100 = getWorkItemStagePhotos(
+                                    photos.photos100,
+                                    item.namaPekerjaan,
+                                  );
+                                  const itemPrasasti = getWorkItemStagePhotos(
+                                    photos.photosPrasasti,
+                                    item.namaPekerjaan,
+                                  );
+                                  const hasAnyItemPhoto =
+                                    item0.length > 0 ||
+                                    item50.length > 0 ||
+                                    item100.length > 0 ||
+                                    itemPrasasti.length > 0;
+
+                                  return (
+                                    <TableRow
+                                      key={`item-${p.no}-${item.namaPekerjaan}-${idx}`}
+                                      className="border-b border-border/40 text-xs transition hover:bg-muted/10"
                                     >
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-mono text-muted-foreground/60">
-                                          ↳
-                                        </span>
-                                        <span className="font-medium text-foreground">
-                                          {item.namaPekerjaan}
-                                        </span>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="border-r border-border/60 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-                                      —
-                                    </TableCell>
+                                      <TableCell className="border-r border-border/60 text-center font-mono text-[10px] text-muted-foreground/60">
+                                        {p.no}.{idx + 1}
+                                      </TableCell>
+                                      <TableCell
+                                        colSpan={2}
+                                        className="border-r border-border/60 pl-6"
+                                      >
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-mono text-muted-foreground/60">
+                                            ↳
+                                          </span>
+                                          <span className="font-medium text-foreground">
+                                            {item.namaPekerjaan}
+                                          </span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="border-r border-border/60 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                                        —
+                                      </TableCell>
 
-                                    {/* HASIL SID Item Columns */}
-                                    <TableCell className="bg-primary/2 text-xs text-muted-foreground">
-                                      {item.namaPekerjaan}
-                                    </TableCell>
-                                    <TableCell className="bg-primary/2 text-right font-mono text-xs tabular-nums text-muted-foreground">
-                                      {item.volume !== null &&
-                                      item.volume !== undefined
-                                        ? String(item.volume)
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="bg-primary/2 text-center text-xs text-muted-foreground">
-                                      {item.satuan || "—"}
-                                    </TableCell>
-                                    <TableCell className="bg-primary/2 text-right font-mono text-xs font-semibold tabular-nums text-foreground">
-                                      {item.biaya > 0
-                                        ? item.biaya.toLocaleString("id-ID")
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="border-r border-border/60 bg-primary/2 text-right font-mono text-xs font-bold tabular-nums text-primary">
-                                      {item.bobotPercent.toFixed(2)}%
-                                    </TableCell>
+                                      {/* HASIL SID Item Columns */}
+                                      <TableCell className="bg-primary/2 text-xs text-muted-foreground">
+                                        {item.namaPekerjaan}
+                                      </TableCell>
+                                      <TableCell className="bg-primary/2 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                                        {item.volume !== null &&
+                                        item.volume !== undefined
+                                          ? String(item.volume)
+                                          : "—"}
+                                      </TableCell>
+                                      <TableCell className="bg-primary/2 text-center text-xs text-muted-foreground">
+                                        {item.satuan || "—"}
+                                      </TableCell>
+                                      <TableCell className="bg-primary/2 text-right font-mono text-xs font-semibold tabular-nums text-foreground">
+                                        {item.biaya > 0
+                                          ? item.biaya.toLocaleString("id-ID")
+                                          : "—"}
+                                      </TableCell>
+                                      <TableCell className="border-r border-border/60 bg-primary/2 text-right font-mono text-xs font-bold tabular-nums text-primary">
+                                        {item.bobotPercent.toFixed(2)}%
+                                      </TableCell>
 
-                                    {/* HASIL FISIK KONSTRUKSI Item Columns */}
-                                    <TableCell className="bg-emerald-500/2 text-right font-mono text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                                      {item.realisasiVolumeCalc !== null &&
-                                      item.realisasiVolumeCalc !== undefined
-                                        ? String(item.realisasiVolumeCalc)
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="bg-emerald-500/2 text-center text-xs text-muted-foreground">
-                                      {item.realisasiSatuan || item.satuan || "—"}
-                                    </TableCell>
-                                    <TableCell className="bg-emerald-500/2 text-right font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-                                      {item.realisasiBiaya > 0
-                                        ? item.realisasiBiaya.toLocaleString("id-ID")
-                                        : "—"}
-                                    </TableCell>
-                                    <TableCell className="bg-emerald-500/2 text-center text-xs font-medium text-emerald-600">
-                                      {p.progresFisikKonstruksiPercent.toFixed(1)}%
-                                    </TableCell>
-                                    <TableCell className="border-r border-border/60 bg-emerald-500/2 text-[11px] text-muted-foreground">
-                                      {item.biaya > 0
-                                        ? p.progresFisikKonstruksiPercent >= 100
-                                          ? "100% Selesai"
-                                          : p.progresFisikKonstruksiPercent > 0
-                                            ? "Pelaksanaan"
-                                            : "Belum Mulai"
-                                        : "Opsional"}
-                                    </TableCell>
+                                      {/* HASIL FISIK KONSTRUKSI Item Columns */}
+                                      <TableCell className="bg-emerald-500/2 text-right font-mono text-xs font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                        {item.realisasiVolumeCalc !== null &&
+                                        item.realisasiVolumeCalc !== undefined
+                                          ? String(item.realisasiVolumeCalc)
+                                          : "—"}
+                                      </TableCell>
+                                      <TableCell className="bg-emerald-500/2 text-center text-xs text-muted-foreground">
+                                        {item.realisasiSatuan ||
+                                          item.satuan ||
+                                          "—"}
+                                      </TableCell>
+                                      <TableCell className="bg-emerald-500/2 text-right font-mono text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                        {item.realisasiBiaya > 0
+                                          ? item.realisasiBiaya.toLocaleString(
+                                              "id-ID",
+                                            )
+                                          : "—"}
+                                      </TableCell>
+                                      <TableCell className="bg-emerald-500/2 text-center text-xs font-medium text-emerald-600">
+                                        {p.progresFisikKonstruksiPercent.toFixed(
+                                          1,
+                                        )}
+                                        %
+                                      </TableCell>
+                                      <TableCell className="border-r border-border/60 bg-emerald-500/2 text-[11px] text-muted-foreground">
+                                        {item.biaya > 0
+                                          ? p.progresFisikKonstruksiPercent >=
+                                            100
+                                            ? "100% Selesai"
+                                            : p.progresFisikKonstruksiPercent >
+                                                0
+                                              ? "Pelaksanaan"
+                                              : "Belum Mulai"
+                                          : "Opsional"}
+                                      </TableCell>
 
-                                    {/* Empty Foto Slots for sub-row */}
-                                    <TableCell
-                                      colSpan={4}
-                                      className="bg-muted/5 py-1 text-center text-[10px] italic text-muted-foreground/40"
-                                    >
-                                      ↳ Foto di baris Kelompok Tani
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
+                                      {/* Item-level Matched Photos */}
+                                      {hasAnyItemPhoto ? (
+                                        <>
+                                          <TableCell className="bg-muted/5 p-1 text-center">
+                                            <PhotoThumbnailSlot
+                                              photos={item0}
+                                              stageName="0%"
+                                              stageTitle={`${item.namaPekerjaan} · 0%`}
+                                              onOpenLightbox={(
+                                                photo,
+                                                list,
+                                                i,
+                                              ) =>
+                                                handleOpenLightbox(
+                                                  photo,
+                                                  list,
+                                                  i,
+                                                  p.no,
+                                                )
+                                              }
+                                              compact
+                                            />
+                                          </TableCell>
+                                          <TableCell className="bg-muted/5 p-1 text-center">
+                                            <PhotoThumbnailSlot
+                                              photos={item50}
+                                              stageName="50%"
+                                              stageTitle={`${item.namaPekerjaan} · 50%`}
+                                              onOpenLightbox={(
+                                                photo,
+                                                list,
+                                                i,
+                                              ) =>
+                                                handleOpenLightbox(
+                                                  photo,
+                                                  list,
+                                                  i,
+                                                  p.no,
+                                                )
+                                              }
+                                              compact
+                                            />
+                                          </TableCell>
+                                          <TableCell className="bg-muted/5 p-1 text-center">
+                                            <PhotoThumbnailSlot
+                                              photos={item100}
+                                              stageName="100%"
+                                              stageTitle={`${item.namaPekerjaan} · 100%`}
+                                              onOpenLightbox={(
+                                                photo,
+                                                list,
+                                                i,
+                                              ) =>
+                                                handleOpenLightbox(
+                                                  photo,
+                                                  list,
+                                                  i,
+                                                  p.no,
+                                                )
+                                              }
+                                              compact
+                                            />
+                                          </TableCell>
+                                          <TableCell className="bg-muted/5 p-1 text-center">
+                                            <PhotoThumbnailSlot
+                                              photos={itemPrasasti}
+                                              stageName="Prasasti"
+                                              stageTitle={`${item.namaPekerjaan} · Prasasti`}
+                                              onOpenLightbox={(
+                                                photo,
+                                                list,
+                                                i,
+                                              ) =>
+                                                handleOpenLightbox(
+                                                  photo,
+                                                  list,
+                                                  i,
+                                                  p.no,
+                                                )
+                                              }
+                                              compact
+                                            />
+                                          </TableCell>
+                                        </>
+                                      ) : (
+                                        <TableCell
+                                          colSpan={4}
+                                          className="bg-muted/5 py-1 text-center text-[10px] text-muted-foreground/60"
+                                        >
+                                          {item.biaya > 0 &&
+                                          photos.rawPhotos.length > 0 ? (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setPhotoAssistantTarget({
+                                                  poktanNo: p.no,
+                                                })
+                                              }
+                                              className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium text-primary/80 transition hover:bg-primary/10 hover:text-primary"
+                                            >
+                                              <Link2 className="size-3" />
+                                              <span>
+                                                Kaitkan Foto ke {item.namaPekerjaan}
+                                              </span>
+                                            </button>
+                                          ) : (
+                                            <span className="italic opacity-60">
+                                              ↳ Foto di baris Poktan
+                                            </span>
+                                          )}
+                                        </TableCell>
+                                      )}
+                                    </TableRow>
+                                  );
+                                })}
                             </Fragment>
                           );
                         })}
@@ -2692,39 +5038,93 @@ export function DinasProjectReportPage({
 
                           {/* Photo Documentation Grid (4 Stages) */}
                           <div>
-                            <div className="mb-1.5 flex items-center justify-between text-xs">
+                            <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
                               <span className="flex items-center gap-1 font-semibold text-foreground">
                                 <ImageIcon className="size-3.5 text-amber-500" />
-                                Dokumentasi Foto Lapangan (4 Tahap)
+                                Foto Lapangan (4 Tahap)
+                                {photos.isManuallyAdjusted && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="ml-1 px-1 py-0 text-[9px]"
+                                  >
+                                    Disesuaikan
+                                  </Badge>
+                                )}
                               </span>
-                              <span className="font-mono text-[11px] text-muted-foreground">
-                                {photos.totalPhotosCount} Foto
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[11px] text-muted-foreground">
+                                  {photos.totalPhotosCount} Foto
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() =>
+                                    setPhotoAssistantTarget({ poktanNo: p.no })
+                                  }
+                                  className="h-6 gap-1 px-2 text-[10px]"
+                                >
+                                  <SlidersHorizontal className="size-3" />
+                                  <span>Sesuaikan</span>
+                                </Button>
+                              </div>
                             </div>
                             <div className="grid grid-cols-4 gap-1.5">
                               <PhotoThumbnailSlot
                                 photos={photos.photos0}
                                 stageName="0%"
                                 stageTitle="Foto 0%"
-                                onOpenLightbox={handleOpenLightbox}
+                                onOpenLightbox={(photo, list, idx) =>
+                                  handleOpenLightbox(photo, list, idx, p.no)
+                                }
+                                onAdjustEmpty={() =>
+                                  setPhotoAssistantTarget({
+                                    poktanNo: p.no,
+                                    focusStage: "0%",
+                                  })
+                                }
                               />
                               <PhotoThumbnailSlot
                                 photos={photos.photos50}
                                 stageName="50%"
                                 stageTitle="Foto 50%"
-                                onOpenLightbox={handleOpenLightbox}
+                                onOpenLightbox={(photo, list, idx) =>
+                                  handleOpenLightbox(photo, list, idx, p.no)
+                                }
+                                onAdjustEmpty={() =>
+                                  setPhotoAssistantTarget({
+                                    poktanNo: p.no,
+                                    focusStage: "50%",
+                                  })
+                                }
                               />
                               <PhotoThumbnailSlot
                                 photos={photos.photos100}
                                 stageName="100%"
                                 stageTitle="Foto 100%"
-                                onOpenLightbox={handleOpenLightbox}
+                                onOpenLightbox={(photo, list, idx) =>
+                                  handleOpenLightbox(photo, list, idx, p.no)
+                                }
+                                onAdjustEmpty={() =>
+                                  setPhotoAssistantTarget({
+                                    poktanNo: p.no,
+                                    focusStage: "100%",
+                                  })
+                                }
                               />
                               <PhotoThumbnailSlot
                                 photos={photos.photosPrasasti}
                                 stageName="Prasasti"
                                 stageTitle="Prasasti"
-                                onOpenLightbox={handleOpenLightbox}
+                                onOpenLightbox={(photo, list, idx) =>
+                                  handleOpenLightbox(photo, list, idx, p.no)
+                                }
+                                onAdjustEmpty={() =>
+                                  setPhotoAssistantTarget({
+                                    poktanNo: p.no,
+                                    focusStage: "Prasasti",
+                                  })
+                                }
                               />
                             </div>
                           </div>
@@ -2928,213 +5328,765 @@ export function DinasProjectReportPage({
           )}
         </>
       )}
-
-      {/* Official Sign-Off Section for Dinas Printing */}
-      <div className="mt-12 hidden border-t border-border pt-6 print:block">
-        <div className="type-p3 grid grid-cols-3 gap-6 text-center">
-          <div>
-            <p>Mengetahui,</p>
-            <p className="font-bold">Kuasa Pengguna Anggaran (KPA)</p>
-            <div className="h-20" />
-            <p className="font-bold underline">NAMA KPA LENGKAP, M.Si</p>
-            <p className="text-muted-foreground">NIP. 19780101 200501 1 001</p>
-          </div>
-          <div>
-            <p>Disetujui Oleh,</p>
-            <p className="font-bold">Pejabat Pembuat Komitmen (PPK)</p>
-            <div className="h-20" />
-            <p className="font-bold underline">NAMA PPK LENGKAP, ST</p>
-            <p className="text-muted-foreground">NIP. 19820315 200801 1 002</p>
-          </div>
-          <div>
-            <p>
-              Takengon,{" "}
-              {new Date().toLocaleDateString("id-ID", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </p>
-            <p className="font-bold">
-              Pejabat Pelaksana Teknis Kegiatan (PPTK)
-            </p>
-            <div className="h-20" />
-            <p className="font-bold underline">NAMA PPTK LENGKAP, SP</p>
-            <p className="text-muted-foreground">NIP. 19850720 201001 1 003</p>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
         </>
       )}
 
       {/* In-App Interactive Lightbox Modal */}
-      {lightboxData && (
+      {lightboxData && (() => {
+        const liveVisual = lightboxData.poktanNo
+          ? photoAdjustments[lightboxData.poktanNo]?.photoVisualMap?.[
+              lightboxData.photo.photoKey
+            ]
+          : undefined;
+        const activeRotation =
+          liveVisual?.rotation ?? lightboxData.photo.rotation ?? 0;
+        const activeDownloadUrl = photoDownloadHref(
+          lightboxData.photo.rawUrl || lightboxData.photo.url,
+        );
+
+        return (
+          <GlobalModal
+            isOpen={Boolean(lightboxData)}
+            onClose={() => setLightboxData(null)}
+            title={
+              <div className="flex items-center gap-2">
+                <ImageIcon className="size-4 text-primary" />
+                <span className="type-h3">{lightboxData.photo.stageLabel}</span>
+              </div>
+            }
+            description={`${lightboxData.photo.poktan} · Desa ${lightboxData.photo.desa}, Kec. ${lightboxData.photo.kecamatan} · Progres ${lightboxData.photo.progress.toFixed(1)}%`}
+            className="max-w-3xl"
+            footer={
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={activeDownloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                  >
+                    <Download className="size-3.5" />
+                    Unduh Foto Asli
+                  </a>
+                  {lightboxData.poktanNo && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => {
+                        const targetNo = lightboxData.poktanNo!;
+                        const targetKey = lightboxData.photo.photoKey;
+                        const targetStage = lightboxData.photo.stage;
+                        setLightboxData(null);
+                        setPhotoAssistantTarget({
+                          poktanNo: targetNo,
+                          focusStage: targetStage,
+                          focusPhotoKey: targetKey,
+                        });
+                      }}
+                      className="gap-1.5 text-xs"
+                    >
+                      <SlidersHorizontal className="size-3.5" />
+                      <span>Sesuaikan Tahap / Rotasi</span>
+                    </Button>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLightboxData(null)}
+                >
+                  Tutup
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              {/* Main Photo Frame */}
+              <div className="relative flex max-h-[60vh] min-h-[260px] w-full items-center justify-center overflow-hidden rounded-xl bg-black/90 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={lightboxData.photo.url}
+                  alt={`${lightboxData.photo.stageLabel} - ${lightboxData.photo.poktan}`}
+                  style={
+                    activeRotation
+                      ? { transform: `rotate(${activeRotation}deg)` }
+                      : undefined
+                  }
+                  className="max-h-[56vh] max-w-full rounded-lg object-contain shadow-2xl transition-all"
+                />
+                {lightboxData.photoList.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={lightboxData.currentIndex <= 0}
+                      onClick={() => {
+                        const newIdx = lightboxData.currentIndex - 1;
+                        if (newIdx >= 0) {
+                          setLightboxData({
+                            ...lightboxData,
+                            currentIndex: newIdx,
+                            photo: lightboxData.photoList[newIdx],
+                          });
+                        }
+                      }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white transition hover:bg-black disabled:opacity-20"
+                      aria-label="Foto Sebelumnya"
+                    >
+                      <ChevronLeft className="size-5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        lightboxData.currentIndex >=
+                        lightboxData.photoList.length - 1
+                      }
+                      onClick={() => {
+                        const newIdx = lightboxData.currentIndex + 1;
+                        if (newIdx < lightboxData.photoList.length) {
+                          setLightboxData({
+                            ...lightboxData,
+                            currentIndex: newIdx,
+                            photo: lightboxData.photoList[newIdx],
+                          });
+                        }
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white transition hover:bg-black disabled:opacity-20"
+                      aria-label="Foto Selanjutnya"
+                    >
+                      <ChevronRight className="size-5" />
+                    </button>
+                  </>
+                )}
+                <div className="absolute right-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white">
+                  {lightboxData.currentIndex + 1} /{" "}
+                  {lightboxData.photoList.length}
+                </div>
+              </div>
+
+              {/* Detailed Metadata Card */}
+              <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-muted/20 p-3 text-xs sm:grid-cols-2">
+                <div>
+                  <span className="block text-[10px] text-muted-foreground">
+                    Kelompok Tani &amp; Wilayah
+                  </span>
+                  <span className="text-sm font-bold text-foreground">
+                    {lightboxData.photo.poktan}
+                  </span>
+                  <p className="mt-0.5 text-muted-foreground">
+                    Kec. {lightboxData.photo.kecamatan}, Desa{" "}
+                    {lightboxData.photo.desa}
+                  </p>
+                  {lightboxData.photo.sourceLabel && (
+                    <Badge variant="outline" className="mt-1 text-[10px]">
+                      Sumber: {lightboxData.photo.sourceLabel}
+                    </Badge>
+                  )}
+                </div>
+                <div>
+                  <span className="block text-[10px] text-muted-foreground">
+                    Tahapan Dokumentasi
+                  </span>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <Badge variant="default" className="text-xs">
+                      {lightboxData.photo.stageLabel}
+                    </Badge>
+                    <span className="font-mono font-bold text-emerald-600">
+                      {lightboxData.photo.progress.toFixed(1)}% Fisik
+                    </span>
+                    {lightboxData.photo.workItemName && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Item: {lightboxData.photo.workItemName}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-muted-foreground">
+                    Laporan Tanggal: {lightboxData.photo.reportDate}
+                  </p>
+                </div>
+                {(lightboxData.photo.workSummary || lightboxData.photo.notes) && (
+                  <div className="border-t border-border/60 pt-2 sm:col-span-2">
+                    <span className="block text-[10px] font-medium text-muted-foreground">
+                      Uraian Pekerjaan / Catatan Lapangan:
+                    </span>
+                    <p className="mt-0.5 whitespace-pre-wrap font-medium text-foreground">
+                      {lightboxData.photo.workSummary ||
+                        lightboxData.photo.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Thumbnail carousel strip */}
+              {lightboxData.photoList.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
+                  {lightboxData.photoList.map((item, idx) => (
+                    <button
+                      key={`modal-thumb-${item.url}-${idx}`}
+                      type="button"
+                      onClick={() =>
+                        setLightboxData({
+                          ...lightboxData,
+                          currentIndex: idx,
+                          photo: item,
+                        })
+                      }
+                      className={cn(
+                        "relative size-14 shrink-0 overflow-hidden rounded-md border transition-all",
+                        idx === lightboxData.currentIndex
+                          ? "scale-105 border-primary ring-2 ring-primary"
+                          : "border-border/60 opacity-60 hover:opacity-100",
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.url}
+                        alt={`Thumb ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[8px] font-bold text-white">
+                        {item.stage}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </GlobalModal>
+        );
+      })()}
+
+      {/* Sistem Bantu Sesuaikan Foto Laporan Harian Modal */}
+      {photoAssistantTarget && activeAssistantPoktan && (
         <GlobalModal
-          isOpen={Boolean(lightboxData)}
-          onClose={() => setLightboxData(null)}
+          isOpen={Boolean(photoAssistantTarget)}
+          onClose={() => setPhotoAssistantTarget(null)}
           title={
             <div className="flex items-center gap-2">
-              <ImageIcon className="size-4 text-primary" />
-              <span className="type-h3">{lightboxData.photo.stageLabel}</span>
+              <Sparkles className="size-4 text-primary" />
+              <span className="type-h3">
+                Sistem Bantu Sesuaikan Foto Laporan Harian
+              </span>
             </div>
           }
-          description={`${lightboxData.photo.poktan} · Desa ${lightboxData.photo.desa}, Kec. ${lightboxData.photo.kecamatan} · Progres ${lightboxData.photo.progress.toFixed(1)}%`}
-          className="max-w-3xl"
+          description={`Atur penempatan tahap (0%, 50%, 100%, Prasasti), tautan item pekerjaan SID, dan orientasi foto dari Laporan Harian untuk ${activeAssistantPoktan.poktan}.`}
+          className="max-w-5xl"
           footer={
-            <div className="flex w-full items-center justify-between">
-              <a
-                href={lightboxData.photo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
-              >
-                <Download className="size-3.5" />
-                Unduh Foto Asli
-              </a>
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                Perubahan otomatis tersimpan &amp; langsung memperbarui Tabel
+                Hasil SID &amp; Foto.
+              </span>
               <Button
                 type="button"
-                variant="outline"
+                variant="default"
                 size="sm"
-                onClick={() => setLightboxData(null)}
+                onClick={() => setPhotoAssistantTarget(null)}
               >
-                Tutup
+                Selesai &amp; Terapkan
               </Button>
             </div>
           }
         >
           <div className="space-y-4">
-            {/* Main Photo Frame */}
-            <div className="relative flex max-h-[60vh] min-h-[260px] w-full items-center justify-center overflow-hidden rounded-xl bg-black/90 p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={lightboxData.photo.url}
-                alt={`${lightboxData.photo.stageLabel} - ${lightboxData.photo.poktan}`}
-                className="max-h-[58vh] max-w-full rounded-lg object-contain shadow-2xl transition-all"
-              />
-              {lightboxData.photoList.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    disabled={lightboxData.currentIndex <= 0}
-                    onClick={() => {
-                      const newIdx = lightboxData.currentIndex - 1;
-                      if (newIdx >= 0) {
-                        setLightboxData({
-                          ...lightboxData,
-                          currentIndex: newIdx,
-                          photo: lightboxData.photoList[newIdx],
-                        });
-                      }
-                    }}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black disabled:opacity-20 transition"
-                    aria-label="Foto Sebelumnya"
-                  >
-                    <ChevronLeft className="size-5" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={
-                      lightboxData.currentIndex >=
-                      lightboxData.photoList.length - 1
-                    }
-                    onClick={() => {
-                      const newIdx = lightboxData.currentIndex + 1;
-                      if (newIdx < lightboxData.photoList.length) {
-                        setLightboxData({
-                          ...lightboxData,
-                          currentIndex: newIdx,
-                          photo: lightboxData.photoList[newIdx],
-                        });
-                      }
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 p-2 text-white hover:bg-black disabled:opacity-20 transition"
-                    aria-label="Foto Selanjutnya"
-                  >
-                    <ChevronRight className="size-5" />
-                  </button>
-                </>
-              )}
-              <div className="absolute top-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white">
-                {lightboxData.currentIndex + 1} / {lightboxData.photoList.length}
+            {/* Poktan & Source Project Selectors */}
+            <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  1. Pilih Kelompok Tani (38 Poktan)
+                </label>
+                <Select
+                  value={String(activeAssistantPoktan.no)}
+                  onValueChange={(val) =>
+                    setPhotoAssistantTarget({
+                      poktanNo: Number(val),
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Pilih Poktan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectReportData.map((item) => (
+                      <SelectItem
+                        key={`assist-opt-${item.no}`}
+                        value={String(item.no)}
+                      >
+                        #{item.no} · {item.poktan} ({item.kecamatan}) —{" "}
+                        {item.photoClassification.rawPhotos.length} Foto
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  2. Sumber Proyek Laporan Harian di DB
+                </label>
+                <Select
+                  value={
+                    activeAssistantPoktan.adjustment?.linkedProjectId ||
+                    "__AUTO__"
+                  }
+                  onValueChange={(val) =>
+                    handleLinkProjectToPoktan(activeAssistantPoktan.no, val)
+                  }
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <Link2 className="mr-1.5 size-3.5 text-muted-foreground" />
+                    <SelectValue placeholder="Pilih sumber proyek" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__AUTO__">
+                      Otomatis{" "}
+                      {activeAssistantPoktan.autoLinkedProjectId
+                        ? `(Tertaut: ${
+                            projectByIdMap.get(
+                              activeAssistantPoktan.autoLinkedProjectId,
+                            )?.name ?? "DB Proyek"
+                          })`
+                        : "(Belum ada proyek cocok otomatis)"}
+                    </SelectItem>
+                    {projects
+                      .filter((proj) => Boolean(proj.id))
+                      .map((proj) => {
+                        const info = extractRawDailyReportPhotos(
+                          proj.kelompokTani || proj.name,
+                          proj.location || proj.address || "-",
+                          "-",
+                          proj,
+                        );
+                        return (
+                          <SelectItem key={proj.id!} value={proj.id!}>
+                            {proj.name} ({proj.kelompokTani}) ·{" "}
+                            {info.dailyReportsCount} Lap ·{" "}
+                            {info.rawPhotos.length} Foto
+                          </SelectItem>
+                        );
+                      })}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {/* Detailed Metadata Card */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-border bg-muted/20 p-3 text-xs">
-              <div>
-                <span className="block text-[10px] text-muted-foreground">
-                  Kelompok Tani &amp; Wilayah
-                </span>
-                <span className="text-sm font-bold text-foreground">
-                  {lightboxData.photo.poktan}
-                </span>
-                <p className="mt-0.5 text-muted-foreground">
-                  Kec. {lightboxData.photo.kecamatan}, Desa {lightboxData.photo.desa}
-                </p>
+            {/* 1-Click Auto-Assist Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="default"
+                  disabled={
+                    activeAssistantPoktan.photoClassification.rawPhotos.length ===
+                    0
+                  }
+                  onClick={() =>
+                    handleApplyPresetToPoktan(
+                      activeAssistantPoktan.no,
+                      "smart_chronological",
+                    )
+                  }
+                  className="gap-1.5 text-xs"
+                >
+                  <Sparkles className="size-3.5" />
+                  <span>Otomatis Kronologis (0% → 50% → 100%)</span>
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={
+                    activeAssistantPoktan.photoClassification.rawPhotos.length ===
+                    0
+                  }
+                  onClick={() =>
+                    handleApplyPresetToPoktan(
+                      activeAssistantPoktan.no,
+                      "distribute_all_4",
+                    )
+                  }
+                  className="gap-1.5 text-xs"
+                >
+                  <Layers className="size-3.5" />
+                  <span>Isi 4 Tahap Merata</span>
+                </Button>
+                {activeAssistantPoktan.photoClassification
+                  .isManuallyAdjusted && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    onClick={() =>
+                      resetPoktanAdjustment(activeAssistantPoktan.no)
+                    }
+                    className="gap-1 text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    <span>Reset Otomatis</span>
+                  </Button>
+                )}
               </div>
-              <div>
-                <span className="block text-[10px] text-muted-foreground">
-                  Tahapan Dokumentasi
+              <Badge variant="outline" className="font-mono text-xs">
+                Progres Fisik:{" "}
+                {activeAssistantPoktan.progresFisikKonstruksiPercent.toFixed(1)}
+                % · {activeAssistantPoktan.photoClassification.dailyReportsCount}{" "}
+                Lap. Harian
+              </Badge>
+            </div>
+
+            {/* Preview 4 Stage Slots */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wide text-foreground">
+                  Pratinjau 4 Tahap Dokumentasi ({activeAssistantPoktan.poktan})
+                </h4>
+                <span className="text-[11px] text-muted-foreground">
+                  Klik × pada foto untuk melepas dari tahap terkait
                 </span>
-                <div className="mt-0.5 flex items-center gap-2">
-                  <Badge variant="default" className="text-xs">
-                    {lightboxData.photo.stageLabel}
-                  </Badge>
-                  <span className="font-mono font-bold text-emerald-600">
-                    {lightboxData.photo.progress.toFixed(1)}% Fisik
-                  </span>
-                </div>
-                <p className="mt-1 text-muted-foreground">
-                  Laporan Tanggal: {lightboxData.photo.reportDate}
-                </p>
               </div>
-              {(lightboxData.photo.workSummary || lightboxData.photo.notes) && (
-                <div className="sm:col-span-2 border-t border-border/60 pt-2">
-                  <span className="block text-[10px] font-medium text-muted-foreground">
-                    Uraian Pekerjaan / Catatan Lapangan:
-                  </span>
-                  <p className="mt-0.5 whitespace-pre-wrap font-medium text-foreground">
-                    {lightboxData.photo.workSummary || lightboxData.photo.notes}
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                {PHOTO_STAGE_META.map((stageMeta) => {
+                  const stagePhotos =
+                    stageMeta.key === "0%"
+                      ? activeAssistantPoktan.photoClassification.photos0
+                      : stageMeta.key === "50%"
+                        ? activeAssistantPoktan.photoClassification.photos50
+                        : stageMeta.key === "100%"
+                          ? activeAssistantPoktan.photoClassification.photos100
+                          : activeAssistantPoktan.photoClassification
+                              .photosPrasasti;
+                  const isFocused =
+                    photoAssistantTarget.focusStage === stageMeta.key;
+
+                  return (
+                    <div
+                      key={`stage-box-${stageMeta.key}`}
+                      className={cn(
+                        "rounded-lg border p-2.5 transition",
+                        isFocused
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border bg-card",
+                      )}
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-foreground">
+                          Foto {stageMeta.shortLabel}
+                        </span>
+                        <Badge
+                          variant={
+                            stagePhotos.length > 0 ? "default" : "secondary"
+                          }
+                          className="px-1.5 py-0 text-[10px]"
+                        >
+                          {stagePhotos.length}
+                        </Badge>
+                      </div>
+                      {stagePhotos.length === 0 ? (
+                        <div className="flex h-16 items-center justify-center rounded border border-dashed border-border/70 bg-muted/15 px-2 text-center text-[10px] text-muted-foreground">
+                          Pilih foto di bawah untuk mengisi tahap{" "}
+                          {stageMeta.shortLabel}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {stagePhotos.map((sp, sIdx) => (
+                            <div
+                              key={`stage-thumb-${stageMeta.key}-${sp.photoKey}-${sIdx}`}
+                              className="group relative size-14 overflow-hidden rounded border border-border bg-muted/20"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={sp.url}
+                                alt={`${stageMeta.shortLabel} #${sIdx + 1}`}
+                                style={
+                                  sp.rotation
+                                    ? {
+                                        transform: `rotate(${sp.rotation}deg)`,
+                                      }
+                                    : undefined
+                                }
+                                className={cn(
+                                  "h-full w-full cursor-pointer",
+                                  sp.fit === "contain"
+                                    ? "bg-black/80 object-contain"
+                                    : "object-cover",
+                                )}
+                                onClick={() =>
+                                  handleOpenLightbox(
+                                    sp,
+                                    stagePhotos,
+                                    sIdx,
+                                    activeAssistantPoktan.no,
+                                  )
+                                }
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTogglePhotoStage(
+                                    activeAssistantPoktan.no,
+                                    sp.photoKey,
+                                    stageMeta.key,
+                                  )
+                                }
+                                title={`Lepas foto dari tahap ${stageMeta.shortLabel}`}
+                                className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/75 text-white opacity-90 transition hover:bg-destructive"
+                              >
+                                <X className="size-2.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Gallery of Source Photos from Daily Reports */}
+            <div className="space-y-2.5 border-t border-border pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-foreground">
+                    Daftar Foto Laporan Harian (
+                    {assistantShowAllProjects
+                      ? globalPhotoPool.list.length
+                      : activeAssistantPoktan.photoClassification.rawPhotos
+                          .length}{" "}
+                    Foto Tersedia)
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground">
+                    Klik tombol tahap (0%, 50%, 100%, Prasasti) untuk memasang
+                    atau melepas foto.
                   </p>
                 </div>
-              )}
-            </div>
-
-            {/* Thumbnail carousel strip */}
-            {lightboxData.photoList.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
-                {lightboxData.photoList.map((item, idx) => (
-                  <button
-                    key={`modal-thumb-${item.url}-${idx}`}
-                    type="button"
-                    onClick={() =>
-                      setLightboxData({
-                        ...lightboxData,
-                        currentIndex: idx,
-                        photo: item,
-                      })
-                    }
-                    className={cn(
-                      "relative size-14 shrink-0 overflow-hidden rounded-md border transition-all",
-                      idx === lightboxData.currentIndex
-                        ? "border-primary ring-2 ring-primary scale-105"
-                        : "border-border/60 opacity-60 hover:opacity-100",
-                    )}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.url}
-                      alt={`Thumb ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] font-bold text-white text-center">
-                      {item.stage}
-                    </span>
-                  </button>
-                ))}
+                <Button
+                  type="button"
+                  size="xs"
+                  variant={assistantShowAllProjects ? "secondary" : "outline"}
+                  onClick={() => setAssistantShowAllProjects((prev) => !prev)}
+                  className="text-xs"
+                >
+                  {assistantShowAllProjects
+                    ? "Hanya Proyek Poktan Ini"
+                    : `Lihat Semua Lap. Harian (${globalPhotoPool.list.length} Foto)`}
+                </Button>
               </div>
-            )}
+
+              {(() => {
+                const candidatePhotos = assistantShowAllProjects
+                  ? globalPhotoPool.list.map((gp) => {
+                      const adj = activeAssistantPoktan.adjustment;
+                      const visual = adj?.photoVisualMap?.[gp.photoKey];
+                      const workItem = adj?.photoWorkItemMap?.[gp.photoKey];
+                      return {
+                        ...gp,
+                        rotation: visual?.rotation ?? 0,
+                        fit: visual?.fit ?? "cover",
+                        workItemName: workItem,
+                      };
+                    })
+                  : activeAssistantPoktan.photoClassification.rawPhotos;
+
+                if (candidatePhotos.length === 0) {
+                  return (
+                    <div className="rounded-xl border border-dashed border-border bg-muted/15 p-6 text-center">
+                      <ImageIcon className="mx-auto mb-2 size-7 text-muted-foreground/40" />
+                      <p className="text-xs font-semibold text-foreground">
+                        Belum ada foto pada Laporan Harian proyek ini
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Anda dapat menautkan proyek sumber di atas atau klik{" "}
+                        <strong>&ldquo;Lihat Semua Lap. Harian&rdquo;</strong>{" "}
+                        untuk memilih foto dari laporan proyek lain.
+                      </p>
+                    </div>
+                  );
+                }
+
+                const stageMapSnapshot = getBaselineStageMap(
+                  activeAssistantPoktan,
+                );
+
+                return (
+                  <div className="grid max-h-[42vh] grid-cols-1 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2">
+                    {candidatePhotos.map((photo, idx) => {
+                      const activeStages =
+                        stageMapSnapshot[photo.photoKey] ?? [];
+                      const isHighlighted =
+                        photoAssistantTarget.focusPhotoKey === photo.photoKey;
+
+                      return (
+                        <div
+                          key={`assist-photo-${photo.photoKey}-${idx}`}
+                          className={cn(
+                            "flex gap-3 rounded-xl border p-2.5 transition",
+                            isHighlighted
+                              ? "border-primary bg-primary/5 ring-1 ring-primary"
+                              : "border-border bg-card",
+                          )}
+                        >
+                          {/* Photo Thumb */}
+                          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/30">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt={`Foto Lap. Harian ${idx + 1}`}
+                              style={
+                                photo.rotation
+                                  ? { transform: `rotate(${photo.rotation}deg)` }
+                                  : undefined
+                              }
+                              className={cn(
+                                "h-full w-full cursor-pointer transition-transform",
+                                photo.fit === "contain"
+                                  ? "bg-black/80 object-contain"
+                                  : "object-cover",
+                              )}
+                              onClick={() =>
+                                handleOpenLightbox(
+                                  photo,
+                                  candidatePhotos,
+                                  idx,
+                                  activeAssistantPoktan.no,
+                                )
+                              }
+                            />
+                            <span className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-center font-mono text-[9px] font-bold text-white">
+                              {photo.progress.toFixed(1)}%
+                            </span>
+                          </div>
+
+                          {/* Controls */}
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                                <Badge variant="outline" className="px-1 py-0">
+                                  {photo.reportDate}
+                                </Badge>
+                                {"projectTitle" in photo &&
+                                  Boolean(photo.projectTitle) && (
+                                    <span className="truncate font-semibold text-primary">
+                                      {String(photo.projectTitle)}
+                                    </span>
+                                  )}
+                              </div>
+                              <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                                {photo.workSummary ||
+                                  photo.sourceLabel ||
+                                  "Foto progres Laporan Harian"}
+                              </p>
+                            </div>
+
+                            {/* 4 Stage Toggle Pills */}
+                            <div className="flex flex-wrap gap-1">
+                              {PHOTO_STAGE_META.map((st) => {
+                                const isActive = activeStages.includes(st.key);
+                                return (
+                                  <button
+                                    key={`btn-${photo.photoKey}-${st.key}`}
+                                    type="button"
+                                    onClick={() =>
+                                      handleTogglePhotoStage(
+                                        activeAssistantPoktan.no,
+                                        photo.photoKey,
+                                        st.key,
+                                      )
+                                    }
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold transition",
+                                      isActive
+                                        ? "border-primary bg-primary text-primary-foreground shadow-2xs"
+                                        : "border-border bg-muted/40 text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                                    )}
+                                  >
+                                    {isActive && <Check className="size-2.5" />}
+                                    <span>{st.shortLabel}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* SID Work Item & Visual Adjust Controls */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Select
+                                value={
+                                  activeAssistantPoktan.adjustment
+                                    ?.photoWorkItemMap?.[photo.photoKey] ||
+                                  "__ALL__"
+                                }
+                                onValueChange={(val) =>
+                                  handleSetPhotoWorkItem(
+                                    activeAssistantPoktan.no,
+                                    photo.photoKey,
+                                    val,
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="h-6 min-w-[130px] flex-1 px-2 text-[10px]">
+                                  <SelectValue placeholder="Tautkan Item SID" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__ALL__">
+                                    Umum (Semua Item Poktan)
+                                  </SelectItem>
+                                  {activeAssistantPoktan.pekerjaanList.map(
+                                    (workItem, wIdx) => (
+                                      <SelectItem
+                                        key={`wi-${wIdx}`}
+                                        value={workItem.namaPekerjaan}
+                                      >
+                                        {workItem.namaPekerjaan}
+                                      </SelectItem>
+                                    ),
+                                  )}
+                                </SelectContent>
+                              </Select>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRotatePhoto(
+                                    activeAssistantPoktan.no,
+                                    photo.photoKey,
+                                  )
+                                }
+                                title="Putar foto 90 derajat"
+                                className="inline-flex h-6 items-center gap-1 rounded border border-border bg-muted/40 px-1.5 text-[10px] font-medium text-foreground transition hover:bg-muted"
+                              >
+                                <RotateCw className="size-3" />
+                                <span>
+                                  {photo.rotation ? `${photo.rotation}°` : "Putar"}
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTogglePhotoFit(
+                                    activeAssistantPoktan.no,
+                                    photo.photoKey,
+                                  )
+                                }
+                                title="Ubah penyesuaian bingkai (Cover / Utuh)"
+                                className="inline-flex h-6 items-center rounded border border-border bg-muted/40 px-1.5 text-[10px] font-medium text-foreground transition hover:bg-muted"
+                              >
+                                {photo.fit === "contain" ? "Utuh" : "Penuh"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </GlobalModal>
       )}

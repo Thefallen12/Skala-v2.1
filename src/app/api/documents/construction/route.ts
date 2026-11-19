@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SPKStatus } from "@prisma/client";
-import { isValidPublicCode } from "@/lib/documents/random-code";
 import { prisma } from "@/lib/prisma";
 import {
   createBrandedQrDataUrl,
   getDocumentHeaderLogoDataUrl,
 } from "@/lib/documents/qr-code";
+import {
+  getRequestOrigin,
+  resolvePublicAppUrl,
+} from "@/lib/documents/public-app-url";
 import { projectSiteName } from "@/lib/documents/project-site-name";
 import { renderPdf } from "@/lib/documents/render-pdf";
 import { documentVerificationPath } from "@/lib/documents/verification-url";
@@ -31,15 +34,22 @@ function currency(value: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const publicCode = request.nextUrl.searchParams.get("publicCode") ?? "";
-  if (!isValidPublicCode(publicCode)) {
+  const publicCode = (request.nextUrl.searchParams.get("publicCode") ?? "").trim();
+  if (!publicCode || publicCode.length > 128) {
     return NextResponse.json({ message: "Kode dokumen tidak valid." }, { status: 400 });
   }
 
   const [contract, bast] = await Promise.all([
-    prisma.subkonContract.findUnique({
-      where: { publicCode },
+    prisma.subkonContract.findFirst({
+      where: {
+        OR: [
+          { publicCode },
+          { contractNumber: publicCode },
+          { id: publicCode },
+        ],
+      },
       select: {
+        publicCode: true,
         contractNumber: true,
         subkonName: true,
         workScope: true,
@@ -52,9 +62,12 @@ export async function GET(request: NextRequest) {
         project: { select: { kelompokTani: true, location: true } },
       },
     }),
-    prisma.bASTDocument.findUnique({
-      where: { publicCode },
+    prisma.bASTDocument.findFirst({
+      where: {
+        OR: [{ publicCode }, { bastNumber: publicCode }, { id: publicCode }],
+      },
       select: {
+        publicCode: true,
         bastNumber: true,
         type: true,
         date: true,
@@ -67,12 +80,7 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
-  const isContractApproved = contract?.status === SPKStatus.ACTIVE;
-  if (
-    Boolean(contract) === Boolean(bast) ||
-    (contract && !isContractApproved) ||
-    (bast && !bast.isApproved)
-  ) {
+  if (!contract && !bast) {
     return NextResponse.json({ message: "Dokumen tidak tersedia." }, { status: 404 });
   }
 
@@ -80,12 +88,17 @@ export async function GET(request: NextRequest) {
     const title = contract
       ? contract.contractNumber
       : bast!.bastNumber;
+    const recordPublicCode = contract ? contract.publicCode : bast!.publicCode;
+    const isApproved = contract ? contract.status === SPKStatus.ACTIVE : bast!.isApproved;
     const projectName = contract
       ? projectSiteName(contract.project.kelompokTani, contract.project.location)
       : projectSiteName(bast!.project.kelompokTani, bast!.project.location);
+    const verificationBaseUrl =
+      resolvePublicAppUrl(getRequestOrigin(request.headers)) ??
+      new URL(request.nextUrl.origin);
     const qrUrl = new URL(
-      documentVerificationPath(contract ? "spk" : "bast", publicCode),
-      request.nextUrl.origin,
+      documentVerificationPath(contract ? "spk" : "bast", recordPublicCode),
+      verificationBaseUrl,
     ).toString();
     const [qrDataUrl, headerLogoDataUrl] = await Promise.all([
       createBrandedQrDataUrl(qrUrl, 300),
@@ -105,6 +118,7 @@ export async function GET(request: NextRequest) {
           <p><strong>Subkontraktor:</strong> ${escapeHtml(contract.subkonName)}</p>
           <p><strong>Tanggal:</strong> ${escapeHtml(documentDate)}</p>
           <p><strong>Nilai kontrak:</strong> ${escapeHtml(currency(decimalStringFromScaledInteger(contract.contractValue)))}</p>
+          <p><strong>Status:</strong> ${escapeHtml(contract.status.replaceAll("_", " "))}</p>
         </section>
         <h3>Lingkup Pekerjaan</h3>
         <p class="scope">${escapeHtml(contract.workScope).replaceAll("\n", "<br>")}</p>`
@@ -115,6 +129,7 @@ export async function GET(request: NextRequest) {
           <p><strong>Jenis:</strong> ${escapeHtml(bast!.type)}</p>
           <p><strong>Tanggal serah terima:</strong> ${escapeHtml(documentDate)}</p>
           <p><strong>Akhir masa pemeliharaan:</strong> ${escapeHtml(bast!.maintenanceEndsAt?.toLocaleDateString("id-ID") ?? "-")}</p>
+          <p><strong>Status:</strong> ${isApproved ? "Disetujui" : "Menunggu Persetujuan"}</p>
         </section>
         <h3>Catatan Serah Terima</h3>
         <p class="scope">${escapeHtml(bast!.notes ?? "-").replaceAll("\n", "<br>")}</p>`;
@@ -167,25 +182,56 @@ export async function GET(request: NextRequest) {
             <div class="signature">
               <strong>VERIFIKASI DOKUMEN</strong>
               <img class="qr" src="${qrDataUrl}" alt="QR verifikasi dokumen">
-              <div><strong>${escapeHtml(contract?.approvedAt?.toLocaleDateString("id-ID") ?? bast?.approvedBy?.name ?? "Disetujui")}</strong><br>QR Tanda Tangan Direktur</div>
+              <div><strong>${escapeHtml(contract?.approvedAt?.toLocaleDateString("id-ID") ?? bast?.approvedBy?.name ?? (isApproved ? "Disetujui" : "Menunggu Persetujuan"))}</strong><br>${isApproved ? "QR Tanda Tangan Direktur" : "QR Verifikasi Dokumen"}</div>
             </div>
           </section>
           <p class="footer">ADAPT, IMPROVISE AND FINISH</p>
         </body>
       </html>`;
-    const pdf = await renderPdf(html);
-    return new NextResponse(pdf, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `${request.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline"}; filename="${encodeURIComponent(title)}.pdf"`,
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+
+    const htmlPreview = request.nextUrl.searchParams.get("format") === "html";
+    const wantDownload = request.nextUrl.searchParams.get("download") === "1";
+    const printableHtml = wantDownload
+      ? html.replace(
+          /<\/body>/i,
+          `<script>window.addEventListener("load",function(){try{window.print();}catch(_e){}});</script></body>`,
+        )
+      : html;
+
+    if (htmlPreview) {
+      return new NextResponse(printableHtml, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
+
+    try {
+      const pdf = await renderPdf(html);
+      return new NextResponse(pdf, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `${wantDownload ? "attachment" : "inline"}; filename="${encodeURIComponent(title)}.pdf"`,
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    } catch (pdfError) {
+      console.error("Construction document PDF rendering failed, falling back to HTML:", pdfError);
+      return new NextResponse(printableHtml, {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
   } catch (error) {
-    console.error("Construction document PDF preview failed:", error);
+    console.error("Construction document preview failed:", error);
     return NextResponse.json(
-      { message: "PDF dokumen gagal dibuat. Periksa konfigurasi browser PDF." },
+      { message: "Dokumen gagal dibuat. Silakan coba kembali." },
       { status: 500 },
     );
   }

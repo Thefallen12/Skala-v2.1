@@ -681,39 +681,119 @@ function getPlannedProgress(
  * ============================================================================ */
 
 async function downloadUrlWithToast(url: string, fallbackFilename: string) {
+  const toastId = toast.loading("Menyiapkan berkas unduhan...");
   try {
     const res = await fetch(url);
     if (!res.ok) {
       let message = "Gagal membuat laporan otomatis.";
       try {
-        const payload = (await res.json()) as { message?: string };
-        if (payload?.message) message = payload.message;
+        const payload = (await res.json()) as {
+          message?: string;
+          error?: string;
+        };
+        message = payload?.message || payload?.error || message;
       } catch {
         // ignore non-JSON body
       }
-      toast.error(message);
+      if (res.status === 503 && /([?&])format=pdf\b/i.test(url)) {
+        const htmlUrl = url.replace(/([?&])format=pdf\b/i, "$1format=html");
+        window.open(htmlUrl, "_blank", "noopener,noreferrer");
+        toast.error(`${message} Pratinjau cetak HTML dibuka di tab baru.`, {
+          id: toastId,
+        });
+        return;
+      }
+      toast.error(message, { id: toastId });
       return;
     }
     const blob = await res.blob();
     const objUrl = URL.createObjectURL(blob);
-    try {
-      const disposition = res.headers.get("content-disposition");
-      const utf8Match = disposition?.match(/filename\*=UTF-8''([^;]+)/i);
-      const plainMatch = disposition?.match(/filename="?([^";]+)"?/i);
-      const resolvedName = utf8Match?.[1]
-        ? decodeURIComponent(utf8Match[1])
-        : plainMatch?.[1] || fallbackFilename;
-      const link = document.createElement("a");
-      link.href = objUrl;
-      link.download = resolvedName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } finally {
-      URL.revokeObjectURL(objUrl);
-    }
+    const disposition = res.headers.get("content-disposition");
+    const utf8Match = disposition?.match(/filename\*=UTF-8''([^;]+)/i);
+    const plainMatch = disposition?.match(/filename="?([^";]+)"?/i);
+    const resolvedName = utf8Match?.[1]
+      ? decodeURIComponent(utf8Match[1])
+      : plainMatch?.[1] || fallbackFilename;
+    const link = document.createElement("a");
+    link.href = objUrl;
+    link.download = resolvedName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(objUrl), 60_000);
+    toast.success(`Unduhan ${resolvedName} dimulai.`, { id: toastId });
   } catch {
-    toast.error("Gagal mengunduh berkas laporan. Periksa koneksi Anda.");
+    toast.error("Gagal mengunduh berkas laporan. Periksa koneksi Anda.", {
+      id: toastId,
+    });
+  }
+}
+
+async function printReportHtmlWithToast(url: string) {
+  const toastId = toast.loading("Menyiapkan pratinjau cetak...");
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      let message = "Gagal menyiapkan dokumen cetak.";
+      try {
+        const payload = (await res.json()) as {
+          message?: string;
+          error?: string;
+        };
+        message = payload?.message || payload?.error || message;
+      } catch {
+        // ignore non-JSON body
+      }
+      toast.error(message, { id: toastId });
+      return;
+    }
+    const html = await res.text();
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      }, 1000);
+    };
+
+    iframe.onload = () => {
+      toast.dismiss(toastId);
+      try {
+        const frameWindow = iframe.contentWindow;
+        if (frameWindow) {
+          frameWindow.onafterprint = cleanup;
+          frameWindow.focus();
+          frameWindow.print();
+          window.setTimeout(cleanup, 120_000);
+          return;
+        }
+      } catch {
+        // Fallback below if iframe printing is blocked
+      }
+      cleanup();
+      const popup = window.open(url, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        window.print();
+      }
+    };
+
+    document.body.appendChild(iframe);
+    iframe.srcdoc = html;
+  } catch {
+    toast.error("Gagal menyiapkan dokumen cetak. Mencoba cetak halaman...", {
+      id: toastId,
+    });
+    window.print();
   }
 }
 
@@ -1137,7 +1217,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
 
   return (
     <TableRow className="group">
-      <TableCell className="align-top">
+      <TableCell className="align-top print:hidden">
         <Checkbox
           aria-label={`Pilih ${project.title}`}
           checked={isSelected}
@@ -1223,7 +1303,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
           </p>
         </button>
       </TableCell>
-      <TableCell className="hidden align-top whitespace-nowrap md:table-cell">
+      <TableCell className="hidden align-top whitespace-nowrap md:table-cell print:table-cell">
         {project.endDate ? (
           <div>
             <p className="type-p2 font-medium text-foreground">
@@ -1239,7 +1319,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
           "—"
         )}
       </TableCell>
-      <TableCell className="hidden align-top xl:table-cell">
+      <TableCell className="hidden align-top xl:table-cell print:table-cell">
         {isOverdue ? (
           <span className="type-p3 font-semibold text-destructive">
             Terlambat dari jadwal
@@ -1264,7 +1344,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
       </TableCell>
       {canViewFinancials && (
         <>
-          <TableCell className="hidden align-top whitespace-nowrap sm:table-cell">
+          <TableCell className="hidden align-top whitespace-nowrap sm:table-cell print:table-cell">
             <button
               type="button"
               onClick={() => onOpenWorkstation(project, "pagu")}
@@ -1280,7 +1360,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
               </p>
             </button>
           </TableCell>
-          <TableCell className="hidden align-top whitespace-nowrap lg:table-cell">
+          <TableCell className="hidden align-top whitespace-nowrap lg:table-cell print:table-cell">
             <button
               type="button"
               onClick={() => onOpenWorkstation(project, "timeline")}
@@ -1310,7 +1390,7 @@ function ProjectTableRow(props: ProjectItemActionsProps) {
           </TableCell>
         </>
       )}
-      <TableCell className="sticky right-0 z-10 bg-card/95 text-right align-top backdrop-blur-xs">
+      <TableCell className="sticky right-0 z-10 bg-card/95 text-right align-top backdrop-blur-xs print:hidden">
         <div className="flex items-center justify-end gap-1.5">
           {isRunning && canSubmitProgress ? (
             <Button
@@ -2026,12 +2106,20 @@ export default function ProjectWorkstationMaster({
     setPicModalSelectedUserId(project.fieldPicId ?? "");
   };
 
-  const getExportHref = (format: "csv" | "xlsx" | "pdf") => {
+  const getExportHref = (format: "csv" | "xlsx" | "pdf" | "html") => {
     const params = new URLSearchParams({ format });
     if (search.trim()) params.set("search", search.trim());
     if (workTypeFilter !== "ALL") params.set("jenisPekerjaan", workTypeFilter);
     if (projectStatusFilter !== "ALL") params.set("status", projectStatusFilter);
     return `/api/projects/export?${params.toString()}`;
+  };
+
+  const handlePrintPortfolio = () => {
+    if (projectViewMode === "dinas") {
+      window.print();
+      return;
+    }
+    void printReportHtmlWithToast(getExportHref("html"));
   };
 
   const handleToggleProjectSelect = (projectId: string, checked: boolean) => {
@@ -2240,7 +2328,7 @@ export default function ProjectWorkstationMaster({
             actions={
               <>
                 {/* Mobile View: 1 Primary CTA + 1 DropdownMenu for all secondary actions */}
-                <div className="grid w-full grid-cols-2 gap-1.5 sm:hidden">
+                <div className="grid w-full grid-cols-2 gap-1.5 sm:hidden print:hidden">
                   {canSubmitDailyProgressRole ? (
                     <Button
                       type="button"
@@ -2339,7 +2427,7 @@ export default function ProjectWorkstationMaster({
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel className="type-p3 text-[11px] text-muted-foreground">
-                        Unduh Laporan Portofolio
+                        Unduh &amp; Cetak Portofolio
                       </DropdownMenuLabel>
                       <DropdownMenuItem
                         onSelect={() =>
@@ -2363,12 +2451,27 @@ export default function ProjectWorkstationMaster({
                         <FileText className="size-4" aria-hidden="true" />
                         Export PDF Resmi
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void downloadUrlWithToast(
+                            getExportHref("csv"),
+                            "portofolio-proyek.csv",
+                          )
+                        }
+                      >
+                        <Download className="size-4" aria-hidden="true" />
+                        Export CSV (.csv)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handlePrintPortfolio()}>
+                        <Printer className="size-4" aria-hidden="true" />
+                        Cetak Tabel Portofolio (Pratinjau Cetak)
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
 
                 {/* Desktop View: Full horizontal button bar intact */}
-                <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+                <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-2 print:hidden">
                   {canSubmitDailyProgressRole && (
                     <Button
                       type="button"
@@ -2430,6 +2533,21 @@ export default function ProjectWorkstationMaster({
                       >
                         <FileText aria-hidden="true" />
                         Portofolio PDF Resmi
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void downloadUrlWithToast(
+                            getExportHref("csv"),
+                            "portofolio-proyek.csv",
+                          )
+                        }
+                      >
+                        <Download aria-hidden="true" />
+                        Export CSV (.csv)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handlePrintPortfolio()}>
+                        <Printer aria-hidden="true" />
+                        Cetak Tabel Portofolio (Pratinjau Cetak)
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onSelect={() => setProjectViewMode("dinas")}
@@ -3079,7 +3197,7 @@ export default function ProjectWorkstationMaster({
           )}
 
           {/* Views Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 print:hidden">
             <div className="flex flex-wrap items-center gap-2.5">
               <div className="inline-flex flex-wrap rounded-lg border border-border bg-muted/30 p-0.5">
                 <Button
@@ -3237,11 +3355,21 @@ export default function ProjectWorkstationMaster({
                       <FileText aria-hidden="true" />
                       Ekspor Portofolio PDF
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={getExportHref("csv")}>
-                        <Download aria-hidden="true" />
-                        Ekspor ke CSV (.csv)
-                      </Link>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        void downloadUrlWithToast(
+                          getExportHref("csv"),
+                          "projects-export.csv",
+                        )
+                      }
+                    >
+                      <Download aria-hidden="true" />
+                      Ekspor ke CSV (.csv)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => handlePrintPortfolio()}>
+                      <Printer aria-hidden="true" />
+                      Cetak Tabel Portofolio (Pratinjau Cetak)
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -3264,7 +3392,7 @@ export default function ProjectWorkstationMaster({
           {projectViewMode === "tabel" && (
             <div className="space-y-4">
               {/* Mobile Card View (< 768px) */}
-              <div className="space-y-3 md:hidden">
+              <div className="space-y-3 md:hidden print:hidden">
                 {sortedProjects.length > 0 && (
                   <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2.5">
                     <Label
@@ -3343,11 +3471,11 @@ export default function ProjectWorkstationMaster({
               </div>
 
               {/* Desktop Shadcn Table (>= 768px) */}
-              <div className="hidden md:block">
+              <div className="hidden md:block print:block">
                 <Table pagination={false}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10">
+                      <TableHead className="w-10 print:hidden">
                         <Checkbox
                           aria-label="Pilih semua proyek"
                           checked={
@@ -3419,7 +3547,7 @@ export default function ProjectWorkstationMaster({
                           />
                         </button>
                       </TableHead>
-                      <TableHead className="hidden w-36 md:table-cell">
+                      <TableHead className="hidden w-36 md:table-cell print:table-cell">
                         <button
                           type="button"
                           onClick={() => toggleSort("endDate")}
@@ -3437,7 +3565,7 @@ export default function ProjectWorkstationMaster({
                           />
                         </button>
                       </TableHead>
-                      <TableHead className="hidden xl:table-cell">
+                      <TableHead className="hidden xl:table-cell print:table-cell">
                         <button
                           type="button"
                           onClick={() => toggleSort("attention")}
@@ -3457,7 +3585,7 @@ export default function ProjectWorkstationMaster({
                       </TableHead>
                       {canViewFinancials && (
                         <>
-                          <TableHead className="hidden w-36 sm:table-cell">
+                          <TableHead className="hidden w-36 sm:table-cell print:table-cell">
                             <button
                               type="button"
                               onClick={() => toggleSort("pagu")}
@@ -3475,7 +3603,7 @@ export default function ProjectWorkstationMaster({
                               />
                             </button>
                           </TableHead>
-                          <TableHead className="hidden w-44 lg:table-cell">
+                          <TableHead className="hidden w-44 lg:table-cell print:table-cell">
                             <button
                               type="button"
                               onClick={() => toggleSort("realized")}
@@ -3496,7 +3624,7 @@ export default function ProjectWorkstationMaster({
                           </TableHead>
                         </>
                       )}
-                      <TableHead className="sticky right-0 z-10 bg-muted/95 text-right backdrop-blur-xs">
+                      <TableHead className="sticky right-0 z-10 bg-muted/95 text-right backdrop-blur-xs print:hidden">
                         Aksi
                       </TableHead>
                     </TableRow>
@@ -3559,13 +3687,15 @@ export default function ProjectWorkstationMaster({
                 </Table>
               </div>
 
-              <TablePaginationControls
-                count={sortedProjects.length}
-                pageSize={PROJECTS_PER_PAGE}
-                page={currentProjectPage}
-                itemLabel="proyek"
-                onPageChange={setProjectPage}
-              />
+              <div className="print:hidden">
+                <TablePaginationControls
+                  count={sortedProjects.length}
+                  pageSize={PROJECTS_PER_PAGE}
+                  page={currentProjectPage}
+                  itemLabel="proyek"
+                  onPageChange={setProjectPage}
+                />
+              </div>
             </div>
           )}
 

@@ -82,28 +82,35 @@ async function triggerProjectReportDownload(
   if (!res.ok) {
     let errMsg = "Gagal mengunduh laporan otomatis.";
     try {
-      const payload = (await res.json()) as { message?: string };
-      if (payload?.message) errMsg = payload.message;
+      const payload = (await res.json()) as {
+        message?: string;
+        error?: string;
+      };
+      errMsg = payload?.message || payload?.error || errMsg;
     } catch {
       // Ignore non-JSON error body
+    }
+    if (res.status === 503 && format === "pdf") {
+      const htmlUrl = url.replace(/([?&])format=pdf\b/i, "$1format=html");
+      window.open(htmlUrl, "_blank", "noopener,noreferrer");
+      throw new Error(`${errMsg} Pratinjau cetak HTML dibuka di tab baru.`);
     }
     throw new Error(errMsg);
   }
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);
-  try {
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = filenameFromDisposition(
-      res.headers.get("content-disposition"),
-      fallbackFilename,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+  const resolvedName = filenameFromDisposition(
+    res.headers.get("content-disposition"),
+    fallbackFilename,
+  );
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = resolvedName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  toast.success(`Unduhan ${resolvedName} dimulai.`);
 }
 
 export interface PrintViewItem {

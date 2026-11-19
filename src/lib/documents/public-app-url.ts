@@ -1,6 +1,7 @@
 function parsePublicOrigin(value: string): URL | null {
   try {
-    const url = new URL(value);
+    const normalized = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+    const url = new URL(normalized);
     const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
     const isWildcardBindAddress = hostname === "0.0.0.0" || hostname === "::";
     const isLocalHost =
@@ -102,5 +103,8 @@ export function resolvePublicAppUrl(requestOrigin?: string | null): URL | null {
     if (parsedOrigin) return parsedOrigin;
   }
 
-  return null;
+  return (
+    (requestOrigin ? parseRequestOrigin(requestOrigin) : null) ??
+    new URL("https://skala-prioritas.com")
+  );
 }

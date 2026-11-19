@@ -403,6 +403,7 @@ export default async function OrderEditPage({
           qrDataUrl={await makeQrDataUrl(
             code,
             documentVerificationPath("do", code),
+            requestOrigin,
           )}
         />
       </main>
