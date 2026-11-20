@@ -1,11 +1,23 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { UserRole } from "@prisma/client";
 import { area } from "@turf/turf";
+import { auth } from "@/../auth";
 import { prisma } from "@/lib/prisma";
+import { canAccessProject } from "@/lib/project-access";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { createBrandedQrDataUrl } from "@/lib/documents/qr-code";
 import { resolvePublicAppUrl } from "@/lib/documents/public-app-url";
 import ReportStaticMapLoader from "./ReportStaticMapLoader";
 import Image from 'next/image';
+
+const SURVEY_REPORT_ROLES: UserRole[] = [
+  UserRole.ADMINISTRATIONS,
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.KOORDINATOR,
+  UserRole.FIELD_TEAM,
+  UserRole.DRAFTER,
+];
 
 type Coordinate = [number, number];
 type GeometryData = {
@@ -103,12 +115,51 @@ export default async function SurveyReportPage({
 }: {
   params: Promise<{ surveyId: string }>;
 }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/auth/login");
+  }
+  if (!SURVEY_REPORT_ROLES.includes(session.user.role)) {
+    notFound();
+  }
+
   const { surveyId } = await params;
   const survey = await prisma.fieldSurvey.findUnique({
     where: { id: surveyId },
-    include: { project: { select: { title: true, name: true, code: true } }, surveyor: { select: { name: true } }, features: true, photos: true },
+    include: {
+      project: {
+        select: {
+          id: true,
+          title: true,
+          name: true,
+          code: true,
+          fieldPicId: true,
+          isDeleted: true,
+        },
+      },
+      surveyor: { select: { name: true } },
+      features: true,
+      photos: true,
+    },
   });
-  if (!survey) notFound();
+  if (!survey || survey.project?.isDeleted) notFound();
+  if (survey.project) {
+    if (
+      !canAccessProject(
+        session.user.role,
+        session.user.id,
+        survey.project.fieldPicId,
+      )
+    ) {
+      notFound();
+    }
+  } else if (
+    (session.user.role === UserRole.FIELD_TEAM ||
+      session.user.role === UserRole.KOORDINATOR) &&
+    survey.surveyorId !== session.user.id
+  ) {
+    notFound();
+  }
   const coordinator = await prisma.user.findUnique({
     where: { email: "gunawan.ariga1@gmail.com" },
     select: { name: true, email: true },

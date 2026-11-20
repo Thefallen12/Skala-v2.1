@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ArrowLeft,
   Briefcase,
@@ -56,8 +63,17 @@ import {
 import {
   DINAS_PROJECTS_DATA,
   DINAS_REPORT_METADATA,
+  type DinasProjectRecord,
+  doesProjectDesaMatch,
+  isProjectPoktanCompatible,
+  normalizePoktanKey,
 } from "@/lib/dinas-report-data";
-import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  doesClientAssetMatchProject,
+  parseClientAssetCode,
+  photoDownloadHref,
+  withLocalPhotoPreview,
+} from "@/lib/photo-urls";
 import {
   calculatePlannedSCurveProgress,
   toJakartaDateKey,
@@ -112,82 +128,105 @@ export const PHOTO_STAGE_META: ReadonlyArray<{
 ];
 
 const PHOTO_ADJUSTMENTS_STORAGE_KEY =
+  "skala_dinas_sid_photo_adjustments_v2";
+const LEGACY_PHOTO_ADJUSTMENTS_STORAGE_KEY =
   "skala_dinas_sid_photo_adjustments_v1";
 const PHOTO_AUTO_MODE_STORAGE_KEY = "skala_dinas_sid_photo_auto_mode_v1";
+const PHOTO_SETTINGS_EVENT = "skala:dinas-photo-settings-updated";
 
 const EMPTY_ADJUSTMENTS_STORE: PhotoAdjustmentsStore = {};
-let adjustmentsCache: PhotoAdjustmentsStore | null = null;
-let autoModeCache: PhotoAutoAdaptMode | null = null;
-const photoSettingsListeners = new Set<() => void>();
 
 function notifyPhotoSettingsChanged() {
-  for (const listener of photoSettingsListeners) listener();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(PHOTO_SETTINGS_EVENT));
+  }
 }
 
 function subscribePhotoSettings(listener: () => void) {
-  photoSettingsListeners.add(listener);
+  if (typeof window === "undefined") {
+    return () => {};
+  }
   const onStorage = (e: StorageEvent) => {
     if (
+      e.key === null ||
       e.key === PHOTO_ADJUSTMENTS_STORAGE_KEY ||
       e.key === PHOTO_AUTO_MODE_STORAGE_KEY
     ) {
-      adjustmentsCache = null;
-      autoModeCache = null;
       listener();
     }
   };
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
-  }
+  const onCustom = () => listener();
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(PHOTO_SETTINGS_EVENT, onCustom);
   return () => {
-    photoSettingsListeners.delete(listener);
-    if (typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
-    }
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(PHOTO_SETTINGS_EVENT, onCustom);
   };
 }
 
-function getAdjustmentsSnapshot(): PhotoAdjustmentsStore {
-  if (typeof window === "undefined") return EMPTY_ADJUSTMENTS_STORE;
-  if (adjustmentsCache) return adjustmentsCache;
+function parseAdjustmentsStoreRaw(raw: string | null): PhotoAdjustmentsStore {
+  if (!raw) return EMPTY_ADJUSTMENTS_STORE;
   try {
-    const raw = window.localStorage.getItem(PHOTO_ADJUSTMENTS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as PhotoAdjustmentsStore;
-      if (parsed && typeof parsed === "object") {
-        adjustmentsCache = parsed;
-        return adjustmentsCache;
-      }
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return EMPTY_ADJUSTMENTS_STORE;
     }
+    const clean: PhotoAdjustmentsStore = {};
+    for (const [key, val] of Object.entries(parsed)) {
+      // Only keep v2 namespaced keys (e.g. "<nomorSpk>::<poktanKey>[::projectId]")
+      if (!key.includes("::") || !val || typeof val !== "object") continue;
+      clean[key] = val as PoktanPhotoAdjustment;
+    }
+    return clean;
   } catch {
-    // ignore malformed storage
+    return EMPTY_ADJUSTMENTS_STORE;
   }
-  adjustmentsCache = EMPTY_ADJUSTMENTS_STORE;
-  return adjustmentsCache;
 }
 
-function getAdjustmentsServerSnapshot(): PhotoAdjustmentsStore {
-  return EMPTY_ADJUSTMENTS_STORE;
+function readAdjustmentsStoreFromStorage(): PhotoAdjustmentsStore {
+  if (typeof window === "undefined") return EMPTY_ADJUSTMENTS_STORE;
+  try {
+    return parseAdjustmentsStoreRaw(
+      window.localStorage.getItem(PHOTO_ADJUSTMENTS_STORAGE_KEY),
+    );
+  } catch {
+    return EMPTY_ADJUSTMENTS_STORE;
+  }
+}
+
+function getAdjustmentsRawSnapshot(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(PHOTO_ADJUSTMENTS_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function getAdjustmentsRawServerSnapshot(): string {
+  return "";
+}
+
+function parseAutoModeRaw(raw: string | null): PhotoAutoAdaptMode {
+  if (
+    raw === "smart_chronological" ||
+    raw === "distribute_all_4" ||
+    raw === "strict_threshold"
+  ) {
+    return raw;
+  }
+  return "smart_chronological";
 }
 
 function getAutoModeSnapshot(): PhotoAutoAdaptMode {
   if (typeof window === "undefined") return "smart_chronological";
-  if (autoModeCache) return autoModeCache;
   try {
-    const raw = window.localStorage.getItem(PHOTO_AUTO_MODE_STORAGE_KEY);
-    if (
-      raw === "smart_chronological" ||
-      raw === "distribute_all_4" ||
-      raw === "strict_threshold"
-    ) {
-      autoModeCache = raw;
-      return autoModeCache;
-    }
+    return parseAutoModeRaw(
+      window.localStorage.getItem(PHOTO_AUTO_MODE_STORAGE_KEY),
+    );
   } catch {
-    // ignore malformed storage
+    return "smart_chronological";
   }
-  autoModeCache = "smart_chronological";
-  return autoModeCache;
 }
 
 function getAutoModeServerSnapshot(): PhotoAutoAdaptMode {
@@ -195,7 +234,6 @@ function getAutoModeServerSnapshot(): PhotoAutoAdaptMode {
 }
 
 function persistAutoMode(mode: PhotoAutoAdaptMode) {
-  autoModeCache = mode;
   try {
     window.localStorage.setItem(PHOTO_AUTO_MODE_STORAGE_KEY, mode);
   } catch {
@@ -205,7 +243,6 @@ function persistAutoMode(mode: PhotoAutoAdaptMode) {
 }
 
 function persistPhotoAdjustments(next: PhotoAdjustmentsStore) {
-  adjustmentsCache = next;
   try {
     window.localStorage.setItem(
       PHOTO_ADJUSTMENTS_STORAGE_KEY,
@@ -217,12 +254,29 @@ function persistPhotoAdjustments(next: PhotoAdjustmentsStore) {
   notifyPhotoSettingsChanged();
 }
 
+function buildDinasAdjustmentGroupKey(
+  record: Pick<DinasProjectRecord, "nomorSpk" | "poktan">,
+): string {
+  return `${record.nomorSpk.trim()}::${normalizePoktanKey(record.poktan)}`;
+}
+
+function buildDinasAdjustmentStorageKey(
+  record: Pick<DinasProjectRecord, "nomorSpk" | "poktan">,
+  projectId?: string | null,
+): string {
+  const groupKey = buildDinasAdjustmentGroupKey(record);
+  const cleanId = projectId?.trim();
+  return cleanId ? `${groupKey}::${cleanId}` : groupKey;
+}
+
 export type PhotoVisualSettings = {
   rotation?: number;
   fit?: "cover" | "contain";
 };
 
 export type PoktanPhotoAdjustment = {
+  groupKey?: string;
+  projectId?: string;
   linkedProjectId?: string;
   stageOverrides?: Partial<Record<PhotoStageKey, string[]>>;
   photoStageMap?: Record<string, PhotoStageKey[]>;
@@ -230,7 +284,7 @@ export type PoktanPhotoAdjustment = {
   photoVisualMap?: Record<string, PhotoVisualSettings>;
 };
 
-export type PhotoAdjustmentsStore = Record<number, PoktanPhotoAdjustment>;
+export type PhotoAdjustmentsStore = Record<string, PoktanPhotoAdjustment>;
 
 export type DinasProjectProgressSource = {
   id?: string;
@@ -264,6 +318,9 @@ export type DinasProjectProgressSource = {
     progressPhotos?: Array<{
       url?: string | null;
       fileUrl?: string | null;
+      publicId?: string | null;
+      assetCode?: string | null;
+      projectId?: string | null;
     }>;
   }>;
   dailyReports?: Array<{
@@ -279,6 +336,9 @@ export type DinasProjectProgressSource = {
     progressPhotos?: Array<{
       url?: string | null;
       fileUrl?: string | null;
+      publicId?: string | null;
+      assetCode?: string | null;
+      projectId?: string | null;
     }>;
   }>;
   workPoints?: Array<{
@@ -298,6 +358,9 @@ export type DinasProjectProgressSource = {
       photos?: Array<{
         url?: string | null;
         fileUrl?: string | null;
+        publicId?: string | null;
+        assetCode?: string | null;
+        projectId?: string | null;
       }>;
     }>;
   }>;
@@ -316,6 +379,11 @@ export type ClassifiedPhotoItem = {
   url: string;
   rawUrl: string;
   photoKey: string;
+  assetCode?: string | null;
+  publicId?: string | null;
+  projectId?: string | null;
+  workPointId?: string | null;
+  workPointTitle?: string | null;
   reportDate: string;
   reportDateRaw?: string | Date;
   reportTimestamp: number;
@@ -352,6 +420,7 @@ export type PoktanPhotoClassification = {
     submittedAt: string;
   } | null;
   isManuallyAdjusted: boolean;
+  filteredForeignPhotosCount: number;
 };
 
 export type LightboxState = {
@@ -419,12 +488,120 @@ function parseDownloadFilename(
   return quotedMatch?.[1] || fallback;
 }
 
-function normalizeGroupName(value: string): string {
-  return value
-    .trim()
-    .normalize("NFKC")
-    .replace(/\s+/g, " ")
-    .toLocaleLowerCase("id-ID");
+function resolvePhotoAssetCode(photo: {
+  assetCode?: string | null;
+  publicId?: string | null;
+  fileUrl?: string | null;
+  url?: string | null;
+}): string | null {
+  return (
+    photo.assetCode?.trim() ||
+    parseClientAssetCode(photo.publicId)?.assetCode ||
+    parseClientAssetCode(photo.fileUrl)?.assetCode ||
+    parseClientAssetCode(photo.url)?.assetCode ||
+    null
+  );
+}
+
+function isAssetOwnedByGroup(
+  asset: {
+    assetCode?: string | null;
+    url?: string | null;
+    publicId?: string | null;
+    projectId?: string | null;
+  },
+  record: Pick<DinasProjectRecord, "poktan" | "poktanAliases" | "nomorSpk">,
+  linkedProject?: Pick<
+    DinasProjectProgressSource,
+    "id" | "code" | "name" | "title" | "kelompokTani"
+  >,
+): boolean {
+  const resolvedAssetCode =
+    asset.assetCode?.trim() ||
+    parseClientAssetCode(asset.publicId)?.assetCode ||
+    parseClientAssetCode(asset.url)?.assetCode ||
+    null;
+
+  const candidatePoktanNames = Array.from(
+    new Set(
+      [
+        linkedProject?.kelompokTani,
+        record.poktan,
+        ...(record.poktanAliases ?? []),
+      ].filter((v): v is string => Boolean(v && v.trim())),
+    ),
+  );
+
+  if (candidatePoktanNames.length === 0) {
+    return doesClientAssetMatchProject(
+      { ...asset, assetCode: resolvedAssetCode },
+      {
+        projectId: linkedProject?.id,
+        projectName: linkedProject?.name,
+        projectTitle: linkedProject?.title,
+        projectCode: linkedProject?.code || record.nomorSpk,
+      },
+    );
+  }
+
+  return candidatePoktanNames.some((poktanName) =>
+    doesClientAssetMatchProject(
+      { ...asset, assetCode: resolvedAssetCode },
+      {
+        projectId: linkedProject?.id,
+        projectName: linkedProject?.name,
+        projectTitle: linkedProject?.title,
+        poktanName,
+        projectCode: linkedProject?.code || record.nomorSpk,
+      },
+    ),
+  );
+}
+
+function normalizeSpkCode(code?: string | null): string {
+  return (code ?? "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
+function findAutoLinkedProject(
+  record: DinasProjectRecord,
+  projects: DinasProjectProgressSource[],
+): DinasProjectProgressSource | undefined {
+  const compatible = projects.filter((project) =>
+    isProjectPoktanCompatible(project, record),
+  );
+  if (compatible.length === 0) return undefined;
+
+  const targetSpk = normalizeSpkCode(record.nomorSpk);
+
+  // Tier 1: Compatible Poktan + matching Desa (prefer exact SPK code if multiple)
+  const desaMatches = compatible.filter((project) =>
+    doesProjectDesaMatch(project, record),
+  );
+  if (desaMatches.length > 0) {
+    const exactSpkInDesa = desaMatches.find(
+      (project) => targetSpk && normalizeSpkCode(project.code) === targetSpk,
+    );
+    return exactSpkInDesa ?? desaMatches[0];
+  }
+
+  // Tier 2: Compatible Poktan + matching SPK code
+  if (targetSpk) {
+    const spkMatch = compatible.find(
+      (project) => normalizeSpkCode(project.code) === targetSpk,
+    );
+    if (spkMatch) return spkMatch;
+  }
+
+  // Tier 3: Compatible Poktan without conflicting SPK code from another Dinas group
+  const otherDinasSpks = new Set(
+    DINAS_PROJECTS_DATA.filter((item) => item.no !== record.no).map((item) =>
+      normalizeSpkCode(item.nomorSpk),
+    ),
+  );
+  return compatible.find((project) => {
+    const projectSpk = normalizeSpkCode(project.code);
+    return !projectSpk || !otherDinasSpks.has(projectSpk);
+  });
 }
 
 function calculateRealizedArea(
@@ -585,21 +762,25 @@ function computeAutoStageMap(
 }
 
 function extractRawDailyReportPhotos(
-  poktan: string,
-  desa: string,
-  kecamatan: string,
+  record: Pick<
+    DinasProjectRecord,
+    "poktan" | "poktanAliases" | "desa" | "kecamatan" | "nomorSpk"
+  >,
   linkedProject?: DinasProjectProgressSource,
 ): {
   rawPhotos: ClassifiedPhotoItem[];
   dailyReportsCount: number;
   latestReportDate: string | null;
   latestProgress: number;
+  filteredForeignPhotosCount: number;
 } {
+  const { poktan, desa, kecamatan } = record;
   const byKey = new Map<string, ClassifiedPhotoItem>();
   const reportDateKeys = new Set<string>();
   const latestProgress = linkedProject?.progress ?? 0;
   let latestReportDate: string | null = null;
   let latestTs = 0;
+  let filteredForeignPhotosCount = 0;
 
   const workPointTitleById = new Map<string, string>();
   for (const wp of linkedProject?.workPoints ?? []) {
@@ -618,12 +799,40 @@ function extractRawDailyReportPhotos(
       workersCount?: number | null;
       notes?: string | null;
       sourceLabel?: string;
+      workPointId?: string | null;
+      workPointTitle?: string | null;
+      publicId?: string | null;
+      assetCode?: string | null;
+      projectId?: string | null;
     },
   ) => {
     if (!rawUrlInput) return;
     const rawUrl = rawUrlInput.trim();
     const photoKey = normalizePhotoKey(rawUrl);
     if (!photoKey) return;
+
+    const resolvedAssetCode = resolvePhotoAssetCode({
+      assetCode: meta.assetCode,
+      publicId: meta.publicId,
+      url: rawUrl,
+    });
+    const resolvedProjectId = meta.projectId ?? linkedProject?.id ?? null;
+
+    if (
+      !isAssetOwnedByGroup(
+        {
+          assetCode: resolvedAssetCode,
+          url: rawUrl,
+          publicId: meta.publicId,
+          projectId: resolvedProjectId,
+        },
+        record,
+        linkedProject,
+      )
+    ) {
+      filteredForeignPhotosCount += 1;
+      return;
+    }
 
     const ts = toTimestampMs(meta.reportDate);
     const reportDateStr = formatDateIndo(meta.reportDate);
@@ -643,6 +852,15 @@ function extractRawDailyReportPhotos(
       }
       if (!existing.notes && notes) existing.notes = notes;
       if (!existing.workSummary && summary) existing.workSummary = summary;
+      if (!existing.assetCode && resolvedAssetCode) {
+        existing.assetCode = resolvedAssetCode;
+      }
+      if (!existing.workPointId && meta.workPointId) {
+        existing.workPointId = meta.workPointId;
+      }
+      if (!existing.workPointTitle && meta.workPointTitle) {
+        existing.workPointTitle = meta.workPointTitle;
+      }
       return;
     }
 
@@ -650,6 +868,11 @@ function extractRawDailyReportPhotos(
       url: withLocalPhotoPreview(rawUrl),
       rawUrl,
       photoKey,
+      assetCode: resolvedAssetCode,
+      publicId: meta.publicId ?? null,
+      projectId: resolvedProjectId,
+      workPointId: meta.workPointId ?? null,
+      workPointTitle: meta.workPointTitle ?? null,
       reportDate: reportDateStr,
       reportDateRaw: meta.reportDate,
       reportTimestamp: ts,
@@ -695,6 +918,11 @@ function extractRawDailyReportPhotos(
         workersCount: dr.workersCount,
         notes: dr.notes,
         sourceLabel,
+        workPointId: dr.workPointId,
+        workPointTitle: wpTitle,
+        publicId: p.publicId,
+        assetCode: p.assetCode,
+        projectId: p.projectId,
       });
     }
   }
@@ -717,6 +945,8 @@ function extractRawDailyReportPhotos(
         workersCount: rep.workersCount,
         notes: rep.notes,
         sourceLabel,
+        workPointId: rep.workPointId,
+        workPointTitle: wpTitle,
       });
     }
     for (const p of rep.progressPhotos ?? []) {
@@ -728,6 +958,11 @@ function extractRawDailyReportPhotos(
         workersCount: rep.workersCount,
         notes: rep.notes,
         sourceLabel,
+        workPointId: rep.workPointId,
+        workPointTitle: wpTitle,
+        publicId: p.publicId,
+        assetCode: p.assetCode,
+        projectId: p.projectId,
       });
     }
   }
@@ -753,6 +988,8 @@ function extractRawDailyReportPhotos(
           progress: pr.progress,
           workSummary: pr.workSummary,
           sourceLabel,
+          workPointId: wp.id,
+          workPointTitle: wp.title,
         });
       }
       for (const p of pr.photos ?? []) {
@@ -761,6 +998,11 @@ function extractRawDailyReportPhotos(
           progress: pr.progress,
           workSummary: pr.workSummary,
           sourceLabel,
+          workPointId: wp.id,
+          workPointTitle: wp.title,
+          publicId: p.publicId,
+          assetCode: p.assetCode,
+          projectId: p.projectId,
         });
       }
     }
@@ -775,82 +1017,57 @@ function extractRawDailyReportPhotos(
     dailyReportsCount: reportDateKeys.size,
     latestReportDate,
     latestProgress,
+    filteredForeignPhotosCount,
   };
 }
 
 function classifyProjectPhotos(
-  poktan: string,
-  desa: string,
-  kecamatan: string,
+  record: Pick<
+    DinasProjectRecord,
+    "poktan" | "poktanAliases" | "desa" | "kecamatan" | "nomorSpk"
+  >,
   linkedProject?: DinasProjectProgressSource,
   adjustment?: PoktanPhotoAdjustment,
   autoAdaptMode: PhotoAutoAdaptMode = "smart_chronological",
-  globalPhotoLookup?: Map<string, ClassifiedPhotoItem>,
 ): PoktanPhotoClassification {
-  const { rawPhotos, dailyReportsCount, latestReportDate, latestProgress } =
-    extractRawDailyReportPhotos(poktan, desa, kecamatan, linkedProject);
+  const {
+    rawPhotos,
+    dailyReportsCount,
+    latestReportDate,
+    latestProgress,
+    filteredForeignPhotosCount,
+  } = extractRawDailyReportPhotos(record, linkedProject);
 
-  // Merge any extra cross-project photos explicitly selected by user into lookup
+  // Strict provenance isolation: ONLY index photos belonging to this matched project
   const photoByKey = new Map<string, ClassifiedPhotoItem>();
   for (const photo of rawPhotos) {
     photoByKey.set(photo.photoKey, photo);
   }
 
-  const extraUrlsFromOverride = new Set<string>();
-  if (adjustment?.stageOverrides) {
-    for (const list of Object.values(adjustment.stageOverrides)) {
-      for (const rawUrl of list ?? []) {
-        extraUrlsFromOverride.add(normalizePhotoKey(rawUrl));
-      }
-    }
-  }
-  if (adjustment?.photoStageMap) {
-    for (const key of Object.keys(adjustment.photoStageMap)) {
-      extraUrlsFromOverride.add(normalizePhotoKey(key));
-    }
-  }
-
-  for (const key of extraUrlsFromOverride) {
-    if (!key || photoByKey.has(key)) continue;
-    const fromGlobal = globalPhotoLookup?.get(key);
-    if (fromGlobal) {
-      photoByKey.set(key, {
-        ...fromGlobal,
-        poktan,
-        desa,
-        kecamatan,
-      });
-    } else {
-      photoByKey.set(key, {
-        url: withLocalPhotoPreview(key),
-        rawUrl: key,
-        photoKey: key,
-        reportDate: latestReportDate || "-",
-        reportTimestamp: Date.now(),
-        progress: latestProgress,
-        workSummary: "Foto ditautkan dari Sistem Bantu Penyesuaian",
-        sourceLabel: "Penyesuaian Manual",
-        stage: "50%",
-        stageLabel: stageLabelFromKey("50%", latestProgress),
-        poktan,
-        desa,
-        kecamatan,
-      });
-    }
-  }
+  const expectedGroupKey = buildDinasAdjustmentGroupKey(record);
+  const validAdjustment =
+    adjustment &&
+    (!adjustment.groupKey || adjustment.groupKey === expectedGroupKey) &&
+    (!adjustment.projectId ||
+      !linkedProject?.id ||
+      adjustment.projectId === linkedProject.id)
+      ? adjustment
+      : undefined;
 
   const allSourcePhotos = Array.from(photoByKey.values()).sort(
     (a, b) => a.reportTimestamp - b.reportTimestamp,
   );
 
   const hasManualMap = Boolean(
-    adjustment?.photoStageMap &&
-      Object.keys(adjustment.photoStageMap).length > 0,
+    validAdjustment?.photoStageMap &&
+      Object.keys(validAdjustment.photoStageMap).some((key) =>
+        photoByKey.has(normalizePhotoKey(key)),
+      ),
   );
   const hasStageOverrides = Boolean(
-    adjustment?.stageOverrides &&
-      Object.values(adjustment.stageOverrides).some(
-        (arr) => (arr?.length ?? 0) > 0,
+    validAdjustment?.stageOverrides &&
+      Object.values(validAdjustment.stageOverrides).some((arr) =>
+        (arr ?? []).some((url) => photoByKey.has(normalizePhotoKey(url))),
       ),
   );
   const isManuallyAdjusted = hasManualMap || hasStageOverrides;
@@ -867,8 +1084,8 @@ function classifyProjectPhotos(
   const photosPrasasti: ClassifiedPhotoItem[] = [];
 
   const pushToStage = (photo: ClassifiedPhotoItem, stage: PhotoStageKey) => {
-    const visual = adjustment?.photoVisualMap?.[photo.photoKey];
-    const workItemName = adjustment?.photoWorkItemMap?.[photo.photoKey];
+    const visual = validAdjustment?.photoVisualMap?.[photo.photoKey];
+    const workItemName = validAdjustment?.photoWorkItemMap?.[photo.photoKey];
     const resolved: ClassifiedPhotoItem = {
       ...photo,
       stage,
@@ -883,10 +1100,10 @@ function classifyProjectPhotos(
     else photosPrasasti.push(resolved);
   };
 
-  if (hasStageOverrides && adjustment?.stageOverrides) {
+  if (hasStageOverrides && validAdjustment?.stageOverrides) {
     const stages: PhotoStageKey[] = ["0%", "50%", "100%", "Prasasti"];
     for (const stage of stages) {
-      for (const rawUrl of adjustment.stageOverrides[stage] ?? []) {
+      for (const rawUrl of validAdjustment.stageOverrides[stage] ?? []) {
         const photo = photoByKey.get(normalizePhotoKey(rawUrl));
         if (photo) pushToStage(photo, stage);
       }
@@ -894,7 +1111,7 @@ function classifyProjectPhotos(
   } else {
     for (const photo of allSourcePhotos) {
       const stages = hasManualMap
-        ? adjustment?.photoStageMap?.[photo.photoKey] ?? []
+        ? validAdjustment?.photoStageMap?.[photo.photoKey] ?? []
         : autoStageMap[photo.photoKey] ?? [photo.stage];
       for (const stage of stages) {
         pushToStage(photo, stage);
@@ -911,10 +1128,10 @@ function classifyProjectPhotos(
   const allPhotos = Array.from(uniqueClassifiedByKey.values());
 
   const decoratedRawPhotos = allSourcePhotos.map((photo) => {
-    const visual = adjustment?.photoVisualMap?.[photo.photoKey];
-    const workItemName = adjustment?.photoWorkItemMap?.[photo.photoKey];
+    const visual = validAdjustment?.photoVisualMap?.[photo.photoKey];
+    const workItemName = validAdjustment?.photoWorkItemMap?.[photo.photoKey];
     const assignedStages = hasManualMap
-      ? adjustment?.photoStageMap?.[photo.photoKey] ?? []
+      ? validAdjustment?.photoStageMap?.[photo.photoKey] ?? []
       : autoStageMap[photo.photoKey] ?? [photo.stage];
     const primaryStage = assignedStages[0] || photo.stage;
     return {
@@ -950,28 +1167,77 @@ function classifyProjectPhotos(
     latestProgress,
     latestWeeklySubmission,
     isManuallyAdjusted,
+    filteredForeignPhotosCount,
   };
+}
+
+function normalizeWorkItemPhrase(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/^(pekerjaan|peningkatan|rehabilitasi|rehab\.?)\s+/i, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasWholeWordToken(text: string, token: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(token)}\\b`, "i").test(text);
 }
 
 function getWorkItemStagePhotos(
   stagePhotos: ClassifiedPhotoItem[],
   itemName: string,
+  expectedProjectId?: string,
 ): ClassifiedPhotoItem[] {
+  const scopedPhotos = expectedProjectId
+    ? stagePhotos.filter(
+        (p) => !p.projectId || p.projectId === expectedProjectId,
+      )
+    : stagePhotos;
+
   const normalizedItem = itemName.trim().toLowerCase();
-  const explicit = stagePhotos.filter(
+  const explicit = scopedPhotos.filter(
     (p) => p.workItemName?.trim().toLowerCase() === normalizedItem,
   );
   if (explicit.length > 0) return explicit;
 
-  const tokens = normalizedItem
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 4 && !["pekerjaan", "lainnya"].includes(w));
-  if (tokens.length === 0) return [];
+  const coreItem = normalizeWorkItemPhrase(itemName);
+  if (!coreItem || coreItem === "lainnya") return [];
 
-  return stagePhotos.filter((p) => {
-    const text = `${p.workSummary || ""} ${p.sourceLabel || ""}`.toLowerCase();
-    return tokens.some((tok) => text.includes(tok));
+  const coreTokens = coreItem
+    .split(/\s+/)
+    .filter(
+      (w) =>
+        w.length >= 3 &&
+        !["pekerjaan", "lainnya", "pas", "pasangan", "batu", "beton"].includes(
+          w,
+        ),
+    );
+  if (coreTokens.length === 0) return [];
+
+  return scopedPhotos.filter((p) => {
+    if (p.workPointTitle) {
+      const normalizedWp = p.workPointTitle.trim().toLowerCase();
+      const coreWp = normalizeWorkItemPhrase(p.workPointTitle);
+      if (normalizedWp === normalizedItem || coreWp === coreItem) {
+        return true;
+      }
+      return coreTokens.every((tok) => hasWholeWordToken(coreWp, tok));
+    }
+
+    const summaryText = (p.workSummary || "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!summaryText) return false;
+    return coreTokens.every((tok) => hasWholeWordToken(summaryText, tok));
   });
 }
 
@@ -1057,6 +1323,7 @@ function PhotoThumbnailSlot({
     firstPhoto.fit === "contain"
       ? "object-contain bg-black/80"
       : "object-cover";
+  const assetCode = resolvePhotoAssetCode(firstPhoto);
 
   return (
     <button
@@ -1066,12 +1333,12 @@ function PhotoThumbnailSlot({
         "group relative mx-auto flex w-full overflow-hidden rounded-md border border-border/80 bg-muted/30 shadow-2xs transition hover:border-primary hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-primary",
         sizeClass,
       )}
-      title={`${stageTitle} (${firstPhoto.reportDate}) - Klik untuk pratinjau (${count} foto)`}
+      title={`${assetCode ? `[${assetCode}] ` : ""}${stageTitle} (${firstPhoto.reportDate}) - Klik untuk pratinjau (${count} foto)`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={firstPhoto.url}
-        alt={`${stageTitle} - ${firstPhoto.poktan}`}
+        alt={`${stageTitle} - ${firstPhoto.poktan}${assetCode ? ` (${assetCode})` : ""}`}
         style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
         className={cn(
           "h-full w-full transition-transform duration-300 group-hover:scale-105",
@@ -1080,6 +1347,18 @@ function PhotoThumbnailSlot({
         loading="lazy"
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent opacity-85 transition-opacity group-hover:opacity-95" />
+      {assetCode && (
+        <span
+          className={cn(
+            "absolute left-0.5 top-0.5 truncate rounded bg-black/75 px-1 font-mono font-semibold text-amber-200 shadow-2xs",
+            compact
+              ? "max-w-[calc(100%-16px)] text-[6px] leading-tight"
+              : "max-w-[calc(100%-20px)] text-[7px] leading-tight",
+          )}
+        >
+          {assetCode}
+        </span>
+      )}
       <span className="absolute bottom-0.5 left-1 text-[9px] font-bold tracking-tight text-white drop-shadow-xs">
         {stageName}
       </span>
@@ -1115,6 +1394,7 @@ function A4PhotoCell({
     firstPhoto.fit === "contain"
       ? "object-contain bg-white"
       : "object-cover";
+  const assetCode = resolvePhotoAssetCode(firstPhoto);
 
   return (
     <div className="flex flex-col items-center gap-0.5">
@@ -1127,7 +1407,7 @@ function A4PhotoCell({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={firstPhoto.url}
-          alt={`${stageName} - ${firstPhoto.poktan}`}
+          alt={`${stageName} - ${firstPhoto.poktan}${assetCode ? ` (${assetCode})` : ""}`}
           style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
           className={cn("h-full w-full", fitClass)}
           loading="eager"
@@ -1138,6 +1418,11 @@ function A4PhotoCell({
           </span>
         )}
       </div>
+      {assetCode && (
+        <span className="block w-full break-all text-center font-mono text-[5.2px] font-bold leading-[1.05] text-slate-800">
+          {assetCode}
+        </span>
+      )}
       {!compact && firstPhoto.reportDate && firstPhoto.reportDate !== "-" && (
         <span className="block max-w-full truncate text-[6px] leading-none text-slate-600 tabular-nums">
           {firstPhoto.reportDate}
@@ -1223,6 +1508,7 @@ interface A4PoktanRowData {
     realisasiSatuan?: string | null;
   }>;
   photoClassification: PoktanPhotoClassification;
+  linkedProjectId?: string;
 }
 
 interface A4DinasAggregatesData {
@@ -1697,18 +1983,22 @@ function DinasA4CleanDocumentSheet({
                       const item0 = getWorkItemStagePhotos(
                         photos.photos0,
                         item.namaPekerjaan,
+                        p.linkedProjectId,
                       );
                       const item50 = getWorkItemStagePhotos(
                         photos.photos50,
                         item.namaPekerjaan,
+                        p.linkedProjectId,
                       );
                       const item100 = getWorkItemStagePhotos(
                         photos.photos100,
                         item.namaPekerjaan,
+                        p.linkedProjectId,
                       );
                       const itemPrasasti = getWorkItemStagePhotos(
                         photos.photosPrasasti,
                         item.namaPekerjaan,
+                        p.linkedProjectId,
                       );
 
                       return (
@@ -2142,8 +2432,6 @@ export function DinasProjectReportPage({
   const [lightboxData, setLightboxData] = useState<LightboxState | null>(null);
   const [photoAssistantTarget, setPhotoAssistantTarget] =
     useState<PhotoAssistantTarget>(null);
-  const [assistantShowAllProjects, setAssistantShowAllProjects] =
-    useState<boolean>(false);
   const [isA4PrintViewOpen, setIsA4PrintViewOpen] = useState<boolean>(false);
   const [printShowSubItems, setPrintShowSubItems] = useState<boolean>(true);
 
@@ -2166,16 +2454,257 @@ export function DinasProjectReportPage({
     }
   };
 
-  // Synced persistence for Auto Adaptation Mode & Per-Poktan Manual Adjustments
+  const projectByIdMap = useMemo(() => {
+    const byId = new Map<string, DinasProjectProgressSource>();
+    for (const project of projects) {
+      if (project.id) byId.set(project.id, project);
+    }
+    return byId;
+  }, [projects]);
+
+  const autoLinkedProjectByNo = useMemo(() => {
+    const map = new Map<number, DinasProjectProgressSource | undefined>();
+    for (const record of DINAS_PROJECTS_DATA) {
+      map.set(record.no, findAutoLinkedProject(record, projects));
+    }
+    return map;
+  }, [projects]);
+
+  // Synced persistence for Auto Adaptation Mode & Namespaced Per-Poktan/Project Adjustments (v2)
   const autoAdaptMode = useSyncExternalStore(
     subscribePhotoSettings,
     getAutoModeSnapshot,
     getAutoModeServerSnapshot,
   );
-  const photoAdjustments = useSyncExternalStore(
+  const adjustmentsRaw = useSyncExternalStore(
     subscribePhotoSettings,
-    getAdjustmentsSnapshot,
-    getAdjustmentsServerSnapshot,
+    getAdjustmentsRawSnapshot,
+    getAdjustmentsRawServerSnapshot,
+  );
+  const photoAdjustments = useMemo(
+    () => parseAdjustmentsStoreRaw(adjustmentsRaw),
+    [adjustmentsRaw],
+  );
+
+  // Migrate legacy v1 entries ONLY if verified against this project's own assets, then clear v1 key
+  useEffect(() => {
+    if (typeof window === "undefined" || projects.length === 0) return;
+    let legacyRaw: string | null = null;
+    try {
+      legacyRaw = window.localStorage.getItem(
+        LEGACY_PHOTO_ADJUSTMENTS_STORAGE_KEY,
+      );
+    } catch {
+      return;
+    }
+    if (!legacyRaw) return;
+
+    try {
+      const legacyParsed = JSON.parse(legacyRaw) as Record<string, unknown>;
+      if (legacyParsed && typeof legacyParsed === "object") {
+        const existingV2 = readAdjustmentsStoreFromStorage();
+        const nextV2: PhotoAdjustmentsStore = { ...existingV2 };
+        let changed = false;
+
+        for (const [noKey, rawEntry] of Object.entries(legacyParsed)) {
+          const poktanNo = Number(noKey);
+          if (
+            !Number.isFinite(poktanNo) ||
+            !rawEntry ||
+            typeof rawEntry !== "object"
+          ) {
+            continue;
+          }
+          const record = DINAS_PROJECTS_DATA.find((r) => r.no === poktanNo);
+          if (!record) continue;
+
+          const entry = rawEntry as {
+            linkedProjectId?: string;
+            stageOverrides?: Partial<Record<PhotoStageKey, string[]>>;
+            photoStageMap?: Record<string, PhotoStageKey[]>;
+            photoWorkItemMap?: Record<string, string>;
+            photoVisualMap?: Record<string, PhotoVisualSettings>;
+          };
+
+          const autoProj = autoLinkedProjectByNo.get(record.no);
+          const manualProj = entry.linkedProjectId
+            ? projectByIdMap.get(entry.linkedProjectId)
+            : undefined;
+          const validLinkedProj =
+            manualProj && isProjectPoktanCompatible(manualProj, record)
+              ? manualProj
+              : autoProj;
+
+          if (!validLinkedProj) continue;
+
+          const { rawPhotos } = extractRawDailyReportPhotos(
+            record,
+            validLinkedProj,
+          );
+          const validPhotoKeys = new Set(rawPhotos.map((p) => p.photoKey));
+
+          const isOwnedPhotoKey = (rawUrl: string) => {
+            const key = normalizePhotoKey(rawUrl);
+            if (!key || !validPhotoKeys.has(key)) return false;
+            const parsedCode = parseClientAssetCode(rawUrl);
+            return isAssetOwnedByGroup(
+              {
+                assetCode: parsedCode?.assetCode,
+                url: rawUrl,
+                projectId: validLinkedProj.id,
+              },
+              record,
+              validLinkedProj,
+            );
+          };
+
+          const migrated: PoktanPhotoAdjustment = {
+            groupKey: buildDinasAdjustmentGroupKey(record),
+            projectId: validLinkedProj.id,
+          };
+
+          if (manualProj && isProjectPoktanCompatible(manualProj, record)) {
+            migrated.linkedProjectId = manualProj.id;
+          }
+
+          if (entry.photoStageMap) {
+            const cleanMap: Record<string, PhotoStageKey[]> = {};
+            for (const [k, stages] of Object.entries(entry.photoStageMap)) {
+              if (isOwnedPhotoKey(k) && Array.isArray(stages)) {
+                cleanMap[normalizePhotoKey(k)] = stages;
+              }
+            }
+            if (Object.keys(cleanMap).length > 0) {
+              migrated.photoStageMap = cleanMap;
+            }
+          }
+
+          if (entry.stageOverrides) {
+            const cleanOverrides: Partial<Record<PhotoStageKey, string[]>> = {};
+            for (const [st, urls] of Object.entries(entry.stageOverrides)) {
+              const filtered = (urls ?? []).filter(isOwnedPhotoKey);
+              if (filtered.length > 0) {
+                cleanOverrides[st as PhotoStageKey] = filtered;
+              }
+            }
+            if (Object.keys(cleanOverrides).length > 0) {
+              migrated.stageOverrides = cleanOverrides;
+            }
+          }
+
+          if (entry.photoWorkItemMap) {
+            const cleanWork: Record<string, string> = {};
+            for (const [k, v] of Object.entries(entry.photoWorkItemMap)) {
+              if (isOwnedPhotoKey(k) && typeof v === "string" && v.trim()) {
+                cleanWork[normalizePhotoKey(k)] = v;
+              }
+            }
+            if (Object.keys(cleanWork).length > 0) {
+              migrated.photoWorkItemMap = cleanWork;
+            }
+          }
+
+          if (entry.photoVisualMap) {
+            const cleanVisual: Record<string, PhotoVisualSettings> = {};
+            for (const [k, v] of Object.entries(entry.photoVisualMap)) {
+              if (isOwnedPhotoKey(k) && v && typeof v === "object") {
+                cleanVisual[normalizePhotoKey(k)] = v;
+              }
+            }
+            if (Object.keys(cleanVisual).length > 0) {
+              migrated.photoVisualMap = cleanVisual;
+            }
+          }
+
+          const hasUsefulData = Boolean(
+            migrated.linkedProjectId ||
+              migrated.photoStageMap ||
+              migrated.stageOverrides ||
+              migrated.photoWorkItemMap ||
+              migrated.photoVisualMap,
+          );
+          if (hasUsefulData) {
+            const storageKey = buildDinasAdjustmentStorageKey(
+              record,
+              validLinkedProj.id,
+            );
+            if (!nextV2[storageKey]) {
+              nextV2[storageKey] = migrated;
+              changed = true;
+            }
+          }
+        }
+
+        if (changed) {
+          persistPhotoAdjustments(nextV2);
+        }
+      }
+      window.localStorage.removeItem(LEGACY_PHOTO_ADJUSTMENTS_STORAGE_KEY);
+    } catch {
+      try {
+        window.localStorage.removeItem(LEGACY_PHOTO_ADJUSTMENTS_STORAGE_KEY);
+      } catch {
+        // ignore storage cleanup errors
+      }
+    }
+  }, [projects, projectByIdMap, autoLinkedProjectByNo]);
+
+  const resolveAdjustmentForRecord = useCallback(
+    (
+      record: DinasProjectRecord,
+      autoLinked?: DinasProjectProgressSource,
+    ): PoktanPhotoAdjustment | undefined => {
+      const groupKey = buildDinasAdjustmentGroupKey(record);
+
+      if (autoLinked?.id) {
+        const direct =
+          photoAdjustments[
+            buildDinasAdjustmentStorageKey(record, autoLinked.id)
+          ];
+        if (
+          direct &&
+          (!direct.groupKey || direct.groupKey === groupKey) &&
+          (!direct.projectId || direct.projectId === autoLinked.id)
+        ) {
+          if (
+            !direct.linkedProjectId ||
+            (() => {
+              const linked = projectByIdMap.get(direct.linkedProjectId);
+              return Boolean(linked && isProjectPoktanCompatible(linked, record));
+            })()
+          ) {
+            return direct;
+          }
+        }
+      }
+
+      for (const entry of Object.values(photoAdjustments)) {
+        if (!entry || entry.groupKey !== groupKey) continue;
+        if (entry.projectId) {
+          const entryProj = projectByIdMap.get(entry.projectId);
+          if (!entryProj || !isProjectPoktanCompatible(entryProj, record)) {
+            continue;
+          }
+          if (
+            autoLinked?.id &&
+            entry.projectId !== autoLinked.id &&
+            entry.linkedProjectId !== entry.projectId
+          ) {
+            continue;
+          }
+        }
+        if (entry.linkedProjectId) {
+          const linked = projectByIdMap.get(entry.linkedProjectId);
+          if (!linked || !isProjectPoktanCompatible(linked, record)) {
+            continue;
+          }
+        }
+        return entry;
+      }
+
+      return undefined;
+    },
+    [photoAdjustments, projectByIdMap],
   );
 
   const handleChangeAutoAdaptMode = (mode: PhotoAutoAdaptMode) => {
@@ -2191,16 +2720,51 @@ export function DinasProjectReportPage({
   const updatePoktanAdjustment = (
     poktanNo: number,
     updater: (prev: PoktanPhotoAdjustment) => PoktanPhotoAdjustment,
+    overrideProjectId?: string | null,
   ) => {
-    const prevAll = getAdjustmentsSnapshot();
-    const current = prevAll[poktanNo] ?? {};
+    const record = DINAS_PROJECTS_DATA.find((r) => r.no === poktanNo);
+    if (!record) return;
+    const prevAll = readAdjustmentsStoreFromStorage();
+    const autoLinked = autoLinkedProjectByNo.get(poktanNo);
+    const current = resolveAdjustmentForRecord(record, autoLinked) ?? {};
     const updated = updater(current);
-    persistPhotoAdjustments({ ...prevAll, [poktanNo]: updated });
+    const groupKey = buildDinasAdjustmentGroupKey(record);
+
+    const candidateLinkedId =
+      overrideProjectId !== undefined
+        ? overrideProjectId
+        : updated.linkedProjectId ?? autoLinked?.id;
+    const resolvedProject = candidateLinkedId
+      ? projectByIdMap.get(candidateLinkedId)
+      : undefined;
+    const targetProjectId =
+      resolvedProject && isProjectPoktanCompatible(resolvedProject, record)
+        ? resolvedProject.id
+        : autoLinked?.id;
+
+    const storageKey = buildDinasAdjustmentStorageKey(record, targetProjectId);
+    persistPhotoAdjustments({
+      ...prevAll,
+      [storageKey]: {
+        ...updated,
+        groupKey,
+        projectId: targetProjectId ?? undefined,
+      },
+    });
   };
 
   const resetPoktanAdjustment = (poktanNo: number) => {
-    const next = { ...getAdjustmentsSnapshot() };
-    delete next[poktanNo];
+    const record = DINAS_PROJECTS_DATA.find((r) => r.no === poktanNo);
+    if (!record) return;
+    const groupKey = buildDinasAdjustmentGroupKey(record);
+    const prevAll = readAdjustmentsStoreFromStorage();
+    const next: PhotoAdjustmentsStore = {};
+    for (const [k, v] of Object.entries(prevAll)) {
+      if (k === groupKey || k.startsWith(`${groupKey}::`) || v?.groupKey === groupKey) {
+        continue;
+      }
+      next[k] = v;
+    }
     persistPhotoAdjustments(next);
     toast.success("Penyesuaian foto Poktan dikembalikan ke otomatis.");
   };
@@ -2533,77 +3097,19 @@ export function DinasProjectReportPage({
     }
   };
 
-  const projectByIdMap = useMemo(() => {
-    const byId = new Map<string, DinasProjectProgressSource>();
-    for (const project of projects) {
-      if (project.id) byId.set(project.id, project);
-    }
-    return byId;
-  }, [projects]);
-
-  const linkedProjectsByGroup = useMemo(() => {
-    const projectByGroup = new Map<string, DinasProjectProgressSource>();
-    for (const project of projects) {
-      const keys = [
-        normalizeGroupName(project.name),
-        normalizeGroupName(project.kelompokTani),
-        normalizeGroupName(project.title),
-        normalizeGroupName(project.code || ""),
-      ].filter(Boolean);
-
-      for (const key of keys) {
-        if (!projectByGroup.has(key)) {
-          projectByGroup.set(key, project);
-        }
-      }
-    }
-    return projectByGroup;
-  }, [projects]);
-
-  const globalPhotoPool = useMemo(() => {
-    const lookup = new Map<string, ClassifiedPhotoItem>();
-    const list: Array<
-      ClassifiedPhotoItem & { projectId?: string; projectTitle: string }
-    > = [];
-    const seenListKeys = new Set<string>();
-
-    for (const project of projects) {
-      const { rawPhotos } = extractRawDailyReportPhotos(
-        project.kelompokTani || project.name,
-        project.location || project.address || "-",
-        "-",
-        project,
-      );
-      const projLabel = project.name || project.title || project.code || "Proyek";
-      for (const photo of rawPhotos) {
-        if (!lookup.has(photo.photoKey)) {
-          lookup.set(photo.photoKey, photo);
-        }
-        if (!seenListKeys.has(photo.photoKey)) {
-          seenListKeys.add(photo.photoKey);
-          list.push({
-            ...photo,
-            projectId: project.id,
-            projectTitle: projLabel,
-          });
-        }
-      }
-    }
-    return { lookup, list };
-  }, [projects]);
-
   const projectReportData = useMemo(
     () =>
       DINAS_PROJECTS_DATA.map((record) => {
-        const adjustment = photoAdjustments[record.no];
-        const autoLinkedProject =
-          linkedProjectsByGroup.get(normalizeGroupName(record.poktan)) ||
-          linkedProjectsByGroup.get(normalizeGroupName(record.desa)) ||
-          linkedProjectsByGroup.get(normalizeGroupName(record.nomorSpk));
-        const linkedProject =
-          (adjustment?.linkedProjectId
-            ? projectByIdMap.get(adjustment.linkedProjectId)
-            : undefined) ?? autoLinkedProject;
+        const autoLinkedProject = autoLinkedProjectByNo.get(record.no);
+        const adjustment = resolveAdjustmentForRecord(record, autoLinkedProject);
+        const manualProject = adjustment?.linkedProjectId
+          ? projectByIdMap.get(adjustment.linkedProjectId)
+          : undefined;
+        const validManualProject =
+          manualProject && isProjectPoktanCompatible(manualProject, record)
+            ? manualProject
+            : undefined;
+        const linkedProject = validManualProject ?? autoLinkedProject;
 
         const sourceProgress =
           linkedProject && Number.isFinite(linkedProject.progress)
@@ -2616,13 +3122,10 @@ export function DinasProjectReportPage({
         );
 
         const photoClassification = classifyProjectPhotos(
-          record.poktan,
-          record.desa,
-          record.kecamatan,
+          record,
           linkedProject,
           adjustment,
           autoAdaptMode,
-          globalPhotoPool.lookup,
         );
 
         const totalBiayaKonstruksi = record.totalBiayaKonstruksi;
@@ -2657,16 +3160,16 @@ export function DinasProjectReportPage({
           pekerjaanListWithBobot,
           photoClassification,
           linkedProject,
+          linkedProjectId: linkedProject?.id,
           autoLinkedProjectId: autoLinkedProject?.id,
           adjustment,
         };
       }),
     [
-      linkedProjectsByGroup,
+      autoLinkedProjectByNo,
+      resolveAdjustmentForRecord,
       projectByIdMap,
-      photoAdjustments,
       autoAdaptMode,
-      globalPhotoPool,
     ],
   );
 
@@ -3020,10 +3523,39 @@ export function DinasProjectReportPage({
   };
 
   const handleLinkProjectToPoktan = (poktanNo: number, projectId: string) => {
-    updatePoktanAdjustment(poktanNo, (prev) => ({
-      ...prev,
-      linkedProjectId: projectId === "__AUTO__" ? undefined : projectId,
-    }));
+    const targetRecord = DINAS_PROJECTS_DATA.find((r) => r.no === poktanNo);
+    if (!targetRecord) return;
+
+    if (projectId !== "__AUTO__") {
+      const selectedProject = projectByIdMap.get(projectId);
+      if (
+        !selectedProject ||
+        !isProjectPoktanCompatible(selectedProject, targetRecord)
+      ) {
+        toast.error(
+          `Proyek tidak cocok dengan Poktan ${targetRecord.poktan} dan tidak dapat ditautkan lintas proyek.`,
+        );
+        return;
+      }
+      updatePoktanAdjustment(
+        poktanNo,
+        (prev) => ({
+          ...prev,
+          linkedProjectId: selectedProject.id,
+        }),
+        selectedProject.id,
+      );
+    } else {
+      const autoLinked = autoLinkedProjectByNo.get(poktanNo);
+      updatePoktanAdjustment(
+        poktanNo,
+        (prev) => ({
+          ...prev,
+          linkedProjectId: undefined,
+        }),
+        autoLinked?.id ?? null,
+      );
+    }
     toast.success("Sumber proyek Laporan Harian diperbarui.");
   };
 
@@ -3031,7 +3563,6 @@ export function DinasProjectReportPage({
     if (!photoAssistantTarget) return null;
     return (
       projectReportData.find((p) => p.no === photoAssistantTarget.poktanNo) ??
-      projectReportData[0] ??
       null
     );
   }, [photoAssistantTarget, projectReportData]);
@@ -4282,9 +4813,13 @@ export function DinasProjectReportPage({
                           (item) => item.photoClassification.totalPhotosCount > 0,
                         ) ??
                         filteredData[0] ??
-                        projectReportData[0];
+                        null;
                       if (preferred) {
                         setPhotoAssistantTarget({ poktanNo: preferred.no });
+                      } else {
+                        toast.info(
+                          "Tidak ada Poktan pada filter saat ini untuk disesuaikan.",
+                        );
                       }
                     }}
                     className="gap-1.5 text-xs font-semibold shadow-2xs"
@@ -4699,18 +5234,22 @@ export function DinasProjectReportPage({
                                   const item0 = getWorkItemStagePhotos(
                                     photos.photos0,
                                     item.namaPekerjaan,
+                                    p.linkedProjectId,
                                   );
                                   const item50 = getWorkItemStagePhotos(
                                     photos.photos50,
                                     item.namaPekerjaan,
+                                    p.linkedProjectId,
                                   );
                                   const item100 = getWorkItemStagePhotos(
                                     photos.photos100,
                                     item.namaPekerjaan,
+                                    p.linkedProjectId,
                                   );
                                   const itemPrasasti = getWorkItemStagePhotos(
                                     photos.photosPrasasti,
                                     item.namaPekerjaan,
+                                    p.linkedProjectId,
                                   );
                                   const hasAnyItemPhoto =
                                     item0.length > 0 ||
@@ -5335,25 +5874,33 @@ export function DinasProjectReportPage({
 
       {/* In-App Interactive Lightbox Modal */}
       {lightboxData && (() => {
-        const liveVisual = lightboxData.poktanNo
-          ? photoAdjustments[lightboxData.poktanNo]?.photoVisualMap?.[
-              lightboxData.photo.photoKey
-            ]
+        const lightboxPoktanItem = lightboxData.poktanNo
+          ? projectReportData.find((p) => p.no === lightboxData.poktanNo)
           : undefined;
+        const liveVisual =
+          lightboxPoktanItem?.adjustment?.photoVisualMap?.[
+            lightboxData.photo.photoKey
+          ];
         const activeRotation =
           liveVisual?.rotation ?? lightboxData.photo.rotation ?? 0;
         const activeDownloadUrl = photoDownloadHref(
           lightboxData.photo.rawUrl || lightboxData.photo.url,
         );
+        const activeAssetCode = resolvePhotoAssetCode(lightboxData.photo);
 
         return (
           <GlobalModal
             isOpen={Boolean(lightboxData)}
             onClose={() => setLightboxData(null)}
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <ImageIcon className="size-4 text-primary" />
                 <span className="type-h3">{lightboxData.photo.stageLabel}</span>
+                {activeAssetCode && (
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    {activeAssetCode}
+                  </Badge>
+                )}
               </div>
             }
             description={`${lightboxData.photo.poktan} · Desa ${lightboxData.photo.desa}, Kec. ${lightboxData.photo.kecamatan} · Progres ${lightboxData.photo.progress.toFixed(1)}%`}
@@ -5411,7 +5958,7 @@ export function DinasProjectReportPage({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={lightboxData.photo.url}
-                  alt={`${lightboxData.photo.stageLabel} - ${lightboxData.photo.poktan}`}
+                  alt={`${lightboxData.photo.stageLabel} - ${lightboxData.photo.poktan}${activeAssetCode ? ` (${activeAssetCode})` : ""}`}
                   style={
                     activeRotation
                       ? { transform: `rotate(${activeRotation}deg)` }
@@ -5498,6 +6045,11 @@ export function DinasProjectReportPage({
                     <span className="font-mono font-bold text-emerald-600">
                       {lightboxData.photo.progress.toFixed(1)}% Fisik
                     </span>
+                    {activeAssetCode && (
+                      <Badge variant="secondary" className="font-mono text-[10px]">
+                        Kode: {activeAssetCode}
+                      </Badge>
+                    )}
                     {lightboxData.photo.workItemName && (
                       <Badge variant="secondary" className="text-[10px]">
                         Item: {lightboxData.photo.workItemName}
@@ -5524,35 +6076,43 @@ export function DinasProjectReportPage({
               {/* Thumbnail carousel strip */}
               {lightboxData.photoList.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1 pt-1">
-                  {lightboxData.photoList.map((item, idx) => (
-                    <button
-                      key={`modal-thumb-${item.url}-${idx}`}
-                      type="button"
-                      onClick={() =>
-                        setLightboxData({
-                          ...lightboxData,
-                          currentIndex: idx,
-                          photo: item,
-                        })
-                      }
-                      className={cn(
-                        "relative size-14 shrink-0 overflow-hidden rounded-md border transition-all",
-                        idx === lightboxData.currentIndex
-                          ? "scale-105 border-primary ring-2 ring-primary"
-                          : "border-border/60 opacity-60 hover:opacity-100",
-                      )}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.url}
-                        alt={`Thumb ${idx + 1}`}
-                        className="h-full w-full object-cover"
-                      />
-                      <span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[8px] font-bold text-white">
-                        {item.stage}
-                      </span>
-                    </button>
-                  ))}
+                  {lightboxData.photoList.map((item, idx) => {
+                    const itemAssetCode = resolvePhotoAssetCode(item);
+                    return (
+                      <button
+                        key={`modal-thumb-${item.url}-${idx}`}
+                        type="button"
+                        title={
+                          itemAssetCode
+                            ? `${itemAssetCode} (${item.stage})`
+                            : item.stage
+                        }
+                        onClick={() =>
+                          setLightboxData({
+                            ...lightboxData,
+                            currentIndex: idx,
+                            photo: item,
+                          })
+                        }
+                        className={cn(
+                          "relative size-14 shrink-0 overflow-hidden rounded-md border transition-all",
+                          idx === lightboxData.currentIndex
+                            ? "scale-105 border-primary ring-2 ring-primary"
+                            : "border-border/60 opacity-60 hover:opacity-100",
+                        )}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.url}
+                          alt={`Thumb ${idx + 1}${itemAssetCode ? ` (${itemAssetCode})` : ""}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[8px] font-bold text-white">
+                          {item.stage}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -5653,12 +6213,14 @@ export function DinasProjectReportPage({
                         : "(Belum ada proyek cocok otomatis)"}
                     </SelectItem>
                     {projects
-                      .filter((proj) => Boolean(proj.id))
+                      .filter(
+                        (proj) =>
+                          Boolean(proj.id) &&
+                          isProjectPoktanCompatible(proj, activeAssistantPoktan),
+                      )
                       .map((proj) => {
                         const info = extractRawDailyReportPhotos(
-                          proj.kelompokTani || proj.name,
-                          proj.location || proj.address || "-",
-                          "-",
+                          activeAssistantPoktan,
                           proj,
                         );
                         return (
@@ -5731,12 +6293,27 @@ export function DinasProjectReportPage({
                   </Button>
                 )}
               </div>
-              <Badge variant="outline" className="font-mono text-xs">
-                Progres Fisik:{" "}
-                {activeAssistantPoktan.progresFisikKonstruksiPercent.toFixed(1)}
-                % · {activeAssistantPoktan.photoClassification.dailyReportsCount}{" "}
-                Lap. Harian
-              </Badge>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {activeAssistantPoktan.photoClassification
+                  .filteredForeignPhotosCount > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-500/40 bg-amber-500/10 font-mono text-[10px] text-amber-700 dark:text-amber-300"
+                  >
+                    {
+                      activeAssistantPoktan.photoClassification
+                        .filteredForeignPhotosCount
+                    }{" "}
+                    foto lintas proyek disaring
+                  </Badge>
+                )}
+                <Badge variant="outline" className="font-mono text-xs">
+                  Progres Fisik:{" "}
+                  {activeAssistantPoktan.progresFisikKonstruksiPercent.toFixed(1)}
+                  % · {activeAssistantPoktan.photoClassification.dailyReportsCount}{" "}
+                  Lap. Harian
+                </Badge>
+              </div>
             </div>
 
             {/* Preview 4 Stage Slots */}
@@ -5793,53 +6370,66 @@ export function DinasProjectReportPage({
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
-                          {stagePhotos.map((sp, sIdx) => (
-                            <div
-                              key={`stage-thumb-${stageMeta.key}-${sp.photoKey}-${sIdx}`}
-                              className="group relative size-14 overflow-hidden rounded border border-border bg-muted/20"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={sp.url}
-                                alt={`${stageMeta.shortLabel} #${sIdx + 1}`}
-                                style={
-                                  sp.rotation
-                                    ? {
-                                        transform: `rotate(${sp.rotation}deg)`,
-                                      }
-                                    : undefined
+                          {stagePhotos.map((sp, sIdx) => {
+                            const spAssetCode = resolvePhotoAssetCode(sp);
+                            return (
+                              <div
+                                key={`stage-thumb-${stageMeta.key}-${sp.photoKey}-${sIdx}`}
+                                title={
+                                  spAssetCode
+                                    ? `${spAssetCode} (${stageMeta.shortLabel})`
+                                    : `${stageMeta.shortLabel} #${sIdx + 1}`
                                 }
-                                className={cn(
-                                  "h-full w-full cursor-pointer",
-                                  sp.fit === "contain"
-                                    ? "bg-black/80 object-contain"
-                                    : "object-cover",
-                                )}
-                                onClick={() =>
-                                  handleOpenLightbox(
-                                    sp,
-                                    stagePhotos,
-                                    sIdx,
-                                    activeAssistantPoktan.no,
-                                  )
-                                }
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleTogglePhotoStage(
-                                    activeAssistantPoktan.no,
-                                    sp.photoKey,
-                                    stageMeta.key,
-                                  )
-                                }
-                                title={`Lepas foto dari tahap ${stageMeta.shortLabel}`}
-                                className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/75 text-white opacity-90 transition hover:bg-destructive"
+                                className="group relative size-14 overflow-hidden rounded border border-border bg-muted/20"
                               >
-                                <X className="size-2.5" />
-                              </button>
-                            </div>
-                          ))}
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={sp.url}
+                                  alt={`${stageMeta.shortLabel} #${sIdx + 1}${spAssetCode ? ` (${spAssetCode})` : ""}`}
+                                  style={
+                                    sp.rotation
+                                      ? {
+                                          transform: `rotate(${sp.rotation}deg)`,
+                                        }
+                                      : undefined
+                                  }
+                                  className={cn(
+                                    "h-full w-full cursor-pointer",
+                                    sp.fit === "contain"
+                                      ? "bg-black/80 object-contain"
+                                      : "object-cover",
+                                  )}
+                                  onClick={() =>
+                                    handleOpenLightbox(
+                                      sp,
+                                      stagePhotos,
+                                      sIdx,
+                                      activeAssistantPoktan.no,
+                                    )
+                                  }
+                                />
+                                {spAssetCode && (
+                                  <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/75 px-0.5 text-center font-mono text-[6.5px] font-semibold text-amber-200">
+                                    {spAssetCode}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleTogglePhotoStage(
+                                      activeAssistantPoktan.no,
+                                      sp.photoKey,
+                                      stageMeta.key,
+                                    )
+                                  }
+                                  title={`Lepas foto dari tahap ${stageMeta.shortLabel}`}
+                                  className="absolute right-0.5 top-0.5 flex size-4 items-center justify-center rounded-full bg-black/75 text-white opacity-90 transition hover:bg-destructive"
+                                >
+                                  <X className="size-2.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -5848,50 +6438,25 @@ export function DinasProjectReportPage({
               </div>
             </div>
 
-            {/* Gallery of Source Photos from Daily Reports */}
+            {/* Gallery of Source Photos from Daily Reports (Strictly Scoped to Matched Project) */}
             <div className="space-y-2.5 border-t border-border pt-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h4 className="text-xs font-bold uppercase tracking-wide text-foreground">
                     Daftar Foto Laporan Harian (
-                    {assistantShowAllProjects
-                      ? globalPhotoPool.list.length
-                      : activeAssistantPoktan.photoClassification.rawPhotos
-                          .length}{" "}
-                    Foto Tersedia)
+                    {activeAssistantPoktan.photoClassification.rawPhotos.length}{" "}
+                    Foto Proyek Ini)
                   </h4>
                   <p className="text-[11px] text-muted-foreground">
                     Klik tombol tahap (0%, 50%, 100%, Prasasti) untuk memasang
-                    atau melepas foto.
+                    atau melepas foto milik Poktan {activeAssistantPoktan.poktan}.
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={assistantShowAllProjects ? "secondary" : "outline"}
-                  onClick={() => setAssistantShowAllProjects((prev) => !prev)}
-                  className="text-xs"
-                >
-                  {assistantShowAllProjects
-                    ? "Hanya Proyek Poktan Ini"
-                    : `Lihat Semua Lap. Harian (${globalPhotoPool.list.length} Foto)`}
-                </Button>
               </div>
 
               {(() => {
-                const candidatePhotos = assistantShowAllProjects
-                  ? globalPhotoPool.list.map((gp) => {
-                      const adj = activeAssistantPoktan.adjustment;
-                      const visual = adj?.photoVisualMap?.[gp.photoKey];
-                      const workItem = adj?.photoWorkItemMap?.[gp.photoKey];
-                      return {
-                        ...gp,
-                        rotation: visual?.rotation ?? 0,
-                        fit: visual?.fit ?? "cover",
-                        workItemName: workItem,
-                      };
-                    })
-                  : activeAssistantPoktan.photoClassification.rawPhotos;
+                const candidatePhotos =
+                  activeAssistantPoktan.photoClassification.rawPhotos;
 
                 if (candidatePhotos.length === 0) {
                   return (
@@ -5901,9 +6466,9 @@ export function DinasProjectReportPage({
                         Belum ada foto pada Laporan Harian proyek ini
                       </p>
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        Anda dapat menautkan proyek sumber di atas atau klik{" "}
-                        <strong>&ldquo;Lihat Semua Lap. Harian&rdquo;</strong>{" "}
-                        untuk memilih foto dari laporan proyek lain.
+                        Unggah foto melalui Laporan Harian pada proyek{" "}
+                        <strong>{activeAssistantPoktan.poktan}</strong> agar
+                        otomatis tampil di sini.
                       </p>
                     </div>
                   );
@@ -5920,6 +6485,7 @@ export function DinasProjectReportPage({
                         stageMapSnapshot[photo.photoKey] ?? [];
                       const isHighlighted =
                         photoAssistantTarget.focusPhotoKey === photo.photoKey;
+                      const photoAssetCode = resolvePhotoAssetCode(photo);
 
                       return (
                         <div
@@ -5936,7 +6502,7 @@ export function DinasProjectReportPage({
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={photo.url}
-                              alt={`Foto Lap. Harian ${idx + 1}`}
+                              alt={`Foto Lap. Harian ${idx + 1}${photoAssetCode ? ` (${photoAssetCode})` : ""}`}
                               style={
                                 photo.rotation
                                   ? { transform: `rotate(${photo.rotation}deg)` }
@@ -5969,12 +6535,14 @@ export function DinasProjectReportPage({
                                 <Badge variant="outline" className="px-1 py-0">
                                   {photo.reportDate}
                                 </Badge>
-                                {"projectTitle" in photo &&
-                                  Boolean(photo.projectTitle) && (
-                                    <span className="truncate font-semibold text-primary">
-                                      {String(photo.projectTitle)}
-                                    </span>
-                                  )}
+                                {photoAssetCode && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="px-1.5 py-0 font-mono text-[10px]"
+                                  >
+                                    {photoAssetCode}
+                                  </Badge>
+                                )}
                               </div>
                               <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
                                 {photo.workSummary ||

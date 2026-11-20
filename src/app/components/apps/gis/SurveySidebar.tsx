@@ -153,6 +153,7 @@ export default function SurveySidebar({
 }) {
   const router = useRouter();
   const [projectId, setProjectId] = useState(initialProjectId);
+  const [prevInitialProjectId, setPrevInitialProjectId] = useState(initialProjectId);
   const [locationName, setLocationName] = useState("");
   const [responsibleName, setResponsibleName] = useState(surveyorName);
   const [notes, setNotes] = useState("");
@@ -161,6 +162,12 @@ export default function SurveySidebar({
   const [loadingSurveyId, setLoadingSurveyId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const locationNameInputRef = useRef<HTMLInputElement>(null);
+
+  if (prevInitialProjectId !== initialProjectId) {
+    setPrevInitialProjectId(initialProjectId);
+    setProjectId(initialProjectId);
+    setMessage(null);
+  }
 
   useEffect(() => {
     if (newSurveyRequest === 0) return;
@@ -182,6 +189,10 @@ export default function SurveySidebar({
 
   const changeProject = (nextProjectId: string) => {
     setProjectId(nextProjectId);
+    setLocationName("");
+    setNotes("");
+    setUploadName("");
+    setMessage(null);
     onProjectChange(nextProjectId);
   };
 

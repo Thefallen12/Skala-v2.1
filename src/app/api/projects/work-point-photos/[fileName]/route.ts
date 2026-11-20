@@ -20,7 +20,9 @@ export async function GET(
       progressReport: {
         select: {
           workPoint: {
-            select: { project: { select: { fieldPicId: true } } },
+            select: {
+              project: { select: { fieldPicId: true, isDeleted: true } },
+            },
           },
         },
       },
@@ -28,6 +30,7 @@ export async function GET(
   });
   if (
     !photoRecord ||
+    photoRecord.progressReport.workPoint.project.isDeleted ||
     !canAccessProject(
       session.user.role,
       session.user.id,

@@ -1,10 +1,11 @@
 import { join, resolve } from "node:path";
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import {
   CloudinaryPhotoValidationError,
-  deleteCloudinaryPhoto,
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
+import type { AssetUploadContext } from "@/lib/file-storage";
 import {
   PROJECT_PROGRESS_PHOTO_CLOUDINARY_FOLDER,
   PROJECT_WORK_POINT_PHOTO_CLOUDINARY_FOLDER,
@@ -27,19 +28,22 @@ export type StoredProjectProgressPhoto = {
   url: string;
   fileUrl: string;
   publicId: string | null;
+  assetCode?: string | null;
 };
 
 async function saveProjectProgressPhotoToCloudinary(
   file: File,
   folder: string,
   maxBytes = MAX_PHOTO_BYTES,
+  context?: AssetUploadContext,
 ): Promise<StoredProjectProgressPhoto> {
   try {
-    const photo = await uploadCloudinaryPhoto(file, folder, maxBytes);
+    const photo = await uploadCloudinaryPhoto(file, folder, maxBytes, context);
     return {
       url: photo.secureUrl,
       fileUrl: photo.secureUrl,
       publicId: photo.publicId,
+      assetCode: photo.assetCode ?? null,
     };
   } catch (error) {
     if (error instanceof CloudinaryPhotoValidationError) {
@@ -51,35 +55,51 @@ async function saveProjectProgressPhotoToCloudinary(
 
 export async function saveProjectProgressPhoto(
   file: File,
+  context?: AssetUploadContext,
 ): Promise<StoredProjectProgressPhoto> {
   return saveProjectProgressPhotoToCloudinary(
     file,
     PROJECT_PROGRESS_PHOTO_CLOUDINARY_FOLDER,
+    MAX_PHOTO_BYTES,
+    { ...context, kind: context?.kind ?? "FTO" },
   );
 }
 
 export async function saveProjectWorkPointPhoto(
   file: File,
   maxBytes = MAX_PHOTO_BYTES,
+  context?: AssetUploadContext,
 ): Promise<StoredProjectProgressPhoto> {
   return saveProjectProgressPhotoToCloudinary(
     file,
     PROJECT_WORK_POINT_PHOTO_CLOUDINARY_FOLDER,
     maxBytes,
+    { ...context, kind: context?.kind ?? "TTK" },
   );
 }
 
 export async function removeProjectProgressPhoto(
   photo: string | { url: string; publicId?: string | null },
 ): Promise<void> {
+  return removeProjectProgressPhotoWithOptions(photo);
+}
+
+export async function removeProjectProgressPhotoWithOptions(
+  photo: string | { url: string; publicId?: string | null },
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<void> {
   const url = typeof photo === "string" ? photo : photo.url;
   const publicId = typeof photo === "string" ? null : photo.publicId;
-  if (publicId) {
-    await deleteCloudinaryPhoto(publicId);
+
+  if (
+    await removeCloudinaryPhoto(url, {
+      publicId,
+      ignore: options?.ignore,
+    })
+  ) {
     return;
   }
 
-  if (await removeCloudinaryPhoto(url)) return;
   if (
     await removePrivatePhoto(
       url,

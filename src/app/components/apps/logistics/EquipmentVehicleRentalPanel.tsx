@@ -52,6 +52,7 @@ import {
   getRentalCategoryOptions,
 } from "@/lib/equipment-catalog";
 import { getJakartaDateKey, shiftDateKey } from "@/lib/habit-date";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1191,19 +1192,30 @@ export default function EquipmentVehicleRentalPanel({
                                   <CheckCircle2 className="size-3.5" aria-hidden="true" />
                                   Lunas
                                 </Badge>
-                                {r.proofOfPaymentUrl && (
-                                  <div>
-                                    <a
-                                      href={r.proofOfPaymentUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="type-p3 inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                                    >
-                                      <ExternalLink className="size-3" aria-hidden="true" />
-                                      Bukti Bayar
-                                    </a>
-                                  </div>
-                                )}
+                                {r.proofOfPaymentUrl && (() => {
+                                  const assetMeta = parseClientAssetCode(r.proofOfPaymentUrl);
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {assetMeta && (
+                                        <span
+                                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                                          title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                                        >
+                                          {assetMeta.assetCode}
+                                        </span>
+                                      )}
+                                      <a
+                                        href={r.proofOfPaymentUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="type-p3 inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                                      >
+                                        <ExternalLink className="size-3" aria-hidden="true" />
+                                        Bukti Bayar
+                                      </a>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             ) : r.paymentStatus === "PENDING_PAYMENT" ? (
                               <Badge variant="lightWarning" className="gap-1">

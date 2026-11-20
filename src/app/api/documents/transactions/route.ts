@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PaymentStatus, UserRole } from "@prisma/client";
-import { auth } from "../../../../../auth";
+import { PaymentStatus, POStatus, UserRole } from "@prisma/client";
+import { auth } from "@/../auth";
 import { renderUniversalTransactionDocument } from "@/lib/documents/universal-transaction-print";
 import type {
   UniversalDocumentData,
@@ -248,6 +248,7 @@ async function loadDocument(
   kind: RouteDocumentKind,
   recordId: string,
   publicCode: string,
+  allowPublicCodeAsId = false,
 ): Promise<UniversalDocumentData | null> {
   if (kind === "PO") {
     const order = await prisma.purchaseOrder.findUnique({
@@ -668,7 +669,9 @@ async function loadDocument(
     const delivery = await prisma.materialDelivery.findFirst({
       where: recordId
         ? { OR: [{ id: recordId }, { publicCode: recordId }] }
-        : { OR: [{ publicCode }, { id: publicCode }] },
+        : allowPublicCodeAsId
+          ? { OR: [{ publicCode }, { id: publicCode }] }
+          : { publicCode },
       select: {
         id: true,
         publicCode: true,
@@ -789,7 +792,9 @@ async function loadDocument(
   if (kind === "INVOICE") {
     const invoice = await prisma.invoice.findFirst({
       where: publicCode
-        ? { OR: [{ publicCode }, { id: publicCode }] }
+        ? allowPublicCodeAsId
+          ? { OR: [{ publicCode }, { id: publicCode }] }
+          : { publicCode }
         : { id: recordId },
       select: {
         invoiceNumber: true,
@@ -893,7 +898,11 @@ async function loadDocument(
         ...(recordId
           ? [{ id: recordId }, { paymentTransactionId: recordId }]
           : []),
-        ...(publicCode ? [{ publicCode }, { id: publicCode }] : []),
+        ...(publicCode
+          ? allowPublicCodeAsId
+            ? [{ publicCode }, { id: publicCode }]
+            : [{ publicCode }]
+          : []),
       ],
     },
     select: {
@@ -1110,38 +1119,72 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "Jenis atau nomor dokumen tidak valid." }, { status: 400 });
   }
 
-  let publicSignedDocument = false;
-  if (
-    !previewOnly &&
-    !recordId &&
-    publicCode &&
-    (kind === "INVOICE" || kind === "KO")
-  ) {
-    const existingRecord =
-      kind === "INVOICE"
-        ? await prisma.invoice.findFirst({
-            where: { OR: [{ publicCode }, { id: publicCode }] },
-            select: { id: true },
-          })
-        : await prisma.orderConfirmation.findFirst({
-            where: { OR: [{ publicCode }, { id: publicCode }] },
-            select: { id: true },
-          });
-    if (!existingRecord) {
-      return NextResponse.json(
-        { message: "Dokumen tidak ditemukan." },
-        { status: 404 },
-      );
+  const session = await auth();
+
+  let publicVerifiedDocument = false;
+  if (!previewOnly && !recordId && publicCode && !session?.user?.id) {
+    if (kind === "PO") {
+      const existingPo = await prisma.purchaseOrder.findFirst({
+        where: { publicCode, status: POStatus.APPROVED, approvedAt: { not: null } },
+        select: { id: true },
+      });
+      if (!existingPo) {
+        return NextResponse.json(
+          { message: "Silakan masuk untuk melihat dokumen yang belum disetujui." },
+          { status: 401 },
+        );
+      }
+      publicVerifiedDocument = true;
+    } else if (kind === "DO") {
+      const existingDo = await prisma.deliveryOrder.findFirst({
+        where: { publicCode },
+        select: { id: true },
+      });
+      if (!existingDo) {
+        return NextResponse.json({ message: "Dokumen tidak ditemukan." }, { status: 404 });
+      }
+      publicVerifiedDocument = true;
+    } else if (kind === "SJ") {
+      const existingSj = await prisma.materialDelivery.findFirst({
+        where: { publicCode },
+        select: { id: true },
+      });
+      if (!existingSj) {
+        return NextResponse.json({ message: "Dokumen tidak ditemukan." }, { status: 404 });
+      }
+      publicVerifiedDocument = true;
+    } else if (kind === "INVOICE") {
+      const existingInvoice = await prisma.invoice.findFirst({
+        where: { publicCode, signedAt: { not: null } },
+        select: { id: true },
+      });
+      if (!existingInvoice) {
+        return NextResponse.json(
+          { message: "Silakan masuk untuk melihat invoice ini." },
+          { status: 401 },
+        );
+      }
+      publicVerifiedDocument = true;
+    } else if (kind === "KO") {
+      const existingKo = await prisma.orderConfirmation.findFirst({
+        where: { publicCode, signedAt: { not: null } },
+        select: { id: true },
+      });
+      if (!existingKo) {
+        return NextResponse.json(
+          { message: "Silakan masuk untuk melihat konfirmasi order ini." },
+          { status: 401 },
+        );
+      }
+      publicVerifiedDocument = true;
     }
-    publicSignedDocument = true;
   }
 
   if (
     previewOnly ||
-    (kind === "SJ" && Boolean(recordId)) ||
-    ((kind === "INVOICE" || kind === "KO") && !publicSignedDocument)
+    Boolean(recordId) ||
+    !publicVerifiedDocument
   ) {
-    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ message: "Silakan masuk untuk mencetak dokumen." }, { status: 401 });
     }
@@ -1159,7 +1202,7 @@ export async function GET(request: NextRequest) {
   try {
     const document = previewOnly
       ? sampleDocument(kind)
-      : await loadDocument(kind, recordId, publicCode);
+      : await loadDocument(kind, recordId, publicCode, Boolean(session?.user?.id));
     if (!document) {
       return NextResponse.json({ message: "Dokumen tidak ditemukan." }, { status: 404 });
     }

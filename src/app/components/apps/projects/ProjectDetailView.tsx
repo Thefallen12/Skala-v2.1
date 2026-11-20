@@ -53,7 +53,11 @@ import {
   calculateWeightedProjectProgress,
 } from "@/lib/project-progress";
 import { formatWorkTypeBadge } from "@/lib/project-work-types";
-import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  parseClientAssetCode,
+  photoDownloadHref,
+  withLocalPhotoPreview,
+} from "@/lib/photo-urls";
 import {
   countOfflineDailyReports,
   flushOfflineDailyReports,
@@ -239,6 +243,7 @@ export default function ProjectDetailView({
     url: string;
     title: string;
     kind: "image" | "document";
+    assetCode?: string | null;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -310,18 +315,19 @@ export default function ProjectDetailView({
   }
 
   const refreshQueueCount = useCallback(async () => {
-    const count = await countOfflineDailyReports();
+    const count = await countOfflineDailyReports({ userId: currentUserId });
     setOfflineQueueCount(count);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     let cancelled = false;
-    void countOfflineDailyReports().then((count) => {
+    void countOfflineDailyReports({ userId: currentUserId }).then((count) => {
       if (!cancelled) setOfflineQueueCount(count);
     });
     const unregister = registerOfflineDailyReportAutoSync(
       submitOfflineDailyReportAction,
       {
+        userId: currentUserId,
         onSynced: (result) => {
           void refreshQueueCount();
           if (result.syncedCount > 0) {
@@ -338,12 +344,15 @@ export default function ProjectDetailView({
       cancelled = true;
       unregister();
     };
-  }, [refreshQueueCount, router]);
+  }, [currentUserId, refreshQueueCount, router]);
 
   const handleFlushOfflineQueue = async () => {
     setIsFlushingQueue(true);
     try {
-      const result = await flushOfflineDailyReports(submitOfflineDailyReportAction);
+      const result = await flushOfflineDailyReports(
+        submitOfflineDailyReportAction,
+        { userId: currentUserId },
+      );
       await refreshQueueCount();
       if (result.skippedOffline) {
         toast.warning("Perangkat masih offline. Antrean akan dikirim otomatis saat sinyal stabil.");
@@ -366,12 +375,17 @@ export default function ProjectDetailView({
     }
   };
 
-  const openMediaLightbox = (url: string, title: string) => {
+  const openMediaLightbox = (
+    url: string,
+    title: string,
+    assetCode?: string | null,
+  ) => {
     const isPdf = /\.pdf(?:[?#]|$)/i.test(url);
     setPreviewMedia({
       url: withLocalPhotoPreview(url),
       title,
       kind: isPdf ? "document" : "image",
+      assetCode: assetCode ?? parseClientAssetCode(url)?.assetCode ?? null,
     });
   };
 
@@ -1553,31 +1567,62 @@ export default function ProjectDetailView({
                       <p className="type-p3 font-medium tabular-nums text-foreground">
                         Akumulasi progres proyek: {latestReport.progress ?? project.progress}%
                       </p>
-                      {latestReport.photoUrls && latestReport.photoUrls.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {latestReport.photoUrls.map((photo, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() =>
-                                openMediaLightbox(
-                                  photo,
-                                  `Foto progres · ${formatDateIndo(latestReport.reportDate)}`,
-                                )
-                              }
-                              aria-label={`Lihat foto progres ${i + 1}`}
-                              className="group relative block size-16 overflow-hidden rounded-lg border border-border"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={withLocalPhotoPreview(photo)}
-                                alt={`Progres foto ${i + 1}`}
-                                className="size-full object-cover transition group-hover:scale-105"
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      {(() => {
+                        const latestPhotos =
+                          latestReport.progressPhotos &&
+                          latestReport.progressPhotos.length > 0
+                            ? latestReport.progressPhotos.map((p) => {
+                                const url = p.fileUrl ?? p.url;
+                                return {
+                                  url,
+                                  assetCode:
+                                    p.assetCode ??
+                                    parseClientAssetCode(url)?.assetCode ??
+                                    null,
+                                };
+                              })
+                            : (latestReport.photoUrls ?? []).map((url) => ({
+                                url,
+                                assetCode:
+                                  parseClientAssetCode(url)?.assetCode ?? null,
+                              }));
+                        if (latestPhotos.length === 0) return null;
+                        return (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {latestPhotos.map((item, i) => (
+                              <button
+                                key={`${item.url}-${i}`}
+                                type="button"
+                                onClick={() =>
+                                  openMediaLightbox(
+                                    item.url,
+                                    `Foto progres · ${formatDateIndo(latestReport.reportDate)}`,
+                                    item.assetCode,
+                                  )
+                                }
+                                aria-label={
+                                  item.assetCode
+                                    ? `Lihat foto progres ${item.assetCode}`
+                                    : `Lihat foto progres ${i + 1}`
+                                }
+                                className="group relative block size-16 overflow-hidden rounded-lg border border-border"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={withLocalPhotoPreview(item.url)}
+                                  alt={`Progres foto ${i + 1}`}
+                                  className="size-full object-cover transition group-hover:scale-105"
+                                />
+                                {item.assetCode && (
+                                  <span className="absolute bottom-0.5 left-0.5 max-w-[calc(100%-0.25rem)] truncate rounded bg-black/75 px-1 py-0.5 font-mono text-[8px] font-semibold text-white">
+                                    {item.assetCode}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       <div className="flex flex-wrap gap-2 pt-2">
                         {canSubmitDailyProgress &&
                           isRunningProjectStatus(project.status) && (
@@ -2761,31 +2806,62 @@ export default function ProjectDetailView({
                         </div>
                       )}
 
-                      {report.photoUrls && report.photoUrls.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {report.photoUrls.map((photo, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() =>
-                                openMediaLightbox(
-                                  photo,
-                                  `Foto lapangan · ${formatDateIndo(report.reportDate)} (${i + 1})`,
-                                )
-                              }
-                              aria-label={`Lihat foto lapangan ${i + 1}`}
-                              className="group relative block size-20 overflow-hidden rounded-lg border border-border"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={withLocalPhotoPreview(photo)}
-                                alt={`Foto lapangan ${i + 1}`}
-                                className="size-full object-cover transition group-hover:scale-105"
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      {(() => {
+                        const reportPhotos =
+                          report.progressPhotos &&
+                          report.progressPhotos.length > 0
+                            ? report.progressPhotos.map((p) => {
+                                const url = p.fileUrl ?? p.url;
+                                return {
+                                  url,
+                                  assetCode:
+                                    p.assetCode ??
+                                    parseClientAssetCode(url)?.assetCode ??
+                                    null,
+                                };
+                              })
+                            : (report.photoUrls ?? []).map((url) => ({
+                                url,
+                                assetCode:
+                                  parseClientAssetCode(url)?.assetCode ?? null,
+                              }));
+                        if (reportPhotos.length === 0) return null;
+                        return (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {reportPhotos.map((item, i) => (
+                              <button
+                                key={`${item.url}-${i}`}
+                                type="button"
+                                onClick={() =>
+                                  openMediaLightbox(
+                                    item.url,
+                                    `Foto lapangan · ${formatDateIndo(report.reportDate)} (${i + 1})`,
+                                    item.assetCode,
+                                  )
+                                }
+                                aria-label={
+                                  item.assetCode
+                                    ? `Lihat foto lapangan ${item.assetCode}`
+                                    : `Lihat foto lapangan ${i + 1}`
+                                }
+                                className="group relative block size-20 overflow-hidden rounded-lg border border-border"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={withLocalPhotoPreview(item.url)}
+                                  alt={`Foto lapangan ${i + 1}`}
+                                  className="size-full object-cover transition group-hover:scale-105"
+                                />
+                                {item.assetCode && (
+                                  <span className="absolute bottom-0.5 left-0.5 max-w-[calc(100%-0.25rem)] truncate rounded bg-black/75 px-1 py-0.5 font-mono text-[9px] font-semibold text-white">
+                                    {item.assetCode}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -3189,6 +3265,7 @@ export default function ProjectDetailView({
             }
           }}
           lockedProject={project}
+          currentUserId={currentUserId}
           canIncludeFinancials={canViewFinancials}
           onSuccess={() => router.refresh()}
           onQueueChange={setOfflineQueueCount}
@@ -3217,13 +3294,20 @@ export default function ProjectDetailView({
         className="max-w-3xl"
         footer={
           previewMedia ? (
-            <div className="flex w-full items-center justify-between gap-2">
-              <Button asChild variant="outline" size="sm">
-                <a href={photoDownloadHref(previewMedia.url)} download>
-                  <Download className="size-3.5" aria-hidden="true" />
-                  Unduh Berkas
-                </a>
-              </Button>
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {previewMedia.assetCode && (
+                  <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-semibold text-foreground">
+                    {previewMedia.assetCode}
+                  </span>
+                )}
+                <Button asChild variant="outline" size="sm">
+                  <a href={photoDownloadHref(previewMedia.url)} download>
+                    <Download className="size-3.5" aria-hidden="true" />
+                    Unduh Berkas
+                  </a>
+                </Button>
+              </div>
               <Button
                 type="button"
                 size="sm"

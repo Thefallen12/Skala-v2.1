@@ -46,6 +46,13 @@ import {
   normalizeFinancePaymentProofFile,
 } from "@/lib/finance-payment-proof-file";
 import { FINANCE_CASHFLOW_CLOUDINARY_FOLDER } from "@/lib/finance-cashflow-config";
+import { normalizeFinanceAssetKind, type FinanceDocKind } from "@/lib/asset-codes";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import {
+  isAssetUrlReferencedInDb,
+  type AssetReferenceIgnoreTarget,
+} from "@/lib/asset-references";
+import { removeCloudinaryRawFile } from "@/lib/cloudinary-raw-files";
 
 export type FinanceActionResult = {
   success: boolean;
@@ -61,6 +68,7 @@ export type IncomingFundInput = {
   proof: File;
   projectId?: string;
   transactionDate?: string;
+  proofDocType?: FinanceDocKind | string;
 };
 
 export type OutgoingFundInput = {
@@ -72,6 +80,7 @@ export type OutgoingFundInput = {
   proof: File;
   projectId?: string;
   transactionDate?: string;
+  proofDocType?: FinanceDocKind | string;
 };
 
 export type FinanceAccountInput = {
@@ -87,6 +96,7 @@ export type FinanceTransferInput = {
   sourceDesc: string;
   proof: File;
   transactionDate?: string;
+  proofDocType?: FinanceDocKind | string;
 };
 
 export type HistoricalPaymentCashflowInput = {
@@ -166,7 +176,10 @@ function parseTransactionDate(dateStr?: string | null): Date {
   return new Date();
 }
 
-export async function uploadCashflowProof(file: File): Promise<string> {
+export async function uploadCashflowProof(
+  file: File,
+  context?: AssetUploadContext,
+): Promise<string> {
   const session = await auth();
   if (!session?.user?.id || !isFinanceOperator(session.user.role)) {
     throw new Error("Akses Keuangan diperlukan untuk mengunggah bukti transaksi.");
@@ -177,8 +190,13 @@ export async function uploadCashflowProof(file: File): Promise<string> {
       "Format file bukti harus PDF, JPG, PNG, atau WEBP.",
     );
   }
+  const uploadContext: AssetUploadContext = {
+    uploadedById: session.user.id,
+    ...context,
+    kind: context?.kind ?? "BKT",
+  };
   if (normalizedFile.type === "application/pdf") {
-    const url = await saveTicketReceipt(normalizedFile);
+    const url = await saveTicketReceipt(normalizedFile, uploadContext);
     if (!isFinanceCashflowProofUrl(url)) {
       await removeTicketReceipt(url);
       throw new Error("URL PDF bukti transaksi tidak valid.");
@@ -189,6 +207,8 @@ export async function uploadCashflowProof(file: File): Promise<string> {
   const uploaded = await uploadCloudinaryPhoto(
     normalizedFile,
     FINANCE_CASHFLOW_CLOUDINARY_FOLDER,
+    undefined,
+    uploadContext,
   );
   if (!isFinanceCashflowProofUrl(uploaded.secureUrl)) {
     await removeCloudinaryPhoto(uploaded.secureUrl);
@@ -197,16 +217,21 @@ export async function uploadCashflowProof(file: File): Promise<string> {
   return uploaded.secureUrl;
 }
 
-export async function removeUploadedCashflowProof(url: string): Promise<void> {
+export async function removeUploadedCashflowProof(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<void> {
   const session = await auth();
   if (!session?.user?.id || !isFinanceOperator(session.user.role)) {
     throw new Error("Akses Keuangan diperlukan untuk menghapus bukti transaksi.");
   }
   try {
-    if (isCloudinaryPrivateTicketReceiptPdf(url)) {
-      await removeTicketReceipt(url);
+    if (url.includes("/raw/upload/")) {
+      await removeCloudinaryRawFile(url, options);
+    } else if (isCloudinaryPrivateTicketReceiptPdf(url)) {
+      await removeTicketReceipt(url, options);
     } else {
-      await removeCloudinaryPhoto(url);
+      await removeCloudinaryPhoto(url, options);
     }
   } catch (error) {
     console.error("Removing unreferenced cashflow proof failed:", error);
@@ -311,7 +336,15 @@ export async function recordIncomingFund(
 
   let proofUrl: string;
   try {
-    proofUrl = await uploadCashflowProof(input.proof);
+    proofUrl = await uploadCashflowProof(input.proof, {
+      projectId: input.projectId?.trim() || null,
+      kind: normalizeFinanceAssetKind(
+        input.proofDocType,
+        input.paymentMethod === "CASH" ? "KWT" : "BKT",
+      ),
+      entityType: "Cashflow",
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     console.error("Incoming cashflow proof upload failed:", error);
     if (
@@ -420,7 +453,15 @@ export async function recordOutgoingFund(
 
   let proofUrl: string;
   try {
-    proofUrl = await uploadCashflowProof(input.proof);
+    proofUrl = await uploadCashflowProof(input.proof, {
+      projectId: input.projectId?.trim() || null,
+      kind: normalizeFinanceAssetKind(
+        input.proofDocType,
+        input.paymentMethod === "CASH" ? "KWT" : "BKT",
+      ),
+      entityType: "Cashflow",
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     console.error("Outgoing cashflow proof upload failed:", error);
     if (
@@ -672,9 +713,13 @@ export async function transferBetweenFinanceAccounts(
 
   let proofUrl: string;
   try {
-    proofUrl = await uploadCashflowProof(input.proof);
+    proofUrl = await uploadCashflowProof(input.proof, {
+      projectId: null,
+      kind: normalizeFinanceAssetKind(input.proofDocType, "BKT"),
+      entityType: "Cashflow",
+      uploadedById: session.user.id,
+    });
   } catch (error) {
-    console.error("Finance account transfer proof upload failed:", error);
     if (
       error instanceof CloudinaryPhotoValidationError ||
       error instanceof CloudinaryConfigurationError ||
@@ -830,16 +875,27 @@ async function isProofUrlStillReferenced(url: string): Promise<boolean> {
   }
 }
 
-async function removeProofAssetSafely(url: string): Promise<void> {
-  if (url.startsWith("/api/tickets/receipts/")) {
+async function removeProofAssetSafely(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<void> {
+  if (url.includes("/raw/upload/")) {
     try {
-      await removeTicketReceipt(url);
+      await removeCloudinaryRawFile(url, options);
+    } catch (error) {
+      console.error("Removing unreferenced raw proof asset failed:", error);
+    }
+    return;
+  }
+  if (url.startsWith("/api/tickets/receipts/") || isCloudinaryPrivateTicketReceiptPdf(url)) {
+    try {
+      await removeTicketReceipt(url, options);
     } catch (error) {
       console.error("Removing unreferenced ticket receipt failed:", error);
     }
     return;
   }
-  await removeUploadedCashflowProof(url);
+  await removeUploadedCashflowProof(url, options);
 }
 
 /**
@@ -861,6 +917,8 @@ export async function replaceCashflowProof(
   }
   const rawCashflowId = formData.get("cashflowId");
   const rawProof = formData.get("proof");
+  const rawDocKind = formData.get("docKind") ?? formData.get("proofDocType");
+  const docKindInput = typeof rawDocKind === "string" ? rawDocKind.trim() : "";
   if (!isText(rawCashflowId, 191)) {
     return fail("ID catatan Buku Kas tidak valid.");
   }
@@ -871,12 +929,74 @@ export async function replaceCashflowProof(
     );
   }
 
-  let existingCashflow: { _id: unknown } | null = null;
+  let existingCashflow: {
+    _id: unknown;
+    projectId?: string | null;
+    paymentMethod?: string | null;
+    paymentTransactionId?: string | null;
+    equipmentRentalId?: string | null;
+  } | null = null;
+  let resolvedProjectId: string | null = null;
   try {
     await connectToMongoDB();
     existingCashflow = await Cashflow.findById(cashflowId)
-      .select({ _id: 1 })
+      .select({
+        _id: 1,
+        projectId: 1,
+        paymentMethod: 1,
+        paymentTransactionId: 1,
+        equipmentRentalId: 1,
+      })
       .lean();
+    if (existingCashflow) {
+      resolvedProjectId = existingCashflow.projectId?.trim() || null;
+      if (!resolvedProjectId && existingCashflow.paymentTransactionId) {
+        const linkedTx = await PaymentTransaction.findById(
+          existingCashflow.paymentTransactionId,
+        )
+          .select({ ticketId: 1, poId: 1, directStockPurchaseId: 1 })
+          .lean();
+        if (linkedTx?.ticketId) {
+          const linkedTicket = await Ticket.findById(linkedTx.ticketId)
+            .select({ projectId: 1 })
+            .lean();
+          resolvedProjectId = linkedTicket?.projectId?.trim() || null;
+        }
+        if (!resolvedProjectId && linkedTx?.poId) {
+          const linkedPo = await PurchaseOrder.findById(linkedTx.poId)
+            .select({ projectId: 1, ticketId: 1 })
+            .lean();
+          resolvedProjectId = linkedPo?.projectId?.trim() || null;
+          if (!resolvedProjectId && linkedPo?.ticketId) {
+            const poTicket = await Ticket.findById(linkedPo.ticketId)
+              .select({ projectId: 1 })
+              .lean();
+            resolvedProjectId = poTicket?.projectId?.trim() || null;
+          }
+        }
+        if (!resolvedProjectId && linkedTx?.directStockPurchaseId) {
+          const linkedDsp = await DirectStockPurchase.findById(
+            linkedTx.directStockPurchaseId,
+          )
+            .select({ ticketId: 1 })
+            .lean();
+          if (linkedDsp?.ticketId) {
+            const dspTicket = await Ticket.findById(linkedDsp.ticketId)
+              .select({ projectId: 1 })
+              .lean();
+            resolvedProjectId = dspTicket?.projectId?.trim() || null;
+          }
+        }
+      }
+      if (!resolvedProjectId && existingCashflow.equipmentRentalId) {
+        const linkedRental = await EquipmentRental.findById(
+          existingCashflow.equipmentRentalId,
+        )
+          .select({ projectId: 1 })
+          .lean();
+        resolvedProjectId = linkedRental?.projectId?.trim() || null;
+      }
+    }
   } catch (error) {
     console.error("Lookup cashflow before proof upload failed:", error);
     return fail("Gagal memeriksa catatan Buku Kas. Silakan coba kembali.");
@@ -887,7 +1007,16 @@ export async function replaceCashflowProof(
 
   let newProofUrl: string;
   try {
-    newProofUrl = await uploadCashflowProof(rawProof);
+    newProofUrl = await uploadCashflowProof(rawProof, {
+      projectId: resolvedProjectId,
+      kind: normalizeFinanceAssetKind(
+        docKindInput,
+        existingCashflow.paymentMethod === "CASH" ? "KWT" : "BKT",
+      ),
+      entityType: "Cashflow",
+      entityId: cashflowId,
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     console.error("Replace cashflow proof upload failed:", error);
     if (
@@ -981,15 +1110,21 @@ export async function replaceCashflowProof(
         const linkedPayment = await PaymentTransaction.findById(
           target.paymentTransactionId,
         )
-          .select({ _id: 1, proofOfTransferUrl: 1 })
+          .select({
+            _id: 1,
+            proofOfTransferUrl: 1,
+            ticketId: 1,
+            poId: 1,
+          })
           .session(transactionSession)
           .lean();
         if (linkedPayment) {
-          if (
-            typeof linkedPayment.proofOfTransferUrl === "string" &&
-            linkedPayment.proofOfTransferUrl
-          ) {
-            oldProofUrls.add(linkedPayment.proofOfTransferUrl);
+          const previousPaymentProof =
+            typeof linkedPayment.proofOfTransferUrl === "string"
+              ? linkedPayment.proofOfTransferUrl
+              : null;
+          if (previousPaymentProof) {
+            oldProofUrls.add(previousPaymentProof);
           }
           await PaymentTransaction.updateOne(
             { _id: linkedPayment._id },
@@ -997,6 +1132,43 @@ export async function replaceCashflowProof(
             { session: transactionSession },
           );
           syncedPaymentTransaction = true;
+
+          if (linkedPayment.ticketId && previousPaymentProof) {
+            const linkedTicket = await Ticket.findById(linkedPayment.ticketId)
+              .select({ _id: 1, transferReceiptUrl: 1, paymentProofUrl: 1 })
+              .session(transactionSession)
+              .lean();
+            if (linkedTicket) {
+              const ticketSet: Record<string, string> = {};
+              if (linkedTicket.transferReceiptUrl === previousPaymentProof) {
+                ticketSet.transferReceiptUrl = newProofUrl;
+              }
+              if (linkedTicket.paymentProofUrl === previousPaymentProof) {
+                ticketSet.paymentProofUrl = newProofUrl;
+              }
+              if (Object.keys(ticketSet).length > 0) {
+                await Ticket.updateOne(
+                  { _id: linkedTicket._id },
+                  { $set: ticketSet },
+                  { session: transactionSession },
+                );
+              }
+            }
+          }
+
+          if (linkedPayment.poId && previousPaymentProof) {
+            const linkedPo = await PurchaseOrder.findById(linkedPayment.poId)
+              .select({ _id: 1, paymentReceiptUrl: 1 })
+              .session(transactionSession)
+              .lean();
+            if (linkedPo && linkedPo.paymentReceiptUrl === previousPaymentProof) {
+              await PurchaseOrder.updateOne(
+                { _id: linkedPo._id },
+                { $set: { paymentReceiptUrl: newProofUrl } },
+                { session: transactionSession },
+              );
+            }
+          }
         }
         const linkedConfirmations = await OrderConfirmation.find({
           paymentTransactionId: target.paymentTransactionId,
@@ -1081,8 +1253,11 @@ export async function replaceCashflowProof(
 
   for (const oldUrl of oldProofUrls) {
     if (!oldUrl || oldUrl === newProofUrl) continue;
-    const stillReferenced = await isProofUrlStillReferenced(oldUrl);
-    if (!stillReferenced) {
+    const [stillReferencedMongo, stillReferencedDb] = await Promise.all([
+      isProofUrlStillReferenced(oldUrl),
+      isAssetUrlReferencedInDb(oldUrl),
+    ]);
+    if (!stillReferencedMongo && !stillReferencedDb) {
       await removeProofAssetSafely(oldUrl);
     }
   }

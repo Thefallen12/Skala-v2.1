@@ -17,7 +17,13 @@ export class PrivatePhotoValidationError extends Error {
 }
 
 function photoPath(fileName: string, directory: string): string | null {
-  if (!/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(fileName)) return null;
+  if (
+    !/^(?:[0-9a-f-]{36}|[A-Za-z0-9]{2,28}-[A-Z]{2,5}-\d+X)\.(jpe?g|png|webp)$/i.test(
+      fileName,
+    )
+  ) {
+    return null;
+  }
   return join(directory, fileName);
 }
 
@@ -48,9 +54,9 @@ export async function readPrivatePhoto(
   const path = photoPath(fileName, directory);
   if (!path) return null;
 
-  const extension = fileName.split(".").at(-1);
+  const extension = fileName.split(".").at(-1)?.toLowerCase();
   const contentType =
-    extension === "jpg"
+    extension === "jpg" || extension === "jpeg"
       ? "image/jpeg"
       : extension === "png"
         ? "image/png"

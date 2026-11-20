@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { doesAssetMatchProject, parseAssetCode } from "@/lib/asset-codes";
 import {
   buildProjectSCurveSeries,
   clampProjectProgress,
@@ -207,7 +208,13 @@ export default async function ProjectPortalPage({
           k3SafetyLog: true,
           progressPhotos: {
             orderBy: { createdAt: "asc" },
-            select: { url: true, fileUrl: true, createdAt: true },
+            select: {
+              url: true,
+              fileUrl: true,
+              assetCode: true,
+              projectId: true,
+              createdAt: true,
+            },
           },
         },
       },
@@ -269,10 +276,27 @@ export default async function ProjectPortalPage({
 
   const recentPhotosRaw = project.dailyReports
     .flatMap((rep) =>
-      rep.progressPhotos.map((p) => ({
-        url: p.fileUrl ?? p.url,
-        reportDate: rep.reportDate,
-      })),
+      rep.progressPhotos
+        .filter((p) =>
+          doesAssetMatchProject(
+            {
+              projectId: p.projectId,
+              assetCode: p.assetCode,
+              url: p.fileUrl ?? p.url,
+            },
+            {
+              projectId: project.id,
+              projectName: project.title || project.name || project.kelompokTani,
+              projectCode: project.code,
+            },
+          ),
+        )
+        .map((p) => ({
+          url: p.fileUrl ?? p.url,
+          assetCode:
+            p.assetCode ?? parseAssetCode(p.fileUrl ?? p.url)?.assetCode ?? null,
+          reportDate: rep.reportDate,
+        })),
     )
     .slice(0, 9);
 
@@ -284,11 +308,21 @@ export default async function ProjectPortalPage({
         return {
           key: `${idx}-${item.url}`,
           src,
+          assetCode: item.assetCode,
           dateLabel: formatDateId(item.reportDate),
         };
       }),
     )
-  ).filter((p): p is { key: string; src: string; dateLabel: string } => p !== null);
+  ).filter(
+    (
+      p,
+    ): p is {
+      key: string;
+      src: string;
+      assetCode: string | null;
+      dateLabel: string;
+    } => p !== null,
+  );
 
   // S-Curve SVG geometry
   const svgW = 760;
@@ -766,8 +800,13 @@ export default async function ProjectPortalPage({
                     alt={`Dokumentasi lapangan ${photo.dateLabel}`}
                     className="h-48 w-full object-cover"
                   />
-                  <figcaption className="px-3 py-2 text-xs font-medium text-slate-600">
-                    Dokumentasi · {photo.dateLabel}
+                  <figcaption className="flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-slate-600">
+                    <span>Dokumentasi · {photo.dateLabel}</span>
+                    {photo.assetCode && (
+                      <span className="shrink-0 rounded bg-slate-200/80 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-800">
+                        {photo.assetCode}
+                      </span>
+                    )}
                   </figcaption>
                 </figure>
               ))}

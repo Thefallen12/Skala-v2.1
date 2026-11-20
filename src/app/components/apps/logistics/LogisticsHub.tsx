@@ -42,6 +42,7 @@ import {
   submitPurchaseOrderForFinanceReview,
 } from "@/app/actions/orders";
 import { getJakartaDateKey } from "@/lib/habit-date";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
 import UniversalDocumentPreview from "@/components/documents/UniversalDocumentPreview";
 import LogisticsWorkspace from "@/app/components/apps/tickets/LogisticsWorkspace";
@@ -584,6 +585,14 @@ function PurchaseOrderRowCard({
                       >
                         <ExternalLink className="size-4" aria-hidden="true" />
                         Lihat Nota
+                        {(() => {
+                          const assetMeta = parseClientAssetCode(order.vendorInvoiceUrl);
+                          return assetMeta ? (
+                            <span className="ml-auto rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+                              {assetMeta.assetCode}
+                            </span>
+                          ) : null;
+                        })()}
                       </a>
                     </DropdownMenuItem>
                   )}

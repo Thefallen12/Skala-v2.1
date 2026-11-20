@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { compressFieldImageFiles } from "@/lib/image-compression-client";
 import {
+  parseClientAssetCode,
   photoDownloadLabel,
   photoDownloadLinkProps,
   withLocalPhotoPreview,
@@ -30,7 +31,22 @@ function todayAsDateInput(): string {
   return localDate.toISOString().slice(0, 10);
 }
 
-export default function ProjectWorkPointsModal({
+export default function ProjectWorkPointsModal(props: {
+  project: ProjectDashboardRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentUserId: string;
+  currentUserRole: UserRole;
+}) {
+  return (
+    <ProjectWorkPointsModalContent
+      key={`${props.project?.id ?? "none"}-${props.open ? "open" : "closed"}`}
+      {...props}
+    />
+  );
+}
+
+function ProjectWorkPointsModalContent({
   project,
   open,
   onOpenChange,
@@ -440,7 +456,10 @@ export default function ProjectWorkPointsModal({
                         onClick={() => {
                           setMessage("");
                           setPhotos([]);
-                          setPhotoPreviews([]);
+                          setPhotoPreviews((prev) => {
+                            prev.forEach((url) => URL.revokeObjectURL(url));
+                            return [];
+                          });
                           setProgressPointId(
                             progressPointId === point.id ? null : point.id,
                           );
@@ -511,14 +530,18 @@ export default function ProjectWorkPointsModal({
                                 setMessage("Maksimal 5 foto untuk satu laporan progres titik.");
                                 event.currentTarget.value = "";
                                 setPhotos([]);
-                                setPhotoPreviews([]);
+                                setPhotoPreviews((prev) => {
+                                  prev.forEach((url) => URL.revokeObjectURL(url));
+                                  return [];
+                                });
                                 return;
                               }
                               setMessage("");
                               setPhotos(selected);
-                              setPhotoPreviews(
-                                selected.map((photo) => URL.createObjectURL(photo)),
-                              );
+                              setPhotoPreviews((prev) => {
+                                prev.forEach((url) => URL.revokeObjectURL(url));
+                                return selected.map((photo) => URL.createObjectURL(photo));
+                              });
                             }}
                           />
                           {photoPreviews.length > 0 && (
@@ -559,13 +582,39 @@ export default function ProjectWorkPointsModal({
                               </p>
                             )}
                             <div className="flex flex-wrap gap-2">
-                              {report.photoUrls.map((photoUrl) => (
+                              {(
+                                (
+                                  report as {
+                                    photos?: Array<{
+                                      url: string;
+                                      fileUrl?: string | null;
+                                      assetCode?: string | null;
+                                    }>;
+                                  }
+                                ).photos?.map((photo) => ({
+                                  url: photo.fileUrl ?? photo.url,
+                                  assetCode:
+                                    photo.assetCode ??
+                                    parseClientAssetCode(photo.fileUrl ?? photo.url)
+                                      ?.assetCode ??
+                                    null,
+                                })) ??
+                                report.photoUrls.map((photoUrl) => ({
+                                  url: photoUrl,
+                                  assetCode:
+                                    parseClientAssetCode(photoUrl)?.assetCode ?? null,
+                                }))
+                              ).map(({ url: photoUrl, assetCode }) => (
                                 <button
                                   key={photoUrl}
                                   type="button"
-                                  className="overflow-hidden rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                  className="relative overflow-hidden rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                   onClick={() => setSelectedPhoto(photoUrl)}
-                                  aria-label="Buka foto progres titik"
+                                  aria-label={
+                                    assetCode
+                                      ? `Buka foto progres titik ${assetCode}`
+                                      : "Buka foto progres titik"
+                                  }
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
@@ -573,6 +622,11 @@ export default function ProjectWorkPointsModal({
                                     alt={`Foto progres ${point.title} ${report.reportDate}`}
                                     className="size-20 object-cover"
                                   />
+                                  {assetCode && (
+                                    <span className="absolute bottom-0.5 left-0.5 max-w-[calc(100%-0.25rem)] truncate rounded bg-black/75 px-1 py-0.5 font-mono text-[9px] font-semibold text-white">
+                                      {assetCode}
+                                    </span>
+                                  )}
                                 </button>
                               ))}
                             </div>
@@ -620,14 +674,21 @@ export default function ProjectWorkPointsModal({
                 alt={`Foto progres titik proyek ${project?.title}`}
                 className="max-h-[70vh] w-full rounded-md object-contain"
               />
-              <Button asChild variant="outline">
-                <a
-                  href={selectedPhoto}
-                  {...photoDownloadLinkProps(selectedPhoto)}
-                >
-                  {photoDownloadLabel(selectedPhoto)}
-                </a>
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {parseClientAssetCode(selectedPhoto)?.assetCode && (
+                  <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-semibold text-foreground">
+                    {parseClientAssetCode(selectedPhoto)?.assetCode}
+                  </span>
+                )}
+                <Button asChild variant="outline">
+                  <a
+                    href={selectedPhoto}
+                    {...photoDownloadLinkProps(selectedPhoto)}
+                  >
+                    {photoDownloadLabel(selectedPhoto)}
+                  </a>
+                </Button>
+              </div>
             </div>
           )}
       </GlobalModal>

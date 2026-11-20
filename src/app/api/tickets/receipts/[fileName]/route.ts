@@ -23,6 +23,9 @@ export async function GET(
   }
 
   const { fileName } = await params;
+  if (!fileName || !/^[A-Za-z0-9._-]+$/.test(fileName)) {
+    return new Response("Bad Request", { status: 400 });
+  }
   const requestUrl = new URL(request.url);
   const cloudinaryPdfUrl = requestUrl.searchParams.get("url");
   if (cloudinaryPdfUrl && !isCloudinaryPrivateTicketReceiptPdf(cloudinaryPdfUrl)) {
@@ -39,12 +42,20 @@ export async function GET(
     officeExpense,
     materialDelivery,
     subkonTermyn,
+    subkonContract,
     vendorInvoicePayment,
     equipmentRental,
+    purchaseOrder,
+    directStockPurchase,
+    invoice,
+    orderConfirmation,
   ] = await Promise.all([
     prisma.ticket.findFirst({
       where: {
         OR: [
+          { attachmentUrl: receiptUrl },
+          { receiptUrls: { has: receiptUrl } },
+          { paymentProofUrl: receiptUrl },
           { purchaseReceiptUrl: receiptUrl },
           { transferReceiptUrl: receiptUrl },
           { deliveryReceiptUrl: receiptUrl },
@@ -56,6 +67,9 @@ export async function GET(
         moverAssigneeId: true,
         type: true,
         status: true,
+        attachmentUrl: true,
+        receiptUrls: true,
+        paymentProofUrl: true,
         purchaseReceiptUrl: true,
         transferReceiptUrl: true,
         deliveryReceiptUrl: true,
@@ -66,12 +80,14 @@ export async function GET(
       where: {
         OR: [
           { deliveryReceiptUrl: receiptUrl },
+          { arrivalPhotoUrl: receiptUrl },
           { receiptPhotos: { some: { url: receiptUrl } } },
         ],
       },
       select: {
         status: true,
         driverName: true,
+        receivedById: true,
         ticket: {
           select: {
             requesterId: true,
@@ -99,9 +115,9 @@ export async function GET(
           { proofOfTransferUrl: receiptUrl },
           { additionalProofUrls: { has: receiptUrl } },
         ],
-        status: PaymentStatus.PAID,
       },
       select: {
+        status: true,
         ticket: {
           select: {
             requesterId: true,
@@ -153,6 +169,14 @@ export async function GET(
       where: { paymentProofUrl: receiptUrl },
       select: { id: true, createdById: true },
     }),
+    prisma.subkonContract.findFirst({
+      where: { retentionReleaseProofUrl: receiptUrl },
+      select: {
+        id: true,
+        createdById: true,
+        project: { select: { fieldPicId: true } },
+      },
+    }),
     prisma.vendorInvoicePayment.findFirst({
       where: { proofOfTransferUrl: receiptUrl },
       select: { id: true, processedById: true },
@@ -166,6 +190,52 @@ export async function GET(
         paidById: true,
       },
     }),
+    prisma.purchaseOrder.findFirst({
+      where: {
+        OR: [{ paymentReceiptUrl: receiptUrl }, { vendorInvoiceUrl: receiptUrl }],
+      },
+      select: {
+        id: true,
+        createdById: true,
+        ticket: {
+          select: {
+            requesterId: true,
+            moverAssigneeId: true,
+            type: true,
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.directStockPurchase.findFirst({
+      where: {
+        OR: [
+          { vendorInvoiceUrl: receiptUrl },
+          { arrivalPhotoUrl: receiptUrl },
+          { receivedPhotos: { has: receiptUrl } },
+        ],
+      },
+      select: {
+        id: true,
+        createdById: true,
+        ticket: {
+          select: {
+            requesterId: true,
+            moverAssigneeId: true,
+            type: true,
+            status: true,
+          },
+        },
+      },
+    }),
+    prisma.invoice.findFirst({
+      where: { documentUrl: receiptUrl },
+      select: { id: true },
+    }),
+    prisma.orderConfirmation.findFirst({
+      where: { proofOfTransferUrl: receiptUrl },
+      select: { id: true, signedById: true, acknowledgedById: true },
+    }),
   ]);
   if (
     !ticket &&
@@ -176,8 +246,13 @@ export async function GET(
     !officeExpense &&
     !materialDelivery &&
     !subkonTermyn &&
+    !subkonContract &&
     !vendorInvoicePayment &&
-    !equipmentRental
+    !equipmentRental &&
+    !purchaseOrder &&
+    !directStockPurchase &&
+    !invoice &&
+    !orderConfirmation
   ) {
     return new Response("Not found", { status: 404 });
   }
@@ -208,7 +283,9 @@ export async function GET(
       deliveryOrder.ticket.status === TicketStatus.COMPLETED);
   const moverIsAssignedToDeliveryOrder =
     deliveryOrder?.ticket?.moverAssigneeId === session.user.id ||
-    (Boolean(session.user.name) &&
+    deliveryOrder?.receivedById === session.user.id ||
+    (!deliveryOrder?.ticket?.moverAssigneeId &&
+      Boolean(session.user.name) &&
       deliveryOrder?.driverName === session.user.name);
   const moverCanReadDeliveryOrder =
     role === UserRole.MOVER &&
@@ -218,15 +295,35 @@ export async function GET(
   const hasAccess =
     (ticket?.requesterId === session.user.id &&
       ticket.deliveryOrderReceiptUrl !== receiptUrl) ||
-    (deliveryOrder?.ticket?.requesterId === session.user.id) ||
-    paymentTicket?.requesterId === session.user.id ||
-    payment?.directStockPurchase?.createdById === session.user.id ||
+    deliveryOrder?.ticket?.requesterId === session.user.id ||
+    purchaseOrder?.ticket?.requesterId === session.user.id ||
+    directStockPurchase?.ticket?.requesterId === session.user.id ||
+    (payment?.status === PaymentStatus.PAID &&
+      paymentTicket?.requesterId === session.user.id) ||
+    (payment?.status === PaymentStatus.PAID &&
+      payment?.directStockPurchase?.createdById === session.user.id) ||
     ((role === UserRole.DIRECTOR ||
       role === UserRole.DEPUTY_DIRECTOR ||
       role === UserRole.ADMINISTRATIONS) &&
-      Boolean(ticket || deliveryOrder || vehicleFuelRequest || payment)) ||
-    (role === UserRole.FINANCE && Boolean(payment)) ||
-    (role === UserRole.LOGISTICS && Boolean(payment?.directStockPurchase)) ||
+      Boolean(deliveryOrder)) ||
+    (canReadFinanceAsset &&
+      Boolean(
+        ticket ||
+          vehicleFuelRequest ||
+          payment ||
+          purchaseOrder ||
+          directStockPurchase ||
+          invoice ||
+          orderConfirmation,
+      )) ||
+    (canReadLogisticsAsset &&
+      Boolean(
+        purchaseOrder ||
+          directStockPurchase ||
+          invoice ||
+          orderConfirmation ||
+          payment?.directStockPurchase,
+      )) ||
     (role === UserRole.LOGISTICS &&
       ((ticket &&
         ticket.type === TicketType.MATERIAL &&
@@ -272,6 +369,10 @@ export async function GET(
         materialDelivery?.project.fieldPicId === session.user.id)) ||
     (Boolean(subkonTermyn) &&
       (canReadFinanceAsset || subkonTermyn?.createdById === session.user.id)) ||
+    (Boolean(subkonContract) &&
+      (canReadFinanceAsset ||
+        subkonContract?.createdById === session.user.id ||
+        subkonContract?.project.fieldPicId === session.user.id)) ||
     (Boolean(vendorInvoicePayment) &&
       (canReadFinanceAsset ||
         canReadLogisticsAsset ||
@@ -281,7 +382,10 @@ export async function GET(
         canReadLogisticsAsset ||
         equipmentRental?.createdById === session.user.id ||
         equipmentRental?.billingSubmittedById === session.user.id ||
-        equipmentRental?.paidById === session.user.id));
+        equipmentRental?.paidById === session.user.id)) ||
+    (Boolean(orderConfirmation) &&
+      (orderConfirmation?.signedById === session.user.id ||
+        orderConfirmation?.acknowledgedById === session.user.id));
   if (!hasAccess) {
     return new Response("Forbidden", { status: 403 });
   }

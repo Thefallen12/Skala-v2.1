@@ -54,7 +54,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getJakartaDateKey } from "@/lib/habit-date";
-import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  parseClientAssetCode,
+  photoDownloadHref,
+  withLocalPhotoPreview,
+} from "@/lib/photo-urls";
 import {
   PROJECT_WORK_TYPE_GROUPS,
   formatWorkTypeBadge,
@@ -65,6 +69,13 @@ import {
   formatEquipmentText,
   isRunningProjectStatus,
 } from "./DailyProgressModal";
+
+export type DailyHubReportPhoto = {
+  url: string;
+  fileUrl?: string | null;
+  assetCode?: string | null;
+  projectId?: string | null;
+};
 
 export type DailyHubReportItem = {
   id: string;
@@ -80,7 +91,27 @@ export type DailyHubReportItem = {
   equipment?: unknown;
   equipmentList?: string[];
   photoUrls: string[];
+  progressPhotos?: DailyHubReportPhoto[];
 };
+
+function getHubReportPhotos(item: DailyHubReportItem): Array<{
+  url: string;
+  assetCode: string | null;
+}> {
+  if (item.progressPhotos && item.progressPhotos.length > 0) {
+    return item.progressPhotos.map((photo) => {
+      const url = photo.fileUrl ?? photo.url;
+      return {
+        url,
+        assetCode: photo.assetCode ?? parseClientAssetCode(url)?.assetCode ?? null,
+      };
+    });
+  }
+  return item.photoUrls.map((url) => ({
+    url,
+    assetCode: parseClientAssetCode(url)?.assetCode ?? null,
+  }));
+}
 
 export type DailyHubProgressSubmission = {
   id: string;
@@ -171,7 +202,8 @@ export default function DailyReportsHubPanel({
   const [lightboxMedia, setLightboxMedia] = React.useState<{
     url: string;
     title: string;
-    allPhotos?: string[];
+    assetCode?: string | null;
+    allPhotos?: Array<{ url: string; assetCode?: string | null }>;
     index?: number;
   } | null>(null);
 
@@ -844,32 +876,42 @@ export default function DailyReportsHubPanel({
                       )}
 
                       {/* Photo preview */}
-                      {item.photoUrls.length > 0 && (
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                          {item.photoUrls.map((url, idx) => (
-                            <button
-                              key={url}
-                              type="button"
-                              onClick={() =>
-                                setLightboxMedia({
-                                  url: withLocalPhotoPreview(url),
-                                  title: `${item.project.title} · ${formatIndoDate(item.reportDate)} (#${idx + 1})`,
-                                  allPhotos: item.photoUrls,
-                                  index: idx,
-                                })
-                              }
-                              className="relative size-12 shrink-0 overflow-hidden rounded-md border border-border"
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={url}
-                                alt={`Foto ${idx + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      {(() => {
+                        const reportPhotos = getHubReportPhotos(item);
+                        if (reportPhotos.length === 0) return null;
+                        return (
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                            {reportPhotos.map((photo, idx) => (
+                              <button
+                                key={`${photo.url}-${idx}`}
+                                type="button"
+                                onClick={() =>
+                                  setLightboxMedia({
+                                    url: withLocalPhotoPreview(photo.url),
+                                    title: `${item.project.title} · ${formatIndoDate(item.reportDate)} (#${idx + 1})`,
+                                    assetCode: photo.assetCode,
+                                    allPhotos: reportPhotos,
+                                    index: idx,
+                                  })
+                                }
+                                className="relative size-12 shrink-0 overflow-hidden rounded-md border border-border"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={withLocalPhotoPreview(photo.url)}
+                                  alt={`Foto ${idx + 1}`}
+                                  className="h-full w-full object-cover"
+                                />
+                                {photo.assetCode && (
+                                  <span className="absolute bottom-0.5 left-0.5 max-w-[calc(100%-0.25rem)] truncate rounded bg-black/75 px-1 py-0.5 font-mono text-[8px] font-semibold text-white">
+                                    {photo.assetCode}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                       {/* Actions */}
                       <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-border/60">
@@ -1043,42 +1085,58 @@ export default function DailyReportsHubPanel({
                         </TableCell>
 
                         <TableCell className="align-top">
-                          {item.photoUrls.length === 0 ? (
-                            <span className="type-p3 text-muted-foreground">
-                              —
-                            </span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                              {item.photoUrls.slice(0, 3).map((url, idx) => (
-                                <button
-                                  key={`${url}-${idx}`}
-                                  type="button"
-                                  onClick={() =>
-                                    setLightboxMedia({
-                                      url: withLocalPhotoPreview(url),
-                                      title: `${item.project.title} · ${formatIndoDate(item.reportDate)} (#${idx + 1})`,
-                                      allPhotos: item.photoUrls,
-                                      index: idx,
-                                    })
-                                  }
-                                  className="group relative size-11 overflow-hidden rounded-md border border-border bg-muted/30"
-                                  aria-label={`Lihat foto laporan ${idx + 1}`}
-                                >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={withLocalPhotoPreview(url)}
-                                    alt={`Foto ${idx + 1}`}
-                                    className="size-full object-cover transition group-hover:scale-105"
-                                  />
-                                </button>
-                              ))}
-                              {item.photoUrls.length > 3 && (
-                                <span className="type-p3 flex size-11 items-center justify-center rounded-md border border-border bg-muted/40 font-semibold text-muted-foreground">
-                                  +{item.photoUrls.length - 3}
+                          {(() => {
+                            const reportPhotos = getHubReportPhotos(item);
+                            if (reportPhotos.length === 0) {
+                              return (
+                                <span className="type-p3 text-muted-foreground">
+                                  —
                                 </span>
-                              )}
-                            </div>
-                          )}
+                              );
+                            }
+                            return (
+                              <div className="flex flex-wrap gap-1.5">
+                                {reportPhotos.slice(0, 3).map((photo, idx) => (
+                                  <button
+                                    key={`${photo.url}-${idx}`}
+                                    type="button"
+                                    onClick={() =>
+                                      setLightboxMedia({
+                                        url: withLocalPhotoPreview(photo.url),
+                                        title: `${item.project.title} · ${formatIndoDate(item.reportDate)} (#${idx + 1})`,
+                                        assetCode: photo.assetCode,
+                                        allPhotos: reportPhotos,
+                                        index: idx,
+                                      })
+                                    }
+                                    className="group relative size-11 overflow-hidden rounded-md border border-border bg-muted/30"
+                                    aria-label={
+                                      photo.assetCode
+                                        ? `Lihat foto laporan ${photo.assetCode}`
+                                        : `Lihat foto laporan ${idx + 1}`
+                                    }
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={withLocalPhotoPreview(photo.url)}
+                                      alt={`Foto ${idx + 1}`}
+                                      className="size-full object-cover transition group-hover:scale-105"
+                                    />
+                                    {photo.assetCode && (
+                                      <span className="absolute bottom-0.5 left-0.5 max-w-[calc(100%-0.25rem)] truncate rounded bg-black/75 px-1 py-0.5 font-mono text-[8px] font-semibold text-white">
+                                        {photo.assetCode}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                                {reportPhotos.length > 3 && (
+                                  <span className="type-p3 flex size-11 items-center justify-center rounded-md border border-border bg-muted/40 font-semibold text-muted-foreground">
+                                    +{reportPhotos.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </TableCell>
 
                         <TableCell className="text-right align-top">
@@ -1165,9 +1223,9 @@ export default function DailyReportsHubPanel({
               <div className="flex items-center gap-2">
                 {lightboxMedia.allPhotos &&
                   lightboxMedia.allPhotos.length > 1 &&
-                  lightboxMedia.allPhotos.map((u, idx) => (
+                  lightboxMedia.allPhotos.map((entry, idx) => (
                     <Button
-                      key={`${u}-${idx}`}
+                      key={`${entry.url}-${idx}`}
                       type="button"
                       size="sm"
                       variant={
@@ -1176,17 +1234,23 @@ export default function DailyReportsHubPanel({
                       onClick={() =>
                         setLightboxMedia({
                           ...lightboxMedia,
-                          url: withLocalPhotoPreview(u),
+                          url: withLocalPhotoPreview(entry.url),
+                          assetCode: entry.assetCode ?? null,
                           index: idx,
                         })
                       }
                       className="h-7 px-2.5 text-xs"
                     >
-                      #{idx + 1}
+                      {entry.assetCode || `#${idx + 1}`}
                     </Button>
                   ))}
               </div>
               <div className="flex items-center gap-2">
+                {lightboxMedia.assetCode && (
+                  <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-semibold text-foreground">
+                    {lightboxMedia.assetCode}
+                  </span>
+                )}
                 <Button asChild variant="outline" size="sm">
                   <a href={photoDownloadHref(lightboxMedia.url)} download>
                     <Download className="size-3.5" aria-hidden="true" />

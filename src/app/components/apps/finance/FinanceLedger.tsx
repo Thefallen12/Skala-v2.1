@@ -53,7 +53,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import { parseClientAssetCode, withLocalPhotoPreview } from "@/lib/photo-urls";
 import { PaymentType } from "@prisma/client";
 
 export type FinanceAccountCard = FinanceAccountOption;
@@ -458,8 +458,18 @@ export default function FinanceLedger({
       });
     };
 
+    const assetMeta = parseClientAssetCode(rawProofUrl);
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
+        {assetMeta && (
+          <Badge
+            variant="outline"
+            className="font-mono text-[10px]"
+            title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+          >
+            {assetMeta.assetCode}
+          </Badge>
+        )}
         {isLegacySharedProof && (
           <Badge
             variant="outlineWarning"

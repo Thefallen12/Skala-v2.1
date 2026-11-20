@@ -35,6 +35,7 @@ import {
   type SurveyGeoJSON,
 } from "@/lib/field-survey-geojson";
 import { compressFieldImageFile } from "@/lib/image-compression-client";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 import type { FieldSurveySummary, SurveyProjectOption } from "./SurveySidebar";
 
 const formSchema = z.object({
@@ -201,12 +202,24 @@ export default function SurveyForm({
         return;
       }
 
-      const compressedPhotoFiles = await Promise.all(
-        documentationPhotos.map(async (item) => ({
-          ...item,
-          file: await compressFieldImageFile(item.file),
-        })),
-      );
+      let compressedPhotoFiles: typeof documentationPhotos = [];
+      try {
+        compressedPhotoFiles = await Promise.all(
+          documentationPhotos.map(async (item) => ({
+            ...item,
+            file: await compressFieldImageFile(item.file),
+          })),
+        );
+      } catch (error) {
+        setStatus({
+          type: "error",
+          message:
+            error instanceof Error && error.message
+              ? error.message
+              : "Gagal memproses foto dokumentasi.",
+        });
+        return;
+      }
 
       const result = await saveFieldSurvey({
         projectId: values.projectId,
@@ -261,6 +274,9 @@ export default function SurveyForm({
         message: result.message,
       });
       if (result.success) {
+        setDocumentationPhotos([]);
+        setUploadError("");
+        form.setValue("documentationUrls", []);
         if (result.surveyId) onSavedSurvey?.(result.surveyId);
         const nextProjectId = values.projectId || "none";
         router.replace(
@@ -275,6 +291,8 @@ export default function SurveyForm({
   const handleLoadSurvey = async (survey: FieldSurveySummary) => {
     setLoadingSurveyId(survey.id);
     setStatus(null);
+    setUploadError("");
+    setDocumentationPhotos([]);
     try {
       await onLoadSurvey(survey);
       form.reset({
@@ -362,6 +380,10 @@ export default function SurveyForm({
                       onValueChange={(value) => {
                         const projectId = value === "preproject" ? null : value;
                         field.onChange(projectId);
+                        setDocumentationPhotos([]);
+                        setUploadError("");
+                        setStatus(null);
+                        form.setValue("documentationUrls", []);
                         onProjectChange(projectId ?? "");
                       }}
                     >
@@ -556,32 +578,40 @@ export default function SurveyForm({
                   Unggah Foto Dokumentasi & Lampiran
                 </Label>
                 <div className="flex min-h-32 flex-wrap items-center gap-2 rounded-lg border border-dashed border-slate-700 bg-slate-800/70 p-3">
-                  {documentationUrls.map((url, index) => (
-                    <div key={url} className="w-full rounded-md border border-slate-700 bg-slate-900/60 p-2 sm:w-[calc(50%-0.25rem)]">
-                      <div
-                        className="group relative h-24 overflow-hidden rounded-md border border-slate-600 bg-cover bg-center"
-                        style={{ backgroundImage: `url("${url}")` }}
-                      >
-                        <button
-                          type="button"
-                          aria-label={`Hapus foto ${index + 1}`}
-                          onClick={() => {
-                            form.setValue(
-                              "documentationUrls",
-                              documentationUrls.filter((item) => item !== url),
-                              { shouldDirty: true },
-                            );
-                          }}
-                          className="absolute right-1 top-1 rounded bg-slate-950/80 p-1 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                  {documentationUrls.map((url, index) => {
+                    const assetCode = parseClientAssetCode(url)?.assetCode ?? null;
+                    return (
+                      <div key={url} className="w-full rounded-md border border-slate-700 bg-slate-900/60 p-2 sm:w-[calc(50%-0.25rem)]">
+                        <div
+                          className="group relative h-24 overflow-hidden rounded-md border border-slate-600 bg-cover bg-center"
+                          style={{ backgroundImage: `url("${url}")` }}
                         >
-                          <Trash2 className="size-3" aria-hidden="true" />
-                        </button>
+                          {assetCode && (
+                            <span className="absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-slate-950/85 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                              {assetCode}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Hapus foto ${index + 1}`}
+                            onClick={() => {
+                              form.setValue(
+                                "documentationUrls",
+                                documentationUrls.filter((item) => item !== url),
+                                { shouldDirty: true },
+                              );
+                            }}
+                            className="absolute right-1 top-1 rounded bg-slate-950/80 p-1 text-white opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+                          >
+                            <Trash2 className="size-3" aria-hidden="true" />
+                          </button>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">
+                          Foto dokumentasi yang sudah tersimpan
+                        </p>
                       </div>
-                      <p className="mt-2 text-xs text-slate-400">
-                        Foto dokumentasi yang sudah tersimpan
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {documentationPhotos.map((photo, index) => (
                     <div
                       key={`${photo.file.name}-${photo.file.lastModified}-${photo.file.size}`}

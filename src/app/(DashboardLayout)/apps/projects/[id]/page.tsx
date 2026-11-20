@@ -14,6 +14,7 @@ import {
   toJakartaDateKey,
 } from "@/lib/project-progress";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
+import { doesAssetMatchProject, parseAssetCode } from "@/lib/asset-codes";
 import ProjectDetailView from "@/app/components/apps/projects/ProjectDetailView";
 import type { ProjectWorkstationMasterData } from "@/app/components/apps/projects/ProjectWorkstationMaster";
 import type { StockItemOption } from "@/app/components/apps/projects/MaterialPlanModal";
@@ -88,7 +89,12 @@ export default async function ProjectDetailPage({
         include: {
           progressPhotos: {
             orderBy: { createdAt: "asc" },
-            select: { url: true, fileUrl: true },
+            select: {
+              url: true,
+              fileUrl: true,
+              assetCode: true,
+              projectId: true,
+            },
           },
         },
       },
@@ -104,7 +110,12 @@ export default async function ProjectDetailPage({
             include: {
               photos: {
                 orderBy: { createdAt: "asc" },
-                select: { url: true, fileUrl: true },
+                select: {
+                  url: true,
+                  fileUrl: true,
+                  assetCode: true,
+                  projectId: true,
+                },
               },
             },
           },
@@ -227,20 +238,11 @@ export default async function ProjectDetailPage({
 
   const dateKey = (date: Date | string | null | undefined) =>
     toJakartaDateKey(date) ?? "";
-  const workPointPhotosByDate = new Map<string, string[]>();
-  for (const point of project.workPoints) {
-    for (const progressReport of point.progressReports) {
-      const key = dateKey(progressReport.reportDate);
-      if (!key || progressReport.photos.length === 0) continue;
-      const photos = progressReport.photos.map(
-        (photo) => photo.fileUrl ?? photo.url,
-      );
-      workPointPhotosByDate.set(key, [
-        ...(workPointPhotosByDate.get(key) ?? []),
-        ...photos,
-      ]);
-    }
-  }
+  const projectAssetTarget = {
+    projectId: project.id,
+    projectName: project.title || project.name || project.kelompokTani,
+    projectCode: project.code,
+  };
 
   const getCumulativeProgressAtDate = (
     reportDate: Date | string,
@@ -282,7 +284,27 @@ export default async function ProjectDetailPage({
 
   const serializedReports = project.dailyReports.map((report) => {
     const key = dateKey(report.reportDate);
-    const workPointPhotos = workPointPhotosByDate.get(key) ?? [];
+    const matchedPhotos = report.progressPhotos
+      .filter((photo) =>
+        doesAssetMatchProject(
+          {
+            projectId: photo.projectId,
+            assetCode: photo.assetCode,
+            url: photo.fileUrl ?? photo.url,
+          },
+          projectAssetTarget,
+        ),
+      )
+      .map((photo) => {
+        const resolvedUrl = photo.fileUrl ?? photo.url;
+        return {
+          url: resolvedUrl,
+          fileUrl: photo.fileUrl ?? null,
+          assetCode:
+            photo.assetCode ?? parseAssetCode(resolvedUrl)?.assetCode ?? null,
+          projectId: photo.projectId ?? project.id,
+        };
+      });
     return {
       id: report.id,
       reportDate: key,
@@ -298,27 +320,49 @@ export default async function ProjectDetailPage({
       workSummary: report.workSummary,
       notes: report.notes,
       k3SafetyLog: report.k3SafetyLog ?? null,
-      photoUrls: [
-        ...new Set([
-          ...report.progressPhotos.map(
-            (photo) => photo.fileUrl ?? photo.url,
-          ),
-          ...workPointPhotos,
-        ]),
-      ],
+      photoUrls: Array.from(new Set(matchedPhotos.map((photo) => photo.url))),
+      progressPhotos: matchedPhotos,
     };
   });
 
   const serializedWorkPoints = project.workPoints.map((point) => {
     const seenDates = new Set<string>();
     const progressReports = point.progressReports
-      .map((report) => ({
-        id: report.id,
-        reportDate: dateKey(report.reportDate),
-        progress: report.progress,
-        workSummary: report.workSummary,
-        photoUrls: report.photos.map((photo) => photo.fileUrl ?? photo.url),
-      }))
+      .map((report) => {
+        const matchedPhotos = report.photos
+          .filter((photo) =>
+            doesAssetMatchProject(
+              {
+                projectId: photo.projectId,
+                assetCode: photo.assetCode,
+                url: photo.fileUrl ?? photo.url,
+              },
+              projectAssetTarget,
+            ),
+          )
+          .map((photo) => {
+            const resolvedUrl = photo.fileUrl ?? photo.url;
+            return {
+              url: resolvedUrl,
+              fileUrl: photo.fileUrl ?? null,
+              assetCode:
+                photo.assetCode ??
+                parseAssetCode(resolvedUrl)?.assetCode ??
+                null,
+              projectId: photo.projectId ?? project.id,
+              workPointId: point.id,
+              workPointName: point.title,
+            };
+          });
+        return {
+          id: report.id,
+          reportDate: dateKey(report.reportDate),
+          progress: report.progress,
+          workSummary: report.workSummary,
+          photoUrls: matchedPhotos.map((photo) => photo.url),
+          photos: matchedPhotos,
+        };
+      })
       .filter((report) => {
         if (!report.reportDate || seenDates.has(report.reportDate)) return false;
         seenDates.add(report.reportDate);

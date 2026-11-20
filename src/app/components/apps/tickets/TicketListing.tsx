@@ -124,11 +124,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  parseClientAssetCode,
   photoDownloadHref,
   photoDownloadLabel,
   photoDownloadLinkProps,
   withLocalPhotoPreview,
 } from "@/lib/photo-urls";
+
+type TicketRowWithDeliveryOrderReceipt = TicketRow & {
+  deliveryOrderReceiptUrl?: string | null;
+};
 import { printUrlInFrame } from "@/lib/print-url";
 import { cn } from "@/lib/utils";
 import FinanceActionModal from "./FinanceActionModal";
@@ -984,7 +989,8 @@ function TicketMobileCard({
       ticket.attachmentUrl ||
         ticket.purchaseReceiptUrl ||
         ticket.transferReceiptUrl ||
-        ticket.deliveryReceiptUrl,
+        ticket.deliveryReceiptUrl ||
+        (ticket as TicketRowWithDeliveryOrderReceipt).deliveryOrderReceiptUrl,
     );
 
   return (
@@ -1121,7 +1127,8 @@ function TicketDesktopRow({
       ticket.attachmentUrl ||
         ticket.purchaseReceiptUrl ||
         ticket.transferReceiptUrl ||
-        ticket.deliveryReceiptUrl,
+        ticket.deliveryReceiptUrl ||
+        (ticket as TicketRowWithDeliveryOrderReceipt).deliveryOrderReceiptUrl,
     );
 
   return (
@@ -3213,22 +3220,31 @@ export default function TicketListing({
                       <h3 className="type-p3 font-bold uppercase tracking-wider text-muted-foreground">
                         Rekening Tujuan
                       </h3>
-                      {selectedTicket.transferReceiptUrl && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            openReceiptPreview({
-                              label: "Bukti Transfer",
-                              url: selectedTicket.transferReceiptUrl!,
-                            })
-                          }
-                        >
-                          <Eye className="size-3.5" aria-hidden="true" />
-                          Bukti Transfer
-                        </Button>
-                      )}
+                      {selectedTicket.transferReceiptUrl && (() => {
+                        const assetMeta = parseClientAssetCode(selectedTicket.transferReceiptUrl);
+                        return (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                            onClick={() =>
+                              openReceiptPreview({
+                                label: "Bukti Transfer",
+                                url: selectedTicket.transferReceiptUrl!,
+                              })
+                            }
+                          >
+                            <Eye className="size-3.5" aria-hidden="true" />
+                            Bukti Transfer
+                            {assetMeta && (
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                {assetMeta.assetCode}
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })()}
                     </div>
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                       <div className="rounded-lg border border-border bg-muted/25 p-3">
@@ -3263,7 +3279,9 @@ export default function TicketListing({
                   selectedTicket.receiptUrls.length > 0 ||
                   selectedTicket.paymentProofUrl ||
                   selectedTicket.purchaseReceiptUrl ||
-                  selectedTicket.deliveryReceiptUrl) && (
+                  selectedTicket.deliveryReceiptUrl ||
+                  (selectedTicket as TicketRowWithDeliveryOrderReceipt)
+                    .deliveryOrderReceiptUrl) && (
                   <div className="rounded-xl border border-border bg-card p-4">
                     <h3 className="type-p3 mb-2.5 font-bold uppercase tracking-wider text-muted-foreground">
                       Lampiran &amp; Bukti Dokumen
@@ -3281,43 +3299,66 @@ export default function TicketListing({
                           </a>
                         </Button>
                       )}
-                      {selectedTicket.receiptUrls.map((url, index) => (
-                        <Button
-                          key={`${selectedTicket.id}-receipt-${index}-${url}`}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            openReceiptPreview({
-                              label: `Bukti Pengajuan ${index + 1}`,
-                              url,
-                            })
-                          }
-                        >
-                          <Eye className="size-3.5" aria-hidden="true" />
-                          Bukti #{index + 1}
-                        </Button>
-                      ))}
+                      {selectedTicket.receiptUrls.map((url, index) => {
+                        const assetMeta = parseClientAssetCode(url);
+                        return (
+                          <Button
+                            key={`${selectedTicket.id}-receipt-${index}-${url}`}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                            onClick={() =>
+                              openReceiptPreview({
+                                label: `Bukti Pengajuan ${index + 1}`,
+                                url,
+                              })
+                            }
+                          >
+                            <Eye className="size-3.5" aria-hidden="true" />
+                            Bukti #{index + 1}
+                            {assetMeta && (
+                              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                {assetMeta.assetCode}
+                              </span>
+                            )}
+                          </Button>
+                        );
+                      })}
                       {[
                         ["Bukti Pembayaran", selectedTicket.paymentProofUrl],
                         ["Bukti Pembelian", selectedTicket.purchaseReceiptUrl],
                         ["Bukti Pengiriman", selectedTicket.deliveryReceiptUrl],
+                        [
+                          "Bukti Surat Jalan / DO",
+                          (selectedTicket as TicketRowWithDeliveryOrderReceipt)
+                            .deliveryOrderReceiptUrl ?? null,
+                        ],
                       ]
                         .filter((receipt): receipt is [string, string] =>
                           Boolean(receipt[1]),
                         )
-                        .map(([label, url]) => (
-                          <Button
-                            key={`${selectedTicket.id}-${label}-${url}`}
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openReceiptPreview({ label, url })}
-                          >
-                            <Eye className="size-3.5" aria-hidden="true" />
-                            {label}
-                          </Button>
-                        ))}
+                        .map(([label, url]) => {
+                          const assetMeta = parseClientAssetCode(url);
+                          return (
+                            <Button
+                              key={`${selectedTicket.id}-${label}-${url}`}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                              onClick={() => openReceiptPreview({ label, url })}
+                            >
+                              <Eye className="size-3.5" aria-hidden="true" />
+                              {label}
+                              {assetMeta && (
+                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                  {assetMeta.assetCode}
+                                </span>
+                              )}
+                            </Button>
+                          );
+                        })}
                     </div>
                   </div>
                 )}
@@ -3390,56 +3431,83 @@ export default function TicketListing({
                           </div>
                           {hasOrderPhotos && (
                             <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
-                              {deliveryOrder.arrivalPhotoUrl && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openReceiptPreview({
-                                      label: `Foto Material Tiba · ${deliveryOrder.doNumber}`,
-                                      url: deliveryOrder.arrivalPhotoUrl!,
-                                    })
-                                  }
-                                >
-                                  <Eye className="size-3.5" aria-hidden="true" />
-                                  Foto Tiba
-                                </Button>
-                              )}
-                              {deliveryOrder.deliveryReceiptUrl && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openReceiptPreview({
-                                      label: `Bukti DO · ${deliveryOrder.doNumber}`,
-                                      url: deliveryOrder.deliveryReceiptUrl!,
-                                    })
-                                  }
-                                >
-                                  <Eye className="size-3.5" aria-hidden="true" />
-                                  Bukti DO
-                                </Button>
-                              )}
-                              {deliveryOrder.receiptPhotos?.map(
-                                (photo, photoIdx) => (
+                              {deliveryOrder.arrivalPhotoUrl && (() => {
+                                const assetMeta = parseClientAssetCode(deliveryOrder.arrivalPhotoUrl);
+                                return (
                                   <Button
-                                    key={photo.id}
                                     type="button"
                                     variant="outline"
                                     size="sm"
+                                    title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
                                     onClick={() =>
                                       openReceiptPreview({
-                                        label: `Serah Terima #${photoIdx + 1} · ${deliveryOrder.doNumber}`,
-                                        url: photo.url,
+                                        label: `Foto Material Tiba · ${deliveryOrder.doNumber}`,
+                                        url: deliveryOrder.arrivalPhotoUrl!,
                                       })
                                     }
                                   >
                                     <Eye className="size-3.5" aria-hidden="true" />
-                                    Foto #{photoIdx + 1}
+                                    Foto Tiba
+                                    {assetMeta && (
+                                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                        {assetMeta.assetCode}
+                                      </span>
+                                    )}
                                   </Button>
-                                ),
+                                );
+                              })()}
+                              {deliveryOrder.deliveryReceiptUrl && (() => {
+                                const assetMeta = parseClientAssetCode(deliveryOrder.deliveryReceiptUrl);
+                                return (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                    onClick={() =>
+                                      openReceiptPreview({
+                                        label: `Bukti DO · ${deliveryOrder.doNumber}`,
+                                        url: deliveryOrder.deliveryReceiptUrl!,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Bukti DO
+                                    {assetMeta && (
+                                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                        {assetMeta.assetCode}
+                                      </span>
+                                    )}
+                                  </Button>
+                                );
+                              })()}
+                              {deliveryOrder.receiptPhotos?.map(
+                                (photo, photoIdx) => {
+                                  const assetMeta = parseClientAssetCode(photo.url);
+                                  return (
+                                    <Button
+                                      key={photo.id}
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                      onClick={() =>
+                                        openReceiptPreview({
+                                          label: `Serah Terima #${photoIdx + 1} · ${deliveryOrder.doNumber}`,
+                                          url: photo.url,
+                                        })
+                                      }
+                                    >
+                                      <Eye className="size-3.5" aria-hidden="true" />
+                                      Foto #{photoIdx + 1}
+                                      {assetMeta && (
+                                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                          {assetMeta.assetCode}
+                                        </span>
+                                      )}
+                                    </Button>
+                                  );
+                                },
                               )}
                             </div>
                           )}
@@ -3519,39 +3587,57 @@ export default function TicketListing({
                           {(purchase.vendorInvoiceUrl ||
                             purchasePhotoUrls.length > 0) && (
                             <div className="flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
-                              {purchase.vendorInvoiceUrl && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openReceiptPreview({
-                                      label: `Invoice · ${purchase.purchaseNumber}`,
-                                      url: purchase.vendorInvoiceUrl!,
-                                    })
-                                  }
-                                >
-                                  <Eye className="size-3.5" aria-hidden="true" />
-                                  Invoice
-                                </Button>
-                              )}
-                              {purchasePhotoUrls.map((photoUrl, photoIdx) => (
-                                <Button
-                                  key={`${purchase.id}-photo-${photoIdx}`}
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    openReceiptPreview({
-                                      label: `Foto Tiba #${photoIdx + 1} · ${purchase.purchaseNumber}`,
-                                      url: photoUrl,
-                                    })
-                                  }
-                                >
-                                  <Eye className="size-3.5" aria-hidden="true" />
-                                  Foto #{photoIdx + 1}
-                                </Button>
-                              ))}
+                              {purchase.vendorInvoiceUrl && (() => {
+                                const assetMeta = parseClientAssetCode(purchase.vendorInvoiceUrl);
+                                return (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                    onClick={() =>
+                                      openReceiptPreview({
+                                        label: `Invoice · ${purchase.purchaseNumber}`,
+                                        url: purchase.vendorInvoiceUrl!,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Invoice
+                                    {assetMeta && (
+                                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                        {assetMeta.assetCode}
+                                      </span>
+                                    )}
+                                  </Button>
+                                );
+                              })()}
+                              {purchasePhotoUrls.map((photoUrl, photoIdx) => {
+                                const assetMeta = parseClientAssetCode(photoUrl);
+                                return (
+                                  <Button
+                                    key={`${purchase.id}-photo-${photoIdx}`}
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                    onClick={() =>
+                                      openReceiptPreview({
+                                        label: `Foto Tiba #${photoIdx + 1} · ${purchase.purchaseNumber}`,
+                                        url: photoUrl,
+                                      })
+                                    }
+                                  >
+                                    <Eye className="size-3.5" aria-hidden="true" />
+                                    Foto #{photoIdx + 1}
+                                    {assetMeta && (
+                                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                        {assetMeta.assetCode}
+                                      </span>
+                                    )}
+                                  </Button>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -4299,22 +4385,31 @@ export default function TicketListing({
                             <span className="type-p2 font-mono font-bold tabular-nums text-foreground">
                               {formatCurrency(String(payment.amount))}
                             </span>
-                            {payment.proofOfTransferUrl && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  openReceiptPreview({
-                                    label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
-                                    url: payment.proofOfTransferUrl!,
-                                  })
-                                }
-                              >
-                                <Eye className="size-3.5" aria-hidden="true" />
-                                Lihat Bukti
-                              </Button>
-                            )}
+                            {payment.proofOfTransferUrl && (() => {
+                              const assetMeta = parseClientAssetCode(payment.proofOfTransferUrl);
+                              return (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                  onClick={() =>
+                                    openReceiptPreview({
+                                      label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
+                                      url: payment.proofOfTransferUrl!,
+                                    })
+                                  }
+                                >
+                                  <Eye className="size-3.5" aria-hidden="true" />
+                                  Lihat Bukti
+                                  {assetMeta && (
+                                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                      {assetMeta.assetCode}
+                                    </span>
+                                  )}
+                                </Button>
+                              );
+                            })()}
                           </div>
                         </div>
                       ))}
@@ -4366,22 +4461,31 @@ export default function TicketListing({
                                 {payment.transferDestination}
                               </TableCell>
                               <TableCell className="text-right">
-                                {payment.proofOfTransferUrl ? (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      openReceiptPreview({
-                                        label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
-                                        url: payment.proofOfTransferUrl!,
-                                      })
-                                    }
-                                  >
-                                    <Eye className="size-3.5" aria-hidden="true" />
-                                    Bukti
-                                  </Button>
-                                ) : (
+                                {payment.proofOfTransferUrl ? (() => {
+                                  const assetMeta = parseClientAssetCode(payment.proofOfTransferUrl);
+                                  return (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                      onClick={() =>
+                                        openReceiptPreview({
+                                          label: `Bukti Pembayaran · ${selectedTicket.ticketNumber}`,
+                                          url: payment.proofOfTransferUrl!,
+                                        })
+                                      }
+                                    >
+                                      <Eye className="size-3.5" aria-hidden="true" />
+                                      Bukti
+                                      {assetMeta && (
+                                        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                          {assetMeta.assetCode}
+                                        </span>
+                                      )}
+                                    </Button>
+                                  );
+                                })() : (
                                   "—"
                                 )}
                               </TableCell>

@@ -15,6 +15,8 @@ import {
   removeUploadedCashflowProof,
   uploadCashflowProof,
 } from "@/app/actions/finance-cashflow";
+import { normalizeFinanceAssetKind, type FinanceDocKind } from "@/lib/asset-codes";
+import { isAssetUrlReferencedInDb } from "@/lib/asset-references";
 
 const expenseTypes = ["SALARY", "ADVANCE", "REIMBURSEMENT"] as const;
 const paymentMethods = ["CASH", "TRANSFER"] as const;
@@ -26,6 +28,7 @@ export type UpdateOfficeExpenseInput = {
   newProofFiles?: File[];
   keepProofUrls?: string[];
   description?: string;
+  proofDocType?: FinanceDocKind | string;
 };
 
 export async function updateOfficeExpense(
@@ -83,9 +86,28 @@ export async function updateOfficeExpense(
   }
 
   const uploadedProofUrls: string[] = [];
+  const defaultDocKind =
+    existing.paymentMethod === "CASH"
+      ? "KWT"
+      : existing.expenseType === "REIMBURSEMENT"
+        ? "BON"
+        : "BKT";
+  const resolvedDocKind = normalizeFinanceAssetKind(
+    input.proofDocType,
+    defaultDocKind,
+  );
+  let removedProofUrls: string[] = [];
   try {
     for (const file of normalizedNewProofFiles) {
-      uploadedProofUrls.push(await uploadCashflowProof(file));
+      uploadedProofUrls.push(
+        await uploadCashflowProof(file, {
+          projectId: null,
+          kind: resolvedDocKind,
+          entityType: "OfficeExpense",
+          entityId: input.id,
+          uploadedById: session.user.id,
+        }),
+      );
     }
 
     const keepUrls = input.keepProofUrls
@@ -99,6 +121,9 @@ export async function updateOfficeExpense(
         message: "Minimal harus ada satu bukti foto/struk transaksi.",
       };
     }
+    removedProofUrls = existing.proofUrls.filter(
+      (url: string) => !finalProofUrls.includes(url),
+    );
 
     const mongoose = await connectToMongoDB();
     await mongoose.connection.transaction(async (transactionSession) => {
@@ -175,6 +200,13 @@ export async function updateOfficeExpense(
       }
     });
 
+    for (const removedUrl of removedProofUrls) {
+      if (!removedUrl || uploadedProofUrls.includes(removedUrl)) continue;
+      if (!(await isAssetUrlReferencedInDb(removedUrl))) {
+        await removeUploadedCashflowProof(removedUrl);
+      }
+    }
+
     revalidatePath("/apps/finance");
     return {
       success: true,
@@ -209,6 +241,7 @@ export type OfficeExpenseInput = {
   paymentMethod: (typeof paymentMethods)[number];
   proofFiles: File[];
   transactionDate?: string;
+  proofDocType?: FinanceDocKind | string;
 };
 
 export type OfficeExpenseActionResult = {
@@ -310,10 +343,25 @@ export async function recordOfficeExpense(
   }
 
   const uploadedProofUrls: string[] = [];
+  const expenseProofKind = normalizeFinanceAssetKind(
+    input.proofDocType,
+    input.paymentMethod === "CASH"
+      ? "KWT"
+      : input.expenseType === "REIMBURSEMENT"
+        ? "BON"
+        : "BKT",
+  );
   try {
     for (const file of normalizedProofFiles) {
       if (file) {
-        uploadedProofUrls.push(await uploadCashflowProof(file));
+        uploadedProofUrls.push(
+          await uploadCashflowProof(file, {
+            projectId: null,
+            kind: expenseProofKind,
+            entityType: "OfficeExpense",
+            uploadedById: session.user.id,
+          }),
+        );
       }
     }
     if (uploadedProofUrls.some((url) => !isFinanceCashflowProofUrl(url))) {

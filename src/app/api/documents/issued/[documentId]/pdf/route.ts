@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { POStatus, TicketStatus, UserRole } from "@prisma/client";
+import { auth } from "@/../auth";
 import { prisma } from "@/lib/prisma";
 import {
   generateDocument,
@@ -32,11 +34,36 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+const allowedIssuedDocumentRoles = new Set<UserRole>([
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.ADMINISTRATIONS,
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+  UserRole.KOORDINATOR,
+  UserRole.FIELD_TEAM,
+  UserRole.MOVER,
+]);
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> },
 ) {
   const { documentId } = await params;
+  if (!documentId || !/^[A-Za-z0-9_-]{1,128}$/.test(documentId)) {
+    return NextResponse.json(
+      { message: "ID dokumen tidak valid." },
+      { status: 400 },
+    );
+  }
+  const session = await auth();
+  if (session?.user?.id && !allowedIssuedDocumentRoles.has(session.user.role)) {
+    return NextResponse.json(
+      { message: "Anda tidak memiliki akses ke dokumen ini." },
+      { status: 403 },
+    );
+  }
+
   const issued = await prisma.issuedDocument.findUnique({
     where: { id: documentId },
     select: {
@@ -56,6 +83,12 @@ export async function GET(
       { status: 404 },
     );
   }
+  if (!session?.user?.id && !issued.relatedRecordId) {
+    return NextResponse.json(
+      { message: "Silakan masuk untuk melihat dokumen ini." },
+      { status: 401 },
+    );
+  }
 
   let documentData: DocumentData | null = null;
   if (issued.relatedRecordId) {
@@ -63,6 +96,7 @@ export async function GET(
       prisma.purchaseOrder.findUnique({
         where: { id: issued.relatedRecordId },
         select: {
+          status: true,
           poNumber: true,
           vendorName: true,
           paymentTerms: true,
@@ -134,6 +168,7 @@ export async function GET(
       prisma.ticket.findUnique({
         where: { id: issued.relatedRecordId },
         select: {
+          status: true,
           ticketNumber: true,
           title: true,
           description: true,
@@ -155,6 +190,25 @@ export async function GET(
         },
       }),
     ]);
+
+    if (!session?.user?.id) {
+      if (purchaseOrder && purchaseOrder.status !== POStatus.APPROVED) {
+        return NextResponse.json(
+          { message: "Silakan masuk untuk melihat dokumen yang belum disetujui." },
+          { status: 401 },
+        );
+      }
+      if (
+        ticket &&
+        (ticket.status === TicketStatus.DRAFT ||
+          ticket.status === TicketStatus.REJECTED)
+      ) {
+        return NextResponse.json(
+          { message: "Silakan masuk untuk melihat dokumen ini." },
+          { status: 401 },
+        );
+      }
+    }
 
     if (purchaseOrder) {
       const total = purchaseOrder.items.reduce(

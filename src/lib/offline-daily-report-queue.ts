@@ -27,6 +27,8 @@ export type StoredOfflineDailyReportPhoto = {
 };
 
 export type OfflineDailyReportInput = {
+  userId?: string;
+  clientRequestId?: string;
   projectId: string;
   reportDate: string;
   weather: string;
@@ -36,6 +38,7 @@ export type OfflineDailyReportInput = {
   dailyVolume?: number;
   progress?: number;
   entries?: OfflineDailyReportWorkEntry[];
+  equipment?: string[];
   issueNotes?: string;
   k3SafetyLog?: string;
   noWorkReason?: string;
@@ -44,6 +47,8 @@ export type OfflineDailyReportInput = {
 
 export type OfflineDailyReportRecord = {
   id: string;
+  userId: string;
+  clientRequestId: string;
   projectId: string;
   reportDate: string;
   weather: string;
@@ -53,6 +58,7 @@ export type OfflineDailyReportRecord = {
   dailyVolume?: number;
   progress?: number;
   entries?: OfflineDailyReportWorkEntry[];
+  equipment?: string[];
   issueNotes?: string;
   k3SafetyLog?: string;
   noWorkReason?: string;
@@ -60,6 +66,11 @@ export type OfflineDailyReportRecord = {
   createdAt: number;
   attempts: number;
   lastError: string | null;
+};
+
+export type OfflineDailyReportScope = {
+  projectId?: string;
+  userId?: string;
 };
 
 export type OfflineDailyReportSubmitResult = {
@@ -90,6 +101,9 @@ const IDB_NAME = "skala_offline_daily_reports_v1";
 const IDB_VERSION = 1;
 const IDB_STORE_NAME = "reports";
 const LOCAL_STORAGE_KEY = "skala_offline_daily_reports_queue_v1";
+const LOCAL_FLUSH_LOCK_KEY = "skala_offline_daily_reports_flush_lock_v1";
+const WEB_LOCK_NAME = "skala_offline_daily_reports_flush_v1";
+const FLUSH_LOCK_TTL_MS = 30_000;
 
 let activeFlushPromise: Promise<FlushOfflineDailyReportsResult> | null = null;
 
@@ -97,11 +111,15 @@ function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
-function generateQueueId(): string {
+function generateRequestUuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return `odr_${crypto.randomUUID()}`;
+    return crypto.randomUUID();
   }
-  return `odr_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function generateQueueId(): string {
+  return `odr_${generateRequestUuid()}`;
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -305,12 +323,41 @@ async function deleteRecordFromIdb(id: string): Promise<void> {
   }
 }
 
+function normalizeScope(
+  projectIdOrScope?: string | OfflineDailyReportScope,
+): OfflineDailyReportScope {
+  if (typeof projectIdOrScope === "string") {
+    return { projectId: projectIdOrScope };
+  }
+  return projectIdOrScope ?? {};
+}
+
+function normalizeEquipmentList(equipment?: string[]): string[] | undefined {
+  if (!Array.isArray(equipment) || equipment.length === 0) return undefined;
+  const cleaned = equipment
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item.length > 0);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
 function buildRecordBase(
   input: OfflineDailyReportInput,
   photos: StoredOfflineDailyReportPhoto[],
 ): OfflineDailyReportRecord {
+  const equipment = normalizeEquipmentList(input.equipment);
+  const clientRequestId =
+    typeof input.clientRequestId === "string" && input.clientRequestId.trim().length > 0
+      ? input.clientRequestId.trim()
+      : generateRequestUuid();
+  const userId =
+    typeof input.userId === "string" && input.userId.trim().length > 0
+      ? input.userId.trim()
+      : "anonymous";
+
   return {
     id: generateQueueId(),
+    userId,
+    clientRequestId,
     projectId: input.projectId,
     reportDate: input.reportDate,
     weather: input.weather,
@@ -320,6 +367,7 @@ function buildRecordBase(
     ...(input.dailyVolume !== undefined ? { dailyVolume: input.dailyVolume } : {}),
     ...(input.progress !== undefined ? { progress: input.progress } : {}),
     ...(input.entries && input.entries.length > 0 ? { entries: input.entries } : {}),
+    ...(equipment ? { equipment } : {}),
     ...(input.issueNotes ? { issueNotes: input.issueNotes } : {}),
     ...(input.k3SafetyLog ? { k3SafetyLog: input.k3SafetyLog } : {}),
     ...(input.noWorkReason ? { noWorkReason: input.noWorkReason } : {}),
@@ -366,9 +414,14 @@ export async function enqueueOfflineDailyReport(
  * Lists queued offline daily reports sorted FIFO by creation timestamp.
  */
 export async function listOfflineDailyReports(
-  projectId?: string,
+  projectIdOrScope?: string | OfflineDailyReportScope,
 ): Promise<OfflineDailyReportRecord[]> {
   if (!isBrowser()) return [];
+
+  const scope = normalizeScope(projectIdOrScope);
+  if (scope.userId !== undefined && !scope.userId.trim()) {
+    return [];
+  }
 
   const localItems = readLocalStorageQueue();
   let idbItems: OfflineDailyReportRecord[] = [];
@@ -386,7 +439,10 @@ export async function listOfflineDailyReports(
   }
 
   return Array.from(mergedById.values())
-    .filter((item) => (!projectId ? true : item.projectId === projectId))
+    .filter((item) => (!scope.projectId ? true : item.projectId === scope.projectId))
+    .filter((item) =>
+      scope.userId !== undefined ? item.userId === scope.userId.trim() : true,
+    )
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
@@ -410,12 +466,12 @@ export async function removeOfflineDailyReport(id: string): Promise<void> {
 }
 
 /**
- * Counts queued offline daily reports, optionally scoped to a single project.
+ * Counts queued offline daily reports, optionally scoped to a project and/or user.
  */
 export async function countOfflineDailyReports(
-  projectId?: string,
+  projectIdOrScope?: string | OfflineDailyReportScope,
 ): Promise<number> {
-  const items = await listOfflineDailyReports(projectId);
+  const items = await listOfflineDailyReports(projectIdOrScope);
   return items.length;
 }
 
@@ -453,6 +509,12 @@ export function buildOfflineDailyReportFormData(
   formData.set("weather", record.weather);
   formData.set("workersCount", String(record.workersCount));
   formData.set("workSummary", record.workSummary);
+  formData.set("clientRequestId", record.clientRequestId || record.id);
+
+  const equipment = normalizeEquipmentList(record.equipment);
+  if (equipment) {
+    formData.set("equipment", JSON.stringify(equipment));
+  }
 
   if (record.entries && record.entries.length > 0) {
     formData.set("entries", JSON.stringify(record.entries));
@@ -493,13 +555,104 @@ export function buildOfflineDailyReportFormData(
   return formData;
 }
 
+function tryAcquireLocalFlushLock(ownerToken: string): boolean {
+  try {
+    const now = Date.now();
+    const raw = window.localStorage.getItem(LOCAL_FLUSH_LOCK_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { owner?: string; expiresAt?: number };
+      if (
+        parsed.owner &&
+        parsed.owner !== ownerToken &&
+        typeof parsed.expiresAt === "number" &&
+        parsed.expiresAt > now
+      ) {
+        return false;
+      }
+    }
+    window.localStorage.setItem(
+      LOCAL_FLUSH_LOCK_KEY,
+      JSON.stringify({ owner: ownerToken, expiresAt: now + FLUSH_LOCK_TTL_MS }),
+    );
+    const verified = window.localStorage.getItem(LOCAL_FLUSH_LOCK_KEY);
+    if (!verified) return true;
+    const parsedVerified = JSON.parse(verified) as { owner?: string };
+    return parsedVerified.owner === ownerToken;
+  } catch {
+    return true;
+  }
+}
+
+function refreshLocalFlushLock(ownerToken: string): void {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_FLUSH_LOCK_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { owner?: string };
+    if (parsed.owner === ownerToken) {
+      window.localStorage.setItem(
+        LOCAL_FLUSH_LOCK_KEY,
+        JSON.stringify({ owner: ownerToken, expiresAt: Date.now() + FLUSH_LOCK_TTL_MS }),
+      );
+    }
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
+
+function releaseLocalFlushLock(ownerToken: string): void {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_FLUSH_LOCK_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { owner?: string };
+    if (parsed.owner === ownerToken) {
+      window.localStorage.removeItem(LOCAL_FLUSH_LOCK_KEY);
+    }
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
+
+async function runWithCrossTabFlushLock<T>(
+  work: () => Promise<T>,
+  onBusy: () => Promise<T>,
+): Promise<T> {
+  const executeWithLocalLease = async (): Promise<T> => {
+    const ownerToken = generateRequestUuid();
+    if (!tryAcquireLocalFlushLock(ownerToken)) {
+      return onBusy();
+    }
+    const heartbeat = window.setInterval(() => {
+      refreshLocalFlushLock(ownerToken);
+    }, Math.floor(FLUSH_LOCK_TTL_MS / 3));
+
+    try {
+      return await work();
+    } finally {
+      window.clearInterval(heartbeat);
+      releaseLocalFlushLock(ownerToken);
+    }
+  };
+
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.locks &&
+    typeof navigator.locks.request === "function"
+  ) {
+    return navigator.locks.request(WEB_LOCK_NAME, async () =>
+      executeWithLocalLease(),
+    );
+  }
+
+  return executeWithLocalLease();
+}
+
 /**
  * Flushes queued offline daily reports in FIFO order when online.
- * Deduplicates concurrent flushes via an in-memory promise lock.
+ * Deduplicates concurrent flushes across hooks and browser tabs.
  */
 export async function flushOfflineDailyReports(
   submitFn: OfflineDailyReportSubmitFn,
-  options?: { projectId?: string },
+  options?: OfflineDailyReportScope,
 ): Promise<FlushOfflineDailyReportsResult> {
   if (!isBrowser()) {
     return {
@@ -511,83 +664,111 @@ export async function flushOfflineDailyReports(
     };
   }
 
+  const scope: OfflineDailyReportScope = {
+    projectId: options?.projectId,
+    ...(options?.userId !== undefined ? { userId: options.userId } : {}),
+  };
+
+  if (scope.userId !== undefined && !scope.userId.trim()) {
+    return {
+      syncedCount: 0,
+      failedCount: 0,
+      remainingCount: 0,
+      skippedOffline: false,
+      results: [],
+    };
+  }
+
   if (activeFlushPromise) {
     return activeFlushPromise;
   }
 
-  const runFlush = async (): Promise<FlushOfflineDailyReportsResult> => {
-    const queue = await listOfflineDailyReports(options?.projectId);
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      return {
-        syncedCount: 0,
-        failedCount: 0,
-        remainingCount: queue.length,
-        skippedOffline: true,
-        results: [],
-      };
-    }
-
-    let syncedCount = 0;
-    let failedCount = 0;
-    const results: FlushOfflineDailyReportsResult["results"] = [];
-
-    for (const item of queue) {
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        break;
-      }
-
-      try {
-        const formData = buildOfflineDailyReportFormData(item);
-        const outcome = await submitFn(item, formData);
-        if (outcome.success) {
-          await removeOfflineDailyReport(item.id);
-          syncedCount += 1;
-          results.push({
-            id: item.id,
-            projectId: item.projectId,
-            reportDate: item.reportDate,
-            success: true,
-            message: outcome.message,
-          });
-        } else {
-          const message =
-            outcome.message || "Gagal menyinkronkan laporan harian.";
-          await updateQueuedReportFailure(item, message);
-          failedCount += 1;
-          results.push({
-            id: item.id,
-            projectId: item.projectId,
-            reportDate: item.reportDate,
-            success: false,
-            message,
-          });
+  const runFlush = async (): Promise<FlushOfflineDailyReportsResult> =>
+    runWithCrossTabFlushLock(
+      async () => {
+        const queue = await listOfflineDailyReports(scope);
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          return {
+            syncedCount: 0,
+            failedCount: 0,
+            remainingCount: queue.length,
+            skippedOffline: true,
+            results: [],
+          };
         }
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : "Koneksi gagal saat sinkronisasi laporan.";
-        await updateQueuedReportFailure(item, message);
-        failedCount += 1;
-        results.push({
-          id: item.id,
-          projectId: item.projectId,
-          reportDate: item.reportDate,
-          success: false,
-          message,
-        });
-      }
-    }
 
-    const remainingCount = await countOfflineDailyReports(options?.projectId);
-    return {
-      syncedCount,
-      failedCount,
-      remainingCount,
-      skippedOffline: false,
-      results,
-    };
-  };
+        let syncedCount = 0;
+        let failedCount = 0;
+        const results: FlushOfflineDailyReportsResult["results"] = [];
+
+        for (const item of queue) {
+          if (typeof navigator !== "undefined" && navigator.onLine === false) {
+            break;
+          }
+
+          try {
+            const formData = buildOfflineDailyReportFormData(item);
+            const outcome = await submitFn(item, formData);
+            if (outcome.success) {
+              await removeOfflineDailyReport(item.id);
+              syncedCount += 1;
+              results.push({
+                id: item.id,
+                projectId: item.projectId,
+                reportDate: item.reportDate,
+                success: true,
+                message: outcome.message,
+              });
+            } else {
+              const message =
+                outcome.message || "Gagal menyinkronkan laporan harian.";
+              await updateQueuedReportFailure(item, message);
+              failedCount += 1;
+              results.push({
+                id: item.id,
+                projectId: item.projectId,
+                reportDate: item.reportDate,
+                success: false,
+                message,
+              });
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error && error.message
+                ? error.message
+                : "Koneksi gagal saat sinkronisasi laporan.";
+            await updateQueuedReportFailure(item, message);
+            failedCount += 1;
+            results.push({
+              id: item.id,
+              projectId: item.projectId,
+              reportDate: item.reportDate,
+              success: false,
+              message,
+            });
+          }
+        }
+
+        const remainingCount = await countOfflineDailyReports(scope);
+        return {
+          syncedCount,
+          failedCount,
+          remainingCount,
+          skippedOffline: false,
+          results,
+        };
+      },
+      async () => {
+        const remainingCount = await countOfflineDailyReports(scope);
+        return {
+          syncedCount: 0,
+          failedCount: 0,
+          remainingCount,
+          skippedOffline: false,
+          results: [],
+        };
+      },
+    );
 
   activeFlushPromise = runFlush().finally(() => {
     activeFlushPromise = null;
@@ -602,19 +783,19 @@ export async function flushOfflineDailyReports(
  */
 export function registerOfflineDailyReportAutoSync(
   submitFn: OfflineDailyReportSubmitFn,
-  options?: {
-    projectId?: string;
+  options?: OfflineDailyReportScope & {
     onSynced?: (result: FlushOfflineDailyReportsResult) => void;
   },
 ): () => void {
   if (!isBrowser()) return () => {};
 
   const handleOnline = () => {
-    void flushOfflineDailyReports(submitFn, { projectId: options?.projectId }).then(
-      (result) => {
-        options?.onSynced?.(result);
-      },
-    );
+    void flushOfflineDailyReports(submitFn, {
+      projectId: options?.projectId,
+      ...(options?.userId !== undefined ? { userId: options.userId } : {}),
+    }).then((result) => {
+      options?.onSynced?.(result);
+    });
   };
 
   window.addEventListener("online", handleOnline);

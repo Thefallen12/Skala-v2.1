@@ -178,7 +178,9 @@ const ticketFormSchema = z
     requestPaymentDescription: z.string().optional(),
     relatedDocumentNumbers: z.string(),
     deliveryReceiptFile: z.instanceof(File).nullable(),
+    deliveryProofDocType: z.enum(["BKT", "BON", "KWT", "INV"]).optional(),
     receiptFiles: z.array(z.instanceof(File)).max(5),
+    proofDocType: z.enum(["BKT", "BON", "KWT", "INV"]).optional(),
     operationalRequestType: z.enum(["GENERAL", "SURVEY"]),
     operationalAmount: z
       .number()
@@ -1219,7 +1221,9 @@ export default function CreateTicketModal({
       requestPaymentDescription: "",
       relatedDocumentNumbers: "",
       deliveryReceiptFile: null,
+      deliveryProofDocType: "BON",
       receiptFiles: [],
+      proofDocType: "BON",
       operationalRequestType: "GENERAL",
       operationalAmount: undefined,
       surveyConsumptionAmount: 0,
@@ -1906,6 +1910,9 @@ export default function CreateTicketModal({
                 deliveryReceiptFile: isShippingCostRequest
                   ? (values.deliveryReceiptFile ?? undefined)
                   : undefined,
+                deliveryProofDocType: isShippingCostRequest
+                  ? values.deliveryProofDocType ?? "BON"
+                  : undefined,
                 priority,
                 projectId: values.projectId || undefined,
                 moverAssigneeId: undefined,
@@ -1932,6 +1939,9 @@ export default function CreateTicketModal({
                       ? values.requestedAmount
                       : undefined,
                 receiptFiles: isInternalFunding ? values.receiptFiles : [],
+                proofDocType: isInternalFunding
+                  ? values.proofDocType ?? "BON"
+                  : undefined,
                 items: requiresFundingRequest
                   ? []
                   : values.items.map((item) => ({
@@ -3133,6 +3143,31 @@ export default function CreateTicketModal({
                     )}
 
                     <div className="space-y-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="ticket-shipping-doc-kind" className="type-p2 font-medium">
+                          Jenis Dokumen Resi / Biaya Pengiriman
+                        </Label>
+                        <Controller
+                          control={form.control}
+                          name="deliveryProofDocType"
+                          render={({ field }) => (
+                            <Select
+                              value={field.value ?? "BON"}
+                              onValueChange={field.onChange}
+                            >
+                              <SelectTrigger id="ticket-shipping-doc-kind">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="BON">Bon / Resi / Nota (BON)</SelectItem>
+                                <SelectItem value="INV">Invoice / Faktur Kurir (INV)</SelectItem>
+                                <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                                <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
                       <Label className="type-p2 font-medium">
                         Resi Pengiriman <span className="text-destructive">*</span>
                       </Label>
@@ -3253,6 +3288,31 @@ export default function CreateTicketModal({
 
                     {requestCategory === TicketRequestCategory.REIMBURSEMENT && (
                       <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="ticket-reimbursement-doc-kind" className="type-p2 font-medium">
+                            Jenis Dokumen Struk / Bukti
+                          </Label>
+                          <Controller
+                            control={form.control}
+                            name="proofDocType"
+                            render={({ field }) => (
+                              <Select
+                                value={field.value ?? "BON"}
+                                onValueChange={field.onChange}
+                              >
+                                <SelectTrigger id="ticket-reimbursement-doc-kind">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                                  <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                                  <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                                  <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                        </div>
                         <Label className="type-p2 font-medium">
                           Struk / Nota Asli{" "}
                           <span className="text-destructive">*</span>

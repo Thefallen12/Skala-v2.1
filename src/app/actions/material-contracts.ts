@@ -58,6 +58,10 @@ import {
 import { CloudinaryPrivatePdfValidationError } from "@/lib/cloudinary-private-pdfs";
 import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
 import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
+import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
+import { normalizeFinanceAssetKind, type FinanceDocKind } from "@/lib/asset-codes";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import { isAssetUrlReferencedInDb } from "@/lib/asset-references";
 import {
   removeUploadedCashflowProof,
   uploadCashflowProof,
@@ -480,19 +484,28 @@ async function syncContractTicketFulfillment(
   };
 }
 
-async function uploadDeliveryProofFile(file: File): Promise<string> {
+async function uploadDeliveryProofFile(
+  file: File,
+  context?: AssetUploadContext,
+): Promise<string> {
   const normalized = normalizeFinancePaymentProofFile(file);
   if (!normalized) {
     throw new CloudinaryPhotoValidationError(
       "Format foto Surat Jalan harus JPG, PNG, WEBP, atau PDF.",
     );
   }
+  const uploadContext: AssetUploadContext = {
+    ...context,
+    kind: context?.kind ?? "SJN",
+  };
   if (normalized.type === "application/pdf") {
-    return saveTicketReceipt(normalized);
+    return saveTicketReceipt(normalized, uploadContext);
   }
   const uploaded = await uploadCloudinaryPhoto(
     normalized,
     MATERIAL_DELIVERY_PROOF_CLOUDINARY_FOLDER,
+    undefined,
+    uploadContext,
   );
   return uploaded.secureUrl;
 }
@@ -728,7 +741,14 @@ export async function recordMaterialDelivery(
   let uploadedProofUrl: string | null = null;
   if (proofFile) {
     try {
-      uploadedProofUrl = await uploadDeliveryProofFile(proofFile);
+      uploadedProofUrl = await uploadDeliveryProofFile(proofFile, {
+        projectId: data.projectId,
+        kind: "SJN",
+        docType: "SURAT_JALAN_MATERIAL",
+        entityType: "MaterialDelivery",
+        ticketId: data.ticketId || null,
+        uploadedById: session.user.id,
+      });
     } catch (error) {
       console.error("Upload material delivery proof error:", error);
       if (
@@ -1494,6 +1514,7 @@ export async function payVendorInvoice(input: {
   financeAccountId: string;
   paymentMethod?: POPaymentMethod;
   notes?: string | null;
+  proofDocType?: FinanceDocKind | string;
 }): Promise<MaterialContractActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -1538,7 +1559,31 @@ export async function payVendorInvoice(input: {
   let createdProofInUpload = false;
   if (input.proof instanceof File) {
     try {
-      uploadedProofUrl = await uploadCashflowProof(input.proof);
+      await connectToMongoDB();
+      const deliveriesForInvoice = await MaterialDelivery.find({
+        vendorInvoiceId,
+      })
+        .select({ projectId: 1 })
+        .lean();
+      const uniqueProjectIds = Array.from(
+        new Set(
+          deliveriesForInvoice
+            .map((delivery) => String(delivery.projectId ?? "").trim())
+            .filter(Boolean),
+        ),
+      );
+      const uploadProjectId =
+        uniqueProjectIds.length === 1 ? uniqueProjectIds[0] : null;
+      uploadedProofUrl = await uploadCashflowProof(input.proof, {
+        projectId: uploadProjectId,
+        kind: normalizeFinanceAssetKind(
+          input.proofDocType,
+          paymentMethod === POPaymentMethod.CASH ? "KWT" : "BKT",
+        ),
+        entityType: "VendorInvoicePayment",
+        entityId: vendorInvoiceId,
+        uploadedById: session.user.id,
+      });
       createdProofInUpload = true;
     } catch (error) {
       console.error("Vendor invoice proof upload failed:", error);
@@ -1555,7 +1600,18 @@ export async function payVendorInvoice(input: {
       };
     }
   } else if (typeof input.proof === "string" && input.proof.trim()) {
-    uploadedProofUrl = input.proof.trim();
+    const trimmedProofUrl = input.proof.trim();
+    if (
+      !isFinancePaymentProofUrl(trimmedProofUrl) &&
+      !isFinanceCashflowProofUrl(trimmedProofUrl)
+    ) {
+      return {
+        success: false,
+        message:
+          "URL bukti transfer tidak valid. Silakan unggah file bukti transfer.",
+      };
+    }
+    uploadedProofUrl = trimmedProofUrl;
   } else {
     return {
       success: false,
@@ -1965,6 +2021,8 @@ export async function replaceVendorInvoicePaymentProof(
   const rawInvoiceId = formData.get("invoiceId");
   const rawPaymentId = formData.get("paymentId");
   const rawProof = formData.get("proof");
+  const rawDocKind = formData.get("docKind") ?? formData.get("proofDocType");
+  const docKindInput = typeof rawDocKind === "string" ? rawDocKind.trim() : "";
 
   const invoiceId =
     typeof rawInvoiceId === "string" ? rawInvoiceId.trim() : "";
@@ -2006,15 +2064,19 @@ export async function replaceVendorInvoicePaymentProof(
   try {
     const mongoose = await connectToMongoDB();
 
-    const [existingInvoice, existingPayment] = await Promise.all([
-      VendorInvoice.findById(invoiceId).select({ _id: 1 }).lean(),
-      VendorInvoicePayment.findOne({
-        _id: paymentId,
-        vendorInvoiceId: invoiceId,
-      })
-        .select({ _id: 1 })
-        .lean(),
-    ]);
+    const [existingInvoice, existingPayment, deliveriesForInvoice] =
+      await Promise.all([
+        VendorInvoice.findById(invoiceId).select({ _id: 1 }).lean(),
+        VendorInvoicePayment.findOne({
+          _id: paymentId,
+          vendorInvoiceId: invoiceId,
+        })
+          .select({ _id: 1, paymentMethod: 1 })
+          .lean(),
+        MaterialDelivery.find({ vendorInvoiceId: invoiceId })
+          .select({ projectId: 1 })
+          .lean(),
+      ]);
     if (!existingInvoice || !existingPayment) {
       return {
         success: false,
@@ -2022,7 +2084,25 @@ export async function replaceVendorInvoicePaymentProof(
       };
     }
 
-    uploadedProofUrl = await uploadCashflowProof(normalizedFile);
+    const uniqueProjectIds = Array.from(
+      new Set(
+        deliveriesForInvoice
+          .map((delivery) => String(delivery.projectId ?? "").trim())
+          .filter(Boolean),
+      ),
+    );
+    const uploadProjectId =
+      uniqueProjectIds.length === 1 ? uniqueProjectIds[0] : null;
+    uploadedProofUrl = await uploadCashflowProof(normalizedFile, {
+      projectId: uploadProjectId,
+      kind: normalizeFinanceAssetKind(
+        docKindInput,
+        existingPayment.paymentMethod === "CASH" ? "KWT" : "BKT",
+      ),
+      entityType: "VendorInvoicePayment",
+      entityId: paymentId,
+      uploadedById: session.user.id,
+    });
     if (!isFinanceCashflowProofUrl(uploadedProofUrl)) {
       throw new Error("URL bukti pembayaran yang diunggah tidak valid.");
     }
@@ -2097,10 +2177,11 @@ export async function replaceVendorInvoicePaymentProof(
       result.oldProofUrl !== nextProofUrl &&
       !isLegacySharedProofUrl(result.oldProofUrl)
     ) {
-      const stillReferenced = await isProofUrlReferencedInDb(
-        result.oldProofUrl,
-      ).catch(() => true);
-      if (!stillReferenced) {
+      const [stillReferencedLocal, stillReferencedDb] = await Promise.all([
+        isProofUrlReferencedInDb(result.oldProofUrl).catch(() => true),
+        isAssetUrlReferencedInDb(result.oldProofUrl).catch(() => true),
+      ]);
+      if (!stillReferencedLocal && !stillReferencedDb) {
         await removeUploadedCashflowProof(result.oldProofUrl).catch(
           () => undefined,
         );
@@ -2237,7 +2318,7 @@ export async function attachMaterialDeliveryProof(
     const existingDelivery = await MaterialDelivery.findOne({
       $or: [{ _id: deliveryId }, { publicCode: deliveryId }],
     })
-      .select({ _id: 1 })
+      .select({ _id: 1, projectId: 1, ticketId: 1 })
       .lean();
     if (!existingDelivery) {
       return {
@@ -2247,7 +2328,15 @@ export async function attachMaterialDeliveryProof(
     }
 
     if (proofFile) {
-      uploadedProofUrl = await uploadDeliveryProofFile(proofFile);
+      uploadedProofUrl = await uploadDeliveryProofFile(proofFile, {
+        projectId: existingDelivery.projectId?.trim() || null,
+        kind: "SJN",
+        docType: "SURAT_JALAN_MATERIAL",
+        entityType: "MaterialDelivery",
+        entityId: String(existingDelivery._id),
+        ticketId: existingDelivery.ticketId?.trim() || null,
+        uploadedById: session.user.id,
+      });
     }
 
     const result = await mongoose.connection.transaction(
@@ -2346,10 +2435,11 @@ export async function attachMaterialDeliveryProof(
       result.oldProofUrl !== uploadedProofUrl &&
       !isLegacySharedProofUrl(result.oldProofUrl)
     ) {
-      const stillReferenced = await isProofUrlReferencedInDb(
-        result.oldProofUrl,
-      ).catch(() => true);
-      if (!stillReferenced) {
+      const [stillReferencedLocal, stillReferencedDb] = await Promise.all([
+        isProofUrlReferencedInDb(result.oldProofUrl).catch(() => true),
+        isAssetUrlReferencedInDb(result.oldProofUrl).catch(() => true),
+      ]);
+      if (!stillReferencedLocal && !stillReferencedDb) {
         await removeDeliveryProofFile(result.oldProofUrl);
       }
     }

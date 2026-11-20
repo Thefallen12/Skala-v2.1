@@ -1,12 +1,19 @@
 import "@/lib/sanitize-env";
 import "server-only";
 
-import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
+import type { AssetKind } from "@/lib/asset-codes";
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import {
+  type AssetUploadContext,
+  removeManagedAssetIfUnreferenced,
+  uploadManagedAsset,
+} from "@/lib/file-storage";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import { DRAWING_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/drawing-document-config";
 import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-invoice-config";
 import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-config";
@@ -20,8 +27,18 @@ const signatureByExtension: Record<string, (bytes: Uint8Array) => boolean> = {
   dwg: (bytes) => /^AC10\d{2}/.test(new TextDecoder().decode(bytes.subarray(0, 6))),
   dxf: (bytes) => /(?:^|\r?\n)\s*0\s*\r?\n\s*SECTION\b/im.test(new TextDecoder().decode(bytes.subarray(0, 1024))),
   ifc: (bytes) => new TextDecoder().decode(bytes.subarray(0, 32)).startsWith("ISO-10303-21"),
-  rvt: (bytes) => /^(?:RVT|Autodesk Revit|Revit)/i.test(new TextDecoder().decode(bytes.subarray(0, 32))),
+  rvt: (bytes) =>
+    (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) ||
+    /^(?:RVT|Autodesk Revit|Revit)/i.test(new TextDecoder().decode(bytes.subarray(0, 32))),
 };
+
+function inferRawAssetKind(folder: string): AssetKind {
+  const lower = folder.toLowerCase();
+  if (lower.includes("drawing") || lower.includes("blueprint")) return "DRW";
+  if (lower.includes("invoice")) return "INV";
+  if (lower.includes("request") || lower.includes("ticket")) return "BON";
+  return "DRW";
+}
 
 function configureCloudinary(): void {
   const credentials = getCloudinaryCredentials();
@@ -50,6 +67,7 @@ export async function uploadCloudinaryRawFile(
   folder: string,
   allowedExtensions: readonly string[],
   maxBytes: number,
+  context?: AssetUploadContext,
 ): Promise<string> {
   const extension = file.name.split(".").at(-1)?.toLowerCase() ?? "";
   if (
@@ -71,50 +89,61 @@ export async function uploadCloudinaryRawFile(
     );
   }
 
-  const credentials = getCloudinaryCredentials();
-  if (!credentials) {
-    const safeFolder = folder.replace(/[^a-zA-Z0-9/_-]/g, "");
-    const fileName = `${randomUUID()}.${extension}`;
-    const relativeDir = path.posix.join("uploads", safeFolder);
-    const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
-    await mkdir(absDir, { recursive: true });
-    await writeFile(
-      path.join(/*turbopackIgnore: true*/ absDir, fileName),
-      bytes,
-      { flag: "wx" },
-    );
-    return `/${relativeDir}/${fileName}`;
-  }
-
-  configureCloudinary();
-  const publicId = `${randomUUID()}.${extension}`;
-  return new Promise((resolveUpload, rejectUpload) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        public_id: publicId,
-        use_filename: false,
-        unique_filename: false,
-        overwrite: false,
-        resource_type: "raw",
-      },
-      (error, response) => {
-        if (error) {
-          rejectUpload(error);
-          return;
-        }
-        if (!response?.secure_url || !response.public_id || response.resource_type !== "raw") {
-          rejectUpload(new Error("Cloudinary tidak mengembalikan file yang valid."));
-          return;
-        }
-        resolveUpload(response.secure_url);
-      },
-    );
-    Readable.from([bytes]).pipe(stream);
+  const defaultKind = inferRawAssetKind(folder);
+  const uploaded = await uploadManagedAsset({
+    bytes,
+    mimeType: file.type || "application/octet-stream",
+    extension,
+    originalFilename: file.name,
+    baseFolder: folder,
+    defaultKind,
+    context,
+    cloudinaryUploader: ({ folder: targetFolder, publicId }) => {
+      configureCloudinary();
+      return new Promise((resolveUpload, rejectUpload) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: targetFolder,
+            public_id: `${publicId}.${extension}`,
+            use_filename: false,
+            unique_filename: false,
+            overwrite: false,
+            resource_type: "raw",
+          },
+          (error, response) => {
+            if (error) {
+              rejectUpload(error);
+              return;
+            }
+            if (!response?.secure_url || !response.public_id || response.resource_type !== "raw") {
+              rejectUpload(new Error("Cloudinary tidak mengembalikan file yang valid."));
+              return;
+            }
+            resolveUpload({
+              secureUrl: response.secure_url,
+              publicId: response.public_id,
+            });
+          },
+        );
+        Readable.from([bytes]).pipe(stream);
+      });
+    },
   });
+
+  return uploaded.secureUrl;
 }
 
-export async function removeCloudinaryRawFile(url: string): Promise<boolean> {
+export async function removeCloudinaryRawFile(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<boolean> {
+  if (extractGoogleDriveFileId(url)) {
+    const result = await removeManagedAssetIfUnreferenced({
+      url,
+      ignore: options?.ignore,
+    });
+    return result.deleted || result.skippedReason === "referenced_elsewhere";
+  }
   const allowedFolders = [
     DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
     PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
@@ -184,19 +213,26 @@ export async function removeCloudinaryRawFile(url: string): Promise<boolean> {
   const publicId = segments
     .slice(uploadIndex + 1)
     .filter((segment) => !/^v\d+$/.test(segment))
-    .join("/")
-    .replace(/\.[^.]+$/, "");
+    .join("/");
   if (!allowedFolders.some((folder) => publicId.startsWith(`${folder}/`))) {
     return false;
   }
 
-  configureCloudinary();
-  const result = await cloudinary.uploader.destroy(publicId, {
-    invalidate: true,
-    resource_type: "raw",
+  const result = await removeManagedAssetIfUnreferenced({
+    url,
+    publicId,
+    ignore: options?.ignore,
+    cloudinaryRemover: async (_targetUrl, targetPublicId) => {
+      if (!targetPublicId) return;
+      configureCloudinary();
+      const destroyRes = await cloudinary.uploader.destroy(targetPublicId, {
+        invalidate: true,
+        resource_type: "raw",
+      });
+      if (destroyRes.result !== "ok" && destroyRes.result !== "not found") {
+        throw new Error(`Cloudinary raw file deletion failed: ${destroyRes.result}`);
+      }
+    },
   });
-  if (result.result !== "ok" && result.result !== "not found") {
-    throw new Error(`Cloudinary raw file deletion failed: ${result.result}`);
-  }
-  return true;
+  return result.deleted || result.skippedReason === "referenced_elsewhere";
 }

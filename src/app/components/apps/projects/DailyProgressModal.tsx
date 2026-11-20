@@ -52,6 +52,7 @@ import {
   getDailyReportFocusHints,
   isConsultancyWorkType,
 } from "@/lib/project-work-types";
+import { parseClientAssetCode, withLocalPhotoPreview } from "@/lib/photo-urls";
 import { cn } from "@/lib/utils";
 import SendProgressModal from "./SendProgressModal";
 
@@ -82,6 +83,12 @@ export type DailyProgressExistingReport = {
   k3SafetyLog?: string | null;
   equipment?: unknown;
   photoUrls?: string[];
+  progressPhotos?: Array<{
+    url: string;
+    fileUrl?: string | null;
+    assetCode?: string | null;
+    projectId?: string | null;
+  }>;
 };
 
 export type DailyProgressProjectOption = {
@@ -109,6 +116,7 @@ export interface DailyProgressModalProps {
   initialProjectId?: string | null;
   initialWorkPointId?: string | null;
   initialDate?: string | null;
+  currentUserId?: string;
   canIncludeFinancials?: boolean;
   onSuccess?: () => void;
   onQueueChange?: (count: number) => void;
@@ -346,6 +354,7 @@ function DailyProgressModalInner({
   initialProjectId = null,
   initialWorkPointId = null,
   initialDate = null,
+  currentUserId,
   onSuccess,
   onQueueChange,
   onRequestSendProgress,
@@ -515,10 +524,29 @@ function DailyProgressModalInner({
   }
 
   const refreshQueueCount = React.useCallback(async () => {
-    const count = await countOfflineDailyReports();
+    const count = await countOfflineDailyReports(
+      currentUserId !== undefined ? { userId: currentUserId } : undefined,
+    );
     setQueuedCount(count);
     onQueueChange?.(count);
-  }, [onQueueChange]);
+  }, [currentUserId, onQueueChange]);
+
+  const clearSelectedPhotos = React.useCallback(() => {
+    for (const item of photosRef.current) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+    setPhotos([]);
+  }, []);
+
+  // Clear attached photos whenever selected project or reportDate changes
+  const photoScopeKey = `${activeProject?.id ?? ""}|${reportDate}`;
+  const prevPhotoScopeRef = React.useRef(photoScopeKey);
+  React.useEffect(() => {
+    if (prevPhotoScopeRef.current !== photoScopeKey) {
+      prevPhotoScopeRef.current = photoScopeKey;
+      clearSelectedPhotos();
+    }
+  }, [photoScopeKey, clearSelectedPhotos]);
 
   // Revoke any remaining preview object URLs on unmount
   React.useEffect(() => {
@@ -536,7 +564,9 @@ function DailyProgressModalInner({
   // Network, initial queue count, & auto-sync registration
   React.useEffect(() => {
     let cancelled = false;
-    void countOfflineDailyReports().then((count) => {
+    void countOfflineDailyReports(
+      currentUserId !== undefined ? { userId: currentUserId } : undefined,
+    ).then((count) => {
       if (!cancelled) {
         setQueuedCount(count);
         onQueueChange?.(count);
@@ -558,6 +588,7 @@ function DailyProgressModalInner({
     const unregisterSync = registerOfflineDailyReportAutoSync(
       submitOfflineDailyReportAction,
       {
+        ...(currentUserId !== undefined ? { userId: currentUserId } : {}),
         onSynced: (result) => {
           void refreshQueueCount();
           if (result.syncedCount > 0) {
@@ -577,7 +608,7 @@ function DailyProgressModalInner({
       window.removeEventListener("offline", handleOffline);
       unregisterSync();
     };
-  }, [onQueueChange, onSuccess, refreshQueueCount]);
+  }, [currentUserId, onQueueChange, onSuccess, refreshQueueCount]);
 
   const projectOptions = React.useMemo<ComboboxOption[]>(
     () =>
@@ -604,6 +635,7 @@ function DailyProgressModalInner({
   const handleProjectSelect = (projectId: string) => {
     setSelectedProjectId(projectId);
     setSelectedVolumes({});
+    clearSelectedPhotos();
     setStepError("");
     const proj = runningProjects.find((item) => item.id === projectId);
     setCumulativeProgress(proj ? String(proj.progress ?? 0) : "0");
@@ -844,6 +876,7 @@ function DailyProgressModalInner({
     try {
       const result = await flushOfflineDailyReports(
         submitOfflineDailyReportAction,
+        currentUserId !== undefined ? { userId: currentUserId } : undefined,
       );
       await refreshQueueCount();
       if (result.skippedOffline) {
@@ -877,7 +910,7 @@ function DailyProgressModalInner({
   };
 
   const handleSubmit = async (sendAfterSave = false) => {
-    if (!activeProject) return;
+    if (!activeProject || isCompressingPhotos || isSubmitting) return;
     if (!validateStep(0) || !validateStep(1)) return;
 
     const parsedWorkers = Number.parseInt(workersCount, 10);
@@ -920,12 +953,14 @@ function DailyProgressModalInner({
         }))
       : [];
 
-    const trimmedEquipment = equipment.trim();
-    const summaryWithEquipmentFallback =
-      trimmedEquipment && workSummary.trim()
-        ? `${workSummary.trim()} [Peralatan: ${trimmedEquipment}]`
-        : workSummary.trim() ||
-          (trimmedEquipment ? `Peralatan: ${trimmedEquipment}` : "");
+    const equipmentItems = equipment
+      .split(/[\n,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const clientRequestId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `odr-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     const parsedCumulative = Number.parseFloat(cumulativeProgress);
     const shouldIncludeCumulativeProgress =
@@ -936,12 +971,15 @@ function DailyProgressModalInner({
         parsedCumulative > activeProject.progress);
 
     const offlineInput: OfflineDailyReportInput = {
+      userId: currentUserId,
+      clientRequestId,
       projectId: activeProject.id,
       reportDate,
       weather,
       workersCount: parsedWorkers,
-      workSummary: summaryWithEquipmentFallback,
+      workSummary: workSummary.trim(),
       entries: entries.length > 0 ? entries : undefined,
+      equipment: equipmentItems.length > 0 ? equipmentItems : undefined,
       progress: shouldIncludeCumulativeProgress ? parsedCumulative : undefined,
       issueNotes: issueNotes.trim() || undefined,
       k3SafetyLog: k3SafetyLog.trim() || undefined,
@@ -950,12 +988,13 @@ function DailyProgressModalInner({
     };
 
     const formData = new FormData();
+    formData.set("clientRequestId", clientRequestId);
     formData.set("reportDate", reportDate);
     formData.set("weather", weather);
     formData.set("workersCount", String(parsedWorkers));
     formData.set("workSummary", workSummary.trim());
-    if (trimmedEquipment) {
-      formData.set("equipment", trimmedEquipment);
+    if (equipmentItems.length > 0) {
+      formData.set("equipment", JSON.stringify(equipmentItems));
     }
 
     if (entries.length > 0) {
@@ -1023,11 +1062,19 @@ function DailyProgressModalInner({
     ? CONSULTANCY_EQUIPMENT_PRESETS
     : PHYSICAL_EQUIPMENT_PRESETS;
 
+  const handleGuardedOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && (isCompressingPhotos || isSubmitting)) {
+      toast.info("Tunggu proses kompresi atau pengiriman foto selesai.");
+      return;
+    }
+    onOpenChange(nextOpen);
+  };
+
   return (
     <GlobalModal
       isOpen={open}
-      onClose={() => onOpenChange(false)}
-      onOpenChange={onOpenChange}
+      onClose={() => handleGuardedOpenChange(false)}
+      onOpenChange={handleGuardedOpenChange}
       mobileBehavior="sheet"
       icon={<Camera className="size-4" aria-hidden="true" />}
       title="Laporan Progres Harian"
@@ -1775,6 +1822,48 @@ function DailyProgressModalInner({
                 label="Ambil atau Pilih Foto Lapangan"
                 hint={`Maks. ${maxAddablePhotos} foto tambahan (otomatis dikompresi agar hemat kuota).`}
               />
+
+              {((existingSameDayReport?.progressPhotos?.length ?? 0) > 0 ||
+                (existingSameDayReport?.photoUrls?.length ?? 0) > 0) && (
+                <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-2.5">
+                  <p className="type-p3 font-medium text-muted-foreground">
+                    Foto tersimpan hari ini ({existingPhotosTodayCount}/{MAX_PHOTOS})
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    {(existingSameDayReport?.progressPhotos &&
+                    existingSameDayReport.progressPhotos.length > 0
+                      ? existingSameDayReport.progressPhotos.map((p) => ({
+                          url: p.fileUrl ?? p.url,
+                          assetCode:
+                            p.assetCode ??
+                            parseClientAssetCode(p.fileUrl ?? p.url)?.assetCode ??
+                            null,
+                        }))
+                      : (existingSameDayReport?.photoUrls ?? []).map((url) => ({
+                          url,
+                          assetCode: parseClientAssetCode(url)?.assetCode ?? null,
+                        }))
+                    ).map((item, idx) => (
+                      <div
+                        key={`${item.url}-${idx}`}
+                        className="relative aspect-square overflow-hidden rounded-lg border border-border bg-background"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={withLocalPhotoPreview(item.url)}
+                          alt={`Foto tersimpan ${idx + 1}`}
+                          className="size-full object-cover"
+                        />
+                        {item.assetCode && (
+                          <span className="absolute bottom-1 left-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-black/75 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                            {item.assetCode}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {photos.length > 0 && (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">

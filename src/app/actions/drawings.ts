@@ -12,6 +12,7 @@ import {
 } from "@/lib/drawing-document-config";
 import {
   CloudinaryPhotoValidationError,
+  isCloudinaryPhotoUrl,
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
@@ -21,6 +22,8 @@ import {
   uploadCloudinaryRawFile,
 } from "@/lib/cloudinary-raw-files";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import {
   drawingReviewRoles,
   drawingUploadRoles,
@@ -41,7 +44,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const DRAWING_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
+
 function isDrawingFileUrl(value: string): boolean {
+  if (extractGoogleDriveFileId(value)) {
+    return true;
+  }
   const cloudName = getCloudinaryCredentials()?.cloudName;
   if (!cloudName) return false;
 
@@ -69,36 +77,65 @@ function isDrawingFileUrl(value: string): boolean {
   }
 }
 
+function isDrawingImageFile(file: File): boolean {
+  const extension = file.name.split(".").at(-1)?.toLowerCase() ?? "";
+  return (DRAWING_IMAGE_EXTENSIONS as readonly string[]).includes(extension);
+}
+
 function isDrawingImageUrl(value: string): boolean {
+  if (extractGoogleDriveFileId(value)) {
+    const cleanPath = value.split("?")[0]?.toLowerCase() ?? "";
+    const nameParam = value.includes("name=")
+      ? decodeURIComponent(value.split("name=")[1]?.split("&")[0] ?? "").toLowerCase()
+      : "";
+    const candidate = nameParam || cleanPath;
+    return DRAWING_IMAGE_EXTENSIONS.some((ext) => candidate.endsWith(`.${ext}`));
+  }
   try {
     const parsed = new URL(value);
     const segments = parsed.pathname.split("/").filter(Boolean);
-    return segments[0] === getCloudinaryCredentials()?.cloudName && segments[1] === "image";
+    return (
+      segments[0] === getCloudinaryCredentials()?.cloudName &&
+      segments[1] === "image" &&
+      isCloudinaryPhotoUrl(value)
+    );
   } catch {
     return false;
   }
 }
 
-async function uploadDrawingFile(file: File): Promise<string> {
+async function uploadDrawingFile(
+  file: File,
+  context: AssetUploadContext,
+): Promise<{ fileUrl: string; isImage: boolean }> {
   const extension = file.name.split(".").at(-1)?.toLowerCase();
-  if (!extension || !DRAWING_FILE_EXTENSIONS.includes(extension as (typeof DRAWING_FILE_EXTENSIONS)[number])) {
-    throw new CloudinaryRawFileValidationError("Format file gambar kerja tidak didukung.");
+  if (
+    !extension ||
+    !DRAWING_FILE_EXTENSIONS.includes(
+      extension as (typeof DRAWING_FILE_EXTENSIONS)[number],
+    )
+  ) {
+    throw new CloudinaryRawFileValidationError(
+      "Format file gambar kerja tidak didukung.",
+    );
   }
-  if (["jpg", "jpeg", "png", "webp"].includes(extension)) {
-    return (
-      await uploadCloudinaryPhoto(
-        file,
-        DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
-        50 * 1024 * 1024,
-      )
-    ).secureUrl;
+  if (isDrawingImageFile(file)) {
+    const uploaded = await uploadCloudinaryPhoto(
+      file,
+      DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
+      50 * 1024 * 1024,
+      context,
+    );
+    return { fileUrl: uploaded.secureUrl, isImage: true };
   }
-  return uploadCloudinaryRawFile(
+  const fileUrl = await uploadCloudinaryRawFile(
     file,
     DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
     DRAWING_FILE_EXTENSIONS,
     50 * 1024 * 1024,
+    context,
   );
+  return { fileUrl, isImage: false };
 }
 
 async function removeDrawingFile(url: string): Promise<void> {
@@ -162,21 +199,40 @@ export async function createDrawingDocument(input: unknown): Promise<DrawingActi
     return { success: false, message: "Periksa kode, judul, kategori, dan file gambar." };
   }
 
+  let projectMeta: {
+    id: string;
+    title: string;
+    name: string;
+    code: string | null;
+    kelompokTani: string | null;
+  } | null = null;
   if (projectId) {
     const project = await prisma.project.findFirst({
       where: { id: projectId, isDeleted: false },
-      select: { id: true },
+      select: { id: true, title: true, name: true, code: true, kelompokTani: true },
     });
     if (!project) {
       return { success: false, message: "Proyek tidak ditemukan atau tidak aktif." };
     }
+    projectMeta = project;
   }
 
   let fileUrl = "";
   try {
-    fileUrl = await uploadDrawingFile(file);
+    const uploaded = await uploadDrawingFile(file, {
+      projectId,
+      projectName:
+        projectMeta?.title || projectMeta?.name || projectMeta?.kelompokTani || null,
+      projectCode: projectMeta?.code ?? null,
+      fallbackScope: projectId ? undefined : drawingCode,
+      kind: "DRW",
+      entityType: "DrawingDocument",
+      entityId: projectId,
+      uploadedById: actor.id,
+    });
+    fileUrl = uploaded.fileUrl;
     if (!isDrawingFileUrl(fileUrl)) {
-      throw new Error("Cloudinary mengembalikan URL gambar kerja yang tidak valid.");
+      throw new Error("Penyimpanan mengembalikan URL gambar kerja yang tidak valid.");
     }
     await prisma.$transaction(async (transaction) => {
       await transaction.drawingDocument.create({
@@ -188,7 +244,7 @@ export async function createDrawingDocument(input: unknown): Promise<DrawingActi
           status: "REVIEW",
           version: 0,
           fileUrl,
-          thumbnailUrl: isDrawingImageUrl(fileUrl) ? fileUrl : null,
+          thumbnailUrl: uploaded.isImage || isDrawingImageUrl(fileUrl) ? fileUrl : null,
           uploadedById: actor.id,
           logs: {
             create: {
@@ -261,12 +317,54 @@ export async function uploadDrawingRevision(
 
   let fileUrl = "";
   let projectId: string | null = null;
+  let previousFileUrl: string | null = null;
+  let previousThumbnailUrl: string | null = null;
   try {
-    fileUrl = await uploadDrawingFile(file);
-    if (!isDrawingFileUrl(fileUrl)) {
-      throw new Error("Cloudinary mengembalikan URL gambar kerja yang tidak valid.");
+    const currentBeforeUpload = await prisma.drawingDocument.findUnique({
+      where: { id: drawingId },
+      select: {
+        id: true,
+        projectId: true,
+        drawingCode: true,
+        fileUrl: true,
+        thumbnailUrl: true,
+        project: {
+          select: {
+            isDeleted: true,
+            title: true,
+            name: true,
+            code: true,
+            kelompokTani: true,
+          },
+        },
+      },
+    });
+    if (!currentBeforeUpload || currentBeforeUpload.project?.isDeleted) {
+      return { success: false, message: "Gambar kerja tidak ditemukan." };
     }
-    projectId = await prisma.$transaction(async (transaction) => {
+
+    const uploaded = await uploadDrawingFile(file, {
+      projectId: currentBeforeUpload.projectId,
+      projectName:
+        currentBeforeUpload.project?.title ||
+        currentBeforeUpload.project?.name ||
+        currentBeforeUpload.project?.kelompokTani ||
+        null,
+      projectCode: currentBeforeUpload.project?.code ?? null,
+      fallbackScope: currentBeforeUpload.projectId
+        ? undefined
+        : currentBeforeUpload.drawingCode,
+      kind: "DRW",
+      entityType: "DrawingDocument",
+      entityId: currentBeforeUpload.id,
+      uploadedById: actor.id,
+    });
+    fileUrl = uploaded.fileUrl;
+    if (!isDrawingFileUrl(fileUrl)) {
+      throw new Error("Penyimpanan mengembalikan URL gambar kerja yang tidak valid.");
+    }
+
+    const result = await prisma.$transaction(async (transaction) => {
       const current = await transaction.drawingDocument.findUnique({
         where: { id: drawingId },
         select: {
@@ -275,6 +373,8 @@ export async function uploadDrawingRevision(
           projectId: true,
           drawingCode: true,
           title: true,
+          fileUrl: true,
+          thumbnailUrl: true,
         },
       });
       if (!current) throw new Error("DRAWING_NOT_FOUND");
@@ -284,7 +384,8 @@ export async function uploadDrawingRevision(
         data: {
           version: { increment: 1 },
           fileUrl,
-          thumbnailUrl: isDrawingImageUrl(fileUrl) ? fileUrl : undefined,
+          thumbnailUrl:
+            uploaded.isImage || isDrawingImageUrl(fileUrl) ? fileUrl : null,
           status: "REVIEW",
         },
         select: { version: true },
@@ -307,8 +408,27 @@ export async function uploadDrawingRevision(
         type: NotificationType.APPROVAL,
         database: transaction,
       });
-      return current.projectId;
+      return {
+        projectId: current.projectId,
+        previousFileUrl: current.fileUrl,
+        previousThumbnailUrl: current.thumbnailUrl,
+      };
     });
+    projectId = result.projectId;
+    previousFileUrl = result.previousFileUrl;
+    previousThumbnailUrl = result.previousThumbnailUrl;
+
+    const staleUrls = Array.from(
+      new Set(
+        [previousFileUrl, previousThumbnailUrl].filter(
+          (url): url is string =>
+            typeof url === "string" && url.length > 0 && url !== fileUrl,
+        ),
+      ),
+    );
+    if (staleUrls.length > 0) {
+      await Promise.allSettled(staleUrls.map((url) => removeDrawingFile(url)));
+    }
   } catch (error) {
     if (fileUrl) {
       try {
@@ -316,6 +436,12 @@ export async function uploadDrawingRevision(
       } catch (cleanupError) {
         console.error("Removing unattached drawing revision failed:", cleanupError);
       }
+    }
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryRawFileValidationError
+    ) {
+      return { success: false, message: error.message };
     }
     if (error instanceof Error && error.message === "DRAWING_NOT_FOUND") {
       return { success: false, message: "Gambar kerja tidak ditemukan." };

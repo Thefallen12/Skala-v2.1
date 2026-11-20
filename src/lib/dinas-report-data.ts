@@ -6,7 +6,9 @@ export interface DinasProjectRecord {
   kabupaten: string;
   kecamatan: string;
   desa: string;
+  desaAliases?: string[];
   poktan: string;
+  poktanAliases?: string[];
   luasLahanHa: number;
   // Konstruksi
   totalBiayaKonstruksi: number;
@@ -52,6 +54,137 @@ export interface DinasProjectRecord {
   sp2d2Jumlah: number;
 }
 
+export interface DinasProjectIdentityTarget {
+  code?: string | null;
+  name?: string | null;
+  title?: string | null;
+  kelompokTani?: string | null;
+  clientName?: string | null;
+  location?: string | null;
+  address?: string | null;
+}
+
+const GENERIC_POKTAN_PLACEHOLDERS = new Set(["", "-", "umum", "n a", "na"]);
+
+export function normalizePoktanKey(value?: string | null): string {
+  if (!value) return "";
+  let normalized = value
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("id-ID");
+
+  // Strip wrapper labels like "Rehabilitasi - Hikmah (Pegasing)" or "Poktan Hikmah"
+  normalized = normalized.replace(/^(rehabilitasi|rehab\.?)\s*[-–:]\s*/i, "");
+  normalized = normalized.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  normalized = normalized
+    .replace(/^(kelompok\s*tani|kel\.?\s*tani|poktan|gapoktan)\s*[-–:\s]+/i, "")
+    .trim();
+  normalized = normalized
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return GENERIC_POKTAN_PLACEHOLDERS.has(normalized) ? "" : normalized;
+}
+
+export function normalizeDesaKey(value?: string | null): string {
+  if (!value) return "";
+  let normalized = value
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("id-ID");
+  normalized = normalized
+    .replace(/^(desa|ds\.?|kampung|kp\.?|gampong)\s+/i, "")
+    .trim();
+  return normalized.replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function getDinasPoktanKeys(
+  record: Pick<DinasProjectRecord, "poktan" | "poktanAliases">,
+): string[] {
+  const keys = new Set<string>();
+  for (const candidate of [record.poktan, ...(record.poktanAliases ?? [])]) {
+    const key = normalizePoktanKey(candidate);
+    if (key) keys.add(key);
+  }
+  return Array.from(keys);
+}
+
+export function getDinasDesaKeys(
+  record: Pick<DinasProjectRecord, "desa" | "desaAliases">,
+): string[] {
+  const keys = new Set<string>();
+  for (const candidate of [record.desa, ...(record.desaAliases ?? [])]) {
+    const key = normalizeDesaKey(candidate);
+    if (key) keys.add(key);
+  }
+  return Array.from(keys);
+}
+
+export function extractProjectPoktanKeys(
+  project: Pick<
+    DinasProjectIdentityTarget,
+    "name" | "title" | "kelompokTani" | "clientName"
+  >,
+): string[] {
+  const keys = new Set<string>();
+  for (const candidate of [
+    project.kelompokTani,
+    project.name,
+    project.title,
+    project.clientName,
+  ]) {
+    const key = normalizePoktanKey(candidate);
+    if (key) keys.add(key);
+  }
+  return Array.from(keys);
+}
+
+export function extractProjectDesaKeys(
+  project: Pick<
+    DinasProjectIdentityTarget,
+    "name" | "title" | "location" | "address"
+  >,
+): string[] {
+  const keys = new Set<string>();
+  if (project.location) {
+    const firstPart = project.location.split(",")[0];
+    const key = normalizeDesaKey(firstPart);
+    if (key) keys.add(key);
+  }
+  if (project.address) {
+    const desaMatch = project.address.match(
+      /(?:desa|ds\.?|kampung|kp\.?|gampong)\s+([^,]+?)(?=\s+(?:kec\.?|kecamatan|kab\.?|kabupaten)\b|$)/i,
+    );
+    if (desaMatch?.[1]) {
+      const key = normalizeDesaKey(desaMatch[1]);
+      if (key) keys.add(key);
+    }
+  }
+  for (const label of [project.title, project.name]) {
+    if (!label) continue;
+    const parenMatch = label.match(/\(([^)]+)\)\s*$/);
+    if (parenMatch?.[1]) {
+      const key = normalizeDesaKey(parenMatch[1]);
+      if (key) keys.add(key);
+    }
+  }
+  return Array.from(keys);
+}
+
+export function doesProjectDesaMatch(
+  project: Pick<
+    DinasProjectIdentityTarget,
+    "name" | "title" | "location" | "address"
+  >,
+  record: Pick<DinasProjectRecord, "desa" | "desaAliases">,
+): boolean {
+  const recordDesaKeys = new Set(getDinasDesaKeys(record));
+  if (recordDesaKeys.size === 0) return false;
+  return extractProjectDesaKeys(project).some((key) => recordDesaKeys.has(key));
+}
+
 export const DINAS_REPORT_METADATA = {
   kegiatan: "REKAPITULASI REALISASI FISIK PELAKSANAAN KEGIATAN KONSTRUKSI DAN OLAH LAHAN REHABILITASI LAHAN SAWAH KABUPATEN ACEH TENGAH",
   satker: "SATKER DINAS PERTANIAN DAN PERKEBUNAN ACEH T.A. 2026",
@@ -85,7 +218,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5573000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/747/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/778/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -106,6 +239,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Bies",
     desa: "SP Unieng",
+    desaAliases: ["Sp. Uning Iken"],
     poktan: "Ine Kreatif",
     luasLahanHa: 6.15,
     totalBiayaKonstruksi: 83025000,
@@ -121,7 +255,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 3191000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/748/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/747/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -157,7 +291,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 4462000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/749/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/748/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -193,7 +327,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 6786000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/750/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/749/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -214,6 +348,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Bintang",
     desa: "Wih Lah Sitie",
+    desaAliases: ["Wih lah Setie"],
     poktan: "Pepanen",
     luasLahanHa: 36.31,
     totalBiayaKonstruksi: 490185000,
@@ -230,7 +365,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 10494000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/751/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/752/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -267,7 +402,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 10128000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/752/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/750/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -288,6 +423,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Bintang",
     desa: "Linung Bulan II",
+    desaAliases: ["Linung Bulen II"],
     poktan: "Tetak",
     luasLahanHa: 34.05,
     totalBiayaKonstruksi: 459675000,
@@ -306,7 +442,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 32303000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/753/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/751/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -343,7 +479,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8866000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/754/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/758/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -364,6 +500,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Jagong Jeget",
     desa: "Paya Telegasari",
+    desaAliases: ["Telegesari"],
     poktan: "Buge Temas",
     luasLahanHa: 40.19,
     totalBiayaKonstruksi: 542565000,
@@ -381,7 +518,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 20780000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/755/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/759/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -418,7 +555,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5359000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/756/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/765/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -456,7 +593,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 7879000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/757/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/763/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -493,7 +630,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5357000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/758/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/761/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -532,7 +669,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 29451000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/759/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/769/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -570,7 +707,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 30552000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/760/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/768/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -591,6 +728,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Linge",
     desa: "Sp. Tuge Uning",
+    desaAliases: ["Sp Tiga Uning"],
     poktan: "Harapan Masa",
     luasLahanHa: 7.81,
     totalBiayaKonstruksi: 105435000,
@@ -607,7 +745,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 3262000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/761/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/773/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -644,7 +782,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 35905000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/762/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/760/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -680,7 +818,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 6305000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/763/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/764/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -717,7 +855,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 27213000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/764/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/767/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "09 Oktober 2026",
     tglSelesai: "07 Desember 2026",
@@ -754,7 +892,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 26090000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/765/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/771/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -791,7 +929,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8083000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/766/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/776/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -828,7 +966,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 7468000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/767/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/774/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -849,7 +987,9 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Rusip Antara",
     desa: "Meurandeh Paya",
+    desaAliases: ["Merandeh Paya"],
     poktan: "Mangat Seujahtera",
+    poktanAliases: ["Mangat Seujahtra"],
     luasLahanHa: 58.01,
     totalBiayaKonstruksi: 783135000,
     biayaDigunakanKonstruksi: 0,
@@ -865,7 +1005,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 15305000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/768/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/782/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -903,7 +1043,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5727000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/769/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/780/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -940,7 +1080,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5390000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/770/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/779/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -961,6 +1101,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kabupaten: "Aceh Tengah",
     kecamatan: "Rusip Antara",
     desa: "Tanjong",
+    desaAliases: ["Tanjung"],
     poktan: "Harapan Jaya",
     luasLahanHa: 29.62,
     totalBiayaKonstruksi: 399870000,
@@ -977,7 +1118,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8806000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/771/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/781/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1014,7 +1155,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 21670000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/772/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/783/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1051,7 +1192,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 3294000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/773/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/784/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1087,7 +1228,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5861000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/774/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/755/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1109,6 +1250,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     kecamatan: "Linge",
     desa: "Delung Sekinel",
     poktan: "Bina Usaha",
+    poktanAliases: ["Tani Bina Usaha"],
     luasLahanHa: 9.24,
     totalBiayaKonstruksi: 124740000,
     biayaDigunakanKonstruksi: 0,
@@ -1125,7 +1267,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 29117000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/775/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/766/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1162,7 +1304,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 25395000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/776/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/777/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1199,7 +1341,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8424000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/777/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/775/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1236,7 +1378,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8073000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/778/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/754/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "09 Oktober 2026",
     tglSelesai: "07 Desember 2026",
@@ -1272,7 +1414,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5756000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/779/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/757/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1308,7 +1450,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 4585000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/780/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/762/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1344,7 +1486,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8313000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/781/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/772/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1380,7 +1522,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 5717000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/782/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/753/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1416,7 +1558,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 6901000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/783/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/756/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "09 Oktober 2026",
     tglSelesai: "07 Desember 2026",
@@ -1452,7 +1594,7 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
       { namaPekerjaan: "Lainnya", volume: null, satuan: "", biaya: 8212000 },
     ],
     noTglSkCpcl: "500.6/38/SK/DISTAN/2026, Tgl 29 Sep 2026",
-    nomorSpk: "500.6/784/SPK-REHAB/DISTAN/2026",
+    nomorSpk: "500.6/770/SPK-REHAB/DISTAN/2026",
     tglSpk: "05 Oktober 2026",
     tglMulai: "05 Oktober 2026",
     tglSelesai: "03 Desember 2026",
@@ -1469,3 +1611,34 @@ export const DINAS_PROJECTS_DATA: DinasProjectRecord[] = [
     sp2d2Jumlah: 84564000,
   },
 ];
+
+const ALL_DINAS_POKTAN_KEYS = new Set(
+  DINAS_PROJECTS_DATA.flatMap((record) => getDinasPoktanKeys(record)),
+);
+
+export function isProjectPoktanCompatible(
+  project: Pick<
+    DinasProjectIdentityTarget,
+    "name" | "title" | "kelompokTani" | "clientName"
+  >,
+  record: Pick<DinasProjectRecord, "poktan" | "poktanAliases">,
+): boolean {
+  const recordKeys = new Set(getDinasPoktanKeys(record));
+  if (recordKeys.size === 0) return false;
+
+  const nameKey = normalizePoktanKey(project.name);
+  const titleKey = normalizePoktanKey(project.title);
+  if (
+    (nameKey && ALL_DINAS_POKTAN_KEYS.has(nameKey) && !recordKeys.has(nameKey)) ||
+    (titleKey && ALL_DINAS_POKTAN_KEYS.has(titleKey) && !recordKeys.has(titleKey))
+  ) {
+    return false;
+  }
+
+  const ktKey = normalizePoktanKey(project.kelompokTani);
+  if (ktKey) {
+    return recordKeys.has(ktKey);
+  }
+
+  return extractProjectPoktanKeys(project).some((key) => recordKeys.has(key));
+}

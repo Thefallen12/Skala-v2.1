@@ -1,9 +1,11 @@
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import {
   CloudinaryPhotoValidationError,
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
 import { DO_ARRIVAL_PHOTO_CLOUDINARY_FOLDER } from "@/lib/delivery-order-arrival-photo-config";
+import type { AssetUploadContext } from "@/lib/file-storage";
 import {
   readPrivatePhoto,
   removePrivatePhoto,
@@ -24,12 +26,14 @@ export class DeliveryOrderArrivalPhotoValidationError extends Error {
 
 export async function saveDeliveryOrderArrivalPhoto(
   file: File,
+  context?: AssetUploadContext,
 ): Promise<string> {
   try {
     const photo = await uploadCloudinaryPhoto(
       file,
       DO_ARRIVAL_PHOTO_CLOUDINARY_FOLDER,
       MAX_PHOTO_BYTES,
+      { ...context, kind: context?.kind ?? "SJN" },
     );
     return photo.secureUrl;
   } catch (error) {
@@ -40,8 +44,11 @@ export async function saveDeliveryOrderArrivalPhoto(
   }
 }
 
-export async function removeDeliveryOrderArrivalPhoto(url: string): Promise<void> {
-  if (await removeCloudinaryPhoto(url)) return;
+export async function removeDeliveryOrderArrivalPhoto(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<void> {
+  if (await removeCloudinaryPhoto(url, options)) return;
   if (photoDirectory) {
     await removePrivatePhoto(
       url,

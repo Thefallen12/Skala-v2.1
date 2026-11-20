@@ -19,6 +19,8 @@ import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
 import { FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER } from "@/lib/finance-payment-proof-config";
 import { uploadCloudinaryPhoto } from "@/lib/cloudinary-photos";
 import { removeTicketReceipt, saveTicketReceipt } from "@/lib/ticket-receipts";
+import { normalizeFinanceAssetKind, type FinanceDocKind } from "@/lib/asset-codes";
+import type { AssetUploadContext } from "@/lib/file-storage";
 import { connectToMongoDB } from "@/lib/mongoose";
 import Cashflow from "@/models/cashflow";
 import DocumentNumberSequence from "@/models/document-number-sequence";
@@ -560,7 +562,10 @@ export async function processEquipmentRequestAtLogistics(
 
 type EquipmentPaymentProof = File | File[] | string;
 
-async function storeEquipmentPaymentProofs(proof: EquipmentPaymentProof) {
+async function storeEquipmentPaymentProofs(
+  proof: EquipmentPaymentProof,
+  context?: AssetUploadContext,
+) {
   const proofs = Array.isArray(proof) ? proof : [proof];
   if (
     proofs.length < 1 ||
@@ -606,13 +611,19 @@ async function storeEquipmentPaymentProofs(proof: EquipmentPaymentProof) {
         throw new Error("File bukti pembayaran tidak dapat diproses.");
       }
 
+      const uploadContext: AssetUploadContext = {
+        ...context,
+        kind: context?.kind ?? "BKT",
+      };
       const url =
         expectedMime === "application/pdf"
-          ? await saveTicketReceipt(normalizedFile)
+          ? await saveTicketReceipt(normalizedFile, uploadContext)
           : (
               await uploadCloudinaryPhoto(
                 normalizedFile,
                 FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER,
+                undefined,
+                uploadContext,
               )
             ).secureUrl;
       uploadedUrls.push(url);
@@ -643,6 +654,7 @@ export async function submitEquipmentRentalPayment(input: {
   financeAccountId: string;
   paymentType: PaymentType;
   amount?: number;
+  proofDocType?: FinanceDocKind | string;
 }) {
   const session = await authForProxy();
   const userId = session?.user?.id;
@@ -712,7 +724,14 @@ export async function submitEquipmentRentalPayment(input: {
     }
 
     const { storedUrls, uploadedUrls: newUploads } =
-      await storeEquipmentPaymentProofs(input.proof);
+      await storeEquipmentPaymentProofs(input.proof, {
+        projectId: ticket.projectId ?? null,
+        kind: normalizeFinanceAssetKind(input.proofDocType, "BKT"),
+        entityType: "Ticket",
+        entityId: input.ticketId,
+        ticketId: input.ticketId,
+        uploadedById: userId,
+      });
     uploadedUrls = newUploads;
     await mongoose.connection.transaction(async (transactionSession) => {
       const currentTicket = await Ticket.findOne({

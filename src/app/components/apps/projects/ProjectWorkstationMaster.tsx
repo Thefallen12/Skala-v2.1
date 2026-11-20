@@ -144,7 +144,11 @@ import {
   flushOfflineDailyReports,
   registerOfflineDailyReportAutoSync,
 } from "@/lib/offline-daily-report-queue";
-import { photoDownloadHref, withLocalPhotoPreview } from "@/lib/photo-urls";
+import {
+  parseClientAssetCode,
+  photoDownloadHref,
+  withLocalPhotoPreview,
+} from "@/lib/photo-urls";
 import {
   buildProjectSCurveSeries,
   calculatePlannedSCurveProgress,
@@ -327,6 +331,12 @@ export type ProjectWorkstationMasterData = {
     notes: string | null;
     k3SafetyLog?: string | null;
     photoUrls: string[];
+    progressPhotos?: {
+      url: string;
+      fileUrl?: string | null;
+      assetCode?: string | null;
+      projectId?: string | null;
+    }[];
   }[];
   progressSubmissions?: {
     id: string;
@@ -367,6 +377,14 @@ export type ProjectWorkstationMasterData = {
       progress: number;
       workSummary: string | null;
       photoUrls: string[];
+      photos?: {
+        url: string;
+        fileUrl?: string | null;
+        assetCode?: string | null;
+        projectId?: string | null;
+        workPointId?: string | null;
+        workPointName?: string | null;
+      }[];
     }[];
   }[];
   wageTicketPayments: {
@@ -442,6 +460,7 @@ type PreviewMediaState = {
   url: string;
   title: string;
   kind: "image" | "document";
+  assetCode?: string | null;
 };
 
 const currency = (amount: number | string) =>
@@ -1589,18 +1608,19 @@ export default function ProjectWorkstationMaster({
   }
 
   const refreshQueueCount = useCallback(async () => {
-    const count = await countOfflineDailyReports();
+    const count = await countOfflineDailyReports({ userId: currentUserId });
     setOfflineQueueCount(count);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     let cancelled = false;
-    void countOfflineDailyReports().then((count) => {
+    void countOfflineDailyReports({ userId: currentUserId }).then((count) => {
       if (!cancelled) setOfflineQueueCount(count);
     });
     const unregister = registerOfflineDailyReportAutoSync(
       submitOfflineDailyReportAction,
       {
+        userId: currentUserId,
         onSynced: (result) => {
           void refreshQueueCount();
           if (result.syncedCount > 0) {
@@ -1617,13 +1637,14 @@ export default function ProjectWorkstationMaster({
       cancelled = true;
       unregister();
     };
-  }, [refreshQueueCount, router]);
+  }, [currentUserId, refreshQueueCount, router]);
 
   const handleFlushQueue = async () => {
     setIsFlushingQueue(true);
     try {
       const result = await flushOfflineDailyReports(
         submitOfflineDailyReportAction,
+        { userId: currentUserId },
       );
       await refreshQueueCount();
       if (result.skippedOffline) {
@@ -2300,12 +2321,17 @@ export default function ProjectWorkstationMaster({
     });
   };
 
-  const openMediaLightbox = (url: string, title: string) => {
+  const openMediaLightbox = (
+    url: string,
+    title: string,
+    assetCode?: string | null,
+  ) => {
     const isPdf = /\.pdf(?:[?#]|$)/i.test(url);
     setPreviewMedia({
       url: withLocalPhotoPreview(url),
       title,
       kind: isPdf ? "document" : "image",
+      assetCode: assetCode ?? parseClientAssetCode(url)?.assetCode ?? null,
     });
   };
 
@@ -3986,6 +4012,7 @@ export default function ProjectWorkstationMaster({
         initialProjectId={dailyProgressState.initialProjectId}
         initialWorkPointId={dailyProgressState.initialWorkPointId}
         initialDate={dailyProgressState.initialDate}
+        currentUserId={currentUserId}
         canIncludeFinancials={canViewFinancials}
         onSuccess={() => router.refresh()}
         onQueueChange={setOfflineQueueCount}
@@ -5196,31 +5223,59 @@ export default function ProjectWorkstationMaster({
                           </p>
                         )}
 
-                        {report.photoUrls.length > 0 && (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {report.photoUrls.map((url, index) => (
-                              <button
-                                key={`${url}-${index}`}
-                                type="button"
-                                onClick={() =>
-                                  openMediaLightbox(
+                        {(() => {
+                          const reportPhotos =
+                            report.progressPhotos &&
+                            report.progressPhotos.length > 0
+                              ? report.progressPhotos.map((p) => {
+                                  const url = p.fileUrl ?? p.url;
+                                  return {
                                     url,
-                                    `Foto Laporan ${report.reportDate} #${index + 1}`,
-                                  )
-                                }
-                                className="group relative size-16 overflow-hidden rounded-lg border border-border bg-muted/30"
-                              >
-                                <Image
-                                  src={withLocalPhotoPreview(url)}
-                                  alt={`Foto laporan ${index + 1}`}
-                                  width={64}
-                                  height={64}
-                                  className="size-full object-cover transition group-hover:scale-105"
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                                    assetCode:
+                                      p.assetCode ??
+                                      parseClientAssetCode(url)?.assetCode ??
+                                      null,
+                                  };
+                                })
+                              : report.photoUrls.map((url) => ({
+                                  url,
+                                  assetCode:
+                                    parseClientAssetCode(url)?.assetCode ??
+                                    null,
+                                }));
+                          if (reportPhotos.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {reportPhotos.map((item, index) => (
+                                <button
+                                  key={`${item.url}-${index}`}
+                                  type="button"
+                                  onClick={() =>
+                                    openMediaLightbox(
+                                      item.url,
+                                      `Foto Laporan ${report.reportDate} #${index + 1}`,
+                                      item.assetCode,
+                                    )
+                                  }
+                                  className="group relative size-16 overflow-hidden rounded-lg border border-border bg-muted/30"
+                                >
+                                  <Image
+                                    src={withLocalPhotoPreview(item.url)}
+                                    alt={`Foto laporan ${index + 1}`}
+                                    width={64}
+                                    height={64}
+                                    className="size-full object-cover transition group-hover:scale-105"
+                                  />
+                                  {item.assetCode && (
+                                    <span className="absolute bottom-0.5 left-0.5 max-w-[calc(100%-0.25rem)] truncate rounded bg-black/75 px-1 py-0.5 font-mono text-[8px] font-semibold text-white">
+                                      {item.assetCode}
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </article>
                     ))}
                     {activeProject.reports.length === 0 && (
@@ -5938,16 +5993,23 @@ export default function ProjectWorkstationMaster({
         className="max-w-3xl"
         footer={
           previewMedia ? (
-            <div className="flex w-full items-center justify-between gap-2">
-              <Button asChild variant="outline" size="sm">
-                <a
-                  href={photoDownloadHref(previewMedia.url)}
-                  download
-                >
-                  <Download className="size-3.5" aria-hidden="true" />
-                  Unduh Berkas
-                </a>
-              </Button>
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {previewMedia.assetCode && (
+                  <span className="rounded bg-muted px-2 py-1 font-mono text-xs font-semibold text-foreground">
+                    {previewMedia.assetCode}
+                  </span>
+                )}
+                <Button asChild variant="outline" size="sm">
+                  <a
+                    href={photoDownloadHref(previewMedia.url)}
+                    download
+                  >
+                    <Download className="size-3.5" aria-hidden="true" />
+                    Unduh Berkas
+                  </a>
+                </Button>
+              </div>
               <Button
                 type="button"
                 size="sm"

@@ -88,6 +88,7 @@ export default function FinanceActionModal({
   onSuccess: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [proofDocType, setProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV" | null>(null);
   const [isPreparingFile, setIsPreparingFile] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>(
     PaymentType.FULL_PAYMENT,
@@ -183,11 +184,13 @@ export default function FinanceActionModal({
   const isAPHRequest = ticket.requestCategory === TicketRequestCategory.APH;
   const isCashPayment =
     isAPHRequest && ticket.requestPaymentMethod === POPaymentMethod.CASH;
+  const effectiveProofDocType = proofDocType ?? (isCashPayment ? "KWT" : "BKT");
   const hasApprovedPosWithoutAnyUnpaid =
     approvedPurchaseOrders.length > 0 && unpaidPurchaseOrders.length === 0;
 
   const resetModal = () => {
     setFile(null);
+    setProofDocType(null);
     setPaymentAmount("");
     setPaymentType(PaymentType.FULL_PAYMENT);
     setSelectedPoCode("");
@@ -227,6 +230,7 @@ export default function FinanceActionModal({
             currentPaymentType === PaymentType.FULL_PAYMENT
               ? undefined
               : parseRupiahInput(paymentAmount),
+          proofDocType: effectiveProofDocType,
         });
         if (result.success) {
           toast.success(result.message);
@@ -524,6 +528,28 @@ export default function FinanceActionModal({
         </fieldset>
 
         <div className="space-y-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="finance-action-doc-kind" className="type-p2 font-medium">
+              Jenis Dokumen Bukti
+            </Label>
+            <Select
+              value={effectiveProofDocType}
+              onValueChange={(value) =>
+                setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+              }
+              disabled={isPending}
+            >
+              <SelectTrigger id="finance-action-doc-kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Label className="type-p2 font-medium">
             {isCashPayment
               ? "Bukti Penyerahan Dana"

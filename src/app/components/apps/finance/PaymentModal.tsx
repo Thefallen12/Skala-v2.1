@@ -25,6 +25,7 @@ import {
   formatRupiahNumber,
   parseRupiahInput,
 } from "@/lib/indonesian-currency";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 
 export type PaymentVendorBankOption = {
   id: string;
@@ -108,6 +109,7 @@ export default function PaymentModal({
     financeAccountId: string,
     paymentMethod?: POPaymentMethod,
     poId?: string,
+    proofDocType?: string,
   ) => Promise<TicketActionResult>;
 }) {
   const router = useRouter();
@@ -183,6 +185,7 @@ export default function PaymentModal({
     return existing === CASH_DIRECT_PURCHASE_DESTINATION ? "" : existing;
   });
   const [financeAccountId, setFinanceAccountId] = useState("");
+  const [proofDocType, setProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<POPaymentMethod>(
     target?.defaultPaymentMethod ?? POPaymentMethod.TRANSFER,
   );
@@ -321,6 +324,7 @@ export default function PaymentModal({
         financeAccountId,
         canSelectPaymentMethod ? paymentMethod : undefined,
         selectedPo?.id,
+        proofDocType ?? (isCashPayment ? "KWT" : "BKT"),
       );
       setMessage(result.message);
       setIsMessageError(!result.success);
@@ -480,30 +484,41 @@ export default function PaymentModal({
                 <div className="space-y-2">
                   <p className="type-p2 font-medium">Struk / nota asli</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {target.receiptUrls.map((url, index) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="type-p3 overflow-hidden rounded-md border text-primary"
-                      >
-                        {/\/image\/upload\//.test(url) ? (
-                          <Image
-                            src={url}
-                            alt={`Bukti pengajuan ${index + 1}`}
-                            width={320}
-                            height={220}
-                            unoptimized
-                            className="h-28 w-full object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-28 items-center justify-center">
-                            Buka dokumen {index + 1}
-                          </span>
-                        )}
-                      </a>
-                    ))}
+                    {target.receiptUrls.map((url, index) => {
+                      const assetMeta = parseClientAssetCode(url);
+                      return (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="type-p3 overflow-hidden rounded-md border text-primary"
+                        >
+                          {/\/image\/upload\//.test(url) ? (
+                            <Image
+                              src={url}
+                              alt={`Bukti pengajuan ${index + 1}`}
+                              width={320}
+                              height={220}
+                              unoptimized
+                              className="h-28 w-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex h-28 items-center justify-center">
+                              Buka dokumen {index + 1}
+                            </span>
+                          )}
+                          {assetMeta && (
+                            <span
+                              className="block truncate border-t bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                              title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                            >
+                              {assetMeta.assetCode}
+                            </span>
+                          )}
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -749,6 +764,26 @@ export default function PaymentModal({
               )}
 
               <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="payment-modal-doc-kind">Jenis Dokumen Bukti</Label>
+                  <Select
+                    value={proofDocType ?? (isCashPayment ? "KWT" : "BKT")}
+                    onValueChange={(value) =>
+                      setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                    }
+                    disabled={isPending}
+                  >
+                    <SelectTrigger id="payment-modal-doc-kind">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                      <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                      <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                      <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Label>
                   {isCashPayment ? "Bukti Kwitansi" : "Bukti Transfer"}
                 </Label>

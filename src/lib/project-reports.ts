@@ -16,6 +16,7 @@ import {
   getDocumentHeaderLogoDataUrl,
 } from "@/lib/documents/qr-code";
 import { readProjectProgressPhoto } from "@/lib/project-progress-photos";
+import { doesAssetMatchProject, parseAssetCode } from "@/lib/asset-codes";
 import { decimalNumberFromScaledInteger } from "@/lib/scaled-decimal";
 import {
   formatWorkTypeBadge,
@@ -612,7 +613,13 @@ export async function generateProjectDailyReport(input: {
           workPoint: { select: { id: true, title: true } },
           progressPhotos: {
             orderBy: { createdAt: "asc" },
-            select: { url: true, fileUrl: true, createdAt: true },
+            select: {
+              url: true,
+              fileUrl: true,
+              assetCode: true,
+              projectId: true,
+              createdAt: true,
+            },
           },
         },
       },
@@ -697,12 +704,33 @@ export async function generateProjectDailyReport(input: {
   ).toString();
   const { logoDataUrl, qrDataUrl } = await resolveBrandAssets(portalUrl);
 
-  const photoSources = (targetReport?.progressPhotos ?? []).slice(0, 6);
+  const projectAssetTarget = {
+    projectId: project.id,
+    projectName: project.title || project.name || project.kelompokTani,
+    projectCode: project.code,
+  };
+  const photoSources = (targetReport?.progressPhotos ?? [])
+    .filter((photo) =>
+      doesAssetMatchProject(
+        {
+          projectId: photo.projectId,
+          assetCode: photo.assetCode,
+          url: photo.fileUrl ?? photo.url,
+        },
+        projectAssetTarget,
+      ),
+    )
+    .slice(0, 6);
   const resolvedPhotos = await Promise.all(
-    photoSources.map(async (photo, idx) => ({
-      src: await resolvePhotoForPdf(photo.fileUrl ?? photo.url),
-      caption: `Dokumentasi #${idx + 1} (${formatWibDate(photo.createdAt)})`,
-    })),
+    photoSources.map(async (photo, idx) => {
+      const resolvedUrl = photo.fileUrl ?? photo.url;
+      const assetCode =
+        photo.assetCode ?? parseAssetCode(resolvedUrl)?.assetCode ?? null;
+      return {
+        src: await resolvePhotoForPdf(resolvedUrl),
+        caption: `${assetCode ? `[${assetCode}] ` : ""}Dokumentasi #${idx + 1} (${formatWibDate(photo.createdAt)})`,
+      };
+    }),
   );
   const visiblePhotos = resolvedPhotos.filter((p) => Boolean(p.src));
 
@@ -973,7 +1001,13 @@ export async function generateProjectProgressReport(input: {
           k3SafetyLog: true,
           progressPhotos: {
             orderBy: { createdAt: "asc" },
-            select: { url: true, fileUrl: true, createdAt: true },
+            select: {
+              url: true,
+              fileUrl: true,
+              assetCode: true,
+              projectId: true,
+              createdAt: true,
+            },
           },
         },
       },
@@ -1111,20 +1145,41 @@ export async function generateProjectProgressReport(input: {
   ).toString();
   const { logoDataUrl, qrDataUrl } = await resolveBrandAssets(portalUrl);
 
+  const progressAssetTarget = {
+    projectId: project.id,
+    projectName: project.title || project.name || project.kelompokTani,
+    projectCode: project.code,
+  };
   const periodPhotosRaw = [...filteredReports]
     .reverse()
     .flatMap((rep) =>
-      rep.progressPhotos.map((p) => ({
-        url: p.fileUrl ?? p.url,
-        date: rep.reportDate,
-      })),
+      rep.progressPhotos
+        .filter((p) =>
+          doesAssetMatchProject(
+            {
+              projectId: p.projectId,
+              assetCode: p.assetCode,
+              url: p.fileUrl ?? p.url,
+            },
+            progressAssetTarget,
+          ),
+        )
+        .map((p) => {
+          const resolvedUrl = p.fileUrl ?? p.url;
+          return {
+            url: resolvedUrl,
+            assetCode:
+              p.assetCode ?? parseAssetCode(resolvedUrl)?.assetCode ?? null,
+            date: rep.reportDate,
+          };
+        }),
     )
     .slice(0, 6);
   const periodPhotos = (
     await Promise.all(
       periodPhotosRaw.map(async (p) => ({
         src: await resolvePhotoForPdf(p.url),
-        caption: `Dokumentasi ${formatWibDate(p.date)}`,
+        caption: `${p.assetCode ? `[${p.assetCode}] ` : ""}Dokumentasi ${formatWibDate(p.date)}`,
       })),
     )
   ).filter((p) => Boolean(p.src));

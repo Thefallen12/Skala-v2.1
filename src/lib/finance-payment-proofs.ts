@@ -2,9 +2,12 @@ import { getCloudinaryPublicId } from "@/lib/cloudinary-photos";
 import { isCloudinaryPrivateTicketReceiptPdf } from "@/lib/cloudinary-private-pdfs";
 import { FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER } from "@/lib/finance-payment-proof-config";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 
 export function isFinancePaymentProofUrl(url: string): boolean {
   if (isCloudinaryPrivateTicketReceiptPdf(url)) return true;
+  if (extractGoogleDriveFileId(url)) return true;
+  if (/^\/api\/tickets\/receipts\/[^/?#]+(?:\?[^#]*)?$/i.test(url)) return true;
   if (url.startsWith(`/uploads/${FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER}/`)) {
     return true;
   }

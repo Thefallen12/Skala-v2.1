@@ -47,7 +47,16 @@ export default function UploadDocumentModal({
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fileName = files[0]?.name ?? "";
+  const handleClose = () => {
+    if (isSubmitting) return;
+    setTitle("");
+    setCategory("Kontrak");
+    setNotes("");
+    setShowInClientPortal(false);
+    setShowInMobileApp(false);
+    setFiles([]);
+    onClose();
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -55,22 +64,31 @@ export default function UploadDocumentModal({
       toast.error("Judul dokumen wajib diisi.");
       return;
     }
+    const selectedFile = files[0];
+    if (!selectedFile) {
+      toast.error("Pilih berkas dokumen terlebih dahulu.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const res = await uploadProjectDocument(projectId, {
-        title: title.trim(),
-        category,
-        fileUrl: fileName
-          ? `/uploads/${fileName}`
-          : "/documents/dokumen_proyek.pdf",
-        notes: notes.trim(),
-      });
+      const formData = new FormData();
+      formData.set("title", title.trim());
+      formData.set("category", category);
+      if (notes.trim()) {
+        formData.set("notes", notes.trim());
+      }
+      formData.set("file", selectedFile);
+
+      const res = await uploadProjectDocument(projectId, formData);
 
       if (res.success) {
         toast.success(res.message || "Dokumen berhasil diunggah.");
         setTitle("");
+        setCategory("Kontrak");
         setNotes("");
+        setShowInClientPortal(false);
+        setShowInMobileApp(false);
         setFiles([]);
         onSuccess?.();
         onClose();
@@ -87,7 +105,7 @@ export default function UploadDocumentModal({
   return (
     <GlobalModal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       mobileBehavior="sheet"
       icon={<UploadCloud className="size-4" aria-hidden="true" />}
       title="Unggah Dokumen"
@@ -99,7 +117,7 @@ export default function UploadDocumentModal({
             type="button"
             variant="outline"
             size="sm"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isSubmitting}
           >
             Batal

@@ -32,6 +32,7 @@ import {
   type VendorInvoiceRow,
 } from "@/lib/material-contracts";
 import { requestNotificationFeedRefresh } from "@/lib/native-bridge";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1288,6 +1289,17 @@ export default function VendorContractBillingPanel({
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
+                        {(() => {
+                          const assetMeta = parseClientAssetCode(payment.proofOfTransferUrl);
+                          return assetMeta ? (
+                            <span
+                              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                              title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                            >
+                              {assetMeta.assetCode}
+                            </span>
+                          ) : null;
+                        })()}
                         <Button
                           type="button"
                           size="sm"
@@ -1372,6 +1384,8 @@ export default function VendorContractBillingPanel({
           amount: number,
           financeAccountId: string,
           paymentMethod?: POPaymentMethod,
+          _poId?: string,
+          proofDocType?: string,
         ) => {
           if (!payingInvoice) {
             return { success: false, message: "Tagihan tidak ditemukan." };
@@ -1384,6 +1398,7 @@ export default function VendorContractBillingPanel({
             amount,
             financeAccountId,
             paymentMethod,
+            proofDocType,
           });
           if (result.success) {
             setFeedback({ text: result.message, isError: false });

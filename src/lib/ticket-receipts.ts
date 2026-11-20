@@ -1,5 +1,6 @@
 import { readFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import {
   CloudinaryPhotoValidationError,
   removeCloudinaryPhoto,
@@ -9,6 +10,7 @@ import {
   removeCloudinaryPrivatePdf,
   uploadCloudinaryPrivatePdf,
 } from "@/lib/cloudinary-private-pdfs";
+import type { AssetUploadContext } from "@/lib/file-storage";
 import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import {
   readPrivatePhoto,
@@ -35,13 +37,20 @@ function isReceiptMimeType(value: string): value is ReceiptMimeType {
 }
 
 function receiptPath(fileName: string): string | null {
-  if (!/^[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/i.test(fileName)) {
+  if (
+    !/^(?:[0-9a-f-]{36}|[A-Za-z0-9]{2,28}-[A-Z]{2,5}-\d+X)\.(pdf|jpe?g|png|webp)$/i.test(
+      fileName,
+    )
+  ) {
     return null;
   }
   return join(receiptDirectory, fileName);
 }
 
-export async function saveTicketReceipt(file: File): Promise<string> {
+export async function saveTicketReceipt(
+  file: File,
+  context?: AssetUploadContext,
+): Promise<string> {
   if (!(file instanceof File) || file.size < 1 || file.size > MAX_RECEIPT_BYTES) {
     throw new Error("Ukuran file bukti harus lebih dari 0 dan maksimal 5 MB.");
   }
@@ -50,12 +59,18 @@ export async function saveTicketReceipt(file: File): Promise<string> {
     throw new Error("Format file bukti harus PDF, JPG, PNG, atau WEBP.");
   }
 
+  const effectiveContext: AssetUploadContext = {
+    ...context,
+    kind: context?.kind ?? "BON",
+  };
+
   if (normalizedFile.type !== "application/pdf") {
     try {
       const photo = await uploadCloudinaryPhoto(
         normalizedFile,
         TICKET_RECEIPT_PHOTO_CLOUDINARY_FOLDER,
         MAX_RECEIPT_BYTES,
+        effectiveContext,
       );
       return photo.secureUrl;
     } catch (error) {
@@ -66,12 +81,15 @@ export async function saveTicketReceipt(file: File): Promise<string> {
     }
   }
 
-  return uploadCloudinaryPrivatePdf(normalizedFile, MAX_RECEIPT_BYTES);
+  return uploadCloudinaryPrivatePdf(normalizedFile, MAX_RECEIPT_BYTES, effectiveContext);
 }
 
-export async function removeTicketReceipt(url: string): Promise<void> {
-  if (await removeCloudinaryPhoto(url)) return;
-  if (await removeCloudinaryPrivatePdf(url)) return;
+export async function removeTicketReceipt(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<void> {
+  if (await removeCloudinaryPhoto(url, options)) return;
+  if (await removeCloudinaryPrivatePdf(url, options)) return;
   if (
     await removePrivatePhoto(
       url,

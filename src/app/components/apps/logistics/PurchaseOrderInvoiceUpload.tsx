@@ -20,6 +20,15 @@ import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 
 type InvoiceItemSeed = {
   itemCode: string | null;
@@ -141,6 +150,17 @@ export default function PurchaseOrderInvoiceUpload({
               target="_blank"
               rel="noreferrer"
             />
+            {(() => {
+              const assetMeta = parseClientAssetCode(invoiceUrl);
+              return assetMeta ? (
+                <span
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                  title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                >
+                  {assetMeta.assetCode}
+                </span>
+              ) : null;
+            })()}
             {invoiceId && (
               <ActionIconButton
                 label="Pratinjau invoice"
@@ -321,6 +341,7 @@ function PurchaseOrderInvoiceFormBody({
 }) {
   const router = useRouter();
   const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
+  const [proofDocType, setProofDocType] = useState<"INV" | "BON">("INV");
   const [draft, setDraft] = useState(() =>
     createInvoiceDraft(items, invoiceDate, includeTax),
   );
@@ -338,6 +359,7 @@ function PurchaseOrderInvoiceFormBody({
         publicCode,
         draft,
         invoiceFile,
+        proofDocType,
       );
       if (response.success) {
         toast.success(response.message);
@@ -376,6 +398,22 @@ function PurchaseOrderInvoiceFormBody({
             Dokumen Invoice / Bon
           </p>
           {invoiceFiles[0] ? <InvoiceFilePreview file={invoiceFiles[0]} /> : null}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`po-invoice-doc-kind-${publicCode}`}>Jenis Dokumen</Label>
+          <Select
+            value={proofDocType}
+            onValueChange={(value) => setProofDocType(value as "INV" | "BON")}
+            disabled={isPending}
+          >
+            <SelectTrigger id={`po-invoice-doc-kind-${publicCode}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="INV">Invoice / Faktur Vendor (INV)</SelectItem>
+              <SelectItem value="BON">Bon / Nota Pembelian (BON)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <FileDropzone
           accept="application/pdf,image/jpeg,image/png,image/webp"
@@ -467,6 +505,7 @@ function ReplacePurchaseOrderInvoiceFormBody({
 }) {
   const router = useRouter();
   const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
+  const [proofDocType, setProofDocType] = useState<"INV" | "BON">("INV");
   const [isPreparing, setIsPreparing] = useState(false);
 
   const handleFilesChange = async (files: File[]) => {
@@ -506,6 +545,7 @@ function ReplacePurchaseOrderInvoiceFormBody({
       const response = await replacePurchaseOrderInvoice(
         publicCode,
         invoiceFile,
+        proofDocType,
       );
       if (response.success) {
         toast.success(response.message);
@@ -555,6 +595,22 @@ function ReplacePurchaseOrderInvoiceFormBody({
             Berkas Invoice / Bon Pengganti
           </p>
           {invoiceFiles[0] ? <InvoiceFilePreview file={invoiceFiles[0]} /> : null}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`po-replace-invoice-doc-kind-${publicCode}`}>Jenis Dokumen</Label>
+          <Select
+            value={proofDocType}
+            onValueChange={(value) => setProofDocType(value as "INV" | "BON")}
+            disabled={isPending || isPreparing}
+          >
+            <SelectTrigger id={`po-replace-invoice-doc-kind-${publicCode}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="INV">Invoice / Faktur Vendor (INV)</SelectItem>
+              <SelectItem value="BON">Bon / Nota Pembelian (BON)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <FileDropzone
           accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"

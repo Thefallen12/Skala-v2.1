@@ -5,6 +5,8 @@ import {
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import {
   readPrivatePhoto,
   removePrivatePhoto,
@@ -33,16 +35,19 @@ export type SavedUserProfilePhoto = {
 
 async function uploadProfileSourceToCloudinary(
   file: File,
+  context?: AssetUploadContext,
 ): Promise<{ url: string; publicId: string }> {
   const uploaded = await uploadCloudinaryPhoto(
     file,
     USER_PROFILE_PHOTO_CLOUDINARY_FOLDER,
     MAX_PHOTO_BYTES,
+    { ...context, kind: "USR", fallbackScope: context?.fallbackScope ?? "USER" },
   );
   return { url: uploaded.secureUrl, publicId: uploaded.publicId };
 }
 
 export function isManagedUserProfilePhotoUrl(value: string): boolean {
+  if (extractGoogleDriveFileId(value)) return true;
   const cloudName = getCloudinaryCredentials()?.cloudName;
   const publicId = getCloudinaryPublicId(value);
   if (!cloudName || !publicId) return false;
@@ -67,9 +72,10 @@ export function isManagedUserProfilePhotoUrl(value: string): boolean {
 
 export async function saveUserProfilePhoto(
   file: File,
+  context?: AssetUploadContext,
 ): Promise<SavedUserProfilePhoto> {
   try {
-    const uploaded = await uploadProfileSourceToCloudinary(file);
+    const uploaded = await uploadProfileSourceToCloudinary(file, context);
     return { url: uploaded.url };
   } catch (error) {
     if (error instanceof CloudinaryPhotoValidationError) {

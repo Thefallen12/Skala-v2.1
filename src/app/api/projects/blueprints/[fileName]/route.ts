@@ -1,7 +1,8 @@
 import { auth } from "@/../auth";
-import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { readBlueprintFile } from "@/lib/blueprint-files";
+import { canAccessProject } from "@/lib/project-access";
+import { drawingAccessRoles } from "@/lib/user-access";
 
 export async function GET(
   request: Request,
@@ -16,19 +17,20 @@ export async function GET(
   const fileUrl = `/api/projects/blueprints/${fileName}`;
   const blueprint = await prisma.blueprint.findFirst({
     where: { fileUrl },
-    select: { id: true, project: { select: { fieldPicId: true } } },
+    select: {
+      id: true,
+      project: { select: { fieldPicId: true, isDeleted: true } },
+    },
   });
-  if (!blueprint) return new Response("Not found", { status: 404 });
-  const broadAccessRoles: UserRole[] = [
-    UserRole.DRAFTER,
-    UserRole.KOORDINATOR,
-    UserRole.DIRECTOR,
-    UserRole.DEPUTY_DIRECTOR,
-    UserRole.ADMINISTRATIONS,
-  ];
   if (
-    !broadAccessRoles.includes(session.user.role) &&
-    blueprint.project.fieldPicId !== session.user.id
+    !blueprint ||
+    blueprint.project.isDeleted ||
+    !drawingAccessRoles.includes(session.user.role) ||
+    !canAccessProject(
+      session.user.role,
+      session.user.id,
+      blueprint.project.fieldPicId,
+    )
   ) {
     return new Response("Not found", { status: 404 });
   }

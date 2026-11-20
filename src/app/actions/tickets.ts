@@ -126,6 +126,10 @@ import { isPurchaseOrderInvoiceUrl } from "@/lib/purchase-order-invoices";
 import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-invoice-config";
 import { isTicketRequestReceiptUrl } from "@/lib/ticket-request-receipts";
 import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-config";
+import { normalizeFinanceAssetKind, type FinanceDocKind } from "@/lib/asset-codes";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import { isAssetUrlReferencedInDb } from "@/lib/asset-references";
+import { isCloudinaryPrivateTicketReceiptPdf } from "@/lib/cloudinary-private-pdfs";
 
 const MAX_FINANCE_PAYMENT_PROOFS = 5;
 const MAX_FINANCE_PAYMENT_PROOF_SIZE = 5 * 1024 * 1024;
@@ -152,33 +156,46 @@ function isValidFinancePaymentProofInput(
   );
 }
 
-async function storeFinancePaymentProof(proof: File | string): Promise<string> {
+async function storeFinancePaymentProof(
+  proof: File | string,
+  context?: AssetUploadContext,
+): Promise<{ url: string; newlyUploaded: boolean }> {
   if (typeof proof === "string") {
     if (!isFinancePaymentProofUrl(proof)) {
       throw new Error("URL bukti transfer Cloudinary tidak valid.");
     }
-    return proof;
+    return { url: proof, newlyUploaded: false };
   }
   const normalizedProof = normalizeFinancePaymentProofFile(proof);
   if (!normalizedProof) {
     throw new Error("Format bukti pembayaran harus PDF, JPG, PNG, atau WEBP.");
   }
+  const uploadContext: AssetUploadContext = {
+    ...context,
+    kind: context?.kind ?? "BKT",
+  };
   if (normalizedProof.type === "application/pdf") {
-    return saveTicketReceipt(normalizedProof);
+    return {
+      url: await saveTicketReceipt(normalizedProof, uploadContext),
+      newlyUploaded: true,
+    };
   }
   const uploaded = await uploadCloudinaryPhoto(
     normalizedProof,
     FINANCE_PAYMENT_PROOF_CLOUDINARY_FOLDER,
+    undefined,
+    uploadContext,
   );
   if (!isFinancePaymentProofUrl(uploaded.secureUrl)) {
     throw new Error("Cloudinary mengembalikan URL foto bukti yang tidak valid.");
   }
-  return uploaded.secureUrl;
+  return { url: uploaded.secureUrl, newlyUploaded: true };
 }
 
 async function storeFinancePaymentProofs(
   proof: FinancePaymentProofInput,
-): Promise<string[]> {
+  context?: AssetUploadContext,
+): Promise<{ urls: string[]; newlyUploadedUrls: string[] }> {
   if (!isValidFinancePaymentProofInput(proof)) {
     throw new Error(
       "Pilih 1-5 bukti pembayaran PDF/JPG/PNG/WEBP, maksimal 5 MB per file.",
@@ -186,13 +203,18 @@ async function storeFinancePaymentProofs(
   }
   const proofs = Array.isArray(proof) ? proof : [proof];
   const storedUrls: string[] = [];
+  const newlyUploadedUrls: string[] = [];
   try {
     for (const file of proofs) {
-      storedUrls.push(await storeFinancePaymentProof(file));
+      const stored = await storeFinancePaymentProof(file, context);
+      storedUrls.push(stored.url);
+      if (stored.newlyUploaded) {
+        newlyUploadedUrls.push(stored.url);
+      }
     }
-    return storedUrls;
+    return { urls: storedUrls, newlyUploadedUrls };
   } catch (error) {
-    await removeFinancePaymentProofs(storedUrls);
+    await removeFinancePaymentProofs(newlyUploadedUrls);
     throw error;
   }
 }
@@ -201,7 +223,11 @@ async function removeFinancePaymentProofs(urls: string[]): Promise<void> {
   await Promise.all(
     urls.map(async (url) => {
       try {
-        await removeTicketReceipt(url);
+        if (url.includes("/raw/upload/")) {
+          await removeCloudinaryRawFile(url);
+        } else {
+          await removeTicketReceipt(url);
+        }
       } catch (error) {
         console.error("Failed to remove an unreferenced payment proof:", error);
       }
@@ -255,6 +281,8 @@ export type CreateTicketInput = {
   deliveryReceiptFile?: File;
   requestedAmount?: number;
   receiptFiles?: File[];
+  proofDocType?: FinanceDocKind | string;
+  deliveryProofDocType?: FinanceDocKind | string;
   items: TicketItemInput[];
   submitImmediately?: boolean;
   rentalDetails?: TicketRentalDetailsInput;
@@ -1517,6 +1545,8 @@ export async function submitDirectStockPurchaseInvoice(
 ): Promise<DirectStockPurchaseActionResult> {
   const purchaseId = formData.get("purchaseId");
   const documentPhoto = formData.get("invoicePhoto");
+  const rawDocKind = formData.get("docKind") ?? formData.get("proofDocType");
+  const docKindInput = typeof rawDocKind === "string" ? rawDocKind.trim() : "";
   const session = await auth();
   if (!session?.user?.id || !canOperateLogisticsActions(session.user.role)) {
     return directPurchaseFailure(
@@ -1530,7 +1560,13 @@ export async function submitDirectStockPurchaseInvoice(
     documentPhoto.size < 1
   ) {
     return directPurchaseFailure(
-      "File invoice/bon tidak valid. Pilih foto JPG, PNG, atau WEBP.",
+      "File invoice/bon tidak valid. Pilih berkas PDF, JPG, PNG, atau WEBP.",
+    );
+  }
+  const normalizedFile = normalizeFinancePaymentProofFile(documentPhoto);
+  if (!normalizedFile) {
+    return directPurchaseFailure(
+      "Format invoice/bon harus PDF, JPG, PNG, atau WEBP maksimal 5 MB.",
     );
   }
 
@@ -1543,6 +1579,8 @@ export async function submitDirectStockPurchaseInvoice(
         isApprovedByDirector: true,
         status: true,
         vendorInvoiceUrl: true,
+        ticketId: true,
+        ticket: { select: { projectId: true } },
       },
     });
     if (!purchaseBeforeUpload) {
@@ -1562,12 +1600,46 @@ export async function submitDirectStockPurchaseInvoice(
       throw new Error("Invoice/bon pembelian ini sudah dilampirkan.");
     }
 
-    const documentUrl = (
-      await uploadCloudinaryPhoto(
-        documentPhoto,
+    const invoiceContext: AssetUploadContext = {
+      projectId: purchaseBeforeUpload.ticket?.projectId ?? null,
+      kind: normalizeFinanceAssetKind(docKindInput, "INV"),
+      docType: "DIRECT_PURCHASE_INVOICE",
+      entityType: "DirectStockPurchase",
+      entityId: purchaseId,
+      ticketId: purchaseBeforeUpload.ticketId ?? null,
+      uploadedById: session.user.id,
+    };
+    let documentUrl = "";
+    if (normalizedFile.type === "application/pdf") {
+      const extension = normalizedFile.name.split(".").at(-1)?.toLowerCase();
+      const pdfFile =
+        extension === "pdf"
+          ? normalizedFile
+          : new File(
+              [normalizedFile],
+              `${normalizedFile.name || "invoice"}.pdf`,
+              {
+                type: "application/pdf",
+                lastModified: normalizedFile.lastModified,
+              },
+            );
+      documentUrl = await uploadCloudinaryRawFile(
+        pdfFile,
         PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
-      )
-    ).secureUrl;
+        ["pdf"],
+        5 * 1024 * 1024,
+        invoiceContext,
+      );
+    } else {
+      documentUrl = (
+        await uploadCloudinaryPhoto(
+          normalizedFile,
+          PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
+          5 * 1024 * 1024,
+          invoiceContext,
+        )
+      ).secureUrl;
+    }
     uploadedPhotoUrl = documentUrl;
     if (!isPurchaseOrderInvoiceUrl(documentUrl)) {
       throw new Error("URL invoice/bon yang diunggah tidak valid.");
@@ -1631,7 +1703,7 @@ export async function submitDirectStockPurchaseInvoice(
     console.error("Direct stock purchase invoice submission failed:", error);
     if (uploadedPhotoUrl && !invoiceAttached) {
       try {
-        await removeCloudinaryPhoto(uploadedPhotoUrl);
+        await removeDirectPurchaseInvoiceAsset(uploadedPhotoUrl);
       } catch (cleanupError) {
         console.error(
           "Failed to clean up unattached direct stock purchase invoice:",
@@ -1641,6 +1713,7 @@ export async function submitDirectStockPurchaseInvoice(
     }
     return directPurchaseFailure(
       error instanceof CloudinaryPhotoValidationError ||
+        error instanceof CloudinaryRawFileValidationError ||
         error instanceof CloudinaryConfigurationError ||
         (error instanceof Error &&
           (error.message === "Pembelian langsung tidak ditemukan." ||
@@ -1765,6 +1838,8 @@ export async function replaceDirectStockPurchaseInvoice(
 
   const rawPurchaseId = formData.get("purchaseId");
   const rawFile = formData.get("invoicePhoto") ?? formData.get("file");
+  const rawDocKind = formData.get("docKind") ?? formData.get("proofDocType");
+  const docKindInput = typeof rawDocKind === "string" ? rawDocKind.trim() : "";
   if (
     typeof rawPurchaseId !== "string" ||
     !rawPurchaseId.trim() ||
@@ -1795,6 +1870,8 @@ export async function replaceDirectStockPurchaseInvoice(
       select: {
         isApprovedByDirector: true,
         vendorInvoiceUrl: true,
+        ticketId: true,
+        ticket: { select: { projectId: true } },
       },
     });
     if (!purchaseBeforeUpload) {
@@ -1809,6 +1886,15 @@ export async function replaceDirectStockPurchaseInvoice(
       throw new Error("Pembelian ini belum memiliki invoice/bon untuk diganti.");
     }
 
+    const replaceInvoiceContext: AssetUploadContext = {
+      projectId: purchaseBeforeUpload.ticket?.projectId ?? null,
+      kind: normalizeFinanceAssetKind(docKindInput, "INV"),
+      docType: "DIRECT_PURCHASE_INVOICE",
+      entityType: "DirectStockPurchase",
+      entityId: purchaseId,
+      ticketId: purchaseBeforeUpload.ticketId ?? null,
+      uploadedById: session.user.id,
+    };
     let documentUrl = "";
     if (normalizedFile.type === "application/pdf") {
       const extension = normalizedFile.name.split(".").at(-1)?.toLowerCase();
@@ -1828,6 +1914,7 @@ export async function replaceDirectStockPurchaseInvoice(
         PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
         ["pdf"],
         5 * 1024 * 1024,
+        replaceInvoiceContext,
       );
     } else {
       documentUrl = (
@@ -1835,6 +1922,7 @@ export async function replaceDirectStockPurchaseInvoice(
           normalizedFile,
           PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
           5 * 1024 * 1024,
+          replaceInvoiceContext,
         )
       ).secureUrl;
     }
@@ -2008,6 +2096,8 @@ export async function receiveDirectStockPurchase(
       select: {
         isApprovedByDirector: true,
         status: true,
+        ticketId: true,
+        ticket: { select: { projectId: true } },
       },
     });
     if (!purchase) {
@@ -2039,7 +2129,17 @@ export async function receiveDirectStockPurchase(
     }
 
     for (const photo of receivedPhotoFiles) {
-      receivedPhotos.push(await saveDirectStockPurchasePhoto(photo));
+      receivedPhotos.push(
+        await saveDirectStockPurchasePhoto(photo, {
+          projectId: purchase.ticket?.projectId ?? null,
+          kind: "BLJ",
+          docType: "DIRECT_PURCHASE_RECEIPT",
+          entityType: "DirectStockPurchase",
+          entityId: purchaseId,
+          ticketId: purchase.ticketId ?? null,
+          uploadedById: session.user.id,
+        }),
+      );
     }
 
     const result = await prisma.$transaction(async (transaction) => {
@@ -3453,6 +3553,20 @@ export async function createTicket(
               : "Tiket diajukan untuk persetujuan Direktur.";
   const receiptUrls: string[] = [];
   let deliveryReceiptUrl: string | null = null;
+  const ticketProjectId = input.projectId?.trim() || null;
+  const ticketReceiptContext: AssetUploadContext = {
+    projectId: ticketProjectId,
+    kind: normalizeFinanceAssetKind(input.proofDocType, "BON"),
+    entityType: "Ticket",
+    uploadedById: session.user.id,
+  };
+  const ticketDeliveryContext: AssetUploadContext = {
+    projectId: ticketProjectId,
+    kind: normalizeFinanceAssetKind(input.deliveryProofDocType, "BON"),
+    docType: "RESI_PENGIRIMAN",
+    entityType: "Ticket",
+    uploadedById: session.user.id,
+  };
   try {
     for (const file of receiptFiles) {
       if (file.type === "application/pdf") {
@@ -3462,6 +3576,7 @@ export async function createTicket(
             REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
             ["pdf"],
             10 * 1024 * 1024,
+            ticketReceiptContext,
           ),
         );
       } else {
@@ -3471,6 +3586,7 @@ export async function createTicket(
               file,
               REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
               10 * 1024 * 1024,
+              ticketReceiptContext,
             )
           ).secureUrl,
         );
@@ -3485,6 +3601,7 @@ export async function createTicket(
           REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
           ["pdf"],
           10 * 1024 * 1024,
+          ticketDeliveryContext,
         );
       } else {
         const mimeTypeByExtension: Record<string, string> = {
@@ -3505,6 +3622,7 @@ export async function createTicket(
             normalizedFile,
             REQUEST_DOCUMENT_CLOUDINARY_FOLDER,
             10 * 1024 * 1024,
+            ticketDeliveryContext,
           )
         ).secureUrl;
       }
@@ -4702,6 +4820,24 @@ export async function deleteTicket(
       );
     }
 
+    const ticketUrlsToCheck = new Set<string>();
+    const addTicketUrl = (value: unknown) => {
+      if (typeof value === "string" && value.trim()) {
+        ticketUrlsToCheck.add(value.trim());
+      }
+    };
+    addTicketUrl(ticket.attachmentUrl);
+    addTicketUrl(ticket.paymentProofUrl);
+    addTicketUrl(ticket.purchaseReceiptUrl);
+    addTicketUrl(ticket.transferReceiptUrl);
+    addTicketUrl(ticket.deliveryReceiptUrl);
+    addTicketUrl(ticket.deliveryOrderReceiptUrl);
+    if (Array.isArray(ticket.receiptUrls)) {
+      for (const receiptUrl of ticket.receiptUrls) {
+        addTicketUrl(receiptUrl);
+      }
+    }
+
     await Promise.all([
       OperationalDocument.deleteMany({ ticketId }),
       TicketItem.deleteMany({ ticketId }),
@@ -4714,6 +4850,21 @@ export async function deleteTicket(
     const result = await Ticket.deleteOne({ _id: ticketId });
     if (result.deletedCount !== 1) {
       return actionFailure("Tiket tidak ditemukan.");
+    }
+
+    for (const url of ticketUrlsToCheck) {
+      try {
+        const stillReferenced = await isAssetUrlReferencedInDb(url);
+        if (!stillReferenced) {
+          if (url.includes("/raw/upload/")) {
+            await removeCloudinaryRawFile(url);
+          } else {
+            await removeTicketReceipt(url);
+          }
+        }
+      } catch (cleanupError) {
+        console.error("Cleaning up deleted ticket attachment failed:", cleanupError);
+      }
     }
   } catch (error) {
     console.error("Ticket deletion failed:", error);
@@ -5053,6 +5204,7 @@ export async function processLogisticsMaterial(
   vehicleId?: string,
   invoiceInput?: Omit<VendorInvoiceInput, "documentUrl">,
   poPublicCode?: string,
+  proofDocType?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -5133,7 +5285,13 @@ export async function processLogisticsMaterial(
 
   const ticketBeforeUpload = await prisma.ticket.findUnique({
     where: { id: ticketId },
-    select: { id: true, type: true, status: true, purchaseReceiptUrl: true },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      projectId: true,
+      purchaseReceiptUrl: true,
+    },
   });
   if (
     !ticketBeforeUpload ||
@@ -5153,6 +5311,15 @@ export async function processLogisticsMaterial(
   }
 
   const extension = invoiceFile.name.split(".").at(-1)?.toLowerCase();
+  const poInvoiceContext: AssetUploadContext = {
+    projectId: ticketBeforeUpload.projectId ?? null,
+    kind: normalizeFinanceAssetKind(proofDocType, "INV"),
+    docType: "PO_INVOICE",
+    entityType: "PurchaseOrder",
+    entityId: approvedPurchaseOrder.id,
+    ticketId,
+    uploadedById: session.user.id,
+  };
   let documentUrl = "";
   let parsedInvoice: ReturnType<typeof vendorInvoiceInputSchema.safeParse>;
   try {
@@ -5162,6 +5329,7 @@ export async function processLogisticsMaterial(
         PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
         ["pdf"],
         5 * 1024 * 1024,
+        poInvoiceContext,
       );
     } else if (["jpg", "jpeg", "png", "webp"].includes(extension ?? "")) {
       documentUrl = (
@@ -5169,6 +5337,7 @@ export async function processLogisticsMaterial(
           invoiceFile,
           PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
           5 * 1024 * 1024,
+          poInvoiceContext,
         )
       ).secureUrl;
     } else {
@@ -6001,6 +6170,7 @@ export async function createLogisticsPurchaseOrderForTicket(
           ticketNumber: true,
           type: true,
           status: true,
+          projectId: true,
           items: {
             select: {
               id: true,
@@ -6238,6 +6408,7 @@ export async function createLogisticsPurchaseOrderForTicket(
           includeTax: payment.includeTax ?? false,
           status: POStatus.PENDING_FINANCE_REVIEW,
           createdById: session.user.id,
+          projectId: ticket.projectId ?? null,
           ticketId,
           items: {
             create: poItems.map((item) => ({
@@ -6807,6 +6978,7 @@ export async function processFinancePayment(
   requestedPaymentAmount?: number,
   paymentMethod?: POPaymentMethod,
   poId?: string,
+  proofDocType?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -6840,10 +7012,33 @@ export async function processFinancePayment(
     return actionFailure("Nominal pembayaran sebagian harus lebih besar dari nol.");
   }
 
-  let receiptUrls: string[];
+  let receiptUrls: string[] = [];
+  let newlyUploadedProofUrls: string[] = [];
   let receiptUrl: string;
   try {
-    receiptUrls = await storeFinancePaymentProofs(proof);
+    await connectToMongoDB();
+    const ticketBeforeUpload = await Ticket.findById(ticketId)
+      .select({ projectId: 1, requestPaymentMethod: 1 })
+      .lean();
+    const effectivePaymentMethod =
+      paymentMethod ?? ticketBeforeUpload?.requestPaymentMethod;
+    const storedProofs = await storeFinancePaymentProofs(proof, {
+      projectId:
+        typeof ticketBeforeUpload?.projectId === "string" &&
+        ticketBeforeUpload.projectId.trim()
+          ? ticketBeforeUpload.projectId.trim()
+          : null,
+      kind: normalizeFinanceAssetKind(
+        proofDocType,
+        effectivePaymentMethod === POPaymentMethod.CASH ? "KWT" : "BKT",
+      ),
+      entityType: "Ticket",
+      entityId: ticketId,
+      ticketId,
+      uploadedById: session.user.id,
+    });
+    receiptUrls = storedProofs.urls;
+    newlyUploadedProofUrls = storedProofs.newlyUploadedUrls;
     receiptUrl = receiptUrls[0];
   } catch (error) {
     return actionFailure(
@@ -7639,7 +7834,7 @@ export async function processFinancePayment(
       }
     });
   } catch (error) {
-    await removeFinancePaymentProofs(receiptUrls);
+    await removeFinancePaymentProofs(newlyUploadedProofUrls);
     console.error("Finance ticket payment failed:", error);
     return actionFailure(
       error instanceof Error
@@ -7673,6 +7868,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
   financeAccountId: string,
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
   requestedPaymentAmount?: number,
+  proofDocType?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id || !canOperateFinanceActions(session.user.role)) {
@@ -7703,10 +7899,32 @@ export async function processFinanceStandalonePurchaseOrderPayment(
     return actionFailure("Nominal pembayaran sebagian harus lebih besar dari nol.");
   }
 
-  let receiptUrls: string[];
+  let receiptUrls: string[] = [];
+  let newlyUploadedProofUrls: string[] = [];
   let receiptUrl: string;
   try {
-    receiptUrls = await storeFinancePaymentProofs(proof);
+    await connectToMongoDB();
+    const orderBeforeUpload = await PurchaseOrder.findOne({ publicCode })
+      .select({ _id: 1, projectId: 1, paymentMethod: 1 })
+      .lean();
+    const storedProofs = await storeFinancePaymentProofs(proof, {
+      projectId:
+        typeof orderBeforeUpload?.projectId === "string" &&
+        orderBeforeUpload.projectId.trim()
+          ? orderBeforeUpload.projectId.trim()
+          : null,
+      kind: normalizeFinanceAssetKind(
+        proofDocType,
+        orderBeforeUpload?.paymentMethod === POPaymentMethod.CASH ? "KWT" : "BKT",
+      ),
+      entityType: "PurchaseOrder",
+      entityId: orderBeforeUpload?._id
+        ? String(orderBeforeUpload._id)
+        : undefined,
+      uploadedById: session.user.id,
+    });
+    receiptUrls = storedProofs.urls;
+    newlyUploadedProofUrls = storedProofs.newlyUploadedUrls;
     receiptUrl = receiptUrls[0];
   } catch (error) {
     return actionFailure(
@@ -7983,7 +8201,7 @@ export async function processFinanceStandalonePurchaseOrderPayment(
       }
     });
   } catch (error) {
-    await removeFinancePaymentProofs(receiptUrls);
+    await removeFinancePaymentProofs(newlyUploadedProofUrls);
     console.error("Standalone Purchase Order payment failed:", error);
     return actionFailure(
       error instanceof Error &&
@@ -8026,6 +8244,7 @@ export async function processFinanceDirectStockPurchasePayment(
   paymentType: PaymentType = PaymentType.FULL_PAYMENT,
   requestedPaymentAmount?: number,
   requestedPaymentMethod?: POPaymentMethod,
+  proofDocType?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id || !canOperateFinanceActions(session.user.role)) {
@@ -8060,10 +8279,39 @@ export async function processFinanceDirectStockPurchasePayment(
     return actionFailure("Nominal pembayaran sebagian harus lebih besar dari nol.");
   }
 
-  let receiptUrls: string[];
+  let receiptUrls: string[] = [];
+  let newlyUploadedProofUrls: string[] = [];
   let receiptUrl: string;
   try {
-    receiptUrls = await storeFinancePaymentProofs(proof);
+    await connectToMongoDB();
+    const dspBeforeUpload = await DirectStockPurchase.findById(purchaseId)
+      .select({ _id: 1, ticketId: 1, paymentMethod: 1 })
+      .lean();
+    let dspProjectId: string | null = null;
+    if (dspBeforeUpload?.ticketId) {
+      const dspTicket = await Ticket.findById(dspBeforeUpload.ticketId)
+        .select({ projectId: 1 })
+        .lean();
+      dspProjectId =
+        typeof dspTicket?.projectId === "string" && dspTicket.projectId.trim()
+          ? dspTicket.projectId.trim()
+          : null;
+    }
+    const effectiveMethod =
+      requestedPaymentMethod ?? dspBeforeUpload?.paymentMethod;
+    const storedProofs = await storeFinancePaymentProofs(proof, {
+      projectId: dspProjectId,
+      kind: normalizeFinanceAssetKind(
+        proofDocType,
+        effectiveMethod === POPaymentMethod.CASH ? "KWT" : "BKT",
+      ),
+      entityType: "DirectStockPurchase",
+      entityId: purchaseId,
+      ticketId: dspBeforeUpload?.ticketId ?? null,
+      uploadedById: session.user.id,
+    });
+    receiptUrls = storedProofs.urls;
+    newlyUploadedProofUrls = storedProofs.newlyUploadedUrls;
     receiptUrl = receiptUrls[0];
   } catch (error) {
     return actionFailure(
@@ -8273,7 +8521,7 @@ export async function processFinanceDirectStockPurchasePayment(
       }
     });
   } catch (error) {
-    await removeFinancePaymentProofs(receiptUrls);
+    await removeFinancePaymentProofs(newlyUploadedProofUrls);
     console.error("Direct stock purchase payment failed:", error);
     return actionFailure(
       error instanceof Error &&
@@ -8329,6 +8577,7 @@ export async function submitPaymentRecord(input: {
   amount?: number;
   paymentMethod?: POPaymentMethod;
   poId?: string;
+  proofDocType?: FinanceDocKind | string;
 }): Promise<TicketActionResult> {
   if (
     !input ||
@@ -8379,6 +8628,7 @@ export async function submitPaymentRecord(input: {
       input.amount,
       input.paymentMethod,
       input.poId ?? input.target.poId,
+      input.proofDocType,
     );
   }
   if (input.target.kind === "purchase-order") {
@@ -8389,6 +8639,7 @@ export async function submitPaymentRecord(input: {
       input.financeAccountId,
       input.paymentType,
       input.amount,
+      input.proofDocType,
     );
   }
   if (input.target.kind === "direct-purchase") {
@@ -8400,6 +8651,7 @@ export async function submitPaymentRecord(input: {
       input.paymentType,
       input.amount,
       input.paymentMethod,
+      input.proofDocType,
     );
   }
   return actionFailure("Jenis tagihan tidak valid.");
@@ -8410,6 +8662,7 @@ export async function replaceFinancePaymentProof(
   existingProofUrl: string,
   proofIndex: number,
   file: File,
+  proofDocType?: string,
 ): Promise<TicketActionResult> {
   const session = await auth();
   if (!session?.user?.id || !canOperateFinanceActions(session.user.role)) {
@@ -8458,14 +8711,73 @@ export async function replaceFinancePaymentProof(
   }
 
   let uploadedProofUrl: string | null = null;
+  let storedProofUrl = "";
   try {
-    const storedProofUrl = await storeFinancePaymentProof(normalizedFile);
-    uploadedProofUrl = storedProofUrl;
+    const mongoose = await connectToMongoDB();
+    const paymentBeforeUpload = await PaymentTransaction.findOne({
+      _id: paymentTransactionId.trim(),
+      status: PaymentStatus.PAID,
+    })
+      .select({
+        ticketId: 1,
+        poId: 1,
+        directStockPurchaseId: 1,
+        paymentMethod: 1,
+      })
+      .lean();
+    let resolvedProjectId: string | null = null;
+    const resolvedTicketId = paymentBeforeUpload?.ticketId?.trim() || null;
+    if (resolvedTicketId) {
+      const linkedTicket = await Ticket.findById(resolvedTicketId)
+        .select({ projectId: 1 })
+        .lean();
+      resolvedProjectId = linkedTicket?.projectId?.trim() || null;
+    }
+    if (!resolvedProjectId && paymentBeforeUpload?.poId) {
+      const linkedPo = await PurchaseOrder.findById(paymentBeforeUpload.poId)
+        .select({ projectId: 1, ticketId: 1 })
+        .lean();
+      resolvedProjectId = linkedPo?.projectId?.trim() || null;
+      if (!resolvedProjectId && linkedPo?.ticketId) {
+        const poTicket = await Ticket.findById(linkedPo.ticketId)
+          .select({ projectId: 1 })
+          .lean();
+        resolvedProjectId = poTicket?.projectId?.trim() || null;
+      }
+    }
+    if (!resolvedProjectId && paymentBeforeUpload?.directStockPurchaseId) {
+      const linkedDsp = await DirectStockPurchase.findById(
+        paymentBeforeUpload.directStockPurchaseId,
+      )
+        .select({ ticketId: 1 })
+        .lean();
+      if (linkedDsp?.ticketId) {
+        const dspTicket = await Ticket.findById(linkedDsp.ticketId)
+          .select({ projectId: 1 })
+          .lean();
+        resolvedProjectId = dspTicket?.projectId?.trim() || null;
+      }
+    }
+
+    const stored = await storeFinancePaymentProof(normalizedFile, {
+      projectId: resolvedProjectId,
+      kind: normalizeFinanceAssetKind(
+        proofDocType,
+        paymentBeforeUpload?.paymentMethod === POPaymentMethod.CASH
+          ? "KWT"
+          : "BKT",
+      ),
+      entityType: "PaymentTransaction",
+      entityId: paymentTransactionId.trim(),
+      ticketId: resolvedTicketId,
+      uploadedById: session.user.id,
+    });
+    storedProofUrl = stored.url;
+    uploadedProofUrl = stored.newlyUploaded ? storedProofUrl : null;
     if (!isFinancePaymentProofUrl(storedProofUrl)) {
       throw new Error("Cloudinary mengembalikan URL bukti yang tidak valid.");
     }
 
-    const mongoose = await connectToMongoDB();
     const updated = await mongoose.connection.transaction(async (mongoSession) => {
       const currentPayment = await PaymentTransaction.findOne({
         _id: paymentTransactionId.trim(),
@@ -8509,24 +8821,71 @@ export async function replaceFinancePaymentProof(
       if (paymentUpdate.modifiedCount !== 1) return false;
 
       if (proofIndex === 0) {
-        await Cashflow.updateMany(
-          { paymentTransactionId: paymentTransactionId.trim() },
-          { $set: { proofUrl: storedProofUrl } },
-          { session: mongoSession },
-        );
-        await OrderConfirmation.updateMany(
-          { paymentTransactionId: paymentTransactionId.trim() },
-          { $set: { proofOfTransferUrl: storedProofUrl } },
-          { session: mongoSession },
-        );
+        await Promise.all([
+          Cashflow.updateMany(
+            { paymentTransactionId: paymentTransactionId.trim() },
+            { $set: { proofUrl: storedProofUrl } },
+            { session: mongoSession },
+          ),
+          OrderConfirmation.updateMany(
+            { paymentTransactionId: paymentTransactionId.trim() },
+            { $set: { proofOfTransferUrl: storedProofUrl } },
+            { session: mongoSession },
+          ),
+          EquipmentRental.updateMany(
+            {
+              paymentTransactionId: paymentTransactionId.trim(),
+              proofOfPaymentUrl: existingProofUrl,
+            },
+            { $set: { proofOfPaymentUrl: storedProofUrl, updatedAt: new Date() } },
+            { session: mongoSession },
+          ),
+        ]);
+        if (currentPayment.ticketId) {
+          await Promise.all([
+            Ticket.updateOne(
+              {
+                _id: currentPayment.ticketId,
+                transferReceiptUrl: existingProofUrl,
+              },
+              { $set: { transferReceiptUrl: storedProofUrl } },
+              { session: mongoSession },
+            ),
+            Ticket.updateOne(
+              {
+                _id: currentPayment.ticketId,
+                paymentProofUrl: existingProofUrl,
+              },
+              { $set: { paymentProofUrl: storedProofUrl } },
+              { session: mongoSession },
+            ),
+          ]);
+        }
+        if (currentPayment.poId) {
+          await PurchaseOrder.updateOne(
+            { _id: currentPayment.poId, paymentReceiptUrl: existingProofUrl },
+            { $set: { paymentReceiptUrl: storedProofUrl } },
+            { session: mongoSession },
+          );
+        }
       }
       return true;
     });
     if (!updated) {
-      await removeFinancePaymentProofs([uploadedProofUrl]);
+      if (uploadedProofUrl) {
+        await removeFinancePaymentProofs([uploadedProofUrl]);
+      }
       return actionFailure(
         "Transaksi tidak ditemukan atau bukti transfernya sudah diperbarui.",
       );
+    }
+    if (existingProofUrl !== storedProofUrl) {
+      const stillReferenced = await isAssetUrlReferencedInDb(
+        existingProofUrl,
+      ).catch(() => true);
+      if (!stillReferenced) {
+        await removeFinancePaymentProofs([existingProofUrl]);
+      }
     }
   } catch (error) {
     if (uploadedProofUrl) {
@@ -8588,9 +8947,28 @@ export async function processMoverDelivery(
       ? options.receiverName.trim().slice(0, 120)
       : null;
 
+  let moverTicketProjectId: string | null = null;
+  try {
+    const ticketBeforeUpload = await prisma.ticket.findUnique({
+      where: { id: normalizedTicketId },
+      select: { projectId: true },
+    });
+    moverTicketProjectId = ticketBeforeUpload?.projectId ?? null;
+  } catch {
+    moverTicketProjectId = null;
+  }
+
   let proofUrl = "";
   try {
-    proofUrl = await saveTicketReceipt(file);
+    proofUrl = await saveTicketReceipt(file, {
+      projectId: moverTicketProjectId,
+      kind: "SJN",
+      docType: "BUKTI_KIRIM_MOVER",
+      entityType: "Ticket",
+      entityId: normalizedTicketId,
+      ticketId: normalizedTicketId,
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     return actionFailure(
       error instanceof Error
@@ -8831,14 +9209,11 @@ export async function processMoverDelivery(
           },
         });
 
-        const nextReceiptUrls = ticket.receiptUrls.includes(proofUrl)
-          ? ticket.receiptUrls
-          : [...ticket.receiptUrls, proofUrl];
         await transaction.ticket.update({
           where: { id: ticket.id },
           data: {
             deliveryReceiptUrl: proofUrl,
-            receiptUrls: nextReceiptUrls,
+            deliveryOrderReceiptUrl: proofUrl,
           },
         });
 
@@ -8984,15 +9359,10 @@ export async function processMoverDelivery(
             !item.doItemId,
         );
 
-        const nextReceiptUrls = ticket.receiptUrls.includes(proofUrl)
-          ? ticket.receiptUrls
-          : [...ticket.receiptUrls, proofUrl];
-
         await transaction.ticket.update({
           where: { id: ticket.id },
           data: {
             deliveryReceiptUrl: proofUrl,
-            receiptUrls: nextReceiptUrls,
             status: hasUnfulfilledNonContract
               ? TicketStatus.PROCESSED_LOGISTIC
               : TicketStatus.COMPLETED,
@@ -9187,9 +9557,32 @@ async function transitionWithReceipt({
     return actionFailure("Bukti file wajib diunggah.");
   }
 
+  let transitionProjectId: string | null = null;
+  try {
+    const ticketBeforeUpload = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { projectId: true },
+    });
+    transitionProjectId = ticketBeforeUpload?.projectId ?? null;
+  } catch {
+    transitionProjectId = null;
+  }
+
   let receiptUrl: string;
   try {
-    receiptUrl = await saveTicketReceipt(file);
+    receiptUrl = await saveTicketReceipt(file, {
+      projectId: transitionProjectId,
+      kind:
+        receiptField === "transferReceiptUrl"
+          ? "BKT"
+          : receiptField === "deliveryReceiptUrl"
+            ? "SJN"
+            : "BON",
+      entityType: "Ticket",
+      entityId: ticketId,
+      ticketId,
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     return actionFailure(
       error instanceof Error ? error.message : "File bukti gagal diproses.",

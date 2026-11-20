@@ -96,6 +96,7 @@ import {
 } from "@/components/ui/table";
 import InvoiceFilePreview from "@/app/components/apps/logistics/InvoiceFilePreview";
 import {
+  parseClientAssetCode,
   photoDownloadHref,
   photoDownloadLabel,
   photoDownloadLinkProps,
@@ -543,6 +544,7 @@ export default function LogisticsWorkspace({
     mode: "invoice" | "replace-invoice" | "detail";
   } | null>(null);
   const [invoiceFiles, setInvoiceFiles] = useState<File[]>([]);
+  const [invoiceDocKind, setInvoiceDocKind] = useState<"INV" | "BON">("INV");
   const [isInvoicePreparing, setIsInvoicePreparing] = useState(false);
   const [isInvoicePending, startInvoiceTransition] = useTransition();
 
@@ -886,10 +888,11 @@ export default function LogisticsWorkspace({
     startInvoiceTransition(async () => {
       try {
         const prepared = await compressFieldImageFile(file, {
-          allowPdfPassthrough: isReplacing,
+          allowPdfPassthrough: true,
         });
         const formData = new FormData();
         formData.set("purchaseId", purchaseId);
+        formData.set("docKind", invoiceDocKind);
         formData.set("invoicePhoto", prepared, prepared.name);
         const result = isReplacing
           ? await replaceDirectStockPurchaseInvoice(formData)
@@ -2233,23 +2236,50 @@ export default function LogisticsWorkspace({
                       >
                         <ExternalLink className="size-3.5" aria-hidden="true" />
                         Lihat Lama
+                        {(() => {
+                          const assetMeta = parseClientAssetCode(
+                            directPurchaseModal.purchase.vendorInvoiceUrl,
+                          );
+                          return assetMeta ? (
+                            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+                              {assetMeta.assetCode}
+                            </span>
+                          ) : null;
+                        })()}
                       </Button>
                     </div>
                   )}
 
                 <div className="space-y-1.5">
+                  <Label htmlFor="direct-purchase-doc-kind" className="type-p2 font-semibold">
+                    Jenis Dokumen
+                  </Label>
+                  <Select
+                    value={invoiceDocKind}
+                    onValueChange={(value) =>
+                      setInvoiceDocKind(value as "INV" | "BON")
+                    }
+                    disabled={isInvoicePending || isInvoicePreparing}
+                  >
+                    <SelectTrigger id="direct-purchase-doc-kind">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INV">Invoice / Faktur Vendor (INV)</SelectItem>
+                      <SelectItem value="BON">Bon / Nota Pembelian (BON)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
                   <Label className="type-p2 font-semibold">
                     {directPurchaseModal.mode === "replace-invoice"
                       ? "Berkas Invoice / Bon Pengganti"
-                      : "Foto Invoice / Bon Faktur"}{" "}
+                      : "Berkas Invoice / Bon Faktur"}{" "}
                     <span className="text-destructive">*</span>
                   </Label>
                   <FileDropzone
-                    accept={
-                      directPurchaseModal.mode === "replace-invoice"
-                        ? "application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-                        : "image/jpeg,image/png,image/webp"
-                    }
+                    accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
                     capture="environment"
                     maxFiles={1}
                     maxSizeMb={5}
@@ -2260,13 +2290,9 @@ export default function LogisticsWorkspace({
                         ? "Memproses berkas..."
                         : directPurchaseModal.mode === "replace-invoice"
                           ? "Unggah Foto / PDF Invoice/Bon Baru"
-                          : "Unggah Foto Nota / Bon"
+                          : "Unggah Foto / PDF Nota / Bon"
                     }
-                    hint={
-                      directPurchaseModal.mode === "replace-invoice"
-                        ? "Format PDF, JPG, PNG, atau WEBP (maksimal 5 MB)."
-                        : "Format JPG, PNG, atau WEBP (maksimal 5 MB)."
-                    }
+                    hint="Format PDF, JPG, PNG, atau WEBP (maksimal 5 MB)."
                     onFilesChange={
                       directPurchaseModal.mode === "replace-invoice"
                         ? (files) => {
@@ -2341,6 +2367,16 @@ export default function LogisticsWorkspace({
                     >
                       <ExternalLink className="size-3.5" aria-hidden="true" />
                       Lihat Nota Vendor
+                      {(() => {
+                        const assetMeta = parseClientAssetCode(
+                          directPurchaseModal.purchase.vendorInvoiceUrl,
+                        );
+                        return assetMeta ? (
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+                            {assetMeta.assetCode}
+                          </span>
+                        ) : null;
+                      })()}
                     </Button>
                     {canReplacePurchaseInvoice &&
                       canReplaceDirectPurchaseInvoice(

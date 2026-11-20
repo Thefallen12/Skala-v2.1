@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SPKStatus } from "@prisma/client";
+import { SPKStatus, UserRole } from "@prisma/client";
+import { auth } from "@/../auth";
 import { prisma } from "@/lib/prisma";
 import {
   createBrandedQrDataUrl,
@@ -33,21 +34,43 @@ function currency(value: string): string {
   }).format(Number(value));
 }
 
+const allowedRoles = new Set<UserRole>([
+  UserRole.DIRECTOR,
+  UserRole.DEPUTY_DIRECTOR,
+  UserRole.ADMINISTRATIONS,
+  UserRole.FINANCE,
+  UserRole.LOGISTICS,
+  UserRole.KOORDINATOR,
+  UserRole.FIELD_TEAM,
+  UserRole.DRAFTER,
+]);
+
 export async function GET(request: NextRequest) {
   const publicCode = (request.nextUrl.searchParams.get("publicCode") ?? "").trim();
   if (!publicCode || publicCode.length > 128) {
     return NextResponse.json({ message: "Kode dokumen tidak valid." }, { status: 400 });
   }
 
-  const [contract, bast] = await Promise.all([
-    prisma.subkonContract.findFirst({
-      where: {
+  const session = await auth();
+  if (session?.user?.id && !allowedRoles.has(session.user.role)) {
+    return NextResponse.json({ message: "Anda tidak memiliki akses ke dokumen ini." }, { status: 403 });
+  }
+  const whereClauseContract = session?.user?.id
+    ? {
         OR: [
           { publicCode },
           { contractNumber: publicCode },
           { id: publicCode },
         ],
-      },
+      }
+    : { publicCode };
+  const whereClauseBast = session?.user?.id
+    ? { OR: [{ publicCode }, { bastNumber: publicCode }, { id: publicCode }] }
+    : { publicCode };
+
+  const [contract, bast] = await Promise.all([
+    prisma.subkonContract.findFirst({
+      where: whereClauseContract,
       select: {
         publicCode: true,
         contractNumber: true,
@@ -63,9 +86,7 @@ export async function GET(request: NextRequest) {
       },
     }),
     prisma.bASTDocument.findFirst({
-      where: {
-        OR: [{ publicCode }, { bastNumber: publicCode }, { id: publicCode }],
-      },
+      where: whereClauseBast,
       select: {
         publicCode: true,
         bastNumber: true,
@@ -81,7 +102,20 @@ export async function GET(request: NextRequest) {
   ]);
 
   if (!contract && !bast) {
-    return NextResponse.json({ message: "Dokumen tidak tersedia." }, { status: 404 });
+    return NextResponse.json(
+      { message: session?.user?.id ? "Dokumen tidak tersedia." : "Silakan masuk untuk mengakses dokumen ini." },
+      { status: session?.user?.id ? 404 : 401 },
+    );
+  }
+  if (
+    !session?.user?.id &&
+    ((contract && contract.status !== SPKStatus.ACTIVE) ||
+      (bast && !bast.isApproved))
+  ) {
+    return NextResponse.json(
+      { message: "Dokumen belum disetujui. Silakan masuk untuk melihat pratinjau." },
+      { status: 401 },
+    );
   }
 
   try {

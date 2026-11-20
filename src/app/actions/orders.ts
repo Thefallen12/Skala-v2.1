@@ -84,6 +84,9 @@ import {
   type VendorInvoiceInput,
 } from "@/lib/invoice-input";
 import { formatVendorBankAccount } from "@/lib/vendor-bank-accounts";
+import { normalizeFinanceAssetKind } from "@/lib/asset-codes";
+import { isAssetUrlReferencedInDb } from "@/lib/asset-references";
+import { isCloudinaryPrivateTicketReceiptPdf } from "@/lib/cloudinary-private-pdfs";
 
 export type PurchaseOrderItemInput = {
   stockItemId?: string;
@@ -654,15 +657,28 @@ export async function deletePurchaseOrder(
     return fail("Kode Purchase Order tidak valid.");
   }
 
+  const urlsToCheckCleanup: string[] = [];
   try {
     const deleted = await prisma.$transaction(async (transaction) => {
       const order = await transaction.purchaseOrder.findUnique({
         where: { publicCode },
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          status: true,
+          vendorInvoiceUrl: true,
+          paymentReceiptUrl: true,
+          invoices: { select: { documentUrl: true } },
+        },
       });
       if (!order) return "not-found";
       if (!canDeleteAnyStatus && order.status !== POStatus.DRAFT) {
         return "not-draft";
+      }
+
+      if (order.vendorInvoiceUrl) urlsToCheckCleanup.push(order.vendorInvoiceUrl);
+      if (order.paymentReceiptUrl) urlsToCheckCleanup.push(order.paymentReceiptUrl);
+      for (const inv of order.invoices) {
+        if (inv.documentUrl) urlsToCheckCleanup.push(inv.documentUrl);
       }
 
       const deleted = await transaction.purchaseOrder.deleteMany({
@@ -677,6 +693,33 @@ export async function deletePurchaseOrder(
     }
     if (deleted === "changed") {
       return fail("Status PO berubah. Muat ulang halaman sebelum mencoba lagi.");
+    }
+
+    const uniqueCleanupUrls = Array.from(
+      new Set(urlsToCheckCleanup.map((url) => url.trim()).filter(Boolean)),
+    );
+    for (const url of uniqueCleanupUrls) {
+      const [stillReferencedOrders, stillReferencedDb] = await Promise.all([
+        isPurchaseOrderInvoiceAssetReferencedInDb(url),
+        isAssetUrlReferencedInDb(url),
+      ]);
+      if (!stillReferencedOrders && !stillReferencedDb) {
+        try {
+          if (
+            url.startsWith("/api/tickets/receipts/") ||
+            isCloudinaryPrivateTicketReceiptPdf(url)
+          ) {
+            await removeTicketReceipt(url);
+          } else {
+            await removePurchaseOrderInvoiceAsset(url);
+          }
+        } catch (cleanupError) {
+          console.error(
+            "Removing unreferenced deleted PO asset failed:",
+            cleanupError,
+          );
+        }
+      }
     }
   } catch (error) {
     console.error("Purchase Order deletion failed:", error);
@@ -961,6 +1004,7 @@ export async function submitPurchaseOrderInvoice(
   publicCode: string,
   input: Omit<VendorInvoiceInput, "documentUrl">,
   file: File,
+  proofDocType?: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
   if (!session?.user || !canEditPurchaseOrders(session.user.role)) {
@@ -979,8 +1023,11 @@ export async function submitPurchaseOrderInvoice(
   const orderBeforeUpload = await prisma.purchaseOrder.findUnique({
     where: { publicCode },
     select: {
+      id: true,
+      projectId: true,
       status: true,
       ticketId: true,
+      ticket: { select: { projectId: true } },
       includeTax: true,
       items: {
         orderBy: { id: "asc" },
@@ -1019,6 +1066,17 @@ export async function submitPurchaseOrderInvoice(
   }
 
   const extension = file.name.split(".").at(-1)?.toLowerCase();
+  const poInvoiceProjectId =
+    orderBeforeUpload.projectId ?? orderBeforeUpload.ticket?.projectId ?? null;
+  const poInvoiceContext = {
+    projectId: poInvoiceProjectId,
+    kind: normalizeFinanceAssetKind(proofDocType, "INV"),
+    docType: "PO_INVOICE",
+    entityType: "PurchaseOrder",
+    entityId: orderBeforeUpload.id,
+    ticketId: orderBeforeUpload.ticketId ?? null,
+    uploadedById: session.user.id,
+  };
   let documentUrl = "";
   try {
     if (extension === "pdf") {
@@ -1027,6 +1085,7 @@ export async function submitPurchaseOrderInvoice(
         PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
         ["pdf"],
         5 * 1024 * 1024,
+        poInvoiceContext,
       );
     } else if (["jpg", "jpeg", "png", "webp"].includes(extension ?? "")) {
       documentUrl = (
@@ -1034,6 +1093,7 @@ export async function submitPurchaseOrderInvoice(
           file,
           PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
           5 * 1024 * 1024,
+          poInvoiceContext,
         )
       ).secureUrl;
     } else {
@@ -1335,6 +1395,7 @@ async function isPurchaseOrderInvoiceAssetReferencedInDb(
 export async function replacePurchaseOrderInvoice(
   publicCode: string,
   file: File,
+  proofDocType?: string,
 ): Promise<OrderActionResult> {
   const session = await auth();
   if (
@@ -1368,6 +1429,9 @@ export async function replacePurchaseOrderInvoice(
     where: { publicCode },
     select: {
       id: true,
+      projectId: true,
+      ticketId: true,
+      ticket: { select: { projectId: true } },
       status: true,
       vendorInvoiceUrl: true,
       invoices: { select: { id: true, documentUrl: true } },
@@ -1386,6 +1450,17 @@ export async function replacePurchaseOrderInvoice(
     return fail("PO ini belum memiliki invoice/bon untuk diganti.");
   }
 
+  const poReplaceProjectId =
+    orderBeforeUpload.projectId ?? orderBeforeUpload.ticket?.projectId ?? null;
+  const poReplaceContext = {
+    projectId: poReplaceProjectId,
+    kind: normalizeFinanceAssetKind(proofDocType, "INV"),
+    docType: "PO_INVOICE",
+    entityType: "PurchaseOrder",
+    entityId: orderBeforeUpload.id,
+    ticketId: orderBeforeUpload.ticketId ?? null,
+    uploadedById: session.user.id,
+  };
   let documentUrl = "";
   try {
     if (normalizedFile.type === "application/pdf") {
@@ -1406,6 +1481,7 @@ export async function replacePurchaseOrderInvoice(
         PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
         ["pdf"],
         5 * 1024 * 1024,
+        poReplaceContext,
       );
     } else {
       documentUrl = (
@@ -1413,6 +1489,7 @@ export async function replacePurchaseOrderInvoice(
           normalizedFile,
           PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER,
           5 * 1024 * 1024,
+          poReplaceContext,
         )
       ).secureUrl;
     }
@@ -1509,9 +1586,11 @@ export async function replacePurchaseOrderInvoice(
       if (!oldUrl || oldUrl === documentUrl || !isPurchaseOrderInvoiceUrl(oldUrl)) {
         continue;
       }
-      const stillReferenced =
-        await isPurchaseOrderInvoiceAssetReferencedInDb(oldUrl);
-      if (!stillReferenced) {
+      const [stillReferencedOrders, stillReferencedDb] = await Promise.all([
+        isPurchaseOrderInvoiceAssetReferencedInDb(oldUrl),
+        isAssetUrlReferencedInDb(oldUrl),
+      ]);
+      if (!stillReferencedOrders && !stillReferencedDb) {
         try {
           await removePurchaseOrderInvoiceAsset(oldUrl);
         } catch (cleanupError) {
@@ -2672,10 +2751,18 @@ export async function updateDeliveryOrder(
         arrivalPhotoUrl: true,
         receivedAt: true,
         receivedById: true,
+        ticketId: true,
         ticket: {
           select: {
             id: true,
+            projectId: true,
             moverAssignee: { select: { name: true } },
+          },
+        },
+        po: {
+          select: {
+            projectId: true,
+            ticket: { select: { projectId: true } },
           },
         },
       },
@@ -2710,8 +2797,22 @@ export async function updateDeliveryOrder(
         return fail("Bukti penerimaan material yang sudah tercatat tidak dapat diganti.");
       }
       if (arrivalPhotoFile instanceof File) {
-        savedArrivalPhotoUrl =
-          await saveDeliveryOrderArrivalPhoto(arrivalPhotoFile);
+        savedArrivalPhotoUrl = await saveDeliveryOrderArrivalPhoto(
+          arrivalPhotoFile,
+          {
+            projectId:
+              existingOrder.ticket?.projectId ??
+              existingOrder.po?.projectId ??
+              existingOrder.po?.ticket?.projectId ??
+              null,
+            kind: "SJN",
+            docType: "DO_ARRIVAL_PHOTO",
+            entityType: "DeliveryOrder",
+            entityId: existingOrder.id,
+            ticketId: existingOrder.ticketId ?? null,
+            uploadedById: session.user.id,
+          },
+        );
       }
     } else if (arrivalPhotoFile instanceof File && arrivalPhotoFile.size > 0) {
       return fail("Foto kedatangan hanya dapat dicatat saat DO ekspedisi diterima.");
@@ -3440,10 +3541,49 @@ export async function submitMoverDeliveryProofs(
     );
   }
 
+  let moverDoId: string | undefined;
+  let moverTicketId: string | null = null;
+  let moverProjectId: string | null = null;
+  try {
+    const doMeta = await prisma.deliveryOrder.findUnique({
+      where: { publicCode },
+      select: {
+        id: true,
+        ticketId: true,
+        ticket: { select: { projectId: true } },
+        po: {
+          select: {
+            projectId: true,
+            ticket: { select: { projectId: true } },
+          },
+        },
+      },
+    });
+    moverDoId = doMeta?.id;
+    moverTicketId = doMeta?.ticketId ?? null;
+    moverProjectId =
+      doMeta?.ticket?.projectId ??
+      doMeta?.po?.projectId ??
+      doMeta?.po?.ticket?.projectId ??
+      null;
+  } catch {
+    moverProjectId = null;
+  }
+
   const receiptUrls: string[] = [];
   try {
     for (const file of files) {
-      receiptUrls.push(await saveTicketReceipt(file));
+      receiptUrls.push(
+        await saveTicketReceipt(file, {
+          projectId: moverProjectId,
+          kind: "SJN",
+          docType: "DO_MOVER_PROOF",
+          entityType: "DeliveryOrder",
+          entityId: moverDoId,
+          ticketId: moverTicketId,
+          uploadedById: session.user.id,
+        }),
+      );
     }
   } catch (error) {
     await Promise.all(
@@ -3769,9 +3909,46 @@ export async function receiveExpeditionDeliveryOrder(
     return fail("Delivery Order dan foto bukti penerimaan wajib dipilih.");
   }
 
+  let expDoId: string | undefined;
+  let expTicketId: string | null = null;
+  let expProjectId: string | null = null;
+  try {
+    const doMeta = await prisma.deliveryOrder.findUnique({
+      where: { publicCode },
+      select: {
+        id: true,
+        ticketId: true,
+        ticket: { select: { projectId: true } },
+        po: {
+          select: {
+            projectId: true,
+            ticket: { select: { projectId: true } },
+          },
+        },
+      },
+    });
+    expDoId = doMeta?.id;
+    expTicketId = doMeta?.ticketId ?? null;
+    expProjectId =
+      doMeta?.ticket?.projectId ??
+      doMeta?.po?.projectId ??
+      doMeta?.po?.ticket?.projectId ??
+      null;
+  } catch {
+    expProjectId = null;
+  }
+
   let arrivalPhotoUrl: string;
   try {
-    arrivalPhotoUrl = await saveDeliveryOrderArrivalPhoto(arrivalPhotoFile);
+    arrivalPhotoUrl = await saveDeliveryOrderArrivalPhoto(arrivalPhotoFile, {
+      projectId: expProjectId,
+      kind: "SJN",
+      docType: "DO_ARRIVAL_PHOTO",
+      entityType: "DeliveryOrder",
+      entityId: expDoId,
+      ticketId: expTicketId,
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     if (error instanceof DeliveryOrderArrivalPhotoValidationError) {
       return fail(error.message);

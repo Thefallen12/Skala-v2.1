@@ -804,9 +804,13 @@ model ProjectProgressPhoto {
   url           String      @unique
   fileUrl       String?
   publicId      String?
+  assetCode     String?
+  projectId     String?
   createdAt     DateTime    @default(now())
 
   @@index([dailyReportId, createdAt])
+  @@index([assetCode])
+  @@index([projectId])
 }
 
 model ProjectProgressSubmission {
@@ -997,9 +1001,13 @@ model ProjectWorkPointProgressPhoto {
   url              String                   @unique
   fileUrl          String?
   publicId         String?
+  assetCode        String?
+  projectId        String?
   createdAt        DateTime                 @default(now())
 
   @@index([progressReportId, createdAt])
+  @@index([assetCode])
+  @@index([projectId])
 }
 
 // Inventory and purchasing.

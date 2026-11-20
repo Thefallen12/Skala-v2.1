@@ -111,6 +111,7 @@ export default function IncomingFundModal({
   const [isError, setIsError] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofDocType, setProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV" | null>(null);
   const [proofError, setProofError] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const form = useForm<FundFormValues>({
@@ -131,6 +132,8 @@ export default function IncomingFundModal({
     control: form.control,
     name: "paymentMethod",
   });
+  const effectiveProofDocType =
+    proofDocType ?? (paymentMethod === "CASH" && mode !== "transfer" ? "KWT" : "BKT");
   const transactionDate = useWatch({
     control: form.control,
     name: "transactionDate",
@@ -235,6 +238,7 @@ export default function IncomingFundModal({
           proof: proofFile,
           projectId: values.projectId || undefined,
           transactionDate: values.transactionDate,
+          proofDocType: effectiveProofDocType,
         } satisfies IncomingFundInput);
       } else if (mode === "outgoing") {
         result = await recordOutgoingFund({
@@ -246,6 +250,7 @@ export default function IncomingFundModal({
           proof: proofFile,
           projectId: values.projectId || undefined,
           transactionDate: values.transactionDate,
+          proofDocType: effectiveProofDocType,
         } satisfies OutgoingFundInput);
       } else {
         result = await transferBetweenFinanceAccounts({
@@ -255,6 +260,7 @@ export default function IncomingFundModal({
           sourceDesc: values.sourceDesc,
           proof: proofFile,
           transactionDate: values.transactionDate,
+          proofDocType: effectiveProofDocType,
         } satisfies FinanceTransferInput);
       }
       setMessage(result.message);
@@ -595,7 +601,27 @@ export default function IncomingFundModal({
             </div>
           )}
 
-          <div className="space-y-2 rounded-lg border border-border p-4">
+          <div className="space-y-3 rounded-lg border border-border p-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="cashflow-doc-kind">Jenis Dokumen Bukti</Label>
+              <Select
+                value={effectiveProofDocType}
+                onValueChange={(value) =>
+                  setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                }
+                disabled={isPending}
+              >
+                <SelectTrigger id="cashflow-doc-kind">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BKT">Bukti Transfer / Setoran (BKT)</SelectItem>
+                  <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                  <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                  <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Label>
               {mode === "incoming"
                 ? proofLabels[paymentMethod]

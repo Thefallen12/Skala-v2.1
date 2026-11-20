@@ -1473,8 +1473,12 @@ export default function ProjectScheduleGantt({
 
       {isTaskModalOpen && (
         <TaskModal
+          key={editingTask?.id || "new-task"}
           isOpen={isTaskModalOpen}
-          onClose={() => setIsTaskModalOpen(false)}
+          onClose={() => {
+            setIsTaskModalOpen(false);
+            setEditingTask(null);
+          }}
           initialData={editingTask}
           projectStartDate={selectedProject.startDate || undefined}
           defaultAssigneeName={defaultAssigneeName || selectedProject.name}

@@ -1,3 +1,4 @@
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import {
   CloudinaryPhotoValidationError,
   removeCloudinaryPhoto,
@@ -5,6 +6,8 @@ import {
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
 import { DIRECT_STOCK_PURCHASE_PHOTO_CLOUDINARY_FOLDER } from "@/lib/direct-stock-purchase-photo-config";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import {
   readPrivatePhoto,
   removePrivatePhoto,
@@ -23,12 +26,16 @@ export class DirectStockPurchasePhotoValidationError extends Error {
   }
 }
 
-export async function saveDirectStockPurchasePhoto(file: File): Promise<string> {
+export async function saveDirectStockPurchasePhoto(
+  file: File,
+  context?: AssetUploadContext,
+): Promise<string> {
   try {
     const photo = await uploadCloudinaryPhoto(
       file,
       DIRECT_STOCK_PURCHASE_PHOTO_CLOUDINARY_FOLDER,
       MAX_PHOTO_BYTES,
+      { ...context, kind: context?.kind ?? "BLJ" },
     );
     return photo.secureUrl;
   } catch (error) {
@@ -39,8 +46,11 @@ export async function saveDirectStockPurchasePhoto(file: File): Promise<string> 
   }
 }
 
-export async function removeDirectStockPurchasePhoto(url: string): Promise<void> {
-  if (await removeCloudinaryPhoto(url)) return;
+export async function removeDirectStockPurchasePhoto(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<void> {
+  if (await removeCloudinaryPhoto(url, options)) return;
   if (photoDirectory) {
     await removePrivatePhoto(
       url,
@@ -51,6 +61,7 @@ export async function removeDirectStockPurchasePhoto(url: string): Promise<void>
 }
 
 export function isDirectStockPurchaseCloudinaryPhotoUrl(url: string): boolean {
+  if (extractGoogleDriveFileId(url)) return true;
   try {
     const parsed = new URL(url);
     const publicId = getCloudinaryPublicId(url);

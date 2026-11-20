@@ -84,7 +84,13 @@ export async function uploadDocumentTemplateImage(
     };
   }
   try {
-    const imageUrl = await saveDocumentTemplateImage(file);
+    const imageUrl = await saveDocumentTemplateImage(file, {
+      kind: "TPL",
+      fallbackScope: "TEMPLATE",
+      docType: "TEMPLATE_IMAGE",
+      entityType: "DocumentTemplate",
+      uploadedById: session.user.id,
+    });
     return { success: true, message: "Gambar berhasil diunggah.", imageUrl };
   } catch (error) {
     if (error instanceof PrivatePhotoValidationError) {

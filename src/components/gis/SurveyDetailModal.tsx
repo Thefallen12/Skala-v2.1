@@ -39,6 +39,7 @@ import type {
   SurveyProjectOption,
 } from "@/app/components/apps/gis/SurveySidebar";
 import { printUrlInFrame } from "@/lib/print-url";
+import { parseClientAssetCode } from "@/lib/photo-urls";
 import { compressFieldImageFile } from "@/lib/image-compression-client";
 
 const ReadOnlyMap = dynamic(() => import("@/components/gis/ReadOnlyMap"), {
@@ -109,6 +110,10 @@ function PhotoSlotCard({
   onLabelChange,
 }: PhotoSlotCardProps) {
   const hasImage = Boolean(photo.url);
+  const assetCode =
+    hasImage && !photo.url.startsWith("blob:")
+      ? (parseClientAssetCode(photo.url)?.assetCode ?? null)
+      : null;
 
   return (
     <div className="min-w-0">
@@ -124,6 +129,11 @@ function PhotoSlotCard({
               style={{ objectPosition: "center" }}
               sizes="(max-width: 768px) 50vw, 20vw"
             />
+            {assetCode && (
+              <span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded bg-slate-950/85 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                {assetCode}
+              </span>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -242,6 +252,21 @@ export default function SurveyDetailModal({
   const [photoNameDraft, setPhotoNameDraft] = useState("");
   const fileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const localPhotoUrlsRef = useRef(new Set<string>());
+  const [prevModalScope, setPrevModalScope] = useState(
+    `${survey?.id ?? ""}|${open}`,
+  );
+  const currentModalScope = `${survey?.id ?? ""}|${open}`;
+  if (prevModalScope !== currentModalScope) {
+    setPrevModalScope(currentModalScope);
+    setPhotos(buildPhotoSlots(getPhotoEntries(survey)));
+    setPendingPhoto(null);
+    setPhotoNameDraft("");
+    setShowPhotoNameDialog(false);
+    setHasUnsavedChanges(false);
+    setShowWarning(false);
+    setSaveError("");
+    setPrintMessage("");
+  }
 
   useEffect(() => {
     const localPhotoUrls = localPhotoUrlsRef.current;
@@ -249,7 +274,7 @@ export default function SurveyDetailModal({
       localPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
       localPhotoUrls.clear();
     };
-  }, []);
+  }, [survey?.id, open]);
 
   const registerInputRef = (slotIndex: number, element: HTMLInputElement | null) => {
     fileInputRefs.current[slotIndex] = element;
@@ -263,8 +288,12 @@ export default function SurveyDetailModal({
     }
     setPhotos(buildPhotoSlots(getPhotoEntries(survey)));
     setPendingPhoto(null);
+    setPhotoNameDraft("");
+    setShowPhotoNameDialog(false);
     setHasUnsavedChanges(false);
+    setShowWarning(false);
     setSaveError("");
+    setPrintMessage("");
   };
 
   const getDefaultPhotoLabel = (index: number) => `Foto ${index + 1}`;
@@ -349,6 +378,7 @@ export default function SurveyDetailModal({
   };
 
   const handleCloseAttempt = () => {
+    if (isSaving) return;
     if (hasUnsavedChanges) {
       setShowWarning(true);
       return;

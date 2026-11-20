@@ -11,9 +11,16 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { GlobalModal } from "@/components/ui/global-modal";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRupiahInput, parseRupiahInput } from "@/lib/indonesian-currency";
-import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import { parseClientAssetCode, withLocalPhotoPreview } from "@/lib/photo-urls";
 import {
   FINANCE_PROOF_ACCEPT_ALL,
   prepareFinanceProofFiles,
@@ -66,6 +73,7 @@ export default function EditOfficeExpenseModal({
   const [description, setDescription] = useState("");
   const [keepUrls, setKeepUrls] = useState<string[]>([]);
   const [newProofFiles, setNewProofFiles] = useState<NewExpenseProofItem[]>([]);
+  const [proofDocType, setProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV" | null>(null);
   const newProofFilesRef = useRef<NewExpenseProofItem[]>([]);
   const [proofError, setProofError] = useState("");
   const [isPreparingProof, setIsPreparingProof] = useState(false);
@@ -99,6 +107,7 @@ export default function EditOfficeExpenseModal({
     setAmountInput(formatRupiahInput(String(expense.amount)));
     setDescription(expense.description || "");
     setKeepUrls(expense.proofUrls || []);
+    setProofDocType(null);
     revokeProofItems(newProofFiles);
     setNewProofFiles([]);
     setProofError("");
@@ -111,6 +120,14 @@ export default function EditOfficeExpenseModal({
   }
 
   if (!expense) return null;
+
+  const effectiveProofDocType =
+    proofDocType ??
+    (expense.paymentMethod === "CASH"
+      ? "KWT"
+      : expense.expenseType === "REIMBURSEMENT"
+        ? "BON"
+        : "BKT");
 
   const handleClose = () => {
     if (isPending) return;
@@ -149,6 +166,7 @@ export default function EditOfficeExpenseModal({
         keepProofUrls: keepUrls,
         newProofFiles: newProofFiles.map((item) => item.file),
         description: description.trim(),
+        proofDocType: effectiveProofDocType,
       });
 
       setMessage(result.message);
@@ -270,7 +288,20 @@ export default function EditOfficeExpenseModal({
                 {keepUrls.map((url, idx) => (
                   <div key={`${url}-${idx}`} className="relative overflow-hidden rounded-lg border bg-card p-2 flex flex-col justify-between">
                     <div className="flex items-center justify-between pb-1.5">
-                      <span className="text-xs font-medium">Bukti {idx + 1}</span>
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium">Bukti {idx + 1}</span>
+                        {(() => {
+                          const assetMeta = parseClientAssetCode(url);
+                          return assetMeta ? (
+                            <span
+                              className="mt-0.5 block truncate rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                              title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                            >
+                              {assetMeta.assetCode}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                       <div className="flex items-center gap-1">
                         {onReceiptPreview && (
                           <ActionIconButton
@@ -360,6 +391,26 @@ export default function EditOfficeExpenseModal({
 
           {/* File input to add new/replacement photos */}
           <div className="space-y-1.5 pt-2">
+            <Label htmlFor="edit-expense-doc-kind" className="type-p3 font-medium">
+              Jenis Dokumen Bukti Tambahan
+            </Label>
+            <Select
+              value={effectiveProofDocType}
+              onValueChange={(value) =>
+                setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+              }
+              disabled={isPending}
+            >
+              <SelectTrigger id="edit-expense-doc-kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+              </SelectContent>
+            </Select>
             <Label htmlFor="edit-expense-file-input" className="type-p3 font-medium">
               Tambah / Ganti Foto Bukti
             </Label>

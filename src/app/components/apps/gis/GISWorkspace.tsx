@@ -1106,6 +1106,7 @@ export default function GISWorkspace({
         </span>
       </p>
       <SurveyDetailModal
+        key={detailSurvey?.id ?? "closed"}
         open={detailSurvey !== null}
         onClose={() => setDetailSurveyId(null)}
         survey={detailSurvey}

@@ -189,12 +189,60 @@ export async function createVehicleFuelRequest(
     );
   }
 
+  let uploadProjectId: string | null = null;
+  let uploadEntityId: string | undefined;
+  try {
+    const doProjectRow = await prisma.deliveryOrder.findUnique({
+      where: { publicCode },
+      select: {
+        id: true,
+        ticket: { select: { projectId: true } },
+        po: { select: { projectId: true, ticket: { select: { projectId: true } } } },
+      },
+    });
+    uploadEntityId = doProjectRow?.id;
+    uploadProjectId =
+      doProjectRow?.ticket?.projectId ??
+      doProjectRow?.po?.projectId ??
+      doProjectRow?.po?.ticket?.projectId ??
+      null;
+  } catch {
+    uploadProjectId = null;
+  }
+
   const savedPhotoUrls: string[] = [];
   try {
-    savedPhotoUrls.push(await saveTicketReceipt(input.beforeFillingPhoto));
-    savedPhotoUrls.push(await saveTicketReceipt(input.afterFillingPhoto));
+    savedPhotoUrls.push(
+      await saveTicketReceipt(input.beforeFillingPhoto, {
+        projectId: uploadProjectId,
+        kind: "BBM",
+        docType: "BBM_SEBELUM",
+        entityType: "VehicleFuelRequest",
+        entityId: uploadEntityId,
+        uploadedById: session.user.id,
+      }),
+    );
+    savedPhotoUrls.push(
+      await saveTicketReceipt(input.afterFillingPhoto, {
+        projectId: uploadProjectId,
+        kind: "BBM",
+        docType: "BBM_SESUDAH",
+        entityType: "VehicleFuelRequest",
+        entityId: uploadEntityId,
+        uploadedById: session.user.id,
+      }),
+    );
     if (input.receiptPhoto) {
-      savedPhotoUrls.push(await saveTicketReceipt(input.receiptPhoto));
+      savedPhotoUrls.push(
+        await saveTicketReceipt(input.receiptPhoto, {
+          projectId: uploadProjectId,
+          kind: "BON",
+          docType: "BON_BBM",
+          entityType: "VehicleFuelRequest",
+          entityId: uploadEntityId,
+          uploadedById: session.user.id,
+        }),
+      );
     }
   } catch (error) {
     await Promise.all(
@@ -355,10 +403,41 @@ export async function submitVehicleFuelProof(
     return fail("Foto speedometer setelah pengisian wajib; format JPG, PNG, atau WEBP maksimal 5 MB.");
   }
 
+  let proofProjectId: string | null = null;
+  try {
+    const existingFuelRequest = await prisma.vehicleFuelRequest.findUnique({
+      where: { id: requestId },
+      select: { projectId: true },
+    });
+    proofProjectId = existingFuelRequest?.projectId ?? null;
+  } catch {
+    proofProjectId = null;
+  }
+
   const savedUrls: string[] = [];
   try {
-    savedUrls.push(await saveTicketReceipt(afterFillingPhoto));
-    if (receiptPhoto) savedUrls.push(await saveTicketReceipt(receiptPhoto));
+    savedUrls.push(
+      await saveTicketReceipt(afterFillingPhoto, {
+        projectId: proofProjectId,
+        kind: "BBM",
+        docType: "BBM_SESUDAH",
+        entityType: "VehicleFuelRequest",
+        entityId: requestId,
+        uploadedById: session.user.id,
+      }),
+    );
+    if (receiptPhoto) {
+      savedUrls.push(
+        await saveTicketReceipt(receiptPhoto, {
+          projectId: proofProjectId,
+          kind: "BON",
+          docType: "BON_BBM",
+          entityType: "VehicleFuelRequest",
+          entityId: requestId,
+          uploadedById: session.user.id,
+        }),
+      );
+    }
   } catch (error) {
     await Promise.all(
       savedUrls.map(async (url) => {
@@ -491,8 +570,25 @@ export async function processVehicleFuelRequest(
     input?.disbursementMethod === POPaymentMethod.TRANSFER &&
     input.transferProof
   ) {
+    let processProjectId: string | null = null;
     try {
-      transferProofUrl = await saveTicketReceipt(input.transferProof);
+      await connectToMongoDB();
+      const fuelReq = await VehicleFuelRequest.findById(requestId)
+        .select({ projectId: 1 })
+        .lean();
+      processProjectId = fuelReq?.projectId?.trim() || null;
+    } catch {
+      processProjectId = null;
+    }
+    try {
+      transferProofUrl = await saveTicketReceipt(input.transferProof, {
+        projectId: processProjectId,
+        kind: "BKT",
+        docType: "BUKTI_TRANSFER_BBM",
+        entityType: "VehicleFuelRequest",
+        entityId: requestId,
+        uploadedById: session.user.id,
+      });
     } catch (error) {
       console.error("Vehicle fuel transfer proof upload failed:", error);
       return fail(

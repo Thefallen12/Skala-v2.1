@@ -711,6 +711,7 @@ export default function LogisticsActionModal({
     orderCode: string | null;
     file: File | null;
   }>({ orderCode: null, file: null });
+  const [invoiceDocKind, setInvoiceDocKind] = useState<"INV" | "BON">("INV");
   const [invoiceDraftState, setInvoiceDraftState] = useState<{
     orderCode: string | null;
     draft: InvoiceDraft;
@@ -843,6 +844,7 @@ export default function LogisticsActionModal({
           actionType === "BUY_STORE"
             ? selectedPurchaseOrder?.publicCode
             : undefined,
+          actionType === "BUY_STORE" ? invoiceDocKind : undefined,
         );
         if (result.success) {
           toast.success(result.message);
@@ -1263,6 +1265,26 @@ export default function LogisticsActionModal({
                         })
                       }
                     />
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`ticket-invoice-doc-kind-${ticket.id}`}>
+                        Jenis Dokumen Tagihan
+                      </Label>
+                      <Select
+                        value={invoiceDocKind}
+                        onValueChange={(value) =>
+                          setInvoiceDocKind(value as "INV" | "BON")
+                        }
+                        disabled={isPending}
+                      >
+                        <SelectTrigger id={`ticket-invoice-doc-kind-${ticket.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="INV">Invoice / Faktur Vendor (INV)</SelectItem>
+                          <SelectItem value="BON">Bon / Nota Pembelian (BON)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <FileDropzone
                       accept="application/pdf,image/jpeg,image/png,image/webp"
                       multiple={false}

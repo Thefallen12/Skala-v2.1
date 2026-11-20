@@ -1,10 +1,17 @@
 import "@/lib/sanitize-env";
-import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
+import type { AssetKind } from "@/lib/asset-codes";
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import {
+  type AssetUploadContext,
+  removeManagedAssetIfUnreferenced,
+  uploadManagedAsset,
+} from "@/lib/file-storage";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import {
   detectImageMimeFromBytes,
   getFinancePaymentProofMimeType,
@@ -15,6 +22,25 @@ const extByMime = {
   "image/png": "png",
   "image/webp": "webp",
 } as const;
+
+function inferPhotoAssetKind(folder: string): AssetKind {
+  const lower = folder.toLowerCase();
+  if (lower.includes("work_point")) return "TTK";
+  if (lower.includes("progress")) return "FTO";
+  if (lower.includes("survey")) return "SRV";
+  if (lower.includes("arrival")) return "SJN";
+  if (lower.includes("direct_stock")) return "BLJ";
+  if (lower.includes("fuel")) return "BBM";
+  if (lower.includes("drawing")) return "DRW";
+  if (lower.includes("profile")) return "USR";
+  if (lower.includes("template")) return "TPL";
+  if (lower.includes("cashflow")) return "BKT";
+  if (lower.includes("payment")) return "BKT";
+  if (lower.includes("ticket") || lower.includes("receipt") || lower.includes("request")) {
+    return "BON";
+  }
+  return "FTO";
+}
 
 export class CloudinaryPhotoValidationError extends Error {
   constructor(message: string) {
@@ -49,7 +75,13 @@ export async function uploadCloudinaryPhoto(
   file: File,
   folder: string,
   maxBytes = 5 * 1024 * 1024,
-): Promise<{ secureUrl: string; publicId: string }> {
+  context?: AssetUploadContext,
+): Promise<{
+  secureUrl: string;
+  publicId: string;
+  assetCode?: string;
+  provider?: "cloudinary" | "gdrive" | "local_private";
+}> {
   if (!(file instanceof File) || file.size < 1 || file.size > maxBytes) {
     throw new CloudinaryPhotoValidationError(
       `Ukuran foto harus lebih dari 0 dan maksimal ${Math.floor(maxBytes / (1024 * 1024))} MB.`,
@@ -71,54 +103,54 @@ export async function uploadCloudinaryPhoto(
     );
   }
 
-  const credentials = getCloudinaryCredentials();
-  if (!credentials) {
-    const safeFolder = folder.replace(/[^a-zA-Z0-9/_-]/g, "");
-    const ext = extByMime[actualMime] ?? "jpg";
-    const fileName = `${randomUUID()}.${ext}`;
-    const relativeDir = path.posix.join("uploads", safeFolder);
-    const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
-    await mkdir(absDir, { recursive: true });
-    await writeFile(
-      path.join(/*turbopackIgnore: true*/ absDir, fileName),
-      bytes,
-      { flag: "wx" },
-    );
-    const localUrl = `/${relativeDir}/${fileName}`;
-    return {
-      secureUrl: localUrl,
-      publicId: `${safeFolder}/${fileName.replace(/\.[^.]+$/, "")}`,
-    };
-  }
-
-  configureCloudinary();
-  return new Promise((resolveUpload, rejectUpload) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        public_id: randomUUID(),
-        use_filename: false,
-        unique_filename: false,
-        overwrite: false,
-        resource_type: "image",
-      },
-      (error, response) => {
-        if (error) {
-          rejectUpload(error);
-          return;
-        }
-        if (!response?.secure_url || !response.public_id) {
-          rejectUpload(new Error("Cloudinary tidak mengembalikan data foto."));
-          return;
-        }
-        resolveUpload({
-          secureUrl: response.secure_url,
-          publicId: response.public_id,
-        });
-      },
-    );
-    Readable.from([bytes]).pipe(stream);
+  const ext = extByMime[actualMime] ?? "jpg";
+  const defaultKind = inferPhotoAssetKind(folder);
+  const uploaded = await uploadManagedAsset({
+    bytes,
+    mimeType: actualMime,
+    extension: ext,
+    originalFilename: file.name,
+    baseFolder: folder,
+    defaultKind,
+    context,
+    cloudinaryUploader: ({ folder: targetFolder, publicId }) => {
+      configureCloudinary();
+      return new Promise((resolveUpload, rejectUpload) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: targetFolder,
+            public_id: publicId,
+            use_filename: false,
+            unique_filename: false,
+            overwrite: false,
+            resource_type: "image",
+          },
+          (error, response) => {
+            if (error) {
+              rejectUpload(error);
+              return;
+            }
+            if (!response?.secure_url || !response.public_id) {
+              rejectUpload(new Error("Cloudinary tidak mengembalikan data foto."));
+              return;
+            }
+            resolveUpload({
+              secureUrl: response.secure_url,
+              publicId: response.public_id,
+            });
+          },
+        );
+        Readable.from([bytes]).pipe(stream);
+      });
+    },
   });
+
+  return {
+    secureUrl: uploaded.secureUrl,
+    publicId: uploaded.publicId,
+    assetCode: uploaded.assetCode,
+    provider: uploaded.provider,
+  };
 }
 
 export function getCloudinaryPublicId(url: string): string | null {
@@ -170,7 +202,10 @@ export function getCloudinaryPublicId(url: string): string | null {
   }
 }
 
-export async function removeCloudinaryPhoto(url: string): Promise<boolean> {
+export async function removeCloudinaryPhoto(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget; publicId?: string | null },
+): Promise<boolean> {
   if (url.startsWith("/uploads/")) {
     try {
       const pathname = new URL(url, "http://localhost").pathname;
@@ -206,10 +241,28 @@ export async function removeCloudinaryPhoto(url: string): Promise<boolean> {
       return false;
     }
   }
-  const publicId = getCloudinaryPublicId(url);
+
+  if (extractGoogleDriveFileId(url)) {
+    const result = await removeManagedAssetIfUnreferenced({
+      url,
+      ignore: options?.ignore,
+    });
+    return result.deleted || result.skippedReason === "referenced_elsewhere";
+  }
+
+  const publicId = options?.publicId || getCloudinaryPublicId(url);
   if (!publicId) return false;
-  await deleteCloudinaryPhoto(publicId);
-  return true;
+  const result = await removeManagedAssetIfUnreferenced({
+    url,
+    publicId,
+    ignore: options?.ignore,
+    cloudinaryRemover: async (_targetUrl, targetPublicId) => {
+      if (targetPublicId) {
+        await deleteCloudinaryPhoto(targetPublicId);
+      }
+    },
+  });
+  return result.deleted || result.skippedReason === "referenced_elsewhere";
 }
 
 export async function deleteCloudinaryPhoto(publicId: string): Promise<void> {
@@ -224,5 +277,5 @@ export async function deleteCloudinaryPhoto(publicId: string): Promise<void> {
 }
 
 export function isCloudinaryPhotoUrl(url: string): boolean {
-  return getCloudinaryPublicId(url) !== null;
+  return getCloudinaryPublicId(url) !== null || extractGoogleDriveFileId(url) !== null;
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "../../../../../../../auth";
+import { parseAssetCode } from "@/lib/asset-codes";
 import { prisma } from "@/lib/prisma";
 import { DinasProjectReportPage } from "@/app/components/apps/projects/DinasProjectReportPage";
 
@@ -49,7 +50,13 @@ export default async function DinasReportRoute() {
           k3SafetyLog: true,
           progressPhotos: {
             orderBy: { createdAt: "asc" },
-            select: { url: true, fileUrl: true },
+            select: {
+              url: true,
+              fileUrl: true,
+              publicId: true,
+              assetCode: true,
+              projectId: true,
+            },
           },
         },
       },
@@ -83,7 +90,13 @@ export default async function DinasReportRoute() {
               workSummary: true,
               photos: {
                 orderBy: { createdAt: "asc" },
-                select: { url: true, fileUrl: true },
+                select: {
+                  url: true,
+                  fileUrl: true,
+                  publicId: true,
+                  assetCode: true,
+                  projectId: true,
+                },
               },
             },
           },
@@ -92,9 +105,40 @@ export default async function DinasReportRoute() {
     },
   });
 
+  const serializedProjects = projects.map((project) => ({
+    ...project,
+    dailyReports: project.dailyReports.map((report) => ({
+      ...report,
+      progressPhotos: report.progressPhotos.map((photo) => ({
+        ...photo,
+        assetCode:
+          photo.assetCode ??
+          parseAssetCode(photo.publicId)?.assetCode ??
+          parseAssetCode(photo.fileUrl)?.assetCode ??
+          parseAssetCode(photo.url)?.assetCode ??
+          null,
+      })),
+    })),
+    workPoints: project.workPoints.map((wp) => ({
+      ...wp,
+      progressReports: wp.progressReports.map((pr) => ({
+        ...pr,
+        photos: pr.photos.map((photo) => ({
+          ...photo,
+          assetCode:
+            photo.assetCode ??
+            parseAssetCode(photo.publicId)?.assetCode ??
+            parseAssetCode(photo.fileUrl)?.assetCode ??
+            parseAssetCode(photo.url)?.assetCode ??
+            null,
+        })),
+      })),
+    })),
+  }));
+
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <DinasProjectReportPage projects={projects} />
+      <DinasProjectReportPage projects={serializedProjects} />
     </div>
   );
 }

@@ -112,6 +112,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
+  parseClientAssetCode,
   photoDownloadHref,
   withLocalPhotoPreview,
 } from "@/lib/photo-urls";
@@ -618,6 +619,7 @@ export default function FinanceHub({
   });
   const [message, setMessage] = useState("");
   const [receiptUrl, setReceiptUrl] = useState<File[]>([]);
+  const [proofDocType, setProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV" | null>(null);
   const [paymentType, setPaymentType] = useState<PaymentType>(
     PaymentType.FULL_PAYMENT,
   );
@@ -1265,6 +1267,13 @@ export default function FinanceHub({
               ? { kind: "direct-purchase" as const, id: activeDirectPurchase.id }
               : null;
         if (!target) return;
+        const resolvedProofDocType =
+          proofDocType ??
+          (directPaymentMethod === POPaymentMethod.CASH ||
+          (activeTicket?.requestCategory === TicketRequestCategory.APH &&
+            activeTicket?.requestPaymentMethod === POPaymentMethod.CASH)
+            ? "KWT"
+            : "BKT");
         const result: TicketActionResult =
           activeTicket?.ticketType === EQUIPMENT_REQUEST_TYPE
             ? await submitEquipmentRentalPayment({
@@ -1274,6 +1283,7 @@ export default function FinanceHub({
                 financeAccountId,
                 paymentType: currentPaymentType,
                 amount,
+                proofDocType: resolvedProofDocType,
               })
             : await submitPaymentRecord({
                 target,
@@ -1285,11 +1295,13 @@ export default function FinanceHub({
                 ...(directPaymentMethod
                   ? { paymentMethod: directPaymentMethod }
                   : {}),
+                proofDocType: resolvedProofDocType,
               });
         setMessage(result.message);
         if (result.success) {
           toast.success(result.message || "Pembayaran berhasil dicatat.");
           setReceiptUrl([]);
+          setProofDocType(null);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
           requestNotificationFeedRefresh();
@@ -1314,6 +1326,7 @@ export default function FinanceHub({
     financeAccountId: string,
     paymentMethod?: POPaymentMethod,
     poId?: string,
+    modalProofDocType?: string,
   ): Promise<TicketActionResult> => {
     if (!selectedPaymentRow) {
       return { success: false, message: "Tagihan tidak ditemukan." };
@@ -1333,6 +1346,7 @@ export default function FinanceHub({
           financeAccountId,
           paymentType: type,
           amount,
+          proofDocType: modalProofDocType,
         });
       }
     }
@@ -1359,6 +1373,7 @@ export default function FinanceHub({
       paymentType: type,
       amount,
       ...(paymentMethod ? { paymentMethod } : {}),
+      proofDocType: modalProofDocType,
     });
   };
 
@@ -1547,8 +1562,18 @@ export default function FinanceHub({
         );
       }
 
+      const assetMeta = parseClientAssetCode(url);
       return (
         <div className="flex flex-wrap items-center gap-2">
+          {assetMeta && (
+            <Badge
+              variant="outline"
+              className="font-mono text-[10px]"
+              title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+            >
+              {assetMeta.assetCode}
+            </Badge>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -1581,8 +1606,18 @@ export default function FinanceHub({
       );
     }
 
+    const assetMeta = parseClientAssetCode(url);
     return (
       <div className="flex flex-wrap items-center gap-2">
+        {assetMeta && (
+          <Badge
+            variant="outline"
+            className="font-mono text-[10px]"
+            title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+          >
+            {assetMeta.assetCode}
+          </Badge>
+        )}
         <Button
           asChild
           variant="outline"
@@ -2189,27 +2224,36 @@ export default function FinanceHub({
                                     <Badge variant="success">
                                       Lengkap · {expense.proofUrls.length} bukti
                                     </Badge>
-                                    {expense.proofUrls.map((url, index) => (
-                                      <Button
-                                        key={`${url}-${index}`}
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-7 gap-1.5 px-2.5 text-xs"
-                                        onClick={() =>
-                                          setReceiptPreview({
-                                            url,
-                                            label: `Bukti ${typeLabel} · ${expense.recipientName} (${index + 1})`,
-                                          })
-                                        }
-                                      >
-                                        <Eye
-                                          className="size-3.5"
-                                          aria-hidden="true"
-                                        />
-                                        Bukti {index + 1}
-                                      </Button>
-                                    ))}
+                                    {expense.proofUrls.map((url, index) => {
+                                      const assetMeta = parseClientAssetCode(url);
+                                      return (
+                                        <Button
+                                          key={`${url}-${index}`}
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 gap-1.5 px-2.5 text-xs"
+                                          title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                                          onClick={() =>
+                                            setReceiptPreview({
+                                              url,
+                                              label: `Bukti ${typeLabel} · ${expense.recipientName} (${index + 1})`,
+                                            })
+                                          }
+                                        >
+                                          <Eye
+                                            className="size-3.5"
+                                            aria-hidden="true"
+                                          />
+                                          Bukti {index + 1}
+                                          {assetMeta && (
+                                            <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                                              {assetMeta.assetCode}
+                                            </span>
+                                          )}
+                                        </Button>
+                                      );
+                                    })}
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right whitespace-nowrap">
@@ -3467,6 +3511,14 @@ export default function FinanceHub({
                                 aria-hidden="true"
                               />
                               Bukti Transfer Pencairan
+                              {(() => {
+                                const assetMeta = parseClientAssetCode(request.transferProofUrl);
+                                return assetMeta ? (
+                                  <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] font-semibold">
+                                    {assetMeta.assetCode}
+                                  </span>
+                                ) : null;
+                              })()}
                             </a>
                           </Button>
                         </div>
@@ -3753,6 +3805,7 @@ export default function FinanceHub({
           setSelection(null);
           setSelectedTicketPoId("");
           setReceiptUrl([]);
+          setProofDocType(null);
           setPaymentAmount("");
           setPaymentType(PaymentType.FULL_PAYMENT);
           setMessage("");
@@ -3801,6 +3854,7 @@ export default function FinanceHub({
                 setSelection(null);
                 setSelectedTicketPoId("");
                 setReceiptUrl([]);
+                setProofDocType(null);
                 setPaymentAmount("");
                 setPaymentType(PaymentType.FULL_PAYMENT);
                 setMessage("");
@@ -3828,6 +3882,7 @@ export default function FinanceHub({
                 setSelection(null);
                 setSelectedTicketPoId("");
                 setReceiptUrl([]);
+                setProofDocType(null);
                 setPaymentAmount("");
                 setPaymentType(PaymentType.FULL_PAYMENT);
                 setMessage("");
@@ -3882,6 +3937,16 @@ export default function FinanceHub({
                 >
                   <ExternalLink className="size-3.5" aria-hidden="true" />
                   Lihat Invoice / Bon Vendor
+                  {(() => {
+                    const assetMeta = parseClientAssetCode(
+                      activeStandaloneOrder.vendorInvoiceUrl,
+                    );
+                    return assetMeta ? (
+                      <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] font-semibold">
+                        {assetMeta.assetCode}
+                      </span>
+                    ) : null;
+                  })()}
                 </a>
               </Button>
             </div>
@@ -4001,6 +4066,26 @@ export default function FinanceHub({
                   disabled={isPending}
                 />
                 <div className="space-y-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="standalone-po-doc-kind">Jenis Dokumen Bukti</Label>
+                    <Select
+                      value={proofDocType ?? "BKT"}
+                      onValueChange={(value) =>
+                        setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                      }
+                      disabled={isPending}
+                    >
+                      <SelectTrigger id="standalone-po-doc-kind">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                        <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                        <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                        <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Label>Bukti pembayaran</Label>
                   <FinancePaymentProofUpload
                     value={receiptUrl}
@@ -4122,6 +4207,16 @@ export default function FinanceHub({
                     >
                       <ExternalLink className="size-3.5" aria-hidden="true" />
                       Lihat Invoice / Bon Faktur
+                      {(() => {
+                        const assetMeta = parseClientAssetCode(
+                          activeDirectPurchase.vendorInvoiceUrl,
+                        );
+                        return assetMeta ? (
+                          <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10px] font-semibold">
+                            {assetMeta.assetCode}
+                          </span>
+                        ) : null;
+                      })()}
                     </a>
                   </Button>
                 </div>
@@ -4396,6 +4491,35 @@ export default function FinanceHub({
                       disabled={isPending}
                     />
                     <div className="space-y-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="direct-purchase-proof-doc-kind">
+                          Jenis Dokumen Bukti
+                        </Label>
+                        <Select
+                          value={
+                            proofDocType ??
+                            (directPurchasePaymentMethods[
+                              activeDirectPurchase.id
+                            ] === POPaymentMethod.CASH
+                              ? "KWT"
+                              : "BKT")
+                          }
+                          onValueChange={(value) =>
+                            setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                          }
+                          disabled={isPending}
+                        >
+                          <SelectTrigger id="direct-purchase-proof-doc-kind">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                            <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                            <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                            <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <Label>Bukti pembayaran</Label>
                       <FinancePaymentProofUpload
                         value={receiptUrl}
@@ -4904,6 +5028,36 @@ export default function FinanceHub({
                         disabled={isPending}
                       />
                       <div className="space-y-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="ticket-payment-doc-kind">
+                            Jenis Dokumen Bukti
+                          </Label>
+                          <Select
+                            value={
+                              proofDocType ??
+                              (activeTicket.requestCategory ===
+                                TicketRequestCategory.APH &&
+                              activeTicket.requestPaymentMethod ===
+                                POPaymentMethod.CASH
+                                ? "KWT"
+                                : "BKT")
+                            }
+                            onValueChange={(value) =>
+                              setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                            }
+                            disabled={isPending}
+                          >
+                            <SelectTrigger id="ticket-payment-doc-kind">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                              <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                              <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                              <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Label>
                           {activeTicket.requestCategory ===
                             TicketRequestCategory.APH &&

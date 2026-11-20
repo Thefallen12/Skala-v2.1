@@ -1,7 +1,12 @@
 import { PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER } from "@/lib/purchase-order-invoice-config";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import { isCloudinaryPrivateTicketReceiptPdf } from "@/lib/cloudinary-private-pdfs";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 
 export function isPurchaseOrderInvoiceUrl(url: string): boolean {
+  if (isCloudinaryPrivateTicketReceiptPdf(url)) return true;
+  if (extractGoogleDriveFileId(url)) return true;
+  if (/^\/api\/tickets\/receipts\/[^/?#]+(?:\?[^#]*)?$/i.test(url)) return true;
   if (
     url.startsWith(`/uploads/${PURCHASE_ORDER_INVOICE_CLOUDINARY_FOLDER}/`) &&
     /\.(pdf|jpe?g|png|webp)$/i.test(url)

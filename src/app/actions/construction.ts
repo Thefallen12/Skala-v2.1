@@ -40,8 +40,10 @@ import {
 import { nextDocumentNumber } from "@/lib/documents/numbering";
 import {
   BlueprintFileValidationError,
+  removeBlueprintFile,
   saveBlueprintFile,
 } from "@/lib/blueprint-files";
+import { normalizeFinanceAssetKind } from "@/lib/asset-codes";
 import {
   removeTicketReceipt,
   saveTicketReceipt,
@@ -142,7 +144,13 @@ export async function createBlueprint(
 
   let fileUrl: string | null = null;
   try {
-    fileUrl = await saveBlueprintFile(parsed.data.file);
+    fileUrl = await saveBlueprintFile(parsed.data.file, {
+      projectId,
+      kind: "DRW",
+      docType: parsed.data.category,
+      entityType: "Blueprint",
+      uploadedById: session.user.id,
+    });
     const result = await prisma.$transaction(async (transaction) => {
       const publicCode = await generateAvailablePublicCode(transaction);
       await transaction.blueprint.create({
@@ -179,6 +187,13 @@ export async function createBlueprint(
       publicCode: result,
     };
   } catch (error) {
+    if (fileUrl) {
+      try {
+        await removeBlueprintFile(fileUrl);
+      } catch (cleanupError) {
+        console.error("Failed to remove unattached blueprint file:", cleanupError);
+      }
+    }
     console.error("Blueprint upload failed:", error);
     return failure(
       error instanceof BlueprintFileValidationError
@@ -876,6 +891,7 @@ export async function paySubkonTermyn(
   id: string,
   file: File,
   financeAccountId: string,
+  proofDocType?: string,
 ): Promise<ConstructionActionResult> {
   const session = await auth();
   if (!session?.user?.id) return failure("Silakan masuk untuk memproses pembayaran termin.");
@@ -885,9 +901,33 @@ export async function paySubkonTermyn(
   if (!validId(id) || !validId(financeAccountId)) {
     return failure("Data termin atau buku kas/bank tidak valid.");
   }
+  let termynProjectId: string | null = null;
+  try {
+    await connectToMongoDB();
+    const existingTermyn = await SubkonTermyn.findById(id)
+      .select({ subkonContractId: 1 })
+      .lean();
+    if (existingTermyn?.subkonContractId) {
+      const parentContract = await SubkonContract.findById(
+        existingTermyn.subkonContractId,
+      )
+        .select({ projectId: 1 })
+        .lean();
+      termynProjectId = parentContract?.projectId?.trim() || null;
+    }
+  } catch {
+    termynProjectId = null;
+  }
   let proofUrl: string;
   try {
-    proofUrl = await saveTicketReceipt(file);
+    proofUrl = await saveTicketReceipt(file, {
+      projectId: termynProjectId,
+      kind: normalizeFinanceAssetKind(proofDocType, "BKT"),
+      docType: "TERMYN_SUBKON",
+      entityType: "SubkonTermyn",
+      entityId: id,
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     return failure(error instanceof Error ? error.message : "Bukti pembayaran tidak valid.");
   }
@@ -1423,6 +1463,7 @@ export async function releaseSubkonRetention(
   contractId: string,
   file: File,
   financeAccountId: string,
+  proofDocType?: string,
 ): Promise<ConstructionActionResult> {
   const session = await auth();
   if (!session?.user?.id) return failure("Silakan masuk untuk mencairkan retensi.");
@@ -1479,7 +1520,14 @@ export async function releaseSubkonRetention(
   }
   let proofUrl: string;
   try {
-    proofUrl = await saveTicketReceipt(file);
+    proofUrl = await saveTicketReceipt(file, {
+      projectId: contract.projectId,
+      kind: normalizeFinanceAssetKind(proofDocType, "BKT"),
+      docType: "RETENSI_SUBKON",
+      entityType: "SubkonContract",
+      entityId: contractId,
+      uploadedById: session.user.id,
+    });
   } catch (error) {
     return failure(error instanceof Error ? error.message : "Bukti transfer tidak valid.");
   }

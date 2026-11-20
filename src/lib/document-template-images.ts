@@ -4,6 +4,8 @@ import {
   getCloudinaryPublicId,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
+import type { AssetUploadContext } from "@/lib/file-storage";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import {
   PrivatePhotoValidationError,
   readPrivatePhoto,
@@ -16,12 +18,16 @@ const imageDirectory = process.env.DOCUMENT_TEMPLATE_IMAGE_UPLOAD_DIR
   ? resolve(process.env.DOCUMENT_TEMPLATE_IMAGE_UPLOAD_DIR)
   : join(process.cwd(), ".private-data", "document-template-images");
 
-export async function saveDocumentTemplateImage(file: File): Promise<string> {
+export async function saveDocumentTemplateImage(
+  file: File,
+  context?: AssetUploadContext,
+): Promise<string> {
   try {
     const image = await uploadCloudinaryPhoto(
       file,
       DOCUMENT_TEMPLATE_IMAGE_CLOUDINARY_FOLDER,
       MAX_IMAGE_BYTES,
+      { ...context, kind: "TPL", fallbackScope: context?.fallbackScope ?? "TEMPLATE" },
     );
     return image.secureUrl;
   } catch (error) {
@@ -37,6 +43,7 @@ export async function readDocumentTemplateImage(fileName: string) {
 }
 
 export function isDocumentTemplateCloudinaryImageUrl(value: string): boolean {
+  if (extractGoogleDriveFileId(value)) return true;
   const cloudName = getCloudinaryCredentials()?.cloudName;
   const publicId = getCloudinaryPublicId(value);
   if (!cloudName || !publicId) return false;

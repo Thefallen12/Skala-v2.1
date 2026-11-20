@@ -19,13 +19,14 @@ export async function GET(
     select: {
       dailyReport: {
         select: {
-          project: { select: { fieldPicId: true } },
+          project: { select: { fieldPicId: true, isDeleted: true } },
         },
       },
     },
   });
   if (
     !photoRecord ||
+    photoRecord.dailyReport.project.isDeleted ||
     !canAccessProject(
       session.user.role,
       session.user.id,

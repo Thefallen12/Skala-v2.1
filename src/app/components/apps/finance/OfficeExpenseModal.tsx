@@ -108,10 +108,12 @@ export default function OfficeExpenseModal({
   });
 
   const [prevOpen, setPrevOpen] = useState(false);
+  const [proofDocType, setProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV" | null>(null);
 
   if (open && !prevOpen) {
     setPrevOpen(true);
     setProofs([]);
+    setProofDocType(null);
     setProofError("");
     setMessage("");
     setIsError(false);
@@ -142,6 +144,13 @@ export default function OfficeExpenseModal({
     control: form.control,
     name: "paymentMethod",
   });
+  const effectiveProofDocType =
+    proofDocType ??
+    (paymentMethod === "CASH"
+      ? "KWT"
+      : expenseType === "REIMBURSEMENT"
+        ? "BON"
+        : "BKT");
   const recipientId = useWatch({ control: form.control, name: "recipientId" });
   const accountId = useWatch({ control: form.control, name: "accountId" });
   const transactionDate = useWatch({
@@ -205,6 +214,7 @@ export default function OfficeExpenseModal({
         ...values,
         proofFiles: proofs.map((proof) => proof.file),
         transactionDate: values.transactionDate,
+        proofDocType: effectiveProofDocType,
       } satisfies OfficeExpenseInput);
       setMessage(result.message);
       setIsError(!result.success);
@@ -468,6 +478,26 @@ export default function OfficeExpenseModal({
           </div>
 
           <div className="space-y-2">
+            <div className="space-y-1.5">
+              <Label htmlFor={`${formId}-doc-kind`}>Jenis Dokumen Bukti</Label>
+              <Select
+                value={effectiveProofDocType}
+                onValueChange={(value) =>
+                  setProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                }
+                disabled={isPending}
+              >
+                <SelectTrigger id={`${formId}-doc-kind`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                  <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                  <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                  <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Label htmlFor={`${formId}-proofs`}>{proofLabel}</Label>
             <FileDropzone
               id={`${formId}-proofs`}

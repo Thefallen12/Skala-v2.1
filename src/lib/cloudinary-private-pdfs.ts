@@ -1,14 +1,20 @@
 import "@/lib/sanitize-env";
-import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
+import type { AssetReferenceIgnoreTarget } from "@/lib/asset-references";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import {
+  type AssetUploadContext,
+  removeManagedAssetIfUnreferenced,
+  uploadManagedAsset,
+} from "@/lib/file-storage";
 import {
   getFinancePaymentProofMimeType,
   hasPdfSignature,
 } from "@/lib/finance-payment-proof-file";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 import { TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER } from "@/lib/ticket-receipt-pdf-config";
 
 const PDF_MIME_TYPE = "application/pdf";
@@ -67,7 +73,7 @@ function parsePrivatePdfUrl(url: string): CloudinaryPrivatePdf | null {
     const assetSegments = segments.slice(assetStart);
     if (assetSegments.length < 2) return null;
     const fileName = assetSegments.at(-1) ?? "";
-    if (!/^[A-Za-z0-9_-]+\.pdf$/i.test(fileName)) return null;
+    if (!/^[A-Za-z0-9_-]+(?:\.pdf)?$/i.test(fileName)) return null;
 
     const publicId = assetSegments.join("/");
     if (!publicId.startsWith(`${TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER}/`)) {
@@ -83,6 +89,7 @@ function parsePrivatePdfUrl(url: string): CloudinaryPrivatePdf | null {
 export async function uploadCloudinaryPrivatePdf(
   file: File,
   maxBytes = 5 * 1024 * 1024,
+  context?: AssetUploadContext,
 ): Promise<string> {
   if (
     !(file instanceof File) ||
@@ -104,51 +111,56 @@ export async function uploadCloudinaryPrivatePdf(
     );
   }
 
-  const credentials = getCloudinaryCredentials();
-  if (!credentials) {
-    const safeFolder = TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER.replace(/[^a-zA-Z0-9/_-]/g, "");
-    const fileName = `${randomUUID()}.pdf`;
-    const relativeDir = path.posix.join("uploads", safeFolder);
-    const absDir = path.join(process.cwd(), "public", ...relativeDir.split("/"));
-    await mkdir(absDir, { recursive: true });
-    await writeFile(path.join(absDir, fileName), bytes, { flag: "wx" });
-    return `/${relativeDir}/${fileName}`;
-  }
-
-  configureCloudinary();
-  return new Promise((resolveUpload, rejectUpload) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        access_mode: "authenticated",
-        folder: TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER,
-        public_id: randomUUID(),
-        use_filename: false,
-        unique_filename: false,
-        overwrite: false,
-        resource_type: "raw",
-        type: "authenticated",
-      },
-      (error, response) => {
-        if (error) {
-          rejectUpload(error);
-          return;
-        }
-        if (
-          !response?.secure_url ||
-          !response.public_id ||
-          response.resource_type !== "raw" ||
-          response.type !== "authenticated"
-        ) {
-          rejectUpload(
-            new Error("Cloudinary tidak mengembalikan aset PDF privat yang valid."),
-          );
-          return;
-        }
-        resolveUpload(response.secure_url);
-      },
-    );
-    Readable.from([bytes]).pipe(stream);
+  const uploaded = await uploadManagedAsset({
+    bytes,
+    mimeType: PDF_MIME_TYPE,
+    extension: "pdf",
+    originalFilename: file.name,
+    baseFolder: TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER,
+    defaultKind: context?.kind ?? "BON",
+    context,
+    cloudinaryUploader: ({ folder: targetFolder, publicId }) => {
+      configureCloudinary();
+      return new Promise((resolveUpload, rejectUpload) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            access_mode: "authenticated",
+            folder: targetFolder,
+            public_id: `${publicId}.pdf`,
+            use_filename: false,
+            unique_filename: false,
+            overwrite: false,
+            resource_type: "raw",
+            type: "authenticated",
+          },
+          (error, response) => {
+            if (error) {
+              rejectUpload(error);
+              return;
+            }
+            if (
+              !response?.secure_url ||
+              !response.public_id ||
+              response.resource_type !== "raw" ||
+              response.type !== "authenticated"
+            ) {
+              rejectUpload(
+                new Error("Cloudinary tidak mengembalikan aset PDF privat yang valid."),
+              );
+              return;
+            }
+            resolveUpload({
+              secureUrl: response.secure_url,
+              publicId: response.public_id,
+            });
+          },
+        );
+        Readable.from([bytes]).pipe(stream);
+      });
+    },
   });
+
+  return uploaded.secureUrl;
 }
 
 export function isCloudinaryPrivateTicketReceiptPdf(url: string): boolean {
@@ -189,7 +201,10 @@ export function createCloudinaryPrivatePdfDownloadUrl(
   });
 }
 
-export async function removeCloudinaryPrivatePdf(url: string): Promise<boolean> {
+export async function removeCloudinaryPrivatePdf(
+  url: string,
+  options?: { ignore?: AssetReferenceIgnoreTarget },
+): Promise<boolean> {
   if (url.startsWith("/uploads/")) {
     const prefix = `/uploads/${TICKET_RECEIPT_PDF_CLOUDINARY_FOLDER}/`;
     if (!url.startsWith(prefix)) return false;
@@ -208,17 +223,34 @@ export async function removeCloudinaryPrivatePdf(url: string): Promise<boolean> 
     await rm(/* turbopackIgnore: true */ localPath, { force: true });
     return true;
   }
+
+  if (extractGoogleDriveFileId(url)) {
+    const result = await removeManagedAssetIfUnreferenced({
+      url,
+      ignore: options?.ignore,
+    });
+    return result.deleted || result.skippedReason === "referenced_elsewhere";
+  }
+
   const asset = parsePrivatePdfUrl(url);
   if (!asset) return false;
 
-  configureCloudinary();
-  const result = await cloudinary.uploader.destroy(asset.publicId, {
-    invalidate: true,
-    resource_type: "raw",
-    type: "authenticated",
+  const result = await removeManagedAssetIfUnreferenced({
+    url,
+    publicId: asset.publicId,
+    ignore: options?.ignore,
+    cloudinaryRemover: async (_targetUrl, targetPublicId) => {
+      if (!targetPublicId) return;
+      configureCloudinary();
+      const destroyRes = await cloudinary.uploader.destroy(targetPublicId, {
+        invalidate: true,
+        resource_type: "raw",
+        type: "authenticated",
+      });
+      if (destroyRes.result !== "ok" && destroyRes.result !== "not found") {
+        throw new Error(`Cloudinary PDF deletion failed: ${destroyRes.result}`);
+      }
+    },
   });
-  if (result.result !== "ok" && result.result !== "not found") {
-    throw new Error(`Cloudinary PDF deletion failed: ${result.result}`);
-  }
-  return true;
+  return result.deleted || result.skippedReason === "referenced_elsewhere";
 }

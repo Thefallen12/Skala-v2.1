@@ -229,31 +229,76 @@ const BlogPost: BlogPostType[] = [
   },
 ]
 
+import { auth } from '@/../auth'
+
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ status: 401, msg: 'Unauthorized' }, { status: 401 })
+    }
     return NextResponse.json({ status: 200, data: BlogPost, msg: 'success' })
-  } catch (error) {
-    return NextResponse.json({ status: 400, msg: 'something went wrong' })
+  } catch {
+    return NextResponse.json({ status: 400, msg: 'something went wrong' }, { status: 400 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { postId, comment } = await req.json()
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ status: 401, msg: 'Unauthorized' }, { status: 401 })
+    }
+    const body = await req.json()
+    const postId = typeof body?.postId === 'string' ? body.postId.trim() : ''
+    const comment = body?.comment
+    if (
+      !postId ||
+      !comment ||
+      typeof comment !== 'object' ||
+      typeof comment.comment !== 'string' ||
+      !comment.comment.trim() ||
+      comment.comment.trim().length > 2000
+    ) {
+      return NextResponse.json(
+        { status: 400, msg: 'Invalid postId or comment payload' },
+        { status: 400 },
+      )
+    }
     const postIndex = BlogPost.findIndex((x) => x.id === postId)
+    if (postIndex === -1) {
+      return NextResponse.json(
+        { status: 404, msg: 'Post not found' },
+        { status: 404 },
+      )
+    }
     const post = BlogPost[postIndex]
     const cComments = post.comments || []
-    post.comments = [comment, ...cComments]
+    post.comments = [
+      {
+        ...comment,
+        comment: comment.comment.trim(),
+        time: new Date(),
+        profile: {
+          id: session.user.id,
+          name: session.user.name ?? 'User',
+          avatar:
+            typeof comment?.profile?.avatar === 'string'
+              ? comment.profile.avatar
+              : '/images/profile/user-1.jpg',
+        },
+      },
+      ...cComments,
+    ]
     return NextResponse.json({
       status: 200,
       data: { posts: [...BlogPost] },
       msg: 'success',
     })
-  } catch (error) {
-    return NextResponse.json({
-      status: 400,
-      msg: 'something went wrong',
-      error,
-    })
+  } catch {
+    return NextResponse.json(
+      { status: 400, msg: 'something went wrong' },
+      { status: 400 },
+    )
   }
 }

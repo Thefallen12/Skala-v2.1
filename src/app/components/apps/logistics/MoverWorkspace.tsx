@@ -31,7 +31,7 @@ import {
   VEHICLE_FUEL_PRICE_PER_LITER,
 } from "@/lib/vehicle-fuel";
 import type { VehicleFuelRequestView } from "@/lib/vehicle-fuel-types";
-import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import { parseClientAssetCode, withLocalPhotoPreview } from "@/lib/photo-urls";
 import {
   compressFieldImageFile,
   compressFieldImageFiles,
@@ -1507,19 +1507,28 @@ function MoverDoActionBody({
             Bukti Serah Terima ({order.receiptPhotoUrls.length})
           </p>
           <div className="flex flex-wrap gap-2">
-            {order.receiptPhotoUrls.map((url, idx) => (
-              <Button key={`${url}-${idx}`} size="sm" variant="outline" asChild>
-                <a
-                  href={withLocalPhotoPreview(url)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <ImageIcon className="size-3.5" aria-hidden="true" />
-                  Foto #{idx + 1}
-                  <ExternalLink className="size-3" aria-hidden="true" />
-                </a>
-              </Button>
-            ))}
+            {order.receiptPhotoUrls.map((url, idx) => {
+              const assetMeta = parseClientAssetCode(url);
+              return (
+                <Button key={`${url}-${idx}`} size="sm" variant="outline" asChild>
+                  <a
+                    href={withLocalPhotoPreview(url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={assetMeta ? `${assetMeta.kindLabel} (${assetMeta.assetCode})` : undefined}
+                  >
+                    <ImageIcon className="size-3.5" aria-hidden="true" />
+                    Foto #{idx + 1}
+                    {assetMeta && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80">
+                        {assetMeta.assetCode}
+                      </span>
+                    )}
+                    <ExternalLink className="size-3" aria-hidden="true" />
+                  </a>
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}

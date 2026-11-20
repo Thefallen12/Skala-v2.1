@@ -131,10 +131,19 @@ export interface PrintViewGroup {
   items: PrintViewItem[];
 }
 
+export interface ProjectPrintPhotoEntry {
+  url: string;
+  fileUrl?: string | null;
+  assetCode?: string | null;
+  projectId?: string | null;
+}
+
 export interface ProjectPrintReportEntry {
   reportDate: string;
   progress?: number | null;
   workSummary?: string | null;
+  photoUrls?: string[];
+  progressPhotos?: ProjectPrintPhotoEntry[];
 }
 
 export interface ProjectPrintWorkPointEntry {
@@ -147,6 +156,8 @@ export interface ProjectPrintWorkPointEntry {
   progressReports?: Array<{
     reportDate: string;
     progress: number;
+    photoUrls?: string[];
+    photos?: ProjectPrintPhotoEntry[];
   }>;
 }
 

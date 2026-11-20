@@ -1,8 +1,13 @@
 import { getCloudinaryPublicId } from "@/lib/cloudinary-photos";
 import { REQUEST_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/request-document-config";
 import { getCloudinaryCredentials } from "@/lib/cloudinary-config";
+import { isCloudinaryPrivateTicketReceiptPdf } from "@/lib/cloudinary-private-pdfs";
+import { extractGoogleDriveFileId } from "@/lib/google-drive-storage";
 
 export function isTicketRequestReceiptUrl(url: string): boolean {
+  if (isCloudinaryPrivateTicketReceiptPdf(url)) return true;
+  if (extractGoogleDriveFileId(url)) return true;
+  if (/^\/api\/tickets\/receipts\/[^/?#]+(?:\?[^#]*)?$/i.test(url)) return true;
   if (url.startsWith(`/uploads/${REQUEST_DOCUMENT_CLOUDINARY_FOLDER}/`)) {
     return true;
   }

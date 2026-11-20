@@ -34,6 +34,8 @@ import { CloudinaryPrivatePdfValidationError } from "@/lib/cloudinary-private-pd
 import { isFinanceCashflowProofUrl } from "@/lib/finance-cashflow";
 import { normalizeFinancePaymentProofFile } from "@/lib/finance-payment-proof-file";
 import { isFinancePaymentProofUrl } from "@/lib/finance-payment-proofs";
+import { normalizeFinanceAssetKind, type FinanceDocKind } from "@/lib/asset-codes";
+import { isAssetUrlReferencedInDb } from "@/lib/asset-references";
 import {
   decimalNumberFromScaledInteger,
   decimalStringFromScaledInteger,
@@ -174,6 +176,7 @@ export type RentalPaymentInput = {
   paymentAccountName?: string;
   financeNotes?: string;
   financeAccountId?: string;
+  proofDocType?: FinanceDocKind | string;
 };
 
 export type RentalActionResult = {
@@ -254,18 +257,7 @@ function getRentalExpenseType(
 }
 
 function isAcceptedProofUrl(url: string): boolean {
-  if (isFinanceCashflowProofUrl(url) || isFinancePaymentProofUrl(url)) {
-    return true;
-  }
-  if (url.startsWith("/uploads/") || url.startsWith("/api/")) {
-    return true;
-  }
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
-  } catch {
-    return false;
-  }
+  return isFinanceCashflowProofUrl(url) || isFinancePaymentProofUrl(url);
 }
 
 async function findActiveProject(projectId: string) {
@@ -851,8 +843,19 @@ export async function processRentalPayment(
   let resolvedProofUrl: string | null = null;
 
   try {
+    const mongoose = await connectToMongoDB();
     if (input.proof instanceof File && input.proof.size > 0) {
-      uploadedProofUrl = await uploadCashflowProof(input.proof);
+      const rentalBeforeUpload = await EquipmentRental.findById(input.rentalId)
+        .select({ _id: 1, projectId: 1, sourceTicketId: 1 })
+        .lean();
+      uploadedProofUrl = await uploadCashflowProof(input.proof, {
+        projectId: cleanOptionalText(rentalBeforeUpload?.projectId),
+        kind: normalizeFinanceAssetKind(input.proofDocType, "BKT"),
+        entityType: "EquipmentRental",
+        entityId: input.rentalId,
+        ticketId: cleanOptionalText(rentalBeforeUpload?.sourceTicketId),
+        uploadedById: session.user.id,
+      });
       resolvedProofUrl = uploadedProofUrl;
     } else if (rawUrlInput) {
       if (!isAcceptedProofUrl(rawUrlInput)) {
@@ -865,7 +868,6 @@ export async function processRentalPayment(
       resolvedProofUrl = rawUrlInput;
     }
 
-    const mongoose = await connectToMongoDB();
     await mongoose.connection.transaction(async (mongoSession) => {
       const current = await EquipmentRental.findById(input.rentalId)
         .session(mongoSession)
@@ -1226,6 +1228,8 @@ export async function replaceRentalPaymentProof(
 
   const rawRentalId = formData.get("rentalId");
   const rawProof = formData.get("proof");
+  const rawDocKind = formData.get("docKind") ?? formData.get("proofDocType");
+  const docKindInput = typeof rawDocKind === "string" ? rawDocKind.trim() : "";
   const rentalId =
     typeof rawRentalId === "string" ? rawRentalId.trim() : "";
 
@@ -1257,7 +1261,7 @@ export async function replaceRentalPaymentProof(
     const mongoose = await connectToMongoDB();
 
     const existing = await EquipmentRental.findById(rentalId)
-      .select({ _id: 1, status: 1, paymentStatus: 1 })
+      .select({ _id: 1, status: 1, paymentStatus: 1, projectId: 1, sourceTicketId: 1 })
       .lean();
     if (!existing) {
       return { success: false, message: "Data sewa tidak ditemukan." };
@@ -1272,7 +1276,14 @@ export async function replaceRentalPaymentProof(
       };
     }
 
-    uploadedProofUrl = await uploadCashflowProof(normalizedFile);
+    uploadedProofUrl = await uploadCashflowProof(normalizedFile, {
+      projectId: cleanOptionalText(existing.projectId),
+      kind: normalizeFinanceAssetKind(docKindInput, "BKT"),
+      entityType: "EquipmentRental",
+      entityId: rentalId,
+      ticketId: cleanOptionalText(existing.sourceTicketId),
+      uploadedById: session.user.id,
+    });
     if (!isFinanceCashflowProofUrl(uploadedProofUrl)) {
       throw new Error("URL bukti pembayaran sewa yang diunggah tidak valid.");
     }
@@ -1329,6 +1340,35 @@ export async function replaceRentalPaymentProof(
             { $set: { proofOfTransferUrl: nextProofUrl } },
             { session: mongoSession },
           );
+          await OrderConfirmation.updateMany(
+            { paymentTransactionId },
+            { $set: { proofOfTransferUrl: nextProofUrl } },
+            { session: mongoSession },
+          );
+        }
+
+        const sourceTicketId = cleanOptionalText(current.sourceTicketId);
+        if (sourceTicketId && oldProofUrl) {
+          const linkedTicket = await Ticket.findById(sourceTicketId)
+            .select({ _id: 1, transferReceiptUrl: 1, paymentProofUrl: 1 })
+            .session(mongoSession)
+            .lean();
+          if (linkedTicket) {
+            const ticketSet: Record<string, string> = {};
+            if (linkedTicket.transferReceiptUrl === oldProofUrl) {
+              ticketSet.transferReceiptUrl = nextProofUrl;
+            }
+            if (linkedTicket.paymentProofUrl === oldProofUrl) {
+              ticketSet.paymentProofUrl = nextProofUrl;
+            }
+            if (Object.keys(ticketSet).length > 0) {
+              await Ticket.updateOne(
+                { _id: linkedTicket._id },
+                { $set: ticketSet },
+                { session: mongoSession },
+              );
+            }
+          }
         }
 
         const cashflowOr: Array<Record<string, unknown>> = [
@@ -1355,10 +1395,11 @@ export async function replaceRentalPaymentProof(
       result.oldProofUrl !== nextProofUrl &&
       !isLegacySharedProofUrl(result.oldProofUrl)
     ) {
-      const stillReferenced = await isProofUrlReferencedInDb(
-        result.oldProofUrl,
-      ).catch(() => true);
-      if (!stillReferenced) {
+      const [stillReferencedLocal, stillReferencedDb] = await Promise.all([
+        isProofUrlReferencedInDb(result.oldProofUrl).catch(() => true),
+        isAssetUrlReferencedInDb(result.oldProofUrl).catch(() => true),
+      ]);
+      if (!stillReferencedLocal && !stillReferencedDb) {
         await removeUploadedCashflowProof(result.oldProofUrl).catch(
           () => undefined,
         );

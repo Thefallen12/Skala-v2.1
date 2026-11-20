@@ -40,6 +40,21 @@ import {
   type StoredProjectProgressPhoto,
 } from "@/lib/project-progress-photos";
 import { removeBlueprintFile } from "@/lib/blueprint-files";
+import mongoose from "mongoose";
+import { connectToMongoDBOptional } from "@/lib/mongoose";
+import { parseAssetCode } from "@/lib/asset-codes";
+import {
+  CloudinaryPhotoValidationError,
+  removeCloudinaryPhoto,
+  uploadCloudinaryPhoto,
+} from "@/lib/cloudinary-photos";
+import {
+  CloudinaryRawFileValidationError,
+  removeCloudinaryRawFile,
+  uploadCloudinaryRawFile,
+} from "@/lib/cloudinary-raw-files";
+import { DRAWING_DOCUMENT_CLOUDINARY_FOLDER } from "@/lib/drawing-document-config";
+import type { AssetUploadContext } from "@/lib/file-storage";
 import { getPaidProjectTicketRealization } from "@/lib/project-realization";
 import {
   decimalFromScaledInteger,
@@ -50,6 +65,182 @@ import {
   parseDrtRabWorkbook,
   getStandardAnalysisForWorkItem,
 } from "@/lib/drt-rab-parser";
+
+const PROJECT_DOC_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
+const PROJECT_DOC_RAW_EXTENSIONS = [
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "dwg",
+  "dxf",
+  "ifc",
+  "rvt",
+] as const;
+const MAX_PROJECT_DOCUMENT_BYTES = 25 * 1024 * 1024;
+
+type OfflineSubmitIdempotencyDoc = {
+  key: string;
+  userId: string;
+  action: string;
+  targetId: string;
+  status: "PENDING" | "COMPLETED";
+  createdAt: Date;
+};
+
+const OfflineSubmitIdempotencySchema = new mongoose.Schema<OfflineSubmitIdempotencyDoc>(
+  {
+    key: { type: String, required: true, unique: true, index: true },
+    userId: { type: String, required: true },
+    action: { type: String, required: true },
+    targetId: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ["PENDING", "COMPLETED"],
+      default: "PENDING",
+      required: true,
+    },
+    createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 14 },
+  },
+  { collection: "offline_submit_idempotencies" },
+);
+
+const OfflineSubmitIdempotencyModel =
+  (mongoose.models.OfflineSubmitIdempotency as
+    | mongoose.Model<OfflineSubmitIdempotencyDoc>
+    | undefined) ??
+  mongoose.model<OfflineSubmitIdempotencyDoc>(
+    "OfflineSubmitIdempotency",
+    OfflineSubmitIdempotencySchema,
+  );
+
+function parseClientRequestId(input: FormData): string | null {
+  const raw = input.get("clientRequestId");
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 128) return null;
+  if (!/^[A-Za-z0-9._:-]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+async function claimOfflineSubmitIdempotency(params: {
+  action: string;
+  userId: string;
+  targetId: string;
+  clientRequestId: string | null;
+}): Promise<
+  | { claimedKey: null; duplicate: false; inFlight: false }
+  | { claimedKey: string; duplicate: false; inFlight: false }
+  | { claimedKey: string; duplicate: true; inFlight: boolean }
+> {
+  if (!params.clientRequestId) {
+    return { claimedKey: null, duplicate: false, inFlight: false };
+  }
+  const mongo = await connectToMongoDBOptional();
+  if (!mongo) {
+    return { claimedKey: null, duplicate: false, inFlight: false };
+  }
+
+  const key = `${params.action}:${params.userId}:${params.targetId}:${params.clientRequestId}`;
+  try {
+    await OfflineSubmitIdempotencyModel.create({
+      key,
+      userId: params.userId,
+      action: params.action,
+      targetId: params.targetId,
+      status: "PENDING",
+      createdAt: new Date(),
+    });
+    return { claimedKey: key, duplicate: false, inFlight: false };
+  } catch (error) {
+    const isDuplicateKey =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: unknown }).code === 11000;
+    if (!isDuplicateKey) {
+      return { claimedKey: null, duplicate: false, inFlight: false };
+    }
+
+    const existing = await OfflineSubmitIdempotencyModel.findOne({ key }).lean();
+    if (existing?.status === "COMPLETED") {
+      return { claimedKey: key, duplicate: true, inFlight: false };
+    }
+    if (
+      existing?.status === "PENDING" &&
+      Date.now() - new Date(existing.createdAt).getTime() < 90_000
+    ) {
+      return { claimedKey: key, duplicate: true, inFlight: true };
+    }
+
+    const updated = await OfflineSubmitIdempotencyModel.findOneAndUpdate(
+      { key, status: "PENDING" },
+      { $set: { createdAt: new Date() } },
+      { new: true },
+    ).lean();
+    if (updated) {
+      return { claimedKey: key, duplicate: false, inFlight: false };
+    }
+    return { claimedKey: key, duplicate: true, inFlight: false };
+  }
+}
+
+async function markOfflineSubmitIdempotencyCompleted(
+  claimedKey: string | null,
+): Promise<void> {
+  if (!claimedKey) return;
+  try {
+    await OfflineSubmitIdempotencyModel.updateOne(
+      { key: claimedKey },
+      { $set: { status: "COMPLETED" } },
+    );
+  } catch (error) {
+    console.error("Failed to mark offline submit idempotency completed:", error);
+  }
+}
+
+async function releaseOfflineSubmitIdempotency(
+  claimedKey: string | null,
+): Promise<void> {
+  if (!claimedKey) return;
+  try {
+    await OfflineSubmitIdempotencyModel.deleteOne({
+      key: claimedKey,
+      status: "PENDING",
+    });
+  } catch (error) {
+    console.error("Failed to release offline submit idempotency:", error);
+  }
+}
+
+function buildProjectAssetContext(params: {
+  projectId: string;
+  project?: {
+    title?: string | null;
+    name?: string | null;
+    kelompokTani?: string | null;
+    code?: string | null;
+  } | null;
+  kind: AssetUploadContext["kind"];
+  entityType: string;
+  entityId?: string | null;
+  uploadedById?: string | null;
+}): AssetUploadContext {
+  return {
+    projectId: params.projectId,
+    projectName:
+      params.project?.title ||
+      params.project?.name ||
+      params.project?.kelompokTani ||
+      null,
+    projectCode: params.project?.code ?? null,
+    kind: params.kind,
+    entityType: params.entityType,
+    entityId: params.entityId ?? null,
+    uploadedById: params.uploadedById ?? null,
+  };
+}
 
 export type ProjectFinancialCategory = {
   key: "MATERIAL" | "LABOR" | "TRANSPORT" | "OPERATIONAL";
@@ -687,6 +878,13 @@ export async function deleteProject(
           },
         },
         blueprints: { select: { fileUrl: true } },
+        drawingDocuments: {
+          select: {
+            fileUrl: true,
+            thumbnailUrl: true,
+            logs: { select: { fileUrl: true } },
+          },
+        },
       },
     });
     if (!project) {
@@ -714,11 +912,23 @@ export async function deleteProject(
         ),
       ),
     ];
+    const drawingDocumentUrls = Array.from(
+      new Set(
+        project.drawingDocuments.flatMap((doc) =>
+          [
+            doc.fileUrl,
+            doc.thumbnailUrl,
+            ...doc.logs.map((log) => log.fileUrl),
+          ].filter((url): url is string => typeof url === "string" && url.length > 0),
+        ),
+      ),
+    );
     const fileCleanupResults = await Promise.allSettled([
       ...projectPhotos.map(removeProjectProgressPhoto),
       ...project.blueprints.map((blueprint) =>
         removeBlueprintFile(blueprint.fileUrl),
       ),
+      ...drawingDocumentUrls.map((url) => removeCloudinaryRawFile(url)),
     ]);
     const cleanupErrors = fileCleanupResults.filter(
       (result) => result.status === "rejected",
@@ -1020,7 +1230,17 @@ export async function addProjectWorkPointProgress(
       id: true,
       title: true,
       projectId: true,
-      project: { select: { isDeleted: true, status: true, fieldPicId: true } },
+      project: {
+        select: {
+          isDeleted: true,
+          status: true,
+          fieldPicId: true,
+          title: true,
+          name: true,
+          code: true,
+          kelompokTani: true,
+        },
+      },
     },
   });
   if (!workPoint || workPoint.project.isDeleted) {
@@ -1066,13 +1286,39 @@ export async function addProjectWorkPointProgress(
     };
   }
 
+  const clientRequestId = parseClientRequestId(input);
+  const idempotency = await claimOfflineSubmitIdempotency({
+    action: "addProjectWorkPointProgress",
+    userId: session.user.id,
+    targetId: workPointId,
+    clientRequestId,
+  });
+  if (idempotency.duplicate) {
+    return {
+      success: true,
+      message: idempotency.inFlight
+        ? "Progres titik sedang diproses."
+        : "Progres titik dan foto sudah tersinkronisasi.",
+    };
+  }
+
   const { start: reportDateStart, endExclusive: reportDateEndExclusive } =
     getJakartaDayRange(parsed.data.reportDate);
+  const photoContext = buildProjectAssetContext({
+    projectId: workPoint.projectId,
+    project: workPoint.project,
+    kind: "TTK",
+    entityType: "ProjectWorkPointProgress",
+    entityId: workPointId,
+    uploadedById: session.user.id,
+  });
   const storedPhotos: StoredProjectProgressPhoto[] = [];
   let transactionCommitted = false;
   try {
     for (const photo of photos) {
-      storedPhotos.push(await saveProjectWorkPointPhoto(photo));
+      storedPhotos.push(
+        await saveProjectWorkPointPhoto(photo, undefined, photoContext),
+      );
     }
     await prisma.$transaction(async (transaction) => {
       const existingProgress = await transaction.projectWorkPointProgress.findFirst({
@@ -1106,6 +1352,8 @@ export async function addProjectWorkPointProgress(
             url: photo.url,
             fileUrl: photo.fileUrl,
             publicId: photo.publicId,
+            assetCode: photo.assetCode ?? null,
+            projectId: workPoint.projectId,
           })),
         });
       }
@@ -1175,15 +1423,19 @@ export async function addProjectWorkPointProgress(
             url: photo.url,
             fileUrl: photo.fileUrl,
             publicId: photo.publicId,
+            assetCode: photo.assetCode ?? null,
+            projectId: workPoint.projectId,
           })),
         });
       }
     });
     transactionCommitted = true;
+    await markOfflineSubmitIdempotencyCompleted(idempotency.claimedKey);
     revalidateProjectReportPaths(workPoint.projectId);
     return { success: true, message: "Progres titik dan foto berhasil dikirim." };
   } catch (error) {
     if (!transactionCommitted) {
+      await releaseOfflineSubmitIdempotency(idempotency.claimedKey);
       for (const photo of storedPhotos) {
         try {
           await removeProjectProgressPhoto(photo);
@@ -1765,6 +2017,8 @@ export async function addProjectProgress(
     };
   }
 
+  const clientRequestId = parseClientRequestId(input);
+  let claimedIdempotencyKey: string | null = null;
   const storedPhotos: StoredProjectProgressPhoto[] = [];
   let transactionCommitted = false;
   try {
@@ -1779,6 +2033,9 @@ export async function addProjectProgress(
       select: {
         id: true,
         title: true,
+        name: true,
+        code: true,
+        kelompokTani: true,
         jenisPekerjaan: true,
         fieldPicId: true,
         progress: true,
@@ -1832,8 +2089,32 @@ export async function addProjectProgress(
       };
     }
 
+    const idempotency = await claimOfflineSubmitIdempotency({
+      action: "addProjectProgress",
+      userId: session.user.id,
+      targetId: projectId,
+      clientRequestId,
+    });
+    claimedIdempotencyKey = idempotency.claimedKey;
+    if (idempotency.duplicate) {
+      return {
+        success: true,
+        message: idempotency.inFlight
+          ? "Laporan harian sedang diproses."
+          : "Laporan harian sudah tersinkronisasi.",
+      };
+    }
+
+    const photoContext = buildProjectAssetContext({
+      projectId: project.id,
+      project,
+      kind: "FTO",
+      entityType: "DailyReport",
+      entityId: project.id,
+      uploadedById: session.user.id,
+    });
     for (const photo of photos) {
-      storedPhotos.push(await saveProjectProgressPhoto(photo));
+      storedPhotos.push(await saveProjectProgressPhoto(photo, photoContext));
     }
 
     await prisma.$transaction(async (transaction) => {
@@ -2117,6 +2398,8 @@ export async function addProjectProgress(
             url: photo.url,
             fileUrl: photo.fileUrl,
             publicId: photo.publicId,
+            assetCode: photo.assetCode ?? null,
+            projectId: project.id,
           })),
         });
       }
@@ -2150,10 +2433,12 @@ export async function addProjectProgress(
       });
     });
     transactionCommitted = true;
+    await markOfflineSubmitIdempotencyCompleted(claimedIdempotencyKey);
     revalidateProjectReportPaths(projectId);
     return { success: true, message: "Progres proyek berhasil diperbarui." };
   } catch (error) {
     if (!transactionCommitted) {
+      await releaseOfflineSubmitIdempotency(claimedIdempotencyKey);
       for (const photo of storedPhotos) {
         try {
           await removeProjectProgressPhoto(photo);
@@ -2514,11 +2799,23 @@ export async function saveProjectRab(
         keptIds.add(created.id);
       }
 
+      let obsoleteWorkPointPhotos: Array<{
+        url: string;
+        publicId: string | null;
+      }> = [];
       if (input.replaceExisting) {
         const obsoleteIds = existingPoints
           .map((pt) => pt.id)
           .filter((id) => !keptIds.has(id));
         if (obsoleteIds.length > 0) {
+          const orphanRows = await tx.projectWorkPointProgressPhoto.findMany({
+            where: { progressReport: { workPointId: { in: obsoleteIds } } },
+            select: { url: true, fileUrl: true, publicId: true },
+          });
+          obsoleteWorkPointPhotos = orphanRows.map((row) => ({
+            url: row.fileUrl ?? row.url,
+            publicId: row.publicId,
+          }));
           await tx.projectWorkPoint.deleteMany({
             where: { id: { in: obsoleteIds } },
           });
@@ -2548,6 +2845,13 @@ export async function saveProjectRab(
           ...(lastEndDate ? { endDate: parseWibDateInput(lastEndDate) } : {}),
         },
       });
+      return obsoleteWorkPointPhotos;
+    }).then(async (obsoleteWorkPointPhotos) => {
+      if (obsoleteWorkPointPhotos.length > 0) {
+        await Promise.allSettled(
+          obsoleteWorkPointPhotos.map((photo) => removeProjectProgressPhoto(photo)),
+        );
+      }
     });
 
     await activateProjectIfReady(projectId);
@@ -3067,7 +3371,16 @@ export async function uploadProjectScheduleTaskPhoto(
         workPoint: {
           select: {
             projectId: true,
-            project: { select: { isDeleted: true, fieldPicId: true } },
+            project: {
+              select: {
+                isDeleted: true,
+                fieldPicId: true,
+                title: true,
+                name: true,
+                code: true,
+                kelompokTani: true,
+              },
+            },
           },
         },
       },
@@ -3104,9 +3417,18 @@ export async function uploadProjectScheduleTaskPhoto(
       };
     }
 
+    const photoContext = buildProjectAssetContext({
+      projectId: report.workPoint.projectId,
+      project: report.workPoint.project,
+      kind: "TTK",
+      entityType: "ProjectWorkPointProgress",
+      entityId: report.id,
+      uploadedById: session.user.id,
+    });
     const photoToStore = await saveProjectWorkPointPhoto(
       photo,
       MAX_SCHEDULE_PHOTO_BYTES,
+      photoContext,
     );
     storedPhoto = photoToStore;
     await prisma.$transaction(async (transaction) => {
@@ -3116,6 +3438,8 @@ export async function uploadProjectScheduleTaskPhoto(
           url: photoToStore.url,
           fileUrl: photoToStore.fileUrl,
           publicId: photoToStore.publicId,
+          assetCode: photoToStore.assetCode ?? null,
+          projectId: report.workPoint.projectId,
         },
       });
       await transaction.projectProgressPhoto.create({
@@ -3124,6 +3448,8 @@ export async function uploadProjectScheduleTaskPhoto(
           url: photoToStore.url,
           fileUrl: photoToStore.fileUrl,
           publicId: photoToStore.publicId,
+          assetCode: photoToStore.assetCode ?? null,
+          projectId: report.workPoint.projectId,
         },
       });
     });
@@ -3191,7 +3517,11 @@ export async function deleteProjectScheduleTask(
       };
     }
 
-    await prisma.$transaction(async (tx) => {
+    const workPointPhotosToClean = await prisma.$transaction(async (tx) => {
+      const photoRows = await tx.projectWorkPointProgressPhoto.findMany({
+        where: { progressReport: { workPointId } },
+        select: { url: true, fileUrl: true, publicId: true },
+      });
       await tx.projectWorkPoint.delete({
         where: { id: workPointId },
       });
@@ -3207,7 +3537,17 @@ export async function deleteProjectScheduleTask(
         where: { id: wp.projectId },
         data: { progress: calculateWeightedProjectProgress(remainingPoints) },
       });
+      return photoRows.map((row) => ({
+        url: row.fileUrl ?? row.url,
+        publicId: row.publicId,
+      }));
     });
+
+    if (workPointPhotosToClean.length > 0) {
+      await Promise.allSettled(
+        workPointPhotosToClean.map((photo) => removeProjectProgressPhoto(photo)),
+      );
+    }
 
     revalidateProjectReportPaths(wp.projectId);
     return { success: true, message: "Task berhasil dihapus." };
@@ -3271,12 +3611,7 @@ export async function saveProjectMilestone(
 
 export async function uploadProjectDocument(
   projectId: string,
-  input: {
-    title: string;
-    category: string;
-    fileUrl?: string;
-    notes?: string;
-  },
+  input: FormData,
 ): Promise<ProjectMutationResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -3288,19 +3623,61 @@ export async function uploadProjectDocument(
       message: "Role Anda tidak diizinkan mengunggah dokumen proyek.",
     };
   }
-  if (
-    typeof projectId !== "string" ||
-    projectId.length < 1 ||
-    projectId.length > 100 ||
-    !input.title.trim()
-  ) {
-    return { success: false, message: "Data dokumen tidak lengkap." };
+  if (typeof projectId !== "string" || projectId.length < 1 || projectId.length > 100) {
+    return { success: false, message: "Project yang dipilih tidak valid." };
+  }
+  if (!(input instanceof FormData)) {
+    return { success: false, message: "Data dokumen tidak valid." };
   }
 
+  const rawTitle = input.get("title");
+  const title = typeof rawTitle === "string" ? rawTitle.trim() : "";
+  const rawCategory = input.get("category");
+  const category =
+    typeof rawCategory === "string" && rawCategory.trim()
+      ? rawCategory.trim().slice(0, 80)
+      : "Kontrak";
+  const rawNotes = input.get("notes");
+  const notes = typeof rawNotes === "string" ? rawNotes.trim().slice(0, 1000) : "";
+  const fileEntry = input.get("file");
+
+  if (!title || title.length > 180) {
+    return { success: false, message: "Judul dokumen wajib diisi (maksimal 180 karakter)." };
+  }
+  if (!(fileEntry instanceof File) || fileEntry.size <= 0) {
+    return { success: false, message: "Pilih file dokumen untuk diunggah." };
+  }
+  if (fileEntry.size > MAX_PROJECT_DOCUMENT_BYTES) {
+    return { success: false, message: "Ukuran file dokumen maksimal 25 MB." };
+  }
+
+  const extension = fileEntry.name.split(".").at(-1)?.toLowerCase() ?? "";
+  const isImageDocument = (PROJECT_DOC_IMAGE_EXTENSIONS as readonly string[]).includes(
+    extension,
+  );
+  const isRawDocument = (PROJECT_DOC_RAW_EXTENSIONS as readonly string[]).includes(
+    extension,
+  );
+  if (!isImageDocument && !isRawDocument) {
+    return {
+      success: false,
+      message: "Format file tidak didukung. Gunakan PDF, Office (DOC/XLS), CAD (DWG/DXF/IFC/RVT), atau gambar.",
+    };
+  }
+
+  let uploadedFileUrl = "";
+  let uploadedAssetCode: string | null = null;
   try {
     const project = await prisma.project.findFirst({
       where: { id: projectId, isDeleted: false },
-      select: { id: true, fieldPicId: true },
+      select: {
+        id: true,
+        fieldPicId: true,
+        title: true,
+        name: true,
+        code: true,
+        kelompokTani: true,
+      },
     });
     if (!project) {
       return { success: false, message: "Proyek tidak ditemukan atau sudah diarsipkan." };
@@ -3315,21 +3692,79 @@ export async function uploadProjectDocument(
       };
     }
 
-    const drawingCode = `DOC-${Date.now().toString().slice(-6)}`;
+    const assetContext = buildProjectAssetContext({
+      projectId,
+      project,
+      kind: "DRW",
+      entityType: "DrawingDocument",
+      entityId: projectId,
+      uploadedById: session.user.id,
+    });
+
+    if (isImageDocument) {
+      const uploadedImage = await uploadCloudinaryPhoto(
+        fileEntry,
+        DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
+        MAX_PROJECT_DOCUMENT_BYTES,
+        assetContext,
+      );
+      uploadedFileUrl = uploadedImage.secureUrl;
+      uploadedAssetCode = uploadedImage.assetCode ?? null;
+    } else {
+      uploadedFileUrl = await uploadCloudinaryRawFile(
+        fileEntry,
+        DRAWING_DOCUMENT_CLOUDINARY_FOLDER,
+        PROJECT_DOC_RAW_EXTENSIONS,
+        MAX_PROJECT_DOCUMENT_BYTES,
+        assetContext,
+      );
+      uploadedAssetCode = parseAssetCode(uploadedFileUrl)?.assetCode ?? null;
+    }
+
+    const fallbackCode = `DOC-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const drawingCode = uploadedAssetCode ?? fallbackCode;
+
     await prisma.drawingDocument.create({
       data: {
         projectId,
-        title: input.title.trim(),
-        category: input.category || "Kontrak",
-        fileUrl: input.fileUrl || "/documents/sample.pdf",
+        title,
+        category,
+        fileUrl: uploadedFileUrl,
+        thumbnailUrl: isImageDocument ? uploadedFileUrl : null,
         uploadedById: session.user.id,
         drawingCode,
+        logs: {
+          create: {
+            action: "UPLOADED",
+            notes: notes || null,
+            version: 0,
+            fileUrl: uploadedFileUrl,
+            createdById: session.user.id,
+          },
+        },
       },
     });
 
     revalidatePath(`/apps/projects/${projectId}`);
-    return { success: true, message: "Dokumen berhasil disimpan." };
+    return { success: true, message: "Dokumen berhasil diunggah." };
   } catch (error) {
+    if (uploadedFileUrl) {
+      try {
+        if (isImageDocument) {
+          await removeCloudinaryPhoto(uploadedFileUrl);
+        } else {
+          await removeCloudinaryRawFile(uploadedFileUrl);
+        }
+      } catch (cleanupError) {
+        console.error("Removing orphaned project document file failed:", cleanupError);
+      }
+    }
+    if (
+      error instanceof CloudinaryPhotoValidationError ||
+      error instanceof CloudinaryRawFileValidationError
+    ) {
+      return { success: false, message: error.message };
+    }
     console.error("Upload project document error:", error);
     return { success: false, message: "Gagal menyimpan dokumen." };
   }

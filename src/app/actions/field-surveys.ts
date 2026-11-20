@@ -14,6 +14,7 @@ import { auth } from "../../../auth";
 import { z } from "zod";
 import {
   CloudinaryPhotoValidationError,
+  isCloudinaryPhotoUrl,
   removeCloudinaryPhoto,
   uploadCloudinaryPhoto,
 } from "@/lib/cloudinary-photos";
@@ -32,6 +33,15 @@ const restrictedProjectRoles: UserRole[] = [
   UserRole.KOORDINATOR,
   UserRole.FIELD_TEAM,
 ];
+
+const validatedSurveyPhotoUrlSchema = z
+  .string()
+  .trim()
+  .min(1, "URL foto dokumentasi tidak valid.")
+  .refine(
+    isCloudinaryPhotoUrl,
+    "URL dokumentasi harus berasal dari penyimpanan aplikasi yang valid.",
+  );
 
 const saveSurveySchema = z.object({
   projectId: z.string().trim().max(100).nullable().optional(),
@@ -53,19 +63,9 @@ const saveSurveySchema = z.object({
   vegetationType: z.string().trim().max(120).optional(),
   topography: z.string().trim().max(120).optional(),
   landOwnership: z.string().trim().max(120).optional(),
-  documentationUrls: z
-    .array(
-      z
-        .string()
-        .url()
-        .refine((value) => {
-          return value.startsWith("https://res.cloudinary.com/");
-        }, "URL dokumentasi harus berasal dari Cloudinary."),
-    )
-    .max(10)
-    .optional(),
+  documentationUrls: z.array(validatedSurveyPhotoUrlSchema).max(10).optional(),
   documentationPhotos: z.array(z.object({
-    url: z.string().url(),
+    url: validatedSurveyPhotoUrlSchema,
     caption: z.string().trim().min(2).max(500),
     latitude: z.number().finite().min(-90).max(90),
     longitude: z.number().finite().min(-180).max(180),
@@ -85,7 +85,7 @@ const saveSurveySchema = z.object({
     description: z.string().trim().max(5000).optional(),
     geometryType: z.string().trim().min(2).max(80),
     geoJsonData: z.unknown(),
-    photoUrls: z.array(z.string().url()).max(10).optional(),
+    photoUrls: z.array(validatedSurveyPhotoUrlSchema).max(10).optional(),
   })).max(200).optional(),
 });
 
@@ -158,7 +158,6 @@ export async function saveFieldSurveyPhotoUrls(input: {
     !surveyId ||
     surveyId.length > 200 ||
     !Array.isArray(photos) ||
-    photos.length < 1 ||
     photos.length > 5
   ) {
     return { success: false, message: "Data foto survei tidak valid." };
@@ -174,13 +173,25 @@ export async function saveFieldSurveyPhotoUrls(input: {
       select: {
         id: true,
         surveyorId: true,
+        projectId: true,
+        projectName: true,
+        projectCode: true,
         documentationUrls: true,
         photos: { select: { url: true } },
-        project: { select: { fieldPicId: true } },
+        project: {
+          select: {
+            fieldPicId: true,
+            isDeleted: true,
+            title: true,
+            name: true,
+            code: true,
+            kelompokTani: true,
+          },
+        },
       },
     });
 
-    if (!survey) {
+    if (!survey || survey.project?.isDeleted) {
       return { success: false, message: "Survei tidak ditemukan." };
     }
 
@@ -198,6 +209,21 @@ export async function saveFieldSurveyPhotoUrls(input: {
       ...survey.documentationUrls,
       ...survey.photos.map((photo) => photo.url),
     ]);
+    const photoContext = {
+      projectId: survey.projectId,
+      projectName:
+        survey.project?.title ||
+        survey.project?.name ||
+        survey.project?.kelompokTani ||
+        survey.projectName ||
+        null,
+      projectCode: survey.project?.code || survey.projectCode || null,
+      fallbackScope: survey.projectId ? undefined : surveyId,
+      kind: "SRV" as const,
+      entityType: "FieldSurvey",
+      entityId: surveyId,
+      uploadedById: surveyor.id,
+    };
     const preparedPhotos: Array<{ url: string; label: string }> = [];
     for (const photo of photos) {
       if (!photo || typeof photo !== "object") {
@@ -213,9 +239,10 @@ export async function saveFieldSurveyPhotoUrls(input: {
           photo.file,
           FIELD_SURVEY_PHOTO_CLOUDINARY_FOLDER,
           8 * 1024 * 1024,
+          photoContext,
         );
         uploadedPhotoUrls.push(uploaded.secureUrl);
-        preparedPhotos.push({ url: uploaded.secureUrl, label });
+        preparedPhotos.push({ url: uploaded.secureUrl, label: label || "Foto" });
         continue;
       }
 
@@ -228,17 +255,23 @@ export async function saveFieldSurveyPhotoUrls(input: {
       preparedPhotos.push({ url, label: label || "Foto" });
     }
 
-    const savedUrls = await prisma.$transaction(async (transaction) => {
+    const uniquePreparedPhotos = Array.from(
+      new Map(preparedPhotos.map((photo) => [photo.url, photo])).values(),
+    );
+
+    const { savedUrls, removedUrls } = await prisma.$transaction(async (transaction) => {
       const currentSurvey = await transaction.fieldSurvey.findUnique({
         where: { id: surveyId },
         select: {
           surveyorId: true,
           documentationUrls: true,
           photos: { select: { url: true } },
-          project: { select: { fieldPicId: true } },
+          project: { select: { fieldPicId: true, isDeleted: true } },
         },
       });
-      if (!currentSurvey) throw new Error("Survei tidak ditemukan saat menyimpan foto.");
+      if (!currentSurvey || currentSurvey.project?.isDeleted) {
+        throw new Error("Survei tidak ditemukan saat menyimpan foto.");
+      }
 
       const stillCanEdit =
         currentSurvey.surveyorId === surveyor.id ||
@@ -254,18 +287,27 @@ export async function saveFieldSurveyPhotoUrls(input: {
         ...currentSurvey.documentationUrls,
         ...currentSurvey.photos.map((photo) => photo.url),
       ]);
-      const uniquePhotos = Array.from(
-        new Map(preparedPhotos.map((photo) => [photo.url, photo])).values(),
-      );
       if (
-        uniquePhotos.some(
+        uniquePreparedPhotos.some(
           (photo) => !uploadedPhotoUrls.includes(photo.url) && !currentUrls.has(photo.url),
         )
       ) {
         throw new Error("Foto survei telah berubah. Muat ulang data lalu coba kembali.");
       }
 
-      for (const photo of uniquePhotos) {
+      const keptUrls = uniquePreparedPhotos.map((photo) => photo.url);
+      const keptUrlSet = new Set(keptUrls);
+      if (keptUrls.length > 0) {
+        await transaction.surveyPhoto.deleteMany({
+          where: { surveyId, url: { notIn: keptUrls } },
+        });
+      } else {
+        await transaction.surveyPhoto.deleteMany({
+          where: { surveyId },
+        });
+      }
+
+      for (const photo of uniquePreparedPhotos) {
         const existing = await transaction.surveyPhoto.findFirst({
           where: { surveyId, url: photo.url },
           select: { id: true },
@@ -288,30 +330,33 @@ export async function saveFieldSurveyPhotoUrls(input: {
         }
       }
 
-      const savedPhotos = await transaction.surveyPhoto.findMany({
-        where: { surveyId },
-        orderBy: { createdAt: "asc" },
-        select: { url: true },
-      });
-      const urls = Array.from(
-        new Set([...currentSurvey.documentationUrls, ...savedPhotos.map((photo) => photo.url)]),
-      ).slice(0, 10);
+      const urls = keptUrls.slice(0, 10);
       await transaction.fieldSurvey.update({
         where: { id: surveyId },
         data: { documentationUrls: urls },
       });
-      return urls;
+
+      return {
+        savedUrls: urls,
+        removedUrls: Array.from(currentUrls).filter((url) => !keptUrlSet.has(url)),
+      };
     });
     photosPersisted = true;
     persistedPhotoUrls = savedUrls;
-    persistedPhotos = preparedPhotos;
+    persistedPhotos = uniquePreparedPhotos;
+
+    if (removedUrls.length > 0) {
+      await Promise.allSettled(
+        removedUrls.map((url) => removeCloudinaryPhoto(url)),
+      );
+    }
 
     revalidatePath("/apps/projects");
     return {
       success: true,
       message: "Foto survei berhasil disimpan.",
       urls: savedUrls,
-      photos: preparedPhotos,
+      photos: uniquePreparedPhotos,
     };
   } catch (error) {
     if (!photosPersisted) {
@@ -403,7 +448,14 @@ export async function saveFieldSurvey(input: SaveFieldSurveyInput): Promise<{
             ? { fieldPicId: surveyor.id }
             : {}),
         },
-        select: { id: true, title: true, name: true, code: true, status: true },
+        select: {
+          id: true,
+          title: true,
+          name: true,
+          code: true,
+          kelompokTani: true,
+          status: true,
+        },
       })
     : null;
   if (projectId && !project) {
@@ -446,6 +498,18 @@ export async function saveFieldSurvey(input: SaveFieldSurveyInput): Promise<{
   }
 
   const uploadedPhotoUrls: string[] = [];
+  const surveyPhotoContext = {
+    projectId: project?.id ?? null,
+    projectName: project
+      ? project.title || project.name || project.kelompokTani
+      : locationName,
+    projectCode: project?.code ?? null,
+    fallbackScope: project ? undefined : locationName,
+    kind: "SRV" as const,
+    entityType: "FieldSurvey",
+    entityId: project?.id ?? null,
+    uploadedById: surveyor.id,
+  };
   try {
     for (const photo of documentationPhotoFiles ?? []) {
       uploadedPhotoUrls.push(
@@ -454,6 +518,7 @@ export async function saveFieldSurvey(input: SaveFieldSurveyInput): Promise<{
             photo.file,
             FIELD_SURVEY_PHOTO_CLOUDINARY_FOLDER,
             8 * 1024 * 1024,
+            surveyPhotoContext,
           )
         ).secureUrl,
       );

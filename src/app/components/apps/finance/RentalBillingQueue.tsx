@@ -32,7 +32,7 @@ import {
   replaceRentalPaymentProof,
 } from "@/app/actions/rentals";
 import { getDefaultRentalUnit } from "@/lib/equipment-catalog";
-import { withLocalPhotoPreview } from "@/lib/photo-urls";
+import { parseClientAssetCode, withLocalPhotoPreview } from "@/lib/photo-urls";
 import FinancePaymentProofReplacement from "@/app/components/apps/finance/FinancePaymentProofReplacement";
 import FinancePaymentProofUpload from "@/app/components/apps/finance/FinancePaymentProofUpload";
 import { Badge } from "@/components/ui/badge";
@@ -141,6 +141,7 @@ export default function RentalBillingQueue({
     financeAccounts[0]?.id ?? "",
   );
   const [formProofFile, setFormProofFile] = useState<File | null>(null);
+  const [formProofDocType, setFormProofDocType] = useState<"BKT" | "BON" | "KWT" | "INV">("BKT");
   const [formBankName, setFormBankName] = useState("");
   const [formAccountNumber, setFormAccountNumber] = useState("");
   const [formAccountName, setFormAccountName] = useState("");
@@ -231,6 +232,7 @@ export default function RentalBillingQueue({
     setFormAccountNumber(rental.paymentAccountNumber ?? "");
     setFormAccountName(rental.paymentAccountName ?? "");
     setFormProofFile(null);
+    setFormProofDocType("BKT");
     setFormNotes("");
     setFormAccountId(financeAccounts[0]?.id ?? "");
     setActionMessage(null);
@@ -268,6 +270,7 @@ export default function RentalBillingQueue({
           paymentAccountName: formAccountName.trim() || undefined,
           financeNotes: formNotes.trim() || undefined,
           financeAccountId: formAccountId || undefined,
+          proofDocType: formProofDocType,
         });
 
         if (res.success) {
@@ -569,33 +572,46 @@ export default function RentalBillingQueue({
                       (isPaid ? (
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {r.proofOfPaymentUrl ? (
-                            onPreviewProof ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  onPreviewProof(
-                                    r.proofOfPaymentUrl!,
-                                    `Bukti Bayar ${r.name}`,
-                                  )
-                                }
-                              >
-                                <Eye className="size-3.5" aria-hidden="true" />
-                                Bukti Bayar
-                              </Button>
-                            ) : (
-                              <Button asChild variant="outline" size="sm">
-                                <a
-                                  href={withLocalPhotoPreview(r.proofOfPaymentUrl)}
-                                  target="_blank"
-                                  rel="noreferrer"
+                            <>
+                              {(() => {
+                                const assetMeta = parseClientAssetCode(r.proofOfPaymentUrl);
+                                return assetMeta ? (
+                                  <span
+                                    className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                                    title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                                  >
+                                    {assetMeta.assetCode}
+                                  </span>
+                                ) : null;
+                              })()}
+                              {onPreviewProof ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    onPreviewProof(
+                                      r.proofOfPaymentUrl!,
+                                      `Bukti Bayar ${r.name}`,
+                                    )
+                                  }
                                 >
-                                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                                  <Eye className="size-3.5" aria-hidden="true" />
                                   Bukti Bayar
-                                </a>
-                              </Button>
-                            )
+                                </Button>
+                              ) : (
+                                <Button asChild variant="outline" size="sm">
+                                  <a
+                                    href={withLocalPhotoPreview(r.proofOfPaymentUrl)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                                    Bukti Bayar
+                                  </a>
+                                </Button>
+                              )}
+                            </>
                           ) : null}
                           <Button
                             type="button"
@@ -810,33 +826,46 @@ export default function RentalBillingQueue({
                           {isPaid ? (
                             <div className="flex flex-wrap items-center justify-end gap-1.5">
                               {r.proofOfPaymentUrl ? (
-                                onPreviewProof ? (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      onPreviewProof(
-                                        r.proofOfPaymentUrl!,
-                                        `Bukti Bayar ${r.name}`,
-                                      )
-                                    }
-                                  >
-                                    <Eye className="size-3.5" aria-hidden="true" />
-                                    Bukti Bayar
-                                  </Button>
-                                ) : (
-                                  <Button asChild variant="outline" size="sm">
-                                    <a
-                                      href={withLocalPhotoPreview(r.proofOfPaymentUrl)}
-                                      target="_blank"
-                                      rel="noreferrer"
+                                <>
+                                  {(() => {
+                                    const assetMeta = parseClientAssetCode(r.proofOfPaymentUrl);
+                                    return assetMeta ? (
+                                      <span
+                                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground/80"
+                                        title={`${assetMeta.kindLabel} (${assetMeta.assetCode})`}
+                                      >
+                                        {assetMeta.assetCode}
+                                      </span>
+                                    ) : null;
+                                  })()}
+                                  {onPreviewProof ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        onPreviewProof(
+                                          r.proofOfPaymentUrl!,
+                                          `Bukti Bayar ${r.name}`,
+                                        )
+                                      }
                                     >
-                                      <ExternalLink className="size-3.5" aria-hidden="true" />
+                                      <Eye className="size-3.5" aria-hidden="true" />
                                       Bukti Bayar
-                                    </a>
-                                  </Button>
-                                )
+                                    </Button>
+                                  ) : (
+                                    <Button asChild variant="outline" size="sm">
+                                      <a
+                                        href={withLocalPhotoPreview(r.proofOfPaymentUrl)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                                        Bukti Bayar
+                                      </a>
+                                    </Button>
+                                  )}
+                                </>
                               ) : null}
                               <Button
                                 type="button"
@@ -1051,6 +1080,24 @@ export default function RentalBillingQueue({
               </div>
 
               <div className="space-y-1.5">
+                <Label htmlFor="rental-proof-doc-kind">Jenis Dokumen Bukti</Label>
+                <Select
+                  value={formProofDocType}
+                  onValueChange={(value) =>
+                    setFormProofDocType(value as "BKT" | "BON" | "KWT" | "INV")
+                  }
+                  disabled={isPending}
+                >
+                  <SelectTrigger id="rental-proof-doc-kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BKT">Bukti Transfer (BKT)</SelectItem>
+                    <SelectItem value="KWT">Kwitansi Tunai (KWT)</SelectItem>
+                    <SelectItem value="BON">Bon / Nota / Struk (BON)</SelectItem>
+                    <SelectItem value="INV">Invoice / Faktur (INV)</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Label>Bukti Transfer *</Label>
                 <FinancePaymentProofUpload
                   value={formProofFile}
